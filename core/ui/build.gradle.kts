@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    namespace = "com.google.samples.apps.nowinandroid.core.ui"
+    namespace = "com.starception.dua.core.ui"
 }
 
 dependencies {

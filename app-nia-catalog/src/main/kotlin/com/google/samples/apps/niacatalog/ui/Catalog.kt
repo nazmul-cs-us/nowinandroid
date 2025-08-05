@@ -38,19 +38,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaButton
-import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaFilterChip
-import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaIconToggleButton
-import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaNavigationBar
-import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaNavigationBarItem
-import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaOutlinedButton
-import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaTab
-import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaTabRow
-import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaTextButton
-import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaTopicTag
-import com.google.samples.apps.nowinandroid.core.designsystem.component.NiaViewToggleButton
-import com.google.samples.apps.nowinandroid.core.designsystem.icon.NiaIcons
-import com.google.samples.apps.nowinandroid.core.designsystem.theme.NiaTheme
+import com.starception.dua.core.designsystem.component.NiaButton
+import com.starception.dua.core.designsystem.component.NiaFilterChip
+import com.starception.dua.core.designsystem.component.NiaIconToggleButton
+import com.starception.dua.core.designsystem.component.NiaNavigationBar
+import com.starception.dua.core.designsystem.component.NiaNavigationBarItem
+import com.starception.dua.core.designsystem.component.NiaOutlinedButton
+import com.starception.dua.core.designsystem.component.NiaTab
+import com.starception.dua.core.designsystem.component.NiaTabRow
+import com.starception.dua.core.designsystem.component.NiaTextButton
+import com.starception.dua.core.designsystem.component.NiaTopicTag
+import com.starception.dua.core.designsystem.component.NiaViewToggleButton
+import com.starception.dua.core.designsystem.icon.NiaIcons
+import com.starception.dua.core.designsystem.theme.NiaTheme
 
 /**
  * Now in Android component catalog.

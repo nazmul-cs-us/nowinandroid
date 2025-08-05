@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "Your:App:Id",
         "android_client_info": {
-          "package_name": "com.google.samples.apps.nowinandroid"
+          "package_name": "com.starception.dua"
         }
       },
       "oauth_client": [],
@@ -28,7 +28,7 @@
       "client_info": {
         "mobilesdk_app_id": "Your:App:Id",
         "android_client_info": {
-          "package_name": "com.google.samples.apps.nowinandroid.demo.debug"
+          "package_name": "com.starception.dua.demo.debug"
         }
       },
       "oauth_client": [],
@@ -47,7 +47,7 @@
       "client_info": {
         "mobilesdk_app_id": "Your:App:Id",
         "android_client_info": {
-          "package_name": "com.google.samples.apps.nowinandroid.demo.benchmark"
+          "package_name": "com.starception.dua.demo.benchmark"
         }
       },
       "oauth_client": [],
@@ -66,7 +66,7 @@
       "client_info": {
         "mobilesdk_app_id": "Your:App:Id",
         "android_client_info": {
-          "package_name": "com.google.samples.apps.nowinandroid.benchmark"
+          "package_name": "com.starception.dua.benchmark"
         }
       },
       "oauth_client": [],
@@ -85,7 +85,7 @@
       "client_info": {
         "mobilesdk_app_id": "Your:App:Id",
         "android_client_info": {
-          "package_name": "com.google.samples.apps.nowinandroid.debug"
+          "package_name": "com.starception.dua.debug"
         }
       },
       "oauth_client": [],
@@ -104,7 +104,7 @@
       "client_info": {
         "mobilesdk_app_id": "Your:App:Id",
         "android_client_info": {
-          "package_name": "com.google.samples.apps.nowinandroid.demo"
+          "package_name": "com.starception.dua.demo"
         }
       },
       "oauth_client": [],

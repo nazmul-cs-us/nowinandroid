@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.google.samples.apps.nowinandroid.sync.di
+package com.starception.dua.sync.di
 
-import com.google.samples.apps.nowinandroid.core.data.util.SyncManager
-import com.google.samples.apps.nowinandroid.sync.status.StubSyncSubscriber
-import com.google.samples.apps.nowinandroid.sync.status.SyncSubscriber
-import com.google.samples.apps.nowinandroid.sync.status.WorkManagerSyncManager
+import com.starception.dua.core.data.util.SyncManager
+import com.starception.dua.sync.status.StubSyncSubscriber
+import com.starception.dua.sync.status.SyncSubscriber
+import com.starception.dua.sync.status.WorkManagerSyncManager
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

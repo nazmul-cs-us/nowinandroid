@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    namespace = "com.google.samples.apps.nowinandroid.core.analytics"
+    namespace = "com.starception.dua.core.analytics"
 }
 
 dependencies {

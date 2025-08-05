@@ -21,7 +21,7 @@ plugins {
 }
 
 android {
-    namespace = "com.google.samples.apps.nowinandroid.feature.settings"
+    namespace = "com.starception.dua.feature.settings"
 }
 
 dependencies {

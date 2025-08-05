@@ -21,7 +21,7 @@ plugins {
 }
 
 android {
-    namespace = "com.google.samples.apps.nowinandroid.core.data"
+    namespace = "com.starception.dua.core.data"
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

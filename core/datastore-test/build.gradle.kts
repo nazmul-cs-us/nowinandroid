@@ -19,7 +19,7 @@ plugins {
 }
 
 android {
-    namespace = "com.google.samples.apps.nowinandroid.core.datastore.test"
+    namespace = "com.starception.dua.core.datastore.test"
 }
 
 dependencies {

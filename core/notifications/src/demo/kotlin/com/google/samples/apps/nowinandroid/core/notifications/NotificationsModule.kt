@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.samples.apps.nowinandroid.core.notifications
+package com.starception.dua.core.notifications
 
 import dagger.Binds
 import dagger.Module

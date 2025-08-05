@@ -21,7 +21,7 @@ plugins {
 }
 
 android {
-    namespace = "com.google.samples.apps.nowinandroid.benchmarks"
+    namespace = "com.starception.dua.benchmarks"
 
     defaultConfig {
         minSdk = 28
