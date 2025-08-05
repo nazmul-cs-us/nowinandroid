@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.google.samples.apps.nowinandroid.core.network.di
+package com.starception.dua.core.network.di
 
-import com.google.samples.apps.nowinandroid.core.network.NiaNetworkDataSource
-import com.google.samples.apps.nowinandroid.core.network.retrofit.RetrofitNiaNetwork
+import com.starception.dua.core.network.NiaNetworkDataSource
+import com.starception.dua.core.network.retrofit.RetrofitNiaNetwork
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

@@ -19,7 +19,7 @@ plugins {
 }
 
 android {
-    namespace = "com.google.samples.apps.nowinandroid.core.sync.test"
+    namespace = "com.starception.dua.core.sync.test"
 }
 
 dependencies {

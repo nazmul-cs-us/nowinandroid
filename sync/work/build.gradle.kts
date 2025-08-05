@@ -21,9 +21,9 @@ plugins {
 
 android {
     defaultConfig {
-        testInstrumentationRunner = "com.google.samples.apps.nowinandroid.core.testing.NiaTestRunner"
+        testInstrumentationRunner = "com.starception.dua.core.testing.NiaTestRunner"
     }
-    namespace = "com.google.samples.apps.nowinandroid.sync"
+    namespace = "com.starception.dua.sync"
 }
 
 dependencies {

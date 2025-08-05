@@ -30,12 +30,12 @@ plugins {
 
 android {
     defaultConfig {
-        applicationId = "com.google.samples.apps.nowinandroid"
+        applicationId = "com.starception.dua"
         versionCode = 8
         versionName = "0.1.2" // X.Y.Z; X = Major, Y = minor, Z = Patch level
 
         // Custom test runner to set up Hilt dependency graph
-        testInstrumentationRunner = "com.google.samples.apps.nowinandroid.core.testing.NiaTestRunner"
+        testInstrumentationRunner = "com.starception.dua.core.testing.NiaTestRunner"
     }
 
     buildTypes {
@@ -67,7 +67,7 @@ android {
             isIncludeAndroidResources = true
         }
     }
-    namespace = "com.google.samples.apps.nowinandroid"
+    namespace = "com.starception.dua"
 }
 
 dependencies {

@@ -21,7 +21,7 @@ plugins {
 }
 
 android {
-    namespace = "com.google.samples.apps.nowinandroid.feature.bookmarks"
+    namespace = "com.starception.dua.feature.bookmarks"
 }
 
 dependencies {
