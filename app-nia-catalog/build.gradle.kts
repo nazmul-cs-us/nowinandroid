@@ -38,7 +38,7 @@ plugins {
 
 android {
     defaultConfig {
-        applicationId = "com.google.samples.apps.niacatalog"
+        applicationId = "com.starception.dua.catalog"
         versionCode = 1
         versionName = "0.0.1" // X.Y.Z; X = Major, Y = minor, Z = Patch level
 
@@ -52,7 +52,7 @@ android {
             excludes.add("/META-INF/{AL2.0,LGPL2.1}")
         }
     }
-    namespace = "com.google.samples.apps.niacatalog"
+    namespace = "com.starception.dua.catalog"
 
     buildTypes {
         release {

@@ -19,7 +19,7 @@ plugins {
 }
 
 android {
-    namespace = "com.google.samples.apps.nowinandroid.core.notifications"
+    namespace = "com.starception.dua.core.notifications"
 }
 
 dependencies {

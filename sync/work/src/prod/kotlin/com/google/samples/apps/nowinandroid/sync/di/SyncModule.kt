@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.google.samples.apps.nowinandroid.sync.di
+package com.starception.dua.sync.di
 
 import com.google.firebase.Firebase
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.messaging
-import com.google.samples.apps.nowinandroid.core.data.util.SyncManager
-import com.google.samples.apps.nowinandroid.sync.status.FirebaseSyncSubscriber
-import com.google.samples.apps.nowinandroid.sync.status.SyncSubscriber
-import com.google.samples.apps.nowinandroid.sync.status.WorkManagerSyncManager
+import com.starception.dua.core.data.util.SyncManager
+import com.starception.dua.sync.status.FirebaseSyncSubscriber
+import com.starception.dua.sync.status.SyncSubscriber
+import com.starception.dua.sync.status.WorkManagerSyncManager
 import dagger.Binds
 import dagger.Module
 import dagger.Provides

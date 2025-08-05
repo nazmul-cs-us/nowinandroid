@@ -19,5 +19,5 @@ plugins {
 }
 
 android {
-    namespace = "com.google.samples.apps.nowinandroid.uitesthiltmanifest"
+    namespace = "com.starception.dua.uitesthiltmanifest"
 }

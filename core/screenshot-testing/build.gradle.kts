@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    namespace = "com.google.samples.apps.nowinandroid.core.screenshottesting"
+    namespace = "com.starception.dua.core.screenshottesting"
 }
 
 dependencies {
