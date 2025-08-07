@@ -18,4 +18,5 @@
     <string name="app_name">Submission</string>
     <string name="not_connected">⚠️ You aren’t connected to the internet</string>
     <string name="live_notification_title">Prayer Time</string>
+    <string name="live_notification_content">It's time for %1$s prayer</string>
 </resources>
