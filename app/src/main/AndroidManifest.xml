@@ -18,6 +18,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <!--
     Firebase automatically adds these AD_ID and ADSERVICES permissions, even though we don't use them.
@@ -57,6 +58,11 @@
                 <data android:host="www.nowinandroid.apps.samples.google.com" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".PrayerNotificationService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback|dataSync|location|connectedDevice|phoneCall|mediaProjection|camera|microphone|health|remoteMessaging|shortService|specialUse|systemExempt|companionDevice|callRedirection|callScreening|dataSync|location|mediaPlayback|mediaProjection|microphone|phoneCall|remoteMessaging|shortService|specialUse|systemExempt" />
 
         <!-- Disable Firebase analytics by default. This setting is overwritten for the `prod`
         flavor -->
