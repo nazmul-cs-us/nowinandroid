@@ -21,8 +21,8 @@
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <!--
-    Firebase automatically adds these AD_ID and ADSERVICES permissions, even though we don't use them.
-    If you use these permissions you must declare how you're using them to Google Play, otherwise the
+    Firebase automatically adds these AD_ID and ADSERVICES permissions, even though we don'''t use them.
+    If you use these permissions you must declare how you'''re using them to Google Play, otherwise the
     app will be rejected when publishing it. To avoid this we remove the permissions entirely.
     -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>
@@ -62,14 +62,14 @@
         <service
             android:name=".PrayerNotificationService"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback|dataSync|location|connectedDevice|phoneCall|mediaProjection|camera|microphone|health|remoteMessaging|shortService|specialUse|systemExempt|companionDevice|callRedirection|callScreening|dataSync|location|mediaPlayback|mediaProjection|microphone|phoneCall|remoteMessaging|shortService|specialUse|systemExempt" />
+            android:foregroundServiceType="health|dataSync|mediaPlayback" />
 
         <!-- Disable Firebase analytics by default. This setting is overwritten for the `prod`
         flavor -->
         <meta-data android:name="firebase_analytics_collection_deactivated" android:value="true" />
         <!-- Disable collection of AD_ID for all build variants -->
         <meta-data android:name="google_analytics_adid_collection_enabled" android:value="false" />
-        <!-- Firebase automatically adds the following property which we don't use so remove it -->
+        <!-- Firebase automatically adds the following property which we don'''t use so remove it -->
         <property
             android:name="android.adservices.AD_SERVICES_CONFIG"
             tools:node="remove" />

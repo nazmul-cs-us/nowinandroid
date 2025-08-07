@@ -5,6 +5,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import androidx.core.app.NotificationCompat
 import com.starception.dua.util.LiveUpdateNotificationHelper
 
 class PrayerNotificationService : Service() {
