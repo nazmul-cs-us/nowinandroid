@@ -3,7 +3,13 @@
     "allow": [
       "Bash(./gradlew:*)",
       "Bash(adb logcat:*)",
-      "Bash(adb:*)"
+      "Bash(adb:*)",
+      "Bash(rm:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(sips:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }
