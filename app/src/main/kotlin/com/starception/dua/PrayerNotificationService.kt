@@ -27,7 +27,7 @@ class PrayerNotificationService : Service() {
         val notification: Notification = NotificationCompat.Builder(this, "prayer_live_update_channel")
             .setContentTitle(getString(R.string.live_notification_title))
             .setContentText(getString(R.string.live_notification_content, prayerName))
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_prayer_notification)
             .setOngoing(true)
             .build()
         startForeground(1001, notification)

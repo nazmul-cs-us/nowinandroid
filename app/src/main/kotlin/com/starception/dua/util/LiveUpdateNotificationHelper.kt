@@ -35,7 +35,7 @@ object LiveUpdateNotificationHelper {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_prayer_notification)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
 
