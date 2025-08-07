@@ -23,27 +23,13 @@ class PrayerNotificationService : Service() {
 
     private fun startForegroundWithPrayer(prayerName: String) {
         LiveUpdateNotificationHelper.createNotificationChannel(this)
-        val notification: Notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // Use promoted ongoing notification for Android 14+
-            LiveUpdateNotificationHelper.postPrayerNotification(this, prayerName)
-            // Notification is posted, but we need to build one for startForeground
-            Notification.Builder(this, "prayer_live_update_channel")
-                .setContentTitle(getString(R.string.live_notification_title))
-                .setContentText(getString(R.string.live_notification_content, prayerName))
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                .setOngoing(true)
-                .setPromotedOngoing(true)
-                .build()
-        } else {
-            // Standard notification for lower versions
-            LiveUpdateNotificationHelper.postPrayerNotification(this, prayerName)
-            NotificationCompat.Builder(this, "prayer_live_update_channel")
-                .setContentTitle(getString(R.string.live_notification_title))
-                .setContentText(getString(R.string.live_notification_content, prayerName))
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                .setOngoing(true)
-                .build()
-        }
+        LiveUpdateNotificationHelper.postPrayerNotification(this, prayerName)
+        val notification: Notification = NotificationCompat.Builder(this, "prayer_live_update_channel")
+            .setContentTitle(getString(R.string.live_notification_title))
+            .setContentText(getString(R.string.live_notification_content, prayerName))
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setOngoing(true)
+            .build()
         startForeground(1001, notification)
     }
 

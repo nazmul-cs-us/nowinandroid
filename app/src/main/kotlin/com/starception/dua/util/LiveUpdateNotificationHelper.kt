@@ -39,10 +39,6 @@ object LiveUpdateNotificationHelper {
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            builder.setPromotedOngoing(true)
-        }
-
         val notification: Notification = builder.build()
         manager.notify(NOTIFICATION_ID, notification)
     }
