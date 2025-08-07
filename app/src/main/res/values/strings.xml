@@ -15,6 +15,8 @@
      limitations under the License.
 -->
 <resources>
-    <string name="app_name">Now in Android</string>
+    <string name="app_name">Submission</string>
     <string name="not_connected">⚠️ You aren’t connected to the internet</string>
+    <string name="live_notification_title">Prayer Time</string>
+    <string name="live_notification_content">It's time for %1$s prayer</string>
 </resources>

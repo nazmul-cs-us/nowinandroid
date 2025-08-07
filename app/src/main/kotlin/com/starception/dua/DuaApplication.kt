@@ -26,6 +26,8 @@ import com.starception.dua.sync.initializers.Sync
 import com.starception.dua.util.ProfileVerifierLogger
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import android.content.Intent
+import android.os.Build
 
 /**
  * [Application] class for DUA
@@ -46,6 +48,13 @@ class DuaApplication : Application(), ImageLoaderFactory {
         // Initialize Sync; the system responsible for keeping data in the app up to date.
         Sync.initialize(context = this)
         profileVerifierLogger()
+        // Start the foreground service for prayer notifications
+        val intent = Intent(this, PrayerNotificationService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
     }
 
     override fun newImageLoader(): ImageLoader = imageLoader.get()
