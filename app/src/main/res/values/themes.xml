@@ -31,7 +31,7 @@
     </style>
 
     <style name="Theme.Nia.Splash" parent="NightAdjusted.Theme.Splash">
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_custom</item>
         <item name="postSplashScreenTheme">@style/Theme.Nia</item>
     </style>
 
