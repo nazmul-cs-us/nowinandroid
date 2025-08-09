@@ -16,7 +16,10 @@
 
 package com.starception.dua
 
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -41,6 +44,7 @@ import com.starception.dua.core.data.util.NetworkMonitor
 import com.starception.dua.core.data.util.TimeZoneMonitor
 import com.starception.dua.core.designsystem.theme.NiaTheme
 import com.starception.dua.core.ui.LocalTimeZone
+import com.starception.dua.services.PrayerNotificationService
 import com.starception.dua.ui.NiaApp
 import com.starception.dua.ui.rememberNiaAppState
 import com.starception.dua.util.isSystemInDarkTheme
@@ -159,6 +163,24 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         lazyStats.get().isTrackingEnabled = true
+        
+        // Start prayer notification service when user interacts with app (Android 16 requirement)
+        startPrayerServiceIfNeeded()
+    }
+    
+    /**
+     * Start prayer notification service when appropriate (Android 16+ compliance)
+     */
+    private fun startPrayerServiceIfNeeded() {
+        if (Build.VERSION.SDK_INT >= 35) { // Android 16+
+            try {
+                val intent = Intent(this, PrayerNotificationService::class.java)
+                startForegroundService(intent)
+                Log.d("MainActivity", "Started prayer service from user interaction")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Could not start prayer service from MainActivity", e)
+            }
+        }
     }
 
     override fun onPause() {
