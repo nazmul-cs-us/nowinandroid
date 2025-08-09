@@ -55,7 +55,7 @@ class PrayerNotificationService : Service() {
             val basicNotification = androidx.core.app.NotificationCompat.Builder(this, "prayer_live_update_channel")
                 .setContentTitle("Prayer Time Tracker")
                 .setContentText("Tracking prayer times")
-                .setSmallIcon(com.starception.dua.R.drawable.ic_prayer_notification)
+                .setSmallIcon(com.starception.dua.R.drawable.ic_prayer_hands)
                 .setOngoing(true)
                 .build()
             

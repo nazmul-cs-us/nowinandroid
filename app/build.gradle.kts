@@ -29,13 +29,13 @@ plugins {
 }
 
 android {
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.starception.dua"
         versionCode = 8
         versionName = "0.1.2" // X.Y.Z; X = Major, Y = minor, Z = Patch level
         minSdk = 28
-        targetSdk = 35
+        targetSdk = 36
 
         // Custom test runner to set up Hilt dependency graph
         testInstrumentationRunner = "com.starception.dua.core.testing.NiaTestRunner"
