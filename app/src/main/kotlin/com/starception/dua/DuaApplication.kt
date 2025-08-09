@@ -28,6 +28,9 @@ import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import android.content.Intent
 import android.os.Build
+import android.util.Log
+import com.starception.dua.services.PrayerNotificationService
+import com.starception.dua.util.PrayerNotificationManager
 
 /**
  * [Application] class for DUA
@@ -48,12 +51,25 @@ class DuaApplication : Application(), ImageLoaderFactory {
         // Initialize Sync; the system responsible for keeping data in the app up to date.
         Sync.initialize(context = this)
         profileVerifierLogger()
-        // Start the foreground service for prayer notifications
-        val intent = Intent(this, PrayerNotificationService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
+        // Initialize prayer notification manager (don't start service immediately on Android 16+)
+        PrayerNotificationManager.initialize(this)
+        
+        // For Android 16+, we'll start the service when the user interacts with the app
+        // For older versions, start the service immediately
+        if (Build.VERSION.SDK_INT < 35) { // Pre-Android 16
+            try {
+                val intent = Intent(this, PrayerNotificationService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+            } catch (e: Exception) {
+                Log.e("DuaApplication", "Could not start prayer service", e)
+            }
         } else {
-            startService(intent)
+            // For Android 16+, just post a regular notification initially
+            PrayerNotificationManager.postPrayerNotification("Fajr", 0, false)
         }
     }
 

@@ -1,50 +1,28 @@
 package com.starception.dua.util
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
-import android.os.Build
-import androidx.core.app.NotificationCompat
-import com.starception.dua.R
 
+/**
+ * Legacy helper for prayer notifications - now delegates to PrayerNotificationManager
+ * This maintains backward compatibility while using the new Live Update implementation
+ */
 object LiveUpdateNotificationHelper {
-    private const val CHANNEL_ID = "prayer_live_update_channel"
-    private const val CHANNEL_NAME = "Prayer Notifications"
-    private const val NOTIFICATION_ID = 1001
-
+    
     fun createNotificationChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
-            )
-            channel.description = "Prayer time notifications"
-            val manager = context.getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
-        }
+        // Initialize the new notification manager
+        PrayerNotificationManager.initialize(context)
     }
 
     fun postPrayerNotification(context: Context, prayerName: String) {
-        createNotificationChannel(context)
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val title = context.getString(R.string.live_notification_title)
-        val content = context.getString(R.string.live_notification_content, prayerName)
-
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(content)
-            .setSmallIcon(R.drawable.ic_prayer_notification)
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-
-        val notification: Notification = builder.build()
-        manager.notify(NOTIFICATION_ID, notification)
+        // Ensure manager is initialized
+        PrayerNotificationManager.initialize(context)
+        // Use the new Live Update implementation
+        PrayerNotificationManager.postPrayerNotification(prayerName, progress = 50, isOngoing = true)
     }
 
     fun cancelPrayerNotification(context: Context) {
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.cancel(NOTIFICATION_ID)
+        // Ensure manager is initialized
+        PrayerNotificationManager.initialize(context)
+        PrayerNotificationManager.cancelPrayerNotification()
     }
 }
