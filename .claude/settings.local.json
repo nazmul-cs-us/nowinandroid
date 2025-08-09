@@ -10,7 +10,8 @@
       "Bash(mkdir:*)",
       "Bash(sips:*)",
       "Bash(cp:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(aapt dump badging:*)"
     ],
     "deny": []
   }

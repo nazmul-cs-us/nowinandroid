@@ -3,9 +3,12 @@ package com.starception.dua.util
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.graphics.Color
 import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.starception.dua.R
 
 object PrayerNotificationManager {
@@ -95,12 +98,10 @@ object PrayerNotificationManager {
             "Current prayer: $prayerName"
         }
         
-        val progressText = if (progress > 0) " - Progress: $progress%" else ""
-        
         val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setContentTitle(title)
-            .setContentText("$content$progressText")
-            .setSmallIcon(R.drawable.ic_prayer_notification)
+            .setContentText(content)
+            .setSmallIcon(R.drawable.ic_prayer_hands)
             .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -111,17 +112,88 @@ object PrayerNotificationManager {
             .setShowWhen(true)
             .setUsesChronometer(false)
         
-        // Show progress bar for Live Update simulation
-        if (progress > 0 && progress <= 100) {
-            builder.setProgress(100, progress, false)
+        // Add Live Update specific features for Android 16+
+        if (Build.VERSION.SDK_INT >= 35) { // Android 16
+            try {
+                builder.setRequestPromotedOngoing(true)
+                if (progress > 0) {
+                    builder.setStyle(buildPrayerProgressStyle(progress))
+                }
+                
+                // Add large icon for better Live Update appearance
+                builder.setLargeIcon(
+                    IconCompat.createWithResource(
+                        appContext, R.drawable.ic_prayer_hands
+                    ).toIcon(appContext)
+                )
+                
+                Log.d(TAG, "Applied Live Update features (API ${Build.VERSION.SDK_INT})")
+            } catch (e: Exception) {
+                Log.d(TAG, "Live Update APIs not available: ${e.message}")
+                // Fallback to regular progress bar
+                if (progress > 0 && progress <= 100) {
+                    builder.setProgress(100, progress, false)
+                }
+            }
+        } else {
+            // Show progress bar for pre-Android 16
+            if (progress > 0 && progress <= 100) {
+                builder.setProgress(100, progress, false)
+            }
+            
+            // Add large icon for better appearance
+            try {
+                builder.setLargeIcon(
+                    IconCompat.createWithResource(
+                        appContext, R.drawable.ic_prayer_hands
+                    ).toIcon(appContext)
+                )
+            } catch (e: Exception) {
+                Log.d(TAG, "Could not set large icon: ${e.message}")
+            }
         }
-        
-        // Future: When AndroidX supports Android 16 APIs, add:
-        // builder.setRequestPromotedOngoing(true)
-        // builder.setStyle(createProgressStyle(progress))
         
         Log.d(TAG, "Built Live Update ready notification")
         return builder
+    }
+    
+    /**
+     * Build prayer progress style for Live Updates
+     */
+    @RequiresApi(35) // Android 16
+    private fun buildPrayerProgressStyle(progress: Int): NotificationCompat.ProgressStyle {
+        val pointColor = Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb() // Green for prayers
+        val segmentColor = Color.valueOf(0.5f, 0.9f, 0.6f, 1f).toArgb() // Light green
+        
+        return try {
+            NotificationCompat.ProgressStyle()
+                .setProgressPoints(
+                    listOf(
+                        NotificationCompat.ProgressStyle.Point(25).setColor(pointColor),
+                        NotificationCompat.ProgressStyle.Point(50).setColor(pointColor), 
+                        NotificationCompat.ProgressStyle.Point(75).setColor(pointColor),
+                        NotificationCompat.ProgressStyle.Point(100).setColor(pointColor)
+                    )
+                )
+                .setProgressSegments(
+                    listOf(
+                        NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
+                        NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
+                        NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
+                        NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor)
+                    )
+                )
+                .setProgressTrackerIcon(
+                    IconCompat.createWithResource(
+                        appContext, if (progress >= 100) R.drawable.ic_prayer_check else R.drawable.ic_prayer_progress
+                    )
+                )
+                .setProgress(progress)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error building progress style: ${e.message}")
+            // Fallback to basic progress style
+            NotificationCompat.ProgressStyle().setProgress(progress)
+        }
     }
     
     /**
@@ -143,7 +215,7 @@ object PrayerNotificationManager {
         val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(R.drawable.ic_prayer_notification)
+            .setSmallIcon(R.drawable.ic_prayer_hands)
             .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
