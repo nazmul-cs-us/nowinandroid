@@ -96,7 +96,7 @@ class PrayerNotificationService : Service() {
             }
         })
     }
-    
+
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "Prayer notification service destroyed")
