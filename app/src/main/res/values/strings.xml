@@ -16,7 +16,8 @@
 -->
 <resources>
     <string name="app_name">Submission</string>
-    <string name="not_connected">⚠️ You aren’t connected to the internet</string>
+    <string name="not_connected">You aren't connected to the internet</string>
     <string name="live_notification_title">Prayer Time</string>
     <string name="live_notification_content">It is time for %1$s prayer</string>
+    <string name="prayer_times_title">Prayer Times</string>
 </resources>

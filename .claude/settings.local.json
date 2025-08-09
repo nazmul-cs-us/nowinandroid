@@ -11,7 +11,9 @@
       "Bash(sips:*)",
       "Bash(cp:*)",
       "Bash(mv:*)",
-      "Bash(aapt dump badging:*)"
+      "Bash(aapt dump badging:*)",
+      "Bash(timeout:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }

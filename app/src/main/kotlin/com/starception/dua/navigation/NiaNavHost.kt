@@ -19,6 +19,7 @@ package com.starception.dua.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import com.starception.dua.feature.bookmarks.navigation.bookmarksScreen
 import com.starception.dua.feature.foryou.navigation.ForYouBaseRoute
 import com.starception.dua.feature.foryou.navigation.forYouSection
