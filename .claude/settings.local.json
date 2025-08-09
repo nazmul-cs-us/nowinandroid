@@ -9,7 +9,8 @@
       "Bash(find:*)",
       "Bash(mkdir:*)",
       "Bash(sips:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }
