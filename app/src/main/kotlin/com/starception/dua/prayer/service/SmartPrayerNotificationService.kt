@@ -55,7 +55,7 @@ class SmartPrayerNotificationService @Inject constructor() {
         return if (currentPrayer != null) {
             calculateInPrayerWindowStatus(currentPrayer, nextPrayer, now)
         } else {
-            calculateWaitingForPrayerStatus(nextPrayer, now)
+            calculateWaitingForPrayerStatus(nextPrayer, now, prayerTimes)
         }
     }
     
@@ -111,8 +111,28 @@ class SmartPrayerNotificationService @Inject constructor() {
      */
     private fun calculateWaitingForPrayerStatus(
         nextPrayer: PrayerInfo,
-        now: LocalTime
+        now: LocalTime,
+        prayerTimes: DayPrayerTimes
     ): PrayerStatus {
+        // Check if next prayer is Fajr and we're past Isha (we're in Isha prayer window)
+        if (nextPrayer.name == "Fajr" && now.isAfter(prayerTimes.isha)) {
+            // We're in the Isha prayer window, calculate remaining time until next Fajr
+            val timeUntilFajr = Duration.between(now, nextPrayer.time)
+            val timeText = formatDuration(timeUntilFajr) + " remaining"
+            val detailedMessage = "Isha time • ${formatDuration(timeUntilFajr)} remaining • Last chance to pray"
+            
+            return PrayerStatus(
+                currentPrayer = "Isha",
+                nextPrayer = nextPrayer.name,
+                nextPrayerTime = nextPrayer.time,
+                isInPrayerWindow = true,
+                phase = PrayerPhase.LAST_CHANCE,
+                timeText = timeText,
+                progressPercentage = 75, // Assuming we're in the last phase
+                detailedMessage = detailedMessage
+            )
+        }
+        
         val timeUntilNext = Duration.between(now, nextPrayer.time)
         
         return PrayerStatus(
