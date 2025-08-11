@@ -114,23 +114,62 @@ class SmartPrayerNotificationService @Inject constructor() {
         now: LocalTime,
         prayerTimes: DayPrayerTimes
     ): PrayerStatus {
-        // Check if next prayer is Fajr and we're past Isha (we're in Isha prayer window)
+        // Check if next prayer is Fajr and we're past Isha
         if (nextPrayer.name == "Fajr" && now.isAfter(prayerTimes.isha)) {
-            // We're in the Isha prayer window, calculate remaining time until next Fajr
-            val timeUntilFajr = Duration.between(now, nextPrayer.time)
-            val timeText = formatDuration(timeUntilFajr) + " remaining"
-            val detailedMessage = "Isha time • ${formatDuration(timeUntilFajr)} remaining • Last chance to pray"
+            // Since we're past today's Isha, next Fajr is tomorrow
+            // Calculate duration to tomorrow's Fajr by adding the remaining time today plus time until Fajr tomorrow
+            val timeUntilMidnight = Duration.between(now, LocalTime.MAX)
+            val timeFromMidnightToFajr = Duration.between(LocalTime.MIN, nextPrayer.time)
+            val totalTimeUntilTomorrowFajr = timeUntilMidnight.plus(timeFromMidnightToFajr)
             
-            return PrayerStatus(
-                currentPrayer = "Isha",
-                nextPrayer = nextPrayer.name,
-                nextPrayerTime = nextPrayer.time,
-                isInPrayerWindow = true,
-                phase = PrayerPhase.LAST_CHANCE,
-                timeText = timeText,
-                progressPercentage = 75, // Assuming we're in the last phase
-                detailedMessage = detailedMessage
-            )
+            // Calculate if we're still in Isha prayer window (until halfway to Fajr)
+            val timeFromIshaToFajr = totalTimeUntilTomorrowFajr.plus(Duration.between(prayerTimes.isha, now))
+            val halfwayPoint = prayerTimes.isha.plus(timeFromIshaToFajr.dividedBy(2))
+            
+            if (now.isBefore(halfwayPoint)) {
+                // We're in Isha prayer window, show elapsed time since Isha
+                val timeSinceIsha = Duration.between(prayerTimes.isha, now)
+                val formattedTime = formatDuration(timeSinceIsha)
+                
+                // Determine prayer phase based on elapsed time
+                val minutesSinceIsha = timeSinceIsha.toMinutes()
+                val phase = when {
+                    minutesSinceIsha <= 20 -> PrayerPhase.TRAVEL_TIME
+                    else -> PrayerPhase.BEST_TIME
+                }
+                
+                val timeText = "$formattedTime since Isha"
+                val detailedMessage = buildPrayerPhaseMessage(phase, "Isha", Duration.between(now, halfwayPoint))
+                
+                return PrayerStatus(
+                    currentPrayer = "Isha",
+                    nextPrayer = nextPrayer.name,
+                    nextPrayerTime = nextPrayer.time, // Keep original time, duration calculation handles the day boundary
+                    isInPrayerWindow = true,
+                    phase = phase,
+                    timeText = timeText,
+                    progressPercentage = (minutesSinceIsha * 100 / timeFromIshaToFajr.dividedBy(2).toMinutes()).toInt(),
+                    detailedMessage = detailedMessage
+                )
+            } else {
+                // Past Isha prayer window, show elapsed time since Isha + time until next prayer
+                val timeSinceIsha = Duration.between(prayerTimes.isha, now)
+                val formattedTimeSince = formatDuration(timeSinceIsha)
+                val formattedTimeUntil = formatDuration(totalTimeUntilTomorrowFajr)
+                val timeText = "$formattedTimeSince since Isha"
+                val detailedMessage = "Next prayer: ${nextPrayer.name} in $formattedTimeUntil"
+                
+                return PrayerStatus(
+                    currentPrayer = null,
+                    nextPrayer = nextPrayer.name,
+                    nextPrayerTime = nextPrayer.time, // Keep original time, duration calculation handles the day boundary
+                    isInPrayerWindow = false,
+                    phase = null,
+                    timeText = timeText,
+                    progressPercentage = 0,
+                    detailedMessage = detailedMessage
+                )
+            }
         }
         
         val timeUntilNext = Duration.between(now, nextPrayer.time)
@@ -153,15 +192,16 @@ class SmartPrayerNotificationService @Inject constructor() {
     private fun buildPrayerPhaseMessage(
         phase: PrayerPhase,
         prayerName: String,
-        timeRemaining: Duration
+        timeUntilWindowEnd: Duration
     ): String {
+        val timeUntilEnd = formatDuration(timeUntilWindowEnd)
         return when (phase) {
             PrayerPhase.TRAVEL_TIME -> 
-                "$prayerName time started • ${formatDuration(timeRemaining)} remaining • Travel time to mosque"
+                "Travel time to mosque • Prayer window ends in $timeUntilEnd"
             PrayerPhase.BEST_TIME -> 
-                "$prayerName time • ${formatDuration(timeRemaining)} remaining • Best time to pray"
+                "Best time to pray • Prayer window ends in $timeUntilEnd"
             PrayerPhase.LAST_CHANCE -> 
-                "$prayerName time • ${formatDuration(timeRemaining)} remaining • Last chance to pray"
+                "Last chance to pray • Prayer window ends in $timeUntilEnd"
         }
     }
     
@@ -174,10 +214,7 @@ class SmartPrayerNotificationService @Inject constructor() {
                 return i
             }
         }
-        // Check if after last prayer of the day
-        if (now.isAfter(prayers.last().time)) {
-            return prayers.size - 1
-        }
+        // When past last prayer of the day, return -1 to trigger waiting status
         return -1
     }
     
