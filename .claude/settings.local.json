@@ -14,7 +14,9 @@
       "Bash(aapt dump badging:*)",
       "Bash(timeout:*)",
       "Bash(pkill:*)",
-      "Bash(echo $?)"
+      "Bash(echo $?)",
+      "Bash(kotlinc:*)",
+      "Bash(python3:*)"
     ],
     "deny": []
   }

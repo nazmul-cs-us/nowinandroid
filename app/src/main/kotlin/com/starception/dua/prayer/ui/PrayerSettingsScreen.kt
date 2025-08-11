@@ -26,90 +26,146 @@ fun PrayerSettingsScreen(
     settings: PrayerSettings,
     onSettingsChanged: (PrayerSettings) -> Unit,
     onBackClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showAsDialog: Boolean = false
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Prayer Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
+    if (showAsDialog) {
+        // Dialog mode - no Scaffold, just content
+        PrayerSettingsContent(
+            settings = settings,
+            onSettingsChanged = onSettingsChanged,
+            onBackClick = onBackClick,
+            modifier = modifier,
+            showTopBar = true
+        )
+    } else {
+        // Full screen mode - with Scaffold
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Prayer Settings") },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
                     }
+                )
+            },
+            modifier = modifier
+        ) { paddingValues ->
+            PrayerSettingsContent(
+                settings = settings,
+                onSettingsChanged = onSettingsChanged,
+                onBackClick = onBackClick,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                showTopBar = false
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PrayerSettingsContent(
+    settings: PrayerSettings,
+    onSettingsChanged: (PrayerSettings) -> Unit,
+    onBackClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    showTopBar: Boolean = false
+) {
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Top bar for dialog mode
+        if (showTopBar) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBackClick) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back"
+                    )
+                }
+                Text(
+                    text = "Prayer Settings",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            Divider()
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        
+        // Calculation Method Section
+        SettingsSection(title = "Calculation Method") {
+            CalculationMethodDropdown(
+                selectedMethod = settings.calculationMethod,
+                onMethodSelected = { method ->
+                    onSettingsChanged(settings.copy(calculationMethod = method))
                 }
             )
-        },
-        modifier = modifier
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Calculation Method Section
-            SettingsSection(title = "Calculation Method") {
-                CalculationMethodDropdown(
-                    selectedMethod = settings.calculationMethod,
-                    onMethodSelected = { method ->
-                        onSettingsChanged(settings.copy(calculationMethod = method))
-                    }
-                )
-            }
-            
-            // Asr Madhhab Section
-            SettingsSection(title = "Asr Calculation") {
-                AsrMadhhabSelector(
-                    selectedMadhhab = settings.asrMadhhab,
-                    onMadhhabSelected = { madhhab ->
-                        onSettingsChanged(settings.copy(asrMadhhab = madhhab))
-                    }
-                )
-            }
-            
-            // High Latitude Adjustment Section
-            SettingsSection(title = "High Latitude Adjustment") {
-                HighLatitudeAdjustmentDropdown(
-                    selectedAdjustment = settings.highLatitudeAdjustment,
-                    onAdjustmentSelected = { adjustment ->
-                        onSettingsChanged(settings.copy(highLatitudeAdjustment = adjustment))
-                    }
-                )
-            }
-            
-            // Custom Angles Section
-            SettingsSection(title = "Custom Angles") {
-                CustomAnglesSection(
-                    settings = settings,
-                    onSettingsChanged = onSettingsChanged
-                )
-            }
-            
-            // Time Offsets Section
-            SettingsSection(title = "Time Adjustments (minutes)") {
-                TimeOffsetsSection(
-                    offsets = settings.timeOffsets,
-                    onOffsetsChanged = { offsets ->
-                        onSettingsChanged(settings.copy(timeOffsets = offsets))
-                    }
-                )
-            }
-            
-            // Location Section
-            SettingsSection(title = "Location") {
-                LocationSection(
-                    useGps = settings.useGpsLocation,
-                    location = settings.location,
-                    onUseGpsChanged = { useGps ->
-                        onSettingsChanged(settings.copy(useGpsLocation = useGps))
-                    }
-                )
-            }
+        }
+        
+        // Asr Madhhab Section
+        SettingsSection(title = "Asr Calculation") {
+            AsrMadhhabSelector(
+                selectedMadhhab = settings.asrMadhhab,
+                onMadhhabSelected = { madhhab ->
+                    onSettingsChanged(settings.copy(asrMadhhab = madhhab))
+                }
+            )
+        }
+        
+        // High Latitude Adjustment Section
+        SettingsSection(title = "High Latitude Adjustment") {
+            HighLatitudeAdjustmentDropdown(
+                selectedAdjustment = settings.highLatitudeAdjustment,
+                onAdjustmentSelected = { adjustment ->
+                    onSettingsChanged(settings.copy(highLatitudeAdjustment = adjustment))
+                }
+            )
+        }
+        
+        // Custom Angles Section
+        SettingsSection(title = "Custom Angles") {
+            CustomAnglesSection(
+                settings = settings,
+                onSettingsChanged = onSettingsChanged
+            )
+        }
+        
+        // Time Offsets Section
+        SettingsSection(title = "Time Adjustments (minutes)") {
+            TimeOffsetsSection(
+                offsets = settings.timeOffsets,
+                onOffsetsChanged = { offsets ->
+                    onSettingsChanged(settings.copy(timeOffsets = offsets))
+                }
+            )
+        }
+        
+        // Location Section
+        SettingsSection(title = "Location") {
+            LocationSection(
+                useGps = settings.useGpsLocation,
+                location = settings.location,
+                onUseGpsChanged = { useGps ->
+                    onSettingsChanged(settings.copy(useGpsLocation = useGps))
+                }
+            )
         }
     }
 }

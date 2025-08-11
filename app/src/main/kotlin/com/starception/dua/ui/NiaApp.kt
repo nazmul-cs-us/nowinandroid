@@ -141,21 +141,27 @@ internal fun NiaApp(
         .collectAsStateWithLifecycle()
     val currentDestination = appState.currentDestination
 
+    // Modal overlay for settings dialog
     if (showSettingsDialog) {
         val isPrayerTimesPage = currentDestination?.hasRoute<com.starception.dua.feature.prayertimes.navigation.PrayerTimesRoute>() == true
         
-        if (isPrayerTimesPage) {
-            PrayerSettingsDialog(
-                onDismiss = { onSettingsDismissed() },
-            )
-        } else {
-            SettingsDialog(
-                onDismiss = { onSettingsDismissed() },
-            )
+        // Full screen modal overlay
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (isPrayerTimesPage) {
+                PrayerSettingsDialog(
+                    onDismiss = { onSettingsDismissed() },
+                )
+            } else {
+                SettingsDialog(
+                    onDismiss = { onSettingsDismissed() },
+                )
+            }
         }
-    }
-
-    NiaNavigationSuiteScaffold(
+    } else {
+        // Show main app content when dialog is not shown
+        NiaNavigationSuiteScaffold(
         navigationSuiteItems = {
             appState.topLevelDestinations.forEach { destination ->
                 val hasUnread = unreadDestinations.contains(destination)
@@ -263,6 +269,7 @@ internal fun NiaApp(
                 // TODO: We may want to add padding or spacer when the snackbar is shown so that
                 //  content doesn't display behind it.
             }
+        }
         }
     }
 }
