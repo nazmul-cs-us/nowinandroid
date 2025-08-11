@@ -86,8 +86,8 @@ private fun PrayerTimesHeader(
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        // Next prayer info
-        if (nextPrayer != null && timeUntilNext != null) {
+        // Next prayer info or last prayer info
+        if (timeUntilNext != null) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -98,31 +98,49 @@ private fun PrayerTimesHeader(
             ) {
                 Icon(
                     imageVector = Icons.Default.Schedule,
-                    contentDescription = "Next Prayer",
+                    contentDescription = if (nextPrayer != null) "Next Prayer" else "Last Prayer",
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
+                    if (nextPrayer != null) {
+                        // Show next prayer
+                        Text(
+                            text = "Next: ${nextPrayer.name}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = "in $timeUntilNext",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    } else {
+                        // Show time since last prayer (all prayers completed)
+                        Text(
+                            text = "Last: Isha",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = timeUntilNext,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                if (nextPrayer != null) {
                     Text(
-                        text = "Next: ${nextPrayer.name}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "in $timeUntilNext",
-                        style = MaterialTheme.typography.bodySmall,
+                        text = nextPrayer.time.format(DateTimeFormatter.ofPattern("h:mm a")),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = nextPrayer.time.format(DateTimeFormatter.ofPattern("h:mm a")),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
             }
         }
     }
