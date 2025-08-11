@@ -176,9 +176,22 @@ class MainActivity : ComponentActivity() {
             try {
                 val intent = Intent(this, PrayerNotificationService::class.java)
                 startForegroundService(intent)
-                Log.d("MainActivity", "Started prayer service from user interaction")
+                Log.d("MainActivity", "Started prayer service from user interaction (Android 16+)")
             } catch (e: Exception) {
                 Log.e("MainActivity", "Could not start prayer service from MainActivity", e)
+            }
+        } else {
+            // For pre-Android 16, ensure service is running (fallback)
+            try {
+                val intent = Intent(this, PrayerNotificationService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+                Log.d("MainActivity", "Ensured prayer service is running (pre-Android 16 fallback)")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Could not ensure prayer service is running", e)
             }
         }
     }
