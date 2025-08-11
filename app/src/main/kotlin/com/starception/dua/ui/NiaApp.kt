@@ -72,6 +72,7 @@ import com.starception.dua.core.designsystem.icon.NiaIcons
 import com.starception.dua.core.designsystem.theme.GradientColors
 import com.starception.dua.core.designsystem.theme.LocalGradientColors
 import com.starception.dua.feature.settings.SettingsDialog
+import com.starception.dua.prayer.ui.PrayerSettingsDialog
 import com.starception.dua.navigation.NiaNavHost
 import com.starception.dua.navigation.TopLevelDestination
 import kotlin.reflect.KClass
@@ -141,9 +142,17 @@ internal fun NiaApp(
     val currentDestination = appState.currentDestination
 
     if (showSettingsDialog) {
-        SettingsDialog(
-            onDismiss = { onSettingsDismissed() },
-        )
+        val isPrayerTimesPage = currentDestination?.hasRoute<com.starception.dua.feature.prayertimes.navigation.PrayerTimesRoute>() == true
+        
+        if (isPrayerTimesPage) {
+            PrayerSettingsDialog(
+                onDismiss = { onSettingsDismissed() },
+            )
+        } else {
+            SettingsDialog(
+                onDismiss = { onSettingsDismissed() },
+            )
+        }
     }
 
     NiaNavigationSuiteScaffold(
