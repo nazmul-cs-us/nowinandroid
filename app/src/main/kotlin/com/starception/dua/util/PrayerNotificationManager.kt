@@ -78,6 +78,58 @@ object PrayerNotificationManager {
     }
     
     /**
+     * Post detailed prayer notification with custom content
+     */
+    fun postDetailedPrayerNotification(
+        title: String, 
+        content: String, 
+        detailedMessage: String,
+        progress: Int = 0, 
+        isOngoing: Boolean = true
+    ) {
+        val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
+            .setSmallIcon(R.drawable.ic_prayer_hands)
+            .setOngoing(isOngoing)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(0)
+            .setSilent(true)
+            .setLocalOnly(true)
+            .setShowWhen(true)
+            .setUsesChronometer(false)
+        
+        // Add progress if specified
+        if (progress > 0 && progress <= 100) {
+            builder.setProgress(100, progress, false)
+        }
+        
+        // Apply Live Update features if supported
+        if (supportsLiveUpdates() && Build.VERSION.SDK_INT >= 35) {
+            try {
+                builder.setRequestPromotedOngoing(true)
+                if (progress > 0) {
+                    builder.setStyle(buildPrayerProgressStyle(progress))
+                }
+                
+                builder.setLargeIcon(
+                    IconCompat.createWithResource(
+                        appContext, R.drawable.ic_prayer_hands
+                    ).toIcon(appContext)
+                )
+            } catch (e: Exception) {
+                Log.d(TAG, "Live Update APIs not available: ${e.message}")
+            }
+        }
+        
+        notificationManager.notify(NOTIFICATION_ID, builder.build())
+        Log.d(TAG, "Posted detailed notification: $title")
+    }
+    
+    /**
      * Build notification ready for Android 16 Live Updates
      * Uses current APIs with Live Update optimizations
      */

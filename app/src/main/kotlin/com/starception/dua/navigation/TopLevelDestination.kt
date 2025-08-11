@@ -24,6 +24,7 @@ import com.starception.dua.feature.bookmarks.navigation.BookmarksRoute
 import com.starception.dua.feature.foryou.navigation.ForYouBaseRoute
 import com.starception.dua.feature.foryou.navigation.ForYouRoute
 import com.starception.dua.feature.interests.navigation.InterestsRoute
+import com.starception.dua.feature.prayertimes.navigation.PrayerTimesRoute
 import kotlin.reflect.KClass
 import com.starception.dua.feature.bookmarks.R as bookmarksR
 import com.starception.dua.feature.foryou.R as forYouR
@@ -72,5 +73,12 @@ enum class TopLevelDestination(
         iconTextId = searchR.string.feature_search_interests,
         titleTextId = searchR.string.feature_search_interests,
         route = InterestsRoute::class,
+    ),
+    PRAYER_TIMES(
+        selectedIcon = NiaIcons.Upcoming,
+        unselectedIcon = NiaIcons.UpcomingBorder,
+        iconTextId = R.string.prayer_times_title,
+        titleTextId = R.string.prayer_times_title,
+        route = PrayerTimesRoute::class,
     ),
 }

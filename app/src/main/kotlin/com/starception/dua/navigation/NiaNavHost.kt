@@ -27,6 +27,7 @@ import com.starception.dua.feature.interests.navigation.navigateToInterests
 import com.starception.dua.feature.search.navigation.searchScreen
 import com.starception.dua.feature.topic.navigation.navigateToTopic
 import com.starception.dua.feature.topic.navigation.topicScreen
+import com.starception.dua.feature.prayertimes.navigation.prayerTimesScreen
 import com.starception.dua.navigation.TopLevelDestination.INTERESTS
 import com.starception.dua.ui.NiaAppState
 import com.starception.dua.ui.interests2pane.interestsListDetailScreen
@@ -69,5 +70,6 @@ fun NiaNavHost(
             onTopicClick = navController::navigateToInterests,
         )
         interestsListDetailScreen()
+        prayerTimesScreen()
     }
 }
