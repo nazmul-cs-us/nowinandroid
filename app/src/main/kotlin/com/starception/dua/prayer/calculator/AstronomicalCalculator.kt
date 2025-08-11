@@ -1,5 +1,6 @@
 package com.starception.dua.prayer.calculator
 
+import android.util.Log
 import com.starception.dua.prayer.model.Location
 import java.time.LocalDate
 import java.time.LocalTime
@@ -14,6 +15,7 @@ import kotlin.math.*
 class AstronomicalCalculator @Inject constructor() {
     
     companion object {
+        private const val TAG = "AstronomicalCalculator"
         private const val JULIAN_EPOCH = 1721425.5
         private const val EARTH_RADIUS_KM = 6371.0
     }
@@ -59,9 +61,9 @@ class AstronomicalCalculator @Inject constructor() {
         val epsilon = Math.toRadians(23.439 - 0.0000004 * n)
         
         val ra = atan2(cos(epsilon) * sin(lambdaSun), cos(lambdaSun))
-        val eot = Math.toDegrees(l / 15.0 - ra * 180.0 / PI / 15.0) * 60.0
+        val eot = Math.toDegrees(ra) / 15.0 - (l / 15.0)
         
-        return eot
+        return eot * 4.0 // Convert to minutes
     }
     
     /**
@@ -102,7 +104,7 @@ class AstronomicalCalculator @Inject constructor() {
         val solarNoon = calculateSolarNoon(location, julianDay)
         
         // Geometric horizon with atmospheric refraction correction
-        val sunriseAltitude = -0.833 - 0.0347 * sqrt(location.altitude)
+        val sunriseAltitude = -0.833 - 0.0347 * sqrt(maxOf(location.altitude, 0.0))
         val hourAngle = calculateHourAngle(location.latitude, declination, sunriseAltitude)
         
         if (hourAngle.isNaN()) return Double.NaN
@@ -118,7 +120,7 @@ class AstronomicalCalculator @Inject constructor() {
         val solarNoon = calculateSolarNoon(location, julianDay)
         
         // Geometric horizon with atmospheric refraction correction
-        val sunsetAltitude = -0.833 - 0.0347 * sqrt(location.altitude)
+        val sunsetAltitude = -0.833 - 0.0347 * sqrt(maxOf(location.altitude, 0.0))
         val hourAngle = calculateHourAngle(location.latitude, declination, sunsetAltitude)
         
         if (hourAngle.isNaN()) return Double.NaN
@@ -180,8 +182,13 @@ class AstronomicalCalculator @Inject constructor() {
         val solarNoon = calculateSolarNoon(location, julianDay)
         
         val latRad = Math.toRadians(location.latitude)
-        val shadowAngle = atan(1.0 / (shadowFactor + tan(abs(latRad - declination))))
-        val hourAngle = calculateHourAngle(location.latitude, declination, Math.toDegrees(shadowAngle))
+        
+        // Calculate Asr altitude angle
+        val cotanAsrAltitude = shadowFactor + tan(abs(latRad - declination))
+        val asrAltitude = atan(1.0 / cotanAsrAltitude)
+        val asrAltitudeDegrees = Math.toDegrees(asrAltitude)
+        
+        val hourAngle = calculateHourAngle(location.latitude, declination, asrAltitudeDegrees)
         
         if (hourAngle.isNaN()) return Double.NaN
         
@@ -192,12 +199,25 @@ class AstronomicalCalculator @Inject constructor() {
      * Converts decimal hour to LocalTime
      */
     fun decimalHourToLocalTime(decimalHour: Double): LocalTime? {
-        if (decimalHour.isNaN() || decimalHour < 0 || decimalHour >= 24) return null
+        Log.d(TAG, "Converting decimal hour to LocalTime: $decimalHour")
+        
+        if (decimalHour.isNaN()) {
+            Log.w(TAG, "Decimal hour is NaN")
+            return null
+        }
+        
+        if (decimalHour < 0 || decimalHour >= 24) {
+            Log.w(TAG, "Decimal hour out of range: $decimalHour")
+            return null
+        }
         
         val hours = floor(decimalHour).toInt()
         val minutes = ((decimalHour - hours) * 60).toInt()
         val seconds = (((decimalHour - hours) * 60 - minutes) * 60).toInt()
         
-        return LocalTime.of(hours, minutes, seconds)
+        val localTime = LocalTime.of(hours, minutes, seconds)
+        Log.d(TAG, "Converted to LocalTime: $localTime")
+        
+        return localTime
     }
 }
