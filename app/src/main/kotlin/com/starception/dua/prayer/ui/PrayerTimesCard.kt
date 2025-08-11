@@ -35,7 +35,8 @@ fun PrayerTimesCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier
@@ -92,7 +93,7 @@ private fun PrayerTimesHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer)
                     .padding(12.dp)
             ) {
@@ -169,7 +170,7 @@ private fun PrayerTimeItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(
                 when {
                     prayer.isCurrently -> MaterialTheme.colorScheme.tertiaryContainer
@@ -201,7 +202,7 @@ private fun PrayerTimeItem(
                 modifier = Modifier
                     .background(
                         MaterialTheme.colorScheme.tertiary,
-                        RoundedCornerShape(4.dp)
+                        RoundedCornerShape(6.dp)
                     )
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             )
