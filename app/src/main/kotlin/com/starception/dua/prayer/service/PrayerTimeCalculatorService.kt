@@ -270,26 +270,44 @@ class PrayerTimeCalculatorService @Inject constructor(
     }
     
     /**
-     * Gets time remaining until next prayer
+     * Gets time remaining until next prayer, or time since last prayer if all prayers have passed
      */
     fun getTimeUntilNextPrayer(prayerTimes: DayPrayerTimes): String? {
-        val nextPrayer = getNextPrayer(prayerTimes) ?: return null
         val now = LocalTime.now()
+        val nextPrayer = getNextPrayer(prayerTimes)
         
-        val minutesUntil = if (nextPrayer.time.isAfter(now)) {
-            java.time.Duration.between(now, nextPrayer.time).toMinutes()
+        if (nextPrayer != null) {
+            // There's still a prayer remaining today
+            val minutesUntil = if (nextPrayer.time.isAfter(now)) {
+                java.time.Duration.between(now, nextPrayer.time).toMinutes()
+            } else {
+                // Next prayer is tomorrow
+                java.time.Duration.between(now, nextPrayer.time.plusHours(24)).toMinutes()
+            }
+            
+            val hours = minutesUntil / 60
+            val minutes = minutesUntil % 60
+            
+            return when {
+                hours > 0 -> "${hours}h ${minutes}m"
+                minutes > 0 -> "${minutes}m"
+                else -> "Now"
+            }
         } else {
-            // Next prayer is tomorrow
-            java.time.Duration.between(now, nextPrayer.time.plusHours(24)).toMinutes()
-        }
-        
-        val hours = minutesUntil / 60
-        val minutes = minutesUntil % 60
-        
-        return when {
-            hours > 0 -> "${hours}h ${minutes}m"
-            minutes > 0 -> "${minutes}m"
-            else -> "Now"
+            // All prayers have passed, show time since last prayer (Isha)
+            val ishaTime = prayerTimes.isha
+            if (now.isAfter(ishaTime)) {
+                val minutesSince = java.time.Duration.between(ishaTime, now).toMinutes()
+                val hours = minutesSince / 60
+                val minutes = minutesSince % 60
+                
+                return when {
+                    hours > 0 -> "${hours}h ${minutes}m ago"
+                    minutes > 0 -> "${minutes}m ago"
+                    else -> "just now"
+                }
+            }
+            return null
         }
     }
 }

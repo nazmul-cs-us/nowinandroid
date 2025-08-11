@@ -51,7 +51,7 @@ class DuaApplication : Application(), ImageLoaderFactory {
         // Initialize Sync; the system responsible for keeping data in the app up to date.
         Sync.initialize(context = this)
         profileVerifierLogger()
-        // Initialize prayer notification manager (don't start service immediately on Android 16+)
+        // Initialize prayer notification manager
         PrayerNotificationManager.initialize(this)
         
         // For Android 16+, we'll start the service when the user interacts with the app
@@ -64,12 +64,14 @@ class DuaApplication : Application(), ImageLoaderFactory {
                 } else {
                     startService(intent)
                 }
+                Log.d("DuaApplication", "Started prayer service immediately (pre-Android 16)")
             } catch (e: Exception) {
                 Log.e("DuaApplication", "Could not start prayer service", e)
             }
         } else {
-            // For Android 16+, just post a regular notification initially
-            PrayerNotificationManager.postPrayerNotification("Fajr", 0, false)
+            // For Android 16+, just initialize the notification manager
+            // The actual service will start when user opens the app (MainActivity.onResume)
+            Log.d("DuaApplication", "Initialized for Android 16+, service will start on user interaction")
         }
     }
 
