@@ -107,6 +107,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.coil.kt)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.play.services.location)
+    implementation(libs.accompanist.permissions)
 
     ksp(libs.hilt.compiler)
 

@@ -13,7 +13,8 @@
       "Bash(mv:*)",
       "Bash(aapt dump badging:*)",
       "Bash(timeout:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(echo $?)"
     ],
     "deny": []
   }

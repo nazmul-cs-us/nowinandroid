@@ -7,6 +7,7 @@ import com.starception.dua.prayer.model.Location
 import com.starception.dua.prayer.model.PrayerSettings
 import com.starception.dua.prayer.repository.PrayerSettingsRepository
 import com.starception.dua.prayer.service.LocationService
+import com.starception.dua.prayer.service.EnhancedLocationService
 import com.starception.dua.prayer.service.PrayerTimeCalculatorService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -21,6 +22,7 @@ import javax.inject.Inject
 class PrayerTimesViewModel @Inject constructor(
     private val prayerCalculatorService: PrayerTimeCalculatorService,
     private val locationService: LocationService,
+    private val enhancedLocationService: EnhancedLocationService,
     private val settingsRepository: PrayerSettingsRepository
 ) : ViewModel() {
 
@@ -41,6 +43,9 @@ class PrayerTimesViewModel @Inject constructor(
         
         // Initial calculation
         calculatePrayerTimes()
+        
+        // Start automatic location updates if GPS is enabled
+        startAutomaticLocationUpdates()
     }
     
     /**
@@ -54,29 +59,23 @@ class PrayerTimesViewModel @Inject constructor(
                 val currentSettings = _settings.value
                 val location = getCurrentLocation(currentSettings)
                 
-                location?.let { loc ->
-                    val prayerTimes = prayerCalculatorService.calculatePrayerTimes(date, loc, currentSettings)
+                val prayerTimes = prayerCalculatorService.calculatePrayerTimes(date, location, currentSettings)
+                
+                prayerTimes?.let { times ->
+                    val timeUntilNext = prayerCalculatorService.getTimeUntilNextPrayer(times)
+                    val isUsingDefault = (currentSettings.location == null)
                     
-                    prayerTimes?.let { times ->
-                        val timeUntilNext = prayerCalculatorService.getTimeUntilNextPrayer(times)
-                        
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            prayerTimes = times,
-                            timeUntilNext = timeUntilNext,
-                            location = loc,
-                            error = null
-                        )
-                    } ?: run {
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            error = "Failed to calculate prayer times"
-                        )
-                    }
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        prayerTimes = times,
+                        timeUntilNext = timeUntilNext,
+                        location = location,
+                        error = if (isUsingDefault) "Using default location (${location.getDisplayName()}). Tap 'Get Location' for accurate times." else null
+                    )
                 } ?: run {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "Location not available"
+                        error = "Failed to calculate prayer times for ${location.getDisplayName()}"
                     )
                 }
             } catch (e: Exception) {
@@ -96,25 +95,34 @@ class PrayerTimesViewModel @Inject constructor(
     }
     
     /**
-     * Requests current GPS location
+     * Requests current GPS location with enhanced accuracy
      */
     fun requestCurrentLocation() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoadingLocation = true)
             
             try {
-                if (!locationService.hasLocationPermission()) {
+                if (!enhancedLocationService.hasLocationPermission()) {
                     _uiState.value = _uiState.value.copy(
                         isLoadingLocation = false,
-                        error = "Location permission required"
+                        error = "Location permission required. Tap 'Grant Permission' to allow location access."
                     )
                     return@launch
                 }
                 
-                val result = locationService.getCurrentLocation()
+                if (!enhancedLocationService.isLocationEnabled()) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingLocation = false,
+                        error = "Please enable location services in device settings"
+                    )
+                    return@launch
+                }
+                
+                // Try high accuracy location first
+                val result = enhancedLocationService.getCurrentLocationHighAccuracy()
                 result.fold(
-                    onSuccess = { location ->
-                        val locationWithDetails = locationService.getLocationDetails(location)
+                    onSuccess = { androidLocation ->
+                        val locationWithDetails = enhancedLocationService.getLocationDetails(androidLocation)
                         
                         // Update settings with new location
                         val updatedSettings = _settings.value.copy(
@@ -125,13 +133,21 @@ class PrayerTimesViewModel @Inject constructor(
                         
                         _uiState.value = _uiState.value.copy(
                             isLoadingLocation = false,
-                            location = locationWithDetails
+                            location = locationWithDetails,
+                            error = null
                         )
+                        
+                        // Recalculate prayer times with new accurate location
+                        calculatePrayerTimes()
                     },
                     onFailure = { exception ->
                         _uiState.value = _uiState.value.copy(
                             isLoadingLocation = false,
-                            error = exception.message ?: "Failed to get location"
+                            error = when (exception) {
+                                is SecurityException -> "Location permission denied"
+                                is IllegalStateException -> "Location services are disabled"
+                                else -> "Failed to get accurate location: ${exception.message}"
+                            }
                         )
                     }
                 )
@@ -145,18 +161,27 @@ class PrayerTimesViewModel @Inject constructor(
     }
     
     /**
-     * Searches for locations by name
+     * Searches for locations by name using enhanced location service
      */
     fun searchLocation(query: String, onResult: (List<Location>) -> Unit) {
         viewModelScope.launch {
             try {
-                val result = locationService.searchLocation(query)
+                val result = enhancedLocationService.searchLocation(query)
                 result.fold(
                     onSuccess = { locations ->
                         onResult(locations)
                     },
                     onFailure = {
-                        onResult(emptyList())
+                        // Fallback to basic location service if enhanced search fails
+                        try {
+                            val fallbackResult = locationService.searchLocation(query)
+                            fallbackResult.fold(
+                                onSuccess = { locations -> onResult(locations) },
+                                onFailure = { onResult(emptyList()) }
+                            )
+                        } catch (e: Exception) {
+                            onResult(emptyList())
+                        }
                     }
                 )
             } catch (e: Exception) {
@@ -173,18 +198,37 @@ class PrayerTimesViewModel @Inject constructor(
     }
     
     /**
-     * Gets current location based on settings
+     * Gets current location based on settings with fallback to default location
      */
-    private suspend fun getCurrentLocation(settings: PrayerSettings): Location? {
-        return if (settings.useGpsLocation) {
-            if (locationService.hasLocationPermission()) {
-                locationService.getCurrentLocation().getOrNull() ?: settings.location
-            } else {
-                settings.location
-            }
-        } else {
-            settings.location
+    private suspend fun getCurrentLocation(settings: PrayerSettings): Location {
+        // If user has set a manual location, use it
+        if (!settings.useGpsLocation && settings.location != null) {
+            return settings.location
         }
+        
+        // If GPS is preferred and we have permission, try to get current location with enhanced accuracy
+        if (settings.useGpsLocation && enhancedLocationService.hasLocationPermission()) {
+            val androidLocation = enhancedLocationService.getBestAvailableLocation().getOrNull()
+            if (androidLocation != null) {
+                return enhancedLocationService.getLocationDetails(androidLocation)
+            }
+        }
+        
+        // Fall back to saved location or default location
+        return settings.location ?: getDefaultLocation()
+    }
+    
+    /**
+     * Provides default location (Mecca) when no location is set
+     */
+    private fun getDefaultLocation(): Location {
+        return Location(
+            latitude = 21.4225,
+            longitude = 39.8262,
+            timeZoneOffset = 3.0, // UTC+3 for Saudi Arabia
+            city = "Mecca",
+            country = "Saudi Arabia"
+        )
     }
     
     /**
@@ -192,6 +236,79 @@ class PrayerTimesViewModel @Inject constructor(
      */
     fun refresh() {
         calculatePrayerTimes()
+    }
+    
+    /**
+     * Starts automatic location updates for better accuracy
+     */
+    private fun startAutomaticLocationUpdates() {
+        viewModelScope.launch {
+            while (true) {
+                try {
+                    // Wait 30 minutes between location updates
+                    kotlinx.coroutines.delay(30 * 60 * 1000L)
+                    
+                    val currentSettings = _settings.value
+                    
+                    // Only update if GPS is enabled and we have permissions
+                    if (currentSettings.useGpsLocation && 
+                        enhancedLocationService.hasLocationPermission() && 
+                        enhancedLocationService.isLocationEnabled()) {
+                        
+                        // Get current location silently (no UI updates for background refresh)
+                        enhancedLocationService.getCurrentLocation().fold(
+                            onSuccess = { androidLocation ->
+                                val newLocation = enhancedLocationService.getLocationDetails(androidLocation)
+                                val existingLocation = currentSettings.location
+                                
+                                // Only update if location has changed significantly (>100m)
+                                if (existingLocation == null || hasLocationChangedSignificantly(existingLocation, newLocation)) {
+                                    val updatedSettings = currentSettings.copy(location = newLocation)
+                                    updateSettings(updatedSettings)
+                                    
+                                    // Silently recalculate prayer times with new location
+                                    calculatePrayerTimes()
+                                }
+                            },
+                            onFailure = { 
+                                // Ignore failures in background updates
+                            }
+                        )
+                    }
+                } catch (e: Exception) {
+                    // Continue the loop even if an update fails
+                }
+            }
+        }
+    }
+    
+    /**
+     * Checks if location has changed significantly (>100 meters)
+     */
+    private fun hasLocationChangedSignificantly(oldLocation: Location, newLocation: Location): Boolean {
+        val distance = calculateDistance(
+            oldLocation.latitude, oldLocation.longitude,
+            newLocation.latitude, newLocation.longitude
+        )
+        return distance > 100.0 // 100 meters threshold
+    }
+    
+    /**
+     * Calculates distance between two coordinates in meters
+     */
+    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val earthRadius = 6371000.0 // Earth's radius in meters
+        
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        
+        val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
+                kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+                kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
+        
+        val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+        
+        return earthRadius * c
     }
 }
 

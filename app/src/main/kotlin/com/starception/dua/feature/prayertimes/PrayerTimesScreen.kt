@@ -1,10 +1,9 @@
 package com.starception.dua.feature.prayertimes
 
+import android.Manifest
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,63 +13,53 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.starception.dua.core.designsystem.theme.NiaTheme
 import com.starception.dua.prayer.ui.PrayerTimesCard
-import com.starception.dua.prayer.ui.PrayerSettingsScreen
 import com.starception.dua.prayer.viewmodel.PrayerTimesViewModel
 
 /**
- * Prayer Times screen showing daily prayer schedule and settings
+ * Prayer Times screen showing daily prayer schedule
+ * Settings are accessed via the main app's context-aware settings button
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun PrayerTimesScreen(
     modifier: Modifier = Modifier,
     viewModel: PrayerTimesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
-    var showSettings by remember { mutableStateOf(false) }
     
-    if (showSettings) {
-        PrayerSettingsScreen(
-            settings = settings,
-            onSettingsChanged = viewModel::updateSettings,
-            onBackClick = { showSettings = false }
+    // Handle location permissions
+    val locationPermissions = rememberMultiplePermissionsState(
+        permissions = listOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
         )
-    } else {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("Prayer Times") },
-                    actions = {
-                        IconButton(onClick = { showSettings = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings"
-                            )
-                        }
-                    }
-                )
-            },
-            modifier = modifier
-        ) { paddingValues ->
-            PrayerTimesContent(
-                uiState = uiState,
-                onRefresh = viewModel::refresh,
-                onRequestLocation = viewModel::requestCurrentLocation,
-                onClearError = viewModel::clearError,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            )
-        }
-    }
+    )
+    
+    PrayerTimesContent(
+        uiState = uiState,
+        locationPermissions = locationPermissions,
+        onRefresh = viewModel::refresh,
+        onRequestLocation = {
+            if (locationPermissions.allPermissionsGranted) {
+                viewModel.requestCurrentLocation()
+            } else {
+                locationPermissions.launchMultiplePermissionRequest()
+            }
+        },
+        onClearError = viewModel::clearError,
+        modifier = modifier.fillMaxSize()
+    )
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 private fun PrayerTimesContent(
     uiState: com.starception.dua.prayer.viewmodel.PrayerTimesUiState,
+    locationPermissions: com.google.accompanist.permissions.MultiplePermissionsState,
     onRefresh: () -> Unit,
     onRequestLocation: () -> Unit,
     onClearError: () -> Unit,
@@ -110,9 +99,12 @@ private fun PrayerTimesContent(
                         TextButton(onClick = onClearError) {
                             Text("Dismiss")
                         }
-                        if (error.contains("Location", ignoreCase = true)) {
+                        if (error.contains("Location", ignoreCase = true) || error.contains("permission", ignoreCase = true)) {
                             TextButton(onClick = onRequestLocation) {
-                                Text("Get Location")
+                                Text(
+                                    if (locationPermissions.allPermissionsGranted) "Get Location" 
+                                    else "Grant Permission"
+                                )
                             }
                         }
                         TextButton(onClick = onRefresh) {
@@ -193,7 +185,10 @@ private fun PrayerTimesContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Button(onClick = onRequestLocation) {
-                        Text("Get My Location")
+                        Text(
+                            if (locationPermissions.allPermissionsGranted) "Get My Location"
+                            else "Grant Location Permission"
+                        )
                     }
                 }
             }

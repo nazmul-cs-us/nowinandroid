@@ -38,10 +38,12 @@ import com.starception.dua.feature.bookmarks.navigation.navigateToBookmarks
 import com.starception.dua.feature.foryou.navigation.navigateToForYou
 import com.starception.dua.feature.interests.navigation.navigateToInterests
 import com.starception.dua.feature.search.navigation.navigateToSearch
+import com.starception.dua.feature.prayertimes.navigation.navigateToPrayerTimes
 import com.starception.dua.navigation.TopLevelDestination
 import com.starception.dua.navigation.TopLevelDestination.BOOKMARKS
 import com.starception.dua.navigation.TopLevelDestination.FOR_YOU
 import com.starception.dua.navigation.TopLevelDestination.INTERESTS
+import com.starception.dua.navigation.TopLevelDestination.PRAYER_TIMES
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -172,6 +174,7 @@ class NiaAppState(
                 FOR_YOU -> navController.navigateToForYou(topLevelNavOptions)
                 BOOKMARKS -> navController.navigateToBookmarks(topLevelNavOptions)
                 INTERESTS -> navController.navigateToInterests(null, topLevelNavOptions)
+                PRAYER_TIMES -> navController.navigate(com.starception.dua.feature.prayertimes.navigation.PrayerTimesRoute, topLevelNavOptions)
             }
         }
     }
