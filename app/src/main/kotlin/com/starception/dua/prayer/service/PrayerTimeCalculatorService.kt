@@ -1,5 +1,6 @@
 package com.starception.dua.prayer.service
 
+import android.util.Log
 import com.starception.dua.prayer.calculator.AstronomicalCalculator
 import com.starception.dua.prayer.model.*
 import java.time.LocalDate
@@ -14,6 +15,9 @@ import javax.inject.Singleton
 class PrayerTimeCalculatorService @Inject constructor(
     private val astronomicalCalculator: AstronomicalCalculator
 ) {
+    companion object {
+        private const val TAG = "PrayerTimeCalculator"
+    }
     
     /**
      * Calculates prayer times for a specific date and location
@@ -23,19 +27,36 @@ class PrayerTimeCalculatorService @Inject constructor(
         location: Location,
         settings: PrayerSettings
     ): DayPrayerTimes? {
-        if (!location.isValid()) return null
+        Log.d(TAG, "Calculating prayer times for ${location.getDisplayName()}")
+        Log.d(TAG, "Location: lat=${location.latitude}, lng=${location.longitude}, tz=${location.timeZoneOffset}")
+        Log.d(TAG, "Date: $date")
+        
+        if (!location.isValid()) {
+            Log.e(TAG, "Invalid location coordinates: lat=${location.latitude}, lng=${location.longitude}")
+            return null
+        }
         
         val julianDay = astronomicalCalculator.calculateJulianDay(date)
+        Log.d(TAG, "Julian day: $julianDay")
         
         // Calculate basic times
         val solarNoon = astronomicalCalculator.calculateSolarNoon(location, julianDay)
         val sunrise = astronomicalCalculator.calculateSunrise(location, julianDay)
         val sunset = astronomicalCalculator.calculateSunset(location, julianDay)
         
+        Log.d(TAG, "Solar noon: $solarNoon")
+        Log.d(TAG, "Sunrise: $sunrise")
+        Log.d(TAG, "Sunset: $sunset")
+        
         // Calculate prayer-specific times
         val fajrTime = calculateFajrWithAdjustments(location, julianDay, settings)
         val asrTime = calculateAsrWithAdjustments(location, julianDay, settings)
         val ishaTime = calculateIshaWithAdjustments(location, julianDay, settings, sunset)
+        
+        Log.d(TAG, "Calculated prayer times:")
+        Log.d(TAG, "  Fajr: $fajrTime")
+        Log.d(TAG, "  Asr: $asrTime") 
+        Log.d(TAG, "  Isha: $ishaTime")
         
         // Apply user offsets
         val offsets = settings.timeOffsets
@@ -56,9 +77,19 @@ class PrayerTimeCalculatorService @Inject constructor(
         )
         val isha = addMinutesToTime(ishaTime, offsets.isha)
         
+        Log.d(TAG, "Final prayer times after adjustments:")
+        Log.d(TAG, "  Fajr: $fajr")
+        Log.d(TAG, "  Sunrise: $sunriseAdjusted") 
+        Log.d(TAG, "  Dhuhr: $dhuhr")
+        Log.d(TAG, "  Asr: $asr")
+        Log.d(TAG, "  Maghrib: $maghrib")
+        Log.d(TAG, "  Isha: $isha")
+        
         // Validate all times are calculated
         if (fajr == null || sunriseAdjusted == null || dhuhr == null || 
             asr == null || maghrib == null || isha == null) {
+            Log.e(TAG, "Some prayer times are null - calculation failed")
+            Log.e(TAG, "Null times: fajr=${fajr == null}, sunrise=${sunriseAdjusted == null}, dhuhr=${dhuhr == null}, asr=${asr == null}, maghrib=${maghrib == null}, isha=${isha == null}")
             return null
         }
         
@@ -83,12 +114,18 @@ class PrayerTimeCalculatorService @Inject constructor(
         settings: PrayerSettings
     ): LocalTime? {
         val fajrAngle = settings.getEffectiveFajrAngle()
+        Log.d(TAG, "Calculating Fajr with angle: $fajrAngle")
+        
         val fajrDecimal = astronomicalCalculator.calculateFajr(location, julianDay, fajrAngle)
+        Log.d(TAG, "Fajr decimal hour: $fajrDecimal")
         
         if (!fajrDecimal.isNaN()) {
-            return astronomicalCalculator.decimalHourToLocalTime(fajrDecimal)
+            val fajrTime = astronomicalCalculator.decimalHourToLocalTime(fajrDecimal)
+            Log.d(TAG, "Fajr time: $fajrTime")
+            return fajrTime
         }
         
+        Log.w(TAG, "Fajr calculation returned NaN, applying high latitude adjustment")
         // Apply high latitude adjustment
         return applyHighLatitudeAdjustment(
             location, julianDay, settings, "fajr", fajrAngle
@@ -104,9 +141,15 @@ class PrayerTimeCalculatorService @Inject constructor(
         settings: PrayerSettings
     ): LocalTime? {
         val shadowFactor = settings.asrMadhhab.shadowFactor
-        val asrDecimal = astronomicalCalculator.calculateAsr(location, julianDay, shadowFactor)
+        Log.d(TAG, "Calculating Asr with shadow factor: $shadowFactor")
         
-        return astronomicalCalculator.decimalHourToLocalTime(asrDecimal)
+        val asrDecimal = astronomicalCalculator.calculateAsr(location, julianDay, shadowFactor)
+        Log.d(TAG, "Asr decimal hour: $asrDecimal")
+        
+        val asrTime = astronomicalCalculator.decimalHourToLocalTime(asrDecimal)
+        Log.d(TAG, "Asr time: $asrTime")
+        
+        return asrTime
     }
     
     /**
@@ -120,13 +163,18 @@ class PrayerTimeCalculatorService @Inject constructor(
     ): LocalTime? {
         val ishaAngle = settings.getEffectiveIshaAngle()
         val ishaDelay = settings.getEffectiveIshaDelay()
+        Log.d(TAG, "Calculating Isha with angle: $ishaAngle, delay: $ishaDelay")
         
         val ishaDecimal = astronomicalCalculator.calculateIsha(location, julianDay, ishaAngle, ishaDelay)
+        Log.d(TAG, "Isha decimal hour: $ishaDecimal")
         
         if (!ishaDecimal.isNaN()) {
-            return astronomicalCalculator.decimalHourToLocalTime(ishaDecimal)
+            val ishaTime = astronomicalCalculator.decimalHourToLocalTime(ishaDecimal)
+            Log.d(TAG, "Isha time: $ishaTime")
+            return ishaTime
         }
         
+        Log.w(TAG, "Isha calculation returned NaN, applying high latitude adjustment")
         // Apply high latitude adjustment
         return applyHighLatitudeAdjustment(
             location, julianDay, settings, "isha", ishaAngle ?: 0.0

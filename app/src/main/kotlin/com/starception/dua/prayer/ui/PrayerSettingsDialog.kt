@@ -1,13 +1,19 @@
 package com.starception.dua.prayer.ui
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.dua.prayer.viewmodel.PrayerTimesViewModel
 
 /**
- * Prayer Settings Dialog that wraps PrayerSettingsScreen
+ * Prayer Settings Dialog that wraps PrayerSettingsScreen as full-screen modal
  */
 @Composable
 fun PrayerSettingsDialog(
@@ -16,9 +22,17 @@ fun PrayerSettingsDialog(
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     
-    PrayerSettingsScreen(
-        settings = settings,
-        onSettingsChanged = viewModel::updateSettings,
-        onBackClick = onDismiss
-    )
+    // Full screen modal dialog
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        PrayerSettingsScreen(
+            settings = settings,
+            onSettingsChanged = viewModel::updateSettings,
+            onBackClick = onDismiss,
+            showAsDialog = false, // Use full screen mode with scaffold
+            modifier = Modifier.fillMaxSize()
+        )
+    }
 }
