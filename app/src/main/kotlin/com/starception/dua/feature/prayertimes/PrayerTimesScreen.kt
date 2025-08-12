@@ -2,8 +2,9 @@ package com.starception.dua.feature.prayertimes
 
 import android.Manifest
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -65,15 +66,17 @@ private fun PrayerTimesContent(
     onClearError: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Adaptive(300.dp),
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalItemSpacing = 24.dp,
+        modifier = modifier.fillMaxSize()
     ) {
         // Error handling
         uiState.error?.let { error ->
-            Card(
+            item(span = StaggeredGridItemSpan.FullLine, contentType = "error") {
+                Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer
                 )
@@ -113,11 +116,13 @@ private fun PrayerTimesContent(
                     }
                 }
             }
+            }
         }
         
         // Loading state
         if (uiState.isLoading) {
-            Card {
+            item(span = StaggeredGridItemSpan.FullLine, contentType = "loading") {
+                Card {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -133,11 +138,13 @@ private fun PrayerTimesContent(
                     }
                 }
             }
+            }
         }
         
         // Location loading
         if (uiState.isLoadingLocation) {
-            Card {
+            item(span = StaggeredGridItemSpan.FullLine, contentType = "locationLoading") {
+                Card {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -153,19 +160,24 @@ private fun PrayerTimesContent(
                     }
                 }
             }
+            }
         }
         
         // Prayer times display
         uiState.prayerTimes?.let { prayerTimes ->
-            PrayerTimesCard(
-                prayerTimes = prayerTimes,
-                timeUntilNext = uiState.timeUntilNext
-            )
+            item(span = StaggeredGridItemSpan.FullLine, contentType = "prayerTimes") {
+                PrayerTimesCard(
+                    prayerTimes = prayerTimes,
+                    timeUntilNext = uiState.timeUntilNext,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+            }
         }
         
         // No prayer times available
         if (!uiState.isLoading && uiState.prayerTimes == null && uiState.error == null) {
-            Card {
+            item(span = StaggeredGridItemSpan.FullLine, contentType = "noPrayerTimes") {
+                Card {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -192,15 +204,18 @@ private fun PrayerTimesContent(
                     }
                 }
             }
+            }
         }
         
         // Refresh button
         if (uiState.prayerTimes != null) {
-            OutlinedButton(
-                onClick = onRefresh,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Refresh Prayer Times")
+            item(span = StaggeredGridItemSpan.FullLine, contentType = "refreshButton") {
+                OutlinedButton(
+                    onClick = onRefresh,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Refresh Prayer Times")
+                }
             }
         }
     }

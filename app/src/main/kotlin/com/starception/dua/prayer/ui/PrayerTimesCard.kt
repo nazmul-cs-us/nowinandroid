@@ -36,7 +36,7 @@ fun PrayerTimesCard(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors()
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -72,7 +72,7 @@ private fun PrayerTimesHeader(
             Icon(
                 imageVector = Icons.Default.LocationOn,
                 contentDescription = "Location",
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
@@ -92,13 +92,13 @@ private fun PrayerTimesHeader(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(12.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Schedule,
                     contentDescription = if (nextPrayer != null) "Next Prayer" else "Last Prayer",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -109,12 +109,12 @@ private fun PrayerTimesHeader(
                             text = "Next: ${nextPrayer.name}",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = "in $timeUntilNext",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
                         // Show time since last prayer (all prayers completed)
@@ -122,12 +122,12 @@ private fun PrayerTimesHeader(
                             text = "Last: Isha",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = timeUntilNext,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -137,7 +137,7 @@ private fun PrayerTimesHeader(
                         text = nextPrayer.time.format(DateTimeFormatter.ofPattern("h:mm a")),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -171,8 +171,8 @@ private fun PrayerTimeItem(
             .clip(RoundedCornerShape(12.dp))
             .background(
                 when {
-                    prayer.isCurrently -> MaterialTheme.colorScheme.tertiaryContainer
-                    prayer.isNext -> MaterialTheme.colorScheme.secondaryContainer
+                    prayer.isCurrently -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    prayer.isNext -> MaterialTheme.colorScheme.surfaceVariant
                     else -> Color.Transparent
                 }
             )
@@ -184,8 +184,8 @@ private fun PrayerTimeItem(
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = if (prayer.isNext || prayer.isCurrently) FontWeight.Medium else FontWeight.Normal,
             color = when {
-                prayer.isCurrently -> MaterialTheme.colorScheme.onTertiaryContainer
-                prayer.isNext -> MaterialTheme.colorScheme.onSecondaryContainer
+                prayer.isCurrently -> MaterialTheme.colorScheme.primary
+                prayer.isNext -> MaterialTheme.colorScheme.onSurfaceVariant
                 else -> MaterialTheme.colorScheme.onSurface
             },
             modifier = Modifier.weight(1f)
@@ -196,10 +196,10 @@ private fun PrayerTimeItem(
                 text = "NOW",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                color = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier
                     .background(
-                        MaterialTheme.colorScheme.tertiary,
+                        MaterialTheme.colorScheme.primary,
                         RoundedCornerShape(6.dp)
                     )
                     .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -212,8 +212,8 @@ private fun PrayerTimeItem(
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = if (prayer.isNext || prayer.isCurrently) FontWeight.Medium else FontWeight.Normal,
             color = when {
-                prayer.isCurrently -> MaterialTheme.colorScheme.onTertiaryContainer
-                prayer.isNext -> MaterialTheme.colorScheme.onSecondaryContainer
+                prayer.isCurrently -> MaterialTheme.colorScheme.primary
+                prayer.isNext -> MaterialTheme.colorScheme.onSurfaceVariant
                 else -> MaterialTheme.colorScheme.onSurface
             },
             textAlign = TextAlign.End
