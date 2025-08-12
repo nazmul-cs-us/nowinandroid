@@ -21,7 +21,7 @@ enum class CalculationMethod(
     UMM_AL_QURA(
         displayName = "Umm al-Qura (Makkah)",
         fajrAngle = 18.5,
-        ishaDelay = 90, // 120 in Ramadan
+        ishaDelay = 90, // 120 in Ramadan, 90 in other months
         description = "Used in Saudi Arabia"
     ),
     
@@ -51,6 +51,22 @@ enum class CalculationMethod(
         fajrAngle = 20.0,
         ishaAngle = 18.0,
         description = "Used in Singapore, Malaysia, Brunei"
+    ),
+    
+    SHIA_ITHNA_ASHARI(
+        displayName = "Shia Ithna Ashari (Leva Research Institute, Qum)",
+        fajrAngle = 16.0,
+        ishaAngle = 14.0,
+        maghribOffset = 4, // 4 minutes after sunset
+        description = "Used by Shia communities"
+    ),
+    
+    INSTITUTE_OF_GEOPHYSICS_TEHRAN(
+        displayName = "Institute of Geophysics, University of Tehran",
+        fajrAngle = 17.7,
+        ishaAngle = 14.0,
+        maghribOffset = 4, // 4 minutes after sunset  
+        description = "Used in Iran"
     );
     
     companion object {
@@ -61,6 +77,7 @@ enum class CalculationMethod(
                 "PK", "BD", "IN", "AF" -> UNIVERSITY_OF_ISLAMIC_SCIENCES
                 "US", "CA", "MX" -> ISNA
                 "SG", "MY", "BN" -> MUIS
+                "IR" -> INSTITUTE_OF_GEOPHYSICS_TEHRAN
                 else -> MUSLIM_WORLD_LEAGUE
             }
         }

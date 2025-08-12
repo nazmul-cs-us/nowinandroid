@@ -44,8 +44,8 @@ data class DayPrayerTimes(
             val isCurrently = when {
                 // For the last prayer (Isha), it's currently if we're past its time and no next prayer today
                 index == prayers.size - 1 && now.isAfter(prayer.time) && nextPrayerIndex == -1 -> true
-                // For other prayers, check if we're between this prayer and the next one
-                index > 0 && now.isAfter(prayers[index - 1].time) && now.isBefore(prayer.time) -> true
+                // For other prayers, check if we're past this prayer's time and before the next prayer's time
+                index < prayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(prayers[index + 1].time) -> true
                 else -> false
             }
             

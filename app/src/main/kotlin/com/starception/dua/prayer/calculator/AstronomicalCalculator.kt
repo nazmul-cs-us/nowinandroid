@@ -24,17 +24,27 @@ class AstronomicalCalculator @Inject constructor() {
      * Calculates Julian Day from given date
      */
     fun calculateJulianDay(date: LocalDate, time: LocalTime = LocalTime.MIDNIGHT): Double {
-        val year = date.year
-        val month = date.monthValue
+        var year = date.year
+        var month = date.monthValue
         val day = date.dayOfMonth
         val hour = time.hour.toDouble()
         val minute = time.minute.toDouble()
         val second = time.second.toDouble()
         
+        // Adjust for January and February being months 13 and 14 of the previous year
+        if (month <= 2) {
+            year -= 1
+            month += 12
+        }
+        
         val ut = hour + minute / 60.0 + second / 3600.0
         
-        return 367 * year - floor((7 * (year + floor((month + 9) / 12.0))) / 4.0) +
-                floor((275 * month) / 9.0) + day + 1721013.5 + ut / 24.0
+        // More precise Julian Day calculation
+        val a = floor(year / 100.0)
+        val b = 2 - a + floor(a / 4.0) // Gregorian calendar correction
+        
+        return floor(365.25 * (year + 4716)) + floor(30.6001 * (month + 1)) + 
+               day + b - 1524.5 + ut / 24.0
     }
     
     /**
@@ -61,7 +71,17 @@ class AstronomicalCalculator @Inject constructor() {
         val epsilon = Math.toRadians(23.439 - 0.0000004 * n)
         
         val ra = atan2(cos(epsilon) * sin(lambdaSun), cos(lambdaSun))
-        val eot = Math.toDegrees(ra) / 15.0 - (l / 15.0)
+        
+        // Normalize right ascension to 0-360 degrees
+        var raDegrees = Math.toDegrees(ra)
+        if (raDegrees < 0) raDegrees += 360.0
+        
+        // Calculate equation of time with proper normalization
+        var eot = (raDegrees / 15.0 - l / 15.0)
+        
+        // Normalize to [-12, +12] hours range
+        while (eot > 12.0) eot -= 24.0
+        while (eot < -12.0) eot += 24.0
         
         return eot * 4.0 // Convert to minutes
     }
