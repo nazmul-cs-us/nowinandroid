@@ -3,11 +3,14 @@ package com.starception.dua.prayer.repository
 import android.content.Context
 import android.content.SharedPreferences
 import com.starception.dua.prayer.model.*
+import java.time.LocalDateTime
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.time.LocalDate
+import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,6 +47,20 @@ class PrayerSettingsRepository @Inject constructor(
         // Notification settings
         private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
         private const val KEY_NOTIFY_BEFORE_MINUTES = "notify_before_minutes"
+        
+        // Prayer times cache keys
+        private const val KEY_CACHED_PRAYER_DATE = "cached_prayer_date"
+        private const val KEY_CACHED_FAJR = "cached_fajr"
+        private const val KEY_CACHED_SUNRISE = "cached_sunrise"
+        private const val KEY_CACHED_DHUHR = "cached_dhuhr"
+        private const val KEY_CACHED_ASR = "cached_asr"
+        private const val KEY_CACHED_MAGHRIB = "cached_maghrib"
+        private const val KEY_CACHED_ISHA = "cached_isha"
+        private const val KEY_CACHED_LOCATION_LAT = "cached_location_lat"
+        private const val KEY_CACHED_LOCATION_LON = "cached_location_lon"
+        private const val KEY_CACHED_LOCATION_CITY = "cached_location_city"
+        private const val KEY_CACHED_LOCATION_COUNTRY = "cached_location_country"
+        private const val KEY_CACHED_LOCATION_TIMEZONE = "cached_location_timezone"
     }
     
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -225,5 +242,129 @@ class PrayerSettingsRepository @Inject constructor(
     fun resetToDefaults() {
         prefs.edit().clear().apply()
         _settingsFlow.value = loadSettings()
+    }
+    
+    /**
+     * Force sets ASR method to Standard (for debugging/fixing incorrect settings)
+     */
+    fun forceSetAsrToStandard() {
+        val updated = _settingsFlow.value.copy(asrMadhhab = AsrMadhhab.STANDARD)
+        updateSettings(updated)
+    }
+    
+    /**
+     * Caches prayer times for quick loading on app startup
+     */
+    fun cachePrayerTimes(prayerTimes: DayPrayerTimes) {
+        prefs.edit().apply {
+            // Cache the date to ensure validity
+            putString(KEY_CACHED_PRAYER_DATE, prayerTimes.date.toLocalDate().toString())
+            
+            // Cache prayer times as minutes from midnight for precision
+            putInt(KEY_CACHED_FAJR, prayerTimes.fajr.toSecondOfDay() / 60)
+            putInt(KEY_CACHED_SUNRISE, prayerTimes.sunrise.toSecondOfDay() / 60)
+            putInt(KEY_CACHED_DHUHR, prayerTimes.dhuhr.toSecondOfDay() / 60)
+            putInt(KEY_CACHED_ASR, prayerTimes.asr.toSecondOfDay() / 60)
+            putInt(KEY_CACHED_MAGHRIB, prayerTimes.maghrib.toSecondOfDay() / 60)
+            putInt(KEY_CACHED_ISHA, prayerTimes.isha.toSecondOfDay() / 60)
+            
+            // Cache location information
+            putFloat(KEY_CACHED_LOCATION_LAT, prayerTimes.location.latitude.toFloat())
+            putFloat(KEY_CACHED_LOCATION_LON, prayerTimes.location.longitude.toFloat())
+            putString(KEY_CACHED_LOCATION_CITY, prayerTimes.location.city)
+            putString(KEY_CACHED_LOCATION_COUNTRY, prayerTimes.location.country)
+            putFloat(KEY_CACHED_LOCATION_TIMEZONE, prayerTimes.location.timeZoneOffset.toFloat())
+            
+            apply()
+        }
+    }
+    
+    /**
+     * Gets cached prayer times if available and valid for today
+     */
+    fun getCachedPrayerTimes(): DayPrayerTimes? {
+        return try {
+            val cachedDateStr = prefs.getString(KEY_CACHED_PRAYER_DATE, null) ?: return null
+            val cachedDate = LocalDate.parse(cachedDateStr)
+            
+            // Only return cached data if it's for today
+            if (cachedDate != LocalDate.now()) {
+                return null
+            }
+            
+            // Check if all required data is present
+            if (!prefs.contains(KEY_CACHED_FAJR) || !prefs.contains(KEY_CACHED_LOCATION_LAT)) {
+                return null
+            }
+            
+            val fajrMinutes = prefs.getInt(KEY_CACHED_FAJR, -1)
+            val sunriseMinutes = prefs.getInt(KEY_CACHED_SUNRISE, -1)
+            val dhuhrMinutes = prefs.getInt(KEY_CACHED_DHUHR, -1)
+            val asrMinutes = prefs.getInt(KEY_CACHED_ASR, -1)
+            val maghribMinutes = prefs.getInt(KEY_CACHED_MAGHRIB, -1)
+            val ishaMinutes = prefs.getInt(KEY_CACHED_ISHA, -1)
+            
+            // Validate all times are present
+            if (fajrMinutes == -1 || sunriseMinutes == -1 || dhuhrMinutes == -1 ||
+                asrMinutes == -1 || maghribMinutes == -1 || ishaMinutes == -1) {
+                return null
+            }
+            
+            val location = Location(
+                latitude = prefs.getFloat(KEY_CACHED_LOCATION_LAT, 0f).toDouble(),
+                longitude = prefs.getFloat(KEY_CACHED_LOCATION_LON, 0f).toDouble(),
+                city = prefs.getString(KEY_CACHED_LOCATION_CITY, "") ?: "",
+                country = prefs.getString(KEY_CACHED_LOCATION_COUNTRY, "") ?: "",
+                timeZoneOffset = prefs.getFloat(KEY_CACHED_LOCATION_TIMEZONE, 0f).toDouble()
+            )
+            
+            DayPrayerTimes(
+                date = cachedDate.atStartOfDay(),
+                fajr = LocalTime.ofSecondOfDay((fajrMinutes * 60).toLong()),
+                sunrise = LocalTime.ofSecondOfDay((sunriseMinutes * 60).toLong()),
+                dhuhr = LocalTime.ofSecondOfDay((dhuhrMinutes * 60).toLong()),
+                asr = LocalTime.ofSecondOfDay((asrMinutes * 60).toLong()),
+                maghrib = LocalTime.ofSecondOfDay((maghribMinutes * 60).toLong()),
+                isha = LocalTime.ofSecondOfDay((ishaMinutes * 60).toLong()),
+                location = location
+            )
+        } catch (e: Exception) {
+            // If any error occurs, return null to force fresh calculation
+            null
+        }
+    }
+    
+    /**
+     * Clears cached prayer times
+     */
+    fun clearPrayerTimesCache() {
+        prefs.edit().apply {
+            remove(KEY_CACHED_PRAYER_DATE)
+            remove(KEY_CACHED_FAJR)
+            remove(KEY_CACHED_SUNRISE)
+            remove(KEY_CACHED_DHUHR)
+            remove(KEY_CACHED_ASR)
+            remove(KEY_CACHED_MAGHRIB)
+            remove(KEY_CACHED_ISHA)
+            remove(KEY_CACHED_LOCATION_LAT)
+            remove(KEY_CACHED_LOCATION_LON)
+            remove(KEY_CACHED_LOCATION_CITY)
+            remove(KEY_CACHED_LOCATION_COUNTRY)
+            remove(KEY_CACHED_LOCATION_TIMEZONE)
+            apply()
+        }
+    }
+    
+    /**
+     * Checks if cached prayer times are available and valid for today
+     */
+    fun hasCachedPrayerTimesForToday(): Boolean {
+        val cachedDateStr = prefs.getString(KEY_CACHED_PRAYER_DATE, null) ?: return false
+        return try {
+            val cachedDate = LocalDate.parse(cachedDateStr)
+            cachedDate == LocalDate.now() && prefs.contains(KEY_CACHED_FAJR)
+        } catch (e: Exception) {
+            false
+        }
     }
 }

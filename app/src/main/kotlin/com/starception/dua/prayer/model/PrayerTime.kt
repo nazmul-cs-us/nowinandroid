@@ -42,10 +42,18 @@ data class DayPrayerTimes(
         
         return prayers.mapIndexed { index, prayer ->
             val isCurrently = when {
-                // For the last prayer (Isha), it's currently if we're past its time and no next prayer today
-                index == prayers.size - 1 && now.isAfter(prayer.time) && nextPrayerIndex == -1 -> true
-                // For other prayers, check if we're past this prayer's time and before the next prayer's time
+                // For Fajr to Maghrib prayers, check if we're between this prayer and the next
                 index < prayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(prayers[index + 1].time) -> true
+                // For Isha prayer, check if we're past Isha but before midnight (we don't show "currently" after midnight)
+                index == prayers.size - 1 && now.isAfter(prayer.time) && nextPrayerIndex == -1 && now.hour < 24 -> {
+                    // Only show Isha as "currently" until around 2-3 AM, then no prayer is "current"
+                    val hoursSinceIsha = if (now.hour >= prayer.time.hour) {
+                        now.hour - prayer.time.hour
+                    } else {
+                        24 - prayer.time.hour + now.hour
+                    }
+                    hoursSinceIsha < 4  // Show as current for max 4 hours after Isha
+                }
                 else -> false
             }
             

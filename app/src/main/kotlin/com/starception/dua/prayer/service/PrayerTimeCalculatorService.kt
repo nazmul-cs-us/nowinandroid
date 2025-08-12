@@ -266,14 +266,25 @@ class PrayerTimeCalculatorService @Inject constructor(
     }
     
     /**
-     * Gets the next prayer time from current time
+     * Gets the next prayer time from current time (including tomorrow's Fajr if all today's prayers have passed)
      */
     fun getNextPrayer(prayerTimes: DayPrayerTimes): PrayerTime? {
-        return prayerTimes.getNextPrayer()
+        val todayNext = prayerTimes.getNextPrayer()
+        if (todayNext != null) {
+            return todayNext
+        }
+        
+        // All prayers have passed, return tomorrow's Fajr
+        return PrayerTime(
+            name = "Fajr",
+            time = prayerTimes.fajr,
+            isNext = true,
+            isCurrently = false
+        )
     }
     
     /**
-     * Gets time remaining until next prayer, or time since last prayer if all prayers have passed
+     * Gets time remaining until next prayer (including tomorrow's Fajr if all today's prayers have passed)
      */
     fun getTimeUntilNextPrayer(prayerTimes: DayPrayerTimes): String? {
         val now = LocalTime.now()
@@ -281,12 +292,7 @@ class PrayerTimeCalculatorService @Inject constructor(
         
         if (nextPrayer != null) {
             // There's still a prayer remaining today
-            val minutesUntil = if (nextPrayer.time.isAfter(now)) {
-                java.time.Duration.between(now, nextPrayer.time).toMinutes()
-            } else {
-                // Next prayer is tomorrow
-                java.time.Duration.between(now, nextPrayer.time.plusHours(24)).toMinutes()
-            }
+            val minutesUntil = java.time.Duration.between(now, nextPrayer.time).toMinutes()
             
             val hours = minutesUntil / 60
             val minutes = minutesUntil % 60
@@ -297,20 +303,17 @@ class PrayerTimeCalculatorService @Inject constructor(
                 else -> "Now"
             }
         } else {
-            // All prayers have passed, show time since last prayer (Isha)
-            val ishaTime = prayerTimes.isha
-            if (now.isAfter(ishaTime)) {
-                val minutesSince = java.time.Duration.between(ishaTime, now).toMinutes()
-                val hours = minutesSince / 60
-                val minutes = minutesSince % 60
-                
-                return when {
-                    hours > 0 -> "${hours}h ${minutes}m ago"
-                    minutes > 0 -> "${minutes}m ago"
-                    else -> "just now"
-                }
+            // All prayers have passed, calculate time until tomorrow's Fajr
+            val fajrTime = prayerTimes.fajr
+            val minutesUntilTomorrowFajr = java.time.Duration.between(now, fajrTime.plusHours(24)).toMinutes()
+            val hours = minutesUntilTomorrowFajr / 60
+            val minutes = minutesUntilTomorrowFajr % 60
+            
+            return when {
+                hours > 0 -> "${hours}h ${minutes}m"
+                minutes > 0 -> "${minutes}m"
+                else -> "Now"
             }
-            return null
         }
     }
 }

@@ -75,8 +75,8 @@ enum class TopLevelDestination(
         route = InterestsRoute::class,
     ),
     PRAYER_TIMES(
-        selectedIcon = NiaIcons.Upcoming,
-        unselectedIcon = NiaIcons.UpcomingBorder,
+        selectedIcon = NiaIcons.PrayerTimes,
+        unselectedIcon = NiaIcons.PrayerTimesBorder,
         iconTextId = R.string.prayer_times_title,
         titleTextId = R.string.prayer_times_title,
         route = PrayerTimesRoute::class,
