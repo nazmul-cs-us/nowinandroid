@@ -72,7 +72,10 @@ class PrayerTimeCalculatorService @Inject constructor(
         )
         val asr = addMinutesToTime(asrTime, offsets.asr)
         val maghrib = addMinutesToTime(
-            astronomicalCalculator.decimalHourToLocalTime(sunset), 
+            addMinutesToTime(
+                astronomicalCalculator.decimalHourToLocalTime(sunset), 
+                settings.calculationMethod.maghribOffset
+            ),
             offsets.maghrib
         )
         val isha = addMinutesToTime(ishaTime, offsets.isha)

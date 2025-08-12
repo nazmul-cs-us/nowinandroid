@@ -16,7 +16,10 @@
       "Bash(pkill:*)",
       "Bash(echo $?)",
       "Bash(kotlinc:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(java:*)",
+      "WebFetch(domain:patentimages.storage.googleapis.com)",
+      "Bash(kotlin verify_prayer_calculations.kt:*)"
     ],
     "deny": []
   }
