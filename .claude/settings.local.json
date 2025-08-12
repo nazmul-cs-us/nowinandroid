@@ -19,7 +19,8 @@
       "Bash(python3:*)",
       "Bash(java:*)",
       "WebFetch(domain:patentimages.storage.googleapis.com)",
-      "Bash(kotlin verify_prayer_calculations.kt:*)"
+      "Bash(kotlin verify_prayer_calculations.kt:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

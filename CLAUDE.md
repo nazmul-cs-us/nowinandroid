@@ -11,6 +11,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `./gradlew assembleRelease` - Build release APKs
 - `./gradlew build` - Full build including tests
 
+### Installation
+- `./gradlew installDemoDebug` - Install demo debug APK on connected device
+- `adb -s 4B221FDAP002T6 install -r app/build/outputs/apk/demo/debug/app-demo-debug.apk` - Install APK on Pixel 9 Pro device
+- `adb devices` - List connected Android devices
+
+**Note**: Always install on Pixel device (4B221FDAP002T6) when multiple devices are connected.
+
 ### Testing
 - `./gradlew testDemoDebug` - Run unit tests for demo debug variant
 - `./gradlew connectedDemoDebugAndroidTest` - Run instrumented tests for demo debug variant
@@ -46,6 +53,12 @@ This is a fully modularized Android app following official Android architecture 
 - **feature:search** - Content search functionality
 - **feature:settings** - App settings and preferences
 - **feature:topic** - Individual topic detail screens
+
+### App-Specific Features
+- **Prayer Times** - Islamic prayer times calculator and display
+  - Located in `app/src/main/kotlin/com/starception/dua/feature/prayertimes/`
+  - Components: `PrayerTimesScreen.kt`, `app/src/main/kotlin/com/starception/dua/prayer/ui/PrayerTimesCard.kt`
+  - Features: Location-based prayer times, notifications, settings integration
 
 ### App Module
 - **app** - Main application module, navigation, and dependency injection setup
@@ -83,3 +96,17 @@ The app uses `com.starception.dua` as the base package (originally forked from G
 - `gradle/libs.versions.toml` - Centralized dependency management
 - `build-logic/convention/` - Gradle convention plugins for consistent module setup
 - `app/src/main/baseline-prof.txt` - Baseline profile for app startup optimization
+
+## UI Design System
+
+### Card Design Guidelines
+All cards in the app follow a consistent design pattern:
+- **Shape**: `RoundedCornerShape(16.dp)`
+- **Colors**: `CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)`
+- **Internal padding**: `16.dp`
+- **External margins**: `16.dp` on all sides for screen-level content
+- **Click handling**: Cards should have `onClick` functionality where applicable
+
+### Recent Updates
+- Fixed Prayer Times card margins and design consistency (August 2025)
+- Updated card colors to match design system used in NewsResourceCard and other components
