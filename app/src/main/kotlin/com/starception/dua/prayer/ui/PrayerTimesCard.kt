@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.starception.dua.core.designsystem.theme.NiaTheme
+import com.starception.dua.prayer.model.CalculationMethod
 import com.starception.dua.prayer.model.DayPrayerTimes
 import com.starception.dua.prayer.model.Location
 import com.starception.dua.prayer.model.PrayerTime
@@ -31,6 +32,7 @@ import java.time.format.DateTimeFormatter
 fun PrayerTimesCard(
     prayerTimes: DayPrayerTimes,
     timeUntilNext: String? = null,
+    calculationMethod: CalculationMethod? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -43,9 +45,11 @@ fun PrayerTimesCard(
         ) {
             // Header with location and next prayer info
             PrayerTimesHeader(
+                prayerTimes = prayerTimes,
                 location = prayerTimes.location,
                 nextPrayer = prayerTimes.getNextPrayer(),
-                timeUntilNext = timeUntilNext
+                timeUntilNext = timeUntilNext,
+                calculationMethod = calculationMethod
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -58,9 +62,11 @@ fun PrayerTimesCard(
 
 @Composable
 private fun PrayerTimesHeader(
+    prayerTimes: DayPrayerTimes,
     location: Location,
     nextPrayer: PrayerTime?,
     timeUntilNext: String?,
+    calculationMethod: CalculationMethod?,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -80,6 +86,16 @@ private fun PrayerTimesHeader(
                 text = location.getDisplayName(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        
+        // Calculation method info
+        calculationMethod?.let { method ->
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Using ${method.displayName}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
             )
         }
         
@@ -105,8 +121,15 @@ private fun PrayerTimesHeader(
                 Column {
                     if (nextPrayer != null) {
                         // Show next prayer
+                        val isNextPrayerToday = prayerTimes.getAllPrayers().any { it.time.isAfter(LocalTime.now()) }
+                        val displayText = if (isNextPrayerToday) {
+                            "Next: ${nextPrayer.name}"
+                        } else {
+                            "Next: ${nextPrayer.name} (tomorrow)"
+                        }
+                        
                         Text(
-                            text = "Next: ${nextPrayer.name}",
+                            text = displayText,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -117,16 +140,11 @@ private fun PrayerTimesHeader(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        // Show time since last prayer (all prayers completed)
+                        // This case should not happen anymore as we always have a next prayer (including tomorrow's Fajr)
                         Text(
-                            text = "Last: Isha",
+                            text = "Prayer times calculated",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = timeUntilNext,
-                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -247,6 +265,7 @@ private fun PrayerTimesCardPreview() {
         PrayerTimesCard(
             prayerTimes = samplePrayerTimes,
             timeUntilNext = "2h 45m",
+            calculationMethod = CalculationMethod.UMM_AL_QURA,
             modifier = Modifier.padding(16.dp)
         )
     }

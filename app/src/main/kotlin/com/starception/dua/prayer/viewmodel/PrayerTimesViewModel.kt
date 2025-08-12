@@ -2,6 +2,8 @@ package com.starception.dua.prayer.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.starception.dua.prayer.model.AsrMadhhab
+import com.starception.dua.prayer.model.CalculationMethod
 import com.starception.dua.prayer.model.DayPrayerTimes
 import com.starception.dua.prayer.model.Location
 import com.starception.dua.prayer.model.PrayerSettings
@@ -33,6 +35,14 @@ class PrayerTimesViewModel @Inject constructor(
     val settings: StateFlow<PrayerSettings> = _settings.asStateFlow()
     
     init {
+        // Fix ASR method to Standard if it was set to Hanafi (one-time fix)
+        if (settingsRepository.getSettings().asrMadhhab == AsrMadhhab.HANAFI) {
+            settingsRepository.forceSetAsrToStandard()
+        }
+        
+        // Load cached prayer times first for instant display
+        loadCachedPrayerTimes()
+        
         // Observe settings changes
         viewModelScope.launch {
             settingsRepository.settingsFlow.collect { newSettings ->
@@ -41,7 +51,7 @@ class PrayerTimesViewModel @Inject constructor(
             }
         }
         
-        // Initial calculation
+        // Calculate fresh prayer times (will update cache if needed)
         calculatePrayerTimes()
         
         // Start automatic location updates if GPS is enabled
@@ -65,11 +75,15 @@ class PrayerTimesViewModel @Inject constructor(
                     val timeUntilNext = prayerCalculatorService.getTimeUntilNextPrayer(times)
                     val isUsingDefault = (currentSettings.location == null)
                     
+                    // Cache the calculated prayer times for quick loading next time
+                    settingsRepository.cachePrayerTimes(times)
+                    
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         prayerTimes = times,
                         timeUntilNext = timeUntilNext,
                         location = location,
+                        calculationMethod = currentSettings.calculationMethod,
                         error = if (isUsingDefault) "Using default location (${location.getDisplayName()}). Tap 'Get Location' for accurate times." else null
                     )
                 } ?: run {
@@ -235,6 +249,8 @@ class PrayerTimesViewModel @Inject constructor(
      * Refreshes prayer times
      */
     fun refresh() {
+        // Clear cache to force fresh calculation
+        settingsRepository.clearPrayerTimesCache()
         calculatePrayerTimes()
     }
     
@@ -310,6 +326,25 @@ class PrayerTimesViewModel @Inject constructor(
         
         return earthRadius * c
     }
+    
+    /**
+     * Loads cached prayer times for instant display on app startup
+     */
+    private fun loadCachedPrayerTimes() {
+        val cachedPrayerTimes = settingsRepository.getCachedPrayerTimes()
+        cachedPrayerTimes?.let { times ->
+            val currentSettings = _settings.value
+            val timeUntilNext = prayerCalculatorService.getTimeUntilNextPrayer(times)
+            
+            _uiState.value = _uiState.value.copy(
+                prayerTimes = times,
+                timeUntilNext = timeUntilNext,
+                location = times.location,
+                calculationMethod = currentSettings.calculationMethod,
+                error = null
+            )
+        }
+    }
 }
 
 /**
@@ -321,5 +356,6 @@ data class PrayerTimesUiState(
     val prayerTimes: DayPrayerTimes? = null,
     val timeUntilNext: String? = null,
     val location: Location? = null,
+    val calculationMethod: CalculationMethod? = null,
     val error: String? = null
 )
