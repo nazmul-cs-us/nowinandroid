@@ -34,14 +34,12 @@ fun PrayerTimesCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors()
     ) {
         Column(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth()
+            modifier = Modifier.padding(16.dp)
         ) {
             // Header with location and next prayer info
             PrayerTimesHeader(
@@ -228,8 +226,8 @@ private fun PrayerTimeItem(
 private fun PrayerTimesCardPreview() {
     NiaTheme {
         val sampleLocation = Location(
-            latitude = 25.2048,
-            longitude = 55.2708,
+            latitude = 25.276987,
+            longitude = 55.296249,
             timeZoneOffset = 4.0,
             city = "Dubai",
             country = "UAE"
