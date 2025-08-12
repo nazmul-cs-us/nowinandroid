@@ -262,15 +262,50 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Estimates timezone offset based on coordinates
-     * This is a simple approximation - for production apps, consider using a timezone service
+     * Gets timezone offset with corrections for major cities/regions
      */
     private fun getTimezoneOffset(latitude: Double, longitude: Double): Double {
-        // Simple approximation: longitude-based timezone estimation
-        // More accurate would be to use a timezone database
-        val estimatedOffset = longitude / 15.0
+        // Known timezone corrections for major cities/regions
+        when {
+            // UAE (Dubai, Abu Dhabi, Sharjah, etc.) - GMT+4
+            latitude in 24.0..26.5 && longitude in 54.0..56.5 -> return 4.0
+            
+            // Saudi Arabia (Riyadh, Jeddah, Mecca, Medina) - GMT+3
+            latitude in 20.0..32.0 && longitude in 36.0..51.0 -> return 3.0
+            
+            // Kuwait - GMT+3
+            latitude in 28.5..30.5 && longitude in 46.5..48.5 -> return 3.0
+            
+            // Qatar - GMT+3
+            latitude in 24.0..26.5 && longitude in 50.0..52.0 -> return 3.0
+            
+            // Bahrain - GMT+3
+            latitude in 25.5..26.5 && longitude in 50.0..51.0 -> return 3.0
+            
+            // Oman - GMT+4
+            latitude in 16.0..26.5 && longitude in 51.5..60.0 -> return 4.0
+            
+            // Egypt (Cairo, Alexandria) - GMT+2
+            latitude in 22.0..32.0 && longitude in 24.0..37.0 -> return 2.0
+            
+            // Pakistan - GMT+5
+            latitude in 23.0..37.0 && longitude in 60.0..78.0 -> return 5.0
+            
+            // India - GMT+5.5
+            latitude in 6.0..38.0 && longitude in 68.0..98.0 -> return 5.5
+            
+            // Bangladesh - GMT+6
+            latitude in 20.0..27.0 && longitude in 88.0..93.0 -> return 6.0
+            
+            // Malaysia/Singapore - GMT+8
+            latitude in 1.0..7.5 && longitude in 99.5..120.0 -> return 8.0
+            
+            // Turkey - GMT+3
+            latitude in 35.0..43.0 && longitude in 25.0..45.0 -> return 3.0
+        }
         
-        // Round to nearest 0.5 hour and clamp to valid range
+        // Fallback to longitude-based approximation
+        val estimatedOffset = longitude / 15.0
         return (kotlin.math.round(estimatedOffset * 2.0) / 2.0).coerceIn(-12.0, 12.0)
     }
     

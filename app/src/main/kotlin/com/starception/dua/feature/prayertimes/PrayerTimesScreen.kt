@@ -169,6 +169,7 @@ private fun PrayerTimesContent(
                 PrayerTimesCard(
                     prayerTimes = prayerTimes,
                     timeUntilNext = uiState.timeUntilNext,
+                    calculationMethod = uiState.calculationMethod,
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }
@@ -212,7 +213,7 @@ private fun PrayerTimesContent(
             item(span = StaggeredGridItemSpan.FullLine, contentType = "refreshButton") {
                 OutlinedButton(
                     onClick = onRefresh,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.padding(horizontal = 8.dp)
                 ) {
                     Text("Refresh Prayer Times")
                 }
