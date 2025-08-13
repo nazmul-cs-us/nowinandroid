@@ -16,6 +16,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
@@ -38,7 +39,6 @@ class PrayerNotificationService : Service() {
     @Inject
     lateinit var settingsRepository: PrayerSettingsRepository
     
-    private val handler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     override fun onCreate() {
@@ -92,22 +92,20 @@ class PrayerNotificationService : Service() {
      * Start real prayer time updates using actual calculation service
      */
     private fun startRealPrayerTimeUpdates() {
-        handler.post(object : Runnable {
-            override fun run() {
-                serviceScope.launch {
-                    try {
-                        updatePrayerNotification()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error updating prayer notification", e)
-                        // Fallback notification on error
-                        PrayerNotificationManager.postPrayerNotification("Error loading times", 0, true)
-                    }
+        serviceScope.launch {
+            while (true) {
+                try {
+                    updatePrayerNotification()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error updating prayer notification", e)
+                    // Fallback notification on error
+                    PrayerNotificationManager.postPrayerNotification("Error loading times", 0, true)
                 }
                 
-                // Schedule next update (every minute)
-                handler.postDelayed(this, UPDATE_INTERVAL_MS)
+                // Wait before next update (every minute) - on background thread
+                kotlinx.coroutines.delay(UPDATE_INTERVAL_MS)
             }
-        })
+        }
     }
     
     /**
@@ -174,7 +172,7 @@ class PrayerNotificationService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "Prayer notification service destroyed")
-        handler.removeCallbacksAndMessages(null)
+        serviceScope.cancel()
         PrayerNotificationManager.cancelPrayerNotification()
     }
 

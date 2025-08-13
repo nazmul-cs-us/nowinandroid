@@ -77,6 +77,7 @@ private fun PrayerTimesContent(
         uiState.error?.let { error ->
             item(span = StaggeredGridItemSpan.FullLine, contentType = "error") {
                 Card(
+                modifier = Modifier.padding(horizontal = 8.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer
                 )
@@ -122,7 +123,9 @@ private fun PrayerTimesContent(
         // Loading state
         if (uiState.isLoading) {
             item(span = StaggeredGridItemSpan.FullLine, contentType = "loading") {
-                Card {
+                Card(
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -144,7 +147,9 @@ private fun PrayerTimesContent(
         // Location loading
         if (uiState.isLoadingLocation) {
             item(span = StaggeredGridItemSpan.FullLine, contentType = "locationLoading") {
-                Card {
+                Card(
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -180,7 +185,9 @@ private fun PrayerTimesContent(
         // No prayer times available
         if (!uiState.isLoading && uiState.prayerTimes == null && uiState.error == null) {
             item(span = StaggeredGridItemSpan.FullLine, contentType = "noPrayerTimes") {
-                Card {
+                Card(
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
