@@ -1,11 +1,14 @@
 package com.starception.dua.services
 
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import com.starception.dua.MainActivity
 import com.starception.dua.prayer.model.Location
 import com.starception.dua.prayer.model.PrayerSettings
 import com.starception.dua.prayer.service.PrayerTimeCalculatorService
@@ -74,10 +77,27 @@ class PrayerNotificationService : Service() {
             }
             
             // Start foreground with a basic notification (the Live Update will be posted separately)
+            val launchIntent = Intent(this, MainActivity::class.java).apply {
+                // Use flags that work well with app launch from notifications
+                // Avoid CLEAR_TASK which can cause dependency injection issues
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                // Add category to ensure proper launcher behavior
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                // Ensure we go to the main activity
+                action = Intent.ACTION_MAIN
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                launchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+            )
+            
             val basicNotification = androidx.core.app.NotificationCompat.Builder(this, "prayer_live_update_channel")
                 .setContentTitle("Prayer Time Tracker")
                 .setContentText("Loading prayer times...")
                 .setSmallIcon(com.starception.dua.R.drawable.ic_prayer_hands)
+                .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build()
             
