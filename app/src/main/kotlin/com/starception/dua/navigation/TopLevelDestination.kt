@@ -52,6 +52,13 @@ enum class TopLevelDestination(
     val route: KClass<*>,
     val baseRoute: KClass<*> = route,
 ) {
+    PRAYER_TIMES(
+        selectedIcon = NiaIcons.PrayerTimes,
+        unselectedIcon = NiaIcons.PrayerTimesBorder,
+        iconTextId = R.string.prayer_times_title,
+        titleTextId = R.string.prayer_times_title,
+        route = PrayerTimesRoute::class,
+    ),
     FOR_YOU(
         selectedIcon = NiaIcons.Upcoming,
         unselectedIcon = NiaIcons.UpcomingBorder,
@@ -73,12 +80,5 @@ enum class TopLevelDestination(
         iconTextId = searchR.string.feature_search_interests,
         titleTextId = searchR.string.feature_search_interests,
         route = InterestsRoute::class,
-    ),
-    PRAYER_TIMES(
-        selectedIcon = NiaIcons.PrayerTimes,
-        unselectedIcon = NiaIcons.PrayerTimesBorder,
-        iconTextId = R.string.prayer_times_title,
-        titleTextId = R.string.prayer_times_title,
-        route = PrayerTimesRoute::class,
     ),
 }

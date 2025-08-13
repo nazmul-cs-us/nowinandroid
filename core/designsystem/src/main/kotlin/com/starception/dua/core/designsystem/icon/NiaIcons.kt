@@ -19,10 +19,12 @@ package com.starception.dua.core.designsystem.icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ShortText
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Bookmarks
-import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Upcoming
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
@@ -60,7 +62,7 @@ object NiaIcons {
     val UpcomingBorder = Icons.Outlined.Upcoming
     val ViewDay = Icons.Rounded.ViewDay
     
-    // Prayer times icons - using Schedule (clock) icons which represent prayer timing
-    val PrayerTimes = Icons.Filled.Schedule
-    val PrayerTimesBorder = Icons.Outlined.Schedule
+    // Prayer times icons - using Notifications icons which better represent prayer reminders and timing
+    val PrayerTimes = Icons.Filled.Notifications
+    val PrayerTimesBorder = Icons.Outlined.NotificationsActive
 }

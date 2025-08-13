@@ -170,6 +170,8 @@ private fun PrayerTimesContent(
                     prayerTimes = prayerTimes,
                     timeUntilNext = uiState.timeUntilNext,
                     calculationMethod = uiState.calculationMethod,
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = onRefresh,
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }
