@@ -2,13 +2,16 @@ package com.starception.dua.util
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
+import com.starception.dua.MainActivity
 import com.starception.dua.R
 
 object PrayerNotificationManager {
@@ -25,6 +28,28 @@ object PrayerNotificationManager {
         notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel()
         Log.d(TAG, "PrayerNotificationManager initialized")
+    }
+    
+    /**
+     * Create PendingIntent to launch the main app
+     * Uses proper flags to ensure clean app startup from notification
+     */
+    private fun createAppLaunchIntent(): PendingIntent {
+        val intent = Intent(appContext, MainActivity::class.java).apply {
+            // Use flags that work well with app launch from notifications
+            // Avoid CLEAR_TASK which can cause dependency injection issues
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            // Add category to ensure proper launcher behavior
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            // Ensure we go to the main activity
+            action = Intent.ACTION_MAIN
+        }
+        return PendingIntent.getActivity(
+            appContext,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        )
     }
     
     private fun createNotificationChannel() {
@@ -92,6 +117,7 @@ object PrayerNotificationManager {
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
             .setSmallIcon(R.drawable.ic_prayer_hands)
+            .setContentIntent(createAppLaunchIntent())
             .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -154,6 +180,7 @@ object PrayerNotificationManager {
             .setContentTitle(title)
             .setContentText(content)
             .setSmallIcon(R.drawable.ic_prayer_hands)
+            .setContentIntent(createAppLaunchIntent())
             .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -268,6 +295,7 @@ object PrayerNotificationManager {
             .setContentTitle(title)
             .setContentText(content)
             .setSmallIcon(R.drawable.ic_prayer_hands)
+            .setContentIntent(createAppLaunchIntent())
             .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

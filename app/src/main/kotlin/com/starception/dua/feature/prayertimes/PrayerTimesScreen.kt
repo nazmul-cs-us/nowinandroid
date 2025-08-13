@@ -43,7 +43,8 @@ fun PrayerTimesScreen(
     PrayerTimesContent(
         uiState = uiState,
         locationPermissions = locationPermissions,
-        onRefresh = viewModel::refresh,
+        onRefresh = { viewModel.refresh(showLoading = false) }, // Pull-to-refresh: smooth animation
+        onRefreshButton = { viewModel.refresh(showLoading = true) }, // Manual button: show loading
         onRequestLocation = {
             if (locationPermissions.allPermissionsGranted) {
                 viewModel.requestCurrentLocation()
@@ -62,6 +63,7 @@ private fun PrayerTimesContent(
     uiState: com.starception.dua.prayer.viewmodel.PrayerTimesUiState,
     locationPermissions: com.google.accompanist.permissions.MultiplePermissionsState,
     onRefresh: () -> Unit,
+    onRefreshButton: () -> Unit,
     onRequestLocation: () -> Unit,
     onClearError: () -> Unit,
     modifier: Modifier = Modifier
@@ -111,7 +113,7 @@ private fun PrayerTimesContent(
                                 )
                             }
                         }
-                        TextButton(onClick = onRefresh) {
+                        TextButton(onClick = onRefreshButton) {
                             Text("Retry")
                         }
                     }
@@ -177,6 +179,7 @@ private fun PrayerTimesContent(
                     calculationMethod = uiState.calculationMethod,
                     isRefreshing = uiState.isRefreshing,
                     onRefresh = onRefresh,
+                    onRefreshButton = onRefreshButton,
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }
@@ -214,18 +217,6 @@ private fun PrayerTimesContent(
                     }
                 }
             }
-            }
-        }
-        
-        // Refresh button
-        if (uiState.prayerTimes != null) {
-            item(span = StaggeredGridItemSpan.FullLine, contentType = "refreshButton") {
-                OutlinedButton(
-                    onClick = onRefresh,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                ) {
-                    Text("Refresh Prayer Times")
-                }
             }
         }
     }

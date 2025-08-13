@@ -42,7 +42,7 @@ class PrayerTimesViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.settingsFlow.collect { newSettings ->
                 _settings.value = newSettings
-                calculatePrayerTimes(showLoading = false) // Background update, no loading state
+                calculatePrayerTimes(showLoading = false, clearLoadingImmediately = true) // Background update, no loading state
             }
         }
         
@@ -56,7 +56,7 @@ class PrayerTimesViewModel @Inject constructor(
     /**
      * Calculates prayer times for today
      */
-    fun calculatePrayerTimes(date: LocalDate = LocalDate.now(), showLoading: Boolean = true) {
+    fun calculatePrayerTimes(date: LocalDate = LocalDate.now(), showLoading: Boolean = true, clearLoadingImmediately: Boolean = true) {
         viewModelScope.launch {
             if (showLoading) {
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
@@ -76,7 +76,7 @@ class PrayerTimesViewModel @Inject constructor(
                     settingsRepository.cachePrayerTimes(times)
                     
                     _uiState.value = _uiState.value.copy(
-                        isLoading = if (showLoading) false else _uiState.value.isLoading,
+                        isLoading = if (showLoading && clearLoadingImmediately) false else _uiState.value.isLoading,
                         prayerTimes = times,
                         timeUntilNext = timeUntilNext,
                         location = location,
@@ -85,13 +85,13 @@ class PrayerTimesViewModel @Inject constructor(
                     )
                 } ?: run {
                     _uiState.value = _uiState.value.copy(
-                        isLoading = if (showLoading) false else _uiState.value.isLoading,
+                        isLoading = if (showLoading && clearLoadingImmediately) false else _uiState.value.isLoading,
                         error = "Failed to calculate prayer times for ${location.getDisplayName()}"
                     )
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    isLoading = if (showLoading) false else _uiState.value.isLoading,
+                    isLoading = if (showLoading && clearLoadingImmediately) false else _uiState.value.isLoading,
                     error = e.message ?: "Unknown error occurred"
                 )
             }
@@ -148,8 +148,8 @@ class PrayerTimesViewModel @Inject constructor(
                             error = null
                         )
                         
-                        // Recalculate prayer times with new accurate location (no loading state for background update)
-                        calculatePrayerTimes(showLoading = false)
+                        // Recalculate prayer times with new accurate location (show loading for manual refresh)
+                        calculatePrayerTimes(showLoading = true, clearLoadingImmediately = true)
                     },
                     onFailure = { exception ->
                         _uiState.value = _uiState.value.copy(
@@ -245,41 +245,78 @@ class PrayerTimesViewModel @Inject constructor(
     /**
      * Refreshes prayer times
      */
-    fun refresh() {
+    fun refresh(showLoading: Boolean = false) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
             
             try {
-                // End refresh animation immediately for smooth UX - do heavy work in background
-                _uiState.value = _uiState.value.copy(isRefreshing = false)
-                
-                // Do ALL heavy work in background without blocking animation
-                launch {
-                    try {
-                        // Clear cache to force fresh calculation
-                        settingsRepository.clearPrayerTimesCache()
-                        
-                        // If using GPS, get fresh location first
-                        if (_settings.value.useGpsLocation && enhancedLocationService.hasLocationPermission()) {
-                            val result = enhancedLocationService.getCurrentLocation()
-                            result.fold(
-                                onSuccess = { androidLocation ->
-                                    val newLocation = enhancedLocationService.getLocationDetails(androidLocation)
-                                    val updatedSettings = _settings.value.copy(location = newLocation)
-                                    updateSettings(updatedSettings)
-                                },
-                                onFailure = {
-                                    // Continue with existing location if GPS fails
-                                }
+                if (showLoading) {
+                    // For manual refresh: show loading state with minimum duration to prevent glitch
+                    val startTime = System.currentTimeMillis()
+                    val minLoadingDuration = 800L // Minimum 800ms loading display
+                    
+                    // Clear cache to force fresh calculation
+                    settingsRepository.clearPrayerTimesCache()
+                    
+                    // If using GPS, get fresh location first
+                    if (_settings.value.useGpsLocation && enhancedLocationService.hasLocationPermission()) {
+                        val result = enhancedLocationService.getCurrentLocation()
+                        result.fold(
+                            onSuccess = { androidLocation ->
+                                val newLocation = enhancedLocationService.getLocationDetails(androidLocation)
+                                val updatedSettings = _settings.value.copy(location = newLocation)
+                                updateSettings(updatedSettings)
+                            },
+                            onFailure = {
+                                // Continue with existing location if GPS fails
+                            }
+                        )
+                    }
+                    
+                    // Calculate fresh prayer times with updated location - don't clear loading immediately
+                    calculatePrayerTimes(showLoading = true, clearLoadingImmediately = false)
+                    
+                    // Ensure minimum loading duration to prevent visual glitch
+                    val elapsedTime = System.currentTimeMillis() - startTime
+                    val remainingTime = minLoadingDuration - elapsedTime
+                    if (remainingTime > 0) {
+                        kotlinx.coroutines.delay(remainingTime)
+                    }
+                    
+                    // Now clear the loading state
+                    _uiState.value = _uiState.value.copy(isLoading = false)
+                } else {
+                    // For pull-to-refresh: end animation immediately for smooth UX
+                    _uiState.value = _uiState.value.copy(isRefreshing = false)
+                    
+                    // Do heavy work in background without blocking animation
+                    launch {
+                        try {
+                            // Clear cache to force fresh calculation
+                            settingsRepository.clearPrayerTimesCache()
+                            
+                            // If using GPS, get fresh location first
+                            if (_settings.value.useGpsLocation && enhancedLocationService.hasLocationPermission()) {
+                                val result = enhancedLocationService.getCurrentLocation()
+                                result.fold(
+                                    onSuccess = { androidLocation ->
+                                        val newLocation = enhancedLocationService.getLocationDetails(androidLocation)
+                                        val updatedSettings = _settings.value.copy(location = newLocation)
+                                        updateSettings(updatedSettings)
+                                    },
+                                    onFailure = {
+                                        // Continue with existing location if GPS fails
+                                    }
+                                )
+                            }
+                            
+                            // Calculate fresh prayer times with updated location
+                            calculatePrayerTimes(showLoading = false, clearLoadingImmediately = true)
+                        } catch (e: Exception) {
+                            _uiState.value = _uiState.value.copy(
+                                error = e.message ?: "Failed to refresh prayer times"
                             )
                         }
-                        
-                        // Calculate fresh prayer times with updated location (no loading state to avoid animation lag)
-                        calculatePrayerTimes(showLoading = false)
-                    } catch (e: Exception) {
-                        _uiState.value = _uiState.value.copy(
-                            error = e.message ?: "Failed to refresh prayer times"
-                        )
                     }
                 }
             } catch (e: Exception) {
@@ -320,7 +357,7 @@ class PrayerTimesViewModel @Inject constructor(
                                     updateSettings(updatedSettings)
                                     
                                     // Silently recalculate prayer times with new location (no loading state)
-                                    calculatePrayerTimes(showLoading = false)
+                                    calculatePrayerTimes(showLoading = false, clearLoadingImmediately = true)
                                 }
                             },
                             onFailure = { 

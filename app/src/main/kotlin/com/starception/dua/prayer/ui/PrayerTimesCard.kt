@@ -76,6 +76,7 @@ fun PrayerTimesCard(
     calculationMethod: CalculationMethod? = null,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    onRefreshButton: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Pull-to-refresh state exactly like ResistRoute
@@ -203,6 +204,16 @@ fun PrayerTimesCard(
                 
                 // Prayer times list
                 PrayerTimesList(prayers = prayerTimes.getAllPrayers())
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Manual refresh button
+                OutlinedButton(
+                    onClick = onRefreshButton,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Refresh Prayer Times")
+                }
             }
         }
     }
