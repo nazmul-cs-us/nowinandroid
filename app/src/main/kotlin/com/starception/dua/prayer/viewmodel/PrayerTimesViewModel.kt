@@ -47,7 +47,7 @@ class PrayerTimesViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.settingsFlow.collect { newSettings ->
                 _settings.value = newSettings
-                calculatePrayerTimes()
+                calculatePrayerTimes(showLoading = false) // Background update, no loading state
             }
         }
         
@@ -61,9 +61,11 @@ class PrayerTimesViewModel @Inject constructor(
     /**
      * Calculates prayer times for today
      */
-    fun calculatePrayerTimes(date: LocalDate = LocalDate.now()) {
+    fun calculatePrayerTimes(date: LocalDate = LocalDate.now(), showLoading: Boolean = true) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            if (showLoading) {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            }
             
             try {
                 val currentSettings = _settings.value
@@ -79,7 +81,7 @@ class PrayerTimesViewModel @Inject constructor(
                     settingsRepository.cachePrayerTimes(times)
                     
                     _uiState.value = _uiState.value.copy(
-                        isLoading = false,
+                        isLoading = if (showLoading) false else _uiState.value.isLoading,
                         prayerTimes = times,
                         timeUntilNext = timeUntilNext,
                         location = location,
@@ -88,13 +90,13 @@ class PrayerTimesViewModel @Inject constructor(
                     )
                 } ?: run {
                     _uiState.value = _uiState.value.copy(
-                        isLoading = false,
+                        isLoading = if (showLoading) false else _uiState.value.isLoading,
                         error = "Failed to calculate prayer times for ${location.getDisplayName()}"
                     )
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    isLoading = false,
+                    isLoading = if (showLoading) false else _uiState.value.isLoading,
                     error = e.message ?: "Unknown error occurred"
                 )
             }
@@ -151,8 +153,8 @@ class PrayerTimesViewModel @Inject constructor(
                             error = null
                         )
                         
-                        // Recalculate prayer times with new accurate location
-                        calculatePrayerTimes()
+                        // Recalculate prayer times with new accurate location (no loading state for background update)
+                        calculatePrayerTimes(showLoading = false)
                     },
                     onFailure = { exception ->
                         _uiState.value = _uiState.value.copy(
@@ -253,28 +255,43 @@ class PrayerTimesViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
             
             try {
-                // Clear cache to force fresh calculation
-                settingsRepository.clearPrayerTimesCache()
-                
-                // If using GPS, try to get fresh location
-                if (_settings.value.useGpsLocation && enhancedLocationService.hasLocationPermission()) {
-                    val result = enhancedLocationService.getCurrentLocation()
-                    result.fold(
-                        onSuccess = { androidLocation ->
-                            val newLocation = enhancedLocationService.getLocationDetails(androidLocation)
-                            val updatedSettings = _settings.value.copy(location = newLocation)
-                            updateSettings(updatedSettings)
-                        },
-                        onFailure = {
-                            // Continue with existing location if GPS fails
-                        }
-                    )
-                }
-                
-                // Calculate fresh prayer times
-                calculatePrayerTimes()
-            } finally {
+                // End refresh animation immediately for smooth UX - do heavy work in background
                 _uiState.value = _uiState.value.copy(isRefreshing = false)
+                
+                // Do ALL heavy work in background without blocking animation
+                launch {
+                    try {
+                        // Clear cache to force fresh calculation
+                        settingsRepository.clearPrayerTimesCache()
+                        
+                        // If using GPS, get fresh location first
+                        if (_settings.value.useGpsLocation && enhancedLocationService.hasLocationPermission()) {
+                            val result = enhancedLocationService.getCurrentLocation()
+                            result.fold(
+                                onSuccess = { androidLocation ->
+                                    val newLocation = enhancedLocationService.getLocationDetails(androidLocation)
+                                    val updatedSettings = _settings.value.copy(location = newLocation)
+                                    updateSettings(updatedSettings)
+                                },
+                                onFailure = {
+                                    // Continue with existing location if GPS fails
+                                }
+                            )
+                        }
+                        
+                        // Calculate fresh prayer times with updated location (no loading state to avoid animation lag)
+                        calculatePrayerTimes(showLoading = false)
+                    } catch (e: Exception) {
+                        _uiState.value = _uiState.value.copy(
+                            error = e.message ?: "Failed to refresh prayer times"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isRefreshing = false,
+                    error = e.message ?: "Failed to refresh prayer times"
+                )
             }
         }
     }
@@ -307,8 +324,8 @@ class PrayerTimesViewModel @Inject constructor(
                                     val updatedSettings = currentSettings.copy(location = newLocation)
                                     updateSettings(updatedSettings)
                                     
-                                    // Silently recalculate prayer times with new location
-                                    calculatePrayerTimes()
+                                    // Silently recalculate prayer times with new location (no loading state)
+                                    calculatePrayerTimes(showLoading = false)
                                 }
                             },
                             onFailure = { 
