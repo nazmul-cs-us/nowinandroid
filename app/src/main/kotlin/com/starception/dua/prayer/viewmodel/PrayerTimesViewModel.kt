@@ -35,11 +35,6 @@ class PrayerTimesViewModel @Inject constructor(
     val settings: StateFlow<PrayerSettings> = _settings.asStateFlow()
     
     init {
-        // Fix ASR method to Standard if it was set to Hanafi (one-time fix)
-        if (settingsRepository.getSettings().asrMadhhab == AsrMadhhab.HANAFI) {
-            settingsRepository.forceSetAsrToStandard()
-        }
-        
         // Load cached prayer times first for instant display
         loadCachedPrayerTimes()
         
