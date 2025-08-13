@@ -42,6 +42,9 @@ import com.starception.dua.prayer.model.DayPrayerTimes
 import com.starception.dua.prayer.model.Location
 import com.starception.dua.prayer.model.PrayerTime
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -75,25 +78,21 @@ fun PrayerTimesCard(
     onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // Pull-to-refresh state
+    // Pull-to-refresh state exactly like ResistRoute
     val context = LocalContext.current
     var dragOffset by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
     
-    // Animation for returning to original position with smooth easing
-    val animatedOffset = animateFloatAsState(
+    // Animation to return the indicator to the original position where dragOffset is zero - exactly like ResistRoute
+    val returnAnimation = animateFloatAsState(
         targetValue = if (isDragging) dragOffset else 0f,
-        animationSpec = if (isDragging) tween(0) else tween(
-            durationMillis = ANIMATION_DURATION_MS,
-            easing = FastOutSlowInEasing
-        ),
-        label = "drag_offset"
+        animationSpec = if (isDragging) tween(0) else tween(800) // Faster return animation
     )
     
-    // Update drag offset during animation return
-    LaunchedEffect(animatedOffset.value) {
-        if (!isDragging) {
-            dragOffset = animatedOffset.value
+    // Update drag offset based on return animation when not dragging - exactly like ResistRoute
+    if (!isDragging) {
+        LaunchedEffect(returnAnimation.value) {
+            dragOffset = returnAnimation.value
         }
     }
     
@@ -144,20 +143,24 @@ fun PrayerTimesCard(
                     isDragging = true
                 },
                 onDragStopped = {
+                    val shouldRefresh = dragOffset >= REFRESH_THRESHOLD
+                    
+                    // Stop dragging - animation will start automatically
                     isDragging = false
-                    // Trigger refresh if dragged past threshold
-                    if (dragOffset >= REFRESH_THRESHOLD) {
+                    
+                    // Trigger refresh if threshold was reached
+                    if (shouldRefresh) {
                         onRefresh()
                     }
                 },
                 state = rememberDraggableState { delta ->
                     if (delta > 0) { // Only allow downward drag
-                        // Apply deceleration resistance like ResistRoute
+                        // Apply deceleration resistance like ResistRoute with smoother resistance
                         val newOffset = dragOffset + delta
                         val resistance = DecelerateInterpolator().getInterpolation(
                             (newOffset / MAX_DRAG_OFFSET).coerceIn(0f, 1f)
                         )
-                        dragOffset = (dragOffset + delta * (1f - resistance * 0.8f)).coerceAtMost(MAX_DRAG_OFFSET)
+                        dragOffset = (dragOffset + delta * (1f - resistance * 0.9f)).coerceAtMost(MAX_DRAG_OFFSET)
                     }
                 }
             ),
@@ -167,7 +170,7 @@ fun PrayerTimesCard(
         Column(
             modifier = Modifier
                 .padding(16.dp)
-                .offset(y = (animatedOffset.value * 0.5f).dp), // Move entire content together
+                .offset(y = (dragOffset * 0.3f).dp), // Less content movement for smoother feel
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Always show refresh indicator at top like ResistRoute

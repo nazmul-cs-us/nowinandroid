@@ -5,10 +5,17 @@ import android.content.SharedPreferences
 import com.starception.dua.prayer.model.*
 import java.time.LocalDateTime
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 import java.time.LocalTime
 import javax.inject.Inject
@@ -65,13 +72,33 @@ class PrayerSettingsRepository @Inject constructor(
     
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     
-    private val _settingsFlow = MutableStateFlow(loadSettings())
-    val settingsFlow: StateFlow<PrayerSettings> = _settingsFlow.asStateFlow()
+    private val _settingsFlow = MutableStateFlow<PrayerSettings?>(null)
+    val settingsFlow: StateFlow<PrayerSettings> = _settingsFlow
+        .filterNotNull()
+        .stateIn(
+            scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
+            started = SharingStarted.Eagerly, // Back to Eagerly to load settings immediately
+            initialValue = getDefaultSettings()
+        )
+    
+    // Initialize settings on startup in background
+    init {
+        // Load settings in background to avoid StrictMode issues
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            _settingsFlow.value = loadSettings()
+        }
+    }
     
     /**
      * Gets current prayer settings
      */
-    fun getSettings(): PrayerSettings = _settingsFlow.value
+    fun getSettings(): PrayerSettings {
+        return _settingsFlow.value ?: run {
+            val settings = loadSettings()
+            _settingsFlow.value = settings
+            settings
+        }
+    }
     
     /**
      * Updates prayer settings
@@ -79,13 +106,15 @@ class PrayerSettingsRepository @Inject constructor(
     fun updateSettings(settings: PrayerSettings) {
         saveSettings(settings)
         _settingsFlow.value = settings
+        // Force trigger flow for UI updates
+        _settingsFlow.tryEmit(settings)
     }
     
     /**
      * Updates calculation method
      */
     fun updateCalculationMethod(method: CalculationMethod) {
-        val updated = _settingsFlow.value.copy(calculationMethod = method)
+        val updated = getSettings().copy(calculationMethod = method)
         updateSettings(updated)
     }
     
@@ -93,7 +122,7 @@ class PrayerSettingsRepository @Inject constructor(
      * Updates Asr madhhab
      */
     fun updateAsrMadhhab(madhhab: AsrMadhhab) {
-        val updated = _settingsFlow.value.copy(asrMadhhab = madhhab)
+        val updated = getSettings().copy(asrMadhhab = madhhab)
         updateSettings(updated)
     }
     
@@ -101,7 +130,7 @@ class PrayerSettingsRepository @Inject constructor(
      * Updates high latitude adjustment method
      */
     fun updateHighLatitudeAdjustment(adjustment: HighLatitudeAdjustment) {
-        val updated = _settingsFlow.value.copy(highLatitudeAdjustment = adjustment)
+        val updated = getSettings().copy(highLatitudeAdjustment = adjustment)
         updateSettings(updated)
     }
     
@@ -109,7 +138,7 @@ class PrayerSettingsRepository @Inject constructor(
      * Updates time offsets
      */
     fun updateTimeOffsets(offsets: PrayerTimeOffsets) {
-        val updated = _settingsFlow.value.copy(timeOffsets = offsets)
+        val updated = getSettings().copy(timeOffsets = offsets)
         updateSettings(updated)
     }
     
@@ -117,9 +146,10 @@ class PrayerSettingsRepository @Inject constructor(
      * Updates location settings
      */
     fun updateLocationSettings(useGps: Boolean, location: Location? = null) {
-        val updated = _settingsFlow.value.copy(
+        val currentSettings = getSettings()
+        val updated = currentSettings.copy(
             useGpsLocation = useGps,
-            location = location ?: _settingsFlow.value.location
+            location = location ?: currentSettings.location
         )
         updateSettings(updated)
     }
@@ -195,6 +225,23 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
+     * Gets default prayer settings without disk I/O
+     */
+    private fun getDefaultSettings(): PrayerSettings {
+        return PrayerSettings(
+            calculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,
+            asrMadhhab = AsrMadhhab.STANDARD,
+            highLatitudeAdjustment = HighLatitudeAdjustment.NONE,
+            customFajrAngle = null,
+            customIshaAngle = null,
+            customIshaDelay = null,
+            timeOffsets = PrayerTimeOffsets(),
+            useGpsLocation = true,
+            location = null
+        )
+    }
+    
+    /**
      * Saves settings to SharedPreferences
      */
     private fun saveSettings(settings: PrayerSettings) {
@@ -248,7 +295,7 @@ class PrayerSettingsRepository @Inject constructor(
      * Force sets ASR method to Standard (for debugging/fixing incorrect settings)
      */
     fun forceSetAsrToStandard() {
-        val updated = _settingsFlow.value.copy(asrMadhhab = AsrMadhhab.STANDARD)
+        val updated = getSettings().copy(asrMadhhab = AsrMadhhab.STANDARD)
         updateSettings(updated)
     }
     
