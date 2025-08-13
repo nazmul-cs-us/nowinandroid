@@ -249,9 +249,34 @@ class PrayerTimesViewModel @Inject constructor(
      * Refreshes prayer times
      */
     fun refresh() {
-        // Clear cache to force fresh calculation
-        settingsRepository.clearPrayerTimesCache()
-        calculatePrayerTimes()
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
+            
+            try {
+                // Clear cache to force fresh calculation
+                settingsRepository.clearPrayerTimesCache()
+                
+                // If using GPS, try to get fresh location
+                if (_settings.value.useGpsLocation && enhancedLocationService.hasLocationPermission()) {
+                    val result = enhancedLocationService.getCurrentLocation()
+                    result.fold(
+                        onSuccess = { androidLocation ->
+                            val newLocation = enhancedLocationService.getLocationDetails(androidLocation)
+                            val updatedSettings = _settings.value.copy(location = newLocation)
+                            updateSettings(updatedSettings)
+                        },
+                        onFailure = {
+                            // Continue with existing location if GPS fails
+                        }
+                    )
+                }
+                
+                // Calculate fresh prayer times
+                calculatePrayerTimes()
+            } finally {
+                _uiState.value = _uiState.value.copy(isRefreshing = false)
+            }
+        }
     }
     
     /**
@@ -353,6 +378,7 @@ class PrayerTimesViewModel @Inject constructor(
 data class PrayerTimesUiState(
     val isLoading: Boolean = false,
     val isLoadingLocation: Boolean = false,
+    val isRefreshing: Boolean = false,
     val prayerTimes: DayPrayerTimes? = null,
     val timeUntilNext: String? = null,
     val location: Location? = null,
