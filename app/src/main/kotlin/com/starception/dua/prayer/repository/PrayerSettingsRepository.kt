@@ -104,6 +104,7 @@ class PrayerSettingsRepository @Inject constructor(
      * Updates prayer settings
      */
     fun updateSettings(settings: PrayerSettings) {
+        android.util.Log.d("PrayerSettingsRepository", "Updating settings - ASR: ${settings.asrMadhhab}")
         saveSettings(settings)
         _settingsFlow.value = settings
         // Force trigger flow for UI updates
@@ -174,6 +175,7 @@ class PrayerSettingsRepository @Inject constructor(
      * Loads settings from SharedPreferences
      */
     private fun loadSettings(): PrayerSettings {
+        android.util.Log.d("PrayerSettingsRepository", "Loading settings from SharedPreferences")
         val calculationMethod = try {
             CalculationMethod.valueOf(prefs.getString(KEY_CALCULATION_METHOD, CalculationMethod.MUSLIM_WORLD_LEAGUE.name) ?: CalculationMethod.MUSLIM_WORLD_LEAGUE.name)
         } catch (e: Exception) {
@@ -181,8 +183,11 @@ class PrayerSettingsRepository @Inject constructor(
         }
         
         val asrMadhhab = try {
-            AsrMadhhab.valueOf(prefs.getString(KEY_ASR_MADHHAB, AsrMadhhab.STANDARD.name) ?: AsrMadhhab.STANDARD.name)
+            val asrValue = prefs.getString(KEY_ASR_MADHHAB, AsrMadhhab.STANDARD.name) ?: AsrMadhhab.STANDARD.name
+            android.util.Log.d("PrayerSettingsRepository", "Loading ASR madhhab: $asrValue")
+            AsrMadhhab.valueOf(asrValue)
         } catch (e: Exception) {
+            android.util.Log.e("PrayerSettingsRepository", "Error loading ASR madhhab: ${e.message}")
             AsrMadhhab.STANDARD
         }
         
@@ -245,6 +250,7 @@ class PrayerSettingsRepository @Inject constructor(
      * Saves settings to SharedPreferences
      */
     private fun saveSettings(settings: PrayerSettings) {
+        android.util.Log.d("PrayerSettingsRepository", "Saving settings - ASR: ${settings.asrMadhhab.name}")
         prefs.edit().apply {
             putString(KEY_CALCULATION_METHOD, settings.calculationMethod.name)
             putString(KEY_ASR_MADHHAB, settings.asrMadhhab.name)
@@ -280,6 +286,8 @@ class PrayerSettingsRepository @Inject constructor(
             }
             
             apply()
+        }.also {
+            android.util.Log.d("PrayerSettingsRepository", "Settings saved to SharedPreferences - ASR: ${settings.asrMadhhab.name}")
         }
     }
     
