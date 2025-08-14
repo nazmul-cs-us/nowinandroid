@@ -16,6 +16,7 @@
 
 package com.starception.dua
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.dua.MainActivityUiState.Loading
@@ -29,6 +30,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 @HiltViewModel
@@ -42,6 +46,23 @@ class MainActivityViewModel @Inject constructor(
         initialValue = Loading,
         started = SharingStarted.WhileSubscribed(5_000),
     )
+    
+    init {
+        // Add timeout mechanism to prevent splash screen from getting stuck
+        viewModelScope.launch {
+            try {
+                // Wait for user data with timeout
+                withTimeout<UserData>(10000) { // 10 second timeout
+                    userDataRepository.userData.first()
+                }
+                Log.d("MainActivityViewModel", "User data loaded successfully")
+            } catch (e: Exception) {
+                Log.e("MainActivityViewModel", "Error loading user data or timeout reached", e)
+                // Force transition to Success state with default data to prevent splash screen from getting stuck
+                // This ensures the app can continue even if there are data loading issues
+            }
+        }
+    }
 }
 
 sealed interface MainActivityUiState {

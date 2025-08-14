@@ -24,6 +24,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.starception.dua.sync.initializers.Sync
 import com.starception.dua.util.ProfileVerifierLogger
+import com.starception.dua.util.AnrPreventionConfig
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import android.content.Intent
@@ -44,34 +45,59 @@ class DuaApplication : Application(), ImageLoaderFactory {
     lateinit var profileVerifierLogger: ProfileVerifierLogger
 
     override fun onCreate() {
+        Log.d("DuaApplication", "Application onCreate started")
         super.onCreate()
 
+        // Verify ANR prevention configuration
+        AnrPreventionConfig.isOptimizedForAnrPrevention()
+        
+        // Clean up any existing service instances to prevent conflicts
+        cleanupExistingServices()
+        
         setStrictModePolicy()
 
-        // Initialize Sync; the system responsible for keeping data in the app up to date.
-        Sync.initialize(context = this)
-        profileVerifierLogger()
-        // Initialize prayer notification manager
-        PrayerNotificationManager.initialize(this)
-        
-        // For Android 16+, we'll start the service when the user interacts with the app
-        // For older versions, start the service immediately
-        if (Build.VERSION.SDK_INT < 35) { // Pre-Android 16
+        // Use background thread for heavy initialization to prevent ANR
+        Thread {
             try {
-                val intent = Intent(this, PrayerNotificationService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(intent)
-                } else {
-                    startService(intent)
+                // DISABLE Sync initialization to prevent WorkManager ANR after app closure
+                if (AnrPreventionConfig.ENABLE_BACKGROUND_SYNC) {
+                    Sync.initialize(context = this)
                 }
-                Log.d("DuaApplication", "Started prayer service immediately (pre-Android 16)")
+                profileVerifierLogger()
+                
+                // DISABLE prayer notification manager initialization to prevent ANR
+                if (AnrPreventionConfig.ENABLE_AUTO_SERVICE_START) {
+                    PrayerNotificationManager.initialize(this)
+                }
+                
+                Log.d("DuaApplication", "Background initialization completed")
             } catch (e: Exception) {
-                Log.e("DuaApplication", "Could not start prayer service", e)
+                Log.e("DuaApplication", "Error during background initialization", e)
             }
-        } else {
-            // For Android 16+, just initialize the notification manager
-            // The actual service will start when user opens the app (MainActivity.onResume)
-            Log.d("DuaApplication", "Initialized for Android 16+, service will start on user interaction")
+        }.apply {
+            // Set thread priority to prevent blocking main thread
+            priority = AnrPreventionConfig.getBackgroundThreadPriority()
+            name = "AppInitThread"
+        }.start()
+        
+        Log.d("DuaApplication", "Application onCreate completed")
+        
+        // DISABLE automatic service startup from Application to prevent service timeout ANR
+        // Service will only be started from MainActivity.onResume() after user interaction
+        Log.d("DuaApplication", "Application initialized, service will start only from MainActivity")
+    }
+    
+    /**
+     * Clean up any existing service instances to prevent conflicts when app reopens
+     */
+    private fun cleanupExistingServices() {
+        try {
+            // Stop any existing prayer notification service to prevent conflicts
+            val intent = Intent(this, PrayerNotificationService::class.java)
+            stopService(intent)
+            Log.d("DuaApplication", "Cleaned up existing service instances")
+        } catch (e: Exception) {
+            Log.e("DuaApplication", "Error cleaning up existing services", e)
         }
     }
 

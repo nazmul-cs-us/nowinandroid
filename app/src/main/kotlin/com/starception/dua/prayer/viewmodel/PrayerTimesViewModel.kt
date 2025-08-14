@@ -12,6 +12,7 @@ import com.starception.dua.prayer.service.LocationService
 import com.starception.dua.prayer.service.EnhancedLocationService
 import com.starception.dua.prayer.service.PrayerTimeCalculatorService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -31,12 +32,15 @@ class PrayerTimesViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PrayerTimesUiState())
     val uiState: StateFlow<PrayerTimesUiState> = _uiState.asStateFlow()
     
-    private val _settings = MutableStateFlow(settingsRepository.getSettings())
+    private val _settings = MutableStateFlow(PrayerSettings()) // Use default settings initially
     val settings: StateFlow<PrayerSettings> = _settings.asStateFlow()
     
     init {
         // Load cached prayer times first for instant display
         loadCachedPrayerTimes()
+        
+        // Load initial settings asynchronously to prevent main thread blocking
+        loadSettingsAsync()
         
         // Observe settings changes
         viewModelScope.launch {
@@ -51,6 +55,23 @@ class PrayerTimesViewModel @Inject constructor(
         
         // Start automatic location updates if GPS is enabled
         startAutomaticLocationUpdates()
+    }
+    
+    /**
+     * Load settings asynchronously to prevent blocking main thread during ViewModel initialization
+     */
+    private fun loadSettingsAsync() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val settings = settingsRepository.getSettings()
+                _settings.value = settings
+                android.util.Log.d("PrayerTimesViewModel", "Settings loaded asynchronously")
+            } catch (e: Exception) {
+                android.util.Log.e("PrayerTimesViewModel", "Error loading settings asynchronously", e)
+                // Provide default settings if loading fails
+                _settings.value = PrayerSettings()
+            }
+        }
     }
     
     /**
