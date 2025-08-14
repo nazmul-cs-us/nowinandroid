@@ -321,11 +321,7 @@ class PrayerNotificationService : Service() {
      * Build prayer progress content for notification
      */
     private fun buildPrayerProgressContent(progress: PrayerProgress): String {
-        val elapsedText = when (progress.elapsedMinutes) {
-            0L -> "just started"
-            1L -> "1 minute since adhan"
-            else -> "${progress.elapsedMinutes} minutes since adhan"
-        }
+        val elapsedText = formatElapsedTime(progress.elapsedMinutes)
         
         val guidanceText = when (progress.phase) {
             PrayerPhase.GO_TO_MOSQUE -> "Please go to mosque"
@@ -362,17 +358,17 @@ class PrayerNotificationService : Service() {
             when (progress.phase) {
                 PrayerPhase.GO_TO_MOSQUE -> {
                     appendLine("🕌 0-20 minutes: Please go to mosque")
-                    appendLine("   ⏰ Time elapsed: ${progress.elapsedMinutes} minutes")
+                    appendLine("   ⏰ Time elapsed: ${formatElapsedTime(progress.elapsedMinutes)}")
                     appendLine("   🎯 Goal: Reach mosque within 20 minutes")
                 }
                 PrayerPhase.BEST_TIME -> {
                     appendLine("🌟 20+ minutes: Best time for Prayer")
-                    appendLine("   ⏰ Time elapsed: ${progress.elapsedMinutes} minutes")
+                    appendLine("   ⏰ Time elapsed: ${formatElapsedTime(progress.elapsedMinutes)}")
                     appendLine("   🎯 This is the optimal prayer window")
                 }
                 PrayerPhase.MAKE_TIME -> {
                     appendLine("⚠️  Halfway+: Please make time for prayer")
-                    appendLine("   ⏰ Time elapsed: ${progress.elapsedMinutes} minutes")
+                    appendLine("   ⏰ Time elapsed: ${formatElapsedTime(progress.elapsedMinutes)}")
                     appendLine("   🎯 Don't delay further")
                 }
             }
@@ -475,6 +471,25 @@ class PrayerNotificationService : Service() {
             hours > 0 -> "${hours}h ${minutes}m"
             minutes > 0 -> "${minutes}m"
             else -> "Now"
+        }
+    }
+    
+    /**
+     * Format elapsed time in a cleaner format
+     */
+    private fun formatElapsedTime(elapsedMinutes: Long): String {
+        return when {
+            elapsedMinutes == 0L -> "just started"
+            elapsedMinutes == 1L -> "1 minute since adhan"
+            elapsedMinutes < 60 -> "${elapsedMinutes} minutes since adhan"
+            else -> {
+                val hours = elapsedMinutes / 60
+                val minutes = elapsedMinutes % 60
+                when {
+                    minutes == 0L -> "${hours}h since adhan"
+                    else -> "${hours}h ${minutes}m since adhan"
+                }
+            }
         }
     }
 
