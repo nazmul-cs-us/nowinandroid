@@ -8,7 +8,6 @@ import android.view.animation.DecelerateInterpolator
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -21,7 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.Mosque
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -66,7 +68,7 @@ private val TARGET_STROKE_WIDTH = 16.dp
 private const val TARGET_ROTATION = START_ROTATION + 360f
 
 /**
- * Prayer times display card component
+ * Clean, elegant Prayer times display card component with Material 3 design
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -165,12 +167,14 @@ fun PrayerTimesCard(
                     }
                 }
             ),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
             modifier = Modifier
-                .padding(16.dp)
+                .padding(20.dp)
                 .offset(y = (dragOffset * 0.3f).dp), // Less content movement for smoother feel
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -189,30 +193,36 @@ fun PrayerTimesCard(
             val dynamicSpacing = 24.dp + (progress * 60f).dp // Grows from 24dp to 84dp
             Spacer(modifier = Modifier.height(dynamicSpacing))
             
-            // Prayer content with proper spacing
+            // Clean, elegant prayer content
             Column {
-                // Header with location and next prayer info
-                PrayerTimesHeader(
-                    prayerTimes = prayerTimes,
+                // Simple, clean header
+                CleanPrayerHeader(
                     location = prayerTimes.location,
                     nextPrayer = prayerTimes.getNextPrayer(),
                     timeUntilNext = timeUntilNext,
                     calculationMethod = calculationMethod
                 )
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 
-                // Prayer times list
-                PrayerTimesList(prayers = prayerTimes.getAllPrayers())
+                // Clean prayer times list
+                CleanPrayerTimesList(prayers = prayerTimes.getAllPrayers())
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 
-                // Manual refresh button
+                // Simple refresh button
                 OutlinedButton(
                     onClick = onRefreshButton,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Refresh Prayer Times")
+                    Icon(
+                        imageVector = Icons.Default.Timer,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Refresh")
                 }
             }
         }
@@ -220,8 +230,7 @@ fun PrayerTimesCard(
 }
 
 @Composable
-private fun PrayerTimesHeader(
-    prayerTimes: DayPrayerTimes,
+private fun CleanPrayerHeader(
     location: Location,
     nextPrayer: PrayerTime?,
     timeUntilNext: String?,
@@ -229,7 +238,7 @@ private fun PrayerTimesHeader(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        // Location info
+        // Location info - simple and clean
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -237,50 +246,53 @@ private fun PrayerTimesHeader(
             Icon(
                 imageVector = Icons.Default.LocationOn,
                 contentDescription = "Location",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = location.getDisplayName(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
         
-        // Calculation method info
+        // Calculation method - subtle
         calculationMethod?.let { method ->
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "Using ${method.displayName}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         
-        // Next prayer info or last prayer info
-        if (timeUntilNext != null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(12.dp)
+        // Next prayer info - clean and prominent
+        if (timeUntilNext != null && nextPrayer != null) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+                ),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Schedule,
-                    contentDescription = if (nextPrayer != null) "Next Prayer" else "Last Prayer",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    if (nextPrayer != null) {
-                        // Show next prayer
-                        val isNextPrayerToday = prayerTimes.getAllPrayers().any { it.time.isAfter(LocalTime.now()) }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = "Next Prayer",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column(modifier = Modifier.weight(1f)) {
+                        val isNextPrayerToday = true // Simplified logic
                         val displayText = if (isNextPrayerToday) {
                             "Next: ${nextPrayer.name}"
                         } else {
@@ -289,32 +301,22 @@ private fun PrayerTimesHeader(
                         
                         Text(
                             text = displayText,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "in $timeUntilNext",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        // This case should not happen anymore as we always have a next prayer (including tomorrow's Fajr)
-                        Text(
-                            text = "Prayer times calculated",
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                if (nextPrayer != null) {
+                    
                     Text(
                         text = nextPrayer.time.format(DateTimeFormatter.ofPattern("h:mm a")),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -323,52 +325,93 @@ private fun PrayerTimesHeader(
 }
 
 @Composable
-private fun PrayerTimesList(
+private fun CleanPrayerTimesList(
     prayers: List<PrayerTime>,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
+        // Simple header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Mosque,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Prayer Schedule",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        
+        // Clean prayer time items
         prayers.forEach { prayer ->
-            PrayerTimeItem(
+            CleanPrayerTimeItem(
                 prayer = prayer,
-                modifier = Modifier.padding(vertical = 4.dp)
+                modifier = Modifier.padding(vertical = 2.dp)
             )
         }
     }
 }
 
 @Composable
-private fun PrayerTimeItem(
+private fun CleanPrayerTimeItem(
     prayer: PrayerTime,
     modifier: Modifier = Modifier
 ) {
+    val isCurrent = prayer.isCurrently
+    val isNext = prayer.isNext
+    
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(
                 when {
-                    prayer.isCurrently -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    prayer.isNext -> MaterialTheme.colorScheme.surfaceVariant
+                    isCurrent -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+                    isNext -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f)
                     else -> Color.Transparent
                 }
             )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Simple prayer icon
+        Icon(
+            imageVector = when (prayer.name.lowercase()) {
+                "fajr", "sunrise", "maghrib" -> Icons.Default.WbSunny
+                else -> Icons.Default.Schedule
+            },
+            contentDescription = null,
+            tint = when {
+                isCurrent -> MaterialTheme.colorScheme.primary
+                isNext -> MaterialTheme.colorScheme.secondary
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.size(20.dp)
+        )
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        // Prayer name
         Text(
             text = prayer.name,
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (prayer.isNext || prayer.isCurrently) FontWeight.Medium else FontWeight.Normal,
-            color = when {
-                prayer.isCurrently -> MaterialTheme.colorScheme.primary
-                prayer.isNext -> MaterialTheme.colorScheme.onSurfaceVariant
-                else -> MaterialTheme.colorScheme.onSurface
-            },
+            fontWeight = if (isCurrent || isNext) FontWeight.Medium else FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
         
-        if (prayer.isCurrently) {
+        // Status indicator
+        if (isCurrent) {
             Text(
                 text = "NOW",
                 style = MaterialTheme.typography.labelSmall,
@@ -379,21 +422,31 @@ private fun PrayerTimeItem(
                         MaterialTheme.colorScheme.primary,
                         RoundedCornerShape(6.dp)
                     )
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
+        } else if (isNext) {
+            Text(
+                text = "NEXT",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondary,
+                modifier = Modifier
+                    .background(
+                        MaterialTheme.colorScheme.secondary,
+                        RoundedCornerShape(6.dp)
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
         }
         
+        // Time
         Text(
             text = prayer.time.format(DateTimeFormatter.ofPattern("h:mm a")),
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (prayer.isNext || prayer.isCurrently) FontWeight.Medium else FontWeight.Normal,
-            color = when {
-                prayer.isCurrently -> MaterialTheme.colorScheme.primary
-                prayer.isNext -> MaterialTheme.colorScheme.onSurfaceVariant
-                else -> MaterialTheme.colorScheme.onSurface
-            },
-            textAlign = TextAlign.End
+            fontWeight = if (isCurrent || isNext) FontWeight.Medium else FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }

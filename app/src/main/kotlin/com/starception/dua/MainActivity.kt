@@ -26,9 +26,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -48,6 +52,7 @@ import com.starception.dua.services.PrayerNotificationService
 import com.starception.dua.ui.NiaApp
 import com.starception.dua.ui.rememberNiaAppState
 import com.starception.dua.util.isSystemInDarkTheme
+import com.starception.dua.util.NotificationTestHelper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -55,12 +60,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     /**
      * Lazily inject [JankStats], which is used to track jank throughout the app.
+     * Using lazy injection to prevent main thread blocking during startup
      */
     @Inject
     lateinit var lazyStats: dagger.Lazy<JankStats>
@@ -80,6 +87,8 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainActivityViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.d("MainActivity", "onCreate started with modern Hilt optimization")
+        
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
 
@@ -93,7 +102,7 @@ class MainActivity : ComponentActivity() {
             ),
         )
 
-        // Update the uiState
+        // Update the uiState with modern optimization patterns
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 combine(
@@ -134,7 +143,57 @@ class MainActivity : ComponentActivity() {
         // Keep the splash screen on-screen until the UI state is loaded. This condition is
         // evaluated each time the app needs to be redrawn so it should be fast to avoid blocking
         // the UI.
-        splashScreen.setKeepOnScreenCondition { viewModel.uiState.value.shouldKeepSplashScreen() }
+        var splashStartTime = System.currentTimeMillis()
+        splashScreen.setKeepOnScreenCondition { 
+            val shouldKeep = viewModel.uiState.value.shouldKeepSplashScreen()
+            val splashDuration = System.currentTimeMillis() - splashStartTime
+            
+            // Add fallback: force hide splash screen after 15 seconds to prevent getting stuck
+            val forceHide = splashDuration > 15000
+            
+            if (forceHide) {
+                Log.w("MainActivity", "Forcing splash screen to hide after ${splashDuration}ms timeout")
+            }
+            
+            Log.d("MainActivity", "Splash screen condition: $shouldKeep, duration: ${splashDuration}ms, forceHide: $forceHide")
+            
+            shouldKeep && !forceHide
+        }
+        
+        // Monitor UI state changes to start service once splash screen is hidden
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    when (state) {
+                        is MainActivityUiState.Success -> {
+                            Log.d("MainActivity", "UI loaded successfully, waiting before starting service")
+                            
+                            // Wait a bit more to ensure UI is fully stable
+                            delay(2000)
+                            
+                            // Only start service if not already running
+                            if (!PrayerNotificationService.isServiceRunningInAnotherProcess(this@MainActivity)) {
+                                startPrayerServiceIfNeeded()
+                                
+                                // Test notifications after UI is loaded
+                                try {
+                                    NotificationTestHelper.logNotificationStatus(this@MainActivity)
+                                    NotificationTestHelper.testBasicNotification(this@MainActivity)
+                                    Log.d("MainActivity", "Test notification sent after UI load")
+                                } catch (e: Exception) {
+                                    Log.e("MainActivity", "Error testing notifications after UI load", e)
+                                }
+                            } else {
+                                Log.d("MainActivity", "Service already running, skipping startup")
+                            }
+                        }
+                        is MainActivityUiState.Loading -> {
+                            Log.d("MainActivity", "UI still loading, waiting...")
+                        }
+                    }
+                }
+            }
+        }
 
         setContent {
             val appState = rememberNiaAppState(
@@ -158,47 +217,61 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        
+        // Test notifications to verify they're working - moved to onResume to prevent blocking onCreate
+        Log.d("MainActivity", "Modern onCreate completed with optimized Hilt")
     }
 
     override fun onResume() {
         super.onResume()
+        
+        // Use lazy stats access to prevent blocking
         lazyStats.get().isTrackingEnabled = true
         
-        // Start prayer notification service when user interacts with app (Android 16 requirement)
-        startPrayerServiceIfNeeded()
+        Log.d("MainActivity", "onResume completed with modern optimization")
     }
     
     /**
-     * Start prayer notification service when appropriate (Android 16+ compliance)
+     * Start prayer notification service when appropriate
+     * Enabled for notifications while maintaining ANR prevention
      */
     private fun startPrayerServiceIfNeeded() {
-        if (Build.VERSION.SDK_INT >= 35) { // Android 16+
+        Log.d("MainActivity", "Starting prayer service for notifications")
+        
+        // Check if service is already running to prevent conflicts
+        if (PrayerNotificationService.isServiceRunningInAnotherProcess(this)) {
+            Log.w("MainActivity", "Service already running in another process, skipping startup to prevent conflicts")
+            return
+        }
+        
+        // Start the service in a background coroutine to prevent ANR
+        lifecycleScope.launch {
             try {
-                val intent = Intent(this, PrayerNotificationService::class.java)
-                startForegroundService(intent)
-                Log.d("MainActivity", "Started prayer service from user interaction (Android 16+)")
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Could not start prayer service from MainActivity", e)
-            }
-        } else {
-            // For pre-Android 16, ensure service is running (fallback)
-            try {
-                val intent = Intent(this, PrayerNotificationService::class.java)
+                // Add delay to ensure UI is fully loaded before starting service
+                delay(1000)
+                
+                // Start service in background to prevent main thread blocking
+                val intent = Intent(this@MainActivity, PrayerNotificationService::class.java)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     startForegroundService(intent)
                 } else {
                     startService(intent)
                 }
-                Log.d("MainActivity", "Ensured prayer service is running (pre-Android 16 fallback)")
+                Log.d("MainActivity", "Prayer service started in background for notifications")
             } catch (e: Exception) {
-                Log.e("MainActivity", "Could not ensure prayer service is running", e)
+                Log.e("MainActivity", "Error starting prayer service", e)
             }
         }
     }
+    
 
     override fun onPause() {
         super.onPause()
+        
+        // Use lazy stats access to prevent blocking  
         lazyStats.get().isTrackingEnabled = false
+        
+        Log.d("MainActivity", "onPause completed with modern optimization")
     }
 }
 

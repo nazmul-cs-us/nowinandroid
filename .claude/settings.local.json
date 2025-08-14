@@ -20,8 +20,10 @@
       "Bash(java:*)",
       "WebFetch(domain:patentimages.storage.googleapis.com)",
       "Bash(kotlin verify_prayer_calculations.kt:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(unzip:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }

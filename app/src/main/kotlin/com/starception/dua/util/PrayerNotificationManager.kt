@@ -17,6 +17,7 @@ import com.starception.dua.R
 object PrayerNotificationManager {
     private lateinit var notificationManager: NotificationManager
     private lateinit var appContext: Context
+    private var initialized: Boolean = false
     
     private const val TAG = "PrayerNotificationMgr"
     private const val CHANNEL_ID = "prayer_live_update_channel"
@@ -27,8 +28,14 @@ object PrayerNotificationManager {
         appContext = context.applicationContext
         notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel()
+        initialized = true
         Log.d(TAG, "PrayerNotificationManager initialized")
     }
+    
+    /**
+     * Check if the notification manager has been initialized
+     */
+    fun isInitialized(): Boolean = initialized
     
     /**
      * Create PendingIntent to launch the main app
@@ -36,13 +43,10 @@ object PrayerNotificationManager {
      */
     private fun createAppLaunchIntent(): PendingIntent {
         val intent = Intent(appContext, MainActivity::class.java).apply {
-            // Use flags that work well with app launch from notifications
-            // Avoid CLEAR_TASK which can cause dependency injection issues
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            // Add category to ensure proper launcher behavior
-            addCategory(Intent.CATEGORY_LAUNCHER)
-            // Ensure we go to the main activity
-            action = Intent.ACTION_MAIN
+            // Use minimal flags to avoid conflicts with app lifecycle
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            // Don't add CATEGORY_LAUNCHER for notification intents - this can cause conflicts
+            // Don't set ACTION_MAIN for notification intents
         }
         return PendingIntent.getActivity(
             appContext,
