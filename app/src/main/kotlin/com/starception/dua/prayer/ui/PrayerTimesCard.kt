@@ -20,8 +20,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.Mosque
 import androidx.compose.material3.*
@@ -217,7 +218,7 @@ fun PrayerTimesCard(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Timer,
+                        imageVector = Icons.Default.Refresh,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp)
                     )
@@ -292,7 +293,9 @@ private fun CleanPrayerHeader(
                     Spacer(modifier = Modifier.width(12.dp))
                     
                     Column(modifier = Modifier.weight(1f)) {
-                        val isNextPrayerToday = true // Simplified logic
+                        // Check if next prayer is today or tomorrow based on the prayer time
+                        val now = LocalTime.now()
+                        val isNextPrayerToday = nextPrayer.time.isAfter(now)
                         val displayText = if (isNextPrayerToday) {
                             "Next: ${nextPrayer.name}"
                         } else {
@@ -317,6 +320,33 @@ private fun CleanPrayerHeader(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        } else if (timeUntilNext == null) {
+            // Show loading state when prayer times are being calculated
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f)
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Text(
+                        text = "Calculating prayer times...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -384,11 +414,13 @@ private fun CleanPrayerTimeItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Simple prayer icon
+        // Smart prayer icon based on time of day
         Icon(
-            imageVector = when (prayer.name.lowercase()) {
-                "fajr", "sunrise", "maghrib" -> Icons.Default.WbSunny
-                else -> Icons.Default.Schedule
+            imageVector = when {
+                // Daytime prayers (6 AM to 6 PM)
+                prayer.time.hour in 6..17 -> Icons.Default.WbSunny
+                // Nighttime prayers (6 PM to 6 AM)
+                else -> Icons.Default.Nightlight
             },
             contentDescription = null,
             tint = when {
