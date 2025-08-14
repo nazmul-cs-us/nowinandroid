@@ -22,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.DisposableEffect
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -129,10 +130,10 @@ class NiaAppState(
     val topLevelDestinationsWithUnreadResources: StateFlow<Set<TopLevelDestination>> =
         userNewsResourceRepository.observeAllForFollowedTopics()
             .combine(userNewsResourceRepository.observeAllBookmarked()) { forYouNewsResources, bookmarkedNewsResources ->
-                setOfNotNull(
+                listOfNotNull(
                     FOR_YOU.takeIf { forYouNewsResources.any { !it.hasBeenViewed } },
                     BOOKMARKS.takeIf { bookmarkedNewsResources.any { !it.hasBeenViewed } },
-                )
+                ).toSet()
             }
             .stateIn(
                 coroutineScope,

@@ -48,11 +48,15 @@ import com.starception.dua.core.data.util.NetworkMonitor
 import com.starception.dua.core.data.util.TimeZoneMonitor
 import com.starception.dua.core.designsystem.theme.NiaTheme
 import com.starception.dua.core.ui.LocalTimeZone
-import com.starception.dua.services.PrayerNotificationService
+import com.starception.dua.core.ui.TrackDisposableJank
+import com.starception.dua.navigation.NiaNavHost
 import com.starception.dua.ui.NiaApp
+import com.starception.dua.ui.NiaAppState
+import com.starception.dua.ui.NiaAppState.Companion.savedStateHandle
 import com.starception.dua.ui.rememberNiaAppState
+import com.starception.dua.util.AnrPreventionConfig
+import com.starception.dua.services.PrayerNotificationService
 import com.starception.dua.util.isSystemInDarkTheme
-import com.starception.dua.util.NotificationTestHelper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -61,6 +65,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlinx.coroutines.delay
+
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -175,16 +180,9 @@ class MainActivity : ComponentActivity() {
                             if (!PrayerNotificationService.isServiceRunningInAnotherProcess(this@MainActivity)) {
                                 startPrayerServiceIfNeeded()
                                 
-                                // Test notifications after UI is loaded
-                                try {
-                                    NotificationTestHelper.logNotificationStatus(this@MainActivity)
-                                    NotificationTestHelper.testBasicNotification(this@MainActivity)
-                                    Log.d("MainActivity", "Test notification sent after UI load")
-                                } catch (e: Exception) {
-                                    Log.e("MainActivity", "Error testing notifications after UI load", e)
-                                }
+                                Log.d("MainActivity", "Prayer service started after UI load")
                             } else {
-                                Log.d("MainActivity", "Service already running, skipping startup")
+                                Log.d("MainActivity", "Prayer service already running in another process")
                             }
                         }
                         is MainActivityUiState.Loading -> {
@@ -213,12 +211,12 @@ class MainActivity : ComponentActivity() {
                     androidTheme = themeSettings.androidTheme,
                     disableDynamicTheming = themeSettings.disableDynamicTheming,
                 ) {
+                    // Full app functionality restored
                     NiaApp(appState)
                 }
             }
         }
         
-        // Test notifications to verify they're working - moved to onResume to prevent blocking onCreate
         Log.d("MainActivity", "Modern onCreate completed with optimized Hilt")
     }
 
