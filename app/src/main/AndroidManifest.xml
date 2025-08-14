@@ -69,11 +69,9 @@
         <service
             android:name=".services.PrayerNotificationService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="prayer_notifications" />
-        </service>
+            android:foregroundServiceType="dataSync"
+            android:stopWithTask="false" />
+            <!-- Using dataSync type instead of specialUse to avoid restrictions -->
 
         <!-- Disable Firebase analytics by default. This setting is overwritten for the `prod`
         flavor -->

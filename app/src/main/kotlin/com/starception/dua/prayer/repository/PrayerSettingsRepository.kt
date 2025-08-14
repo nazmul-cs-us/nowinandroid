@@ -70,7 +70,10 @@ class PrayerSettingsRepository @Inject constructor(
         private const val KEY_CACHED_LOCATION_TIMEZONE = "cached_location_timezone"
     }
     
-    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    // Use lazy initialization to prevent main thread blocking during repository creation
+    private val prefs: SharedPreferences by lazy { 
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
     
     private val _settingsFlow = MutableStateFlow<PrayerSettings?>(null)
     val settingsFlow: StateFlow<PrayerSettings> = _settingsFlow
@@ -91,13 +94,10 @@ class PrayerSettingsRepository @Inject constructor(
     
     /**
      * Gets current prayer settings
+     * Returns default settings if async loading is not complete yet to prevent main thread blocking
      */
     fun getSettings(): PrayerSettings {
-        return _settingsFlow.value ?: run {
-            val settings = loadSettings()
-            _settingsFlow.value = settings
-            settings
-        }
+        return _settingsFlow.value ?: PrayerSettings() // Return default settings instead of blocking main thread
     }
     
     /**
