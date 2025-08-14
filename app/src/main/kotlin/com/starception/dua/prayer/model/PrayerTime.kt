@@ -37,7 +37,7 @@ data class DayPrayerTimes(
             PrayerTime("Isha", isha)
         )
         
-        // Find next prayer
+        // Find next prayer today
         val nextPrayerIndex = prayers.indexOfFirst { it.time.isAfter(now) }
         
         return prayers.mapIndexed { index, prayer ->
@@ -57,8 +57,16 @@ data class DayPrayerTimes(
                 else -> false
             }
             
+            val isNext = when {
+                // If there's a next prayer today, mark it
+                index == nextPrayerIndex -> true
+                // If no prayers left today and this is Fajr, it might be tomorrow's next prayer
+                nextPrayerIndex == -1 && index == 0 -> true
+                else -> false
+            }
+            
             prayer.copy(
-                isNext = index == nextPrayerIndex,
+                isNext = isNext,
                 isCurrently = isCurrently
             )
         }
@@ -66,6 +74,45 @@ data class DayPrayerTimes(
     
     fun getNextPrayer(): PrayerTime? {
         val now = LocalTime.now()
-        return getAllPrayers().firstOrNull { it.time.isAfter(now) }
+        
+        // First try to find a prayer today that's after current time
+        val todayNextPrayer = getAllPrayers().firstOrNull { it.time.isAfter(now) }
+        if (todayNextPrayer != null) {
+            return todayNextPrayer
+        }
+        
+        // If no prayers left today, the next prayer is tomorrow's Fajr
+        // This handles the cyclical nature: Fajr -> Dhuhr -> Asr -> Maghrib -> Isha -> (next day) Fajr
+        return PrayerTime("Fajr", fajr, isNext = true)
+    }
+    
+    fun getTimeUntilNextPrayer(): String? {
+        val nextPrayer = getNextPrayer() ?: return null
+        val now = LocalTime.now()
+        
+        return if (nextPrayer.time.isAfter(now)) {
+            // Next prayer is today
+            val duration = java.time.Duration.between(now, nextPrayer.time)
+            val hours = duration.toHours()
+            val minutes = duration.toMinutesPart()
+            
+            when {
+                hours > 0 -> "${hours}h ${minutes}m"
+                minutes > 0 -> "${minutes}m"
+                else -> "Now"
+            }
+        } else {
+            // Next prayer is tomorrow's Fajr
+            val duration = java.time.Duration.between(now, LocalTime.MAX) + 
+                         java.time.Duration.between(LocalTime.MIN, nextPrayer.time)
+            val hours = duration.toHours()
+            val minutes = duration.toMinutesPart()
+            
+            when {
+                hours > 0 -> "${hours}h ${minutes}m"
+                minutes > 0 -> "${minutes}m"
+                else -> "Now"
+            }
+        }
     }
 }
