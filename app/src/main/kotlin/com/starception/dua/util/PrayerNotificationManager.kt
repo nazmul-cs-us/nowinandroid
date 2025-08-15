@@ -105,8 +105,9 @@ object PrayerNotificationManager {
             buildRegularNotification(prayerName, progress, isOngoing)
         }
         
+        // Always use the same notification ID to update existing notification
         notificationManager.notify(NOTIFICATION_ID, notification.build())
-        Log.d(TAG, "Posted notification: $prayerName (progress: $progress%)")
+        Log.d(TAG, "Updated notification: $prayerName (progress: $progress%)")
     }
     
     /**
@@ -149,8 +150,9 @@ object PrayerNotificationManager {
                     prayerName = prayerName // Pass the prayer name to the style builder
                 )
                 
+                // Update existing notification instead of creating new one
                 notificationManager.notify(NOTIFICATION_ID, notification.build())
-                Log.d(TAG, "Posted Android 16 Live Update notification: $title")
+                Log.d(TAG, "Updated Android 16 Live Update notification: $title")
                 
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to create Android 16 Live Update notification, falling back: ${e.message}")
@@ -499,6 +501,7 @@ object PrayerNotificationManager {
     /**
      * Build Live Update notification using native Android 16 ProgressStyle
      * This provides modern progress segments and better visual appeal
+     * Optimized for lock screen compatibility with static colors
      */
     @RequiresApi(35) // Android 16
     private fun buildLiveUpdateNotification(
@@ -541,6 +544,8 @@ object PrayerNotificationManager {
             setShowWhen(true)
             setUsesChronometer(false)
             setAutoCancel(false)
+            
+
         }
     }
     
@@ -553,20 +558,21 @@ object PrayerNotificationManager {
         return try {
             // Use NotificationCompat.ProgressStyle for official progressSegments
             // Following the exact pattern from the official Android platform sample
+            // No custom colors to prevent lock screen color issues
             val progressStyle = NotificationCompat.ProgressStyle()
                 .setProgress(progress) // Only takes progress value
                 .setProgressSegments(
                     listOf(
-                        NotificationCompat.ProgressStyle.Segment(20).setColor(Color.parseColor("#4CAF50")), // Green for mosque phase
-                        NotificationCompat.ProgressStyle.Segment(40).setColor(Color.parseColor("#FF9800")), // Orange for best time phase
-                        NotificationCompat.ProgressStyle.Segment(40).setColor(Color.parseColor("#F44336"))  // Red for make time phase
+                        NotificationCompat.ProgressStyle.Segment(20), // No custom color
+                        NotificationCompat.ProgressStyle.Segment(40), // No custom color
+                        NotificationCompat.ProgressStyle.Segment(40)  // No custom color
                     )
                 )
                 .setProgressPoints(
                     listOf(
-                        NotificationCompat.ProgressStyle.Point(20).setColor(Color.parseColor("#4CAF50")),  // Mosque phase point
-                        NotificationCompat.ProgressStyle.Point(60).setColor(Color.parseColor("#FF9800")),  // Best time phase point
-                        NotificationCompat.ProgressStyle.Point(100).setColor(Color.parseColor("#F44336"))  // Make time phase point
+                        NotificationCompat.ProgressStyle.Point(20),  // No custom color
+                        NotificationCompat.ProgressStyle.Point(60),  // No custom color
+                        NotificationCompat.ProgressStyle.Point(100)  // No custom color
                     )
                 )
             
