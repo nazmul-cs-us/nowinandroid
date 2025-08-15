@@ -233,7 +233,12 @@ class PrayerNotificationService : Service() {
                     content = content,
                     detailedMessage = detailedMessage,
                     progress = progress,
-                    isOngoing = true
+                    isOngoing = true,
+                    prayerName = if (content.contains(" since ")) {
+                        content.split(" since ").lastOrNull()?.split(" • ")?.firstOrNull() ?: "Prayer"
+                    } else {
+                        "Prayer"
+                    }
                 )
                 Log.d(TAG, "Updated prayer notification with real data: $title (progress: $progress%)")
             } else {
@@ -286,11 +291,11 @@ class PrayerNotificationService : Service() {
             
             // Format notification content based on prayer progress
             val title = when (prayerProgress.phase) {
-                PrayerPhase.GO_TO_MOSQUE -> "Prayer Time • ${currentPrayer.name}"
-                PrayerPhase.BEST_TIME -> "Best Time to Pray • ${currentPrayer.name}"
-                PrayerPhase.MAKE_TIME -> "Make Time for Prayer • ${currentPrayer.name}"
+                PrayerPhase.GO_TO_MOSQUE -> "Prayer Time"
+                PrayerPhase.BEST_TIME -> "Best Time to Pray"
+                PrayerPhase.MAKE_TIME -> "Make Time for Prayer"
             }
-            val content = buildPrayerProgressContent(prayerProgress)
+            val content = buildPrayerProgressContent(prayerProgress, currentPrayer)
             val detailedMessage = buildDetailedPrayerProgressMessage(prayerTimes, currentPrayer, nextPrayer, prayerProgress)
             
             // Add next prayer countdown to title for better visibility
@@ -341,19 +346,15 @@ class PrayerNotificationService : Service() {
     /**
      * Build prayer progress content for notification
      */
-    private fun buildPrayerProgressContent(progress: PrayerProgress): String {
+    private fun buildPrayerProgressContent(progress: PrayerProgress, currentPrayer: PrayerTime): String {
         val elapsedText = formatElapsedTime(progress.elapsedMinutes)
-        
         val guidanceText = when (progress.phase) {
             PrayerPhase.GO_TO_MOSQUE -> "Go to mosque"
             PrayerPhase.BEST_TIME -> "Best time to pray"
-            PrayerPhase.MAKE_TIME -> "Make time for prayer"
+            PrayerPhase.MAKE_TIME -> "Make time for Prayer"
         }
         
-        // Add progress percentage for better visibility
-        val progressText = "${progress.progressPercentage.toInt()}% complete"
-        
-        return "$elapsedText • $guidanceText • $progressText"
+        return "$elapsedText since ${currentPrayer.name} • $guidanceText"
     }
     
     /**
@@ -366,23 +367,10 @@ class PrayerNotificationService : Service() {
         progress: PrayerProgress
     ): String {
         return buildString {
-            // First line: Current prayer with clear time information
-            val elapsedText = formatElapsedTime(progress.elapsedMinutes)
-            val guidanceText = when (progress.phase) {
-                PrayerPhase.GO_TO_MOSQUE -> "Go to mosque"
-                PrayerPhase.BEST_TIME -> "Best time to pray"
-                PrayerPhase.MAKE_TIME -> "Make time for prayer"
-            }
-            appendLine("${currentPrayer.name} Prayer • $elapsedText")
-            appendLine("$guidanceText")
-            
-            // Second line: Clear next prayer countdown
+            // Only show next prayer countdown since elapsed time is already in main content
             if (nextPrayer != null) {
                 val timeRemaining = formatTimeRemaining(nextPrayer.time)
-                val nextPrayerTime = nextPrayer.time.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
-                appendLine("")
-                appendLine("Next Prayer • ${nextPrayer.name} at $nextPrayerTime")
-                appendLine("Time remaining • $timeRemaining")
+                appendLine("Next • ${nextPrayer.name} in $timeRemaining")
             }
         }
     }
@@ -447,14 +435,14 @@ class PrayerNotificationService : Service() {
     private fun formatElapsedTime(elapsedMinutes: Long): String {
         return when {
             elapsedMinutes == 0L -> "just started"
-            elapsedMinutes == 1L -> "1 minute since adhan"
-            elapsedMinutes < 60 -> "${elapsedMinutes} minutes since adhan"
+            elapsedMinutes == 1L -> "1 minute"
+            elapsedMinutes < 60 -> "${elapsedMinutes} minutes"
             else -> {
                 val hours = elapsedMinutes / 60
                 val minutes = elapsedMinutes % 60
                 when {
-                    minutes == 0L -> "${hours}h since adhan"
-                    else -> "${hours}h ${minutes}m since adhan"
+                    minutes == 0L -> "${hours}h"
+                    else -> "${hours}h ${minutes}m"
                 }
             }
         }

@@ -117,7 +117,8 @@ object PrayerNotificationManager {
         content: String,
         detailedMessage: String,
         progress: Int = 0,
-        isOngoing: Boolean = true
+        isOngoing: Boolean = true,
+        prayerName: String
     ) {
         Log.d(TAG, "Posting detailed prayer notification: $title")
         
@@ -144,7 +145,8 @@ object PrayerNotificationManager {
                     content = content,
                     detailedMessage = detailedMessage,
                     progress = progress,
-                    isOngoing = isOngoing
+                    isOngoing = isOngoing,
+                    prayerName = prayerName // Pass the prayer name to the style builder
                 )
                 
                 notificationManager.notify(NOTIFICATION_ID, notification.build())
@@ -342,6 +344,7 @@ object PrayerNotificationManager {
         // Add progress if specified
         if (progress > 0 && progress <= 100) {
             notification.setProgress(100, progress, false)
+            // Removed custom colors to maintain lock screen compatibility
         }
         
         notificationManager.notify(NOTIFICATION_ID, notification.build())
@@ -393,7 +396,8 @@ object PrayerNotificationManager {
                     "Live Updates Active",
                     "Prayer time tracking with real-time updates",
                     0,
-                    true
+                    true,
+                    "Prayer Time Tracker" // Pass a dummy prayer name for the force refresh
                 ).build()
                 
                 notificationManager.notify(NOTIFICATION_ID, notification)
@@ -476,22 +480,17 @@ object PrayerNotificationManager {
      * Following the official Android 16 sample pattern
      */
     @RequiresApi(35) // Android 16
-    private fun buildLiveUpdateProgressStyle(progress: Int): NotificationCompat.ProgressStyle {
-        // Modern Material Design 3 color palette for prayer phases
-        val mosqueColor = Color.parseColor("#4CAF50")      // Green for mosque phase
-        val bestTimeColor = Color.parseColor("#FF9800")    // Orange for best time phase  
-        val makeTimeColor = Color.parseColor("#F44336")    // Red for make time phase
-        
+    private fun buildLiveUpdateProgressStyle(progress: Int, detailedMessage: String, prayerName: String, mainContent: String): NotificationCompat.Style {
         return try {
-            // Note: The advanced ProgressStyle features (segments, points) are not yet available
-            // in NotificationCompat.ProgressStyle. This will be enhanced when AndroidX fully
-            // supports Android 16 Progress-Centric Notifications.
-            // For now, we use the basic progress functionality.
-            NotificationCompat.ProgressStyle().setProgress(progress)
+            // Create a custom style that combines main content with detailed text
+            // This ensures both main content and detailed message are visible with minimal spacing
+            NotificationCompat.BigTextStyle()
+                .bigText("$mainContent\n$detailedMessage")
+                .setBigContentTitle("${progress}% $prayerName Prayer time passed")
         } catch (e: Exception) {
-            Log.w(TAG, "Error building Live Update ProgressStyle: ${e.message}")
-            // Fallback to basic ProgressStyle
-            NotificationCompat.ProgressStyle().setProgress(progress)
+            Log.w(TAG, "Error building Live Update Style: ${e.message}")
+            // Fallback to basic BigTextStyle
+            NotificationCompat.BigTextStyle().bigText("$mainContent\n$detailedMessage")
         }
     }
     
@@ -505,27 +504,30 @@ object PrayerNotificationManager {
         content: String,
         detailedMessage: String,
         progress: Int,
-        isOngoing: Boolean
+        isOngoing: Boolean,
+        prayerName: String
     ): NotificationCompat.Builder {
         return NotificationCompat.Builder(appContext, CHANNEL_ID).apply {
             setContentTitle(title)
             setContentText(content)
-            setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
             setSmallIcon(R.drawable.ic_prayer_hands)
             setContentIntent(createAppLaunchIntent())
             setOngoing(isOngoing)
             setCategory(NotificationCompat.CATEGORY_STATUS)
             setVisibility(Notification.VISIBILITY_PUBLIC)
             setPriority(NotificationCompat.PRIORITY_HIGH)
-            // Remove custom colorization for better lock screen compatibility
-            // setColor(themeColor)
-            // setColorized(true)
             
             // Android 16 Live Update specific features (following official sample)
             setRequestPromotedOngoing(true)
             
-            // Set the ProgressStyle for Live Updates
-            setStyle(buildLiveUpdateProgressStyle(progress))
+            // Set the detailed message style
+            setStyle(buildLiveUpdateProgressStyle(progress, detailedMessage, prayerName, content))
+            
+            // Add progress bar with better visibility
+            if (progress > 0 && progress <= 100) {
+                setProgress(100, progress, false)
+                // Removed custom colors to maintain lock screen compatibility
+            }
             
             // Add large icon for better Live Update appearance
             setLargeIcon(IconCompat.createWithResource(appContext, R.drawable.ic_prayer_hands).toIcon(appContext))
