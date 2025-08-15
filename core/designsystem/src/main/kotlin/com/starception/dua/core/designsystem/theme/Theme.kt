@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.designsystem.theme
+package com.starception.submission.core.designsystem.theme
 
 import android.os.Build
 import androidx.annotation.ChecksSdkIntAtLeast

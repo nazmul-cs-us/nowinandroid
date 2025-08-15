@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.database.di
+package com.starception.submission.core.database.di
 
 import android.content.Context
 import androidx.room.Room
-import com.starception.dua.core.database.NiaDatabase
+import com.starception.submission.core.database.NiaDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

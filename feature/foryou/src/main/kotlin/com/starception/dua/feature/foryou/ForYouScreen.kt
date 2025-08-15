@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.foryou
+package com.starception.submission.feature.foryou
 
 import android.net.Uri
 import android.os.Build.VERSION
@@ -85,24 +85,24 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus.Denied
 import com.google.accompanist.permissions.rememberPermissionState
-import com.starception.dua.core.designsystem.component.DynamicAsyncImage
-import com.starception.dua.core.designsystem.component.NiaButton
-import com.starception.dua.core.designsystem.component.NiaIconToggleButton
-import com.starception.dua.core.designsystem.component.NiaOverlayLoadingWheel
-import com.starception.dua.core.designsystem.component.scrollbar.DecorativeScrollbar
-import com.starception.dua.core.designsystem.component.scrollbar.DraggableScrollbar
-import com.starception.dua.core.designsystem.component.scrollbar.rememberDraggableScroller
-import com.starception.dua.core.designsystem.component.scrollbar.scrollbarState
-import com.starception.dua.core.designsystem.icon.NiaIcons
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.core.model.data.UserNewsResource
-import com.starception.dua.core.ui.DevicePreviews
-import com.starception.dua.core.ui.NewsFeedUiState
-import com.starception.dua.core.ui.TrackScreenViewEvent
-import com.starception.dua.core.ui.TrackScrollJank
-import com.starception.dua.core.ui.UserNewsResourcePreviewParameterProvider
-import com.starception.dua.core.ui.launchCustomChromeTab
-import com.starception.dua.core.ui.newsFeed
+import com.starception.submission.core.designsystem.component.DynamicAsyncImage
+import com.starception.submission.core.designsystem.component.NiaButton
+import com.starception.submission.core.designsystem.component.NiaIconToggleButton
+import com.starception.submission.core.designsystem.component.NiaOverlayLoadingWheel
+import com.starception.submission.core.designsystem.component.scrollbar.DecorativeScrollbar
+import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
+import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
+import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
+import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.model.data.UserNewsResource
+import com.starception.submission.core.ui.DevicePreviews
+import com.starception.submission.core.ui.NewsFeedUiState
+import com.starception.submission.core.ui.TrackScreenViewEvent
+import com.starception.submission.core.ui.TrackScrollJank
+import com.starception.submission.core.ui.UserNewsResourcePreviewParameterProvider
+import com.starception.submission.core.ui.launchCustomChromeTab
+import com.starception.submission.core.ui.newsFeed
 
 @Composable
 internal fun ForYouScreen(

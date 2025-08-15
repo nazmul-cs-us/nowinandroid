@@ -1,4 +1,4 @@
-package com.starception.dua.prayer.model
+package com.starception.submission.prayer.model
 
 import java.time.LocalDateTime
 import java.time.LocalTime

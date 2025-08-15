@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.core.screenshottesting"
+    namespace = "com.starception.submission.core.screenshottesting"
 }
 
 dependencies {

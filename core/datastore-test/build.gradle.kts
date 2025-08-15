@@ -19,7 +19,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.core.datastore.test"
+    namespace = "com.starception.submission.core.datastore.test"
 }
 
 dependencies {

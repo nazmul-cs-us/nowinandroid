@@ -14,24 +14,24 @@
  * limitations under the License.
  */
 
-package com.starception.dua.navigation
+package com.starception.submission.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.starception.dua.feature.bookmarks.navigation.bookmarksScreen
-import com.starception.dua.feature.foryou.navigation.ForYouBaseRoute
-import com.starception.dua.feature.foryou.navigation.forYouSection
-import com.starception.dua.feature.interests.navigation.navigateToInterests
-import com.starception.dua.feature.search.navigation.searchScreen
-import com.starception.dua.feature.topic.navigation.navigateToTopic
-import com.starception.dua.feature.topic.navigation.topicScreen
-import com.starception.dua.feature.prayertimes.navigation.prayerTimesScreen
-import com.starception.dua.feature.prayertimes.navigation.PrayerTimesRoute
-import com.starception.dua.navigation.TopLevelDestination.INTERESTS
-import com.starception.dua.ui.NiaAppState
-import com.starception.dua.ui.interests2pane.interestsListDetailScreen
+import com.starception.submission.feature.bookmarks.navigation.bookmarksScreen
+import com.starception.submission.feature.foryou.navigation.ForYouBaseRoute
+import com.starception.submission.feature.foryou.navigation.forYouSection
+import com.starception.submission.feature.interests.navigation.navigateToInterests
+import com.starception.submission.feature.search.navigation.searchScreen
+import com.starception.submission.feature.topic.navigation.navigateToTopic
+import com.starception.submission.feature.topic.navigation.topicScreen
+import com.starception.submission.feature.prayertimes.navigation.prayerTimesScreen
+import com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute
+import com.starception.submission.navigation.TopLevelDestination.INTERESTS
+import com.starception.submission.ui.NiaAppState
+import com.starception.submission.ui.interests2pane.interestsListDetailScreen
 
 /**
  * Top-level navigation graph. Navigation is organized as explained at

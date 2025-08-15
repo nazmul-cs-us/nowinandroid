@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.network.retrofit
+package com.starception.submission.core.network.retrofit
 
 import androidx.tracing.trace
-import com.starception.dua.core.network.BuildConfig
-import com.starception.dua.core.network.NiaNetworkDataSource
-import com.starception.dua.core.network.model.NetworkChangeList
-import com.starception.dua.core.network.model.NetworkNewsResource
-import com.starception.dua.core.network.model.NetworkTopic
+import com.starception.submission.core.network.BuildConfig
+import com.starception.submission.core.network.NiaNetworkDataSource
+import com.starception.submission.core.network.model.NetworkChangeList
+import com.starception.submission.core.network.model.NetworkNewsResource
+import com.starception.submission.core.network.model.NetworkTopic
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.Call

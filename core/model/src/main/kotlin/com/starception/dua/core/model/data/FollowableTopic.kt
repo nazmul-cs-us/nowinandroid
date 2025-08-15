@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.model.data
+package com.starception.submission.core.model.data
 
 /**
  * A [topic] with the additional information for whether or not it is followed.

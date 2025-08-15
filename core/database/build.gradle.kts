@@ -22,7 +22,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.core.database"
+    namespace = "com.starception.submission.core.database"
 }
 
 dependencies {

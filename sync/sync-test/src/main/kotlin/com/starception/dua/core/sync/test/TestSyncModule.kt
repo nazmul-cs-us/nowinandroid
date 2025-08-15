@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.sync.test
+package com.starception.submission.core.sync.test
 
-import com.starception.dua.core.data.util.SyncManager
-import com.starception.dua.sync.di.SyncModule
-import com.starception.dua.sync.status.StubSyncSubscriber
-import com.starception.dua.sync.status.SyncSubscriber
+import com.starception.submission.core.data.util.SyncManager
+import com.starception.submission.sync.di.SyncModule
+import com.starception.submission.sync.status.StubSyncSubscriber
+import com.starception.submission.sync.status.SyncSubscriber
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.components.SingletonComponent

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.designsystem.component.scrollbar
+package com.starception.submission.core.designsystem.component.scrollbar
 
 import androidx.compose.foundation.gestures.ScrollableState
 import kotlin.math.abs

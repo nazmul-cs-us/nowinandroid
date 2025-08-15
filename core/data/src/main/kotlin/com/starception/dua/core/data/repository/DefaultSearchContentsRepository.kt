@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.repository
+package com.starception.submission.core.data.repository
 
-import com.starception.dua.core.database.dao.NewsResourceDao
-import com.starception.dua.core.database.dao.NewsResourceFtsDao
-import com.starception.dua.core.database.dao.TopicDao
-import com.starception.dua.core.database.dao.TopicFtsDao
-import com.starception.dua.core.database.model.PopulatedNewsResource
-import com.starception.dua.core.database.model.asExternalModel
-import com.starception.dua.core.database.model.asFtsEntity
-import com.starception.dua.core.model.data.SearchResult
-import com.starception.dua.core.network.Dispatcher
-import com.starception.dua.core.network.NiaDispatchers.IO
+import com.starception.submission.core.database.dao.NewsResourceDao
+import com.starception.submission.core.database.dao.NewsResourceFtsDao
+import com.starception.submission.core.database.dao.TopicDao
+import com.starception.submission.core.database.dao.TopicFtsDao
+import com.starception.submission.core.database.model.PopulatedNewsResource
+import com.starception.submission.core.database.model.asExternalModel
+import com.starception.submission.core.database.model.asFtsEntity
+import com.starception.submission.core.model.data.SearchResult
+import com.starception.submission.core.network.Dispatcher
+import com.starception.submission.core.network.NiaDispatchers.IO
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine

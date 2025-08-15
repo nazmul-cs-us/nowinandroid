@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.ui
+package com.starception.submission.core.ui
 
 import android.content.Context
 import android.net.Uri
@@ -36,9 +36,9 @@ import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
-import com.starception.dua.core.analytics.LocalAnalyticsHelper
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.core.model.data.UserNewsResource
+import com.starception.submission.core.analytics.LocalAnalyticsHelper
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.model.data.UserNewsResource
 
 /**
  * An extension on [LazyListScope] defining a feed with news resources.

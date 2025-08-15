@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.ui
+package com.starception.submission.core.ui
 
 import android.content.ClipData
 import android.os.Build.VERSION
@@ -66,14 +66,14 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
-import com.starception.dua.core.designsystem.R.drawable
-import com.starception.dua.core.designsystem.component.NiaIconToggleButton
-import com.starception.dua.core.designsystem.component.NiaTopicTag
-import com.starception.dua.core.designsystem.icon.NiaIcons
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.model.data.UserNewsResource
+import com.starception.submission.core.designsystem.R.drawable
+import com.starception.submission.core.designsystem.component.NiaIconToggleButton
+import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.model.data.UserNewsResource
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toJavaZoneId

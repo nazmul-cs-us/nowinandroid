@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.database.model
+package com.starception.submission.core.database.model
 
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.model.data.Topic
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.model.data.Topic
 import kotlinx.datetime.Instant
 import org.junit.Test
 import kotlin.test.assertEquals

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.interests
+package com.starception.submission.feature.interests
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
@@ -26,13 +26,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.starception.dua.core.designsystem.component.NiaBackground
-import com.starception.dua.core.designsystem.component.NiaLoadingWheel
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.core.ui.DevicePreviews
-import com.starception.dua.core.ui.FollowableTopicPreviewParameterProvider
-import com.starception.dua.core.ui.TrackScreenViewEvent
+import com.starception.submission.core.designsystem.component.NiaBackground
+import com.starception.submission.core.designsystem.component.NiaLoadingWheel
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.ui.DevicePreviews
+import com.starception.submission.core.ui.FollowableTopicPreviewParameterProvider
+import com.starception.submission.core.ui.TrackScreenViewEvent
 
 @Composable
 fun InterestsRoute(

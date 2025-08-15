@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package com.starception.dua.interests
+package com.starception.submission.interests
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.testing.invoke
-import com.starception.dua.core.domain.GetFollowableTopicsUseCase
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.core.model.data.Topic
-import com.starception.dua.core.testing.repository.TestTopicsRepository
-import com.starception.dua.core.testing.repository.TestUserDataRepository
-import com.starception.dua.core.testing.util.MainDispatcherRule
-import com.starception.dua.feature.interests.InterestsUiState
-import com.starception.dua.feature.interests.InterestsViewModel
-import com.starception.dua.feature.interests.navigation.InterestsRoute
+import com.starception.submission.core.domain.GetFollowableTopicsUseCase
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.model.data.Topic
+import com.starception.submission.core.testing.repository.TestTopicsRepository
+import com.starception.submission.core.testing.repository.TestUserDataRepository
+import com.starception.submission.core.testing.util.MainDispatcherRule
+import com.starception.submission.feature.interests.InterestsUiState
+import com.starception.submission.feature.interests.InterestsViewModel
+import com.starception.submission.feature.interests.navigation.InterestsRoute
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

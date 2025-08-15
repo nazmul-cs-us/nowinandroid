@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.ui
+package com.starception.submission.core.ui
 
 import androidx.compose.ui.tooling.preview.Preview
 

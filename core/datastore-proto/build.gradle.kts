@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.core.datastore.proto"
+    namespace = "com.starception.submission.core.datastore.proto"
 }
 
 // Setup protobuf configuration, generating lite Java and Kotlin classes

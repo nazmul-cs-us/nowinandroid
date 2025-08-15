@@ -21,7 +21,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.feature.bookmarks"
+    namespace = "com.starception.submission.feature.bookmarks"
 }
 
 dependencies {

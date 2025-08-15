@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.network.di
+package com.starception.submission.core.network.di
 
-import com.starception.dua.core.network.NiaNetworkDataSource
-import com.starception.dua.core.network.retrofit.RetrofitNiaNetwork
+import com.starception.submission.core.network.NiaNetworkDataSource
+import com.starception.submission.core.network.retrofit.RetrofitNiaNetwork
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

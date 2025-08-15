@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.designsystem.icon
+package com.starception.submission.core.designsystem.icon
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.designsystem.component.scrollbar
+package com.starception.submission.core.designsystem.component.scrollbar
 
 import android.annotation.SuppressLint
 import androidx.compose.animation.animateColorAsState
@@ -55,9 +55,9 @@ import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import com.starception.dua.core.designsystem.component.scrollbar.ThumbState.Active
-import com.starception.dua.core.designsystem.component.scrollbar.ThumbState.Dormant
-import com.starception.dua.core.designsystem.component.scrollbar.ThumbState.Inactive
+import com.starception.submission.core.designsystem.component.scrollbar.ThumbState.Active
+import com.starception.submission.core.designsystem.component.scrollbar.ThumbState.Dormant
+import com.starception.submission.core.designsystem.component.scrollbar.ThumbState.Inactive
 import kotlinx.coroutines.delay
 
 /**

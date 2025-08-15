@@ -1,10 +1,10 @@
-package com.starception.dua.di
+package com.starception.submission.di
 
-import com.starception.dua.prayer.calculator.AstronomicalCalculator
-import com.starception.dua.prayer.repository.PrayerSettingsRepository
-import com.starception.dua.prayer.service.EnhancedLocationService
-import com.starception.dua.prayer.service.LocationService
-import com.starception.dua.prayer.service.PrayerTimeCalculatorService
+import com.starception.submission.prayer.calculator.AstronomicalCalculator
+import com.starception.submission.prayer.repository.PrayerSettingsRepository
+import com.starception.submission.prayer.service.EnhancedLocationService
+import com.starception.submission.prayer.service.LocationService
+import com.starception.submission.prayer.service.PrayerTimeCalculatorService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

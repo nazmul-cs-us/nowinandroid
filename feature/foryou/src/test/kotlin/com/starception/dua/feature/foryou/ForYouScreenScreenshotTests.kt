@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.foryou
+package com.starception.submission.feature.foryou
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
@@ -23,17 +23,17 @@ import com.google.android.apps.common.testing.accessibility.framework.Accessibil
 import com.google.android.apps.common.testing.accessibility.framework.AccessibilityCheckResultUtils.matchesElements
 import com.google.android.apps.common.testing.accessibility.framework.checks.TextContrastCheck
 import com.google.android.apps.common.testing.accessibility.framework.matcher.ElementMatchers.withText
-import com.starception.dua.core.designsystem.component.NiaBackground
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.core.testing.util.DefaultTestDevices
-import com.starception.dua.core.testing.util.captureForDevice
-import com.starception.dua.core.testing.util.captureMultiDevice
-import com.starception.dua.core.ui.NewsFeedUiState
-import com.starception.dua.core.ui.NewsFeedUiState.Success
-import com.starception.dua.core.ui.UserNewsResourcePreviewParameterProvider
-import com.starception.dua.feature.foryou.OnboardingUiState.Loading
-import com.starception.dua.feature.foryou.OnboardingUiState.NotShown
-import com.starception.dua.feature.foryou.OnboardingUiState.Shown
+import com.starception.submission.core.designsystem.component.NiaBackground
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.testing.util.DefaultTestDevices
+import com.starception.submission.core.testing.util.captureForDevice
+import com.starception.submission.core.testing.util.captureMultiDevice
+import com.starception.submission.core.ui.NewsFeedUiState
+import com.starception.submission.core.ui.NewsFeedUiState.Success
+import com.starception.submission.core.ui.UserNewsResourcePreviewParameterProvider
+import com.starception.submission.feature.foryou.OnboardingUiState.Loading
+import com.starception.submission.feature.foryou.OnboardingUiState.NotShown
+import com.starception.submission.feature.foryou.OnboardingUiState.Shown
 import dagger.hilt.android.testing.HiltTestApplication
 import org.hamcrest.Matchers
 import org.junit.Before

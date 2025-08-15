@@ -21,7 +21,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.core.data"
+    namespace = "com.starception.submission.core.data"
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

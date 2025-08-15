@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.designsystem.component
+package com.starception.submission.core.designsystem.component
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Box
@@ -34,10 +34,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.starception.dua.core.designsystem.theme.GradientColors
-import com.starception.dua.core.designsystem.theme.LocalBackgroundTheme
-import com.starception.dua.core.designsystem.theme.LocalGradientColors
-import com.starception.dua.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.designsystem.theme.GradientColors
+import com.starception.submission.core.designsystem.theme.LocalBackgroundTheme
+import com.starception.submission.core.designsystem.theme.LocalGradientColors
+import com.starception.submission.core.designsystem.theme.NiaTheme
 import kotlin.math.tan
 
 /**

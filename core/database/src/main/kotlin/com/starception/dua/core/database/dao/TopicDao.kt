@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.database.dao
+package com.starception.submission.core.database.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
-import com.starception.dua.core.database.model.TopicEntity
+import com.starception.submission.core.database.model.TopicEntity
 import kotlinx.coroutines.flow.Flow
 
 /**

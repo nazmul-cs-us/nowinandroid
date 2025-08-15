@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.datastore
+package com.starception.submission.core.datastore
 
-import com.starception.dua.core.datastore.test.InMemoryDataStore
+import com.starception.submission.core.datastore.test.InMemoryDataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

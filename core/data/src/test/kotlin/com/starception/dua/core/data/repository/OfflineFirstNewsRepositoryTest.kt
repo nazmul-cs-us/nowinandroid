@@ -14,31 +14,31 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.repository
+package com.starception.submission.core.data.repository
 
-import com.starception.dua.core.data.Synchronizer
-import com.starception.dua.core.data.model.asEntity
-import com.starception.dua.core.data.model.topicCrossReferences
-import com.starception.dua.core.data.model.topicEntityShells
-import com.starception.dua.core.data.testdoubles.CollectionType
-import com.starception.dua.core.data.testdoubles.TestNewsResourceDao
-import com.starception.dua.core.data.testdoubles.TestNiaNetworkDataSource
-import com.starception.dua.core.data.testdoubles.TestTopicDao
-import com.starception.dua.core.data.testdoubles.filteredInterestsIds
-import com.starception.dua.core.data.testdoubles.nonPresentInterestsIds
-import com.starception.dua.core.database.model.NewsResourceEntity
-import com.starception.dua.core.database.model.NewsResourceTopicCrossRef
-import com.starception.dua.core.database.model.PopulatedNewsResource
-import com.starception.dua.core.database.model.TopicEntity
-import com.starception.dua.core.database.model.asExternalModel
-import com.starception.dua.core.datastore.NiaPreferencesDataSource
-import com.starception.dua.core.datastore.UserPreferences
-import com.starception.dua.core.datastore.test.InMemoryDataStore
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.model.data.Topic
-import com.starception.dua.core.network.model.NetworkChangeList
-import com.starception.dua.core.network.model.NetworkNewsResource
-import com.starception.dua.core.testing.notifications.TestNotifier
+import com.starception.submission.core.data.Synchronizer
+import com.starception.submission.core.data.model.asEntity
+import com.starception.submission.core.data.model.topicCrossReferences
+import com.starception.submission.core.data.model.topicEntityShells
+import com.starception.submission.core.data.testdoubles.CollectionType
+import com.starception.submission.core.data.testdoubles.TestNewsResourceDao
+import com.starception.submission.core.data.testdoubles.TestNiaNetworkDataSource
+import com.starception.submission.core.data.testdoubles.TestTopicDao
+import com.starception.submission.core.data.testdoubles.filteredInterestsIds
+import com.starception.submission.core.data.testdoubles.nonPresentInterestsIds
+import com.starception.submission.core.database.model.NewsResourceEntity
+import com.starception.submission.core.database.model.NewsResourceTopicCrossRef
+import com.starception.submission.core.database.model.PopulatedNewsResource
+import com.starception.submission.core.database.model.TopicEntity
+import com.starception.submission.core.database.model.asExternalModel
+import com.starception.submission.core.datastore.NiaPreferencesDataSource
+import com.starception.submission.core.datastore.UserPreferences
+import com.starception.submission.core.datastore.test.InMemoryDataStore
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.model.data.Topic
+import com.starception.submission.core.network.model.NetworkChangeList
+import com.starception.submission.core.network.model.NetworkNewsResource
+import com.starception.submission.core.testing.notifications.TestNotifier
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

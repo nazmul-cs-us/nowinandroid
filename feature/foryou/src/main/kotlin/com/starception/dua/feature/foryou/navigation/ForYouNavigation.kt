@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.foryou.navigation
+package com.starception.submission.feature.foryou.navigation
 
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
@@ -22,8 +22,8 @@ import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.navDeepLink
-import com.starception.dua.core.notifications.DEEP_LINK_URI_PATTERN
-import com.starception.dua.feature.foryou.ForYouScreen
+import com.starception.submission.core.notifications.DEEP_LINK_URI_PATTERN
+import com.starception.submission.feature.foryou.ForYouScreen
 import kotlinx.serialization.Serializable
 
 @Serializable data object ForYouRoute // route to ForYou screen

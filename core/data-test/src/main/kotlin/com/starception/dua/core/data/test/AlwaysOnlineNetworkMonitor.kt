@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.test
+package com.starception.submission.core.data.test
 
-import com.starception.dua.core.data.util.NetworkMonitor
+import com.starception.submission.core.data.util.NetworkMonitor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import javax.inject.Inject

@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.settings
+package com.starception.submission.feature.settings
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import com.starception.dua.core.model.data.DarkThemeConfig.DARK
-import com.starception.dua.core.model.data.ThemeBrand.ANDROID
-import com.starception.dua.core.model.data.ThemeBrand.DEFAULT
-import com.starception.dua.feature.settings.SettingsUiState.Loading
-import com.starception.dua.feature.settings.SettingsUiState.Success
+import com.starception.submission.core.model.data.DarkThemeConfig.DARK
+import com.starception.submission.core.model.data.ThemeBrand.ANDROID
+import com.starception.submission.core.model.data.ThemeBrand.DEFAULT
+import com.starception.submission.feature.settings.SettingsUiState.Loading
+import com.starception.submission.feature.settings.SettingsUiState.Success
 import org.junit.Rule
 import org.junit.Test
 

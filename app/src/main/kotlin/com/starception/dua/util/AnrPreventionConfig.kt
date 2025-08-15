@@ -1,4 +1,4 @@
-package com.starception.dua.util
+package com.starception.submission.util
 
 import android.util.Log
 

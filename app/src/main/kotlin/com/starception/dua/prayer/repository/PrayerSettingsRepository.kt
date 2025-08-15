@@ -1,8 +1,8 @@
-package com.starception.dua.prayer.repository
+package com.starception.submission.prayer.repository
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.starception.dua.prayer.model.*
+import com.starception.submission.prayer.model.*
 import java.time.LocalDateTime
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope

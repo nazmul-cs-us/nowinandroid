@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.foryou
+package com.starception.submission.feature.foryou
 
-import com.starception.dua.core.model.data.FollowableTopic
+import com.starception.submission.core.model.data.FollowableTopic
 
 /**
  * A sealed hierarchy describing the onboarding state for the for you screen.

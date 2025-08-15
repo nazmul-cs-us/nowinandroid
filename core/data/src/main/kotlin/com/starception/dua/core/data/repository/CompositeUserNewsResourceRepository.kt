@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.repository
+package com.starception.submission.core.data.repository
 
-import com.starception.dua.core.model.data.UserNewsResource
-import com.starception.dua.core.model.data.mapToUserNewsResources
+import com.starception.submission.core.model.data.UserNewsResource
+import com.starception.submission.core.model.data.mapToUserNewsResources
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged

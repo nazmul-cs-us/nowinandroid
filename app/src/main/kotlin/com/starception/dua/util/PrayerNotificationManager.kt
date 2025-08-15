@@ -1,7 +1,7 @@
-package com.starception.dua.util
+package com.starception.submission.util
 
-import com.starception.dua.MainActivity
-import com.starception.dua.R
+import com.starception.submission.MainActivity
+import com.starception.submission.R
 import android.app.Notification
 import android.content.res.Configuration
 import android.graphics.Color

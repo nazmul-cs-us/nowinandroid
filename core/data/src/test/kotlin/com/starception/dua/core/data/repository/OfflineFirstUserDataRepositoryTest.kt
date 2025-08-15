@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.repository
+package com.starception.submission.core.data.repository
 
-import com.starception.dua.core.analytics.NoOpAnalyticsHelper
-import com.starception.dua.core.datastore.NiaPreferencesDataSource
-import com.starception.dua.core.datastore.UserPreferences
-import com.starception.dua.core.datastore.test.InMemoryDataStore
-import com.starception.dua.core.model.data.DarkThemeConfig
-import com.starception.dua.core.model.data.ThemeBrand
-import com.starception.dua.core.model.data.UserData
+import com.starception.submission.core.analytics.NoOpAnalyticsHelper
+import com.starception.submission.core.datastore.NiaPreferencesDataSource
+import com.starception.submission.core.datastore.UserPreferences
+import com.starception.submission.core.datastore.test.InMemoryDataStore
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.model.data.UserData
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.TestScope

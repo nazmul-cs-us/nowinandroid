@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.network.di
+package com.starception.submission.core.network.di
 
 import android.content.Context
 import androidx.tracing.trace
 import coil.ImageLoader
 import coil.decode.SvgDecoder
 import coil.util.DebugLogger
-import com.starception.dua.core.network.BuildConfig
-import com.starception.dua.core.network.demo.DemoAssetManager
+import com.starception.submission.core.network.BuildConfig
+import com.starception.submission.core.network.demo.DemoAssetManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

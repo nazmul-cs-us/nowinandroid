@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.notifications
+package com.starception.submission.core.notifications
 
 import android.Manifest.permission
 import android.app.Notification
@@ -32,13 +32,13 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.InboxStyle
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toUri
-import com.starception.dua.core.model.data.NewsResource
+import com.starception.submission.core.model.data.NewsResource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val MAX_NUM_NOTIFICATIONS = 5
-private const val TARGET_ACTIVITY_NAME = "com.starception.dua.MainActivity"
+    private const val TARGET_ACTIVITY_NAME = "com.starception.submission.MainActivity"
 private const val NEWS_NOTIFICATION_REQUEST_CODE = 0
 private const val NEWS_NOTIFICATION_SUMMARY_ID = 1
 private const val NEWS_NOTIFICATION_CHANNEL_ID = ""

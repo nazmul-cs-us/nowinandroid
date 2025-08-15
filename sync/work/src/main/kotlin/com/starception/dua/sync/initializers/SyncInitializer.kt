@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.starception.dua.sync.initializers
+package com.starception.submission.sync.initializers
 
 import android.content.Context
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
-import com.starception.dua.sync.workers.SyncWorker
+import com.starception.submission.sync.workers.SyncWorker
 
 object Sync {
     // This method is initializes sync, the process that keeps the app's data current.

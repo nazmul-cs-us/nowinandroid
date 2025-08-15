@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.model.data
+package com.starception.submission.core.model.data
 
 enum class DarkThemeConfig {
     FOLLOW_SYSTEM,

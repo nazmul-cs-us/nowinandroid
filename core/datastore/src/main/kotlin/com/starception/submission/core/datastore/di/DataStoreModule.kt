@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.datastore.di
+package com.starception.submission.core.datastore.di
 
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.dataStoreFile
-import com.starception.dua.core.datastore.IntToStringIdsMigration
-import com.starception.dua.core.datastore.UserPreferences
-import com.starception.dua.core.datastore.UserPreferencesSerializer
-import com.starception.dua.core.network.Dispatcher
-import com.starception.dua.core.network.NiaDispatchers.IO
-import com.starception.dua.core.network.di.ApplicationScope
+import com.starception.submission.core.datastore.IntToStringIdsMigration
+import com.starception.submission.core.datastore.UserPreferences
+import com.starception.submission.core.datastore.UserPreferencesSerializer
+import com.starception.submission.core.network.Dispatcher
+import com.starception.submission.core.network.NiaDispatchers.IO
+import com.starception.submission.core.network.di.ApplicationScope
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

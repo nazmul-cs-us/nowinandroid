@@ -21,7 +21,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.core.designsystem"
+    namespace = "com.starception.submission.core.designsystem"
 }
 
 dependencies {

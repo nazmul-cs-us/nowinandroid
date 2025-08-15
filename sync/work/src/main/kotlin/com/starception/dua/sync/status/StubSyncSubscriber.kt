@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.sync.status
+package com.starception.submission.sync.status
 
 import android.util.Log
 import javax.inject.Inject

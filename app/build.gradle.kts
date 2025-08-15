@@ -31,14 +31,14 @@ plugins {
 android {
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.starception.dua"
+        applicationId = "com.starception.submission"
         versionCode = 8
         versionName = "0.1.2" // X.Y.Z; X = Major, Y = minor, Z = Patch level
         minSdk = 28
         targetSdk = 36
 
         // Custom test runner to set up Hilt dependency graph
-        testInstrumentationRunner = "com.starception.dua.core.testing.NiaTestRunner"
+        testInstrumentationRunner = "com.starception.submission.core.testing.NiaTestRunner"
     }
 
     buildTypes {
@@ -70,7 +70,7 @@ android {
             isIncludeAndroidResources = true
         }
     }
-    namespace = "com.starception.dua"
+    namespace = "com.starception.submission"
 }
 
 dependencies {

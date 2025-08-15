@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.designsystem.component
+package com.starception.submission.core.designsystem.component
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -39,8 +39,8 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter.State.Error
 import coil.compose.AsyncImagePainter.State.Loading
 import coil.compose.rememberAsyncImagePainter
-import com.starception.dua.core.designsystem.R
-import com.starception.dua.core.designsystem.theme.LocalTintTheme
+import com.starception.submission.core.designsystem.R
+import com.starception.submission.core.designsystem.theme.LocalTintTheme
 
 /**
  * A wrapper around [AsyncImage] which determines the colorFilter based on the theme

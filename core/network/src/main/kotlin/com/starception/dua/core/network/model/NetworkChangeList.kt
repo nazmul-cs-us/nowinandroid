@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.network.model
+package com.starception.submission.core.network.model
 
 import kotlinx.serialization.Serializable
 

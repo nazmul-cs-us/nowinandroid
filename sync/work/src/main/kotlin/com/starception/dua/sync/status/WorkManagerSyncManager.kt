@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package com.starception.dua.sync.status
+package com.starception.submission.sync.status
 
 import android.content.Context
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkInfo.State
 import androidx.work.WorkManager
-import com.starception.dua.core.data.util.SyncManager
-import com.starception.dua.sync.initializers.SYNC_WORK_NAME
-import com.starception.dua.sync.workers.SyncWorker
+import com.starception.submission.core.data.util.SyncManager
+import com.starception.submission.sync.initializers.SYNC_WORK_NAME
+import com.starception.submission.sync.workers.SyncWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.conflate

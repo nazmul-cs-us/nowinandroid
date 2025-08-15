@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import com.starception.dua.core.network.demo.DemoAssetManager
+import com.starception.submission.core.network.demo.DemoAssetManager
 import java.io.File
 import java.io.InputStream
 import java.util.Properties

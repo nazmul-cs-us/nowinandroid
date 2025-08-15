@@ -1,16 +1,16 @@
-package com.starception.dua.prayer.viewmodel
+package com.starception.submission.prayer.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.starception.dua.prayer.model.AsrMadhhab
-import com.starception.dua.prayer.model.CalculationMethod
-import com.starception.dua.prayer.model.DayPrayerTimes
-import com.starception.dua.prayer.model.Location
-import com.starception.dua.prayer.model.PrayerSettings
-import com.starception.dua.prayer.repository.PrayerSettingsRepository
-import com.starception.dua.prayer.service.LocationService
-import com.starception.dua.prayer.service.EnhancedLocationService
-import com.starception.dua.prayer.service.PrayerTimeCalculatorService
+import com.starception.submission.prayer.model.AsrMadhhab
+import com.starception.submission.prayer.model.CalculationMethod
+import com.starception.submission.prayer.model.DayPrayerTimes
+import com.starception.submission.prayer.model.Location
+import com.starception.submission.prayer.model.PrayerSettings
+import com.starception.submission.prayer.repository.PrayerSettingsRepository
+import com.starception.submission.prayer.service.LocationService
+import com.starception.submission.prayer.service.EnhancedLocationService
+import com.starception.submission.prayer.service.PrayerTimeCalculatorService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*

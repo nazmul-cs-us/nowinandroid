@@ -20,7 +20,7 @@ plugins {
     alias(libs.plugins.nowinandroid.android.library.jacoco)
 }
 android {
-    namespace = "com.starception.dua.feature.interests"
+    namespace = "com.starception.submission.feature.interests"
 }
 
 dependencies {

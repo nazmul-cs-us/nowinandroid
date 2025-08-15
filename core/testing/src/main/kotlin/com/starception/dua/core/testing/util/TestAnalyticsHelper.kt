@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.testing.util
+package com.starception.submission.core.testing.util
 
-import com.starception.dua.core.analytics.AnalyticsEvent
-import com.starception.dua.core.analytics.AnalyticsHelper
+import com.starception.submission.core.analytics.AnalyticsEvent
+import com.starception.submission.core.analytics.AnalyticsHelper
 
 class TestAnalyticsHelper : AnalyticsHelper {
 

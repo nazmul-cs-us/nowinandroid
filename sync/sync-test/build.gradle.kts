@@ -19,7 +19,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.core.sync.test"
+    namespace = "com.starception.submission.core.sync.test"
 }
 
 dependencies {

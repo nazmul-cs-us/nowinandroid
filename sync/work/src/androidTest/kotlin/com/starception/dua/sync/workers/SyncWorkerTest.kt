@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.sync.workers
+package com.starception.submission.sync.workers
 
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry

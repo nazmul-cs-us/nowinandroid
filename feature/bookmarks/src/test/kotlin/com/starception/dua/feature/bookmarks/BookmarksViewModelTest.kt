@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.bookmarks
+package com.starception.submission.feature.bookmarks
 
-import com.starception.dua.core.data.repository.CompositeUserNewsResourceRepository
-import com.starception.dua.core.testing.data.newsResourcesTestData
-import com.starception.dua.core.testing.repository.TestNewsRepository
-import com.starception.dua.core.testing.repository.TestUserDataRepository
-import com.starception.dua.core.testing.util.MainDispatcherRule
-import com.starception.dua.core.ui.NewsFeedUiState.Loading
-import com.starception.dua.core.ui.NewsFeedUiState.Success
+import com.starception.submission.core.data.repository.CompositeUserNewsResourceRepository
+import com.starception.submission.core.testing.data.newsResourcesTestData
+import com.starception.submission.core.testing.repository.TestNewsRepository
+import com.starception.submission.core.testing.repository.TestUserDataRepository
+import com.starception.submission.core.testing.util.MainDispatcherRule
+import com.starception.submission.core.ui.NewsFeedUiState.Loading
+import com.starception.submission.core.ui.NewsFeedUiState.Success
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

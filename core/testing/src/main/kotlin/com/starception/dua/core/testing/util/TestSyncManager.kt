@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.testing.util
+package com.starception.submission.core.testing.util
 
-import com.starception.dua.core.data.util.SyncManager
+import com.starception.submission.core.data.util.SyncManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 

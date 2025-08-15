@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.di
+package com.starception.submission.di
 
 import android.app.Activity
 import android.util.Log

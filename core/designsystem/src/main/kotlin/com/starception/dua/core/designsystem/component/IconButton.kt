@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.designsystem.component
+package com.starception.submission.core.designsystem.component
 
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.Icon
@@ -24,8 +24,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import com.starception.dua.core.designsystem.icon.NiaIcons
-import com.starception.dua.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.theme.NiaTheme
 
 /**
  * Now in Android toggle button with icon and checked icon content slots. Wraps Material 3

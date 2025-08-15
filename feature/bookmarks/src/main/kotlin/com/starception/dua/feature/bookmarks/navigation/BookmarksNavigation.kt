@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.bookmarks.navigation
+package com.starception.submission.feature.bookmarks.navigation
 
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
-import com.starception.dua.feature.bookmarks.BookmarksRoute
+import com.starception.submission.feature.bookmarks.BookmarksRoute
 import kotlinx.serialization.Serializable
 
 @Serializable object BookmarksRoute

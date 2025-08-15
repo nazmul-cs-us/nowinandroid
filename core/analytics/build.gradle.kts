@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.core.analytics"
+    namespace = "com.starception.submission.core.analytics"
 }
 
 dependencies {

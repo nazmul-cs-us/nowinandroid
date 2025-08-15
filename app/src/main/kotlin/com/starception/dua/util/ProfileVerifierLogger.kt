@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.starception.dua.util
+package com.starception.submission.util
 
 import android.util.Log
 import androidx.profileinstaller.ProfileVerifier
-import com.starception.dua.core.network.di.ApplicationScope
+import com.starception.submission.core.network.di.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch

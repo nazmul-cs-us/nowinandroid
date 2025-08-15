@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.bookmarks
+package com.starception.submission.feature.bookmarks
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.starception.dua.core.data.repository.UserDataRepository
-import com.starception.dua.core.data.repository.UserNewsResourceRepository
-import com.starception.dua.core.model.data.UserNewsResource
-import com.starception.dua.core.ui.NewsFeedUiState
-import com.starception.dua.core.ui.NewsFeedUiState.Loading
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.data.repository.UserNewsResourceRepository
+import com.starception.submission.core.model.data.UserNewsResource
+import com.starception.submission.core.ui.NewsFeedUiState
+import com.starception.submission.core.ui.NewsFeedUiState.Loading
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

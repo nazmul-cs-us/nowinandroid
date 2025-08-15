@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.topic
+package com.starception.submission.feature.topic
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -24,8 +24,8 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
-import com.starception.dua.core.testing.data.followableTopicTestData
-import com.starception.dua.core.testing.data.userNewsResourcesTestData
+import com.starception.submission.core.testing.data.followableTopicTestData
+import com.starception.submission.core.testing.data.userNewsResourcesTestData
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test

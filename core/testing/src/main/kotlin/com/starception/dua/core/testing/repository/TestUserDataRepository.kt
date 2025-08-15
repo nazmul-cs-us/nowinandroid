@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.testing.repository
+package com.starception.submission.core.testing.repository
 
-import com.starception.dua.core.data.repository.UserDataRepository
-import com.starception.dua.core.model.data.DarkThemeConfig
-import com.starception.dua.core.model.data.ThemeBrand
-import com.starception.dua.core.model.data.UserData
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.model.data.UserData
 import kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow

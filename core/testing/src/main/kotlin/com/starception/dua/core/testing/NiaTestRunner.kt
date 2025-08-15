@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.testing
+package com.starception.submission.core.testing
 
 import android.app.Application
 import android.content.Context
