@@ -532,9 +532,13 @@ object PrayerNotificationManager {
                 // Use ProgressStyle with text content
                 setStyle(progressStyle)
                 setContentText("$content\n$detailedMessage")
+                Log.d(TAG, "Applied ProgressStyle with progress=$progress%")
             } else {
                 // Fallback to BigTextStyle if ProgressStyle fails
                 setStyle(progressStyle)
+                // Also add a basic progress bar as fallback
+                setProgress(100, progress, false)
+                Log.d(TAG, "Applied BigTextStyle with basic progress bar, progress=$progress%")
             }
             
             // Add large icon for better Live Update appearance
@@ -561,7 +565,7 @@ object PrayerNotificationManager {
             // No custom colors to prevent lock screen color issues
             // Segments: 0-20% (Go to mosque), 20-60% (Best time), 60-100% (Make time)
             val progressStyle = NotificationCompat.ProgressStyle()
-                .setProgress(progress) // Only takes progress value
+                .setProgress(progress) // Set current progress value
                 .setProgressSegments(
                     listOf(
                         NotificationCompat.ProgressStyle.Segment(20), // 0-20%: Go to mosque
@@ -577,7 +581,7 @@ object PrayerNotificationManager {
                     )
                 )
             
-            Log.d(TAG, "Created official Android 16 ProgressStyle with progressSegments and progressPoints")
+            Log.d(TAG, "Created official Android 16 ProgressStyle with progressSegments and progressPoints, progress=$progress%")
             
             // Return the ProgressStyle to maintain the beautiful segmented progress bar
             return progressStyle
