@@ -72,11 +72,58 @@ data class DayPrayerTimes(
         }
     }
     
+    /**
+     * Get only actual prayers (excluding sunrise and other astronomical events)
+     */
+    fun getActualPrayers(): List<PrayerTime> {
+        val now = LocalTime.now()
+        val actualPrayers = listOf(
+            PrayerTime("Fajr", fajr),
+            PrayerTime("Dhuhr", dhuhr),
+            PrayerTime("Asr", asr),
+            PrayerTime("Maghrib", maghrib),
+            PrayerTime("Isha", isha)
+        )
+        
+        // Find next prayer today
+        val nextPrayerIndex = actualPrayers.indexOfFirst { it.time.isAfter(now) }
+        
+        return actualPrayers.mapIndexed { index, prayer ->
+            val isCurrently = when {
+                // For Fajr to Maghrib prayers, check if we're between this prayer and the next
+                index < actualPrayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(actualPrayers[index + 1].time) -> true
+                // For Isha prayer, check if we're past Isha but before midnight
+                index == actualPrayers.size - 1 && now.isAfter(prayer.time) && nextPrayerIndex == -1 && now.hour < 24 -> {
+                    val hoursSinceIsha = if (now.hour >= prayer.time.hour) {
+                        now.hour - prayer.time.hour
+                    } else {
+                        24 - prayer.time.hour + now.hour
+                    }
+                    hoursSinceIsha < 4  // Show as current for max 4 hours after Isha
+                }
+                else -> false
+            }
+            
+            val isNext = when {
+                // If there's a next prayer today, mark it
+                index == nextPrayerIndex -> true
+                // If no prayers left today and this is Fajr, it might be tomorrow's next prayer
+                nextPrayerIndex == -1 && index == 0 -> true
+                else -> false
+            }
+            
+            prayer.copy(
+                isNext = isNext,
+                isCurrently = isCurrently
+            )
+        }
+    }
+    
     fun getNextPrayer(): PrayerTime? {
         val now = LocalTime.now()
         
         // First try to find a prayer today that's after current time
-        val todayNextPrayer = getAllPrayers().firstOrNull { it.time.isAfter(now) }
+        val todayNextPrayer = getActualPrayers().firstOrNull { it.time.isAfter(now) }
         if (todayNextPrayer != null) {
             return todayNextPrayer
         }

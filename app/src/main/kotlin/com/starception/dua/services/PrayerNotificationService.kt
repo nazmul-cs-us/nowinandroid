@@ -25,6 +25,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.Duration
 import javax.inject.Inject
+import android.graphics.Color
 
 /**
  * Simplified Prayer Notification Service
@@ -67,6 +68,12 @@ class PrayerNotificationService : Service() {
         
         // Initialize PrayerNotificationManager
         PrayerNotificationManager.initialize(this)
+        
+        // Check Live Update status for debugging
+        if (PrayerNotificationManager.supportsLiveUpdates()) {
+            val status = PrayerNotificationManager.checkLiveUpdateStatus()
+            Log.i(TAG, "Live Update Status: $status")
+        }
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -109,22 +116,24 @@ class PrayerNotificationService : Service() {
     }
     
     private fun createInitialNotification(): Notification {
-        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Prayer Time Tracker")
-            .setContentText("Starting prayer time updates...")
+            .setContentText("Initializing...")
             .setSmallIcon(R.drawable.ic_prayer_hands)
-            .setContentIntent(
-                android.app.PendingIntent.getActivity(
-                    this,
-                    0,
-                    Intent(this, com.starception.dua.MainActivity::class.java),
-                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) android.app.PendingIntent.FLAG_IMMUTABLE else 0
-                )
-            )
             .setOngoing(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setColor(Color.parseColor("#8B418F"))
+            .setColorized(true)
             .build()
+        
+        // Force refresh to ensure Live Updates are activated on Android 16
+        if (PrayerNotificationManager.supportsLiveUpdates()) {
+            PrayerNotificationManager.forceRefreshNotification()
+        }
+        
+        return notification
     }
     
     /**
@@ -261,7 +270,7 @@ class PrayerNotificationService : Service() {
             }
             
             // Get current and next prayer
-            val currentPrayer = prayerTimes.getAllPrayers().find { it.isCurrently }
+            val currentPrayer = prayerTimes.getActualPrayers().find { it.isCurrently }
             val nextPrayer = prayerTimes.getNextPrayer()
             
             if (currentPrayer == null) {
@@ -276,11 +285,23 @@ class PrayerNotificationService : Service() {
             val prayerProgress = calculatePrayerProgress(currentPrayer, nextPrayer)
             
             // Format notification content based on prayer progress
-            val title = "🕌 ${currentPrayer.name} Prayer Time"
+            val title = when (prayerProgress.phase) {
+                PrayerPhase.GO_TO_MOSQUE -> "Prayer Time • ${currentPrayer.name}"
+                PrayerPhase.BEST_TIME -> "Best Time to Pray • ${currentPrayer.name}"
+                PrayerPhase.MAKE_TIME -> "Make Time for Prayer • ${currentPrayer.name}"
+            }
             val content = buildPrayerProgressContent(prayerProgress)
             val detailedMessage = buildDetailedPrayerProgressMessage(prayerTimes, currentPrayer, nextPrayer, prayerProgress)
             
-            Triple(title, content, detailedMessage)
+            // Add next prayer countdown to title for better visibility
+            val enhancedTitle = if (nextPrayer != null) {
+                val timeRemaining = formatTimeRemaining(nextPrayer.time)
+                "$title • Next: ${nextPrayer.name} in $timeRemaining"
+            } else {
+                title
+            }
+            
+            Triple(enhancedTitle, content, detailedMessage)
             
         } catch (e: Exception) {
             Log.e(TAG, "Error getting current prayer data", e)
@@ -324,12 +345,15 @@ class PrayerNotificationService : Service() {
         val elapsedText = formatElapsedTime(progress.elapsedMinutes)
         
         val guidanceText = when (progress.phase) {
-            PrayerPhase.GO_TO_MOSQUE -> "Please go to mosque"
-            PrayerPhase.BEST_TIME -> "Best time for Prayer"
-            PrayerPhase.MAKE_TIME -> "Please make time for prayer"
+            PrayerPhase.GO_TO_MOSQUE -> "Go to mosque"
+            PrayerPhase.BEST_TIME -> "Best time to pray"
+            PrayerPhase.MAKE_TIME -> "Make time for prayer"
         }
         
-        return "$elapsedText, $guidanceText"
+        // Add progress percentage for better visibility
+        val progressText = "${progress.progressPercentage.toInt()}% complete"
+        
+        return "$elapsedText • $guidanceText • $progressText"
     }
     
     /**
@@ -341,65 +365,24 @@ class PrayerNotificationService : Service() {
         nextPrayer: PrayerTime?,
         progress: PrayerProgress
     ): String {
-        val now = LocalTime.now()
-        val prayers = prayerTimes.getAllPrayers()
-        
         return buildString {
-            appendLine("🕌 ${currentPrayer.name} Prayer Progress")
-            appendLine()
-            
-            // Current prayer progress
-            appendLine("⏰ Started: ${currentPrayer.time.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))}")
-            appendLine("📊 Progress: ${progress.progressPercentage.toInt()}% complete")
-            appendLine()
-            
-            // Phase guidance
-            appendLine("📋 Current Phase:")
-            when (progress.phase) {
-                PrayerPhase.GO_TO_MOSQUE -> {
-                    appendLine("🕌 0-20 minutes: Please go to mosque")
-                    appendLine("   ⏰ Time elapsed: ${formatElapsedTime(progress.elapsedMinutes)}")
-                    appendLine("   🎯 Goal: Reach mosque within 20 minutes")
-                }
-                PrayerPhase.BEST_TIME -> {
-                    appendLine("🌟 20+ minutes: Best time for Prayer")
-                    appendLine("   ⏰ Time elapsed: ${formatElapsedTime(progress.elapsedMinutes)}")
-                    appendLine("   🎯 This is the optimal prayer window")
-                }
-                PrayerPhase.MAKE_TIME -> {
-                    appendLine("⚠️  Halfway+: Please make time for prayer")
-                    appendLine("   ⏰ Time elapsed: ${formatElapsedTime(progress.elapsedMinutes)}")
-                    appendLine("   🎯 Don't delay further")
-                }
+            // First line: Current prayer with clear time information
+            val elapsedText = formatElapsedTime(progress.elapsedMinutes)
+            val guidanceText = when (progress.phase) {
+                PrayerPhase.GO_TO_MOSQUE -> "Go to mosque"
+                PrayerPhase.BEST_TIME -> "Best time to pray"
+                PrayerPhase.MAKE_TIME -> "Make time for prayer"
             }
-            appendLine()
+            appendLine("${currentPrayer.name} Prayer • $elapsedText")
+            appendLine("$guidanceText")
             
-            // Progress bar visualization
-            appendLine("📈 Progress Bar:")
-            appendLine("${currentPrayer.time.format(java.time.format.DateTimeFormatter.ofPattern("h:mm"))}──🕌──⏰20min──🕌──⏰${(progress.totalDuration/2).toInt()}min──🕌──${nextPrayer?.time?.format(java.time.format.DateTimeFormatter.ofPattern("h:mm")) ?: "??:??"}")
-            appendLine("   Start    Mosque   Best Time   End")
-            appendLine()
-            
-            // Next prayer info
+            // Second line: Clear next prayer countdown
             if (nextPrayer != null) {
-                appendLine("⏭️ Next Prayer: ${nextPrayer.name}")
-                appendLine("   ⏰ Time: ${nextPrayer.time.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))}")
-                appendLine("   ⏳ Remaining: ${formatTimeRemaining(nextPrayer.time)}")
-            }
-            
-            // Daily schedule
-            appendLine()
-            appendLine("📅 Today's Schedule:")
-            prayers.forEach { prayer ->
-                val timeStr = prayer.time.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
-                val status = when {
-                    prayer.isCurrently -> "🟢 NOW (${progress.progressPercentage.toInt()}%)"
-                    prayer.isNext -> "⏭️ NEXT"
-                    prayer.time.isBefore(now) -> "✅ Done"
-                    else -> "⏳ Upcoming"
-                }
-                
-                appendLine("${prayer.name}: $timeStr $status")
+                val timeRemaining = formatTimeRemaining(nextPrayer.time)
+                val nextPrayerTime = nextPrayer.time.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+                appendLine("")
+                appendLine("Next Prayer • ${nextPrayer.name} at $nextPrayerTime")
+                appendLine("Time remaining • $timeRemaining")
             }
         }
     }
@@ -408,29 +391,13 @@ class PrayerNotificationService : Service() {
      * Build next prayer message when no current prayer
      */
     private fun buildNextPrayerMessage(prayerTimes: DayPrayerTimes, nextPrayer: PrayerTime?): String {
-        val prayers = prayerTimes.getAllPrayers()
-        
         return buildString {
-            appendLine("⏰ Next Prayer Information")
-            appendLine()
-            
             if (nextPrayer != null) {
-                appendLine("⏭️ Next: ${nextPrayer.name}")
-                appendLine("   ⏰ Time: ${nextPrayer.time.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))}")
-                appendLine("   ⏳ Remaining: ${formatTimeRemaining(nextPrayer.time)}")
-            }
-            
-            appendLine()
-            appendLine("📅 Today's Schedule:")
-            prayers.forEach { prayer ->
-                val timeStr = prayer.time.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
-                val status = when {
-                    prayer.isNext -> "⏭️ NEXT"
-                    prayer.time.isBefore(LocalTime.now()) -> "✅ Done"
-                    else -> "⏳ Upcoming"
-                }
-                
-                appendLine("${prayer.name}: $timeStr $status")
+                val timeRemaining = formatTimeRemaining(nextPrayer.time)
+                appendLine("⏭️ Next Prayer: ${nextPrayer.name}")
+                appendLine("⏰ Time remaining: $timeRemaining")
+            } else {
+                appendLine("📅 No upcoming prayers")
             }
         }
     }
@@ -512,7 +479,7 @@ class PrayerNotificationService : Service() {
             if (prayerTimes == null) return 0
             
             // Get current prayer
-            val currentPrayer = prayerTimes.getAllPrayers().find { it.isCurrently } ?: return 0
+            val currentPrayer = prayerTimes.getActualPrayers().find { it.isCurrently } ?: return 0
             val nextPrayer = prayerTimes.getNextPrayer()
             
             // Calculate progress through current prayer
