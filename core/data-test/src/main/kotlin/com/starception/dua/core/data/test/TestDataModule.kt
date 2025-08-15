@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.test
+package com.starception.submission.core.data.test
 
-import com.starception.dua.core.data.di.DataModule
-import com.starception.dua.core.data.repository.NewsRepository
-import com.starception.dua.core.data.repository.RecentSearchRepository
-import com.starception.dua.core.data.repository.SearchContentsRepository
-import com.starception.dua.core.data.repository.TopicsRepository
-import com.starception.dua.core.data.repository.UserDataRepository
-import com.starception.dua.core.data.test.repository.FakeNewsRepository
-import com.starception.dua.core.data.test.repository.FakeRecentSearchRepository
-import com.starception.dua.core.data.test.repository.FakeSearchContentsRepository
-import com.starception.dua.core.data.test.repository.FakeTopicsRepository
-import com.starception.dua.core.data.test.repository.FakeUserDataRepository
-import com.starception.dua.core.data.util.NetworkMonitor
-import com.starception.dua.core.data.util.TimeZoneMonitor
+import com.starception.submission.core.data.di.DataModule
+import com.starception.submission.core.data.repository.NewsRepository
+import com.starception.submission.core.data.repository.RecentSearchRepository
+import com.starception.submission.core.data.repository.SearchContentsRepository
+import com.starception.submission.core.data.repository.TopicsRepository
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.data.test.repository.FakeNewsRepository
+import com.starception.submission.core.data.test.repository.FakeRecentSearchRepository
+import com.starception.submission.core.data.test.repository.FakeSearchContentsRepository
+import com.starception.submission.core.data.test.repository.FakeTopicsRepository
+import com.starception.submission.core.data.test.repository.FakeUserDataRepository
+import com.starception.submission.core.data.util.NetworkMonitor
+import com.starception.submission.core.data.util.TimeZoneMonitor
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.components.SingletonComponent

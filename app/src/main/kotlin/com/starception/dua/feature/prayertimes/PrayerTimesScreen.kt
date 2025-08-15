@@ -1,4 +1,4 @@
-package com.starception.dua.feature.prayertimes
+package com.starception.submission.feature.prayertimes
 
 import android.Manifest
 import androidx.compose.foundation.layout.*
@@ -16,9 +16,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.prayer.ui.PrayerTimesCard
-import com.starception.dua.prayer.viewmodel.PrayerTimesViewModel
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.prayer.ui.PrayerTimesCard
+import com.starception.submission.prayer.viewmodel.PrayerTimesViewModel
 
 /**
  * Prayer Times screen showing daily prayer schedule
@@ -60,7 +60,7 @@ fun PrayerTimesScreen(
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 private fun PrayerTimesContent(
-    uiState: com.starception.dua.prayer.viewmodel.PrayerTimesUiState,
+            uiState: com.starception.submission.prayer.viewmodel.PrayerTimesUiState,
     locationPermissions: com.google.accompanist.permissions.MultiplePermissionsState,
     onRefresh: () -> Unit,
     onRefreshButton: () -> Unit,

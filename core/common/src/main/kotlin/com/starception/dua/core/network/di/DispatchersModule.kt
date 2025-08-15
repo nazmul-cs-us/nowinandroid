@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.network.di
+package com.starception.submission.core.network.di
 
-import com.starception.dua.core.network.Dispatcher
-import com.starception.dua.core.network.NiaDispatchers.Default
-import com.starception.dua.core.network.NiaDispatchers.IO
+import com.starception.submission.core.network.Dispatcher
+import com.starception.submission.core.network.NiaDispatchers.Default
+import com.starception.submission.core.network.NiaDispatchers.IO
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

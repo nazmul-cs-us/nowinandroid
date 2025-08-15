@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.starception.dua.ui.interests2pane
+package com.starception.submission.ui.interests2pane
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.navigation.toRoute
-import com.starception.dua.feature.interests.navigation.InterestsRoute
+import com.starception.submission.feature.interests.navigation.InterestsRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject

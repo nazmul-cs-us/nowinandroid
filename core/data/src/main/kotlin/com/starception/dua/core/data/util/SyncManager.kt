@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.util
+package com.starception.submission.core.data.util
 
 import kotlinx.coroutines.flow.Flow
 

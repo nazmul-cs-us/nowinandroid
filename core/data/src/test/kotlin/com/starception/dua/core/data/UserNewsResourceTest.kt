@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data
+package com.starception.submission.core.data
 
-import com.starception.dua.core.model.data.DarkThemeConfig.FOLLOW_SYSTEM
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.model.data.ThemeBrand.DEFAULT
-import com.starception.dua.core.model.data.Topic
-import com.starception.dua.core.model.data.UserData
-import com.starception.dua.core.model.data.UserNewsResource
+import com.starception.submission.core.model.data.DarkThemeConfig.FOLLOW_SYSTEM
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.model.data.ThemeBrand.DEFAULT
+import com.starception.submission.core.model.data.Topic
+import com.starception.submission.core.model.data.UserData
+import com.starception.submission.core.model.data.UserNewsResource
 import kotlinx.datetime.Clock
 import org.junit.Test
 import kotlin.test.assertEquals

@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.starception.dua.sync.services
+package com.starception.submission.sync.services
 
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import com.starception.dua.core.data.util.SyncManager
+import com.starception.submission.core.data.util.SyncManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 

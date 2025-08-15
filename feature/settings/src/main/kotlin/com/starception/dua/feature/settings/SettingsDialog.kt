@@ -16,7 +16,7 @@
 
 @file:Suppress("ktlint:standard:max-line-length")
 
-package com.starception.dua.feature.settings
+package com.starception.submission.feature.settings
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
@@ -55,20 +55,20 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
-import com.starception.dua.core.designsystem.component.NiaTextButton
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.core.designsystem.theme.supportsDynamicTheming
-import com.starception.dua.core.model.data.DarkThemeConfig
-import com.starception.dua.core.model.data.DarkThemeConfig.DARK
-import com.starception.dua.core.model.data.DarkThemeConfig.FOLLOW_SYSTEM
-import com.starception.dua.core.model.data.DarkThemeConfig.LIGHT
-import com.starception.dua.core.model.data.ThemeBrand
-import com.starception.dua.core.model.data.ThemeBrand.ANDROID
-import com.starception.dua.core.model.data.ThemeBrand.DEFAULT
-import com.starception.dua.core.ui.TrackScreenViewEvent
-import com.starception.dua.feature.settings.R.string
-import com.starception.dua.feature.settings.SettingsUiState.Loading
-import com.starception.dua.feature.settings.SettingsUiState.Success
+import com.starception.submission.core.designsystem.component.NiaTextButton
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.designsystem.theme.supportsDynamicTheming
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.DarkThemeConfig.DARK
+import com.starception.submission.core.model.data.DarkThemeConfig.FOLLOW_SYSTEM
+import com.starception.submission.core.model.data.DarkThemeConfig.LIGHT
+import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.model.data.ThemeBrand.ANDROID
+import com.starception.submission.core.model.data.ThemeBrand.DEFAULT
+import com.starception.submission.core.ui.TrackScreenViewEvent
+import com.starception.submission.feature.settings.R.string
+import com.starception.submission.feature.settings.SettingsUiState.Loading
+import com.starception.submission.feature.settings.SettingsUiState.Success
 
 @Composable
 fun SettingsDialog(

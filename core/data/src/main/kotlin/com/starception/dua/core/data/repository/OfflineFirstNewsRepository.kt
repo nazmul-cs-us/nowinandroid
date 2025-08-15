@@ -14,24 +14,24 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.repository
+package com.starception.submission.core.data.repository
 
-import com.starception.dua.core.data.Synchronizer
-import com.starception.dua.core.data.changeListSync
-import com.starception.dua.core.data.model.asEntity
-import com.starception.dua.core.data.model.topicCrossReferences
-import com.starception.dua.core.data.model.topicEntityShells
-import com.starception.dua.core.database.dao.NewsResourceDao
-import com.starception.dua.core.database.dao.TopicDao
-import com.starception.dua.core.database.model.PopulatedNewsResource
-import com.starception.dua.core.database.model.TopicEntity
-import com.starception.dua.core.database.model.asExternalModel
-import com.starception.dua.core.datastore.ChangeListVersions
-import com.starception.dua.core.datastore.NiaPreferencesDataSource
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.network.NiaNetworkDataSource
-import com.starception.dua.core.network.model.NetworkNewsResource
-import com.starception.dua.core.notifications.Notifier
+import com.starception.submission.core.data.Synchronizer
+import com.starception.submission.core.data.changeListSync
+import com.starception.submission.core.data.model.asEntity
+import com.starception.submission.core.data.model.topicCrossReferences
+import com.starception.submission.core.data.model.topicEntityShells
+import com.starception.submission.core.database.dao.NewsResourceDao
+import com.starception.submission.core.database.dao.TopicDao
+import com.starception.submission.core.database.model.PopulatedNewsResource
+import com.starception.submission.core.database.model.TopicEntity
+import com.starception.submission.core.database.model.asExternalModel
+import com.starception.submission.core.datastore.ChangeListVersions
+import com.starception.submission.core.datastore.NiaPreferencesDataSource
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.network.NiaNetworkDataSource
+import com.starception.submission.core.network.model.NetworkNewsResource
+import com.starception.submission.core.notifications.Notifier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map

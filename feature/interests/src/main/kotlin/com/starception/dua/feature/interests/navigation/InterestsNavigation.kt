@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.interests.navigation
+package com.starception.submission.feature.interests.navigation
 
 import androidx.navigation.NavController
 import androidx.navigation.NavOptions

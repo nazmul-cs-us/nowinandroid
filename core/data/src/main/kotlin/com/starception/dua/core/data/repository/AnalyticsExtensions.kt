@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.repository
+package com.starception.submission.core.data.repository
 
-import com.starception.dua.core.analytics.AnalyticsEvent
-import com.starception.dua.core.analytics.AnalyticsEvent.Param
-import com.starception.dua.core.analytics.AnalyticsHelper
+import com.starception.submission.core.analytics.AnalyticsEvent
+import com.starception.submission.core.analytics.AnalyticsEvent.Param
+import com.starception.submission.core.analytics.AnalyticsHelper
 
 internal fun AnalyticsHelper.logNewsResourceBookmarkToggled(newsResourceId: String, isBookmarked: Boolean) {
     val eventType = if (isBookmarked) "news_resource_saved" else "news_resource_unsaved"

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.ui
+package com.starception.submission.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,20 +63,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
-import com.starception.dua.R
-import com.starception.dua.core.designsystem.component.NiaBackground
-import com.starception.dua.core.designsystem.component.NiaGradientBackground
-import com.starception.dua.core.designsystem.component.NiaNavigationSuiteScaffold
-import com.starception.dua.core.designsystem.component.NiaTopAppBar
-import com.starception.dua.core.designsystem.icon.NiaIcons
-import com.starception.dua.core.designsystem.theme.GradientColors
-import com.starception.dua.core.designsystem.theme.LocalGradientColors
-import com.starception.dua.feature.settings.SettingsDialog
-import com.starception.dua.prayer.ui.PrayerSettingsDialog
-import com.starception.dua.navigation.NiaNavHost
-import com.starception.dua.navigation.TopLevelDestination
+import com.starception.submission.R
+import com.starception.submission.core.designsystem.component.NiaBackground
+import com.starception.submission.core.designsystem.component.NiaGradientBackground
+import com.starception.submission.core.designsystem.component.NiaNavigationSuiteScaffold
+import com.starception.submission.core.designsystem.component.NiaTopAppBar
+import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.theme.GradientColors
+import com.starception.submission.core.designsystem.theme.LocalGradientColors
+import com.starception.submission.feature.settings.SettingsDialog
+import com.starception.submission.prayer.ui.PrayerSettingsDialog
+import com.starception.submission.navigation.NiaNavHost
+import com.starception.submission.navigation.TopLevelDestination
 import kotlin.reflect.KClass
-import com.starception.dua.feature.settings.R as settingsR
+import com.starception.submission.feature.settings.R as settingsR
 
 @Composable
 fun NiaApp(
@@ -143,7 +143,7 @@ internal fun NiaApp(
 
     // Modal overlay for settings dialog
     if (showSettingsDialog) {
-        val isPrayerTimesPage = currentDestination?.hasRoute<com.starception.dua.feature.prayertimes.navigation.PrayerTimesRoute>() == true
+        val isPrayerTimesPage = currentDestination?.hasRoute<com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute>() == true
         
         // Full screen modal overlay
         Box(

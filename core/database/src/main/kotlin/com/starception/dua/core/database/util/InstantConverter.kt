@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.database.util
+package com.starception.submission.core.database.util
 
 import androidx.room.TypeConverter
 import kotlinx.datetime.Instant

@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.testdoubles
+package com.starception.submission.core.data.testdoubles
 
-import com.starception.dua.core.network.NiaNetworkDataSource
-import com.starception.dua.core.network.demo.DemoNiaNetworkDataSource
-import com.starception.dua.core.network.model.NetworkChangeList
-import com.starception.dua.core.network.model.NetworkNewsResource
-import com.starception.dua.core.network.model.NetworkTopic
+import com.starception.submission.core.network.NiaNetworkDataSource
+import com.starception.submission.core.network.demo.DemoNiaNetworkDataSource
+import com.starception.submission.core.network.model.NetworkChangeList
+import com.starception.submission.core.network.model.NetworkNewsResource
+import com.starception.submission.core.network.model.NetworkTopic
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.serialization.json.Json

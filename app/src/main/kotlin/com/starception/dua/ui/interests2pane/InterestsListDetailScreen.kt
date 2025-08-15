@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.ui.interests2pane
+package com.starception.submission.ui.interests2pane
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -52,12 +52,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import com.starception.dua.feature.interests.InterestsRoute
-import com.starception.dua.feature.interests.navigation.InterestsRoute
-import com.starception.dua.feature.topic.TopicDetailPlaceholder
-import com.starception.dua.feature.topic.TopicScreen
-import com.starception.dua.feature.topic.TopicViewModel
-import com.starception.dua.feature.topic.navigation.TopicRoute
+import com.starception.submission.feature.interests.InterestsRoute
+import com.starception.submission.feature.interests.navigation.InterestsRoute
+import com.starception.submission.feature.topic.TopicDetailPlaceholder
+import com.starception.submission.feature.topic.TopicScreen
+import com.starception.submission.feature.topic.TopicViewModel
+import com.starception.submission.feature.topic.navigation.TopicRoute
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlin.math.max

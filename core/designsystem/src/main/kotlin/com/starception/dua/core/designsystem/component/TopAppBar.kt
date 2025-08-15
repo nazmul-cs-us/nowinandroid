@@ -16,7 +16,7 @@
 
 @file:OptIn(ExperimentalMaterial3Api::class)
 
-package com.starception.dua.core.designsystem.component
+package com.starception.submission.core.designsystem.component
 
 import androidx.annotation.StringRes
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -33,8 +33,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import com.starception.dua.core.designsystem.icon.NiaIcons
-import com.starception.dua.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.theme.NiaTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

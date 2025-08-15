@@ -1,8 +1,8 @@
-package com.starception.dua.prayer
+package com.starception.submission.prayer
 
-import com.starception.dua.prayer.calculator.AstronomicalCalculator
-import com.starception.dua.prayer.model.*
-import com.starception.dua.prayer.service.PrayerTimeCalculatorService
+import com.starception.submission.prayer.calculator.AstronomicalCalculator
+import com.starception.submission.prayer.model.*
+import com.starception.submission.prayer.service.PrayerTimeCalculatorService
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalTime

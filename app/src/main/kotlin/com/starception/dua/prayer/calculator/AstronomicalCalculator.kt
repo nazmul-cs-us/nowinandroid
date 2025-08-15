@@ -1,7 +1,7 @@
-package com.starception.dua.prayer.calculator
+package com.starception.submission.prayer.calculator
 
 import android.util.Log
-import com.starception.dua.prayer.model.Location
+import com.starception.submission.prayer.model.Location
 import java.time.LocalDate
 import java.time.LocalTime
 import javax.inject.Inject

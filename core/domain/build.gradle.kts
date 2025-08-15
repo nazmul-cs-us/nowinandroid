@@ -20,7 +20,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.core.domain"
+    namespace = "com.starception.submission.core.domain"
 }
 
 dependencies {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.datastore
+package com.starception.submission.core.datastore
 
 import androidx.datastore.core.CorruptionException
 import kotlinx.coroutines.test.runTest

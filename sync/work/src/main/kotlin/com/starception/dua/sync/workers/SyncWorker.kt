@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.sync.workers
+package com.starception.submission.sync.workers
 
 import android.content.Context
 import androidx.hilt.work.HiltWorker
@@ -24,18 +24,18 @@ import androidx.work.ForegroundInfo
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkerParameters
-import com.starception.dua.core.analytics.AnalyticsHelper
-import com.starception.dua.core.data.Synchronizer
-import com.starception.dua.core.data.repository.NewsRepository
-import com.starception.dua.core.data.repository.SearchContentsRepository
-import com.starception.dua.core.data.repository.TopicsRepository
-import com.starception.dua.core.datastore.ChangeListVersions
-import com.starception.dua.core.datastore.NiaPreferencesDataSource
-import com.starception.dua.core.network.Dispatcher
-import com.starception.dua.core.network.NiaDispatchers.IO
-import com.starception.dua.sync.initializers.SyncConstraints
-import com.starception.dua.sync.initializers.syncForegroundInfo
-import com.starception.dua.sync.status.SyncSubscriber
+import com.starception.submission.core.analytics.AnalyticsHelper
+import com.starception.submission.core.data.Synchronizer
+import com.starception.submission.core.data.repository.NewsRepository
+import com.starception.submission.core.data.repository.SearchContentsRepository
+import com.starception.submission.core.data.repository.TopicsRepository
+import com.starception.submission.core.datastore.ChangeListVersions
+import com.starception.submission.core.datastore.NiaPreferencesDataSource
+import com.starception.submission.core.network.Dispatcher
+import com.starception.submission.core.network.NiaDispatchers.IO
+import com.starception.submission.sync.initializers.SyncConstraints
+import com.starception.submission.sync.initializers.syncForegroundInfo
+import com.starception.submission.sync.status.SyncSubscriber
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineDispatcher

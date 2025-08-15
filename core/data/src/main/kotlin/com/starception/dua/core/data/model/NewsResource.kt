@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.model
+package com.starception.submission.core.data.model
 
-import com.starception.dua.core.database.model.NewsResourceEntity
-import com.starception.dua.core.database.model.NewsResourceTopicCrossRef
-import com.starception.dua.core.database.model.TopicEntity
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.network.model.NetworkNewsResource
-import com.starception.dua.core.network.model.NetworkTopic
-import com.starception.dua.core.network.model.asExternalModel
+import com.starception.submission.core.database.model.NewsResourceEntity
+import com.starception.submission.core.database.model.NewsResourceTopicCrossRef
+import com.starception.submission.core.database.model.TopicEntity
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.network.model.NetworkNewsResource
+import com.starception.submission.core.network.model.NetworkTopic
+import com.starception.submission.core.network.model.asExternalModel
 
 fun NetworkNewsResource.asEntity() = NewsResourceEntity(
     id = id,

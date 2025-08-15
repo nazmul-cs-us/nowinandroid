@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package com.starception.dua
+package com.starception.submission
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.starception.dua.MainActivityUiState.Loading
-import com.starception.dua.MainActivityUiState.Success
-import com.starception.dua.core.data.repository.UserDataRepository
-import com.starception.dua.core.model.data.DarkThemeConfig
-import com.starception.dua.core.model.data.ThemeBrand
-import com.starception.dua.core.model.data.UserData
+import com.starception.submission.MainActivityUiState.Loading
+import com.starception.submission.MainActivityUiState.Success
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.model.data.UserData
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

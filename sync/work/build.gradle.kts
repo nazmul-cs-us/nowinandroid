@@ -21,9 +21,9 @@ plugins {
 
 android {
     defaultConfig {
-        testInstrumentationRunner = "com.starception.dua.core.testing.NiaTestRunner"
+        testInstrumentationRunner = "com.starception.submission.core.testing.NiaTestRunner"
     }
-    namespace = "com.starception.dua.sync"
+    namespace = "com.starception.submission.sync"
 }
 
 dependencies {

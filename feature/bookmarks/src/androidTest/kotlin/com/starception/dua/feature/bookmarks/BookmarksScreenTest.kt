@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.bookmarks
+package com.starception.submission.feature.bookmarks
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
@@ -34,8 +34,8 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.testing.TestLifecycleOwner
-import com.starception.dua.core.testing.data.userNewsResourcesTestData
-import com.starception.dua.core.ui.NewsFeedUiState
+import com.starception.submission.core.testing.data.userNewsResourcesTestData
+import com.starception.submission.core.ui.NewsFeedUiState
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -130,7 +130,7 @@ class BookmarksScreenTest {
         composeTestRule
             .onAllNodesWithContentDescription(
                 composeTestRule.activity.getString(
-                    com.starception.dua.core.ui.R.string.core_ui_unbookmark,
+                    com.starception.submission.core.ui.R.string.core_ui_unbookmark,
                 ),
             ).filter(
                 hasAnyAncestor(

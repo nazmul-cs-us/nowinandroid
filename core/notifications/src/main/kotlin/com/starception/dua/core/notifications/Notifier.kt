@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.notifications
+package com.starception.submission.core.notifications
 
-import com.starception.dua.core.model.data.NewsResource
+import com.starception.submission.core.model.data.NewsResource
 
 /**
  * Interface for creating notifications in the app

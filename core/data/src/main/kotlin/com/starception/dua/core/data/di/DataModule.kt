@@ -14,22 +14,22 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.di
+package com.starception.submission.core.data.di
 
-import com.starception.dua.core.data.repository.DefaultRecentSearchRepository
-import com.starception.dua.core.data.repository.DefaultSearchContentsRepository
-import com.starception.dua.core.data.repository.NewsRepository
-import com.starception.dua.core.data.repository.OfflineFirstNewsRepository
-import com.starception.dua.core.data.repository.OfflineFirstTopicsRepository
-import com.starception.dua.core.data.repository.OfflineFirstUserDataRepository
-import com.starception.dua.core.data.repository.RecentSearchRepository
-import com.starception.dua.core.data.repository.SearchContentsRepository
-import com.starception.dua.core.data.repository.TopicsRepository
-import com.starception.dua.core.data.repository.UserDataRepository
-import com.starception.dua.core.data.util.ConnectivityManagerNetworkMonitor
-import com.starception.dua.core.data.util.NetworkMonitor
-import com.starception.dua.core.data.util.TimeZoneBroadcastMonitor
-import com.starception.dua.core.data.util.TimeZoneMonitor
+import com.starception.submission.core.data.repository.DefaultRecentSearchRepository
+import com.starception.submission.core.data.repository.DefaultSearchContentsRepository
+import com.starception.submission.core.data.repository.NewsRepository
+import com.starception.submission.core.data.repository.OfflineFirstNewsRepository
+import com.starception.submission.core.data.repository.OfflineFirstTopicsRepository
+import com.starception.submission.core.data.repository.OfflineFirstUserDataRepository
+import com.starception.submission.core.data.repository.RecentSearchRepository
+import com.starception.submission.core.data.repository.SearchContentsRepository
+import com.starception.submission.core.data.repository.TopicsRepository
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.data.util.ConnectivityManagerNetworkMonitor
+import com.starception.submission.core.data.util.NetworkMonitor
+import com.starception.submission.core.data.util.TimeZoneBroadcastMonitor
+import com.starception.submission.core.data.util.TimeZoneMonitor
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

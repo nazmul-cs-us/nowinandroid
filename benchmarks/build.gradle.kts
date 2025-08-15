@@ -21,7 +21,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.benchmarks"
+    namespace = "com.starception.submission.benchmarks"
 
     defaultConfig {
         minSdk = 28

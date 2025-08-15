@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.testdoubles
+package com.starception.submission.core.data.testdoubles
 
-import com.starception.dua.core.database.dao.NewsResourceDao
-import com.starception.dua.core.database.model.NewsResourceEntity
-import com.starception.dua.core.database.model.NewsResourceTopicCrossRef
-import com.starception.dua.core.database.model.PopulatedNewsResource
-import com.starception.dua.core.database.model.TopicEntity
+import com.starception.submission.core.database.dao.NewsResourceDao
+import com.starception.submission.core.database.model.NewsResourceEntity
+import com.starception.submission.core.database.model.NewsResourceTopicCrossRef
+import com.starception.submission.core.database.model.PopulatedNewsResource
+import com.starception.submission.core.database.model.TopicEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map

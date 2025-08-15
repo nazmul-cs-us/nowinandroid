@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.datastore
+package com.starception.submission.core.datastore
 
 import android.util.Log
 import androidx.datastore.core.DataStore
-import com.starception.dua.core.model.data.DarkThemeConfig
-import com.starception.dua.core.model.data.ThemeBrand
-import com.starception.dua.core.model.data.UserData
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.model.data.UserData
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import java.io.IOException

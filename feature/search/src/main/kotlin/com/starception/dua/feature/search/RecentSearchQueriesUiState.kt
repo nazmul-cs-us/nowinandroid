@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.search
+package com.starception.submission.feature.search
 
-import com.starception.dua.core.data.model.RecentSearchQuery
+import com.starception.submission.core.data.model.RecentSearchQuery
 
 sealed interface RecentSearchQueriesUiState {
     data object Loading : RecentSearchQueriesUiState

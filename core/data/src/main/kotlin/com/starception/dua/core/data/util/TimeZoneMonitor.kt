@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.util
+package com.starception.submission.core.data.util
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -23,9 +23,9 @@ import android.content.IntentFilter
 import android.os.Build.VERSION
 import android.os.Build.VERSION_CODES
 import androidx.tracing.trace
-import com.starception.dua.core.network.Dispatcher
-import com.starception.dua.core.network.NiaDispatchers.IO
-import com.starception.dua.core.network.di.ApplicationScope
+import com.starception.submission.core.network.Dispatcher
+import com.starception.submission.core.network.NiaDispatchers.IO
+import com.starception.submission.core.network.di.ApplicationScope
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope

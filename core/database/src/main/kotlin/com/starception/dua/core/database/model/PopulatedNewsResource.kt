@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.database.model
+package com.starception.submission.core.database.model
 
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
-import com.starception.dua.core.model.data.NewsResource
+import com.starception.submission.core.model.data.NewsResource
 
 /**
  * External data layer representation of a fully populated NiA news resource

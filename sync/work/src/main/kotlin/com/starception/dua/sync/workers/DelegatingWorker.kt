@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.sync.workers
+package com.starception.submission.sync.workers
 
 import android.content.Context
 import androidx.hilt.work.HiltWorkerFactory

@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data
+package com.starception.submission.core.data
 
 import android.util.Log
-import com.starception.dua.core.datastore.ChangeListVersions
-import com.starception.dua.core.network.model.NetworkChangeList
+import com.starception.submission.core.datastore.ChangeListVersions
+import com.starception.submission.core.network.model.NetworkChangeList
 import kotlin.coroutines.cancellation.CancellationException
 
 /**

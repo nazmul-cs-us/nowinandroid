@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.testing.util
+package com.starception.submission.core.testing.util
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.TestDispatcher

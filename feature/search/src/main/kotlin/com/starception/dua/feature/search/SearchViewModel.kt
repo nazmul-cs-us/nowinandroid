@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.search
+package com.starception.submission.feature.search
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.starception.dua.core.analytics.AnalyticsEvent
-import com.starception.dua.core.analytics.AnalyticsEvent.Param
-import com.starception.dua.core.analytics.AnalyticsHelper
-import com.starception.dua.core.data.repository.RecentSearchRepository
-import com.starception.dua.core.data.repository.SearchContentsRepository
-import com.starception.dua.core.data.repository.UserDataRepository
-import com.starception.dua.core.domain.GetRecentSearchQueriesUseCase
-import com.starception.dua.core.domain.GetSearchContentsUseCase
-import com.starception.dua.core.model.data.UserSearchResult
+import com.starception.submission.core.analytics.AnalyticsEvent
+import com.starception.submission.core.analytics.AnalyticsEvent.Param
+import com.starception.submission.core.analytics.AnalyticsHelper
+import com.starception.submission.core.data.repository.RecentSearchRepository
+import com.starception.submission.core.data.repository.SearchContentsRepository
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.domain.GetRecentSearchQueriesUseCase
+import com.starception.submission.core.domain.GetSearchContentsUseCase
+import com.starception.submission.core.model.data.UserSearchResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

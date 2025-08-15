@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.database.model
+package com.starception.submission.core.database.model
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity

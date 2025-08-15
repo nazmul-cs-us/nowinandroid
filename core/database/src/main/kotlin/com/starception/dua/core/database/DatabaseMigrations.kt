@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.database
+package com.starception.submission.core.database
 
 import androidx.room.DeleteColumn
 import androidx.room.DeleteTable

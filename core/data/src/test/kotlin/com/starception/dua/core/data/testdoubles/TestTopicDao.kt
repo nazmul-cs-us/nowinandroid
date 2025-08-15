@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.testdoubles
+package com.starception.submission.core.data.testdoubles
 
-import com.starception.dua.core.database.dao.TopicDao
-import com.starception.dua.core.database.model.TopicEntity
+import com.starception.submission.core.database.dao.TopicDao
+import com.starception.submission.core.database.model.TopicEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map

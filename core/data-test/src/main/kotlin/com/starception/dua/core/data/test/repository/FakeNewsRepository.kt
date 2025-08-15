@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.test.repository
+package com.starception.submission.core.data.test.repository
 
-import com.starception.dua.core.data.Synchronizer
-import com.starception.dua.core.data.model.asExternalModel
-import com.starception.dua.core.data.repository.NewsRepository
-import com.starception.dua.core.data.repository.NewsResourceQuery
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.network.Dispatcher
-import com.starception.dua.core.network.NiaDispatchers.IO
-import com.starception.dua.core.network.demo.DemoNiaNetworkDataSource
+import com.starception.submission.core.data.Synchronizer
+import com.starception.submission.core.data.model.asExternalModel
+import com.starception.submission.core.data.repository.NewsRepository
+import com.starception.submission.core.data.repository.NewsResourceQuery
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.network.Dispatcher
+import com.starception.submission.core.network.NiaDispatchers.IO
+import com.starception.submission.core.network.demo.DemoNiaNetworkDataSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow

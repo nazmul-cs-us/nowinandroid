@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.sync.status
+package com.starception.submission.sync.status
 
 import com.google.firebase.messaging.FirebaseMessaging
-import com.starception.dua.sync.initializers.SYNC_TOPIC
+import com.starception.submission.sync.initializers.SYNC_TOPIC
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 

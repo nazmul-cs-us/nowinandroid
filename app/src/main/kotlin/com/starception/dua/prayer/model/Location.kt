@@ -1,4 +1,4 @@
-package com.starception.dua.prayer.model
+package com.starception.submission.prayer.model
 
 /**
  * Represents a geographical location with timezone information

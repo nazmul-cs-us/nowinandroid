@@ -16,10 +16,10 @@
 
 syntax = "proto3";
 
-import "com/starception/dua/data/dark_theme_config.proto";
-import "com/starception/dua/data/theme_brand.proto";
+import "com/starception/submission/data/dark_theme_config.proto";
+import "com/starception/submission/data/theme_brand.proto";
 
-option java_package = "com.starception.dua.core.datastore";
+option java_package = "com.starception.submission.core.datastore";
 option java_multiple_files = true;
 
 message UserPreferences {

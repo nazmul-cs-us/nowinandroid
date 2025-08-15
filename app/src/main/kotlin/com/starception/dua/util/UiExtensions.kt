@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.util
+package com.starception.submission.util
 
 import android.content.res.Configuration
 import androidx.activity.ComponentActivity

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.result
+package com.starception.submission.core.result
 
 import app.cash.turbine.test
 import kotlinx.coroutines.flow.flow

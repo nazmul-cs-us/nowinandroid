@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.interests
+package com.starception.submission.interests
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
@@ -24,14 +24,14 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import com.starception.dua.core.testing.data.followableTopicTestData
-import com.starception.dua.feature.interests.InterestsScreen
-import com.starception.dua.feature.interests.InterestsUiState
+import com.starception.submission.core.testing.data.followableTopicTestData
+import com.starception.submission.feature.interests.InterestsScreen
+import com.starception.submission.feature.interests.InterestsUiState
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import com.starception.dua.core.ui.R as CoreUiR
-import com.starception.dua.feature.interests.R as InterestsR
+import com.starception.submission.core.ui.R as CoreUiR
+import com.starception.submission.feature.interests.R as InterestsR
 
 /**
  * UI test for checking the correct behaviour of the Interests screen;

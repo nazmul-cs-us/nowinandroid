@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.interests
+package com.starception.submission.feature.interests
 
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Box
@@ -35,11 +35,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.starception.dua.core.designsystem.component.scrollbar.DraggableScrollbar
-import com.starception.dua.core.designsystem.component.scrollbar.rememberDraggableScroller
-import com.starception.dua.core.designsystem.component.scrollbar.scrollbarState
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.core.ui.InterestsItem
+import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
+import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
+import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.ui.InterestsItem
 
 @Composable
 fun TopicsTabContent(

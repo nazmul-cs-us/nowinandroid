@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.domain
+package com.starception.submission.core.domain
 
-import com.starception.dua.core.data.repository.TopicsRepository
-import com.starception.dua.core.data.repository.UserDataRepository
-import com.starception.dua.core.domain.TopicSortField.NAME
-import com.starception.dua.core.domain.TopicSortField.NONE
-import com.starception.dua.core.model.data.FollowableTopic
+import com.starception.submission.core.data.repository.TopicsRepository
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.domain.TopicSortField.NAME
+import com.starception.submission.core.domain.TopicSortField.NONE
+import com.starception.submission.core.model.data.FollowableTopic
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import javax.inject.Inject

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.designsystem
+package com.starception.submission.core.designsystem
 
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.size
@@ -22,9 +22,9 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
-import com.starception.dua.core.designsystem.component.NiaBackground
-import com.starception.dua.core.designsystem.component.NiaGradientBackground
-import com.starception.dua.core.testing.util.captureMultiTheme
+import com.starception.submission.core.designsystem.component.NiaBackground
+import com.starception.submission.core.designsystem.component.NiaGradientBackground
+import com.starception.submission.core.testing.util.captureMultiTheme
 import dagger.hilt.android.testing.HiltTestApplication
 import org.junit.Rule
 import org.junit.Test

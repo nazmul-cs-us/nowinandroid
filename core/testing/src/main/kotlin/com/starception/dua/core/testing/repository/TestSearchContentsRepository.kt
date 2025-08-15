@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.testing.repository
+package com.starception.submission.core.testing.repository
 
-import com.starception.dua.core.data.repository.SearchContentsRepository
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.model.data.SearchResult
-import com.starception.dua.core.model.data.Topic
+import com.starception.submission.core.data.repository.SearchContentsRepository
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.model.data.SearchResult
+import com.starception.submission.core.model.data.Topic
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine

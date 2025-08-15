@@ -1,4 +1,4 @@
-package com.starception.dua.prayer.ui
+package com.starception.submission.prayer.ui
 
 import android.content.Context
 import android.os.Build
@@ -39,11 +39,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.core.content.ContextCompat
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.prayer.model.CalculationMethod
-import com.starception.dua.prayer.model.DayPrayerTimes
-import com.starception.dua.prayer.model.Location
-import com.starception.dua.prayer.model.PrayerTime
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.prayer.model.CalculationMethod
+import com.starception.submission.prayer.model.DayPrayerTimes
+import com.starception.submission.prayer.model.Location
+import com.starception.submission.prayer.model.PrayerTime
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

@@ -1,4 +1,4 @@
-package com.starception.dua.prayer.service
+package com.starception.submission.prayer.service
 
 import android.Manifest
 import android.content.Context
@@ -8,7 +8,7 @@ import android.location.LocationManager
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
 import com.google.android.gms.tasks.CancellationTokenSource
-import com.starception.dua.prayer.model.Location
+import com.starception.submission.prayer.model.Location
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.model
+package com.starception.submission.core.data.model
 
-import com.starception.dua.core.database.model.TopicEntity
-import com.starception.dua.core.network.model.NetworkTopic
+import com.starception.submission.core.database.model.TopicEntity
+import com.starception.submission.core.network.model.NetworkTopic
 
 fun NetworkTopic.asEntity() = TopicEntity(
     id = id,

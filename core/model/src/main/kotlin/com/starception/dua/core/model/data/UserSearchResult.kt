@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.model.data
+package com.starception.submission.core.model.data
 
 /**
  * An entity of [SearchResult] with additional user information such as whether the user is

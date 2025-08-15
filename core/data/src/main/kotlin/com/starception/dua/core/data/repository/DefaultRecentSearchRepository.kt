@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.repository
+package com.starception.submission.core.data.repository
 
-import com.starception.dua.core.data.model.RecentSearchQuery
-import com.starception.dua.core.data.model.asExternalModel
-import com.starception.dua.core.database.dao.RecentSearchQueryDao
-import com.starception.dua.core.database.model.RecentSearchQueryEntity
+import com.starception.submission.core.data.model.RecentSearchQuery
+import com.starception.submission.core.data.model.asExternalModel
+import com.starception.submission.core.database.dao.RecentSearchQueryDao
+import com.starception.submission.core.database.model.RecentSearchQueryEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock

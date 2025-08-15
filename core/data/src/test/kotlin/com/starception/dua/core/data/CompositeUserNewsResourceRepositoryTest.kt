@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data
+package com.starception.submission.core.data
 
-import com.starception.dua.core.data.repository.CompositeUserNewsResourceRepository
-import com.starception.dua.core.data.repository.NewsResourceQuery
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.model.data.Topic
-import com.starception.dua.core.model.data.mapToUserNewsResources
-import com.starception.dua.core.testing.repository.TestNewsRepository
-import com.starception.dua.core.testing.repository.TestUserDataRepository
-import com.starception.dua.core.testing.repository.emptyUserData
+import com.starception.submission.core.data.repository.CompositeUserNewsResourceRepository
+import com.starception.submission.core.data.repository.NewsResourceQuery
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.model.data.Topic
+import com.starception.submission.core.model.data.mapToUserNewsResources
+import com.starception.submission.core.testing.repository.TestNewsRepository
+import com.starception.submission.core.testing.repository.TestUserDataRepository
+import com.starception.submission.core.testing.repository.emptyUserData
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant

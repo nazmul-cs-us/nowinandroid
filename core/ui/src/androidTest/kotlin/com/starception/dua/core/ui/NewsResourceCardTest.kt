@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.ui
+package com.starception.submission.core.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertContentDescriptionEquals
@@ -22,8 +22,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import com.starception.dua.core.testing.data.followableTopicTestData
-import com.starception.dua.core.testing.data.userNewsResourcesTestData
+import com.starception.submission.core.testing.data.followableTopicTestData
+import com.starception.submission.core.testing.data.userNewsResourcesTestData
 import org.junit.Rule
 import org.junit.Test
 

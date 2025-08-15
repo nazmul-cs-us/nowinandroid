@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.di
+package com.starception.submission.core.data.di
 
-import com.starception.dua.core.data.repository.CompositeUserNewsResourceRepository
-import com.starception.dua.core.data.repository.UserNewsResourceRepository
+import com.starception.submission.core.data.repository.CompositeUserNewsResourceRepository
+import com.starception.submission.core.data.repository.UserNewsResourceRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

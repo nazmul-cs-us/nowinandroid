@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.designsystem
+package com.starception.submission.core.designsystem
 
 import android.os.Build.VERSION.SDK_INT
 import android.os.Build.VERSION_CODES
@@ -27,21 +27,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
-import com.starception.dua.core.designsystem.theme.BackgroundTheme
-import com.starception.dua.core.designsystem.theme.DarkAndroidBackgroundTheme
-import com.starception.dua.core.designsystem.theme.DarkAndroidColorScheme
-import com.starception.dua.core.designsystem.theme.DarkAndroidGradientColors
-import com.starception.dua.core.designsystem.theme.DarkDefaultColorScheme
-import com.starception.dua.core.designsystem.theme.GradientColors
-import com.starception.dua.core.designsystem.theme.LightAndroidBackgroundTheme
-import com.starception.dua.core.designsystem.theme.LightAndroidColorScheme
-import com.starception.dua.core.designsystem.theme.LightAndroidGradientColors
-import com.starception.dua.core.designsystem.theme.LightDefaultColorScheme
-import com.starception.dua.core.designsystem.theme.LocalBackgroundTheme
-import com.starception.dua.core.designsystem.theme.LocalGradientColors
-import com.starception.dua.core.designsystem.theme.LocalTintTheme
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.core.designsystem.theme.TintTheme
+import com.starception.submission.core.designsystem.theme.BackgroundTheme
+import com.starception.submission.core.designsystem.theme.DarkAndroidBackgroundTheme
+import com.starception.submission.core.designsystem.theme.DarkAndroidColorScheme
+import com.starception.submission.core.designsystem.theme.DarkAndroidGradientColors
+import com.starception.submission.core.designsystem.theme.DarkDefaultColorScheme
+import com.starception.submission.core.designsystem.theme.GradientColors
+import com.starception.submission.core.designsystem.theme.LightAndroidBackgroundTheme
+import com.starception.submission.core.designsystem.theme.LightAndroidColorScheme
+import com.starception.submission.core.designsystem.theme.LightAndroidGradientColors
+import com.starception.submission.core.designsystem.theme.LightDefaultColorScheme
+import com.starception.submission.core.designsystem.theme.LocalBackgroundTheme
+import com.starception.submission.core.designsystem.theme.LocalGradientColors
+import com.starception.submission.core.designsystem.theme.LocalTintTheme
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.designsystem.theme.TintTheme
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

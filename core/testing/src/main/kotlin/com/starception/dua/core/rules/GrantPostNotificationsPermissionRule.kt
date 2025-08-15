@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.rules
+package com.starception.submission.core.rules
 
 import android.Manifest.permission.POST_NOTIFICATIONS
 import android.os.Build.VERSION.SDK_INT
