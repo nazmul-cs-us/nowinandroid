@@ -352,13 +352,9 @@ class PrayerNotificationService : Service() {
      */
     private fun buildPrayerProgressContent(progress: PrayerProgress, currentPrayer: PrayerTime): String {
         val elapsedText = formatElapsedTime(progress.elapsedMinutes)
-        val guidanceText = when (progress.phase) {
-            PrayerPhase.GO_TO_MOSQUE -> "Go to mosque"
-            PrayerPhase.BEST_TIME -> "Best time to pray"
-            PrayerPhase.MAKE_TIME -> "Make time for Prayer"
-        }
         
-        return "$elapsedText since ${currentPrayer.name} • $guidanceText"
+        // Show elapsed time since prayer started - no redundant guidance text
+        return "$elapsedText since ${currentPrayer.name}"
     }
     
     /**
@@ -371,7 +367,7 @@ class PrayerNotificationService : Service() {
         progress: PrayerProgress
     ): String {
         return buildString {
-            // Only show next prayer countdown since elapsed time is already in main content
+            // Show next prayer countdown
             if (nextPrayer != null) {
                 val timeRemaining = formatTimeRemaining(nextPrayer.time)
                 appendLine("Next • ${nextPrayer.name} in $timeRemaining")
