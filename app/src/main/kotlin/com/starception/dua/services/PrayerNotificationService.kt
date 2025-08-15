@@ -474,26 +474,42 @@ class PrayerNotificationService : Service() {
             val prayerStart = currentPrayer.time
             val elapsedMinutes = Duration.between(prayerStart, now).toMinutes()
             
-            // Phase-based progress calculation:
-            // 0-20 min: Go to mosque (0-20%)
-            // 20-50 min: Best time (20-60%) 
-            // 50+ min: Make time (60-100%)
-            val progressPercentage = when {
+            // Get next prayer for duration calculation
+            val nextPrayer = prayerTimes.getNextPrayer()
+            
+            // Dynamic phase-based progress calculation based on actual prayer duration
+            val prayerEnd = nextPrayer?.time ?: prayerStart.plusHours(2) // Default 2 hours if no next prayer
+            val totalPrayerDuration = Duration.between(prayerStart, prayerEnd).toMinutes()
+            val halfDuration = totalPrayerDuration / 2
+            
+            // Each segment represents its own progress (0-100% for that segment)
+            val (currentPhase, phaseProgress) = when {
                 elapsedMinutes <= 20 -> {
-                    // Go to mosque phase: 0-20%
-                    (elapsedMinutes.toFloat() / 20f * 20f).coerceIn(0f, 20f)
+                    // Go to mosque phase: 0-20 minutes
+                    // Show progress within this segment (0-100% of first segment)
+                    val phaseProgress = (elapsedMinutes.toFloat() / 20f * 100f).coerceIn(0f, 100f)
+                    Pair(0, phaseProgress.toInt()) // First segment (0-20%)
                 }
-                elapsedMinutes <= 50 -> {
-                    // Best time phase: 20-60%
-                    20f + ((elapsedMinutes - 20).toFloat() / 30f * 40f).coerceIn(0f, 40f)
+                elapsedMinutes <= halfDuration -> {
+                    // Best time phase: 20 minutes to halfway
+                    // Show progress within this segment (0-100% of second segment)
+                    val bestTimePhaseDuration = halfDuration - 20
+                    val progressInBestTime = elapsedMinutes - 20
+                    val phaseProgress = (progressInBestTime.toFloat() / bestTimePhaseDuration.toFloat() * 100f).coerceIn(0f, 100f)
+                    Pair(1, phaseProgress.toInt()) // Second segment (20-60%)
                 }
                 else -> {
-                    // Make time phase: 60-100%
-                    60f + ((elapsedMinutes - 50).toFloat() / 50f * 40f).coerceIn(0f, 40f)
+                    // Make time phase: halfway to end
+                    // Show progress within this segment (0-100% of third segment)
+                    val makeTimePhaseDuration = totalPrayerDuration - halfDuration
+                    val progressInMakeTime = elapsedMinutes - halfDuration
+                    val phaseProgress = (progressInMakeTime.toFloat() / makeTimePhaseDuration.toFloat() * 100f).coerceIn(0f, 100f)
+                    Pair(2, phaseProgress.toInt()) // Third segment (60-100%)
                 }
             }
             
-            progressPercentage.toInt()
+            // Return the phase progress (0-100) for the current segment
+            phaseProgress
             
         } catch (e: Exception) {
             Log.e(TAG, "Error calculating notification progress", e)
