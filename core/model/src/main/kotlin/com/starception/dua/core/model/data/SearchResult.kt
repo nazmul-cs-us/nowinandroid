@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.model.data
+package com.starception.submission.core.model.data
 
 /** An entity that holds the search result */
 data class SearchResult(

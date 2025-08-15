@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.interests
+package com.starception.submission.feature.interests
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
-import com.starception.dua.core.data.repository.UserDataRepository
-import com.starception.dua.core.domain.GetFollowableTopicsUseCase
-import com.starception.dua.core.domain.TopicSortField
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.feature.interests.navigation.InterestsRoute
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.domain.GetFollowableTopicsUseCase
+import com.starception.submission.core.domain.TopicSortField
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.feature.interests.navigation.InterestsRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

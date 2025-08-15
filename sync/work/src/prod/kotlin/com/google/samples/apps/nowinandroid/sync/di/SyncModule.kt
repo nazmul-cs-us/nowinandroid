@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.starception.dua.sync.di
+package com.starception.submission.sync.di
 
 import com.google.firebase.Firebase
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.messaging
-import com.starception.dua.core.data.util.SyncManager
-import com.starception.dua.sync.status.FirebaseSyncSubscriber
-import com.starception.dua.sync.status.SyncSubscriber
-import com.starception.dua.sync.status.WorkManagerSyncManager
+import com.starception.submission.core.data.util.SyncManager
+import com.starception.submission.sync.status.FirebaseSyncSubscriber
+import com.starception.submission.sync.status.SyncSubscriber
+import com.starception.submission.sync.status.WorkManagerSyncManager
 import dagger.Binds
 import dagger.Module
 import dagger.Provides

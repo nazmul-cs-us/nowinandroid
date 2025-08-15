@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.domain
+package com.starception.submission.core.domain
 
-import com.starception.dua.core.data.repository.SearchContentsRepository
-import com.starception.dua.core.data.repository.UserDataRepository
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.core.model.data.SearchResult
-import com.starception.dua.core.model.data.UserData
-import com.starception.dua.core.model.data.UserNewsResource
-import com.starception.dua.core.model.data.UserSearchResult
+import com.starception.submission.core.data.repository.SearchContentsRepository
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.model.data.SearchResult
+import com.starception.submission.core.model.data.UserData
+import com.starception.submission.core.model.data.UserNewsResource
+import com.starception.submission.core.model.data.UserSearchResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import javax.inject.Inject

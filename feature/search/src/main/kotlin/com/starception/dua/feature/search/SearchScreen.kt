@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.search
+package com.starception.submission.feature.search
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -80,20 +80,20 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.starception.dua.core.designsystem.component.scrollbar.DraggableScrollbar
-import com.starception.dua.core.designsystem.component.scrollbar.rememberDraggableScroller
-import com.starception.dua.core.designsystem.component.scrollbar.scrollbarState
-import com.starception.dua.core.designsystem.icon.NiaIcons
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.core.model.data.UserNewsResource
-import com.starception.dua.core.ui.DevicePreviews
-import com.starception.dua.core.ui.InterestsItem
-import com.starception.dua.core.ui.NewsFeedUiState.Success
-import com.starception.dua.core.ui.R.string
-import com.starception.dua.core.ui.TrackScreenViewEvent
-import com.starception.dua.core.ui.newsFeed
-import com.starception.dua.feature.search.R as searchR
+import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
+import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
+import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
+import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.model.data.UserNewsResource
+import com.starception.submission.core.ui.DevicePreviews
+import com.starception.submission.core.ui.InterestsItem
+import com.starception.submission.core.ui.NewsFeedUiState.Success
+import com.starception.submission.core.ui.R.string
+import com.starception.submission.core.ui.TrackScreenViewEvent
+import com.starception.submission.core.ui.newsFeed
+import com.starception.submission.feature.search.R as searchR
 
 @Composable
 internal fun SearchRoute(

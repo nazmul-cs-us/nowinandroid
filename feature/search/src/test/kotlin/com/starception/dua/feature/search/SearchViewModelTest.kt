@@ -14,23 +14,23 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.search
+package com.starception.submission.feature.search
 
 import androidx.lifecycle.SavedStateHandle
-import com.starception.dua.core.analytics.NoOpAnalyticsHelper
-import com.starception.dua.core.domain.GetRecentSearchQueriesUseCase
-import com.starception.dua.core.domain.GetSearchContentsUseCase
-import com.starception.dua.core.testing.data.newsResourcesTestData
-import com.starception.dua.core.testing.data.topicsTestData
-import com.starception.dua.core.testing.repository.TestRecentSearchRepository
-import com.starception.dua.core.testing.repository.TestSearchContentsRepository
-import com.starception.dua.core.testing.repository.TestUserDataRepository
-import com.starception.dua.core.testing.repository.emptyUserData
-import com.starception.dua.core.testing.util.MainDispatcherRule
-import com.starception.dua.feature.search.RecentSearchQueriesUiState.Success
-import com.starception.dua.feature.search.SearchResultUiState.EmptyQuery
-import com.starception.dua.feature.search.SearchResultUiState.Loading
-import com.starception.dua.feature.search.SearchResultUiState.SearchNotReady
+import com.starception.submission.core.analytics.NoOpAnalyticsHelper
+import com.starception.submission.core.domain.GetRecentSearchQueriesUseCase
+import com.starception.submission.core.domain.GetSearchContentsUseCase
+import com.starception.submission.core.testing.data.newsResourcesTestData
+import com.starception.submission.core.testing.data.topicsTestData
+import com.starception.submission.core.testing.repository.TestRecentSearchRepository
+import com.starception.submission.core.testing.repository.TestSearchContentsRepository
+import com.starception.submission.core.testing.repository.TestUserDataRepository
+import com.starception.submission.core.testing.repository.emptyUserData
+import com.starception.submission.core.testing.util.MainDispatcherRule
+import com.starception.submission.feature.search.RecentSearchQueriesUiState.Success
+import com.starception.submission.feature.search.SearchResultUiState.EmptyQuery
+import com.starception.submission.feature.search.SearchResultUiState.Loading
+import com.starception.submission.feature.search.SearchResultUiState.SearchNotReady
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

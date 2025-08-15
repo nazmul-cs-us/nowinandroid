@@ -19,7 +19,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.core.notifications"
+    namespace = "com.starception.submission.core.notifications"
 }
 
 dependencies {

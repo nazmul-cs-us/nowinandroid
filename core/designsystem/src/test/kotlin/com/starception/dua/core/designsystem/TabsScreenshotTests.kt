@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.designsystem
+package com.starception.submission.core.designsystem
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Surface
@@ -27,11 +27,11 @@ import androidx.compose.ui.test.FontScale
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
-import com.starception.dua.core.designsystem.component.NiaTab
-import com.starception.dua.core.designsystem.component.NiaTabRow
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.core.testing.util.DefaultRoborazziOptions
-import com.starception.dua.core.testing.util.captureMultiTheme
+import com.starception.submission.core.designsystem.component.NiaTab
+import com.starception.submission.core.designsystem.component.NiaTabRow
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.testing.util.DefaultRoborazziOptions
+import com.starception.submission.core.testing.util.captureMultiTheme
 import dagger.hilt.android.testing.HiltTestApplication
 import org.junit.Rule
 import org.junit.Test

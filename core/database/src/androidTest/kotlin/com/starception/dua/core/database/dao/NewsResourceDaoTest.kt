@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.database.dao
+package com.starception.submission.core.database.dao
 
-import com.starception.dua.core.database.model.NewsResourceEntity
-import com.starception.dua.core.database.model.NewsResourceTopicCrossRef
-import com.starception.dua.core.database.model.TopicEntity
-import com.starception.dua.core.database.model.asExternalModel
+import com.starception.submission.core.database.model.NewsResourceEntity
+import com.starception.submission.core.database.model.NewsResourceTopicCrossRef
+import com.starception.submission.core.database.model.TopicEntity
+import com.starception.submission.core.database.model.asExternalModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant

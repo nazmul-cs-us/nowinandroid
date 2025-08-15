@@ -29,7 +29,7 @@ android {
     buildFeatures {
         buildConfig = true
     }
-    namespace = "com.starception.dua.core.network"
+    namespace = "com.starception.submission.core.network"
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

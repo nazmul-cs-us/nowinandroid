@@ -14,44 +14,37 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.datastore
+package com.starception.submission.core.datastore
 
 import androidx.datastore.core.DataMigration
 
 /**
- * Migrates from using lists to maps for user data.
+ * Migrates saved ids from [Int] to [String] types
  */
-internal object ListToMapMigration : DataMigration<UserPreferences> {
+internal object IntToStringIdsMigration : DataMigration<UserPreferences> {
 
     override suspend fun cleanUp() = Unit
 
     override suspend fun migrate(currentData: UserPreferences): UserPreferences =
         currentData.copy {
-            // Migrate topic id lists
-            followedTopicIds.clear()
-            followedTopicIds.putAll(
-                currentData.deprecatedFollowedTopicIdsList.associateWith { true },
-            )
+            // Migrate topic ids
             deprecatedFollowedTopicIds.clear()
+            deprecatedFollowedTopicIds.addAll(
+                currentData.deprecatedIntFollowedTopicIdsList.map(Int::toString),
+            )
+            deprecatedIntFollowedTopicIds.clear()
 
             // Migrate author ids
-            followedAuthorIds.clear()
-            followedAuthorIds.putAll(
-                currentData.deprecatedFollowedAuthorIdsList.associateWith { true },
-            )
             deprecatedFollowedAuthorIds.clear()
-
-            // Migrate bookmarks
-            bookmarkedNewsResourceIds.clear()
-            bookmarkedNewsResourceIds.putAll(
-                currentData.deprecatedBookmarkedNewsResourceIdsList.associateWith { true },
+            deprecatedFollowedAuthorIds.addAll(
+                currentData.deprecatedIntFollowedAuthorIdsList.map(Int::toString),
             )
-            deprecatedBookmarkedNewsResourceIds.clear()
+            deprecatedIntFollowedAuthorIds.clear()
 
             // Mark migration as complete
-            hasDoneListToMapMigration = true
+            hasDoneIntToStringIdMigration = true
         }
 
     override suspend fun shouldMigrate(currentData: UserPreferences): Boolean =
-        !currentData.hasDoneListToMapMigration
+        !currentData.hasDoneIntToStringIdMigration
 }

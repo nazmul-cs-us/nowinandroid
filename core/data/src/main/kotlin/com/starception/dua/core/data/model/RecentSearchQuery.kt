@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.model
+package com.starception.submission.core.data.model
 
-import com.starception.dua.core.database.model.RecentSearchQueryEntity
+import com.starception.submission.core.database.model.RecentSearchQueryEntity
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 

@@ -19,5 +19,5 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.uitesthiltmanifest"
+    namespace = "com.starception.submission.uitesthiltmanifest"
 }

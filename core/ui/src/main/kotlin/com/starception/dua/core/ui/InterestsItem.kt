@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.ui
+package com.starception.submission.core.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -34,11 +34,11 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.starception.dua.core.designsystem.component.DynamicAsyncImage
-import com.starception.dua.core.designsystem.component.NiaIconToggleButton
-import com.starception.dua.core.designsystem.icon.NiaIcons
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.core.ui.R.string
+import com.starception.submission.core.designsystem.component.DynamicAsyncImage
+import com.starception.submission.core.designsystem.component.NiaIconToggleButton
+import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.ui.R.string
 
 @Composable
 fun InterestsItem(

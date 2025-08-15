@@ -24,7 +24,7 @@ android {
     defaultConfig {
         consumerProguardFiles("consumer-proguard-rules.pro")
     }
-    namespace = "com.starception.dua.core.datastore"
+    namespace = "com.starception.submission.core.datastore"
 }
 
 dependencies {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.database.dao
+package com.starception.submission.core.database.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
@@ -22,10 +22,10 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
-import com.starception.dua.core.database.model.NewsResourceEntity
-import com.starception.dua.core.database.model.NewsResourceTopicCrossRef
-import com.starception.dua.core.database.model.PopulatedNewsResource
-import com.starception.dua.core.model.data.NewsResource
+import com.starception.submission.core.database.model.NewsResourceEntity
+import com.starception.submission.core.database.model.NewsResourceTopicCrossRef
+import com.starception.submission.core.database.model.PopulatedNewsResource
+import com.starception.submission.core.model.data.NewsResource
 import kotlinx.coroutines.flow.Flow
 
 /**

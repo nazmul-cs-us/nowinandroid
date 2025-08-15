@@ -1,4 +1,4 @@
-package com.starception.dua.services
+package com.starception.submission.services
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -12,13 +12,13 @@ import android.os.Vibrator
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.starception.dua.R
-import com.starception.dua.prayer.model.DayPrayerTimes
-import com.starception.dua.prayer.model.PrayerTime
-import com.starception.dua.prayer.service.PrayerTimeCalculatorService
-import com.starception.dua.prayer.repository.PrayerSettingsRepository
-import com.starception.dua.util.PrayerNotificationManager
-import com.starception.dua.util.AnrPreventionConfig
+import com.starception.submission.R
+import com.starception.submission.prayer.model.DayPrayerTimes
+import com.starception.submission.prayer.model.PrayerTime
+import com.starception.submission.prayer.service.PrayerTimeCalculatorService
+import com.starception.submission.prayer.repository.PrayerSettingsRepository
+import com.starception.submission.util.PrayerNotificationManager
+import com.starception.submission.util.AnrPreventionConfig
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import java.time.LocalDate

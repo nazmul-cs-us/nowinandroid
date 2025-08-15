@@ -22,7 +22,7 @@ plugins {
 }
 
 android {
-    namespace = "com.starception.dua.feature.foryou"
+    namespace = "com.starception.submission.feature.foryou"
 }
 
 dependencies {

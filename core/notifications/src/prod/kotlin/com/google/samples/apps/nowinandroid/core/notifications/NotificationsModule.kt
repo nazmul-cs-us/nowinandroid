@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.notifications
+package com.starception.submission.core.notifications
 
 import dagger.Binds
 import dagger.Module

@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.repository
+package com.starception.submission.core.data.repository
 
-import com.starception.dua.core.data.Synchronizer
-import com.starception.dua.core.datastore.ChangeListVersions
-import com.starception.dua.core.datastore.NiaPreferencesDataSource
+import com.starception.submission.core.data.Synchronizer
+import com.starception.submission.core.datastore.ChangeListVersions
+import com.starception.submission.core.datastore.NiaPreferencesDataSource
 
 /**
  * Test synchronizer that delegates to [NiaPreferencesDataSource]

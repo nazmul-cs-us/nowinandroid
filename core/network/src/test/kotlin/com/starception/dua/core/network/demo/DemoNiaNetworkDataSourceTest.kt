@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.network.demo
+package com.starception.submission.core.network.demo
 
 import JvmUnitTestDemoAssetManager
-import com.starception.dua.core.network.model.NetworkNewsResource
-import com.starception.dua.core.network.model.NetworkTopic
+import com.starception.submission.core.network.model.NetworkNewsResource
+import com.starception.submission.core.network.model.NetworkTopic
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDateTime

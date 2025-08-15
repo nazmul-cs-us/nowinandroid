@@ -16,16 +16,16 @@
 
 @file:Suppress("ktlint:standard:max-line-length")
 
-package com.starception.dua.core.ui
+package com.starception.submission.core.ui
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
-import com.starception.dua.core.model.data.DarkThemeConfig
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.model.data.ThemeBrand
-import com.starception.dua.core.model.data.Topic
-import com.starception.dua.core.model.data.UserData
-import com.starception.dua.core.model.data.UserNewsResource
-import com.starception.dua.core.ui.PreviewParameterData.newsResources
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.model.data.Topic
+import com.starception.submission.core.model.data.UserData
+import com.starception.submission.core.model.data.UserNewsResource
+import com.starception.submission.core.ui.PreviewParameterData.newsResources
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone

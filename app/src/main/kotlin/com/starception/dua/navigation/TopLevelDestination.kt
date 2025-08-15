@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-package com.starception.dua.navigation
+package com.starception.submission.navigation
 
 import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.starception.dua.R
-import com.starception.dua.core.designsystem.icon.NiaIcons
-import com.starception.dua.feature.bookmarks.navigation.BookmarksRoute
-import com.starception.dua.feature.foryou.navigation.ForYouBaseRoute
-import com.starception.dua.feature.foryou.navigation.ForYouRoute
-import com.starception.dua.feature.interests.navigation.InterestsRoute
-import com.starception.dua.feature.prayertimes.navigation.PrayerTimesRoute
+import com.starception.submission.R
+import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.feature.bookmarks.navigation.BookmarksRoute
+import com.starception.submission.feature.foryou.navigation.ForYouBaseRoute
+import com.starception.submission.feature.foryou.navigation.ForYouRoute
+import com.starception.submission.feature.interests.navigation.InterestsRoute
+import com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute
 import kotlin.reflect.KClass
-import com.starception.dua.feature.bookmarks.R as bookmarksR
-import com.starception.dua.feature.foryou.R as forYouR
-import com.starception.dua.feature.search.R as searchR
+import com.starception.submission.feature.bookmarks.R as bookmarksR
+import com.starception.submission.feature.foryou.R as forYouR
+import com.starception.submission.feature.search.R as searchR
 
 /**
  * Type for the top level destinations in the application. Contains metadata about the destination

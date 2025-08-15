@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.testing.notifications
+package com.starception.submission.core.testing.notifications
 
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.notifications.Notifier
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.notifications.Notifier
 
 /**
  * Aggregates news resources that have been notified for addition

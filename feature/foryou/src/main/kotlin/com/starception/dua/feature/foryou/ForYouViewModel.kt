@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.foryou
+package com.starception.submission.feature.foryou
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.starception.dua.core.analytics.AnalyticsEvent
-import com.starception.dua.core.analytics.AnalyticsEvent.Param
-import com.starception.dua.core.analytics.AnalyticsHelper
-import com.starception.dua.core.data.repository.NewsResourceQuery
-import com.starception.dua.core.data.repository.UserDataRepository
-import com.starception.dua.core.data.repository.UserNewsResourceRepository
-import com.starception.dua.core.data.util.SyncManager
-import com.starception.dua.core.domain.GetFollowableTopicsUseCase
-import com.starception.dua.core.notifications.DEEP_LINK_NEWS_RESOURCE_ID_KEY
-import com.starception.dua.core.ui.NewsFeedUiState
+import com.starception.submission.core.analytics.AnalyticsEvent
+import com.starception.submission.core.analytics.AnalyticsEvent.Param
+import com.starception.submission.core.analytics.AnalyticsHelper
+import com.starception.submission.core.data.repository.NewsResourceQuery
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.data.repository.UserNewsResourceRepository
+import com.starception.submission.core.data.util.SyncManager
+import com.starception.submission.core.domain.GetFollowableTopicsUseCase
+import com.starception.submission.core.notifications.DEEP_LINK_NEWS_RESOURCE_ID_KEY
+import com.starception.submission.core.ui.NewsFeedUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted

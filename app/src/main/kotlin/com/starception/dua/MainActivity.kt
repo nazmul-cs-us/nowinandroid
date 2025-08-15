@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua
+package com.starception.submission
 
 import android.content.Intent
 import android.os.Build
@@ -40,18 +40,18 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.metrics.performance.JankStats
 import androidx.tracing.trace
-import com.starception.dua.MainActivityUiState.Loading
-import com.starception.dua.core.analytics.AnalyticsHelper
-import com.starception.dua.core.analytics.LocalAnalyticsHelper
-import com.starception.dua.core.data.repository.UserNewsResourceRepository
-import com.starception.dua.core.data.util.NetworkMonitor
-import com.starception.dua.core.data.util.TimeZoneMonitor
-import com.starception.dua.core.designsystem.theme.NiaTheme
-import com.starception.dua.core.ui.LocalTimeZone
-import com.starception.dua.ui.NiaApp
-import com.starception.dua.ui.rememberNiaAppState
-import com.starception.dua.services.PrayerNotificationService
-import com.starception.dua.util.isSystemInDarkTheme
+import com.starception.submission.MainActivityUiState.Loading
+import com.starception.submission.core.analytics.AnalyticsHelper
+import com.starception.submission.core.analytics.LocalAnalyticsHelper
+import com.starception.submission.core.data.repository.UserNewsResourceRepository
+import com.starception.submission.core.data.util.NetworkMonitor
+import com.starception.submission.core.data.util.TimeZoneMonitor
+import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.ui.LocalTimeZone
+import com.starception.submission.ui.NiaApp
+import com.starception.submission.ui.rememberNiaAppState
+import com.starception.submission.services.PrayerNotificationService
+import com.starception.submission.util.isSystemInDarkTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged

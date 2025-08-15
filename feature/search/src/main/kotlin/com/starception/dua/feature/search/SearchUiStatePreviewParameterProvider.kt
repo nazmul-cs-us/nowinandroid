@@ -16,12 +16,12 @@
 
 @file:Suppress("ktlint:standard:max-line-length")
 
-package com.starception.dua.feature.search
+package com.starception.submission.feature.search
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.core.ui.PreviewParameterData.newsResources
-import com.starception.dua.core.ui.PreviewParameterData.topics
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.ui.PreviewParameterData.newsResources
+import com.starception.submission.core.ui.PreviewParameterData.topics
 
 /**
  * This [PreviewParameterProvider](https://developer.android.com/reference/kotlin/androidx/compose/ui/tooling/preview/PreviewParameterProvider)

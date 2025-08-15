@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.network
+package com.starception.submission.core.network
 
-import com.starception.dua.core.network.model.NetworkChangeList
-import com.starception.dua.core.network.model.NetworkNewsResource
-import com.starception.dua.core.network.model.NetworkTopic
+import com.starception.submission.core.network.model.NetworkChangeList
+import com.starception.submission.core.network.model.NetworkNewsResource
+import com.starception.submission.core.network.model.NetworkTopic
 
 /**
  * Interface representing network calls to the NIA backend

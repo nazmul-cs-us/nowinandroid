@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.result
+package com.starception.submission.core.result
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch

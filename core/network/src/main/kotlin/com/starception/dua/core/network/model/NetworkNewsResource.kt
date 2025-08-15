@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.network.model
+package com.starception.submission.core.network.model
 
 import android.annotation.SuppressLint
-import com.starception.dua.core.model.data.NewsResource
+import com.starception.submission.core.model.data.NewsResource
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 

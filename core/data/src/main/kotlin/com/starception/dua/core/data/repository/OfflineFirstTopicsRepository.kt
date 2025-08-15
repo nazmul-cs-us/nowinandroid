@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.repository
+package com.starception.submission.core.data.repository
 
-import com.starception.dua.core.data.Synchronizer
-import com.starception.dua.core.data.changeListSync
-import com.starception.dua.core.data.model.asEntity
-import com.starception.dua.core.database.dao.TopicDao
-import com.starception.dua.core.database.model.TopicEntity
-import com.starception.dua.core.database.model.asExternalModel
-import com.starception.dua.core.datastore.ChangeListVersions
-import com.starception.dua.core.model.data.Topic
-import com.starception.dua.core.network.NiaNetworkDataSource
-import com.starception.dua.core.network.model.NetworkTopic
+import com.starception.submission.core.data.Synchronizer
+import com.starception.submission.core.data.changeListSync
+import com.starception.submission.core.data.model.asEntity
+import com.starception.submission.core.database.dao.TopicDao
+import com.starception.submission.core.database.model.TopicEntity
+import com.starception.submission.core.database.model.asExternalModel
+import com.starception.submission.core.datastore.ChangeListVersions
+import com.starception.submission.core.model.data.Topic
+import com.starception.submission.core.network.NiaNetworkDataSource
+import com.starception.submission.core.network.model.NetworkTopic
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject

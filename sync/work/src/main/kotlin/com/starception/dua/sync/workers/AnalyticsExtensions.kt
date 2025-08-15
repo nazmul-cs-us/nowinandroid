@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.sync.workers
+package com.starception.submission.sync.workers
 
-import com.starception.dua.core.analytics.AnalyticsEvent
-import com.starception.dua.core.analytics.AnalyticsHelper
+import com.starception.submission.core.analytics.AnalyticsEvent
+import com.starception.submission.core.analytics.AnalyticsHelper
 
 internal fun AnalyticsHelper.logSyncStarted() =
     logEvent(

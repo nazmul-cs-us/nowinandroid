@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.data.test.repository
+package com.starception.submission.core.data.test.repository
 
-import com.starception.dua.core.data.model.RecentSearchQuery
-import com.starception.dua.core.data.repository.RecentSearchRepository
+import com.starception.submission.core.data.model.RecentSearchQuery
+import com.starception.submission.core.data.repository.RecentSearchRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import javax.inject.Inject

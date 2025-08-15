@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.testing.repository
+package com.starception.submission.core.testing.repository
 
-import com.starception.dua.core.data.Synchronizer
-import com.starception.dua.core.data.repository.NewsRepository
-import com.starception.dua.core.data.repository.NewsResourceQuery
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.model.data.Topic
+import com.starception.submission.core.data.Synchronizer
+import com.starception.submission.core.data.repository.NewsRepository
+import com.starception.submission.core.data.repository.NewsResourceQuery
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.model.data.Topic
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow

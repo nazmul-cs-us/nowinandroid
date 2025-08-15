@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.foryou
+package com.starception.submission.feature.foryou
 
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
@@ -28,10 +28,10 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
-import com.starception.dua.core.rules.GrantPostNotificationsPermissionRule
-import com.starception.dua.core.testing.data.followableTopicTestData
-import com.starception.dua.core.testing.data.userNewsResourcesTestData
-import com.starception.dua.core.ui.NewsFeedUiState
+import com.starception.submission.core.rules.GrantPostNotificationsPermissionRule
+import com.starception.submission.core.testing.data.followableTopicTestData
+import com.starception.submission.core.testing.data.userNewsResourcesTestData
+import com.starception.submission.core.ui.NewsFeedUiState
 import org.junit.Rule
 import org.junit.Test
 

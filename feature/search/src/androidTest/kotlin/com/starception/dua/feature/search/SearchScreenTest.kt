@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.search
+package com.starception.submission.feature.search
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertCountEquals
@@ -28,14 +28,14 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToIndex
-import com.starception.dua.core.data.model.RecentSearchQuery
-import com.starception.dua.core.model.data.DarkThemeConfig.DARK
-import com.starception.dua.core.model.data.ThemeBrand.ANDROID
-import com.starception.dua.core.model.data.UserData
-import com.starception.dua.core.model.data.UserNewsResource
-import com.starception.dua.core.testing.data.followableTopicTestData
-import com.starception.dua.core.testing.data.newsResourcesTestData
-import com.starception.dua.core.ui.R.string
+import com.starception.submission.core.data.model.RecentSearchQuery
+import com.starception.submission.core.model.data.DarkThemeConfig.DARK
+import com.starception.submission.core.model.data.ThemeBrand.ANDROID
+import com.starception.submission.core.model.data.UserData
+import com.starception.submission.core.model.data.UserNewsResource
+import com.starception.submission.core.testing.data.followableTopicTestData
+import com.starception.submission.core.testing.data.newsResourcesTestData
+import com.starception.submission.core.ui.R.string
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test

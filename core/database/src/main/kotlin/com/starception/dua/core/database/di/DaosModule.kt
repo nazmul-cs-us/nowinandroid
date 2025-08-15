@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.database.di
+package com.starception.submission.core.database.di
 
-import com.starception.dua.core.database.NiaDatabase
-import com.starception.dua.core.database.dao.NewsResourceDao
-import com.starception.dua.core.database.dao.NewsResourceFtsDao
-import com.starception.dua.core.database.dao.RecentSearchQueryDao
-import com.starception.dua.core.database.dao.TopicDao
-import com.starception.dua.core.database.dao.TopicFtsDao
+import com.starception.submission.core.database.NiaDatabase
+import com.starception.submission.core.database.dao.NewsResourceDao
+import com.starception.submission.core.database.dao.NewsResourceFtsDao
+import com.starception.submission.core.database.dao.RecentSearchQueryDao
+import com.starception.submission.core.database.dao.TopicDao
+import com.starception.submission.core.database.dao.TopicFtsDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

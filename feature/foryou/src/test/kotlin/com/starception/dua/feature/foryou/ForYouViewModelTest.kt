@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.foryou
+package com.starception.submission.feature.foryou
 
 import androidx.lifecycle.SavedStateHandle
-import com.starception.dua.core.analytics.AnalyticsEvent
-import com.starception.dua.core.analytics.AnalyticsEvent.Param
-import com.starception.dua.core.data.repository.CompositeUserNewsResourceRepository
-import com.starception.dua.core.domain.GetFollowableTopicsUseCase
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.model.data.Topic
-import com.starception.dua.core.model.data.UserNewsResource
-import com.starception.dua.core.model.data.mapToUserNewsResources
-import com.starception.dua.core.notifications.DEEP_LINK_NEWS_RESOURCE_ID_KEY
-import com.starception.dua.core.testing.repository.TestNewsRepository
-import com.starception.dua.core.testing.repository.TestTopicsRepository
-import com.starception.dua.core.testing.repository.TestUserDataRepository
-import com.starception.dua.core.testing.repository.emptyUserData
-import com.starception.dua.core.testing.util.MainDispatcherRule
-import com.starception.dua.core.testing.util.TestAnalyticsHelper
-import com.starception.dua.core.testing.util.TestSyncManager
-import com.starception.dua.core.ui.NewsFeedUiState
+import com.starception.submission.core.analytics.AnalyticsEvent
+import com.starception.submission.core.analytics.AnalyticsEvent.Param
+import com.starception.submission.core.data.repository.CompositeUserNewsResourceRepository
+import com.starception.submission.core.domain.GetFollowableTopicsUseCase
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.model.data.Topic
+import com.starception.submission.core.model.data.UserNewsResource
+import com.starception.submission.core.model.data.mapToUserNewsResources
+import com.starception.submission.core.notifications.DEEP_LINK_NEWS_RESOURCE_ID_KEY
+import com.starception.submission.core.testing.repository.TestNewsRepository
+import com.starception.submission.core.testing.repository.TestTopicsRepository
+import com.starception.submission.core.testing.repository.TestUserDataRepository
+import com.starception.submission.core.testing.repository.emptyUserData
+import com.starception.submission.core.testing.util.MainDispatcherRule
+import com.starception.submission.core.testing.util.TestAnalyticsHelper
+import com.starception.submission.core.testing.util.TestSyncManager
+import com.starception.submission.core.ui.NewsFeedUiState
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

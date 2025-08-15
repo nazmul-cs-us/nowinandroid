@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.topic
+package com.starception.submission.feature.topic
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.starception.dua.core.data.repository.NewsResourceQuery
-import com.starception.dua.core.data.repository.TopicsRepository
-import com.starception.dua.core.data.repository.UserDataRepository
-import com.starception.dua.core.data.repository.UserNewsResourceRepository
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.core.model.data.Topic
-import com.starception.dua.core.model.data.UserNewsResource
-import com.starception.dua.core.result.Result
-import com.starception.dua.core.result.asResult
+import com.starception.submission.core.data.repository.NewsResourceQuery
+import com.starception.submission.core.data.repository.TopicsRepository
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.data.repository.UserNewsResourceRepository
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.model.data.Topic
+import com.starception.submission.core.model.data.UserNewsResource
+import com.starception.submission.core.result.Result
+import com.starception.submission.core.result.asResult
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject

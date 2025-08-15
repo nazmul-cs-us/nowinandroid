@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua
+package com.starception.submission
 
 import android.app.Application
 import android.content.pm.ApplicationInfo
@@ -22,22 +22,22 @@ import android.os.StrictMode
 import android.os.StrictMode.ThreadPolicy.Builder
 import coil.ImageLoader
 import coil.ImageLoaderFactory
-import com.starception.dua.sync.initializers.Sync
-import com.starception.dua.util.ProfileVerifierLogger
-import com.starception.dua.util.AnrPreventionConfig
+import com.starception.submission.sync.initializers.Sync
+import com.starception.submission.util.ProfileVerifierLogger
+import com.starception.submission.util.AnrPreventionConfig
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import com.starception.dua.services.PrayerNotificationService
-import com.starception.dua.util.PrayerNotificationManager
+import com.starception.submission.services.PrayerNotificationService
+import com.starception.submission.util.PrayerNotificationManager
 
 /**
  * [Application] class for DUA
  */
 @HiltAndroidApp
-class DuaApplication : Application(), ImageLoaderFactory {
+class SubmissionApplication : Application(), ImageLoaderFactory {
     @Inject
     lateinit var imageLoader: dagger.Lazy<ImageLoader>
 

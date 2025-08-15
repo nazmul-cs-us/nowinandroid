@@ -16,13 +16,13 @@
 
 @file:Suppress("ktlint:standard:max-line-length")
 
-package com.starception.dua.core.testing.data
+package com.starception.submission.core.testing.data
 
-import com.starception.dua.core.model.data.DarkThemeConfig
-import com.starception.dua.core.model.data.NewsResource
-import com.starception.dua.core.model.data.ThemeBrand
-import com.starception.dua.core.model.data.UserData
-import com.starception.dua.core.model.data.UserNewsResource
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.model.data.UserData
+import com.starception.submission.core.model.data.UserNewsResource
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone

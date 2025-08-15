@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.datastore.test
+package com.starception.submission.core.datastore.test
 
 import androidx.datastore.core.DataStore
 import kotlinx.coroutines.flow.MutableStateFlow

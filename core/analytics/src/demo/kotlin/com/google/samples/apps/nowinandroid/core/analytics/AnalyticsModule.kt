@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.analytics
+package com.starception.submission.core.analytics
 
 import dagger.Binds
 import dagger.Module

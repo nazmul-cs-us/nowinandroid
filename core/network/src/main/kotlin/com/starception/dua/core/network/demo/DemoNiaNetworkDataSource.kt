@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.network.demo
+package com.starception.submission.core.network.demo
 
 import JvmUnitTestDemoAssetManager
 import android.os.Build.VERSION.SDK_INT
 import android.os.Build.VERSION_CODES.M
-import com.starception.dua.core.network.Dispatcher
-import com.starception.dua.core.network.NiaDispatchers.IO
-import com.starception.dua.core.network.NiaNetworkDataSource
-import com.starception.dua.core.network.model.NetworkChangeList
-import com.starception.dua.core.network.model.NetworkNewsResource
-import com.starception.dua.core.network.model.NetworkTopic
+import com.starception.submission.core.network.Dispatcher
+import com.starception.submission.core.network.NiaDispatchers.IO
+import com.starception.submission.core.network.NiaNetworkDataSource
+import com.starception.submission.core.network.model.NetworkChangeList
+import com.starception.submission.core.network.model.NetworkNewsResource
+import com.starception.submission.core.network.model.NetworkTopic
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi

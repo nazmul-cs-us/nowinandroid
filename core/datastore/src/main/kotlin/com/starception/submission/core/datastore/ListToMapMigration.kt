@@ -14,37 +14,44 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.datastore
+package com.starception.submission.core.datastore
 
 import androidx.datastore.core.DataMigration
 
 /**
- * Migrates saved ids from [Int] to [String] types
+ * Migrates from using lists to maps for user data.
  */
-internal object IntToStringIdsMigration : DataMigration<UserPreferences> {
+internal object ListToMapMigration : DataMigration<UserPreferences> {
 
     override suspend fun cleanUp() = Unit
 
     override suspend fun migrate(currentData: UserPreferences): UserPreferences =
         currentData.copy {
-            // Migrate topic ids
-            deprecatedFollowedTopicIds.clear()
-            deprecatedFollowedTopicIds.addAll(
-                currentData.deprecatedIntFollowedTopicIdsList.map(Int::toString),
+            // Migrate topic id lists
+            followedTopicIds.clear()
+            followedTopicIds.putAll(
+                currentData.deprecatedFollowedTopicIdsList.associateWith { true },
             )
-            deprecatedIntFollowedTopicIds.clear()
+            deprecatedFollowedTopicIds.clear()
 
             // Migrate author ids
-            deprecatedFollowedAuthorIds.clear()
-            deprecatedFollowedAuthorIds.addAll(
-                currentData.deprecatedIntFollowedAuthorIdsList.map(Int::toString),
+            followedAuthorIds.clear()
+            followedAuthorIds.putAll(
+                currentData.deprecatedFollowedAuthorIdsList.associateWith { true },
             )
-            deprecatedIntFollowedAuthorIds.clear()
+            deprecatedFollowedAuthorIds.clear()
+
+            // Migrate bookmarks
+            bookmarkedNewsResourceIds.clear()
+            bookmarkedNewsResourceIds.putAll(
+                currentData.deprecatedBookmarkedNewsResourceIdsList.associateWith { true },
+            )
+            deprecatedBookmarkedNewsResourceIds.clear()
 
             // Mark migration as complete
-            hasDoneIntToStringIdMigration = true
+            hasDoneListToMapMigration = true
         }
 
     override suspend fun shouldMigrate(currentData: UserPreferences): Boolean =
-        !currentData.hasDoneIntToStringIdMigration
+        !currentData.hasDoneListToMapMigration
 }

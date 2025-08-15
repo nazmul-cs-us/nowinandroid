@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.designsystem.component
+package com.starception.submission.core.designsystem.component
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -32,7 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.starception.dua.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.designsystem.theme.NiaTheme
 
 /**
  * Now in Android tab. Wraps Material 3 [Tab] and shifts text label down.

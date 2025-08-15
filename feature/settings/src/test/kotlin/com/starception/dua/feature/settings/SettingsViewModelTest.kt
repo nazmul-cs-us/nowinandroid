@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.settings
+package com.starception.submission.feature.settings
 
-import com.starception.dua.core.model.data.DarkThemeConfig.DARK
-import com.starception.dua.core.model.data.ThemeBrand.ANDROID
-import com.starception.dua.core.testing.repository.TestUserDataRepository
-import com.starception.dua.core.testing.util.MainDispatcherRule
-import com.starception.dua.feature.settings.SettingsUiState.Loading
-import com.starception.dua.feature.settings.SettingsUiState.Success
+import com.starception.submission.core.model.data.DarkThemeConfig.DARK
+import com.starception.submission.core.model.data.ThemeBrand.ANDROID
+import com.starception.submission.core.testing.repository.TestUserDataRepository
+import com.starception.submission.core.testing.util.MainDispatcherRule
+import com.starception.submission.feature.settings.SettingsUiState.Loading
+import com.starception.submission.feature.settings.SettingsUiState.Success
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

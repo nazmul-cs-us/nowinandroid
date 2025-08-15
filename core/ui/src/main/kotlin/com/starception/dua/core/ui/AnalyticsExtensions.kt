@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.ui
+package com.starception.submission.core.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import com.starception.dua.core.analytics.AnalyticsEvent
-import com.starception.dua.core.analytics.AnalyticsEvent.Param
-import com.starception.dua.core.analytics.AnalyticsEvent.ParamKeys
-import com.starception.dua.core.analytics.AnalyticsEvent.Types
-import com.starception.dua.core.analytics.AnalyticsHelper
-import com.starception.dua.core.analytics.LocalAnalyticsHelper
+import com.starception.submission.core.analytics.AnalyticsEvent
+import com.starception.submission.core.analytics.AnalyticsEvent.Param
+import com.starception.submission.core.analytics.AnalyticsEvent.ParamKeys
+import com.starception.submission.core.analytics.AnalyticsEvent.Types
+import com.starception.submission.core.analytics.AnalyticsHelper
+import com.starception.submission.core.analytics.LocalAnalyticsHelper
 
 /**
  * Classes and functions associated with analytics events for the UI.

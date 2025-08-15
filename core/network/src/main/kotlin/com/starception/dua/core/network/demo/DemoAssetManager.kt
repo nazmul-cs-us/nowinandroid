@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.network.demo
+package com.starception.submission.core.network.demo
 
 import java.io.InputStream
 

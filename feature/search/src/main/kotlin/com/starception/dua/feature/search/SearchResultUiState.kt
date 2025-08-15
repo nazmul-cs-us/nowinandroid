@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.search
+package com.starception.submission.feature.search
 
-import com.starception.dua.core.model.data.FollowableTopic
-import com.starception.dua.core.model.data.UserNewsResource
+import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.model.data.UserNewsResource
 
 sealed interface SearchResultUiState {
     data object Loading : SearchResultUiState

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.network
+package com.starception.submission.core.network
 
 import javax.inject.Qualifier
 import kotlin.annotation.AnnotationRetention.RUNTIME

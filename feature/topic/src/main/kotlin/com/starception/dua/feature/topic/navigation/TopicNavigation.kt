@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.topic.navigation
+package com.starception.submission.feature.topic.navigation
 
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -22,8 +22,8 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.starception.dua.feature.topic.TopicScreen
-import com.starception.dua.feature.topic.TopicViewModel
+import com.starception.submission.feature.topic.TopicScreen
+import com.starception.submission.feature.topic.TopicViewModel
 import kotlinx.serialization.Serializable
 
 @Serializable data class TopicRoute(val id: String)

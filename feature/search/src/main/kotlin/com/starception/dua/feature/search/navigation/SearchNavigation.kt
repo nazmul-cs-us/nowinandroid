@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.starception.dua.feature.search.navigation
+package com.starception.submission.feature.search.navigation
 
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
-import com.starception.dua.feature.search.SearchRoute
+import com.starception.submission.feature.search.SearchRoute
 import kotlinx.serialization.Serializable
 
 @Serializable data object SearchRoute

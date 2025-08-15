@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.analytics
+package com.starception.submission.core.analytics
 
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.analytics.logEvent

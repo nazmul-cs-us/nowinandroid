@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.starception.dua.core.datastore.test
+package com.starception.submission.core.datastore.test
 
 import androidx.datastore.core.DataStore
-import com.starception.dua.core.datastore.UserPreferences
-import com.starception.dua.core.datastore.UserPreferencesSerializer
-import com.starception.dua.core.datastore.di.DataStoreModule
+import com.starception.submission.core.datastore.UserPreferences
+import com.starception.submission.core.datastore.UserPreferencesSerializer
+import com.starception.submission.core.datastore.di.DataStoreModule
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.components.SingletonComponent
