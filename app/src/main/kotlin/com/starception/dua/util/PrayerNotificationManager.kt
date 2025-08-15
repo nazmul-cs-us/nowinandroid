@@ -188,7 +188,7 @@ object PrayerNotificationManager {
         val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(R.drawable.ic_prayer_hands)
+            .setSmallIcon(R.drawable.ic_prayer)
             .setContentIntent(createAppLaunchIntent())
             .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
@@ -211,7 +211,7 @@ object PrayerNotificationManager {
                 // Add large icon for better Live Update appearance
                 builder.setLargeIcon(
                     IconCompat.createWithResource(
-                        appContext, R.drawable.ic_prayer_hands
+                        appContext, R.drawable.ic_prayer
                     ).toIcon(appContext)
                 )
                 
@@ -233,7 +233,7 @@ object PrayerNotificationManager {
             try {
                 builder.setLargeIcon(
                     IconCompat.createWithResource(
-                        appContext, R.drawable.ic_prayer_hands
+                        appContext, R.drawable.ic_prayer
                     ).toIcon(appContext)
                 )
             } catch (e: Exception) {
@@ -304,7 +304,7 @@ object PrayerNotificationManager {
         val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(R.drawable.ic_prayer_hands)
+            .setSmallIcon(R.drawable.ic_prayer)
             .setContentIntent(createAppLaunchIntent())
             .setOngoing(isOngoing)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
@@ -334,7 +334,7 @@ object PrayerNotificationManager {
             setContentTitle(title)
             setContentText(content)
             setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
-            setSmallIcon(R.drawable.ic_prayer_hands)
+            setSmallIcon(R.drawable.ic_prayer)
             setContentIntent(createAppLaunchIntent())
             setOngoing(isOngoing)
             setCategory(NotificationCompat.CATEGORY_STATUS)
@@ -410,7 +410,7 @@ object PrayerNotificationManager {
                 val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
                     .setContentTitle("Prayer Time Tracker")
                     .setContentText("Live Updates Active")
-                    .setSmallIcon(R.drawable.ic_prayer_hands)
+                    .setSmallIcon(R.drawable.ic_prayer)
                     .setOngoing(true)
                     .setCategory(NotificationCompat.CATEGORY_STATUS)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -515,7 +515,7 @@ object PrayerNotificationManager {
         return NotificationCompat.Builder(appContext, CHANNEL_ID).apply {
             setContentTitle(title)
             setContentText(content)
-            setSmallIcon(R.drawable.ic_prayer_hands)
+            setSmallIcon(R.drawable.ic_prayer)
             setContentIntent(createAppLaunchIntent())
             setOngoing(isOngoing)
             setCategory(NotificationCompat.CATEGORY_STATUS)
@@ -538,7 +538,7 @@ object PrayerNotificationManager {
             }
             
             // Add large icon for better Live Update appearance
-            setLargeIcon(IconCompat.createWithResource(appContext, R.drawable.ic_prayer_hands).toIcon(appContext))
+            setLargeIcon(IconCompat.createWithResource(appContext, R.drawable.ic_prayer).toIcon(appContext))
             
             // Additional settings for better lock screen display
             setShowWhen(true)
