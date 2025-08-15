@@ -480,23 +480,25 @@ object PrayerNotificationManager {
      * Following the official Android 16 sample pattern
      */
     @RequiresApi(35) // Android 16
-    private fun buildLiveUpdateProgressStyle(progress: Int, detailedMessage: String, prayerName: String, mainContent: String): NotificationCompat.Style {
+    private fun buildLiveUpdateProgressStyle(progress: Int, detailedMessage: String, prayerName: String): NotificationCompat.Style {
         return try {
             // Create a custom style that combines main content with detailed text
             // This ensures both main content and detailed message are visible with minimal spacing
             NotificationCompat.BigTextStyle()
-                .bigText("$mainContent\n$detailedMessage")
+                .bigText("$detailedMessage")
                 .setBigContentTitle("${progress}% $prayerName Prayer time passed")
         } catch (e: Exception) {
             Log.w(TAG, "Error building Live Update Style: ${e.message}")
             // Fallback to basic BigTextStyle
-            NotificationCompat.BigTextStyle().bigText("$mainContent\n$detailedMessage")
+            NotificationCompat.BigTextStyle()
+                .bigText("$detailedMessage")
+                .setBigContentTitle("${progress}% $prayerName Prayer time passed")
         }
     }
     
     /**
-     * Build Live Update notification using NotificationCompat.ProgressStyle
-     * Following the official Android 16 Live Update sample pattern
+     * Build Live Update notification using native Android 16 ProgressStyle
+     * This provides modern progress segments and better visual appeal
      */
     @RequiresApi(35) // Android 16
     private fun buildLiveUpdateNotification(
@@ -520,13 +522,16 @@ object PrayerNotificationManager {
             // Android 16 Live Update specific features (following official sample)
             setRequestPromotedOngoing(true)
             
-            // Set the detailed message style
-            setStyle(buildLiveUpdateProgressStyle(progress, detailedMessage, prayerName, content))
-            
-            // Add progress bar with better visibility
-            if (progress > 0 && progress <= 100) {
-                setProgress(100, progress, false)
-                // Removed custom colors to maintain lock screen compatibility
+            // Set the ProgressStyle for Live Updates (this will show progress segments)
+            // Combine ProgressStyle with text content for both beautiful progress bar and readable text
+            val progressStyle = buildLiveUpdateProgressStyle(progress, detailedMessage, prayerName, content)
+            if (progressStyle is NotificationCompat.ProgressStyle) {
+                // Use ProgressStyle with text content
+                setStyle(progressStyle)
+                setContentText("$content\n$detailedMessage")
+            } else {
+                // Fallback to BigTextStyle if ProgressStyle fails
+                setStyle(progressStyle)
             }
             
             // Add large icon for better Live Update appearance
@@ -536,6 +541,46 @@ object PrayerNotificationManager {
             setShowWhen(true)
             setUsesChronometer(false)
             setAutoCancel(false)
+        }
+    }
+    
+    /**
+     * Build modern ProgressStyle with official Android 16 progressSegments
+     * Uses NotificationCompat.ProgressStyle following the official platform sample
+     */
+    @RequiresApi(35) // Android 16
+    private fun buildLiveUpdateProgressStyle(progress: Int, detailedMessage: String, prayerName: String, mainContent: String): NotificationCompat.Style {
+        return try {
+            // Use NotificationCompat.ProgressStyle for official progressSegments
+            // Following the exact pattern from the official Android platform sample
+            val progressStyle = NotificationCompat.ProgressStyle()
+                .setProgress(progress) // Only takes progress value
+                .setProgressSegments(
+                    listOf(
+                        NotificationCompat.ProgressStyle.Segment(20).setColor(Color.parseColor("#4CAF50")), // Green for mosque phase
+                        NotificationCompat.ProgressStyle.Segment(40).setColor(Color.parseColor("#FF9800")), // Orange for best time phase
+                        NotificationCompat.ProgressStyle.Segment(40).setColor(Color.parseColor("#F44336"))  // Red for make time phase
+                    )
+                )
+                .setProgressPoints(
+                    listOf(
+                        NotificationCompat.ProgressStyle.Point(20).setColor(Color.parseColor("#4CAF50")),  // Mosque phase point
+                        NotificationCompat.ProgressStyle.Point(60).setColor(Color.parseColor("#FF9800")),  // Best time phase point
+                        NotificationCompat.ProgressStyle.Point(100).setColor(Color.parseColor("#F44336"))  // Make time phase point
+                    )
+                )
+            
+            Log.d(TAG, "Created official Android 16 ProgressStyle with progressSegments and progressPoints")
+            
+            // Return the ProgressStyle to maintain the beautiful segmented progress bar
+            return progressStyle
+                        
+        } catch (e: Exception) {
+            Log.w(TAG, "Error building Live Update ProgressStyle: ${e.message}")
+            // Fallback to basic BigTextStyle
+            NotificationCompat.BigTextStyle()
+                .bigText("$mainContent\n$detailedMessage")
+                .setBigContentTitle("${progress}% $prayerName Prayer time passed")
         }
     }
 }
