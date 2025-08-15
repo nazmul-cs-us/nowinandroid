@@ -13,7 +13,10 @@ object AnrPreventionConfig {
     // Service timeout settings
     const val SERVICE_STARTUP_TIMEOUT_MS = 4000L // 4 seconds (below 5s ANR threshold)
     const val MAX_SERVICE_RUNTIME_MS = 30 * 60 * 1000L // 30 minutes max service time
-    const val SERVICE_UPDATE_INTERVAL_MS = 60000L // 1 minute between updates
+    const val SERVICE_UPDATE_INTERVAL_MS = 60000L // 1 minute between updates (production)
+    
+    // Always-on display optimization
+    const val ALWAYS_ON_DISPLAY_UPDATE_INTERVAL_MS = 30000L // 30 seconds for always-on display to prevent color flashing
     
     // Thread priority settings
     const val BACKGROUND_THREAD_PRIORITY = Thread.NORM_PRIORITY - 1

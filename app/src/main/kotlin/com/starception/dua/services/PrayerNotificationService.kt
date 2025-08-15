@@ -193,8 +193,16 @@ class PrayerNotificationService : Service() {
                     }
                 }
                 
-                // Wait before next update (every minute) - on background thread
-                delay(AnrPreventionConfig.SERVICE_UPDATE_INTERVAL_MS)
+                // Smart update strategy: 1-minute updates for notification content, 6-minute updates for always-on display
+                // This prevents color flashing on always-on display while keeping notifications battery-efficient
+                val updateInterval = if (updateCount % 6 == 0) {
+                    // Every 6th update (6 minutes), update the always-on display content
+                    AnrPreventionConfig.ALWAYS_ON_DISPLAY_UPDATE_INTERVAL_MS
+                } else {
+                    // Regular updates (1 minute) for notification content
+                    AnrPreventionConfig.SERVICE_UPDATE_INTERVAL_MS
+                }
+                delay(updateInterval)
             }
             
             // Auto-stop service after max updates or time limit
