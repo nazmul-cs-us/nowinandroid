@@ -1,25 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-     Copyright 2022 The Android Open Source Project
-
-     Licensed under the Apache License, Version 2.0 (the "License");
-     you may not use this file except in compliance with the License.
-     You may obtain a copy of the License at
-
-          http://www.apache.org/licenses/LICENSE-2.0
-
-     Unless required by applicable law or agreed to in writing, software
-     distributed under the License is distributed on an "AS IS" BASIS,
-     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-     See the License for the specific language governing permissions and
-     limitations under the License.
--->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-  <path
-      android:pathData="M0,0h108v108h-108z"
-      android:fillColor="@color/ic_launcher_background_tint"/>
+    
+    <!-- Radial gradient background -->
+    <defs>
+        <radialGradient
+            android:centerX="0.5"
+            android:centerY="0.5"
+            android:gradientRadius="0.8"
+            android:type="radial">
+            <item android:offset="0" android:color="#4ECDC4" /> <!-- Teal center -->
+            <item android:offset="0.6" android:color="#45B7AF" /> <!-- Darker teal -->
+            <item android:offset="1" android:color="#2C7A7B" /> <!-- Deep teal edge -->
+        </radialGradient>
+    </defs>
+    
+    <!-- Background circle with gradient -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M54,54m-54,0a54,54 0,1 1,108 0a54,54 0,1 1,-108 0" />
+    
+    <!-- Subtle geometric pattern overlay -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.1"
+        android:pathData="M0,0L108,0L108,108L0,108Z" />
+    
+    <!-- Diagonal accent lines -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.15"
+        android:pathData="M0,0L108,108M108,0L0,108" />
+    
+    <!-- Corner accents -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.2"
+        android:pathData="M0,0L20,0L20,20L0,20Z" />
+    
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.2"
+        android:pathData="M88,0L108,0L108,20L88,20Z" />
+    
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.2"
+        android:pathData="M0,88L20,88L20,108L0,108Z" />
+    
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.2"
+        android:pathData="M88,88L108,88L108,108L88,108Z" />
 </vector>
