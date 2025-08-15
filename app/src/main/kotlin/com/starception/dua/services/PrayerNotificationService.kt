@@ -52,9 +52,21 @@ class PrayerNotificationService : Service() {
         // Check if service is running in another process
         fun isServiceRunningInAnotherProcess(context: android.content.Context): Boolean {
             val manager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            return manager.getRunningServices(Integer.MAX_VALUE).any {
-                it.service.className == PrayerNotificationService::class.java.name &&
-                it.pid != android.os.Process.myPid()
+            val runningServices = manager.getRunningServices(Integer.MAX_VALUE)
+            val ourServiceCount = runningServices.count {
+                it.service.className == PrayerNotificationService::class.java.name
+            }
+            
+            Log.d(TAG, "Found $ourServiceCount instances of PrayerNotificationService running")
+            
+            return ourServiceCount > 0
+        }
+        
+        // Get current instance count for debugging
+        fun getServiceInstanceCount(context: android.content.Context): Int {
+            val manager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            return manager.getRunningServices(Integer.MAX_VALUE).count {
+                it.service.className == PrayerNotificationService::class.java.name
             }
         }
     }
@@ -77,12 +89,16 @@ class PrayerNotificationService : Service() {
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "Prayer notification service onStartCommand - startId: $startId")
+        Log.d(TAG, "Prayer notification service onStartCommand - startId: $startId, isServiceRunning: $isServiceRunning")
         
         if (isServiceRunning) {
-            Log.d(TAG, "Service already running, ignoring duplicate start")
+            Log.w(TAG, "Service already running, ignoring duplicate start - startId: $startId")
             return START_STICKY
         }
+        
+        // Log current service count for debugging
+        val serviceCount = getServiceInstanceCount(this)
+        Log.d(TAG, "Starting service - current instance count: $serviceCount, startId: $startId")
         
         // Start foreground service immediately
         startForeground(NOTIFICATION_ID, createInitialNotification())
@@ -93,6 +109,7 @@ class PrayerNotificationService : Service() {
         // Start prayer time updates in background
         startRealPrayerTimeUpdates()
         
+        Log.d(TAG, "Service started successfully - startId: $startId")
         return START_STICKY
     }
     
@@ -482,34 +499,47 @@ class PrayerNotificationService : Service() {
             val totalPrayerDuration = Duration.between(prayerStart, prayerEnd).toMinutes()
             val halfDuration = totalPrayerDuration / 2
             
-            // Each segment represents its own progress (0-100% for that segment)
-            val (currentPhase, phaseProgress) = when {
-                elapsedMinutes <= 20 -> {
+            // Calculate overall progress across all segments (0-100%)
+            // Ensure minimum phase durations and handle edge cases
+            val minPhaseDuration = 20L // Minimum 20 minutes per phase
+            val adjustedHalfDuration = maxOf(halfDuration, minPhaseDuration * 2) // At least 40 minutes total
+            
+            val overallProgress = when {
+                elapsedMinutes <= minPhaseDuration -> {
                     // Go to mosque phase: 0-20 minutes
-                    // Show progress within this segment (0-100% of first segment)
-                    val phaseProgress = (elapsedMinutes.toFloat() / 20f * 100f).coerceIn(0f, 100f)
-                    Pair(0, phaseProgress.toInt()) // First segment (0-20%)
+                    // First segment: 0-20% of total progress
+                    (elapsedMinutes.toFloat() / minPhaseDuration.toFloat() * 20f).coerceIn(0f, 20f)
                 }
-                elapsedMinutes <= halfDuration -> {
-                    // Best time phase: 20 minutes to halfway
-                    // Show progress within this segment (0-100% of second segment)
-                    val bestTimePhaseDuration = halfDuration - 20
-                    val progressInBestTime = elapsedMinutes - 20
-                    val phaseProgress = (progressInBestTime.toFloat() / bestTimePhaseDuration.toFloat() * 100f).coerceIn(0f, 100f)
-                    Pair(1, phaseProgress.toInt()) // Second segment (20-60%)
+                elapsedMinutes <= adjustedHalfDuration -> {
+                    // Best time phase: 20 minutes to adjusted halfway
+                    // Second segment: 20-60% of total progress
+                    val bestTimePhaseDuration = adjustedHalfDuration - minPhaseDuration
+                    val progressInBestTime = elapsedMinutes - minPhaseDuration
+                    val segmentProgress = (progressInBestTime.toFloat() / bestTimePhaseDuration.toFloat() * 40f).coerceIn(0f, 40f)
+                    20f + segmentProgress // 20% + progress within second segment
                 }
                 else -> {
-                    // Make time phase: halfway to end
-                    // Show progress within this segment (0-100% of third segment)
-                    val makeTimePhaseDuration = totalPrayerDuration - halfDuration
-                    val progressInMakeTime = elapsedMinutes - halfDuration
-                    val phaseProgress = (progressInMakeTime.toFloat() / makeTimePhaseDuration.toFloat() * 100f).coerceIn(0f, 100f)
-                    Pair(2, phaseProgress.toInt()) // Third segment (60-100%)
+                    // Make time phase: adjusted halfway to end
+                    // Third segment: 60-100% of total progress
+                    val makeTimePhaseDuration = maxOf(totalPrayerDuration - adjustedHalfDuration, minPhaseDuration)
+                    val progressInMakeTime = elapsedMinutes - adjustedHalfDuration
+                    val segmentProgress = (progressInMakeTime.toFloat() / makeTimePhaseDuration.toFloat() * 40f).coerceIn(0f, 40f)
+                    60f + segmentProgress // 60% + progress within third segment
                 }
             }
             
-            // Return the phase progress (0-100) for the current segment
-            phaseProgress
+            // Return the overall progress (0-100) across all segments
+            val finalProgress = overallProgress.toInt()
+            
+            // Determine which phase we're in for logging
+            val currentPhase = when {
+                elapsedMinutes <= minPhaseDuration -> "Go to mosque (0-20%)"
+                elapsedMinutes <= adjustedHalfDuration -> "Best time (20-60%)"
+                else -> "Make time (60-100%)"
+            }
+            
+            Log.d(TAG, "Progress calculation: elapsed=${elapsedMinutes}m, total=${totalPrayerDuration}m, adjustedHalf=${adjustedHalfDuration}m, phase=$currentPhase, progress=$finalProgress%")
+            finalProgress
             
         } catch (e: Exception) {
             Log.e(TAG, "Error calculating notification progress", e)
