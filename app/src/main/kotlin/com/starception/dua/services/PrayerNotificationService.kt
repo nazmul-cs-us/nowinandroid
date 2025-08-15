@@ -450,7 +450,7 @@ class PrayerNotificationService : Service() {
 
     /**
      * Calculate progress for the notification progress bar.
-     * This shows the progress through the current prayer time.
+     * This shows the progress through the current prayer time using phase-based calculation.
      */
     private fun calculateNotificationProgress(prayerData: Triple<String, String, String>): Int {
         return try {
@@ -468,19 +468,31 @@ class PrayerNotificationService : Service() {
             
             // Get current prayer
             val currentPrayer = prayerTimes.getActualPrayers().find { it.isCurrently } ?: return 0
-            val nextPrayer = prayerTimes.getNextPrayer()
             
-            // Calculate progress through current prayer
+            // Calculate progress through current prayer using phase-based approach
             val now = LocalTime.now()
             val prayerStart = currentPrayer.time
-            val prayerEnd = nextPrayer?.time ?: prayerStart.plusHours(1) // Default 1 hour if no next prayer
-            
             val elapsedMinutes = Duration.between(prayerStart, now).toMinutes()
-            val totalDuration = Duration.between(prayerStart, prayerEnd).toMinutes()
             
-            if (totalDuration <= 0) return 0
+            // Phase-based progress calculation:
+            // 0-20 min: Go to mosque (0-20%)
+            // 20-50 min: Best time (20-60%) 
+            // 50+ min: Make time (60-100%)
+            val progressPercentage = when {
+                elapsedMinutes <= 20 -> {
+                    // Go to mosque phase: 0-20%
+                    (elapsedMinutes.toFloat() / 20f * 20f).coerceIn(0f, 20f)
+                }
+                elapsedMinutes <= 50 -> {
+                    // Best time phase: 20-60%
+                    20f + ((elapsedMinutes - 20).toFloat() / 30f * 40f).coerceIn(0f, 40f)
+                }
+                else -> {
+                    // Make time phase: 60-100%
+                    60f + ((elapsedMinutes - 50).toFloat() / 50f * 40f).coerceIn(0f, 40f)
+                }
+            }
             
-            val progressPercentage = (elapsedMinutes.toFloat() / totalDuration.toFloat() * 100).coerceIn(0f, 100f)
             progressPercentage.toInt()
             
         } catch (e: Exception) {
