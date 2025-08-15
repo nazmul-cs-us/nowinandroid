@@ -291,20 +291,16 @@ class PrayerNotificationService : Service() {
             
             // Format notification content based on prayer progress
             val title = when (prayerProgress.phase) {
-                PrayerPhase.GO_TO_MOSQUE -> "Prayer Time"
-                PrayerPhase.BEST_TIME -> "Best Time to Pray"
-                PrayerPhase.MAKE_TIME -> "Make Time for Prayer"
+                PrayerPhase.GO_TO_MOSQUE -> "Go to Mosque for ${currentPrayer.name}"
+                PrayerPhase.BEST_TIME -> "Best Time to Pray ${currentPrayer.name}"
+                PrayerPhase.MAKE_TIME -> "Make Time for ${currentPrayer.name}"
             }
             val content = buildPrayerProgressContent(prayerProgress, currentPrayer)
             val detailedMessage = buildDetailedPrayerProgressMessage(prayerTimes, currentPrayer, nextPrayer, prayerProgress)
             
-            // Add next prayer countdown to title for better visibility
-            val enhancedTitle = if (nextPrayer != null) {
-                val timeRemaining = formatTimeRemaining(nextPrayer.time)
-                "$title • Next: ${nextPrayer.name} in $timeRemaining"
-            } else {
-                title
-            }
+            // Keep title simple - don't add next prayer info here to avoid duplication
+            // The detailedMessage already shows the next prayer countdown
+            val enhancedTitle = title
             
             Triple(enhancedTitle, content, detailedMessage)
             
