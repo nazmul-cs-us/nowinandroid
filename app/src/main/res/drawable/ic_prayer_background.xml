@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    
+    <!-- Subtle gradient background circle -->
+    <defs>
+        <radialGradient
+            android:centerX="0.5"
+            android:centerY="0.5"
+            android:gradientRadius="0.8"
+            android:type="radial">
+            <item android:offset="0" android:color="#4ECDC4" /> <!-- Light teal center -->
+            <item android:offset="0.7" android:color="#45B7AF" /> <!-- Medium teal -->
+            <item android:offset="1" android:color="#2C7A7B" /> <!-- Dark teal edge -->
+        </radialGradient>
+    </defs>
+    
+    <!-- Background circle with gradient -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M12,12m-12,0a12,12 0,1 1,24 0a12,12 0,1 1,-24 0" />
+    
+    <!-- Subtle geometric pattern overlay -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.1"
+        android:pathData="M0,0L24,0L24,24L0,24Z" />
+    
+    <!-- Corner accents for better definition -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.15"
+        android:pathData="M0,0L4,0L4,4L0,4Z" />
+    
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.15"
+        android:pathData="M20,0L24,0L24,4L20,4Z" />
+    
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.15"
+        android:pathData="M0,20L4,20L4,24L0,24Z" />
+    
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.15"
+        android:pathData="M20,20L24,20L24,24L20,24Z" />
+    
+    <!-- Subtle inner glow -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.05"
+        android:pathData="M12,12m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
+</vector>

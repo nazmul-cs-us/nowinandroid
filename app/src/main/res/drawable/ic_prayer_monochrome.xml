@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    
+    <!-- Monochrome prayer hands - centered and optimized for 24dp -->
+    <group
+        android:scaleX="0.023"
+        android:scaleY="0.023"
+        android:translateX="0.552"
+        android:translateY="0.552">
+        
+        <!-- Left hand - cupped and positioned for prayer -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M25,32C25,29.2 27.2,27 30,27C32.8,27 35,29.2 35,32C35,34.8 32.8,37 30,37C27.2,37 25,34.8 25,32Z" />
+        
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M26,33C26,31.9 26.9,31 28,31C29.1,31 30,31.9 30,33C30,34.1 29.1,35 28,35C26.9,35 26,34.1 26,33Z" />
+        
+        <!-- Right hand - cupped and positioned for prayer -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M55,32C55,29.2 57.2,27 60,27C62.8,27 65,29.2 65,32C65,34.8 62.8,37 60,37C57.2,37 55,34.8 55,32Z" />
+        
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M56,33C56,31.9 56.9,31 58,31C59.1,31 60,31.9 60,33C60,34.1 59.1,35 58,35C56.9,35 56,34.1 56,33Z" />
+        
+        <!-- Prayer gesture - hands coming together -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M30,37C30,37 40,37 45,37C50,37 60,37 60,37C60,37 60,40 60,44C60,48 57,51 54,51C51,51 48,48 48,44C48,40 46,40 44,40C42,40 40,40 40,44C40,48 37,51 34,51C31,51 28,48 28,44C28,40 28,37 28,37C28,37 30,37 30,37Z" />
+        
+        <!-- Light rays representing spirituality -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="2"
+            android:strokeLineCap="round"
+            android:pathData="M45,8L45,16M45,24L45,32M38,12L45,20L52,12M38,28L45,36L52,28" />
+        
+        <!-- Additional spiritual elements -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M45,60C45,60 42,60 39,60C36,60 33,60 33,60C33,60 33,62 33,64C33,66 35,68 37,68C39,68 41,66 41,64C41,62 42,62 44,62C46,62 47,62 47,64C47,66 49,68 51,68C53,68 55,66 55,64C55,62 55,60 55,60C55,60 52,60 49,60C46,60 45,60 45,60Z" />
+    </group>
+</vector>
