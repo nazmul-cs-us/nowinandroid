@@ -1,0 +1,43 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Left hand - cupped and positioned for prayer -->
+    <path
+        android:fillColor="#FF6B6B"
+        android:pathData="M6,8C6,6.9 6.9,6 8,6C9.1,6 10,6.9 10,8C10,9.1 9.1,10 8,10C6.9,10 6,9.1 6,8Z"/>
+    
+    <path
+        android:fillColor="#FF6B6B"
+        android:pathData="M7,9C7,8.4 7.4,8 8,8C8.6,8 9,8.4 9,9C9,9.6 8.6,10 8,10C7.4,10 7,9.6 7,9Z"/>
+    
+    <!-- Right hand - cupped and positioned for prayer -->
+    <path
+        android:fillColor="#4ECDC4"
+        android:pathData="M14,8C14,6.9 14.9,6 16,6C17.1,6 18,6.9 18,8C18,9.1 17.1,10 16,10C14.9,10 14,9.1 14,8Z"/>
+    
+    <path
+        android:fillColor="#4ECDC4"
+        android:pathData="M15,9C15,8.4 15.4,8 16,8C16.6,8 17,8.4 17,9C17,9.6 16.6,10 16,10C15.4,10 15,9.6 15,9Z"/>
+    
+    <!-- Prayer gesture - hands coming together -->
+    <path
+        android:fillColor="#FFE66D"
+        android:pathData="M8,10C8,10 10,10 12,10C14,10 16,10 16,10C16,10 16,11 16,12C16,13 15,14 14,14C13,14 12,13 12,12C12,11 11,11 10,11C9,11 8,11 8,12C8,13 7,14 6,14C5,14 4,13 4,12C4,11 4,10 4,10C4,10 6,10 8,10Z"/>
+    
+    <!-- Light rays representing spirituality -->
+    <path
+        android:fillColor="#FFE66D"
+        android:strokeColor="#FFD93D"
+        android:strokeWidth="0.5"
+        android:pathData="M12,2L12,4M12,6L12,8M10,3L12,5L14,3M10,7L12,9L14,7"/>
+    
+    <!-- Subtle glow effect -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.3"
+        android:pathData="M12,10C12,10 10,10 8,10C6,10 4,10 4,10C4,10 4,11 4,12C4,13 5,14 6,14C7,14 8,13 8,12C8,11 9,11 10,11C11,11 12,11 12,12C12,13 13,14 14,14C15,14 16,13 16,12C16,11 16,10 16,10C16,10 14,10 12,10Z"/>
+
+</vector>

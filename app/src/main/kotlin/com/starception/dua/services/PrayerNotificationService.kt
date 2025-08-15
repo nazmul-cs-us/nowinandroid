@@ -119,7 +119,7 @@ class PrayerNotificationService : Service() {
         val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Prayer Time Tracker")
             .setContentText("Initializing...")
-            .setSmallIcon(R.drawable.ic_prayer_hands)
+            .setSmallIcon(R.drawable.ic_prayer)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
