@@ -5,10 +5,7 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     
-    <!-- Simple, elegant prayer-themed foreground -->
-    <!-- This will be your main launcher icon -->
-    
-    <!-- Main prayer symbol -->
+    <!-- Simple prayer-themed app icon -->
     <path
         android:fillColor="#000000"
         android:pathData="M54,20C42,20 32,30 32,42C32,54 42,64 54,64C66,64 76,54 76,42C76,30 66,20 54,20ZM54,58C46,58 40,52 40,44C40,36 46,30 54,30C62,30 68,36 68,44C68,52 62,58 54,58Z" />
@@ -22,29 +19,4 @@
     <path
         android:fillColor="#000000"
         android:pathData="M54,40C52,40 50,42 50,44C50,46 52,48 54,48C56,48 58,46 58,44C58,42 56,40 54,40Z" />
-    
-    <!-- Subtle decorative elements -->
-    <path
-        android:strokeColor="#000000"
-        android:strokeWidth="1"
-        android:strokeAlpha="0.3"
-        android:pathData="M20,20L25,20L25,25L20,25Z" />
-    
-    <path
-        android:strokeColor="#000000"
-        android:strokeWidth="1"
-        android:strokeAlpha="0.3"
-        android:pathData="M83,20L88,20L88,25L83,25Z" />
-    
-    <path
-        android:strokeColor="#000000"
-        android:strokeWidth="1"
-        android:strokeAlpha="0.3"
-        android:pathData="M20,83L25,83L25,88L20,88Z" />
-    
-    <path
-        android:strokeColor="#000000"
-        android:strokeWidth="1"
-        android:strokeAlpha="0.3"
-        android:pathData="M83,83L88,83L88,88L83,88Z" />
 </vector>
