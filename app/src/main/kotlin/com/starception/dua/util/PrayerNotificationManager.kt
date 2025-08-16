@@ -71,14 +71,14 @@ object PrayerNotificationManager {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Prayer Times",
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_HIGH // High importance to allow both alert and silent modes
             ).apply {
-                description = "Live updates for prayer times and guidance"
-                // Remove custom light color for better lock screen compatibility
-                // lightColor = appContext.getColor(R.color.purple_500)
+                description = "Live updates for prayer times and guidance (alerts only on phase changes)"
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                enableLights(false) // Disable custom lights for better compatibility
-                enableVibration(false)
+                enableLights(true) // Enable lights for phase transitions
+                enableVibration(true) // Enable vibration for phase transitions
+                setSound(null, null) // No default sound, controlled per notification
+                setBypassDnd(false) // Don't bypass Do Not Disturb
             }
             notificationManager.createNotificationChannel(channel)
             Log.d(TAG, "Modern notification channel created with theme colors and Live Update support")
@@ -190,13 +190,15 @@ object PrayerNotificationManager {
             .setContentText(content)
             .setSmallIcon(R.drawable.ic_prayer)
             .setContentIntent(createAppLaunchIntent())
-            .setOngoing(isOngoing)
+            .setOngoing(true) // Always ongoing to prevent sounds
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setDefaults(0) // Silent for live updates
-            .setSilent(true)
-            .setLocalOnly(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW) // Lower priority to reduce interruptions
+            .setDefaults(0) // No sound, vibration, or lights
+            .setSilent(true) // Explicitly silent
+            .setLocalOnly(true) // Only show locally
+            .setAutoCancel(false) // Don't auto-cancel
+            .setOnlyAlertOnce(true) // Only alert once, then silent updates
             .setShowWhen(true)
             .setUsesChronometer(false)
         
@@ -361,6 +363,244 @@ object PrayerNotificationManager {
     }
     
     /**
+     * Smart notification update - only popup/sound when phase changes
+     */
+    fun updatePrayerProgressSmart(
+        prayerName: String, 
+        progress: Int, 
+        previousPhase: String? = null,
+        title: String? = null,
+        content: String? = null,
+        detailedMessage: String? = null
+    ) {
+        val currentPhase = getCurrentPrayerPhase(progress)
+        
+        // Check if this is a new phase (phase transition)
+        val isPhaseTransition = previousPhase != null && previousPhase != currentPhase
+        
+        if (isPhaseTransition) {
+            // New phase - show popup and sound
+            Log.d(TAG, "Phase transition detected: $previousPhase -> $currentPhase")
+            postPrayerNotificationWithAlert(prayerName, progress, currentPhase, title, content, detailedMessage)
+        } else {
+            // Same phase - silent update
+            Log.d(TAG, "Same phase ($currentPhase) - silent update")
+            postPrayerNotificationSilent(prayerName, progress, currentPhase, title, content, detailedMessage)
+        }
+    }
+    
+    /**
+     * Get current prayer phase based on progress
+     */
+    private fun getCurrentPrayerPhase(progress: Int): String {
+        return when {
+            progress <= 20 -> "GO_TO_MOSQUE"
+            progress <= 60 -> "BEST_TIME_TO_PRAY"
+            else -> "MAKE_TIME_FOR_PRAYER"
+        }
+    }
+    
+    /**
+     * Post notification with alert (popup and sound) for phase transitions
+     */
+    private fun postPrayerNotificationWithAlert(
+        prayerName: String, 
+        progress: Int, 
+        phase: String,
+        title: String? = null,
+        content: String? = null,
+        detailedMessage: String? = null
+    ) {
+        // Use actual prayer data if available, otherwise fall back to generic phase info
+        val notificationTitle = title ?: "$prayerName - ${getPhaseTitle(phase)}"
+        val notificationContent = content ?: getPhaseDescription(phase)
+        val notificationDetailed = detailedMessage ?: getPhaseDescription(phase)
+        
+        Log.d(TAG, "🔔 ALERT NOTIFICATION - Phase: $phase")
+        Log.d(TAG, "   📝 Title: '$notificationTitle' (${notificationTitle.length} chars)")
+        Log.d(TAG, "   📝 Content: '$notificationContent' (${notificationContent.length} chars)")
+        Log.d(TAG, "   📝 Detailed: '$notificationDetailed' (${notificationDetailed.length} chars)")
+        Log.d(TAG, "   📊 Progress: $progress%")
+        
+        val notification = buildPhaseTransitionNotification(
+            prayerName, progress, notificationTitle, notificationContent, true, notificationDetailed
+        )
+        notificationManager.notify(NOTIFICATION_ID, notification.build())
+        Log.d(TAG, "Posted phase transition notification with alert: $phase")
+    }
+    
+    /**
+     * Post notification silently (no popup, no sound) for ongoing updates
+     */
+    private fun postPrayerNotificationSilent(
+        prayerName: String, 
+        progress: Int, 
+        phase: String,
+        title: String? = null,
+        content: String? = null,
+        detailedMessage: String? = null
+    ) {
+        // Use actual prayer data if available, otherwise fall back to generic phase info
+        val notificationTitle = title ?: "$prayerName - ${getPhaseDescription(phase)}"
+        val notificationContent = content ?: getPhaseDescription(phase)
+        val notificationDetailed = detailedMessage ?: getPhaseDescription(phase)
+        
+        Log.d(TAG, "🔇 SILENT NOTIFICATION - Phase: $phase")
+        Log.d(TAG, "   📝 Title: '$notificationTitle' (${notificationTitle.length} chars)")
+        Log.d(TAG, "   📝 Content: '$notificationContent' (${notificationContent.length} chars)")
+        Log.d(TAG, "   📝 Detailed: '$notificationDetailed' (${notificationDetailed.length} chars)")
+        Log.d(TAG, "   📊 Progress: $progress%")
+        
+        val notification = buildPhaseTransitionNotification(
+            prayerName, progress, notificationTitle, notificationContent, false, notificationDetailed
+        )
+        notificationManager.notify(NOTIFICATION_ID, notification.build())
+        Log.d(TAG, "Posted silent progress update: $phase")
+    }
+    
+    /**
+     * Build notification for phase transitions
+     */
+    private fun buildPhaseTransitionNotification(
+        prayerName: String, 
+        progress: Int, 
+        phaseTitle: String, 
+        phaseDescription: String,
+        withAlert: Boolean,
+        detailedMessage: String? = null
+    ): NotificationCompat.Builder {
+        Log.d(TAG, "🔨 BUILDING NOTIFICATION:")
+        Log.d(TAG, "   📝 Phase Title: '$phaseTitle' (${phaseTitle.length} chars)")
+        Log.d(TAG, "   📝 Phase Description: '$phaseDescription' (${phaseDescription.length} chars)")
+        Log.d(TAG, "   📝 Detailed Message: '${detailedMessage ?: "null"}' (${detailedMessage?.length ?: 0} chars)")
+        Log.d(TAG, "   📊 Progress: $progress%")
+        Log.d(TAG, "   🔔 With Alert: $withAlert")
+        
+        val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
+            .setContentTitle(phaseTitle) // Just the phase title, no prayer name prefix
+            .setContentText(phaseDescription) // Elapsed time since prayer started
+            .setSmallIcon(R.drawable.ic_prayer)
+            .setContentIntent(createAppLaunchIntent())
+            .setOngoing(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setLocalOnly(false)
+            .setAutoCancel(false)
+            .setOnlyAlertOnce(false) // Allow alerts for phase transitions
+        
+        // Set alert behavior based on phase transition
+        if (withAlert) {
+            // Phase transition - show popup and sound
+            builder.setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(NotificationCompat.DEFAULT_ALL) // Sound, vibration, lights
+                .setSilent(false)
+                .setVibrate(longArrayOf(0, 250, 100, 250)) // Short vibration pattern
+        } else {
+            // Silent update - no popup, no sound
+            builder.setPriority(NotificationCompat.PRIORITY_LOW)
+                .setDefaults(0) // No sound, vibration, or lights
+                .setSilent(true)
+                .setVibrate(null)
+        }
+        
+        // Add live update progress style for Android 16+ or basic progress bar for older versions
+        if (progress > 0 && progress <= 100) {
+            if (Build.VERSION.SDK_INT >= 35 && supportsLiveUpdates()) {
+                // Use Android 16 Live Update progress style with segments
+                try {
+                    // Create a ProgressStyle with segments for the beautiful progress bar
+                    val progressStyle = NotificationCompat.ProgressStyle()
+                        .setProgress(progress)
+                        .setProgressSegments(
+                            listOf(
+                                NotificationCompat.ProgressStyle.Segment(20), // 0-20%: Go to mosque
+                                NotificationCompat.ProgressStyle.Segment(40), // 20-60%: Best time to pray
+                                NotificationCompat.ProgressStyle.Segment(40)  // 60-100%: Make time for prayer
+                            )
+                        )
+                        .setProgressPoints(
+                            listOf(
+                                NotificationCompat.ProgressStyle.Point(20),  // End of go to mosque phase
+                                NotificationCompat.ProgressStyle.Point(60),  // End of best time phase
+                                NotificationCompat.ProgressStyle.Point(100)  // End of prayer time
+                            )
+                        )
+                    
+                    // Apply the progress style to the main builder
+                    builder.setStyle(progressStyle)
+                    
+                    // Enable Live Update features
+                    builder.setRequestPromotedOngoing(true)
+                    
+                    // IMPORTANT: Add the detailed message as additional content since ProgressStyle doesn't show it
+                    if (!detailedMessage.isNullOrBlank()) {
+                        // Set the detailed message as the main content text, combining both content and detailed message
+                        val combinedContent = "$phaseDescription\n$detailedMessage"
+                        builder.setContentText(combinedContent)
+                        Log.d(TAG, "📝 Added detailed message to content: '$combinedContent'")
+                    }
+                    
+                    Log.d(TAG, "✅ Applied Live Update progress style with segments for progress: $progress%")
+                    
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to apply Live Update progress style, falling back to basic: ${e.message}")
+                    builder.setProgress(100, progress, false)
+                    
+                    // Add detailed message as BigTextStyle for fallback
+                    if (!detailedMessage.isNullOrBlank()) {
+                        builder.setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
+                    }
+                }
+            } else {
+                // Basic progress bar for older Android versions
+                builder.setProgress(100, progress, false)
+                
+                // Add detailed message as BigTextStyle for older Android
+                if (!detailedMessage.isNullOrBlank()) {
+                    builder.setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
+                }
+            }
+        } else {
+            // No progress bar, just add detailed message
+            if (!detailedMessage.isNullOrBlank()) {
+                builder.setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
+            }
+        }
+        
+        Log.d(TAG, "🏗️ FINAL NOTIFICATION BUILDER:")
+        Log.d(TAG, "   📝 Title: '${builder.build().extras.getString("android.title")}'")
+        Log.d(TAG, "   📝 Text: '${builder.build().extras.getString("android.text")}'")
+        Log.d(TAG, "   📝 Style: ${builder.build().extras.getString("android.template")}")
+        Log.d(TAG, "   📊 Progress: ${builder.build().extras.getInt("android.progress", -1)}/${builder.build().extras.getInt("android.progressMax", -1)}")
+        
+        return builder
+    }
+    
+    /**
+     * Get human-readable phase title
+     */
+    private fun getPhaseTitle(phase: String): String {
+        return when (phase) {
+            "GO_TO_MOSQUE" -> "Go to Mosque"
+            "BEST_TIME_TO_PRAY" -> "Best Time to Pray"
+            "MAKE_TIME_FOR_PRAYER" -> "Make Time for Prayer"
+            else -> "Prayer Time"
+        }
+    }
+    
+    /**
+     * Get phase description
+     */
+    private fun getPhaseDescription(phase: String): String {
+        return when (phase) {
+            "GO_TO_MOSQUE" -> "Time to prepare and go to the mosque"
+            "BEST_TIME_TO_PRAY" -> "Optimal time for prayer"
+            "MAKE_TIME_FOR_PRAYER" -> "Ensure you make time for prayer"
+            else -> "Prayer time in progress"
+        }
+    }
+    
+    /**
      * Cancel prayer notification
      */
     fun cancelPrayerNotification() {
@@ -477,26 +717,7 @@ object PrayerNotificationManager {
         }
     }
 
-    /**
-     * Build Live Update ProgressStyle with segments and points
-     * Following the official Android 16 sample pattern
-     */
-    @RequiresApi(35) // Android 16
-    private fun buildLiveUpdateProgressStyle(progress: Int, detailedMessage: String, prayerName: String): NotificationCompat.Style {
-        return try {
-            // Create a custom style that combines main content with detailed text
-            // This ensures both main content and detailed message are visible with minimal spacing
-            NotificationCompat.BigTextStyle()
-                .bigText("$detailedMessage")
-                .setBigContentTitle("${progress}% $prayerName Prayer time passed")
-        } catch (e: Exception) {
-            Log.w(TAG, "Error building Live Update Style: ${e.message}")
-            // Fallback to basic BigTextStyle
-            NotificationCompat.BigTextStyle()
-                .bigText("$detailedMessage")
-                .setBigContentTitle("${progress}% $prayerName Prayer time passed")
-        }
-    }
+
     
     /**
      * Build Live Update notification using native Android 16 ProgressStyle
