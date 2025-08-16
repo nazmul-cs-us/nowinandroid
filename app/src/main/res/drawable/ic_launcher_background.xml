@@ -5,55 +5,48 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     
-    <!-- Radial gradient background -->
+    <!-- Simple, elegant background for monochrome icon -->
     <defs>
         <radialGradient
             android:centerX="0.5"
             android:centerY="0.5"
-            android:gradientRadius="0.8"
+            android:gradientRadius="0.7"
             android:type="radial">
-            <item android:offset="0" android:color="#4ECDC4" /> <!-- Teal center -->
-            <item android:offset="0.6" android:color="#45B7AF" /> <!-- Darker teal -->
-            <item android:offset="1" android:color="#2C7A7B" /> <!-- Deep teal edge -->
+            <item android:offset="0" android:color="#F8F9FA" /> <!-- Light center -->
+            <item android:offset="0.7" android:color="#E9ECEF" /> <!-- Subtle middle -->
+            <item android:offset="1" android:color="#DEE2E6" /> <!-- Gentle edge -->
         </radialGradient>
     </defs>
     
-    <!-- Background circle with gradient -->
+    <!-- Clean background circle -->
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M54,54m-54,0a54,54 0,1 1,108 0a54,54 0,1 1,-108 0" />
     
-    <!-- Subtle geometric pattern overlay -->
+    <!-- Very subtle texture overlay -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.05"
+        android:pathData="M0,0L108,0L108,108L0,108Z" />
+    
+    <!-- Minimal corner accents -->
     <path
         android:fillColor="#FFFFFF"
         android:fillAlpha="0.1"
-        android:pathData="M0,0L108,0L108,108L0,108Z" />
-    
-    <!-- Diagonal accent lines -->
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1"
-        android:strokeAlpha="0.15"
-        android:pathData="M0,0L108,108M108,0L0,108" />
-    
-    <!-- Corner accents -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.2"
-        android:pathData="M0,0L20,0L20,20L0,20Z" />
+        android:pathData="M0,0L15,0L15,15L0,15Z" />
     
     <path
         android:fillColor="#FFFFFF"
-        android:fillAlpha="0.2"
-        android:pathData="M88,0L108,0L108,20L88,20Z" />
+        android:fillAlpha="0.1"
+        android:pathData="M93,0L108,0L108,15L93,15Z" />
     
     <path
         android:fillColor="#FFFFFF"
-        android:fillAlpha="0.2"
-        android:pathData="M0,88L20,88L20,108L0,108Z" />
+        android:fillAlpha="0.1"
+        android:pathData="M0,93L15,93L15,108L0,108Z" />
     
     <path
         android:fillColor="#FFFFFF"
-        android:fillAlpha="0.2"
-        android:pathData="M88,88L108,88L108,108L88,108Z" />
+        android:fillAlpha="0.1"
+        android:pathData="M93,93L108,93L108,108L93,108Z" />
 </vector>
