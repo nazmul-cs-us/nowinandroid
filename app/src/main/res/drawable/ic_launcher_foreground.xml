@@ -5,78 +5,43 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     
-    <!-- Main prayer hands - centered and scaled for adaptive icon -->
-    <group
-        android:scaleX="0.6"
-        android:scaleY="0.6"
-        android:translateX="21.6"
-        android:translateY="21.6">
-        
-        <!-- Left hand - cupped and positioned for prayer -->
-        <path
-            android:fillColor="#FF6B6B"
-            android:pathData="M25,32C25,29.2 27.2,27 30,27C32.8,27 35,29.2 35,32C35,34.8 32.8,37 30,37C27.2,37 25,34.8 25,32Z" />
-        
-        <path
-            android:fillColor="#FF6B6B"
-            android:pathData="M26,33C26,31.9 26.9,31 28,31C29.1,31 30,31.9 30,33C30,34.1 29.1,35 28,35C26.9,35 26,34.1 26,33Z" />
-        
-        <!-- Right hand - cupped and positioned for prayer -->
-        <path
-            android:fillColor="#4ECDC4"
-            android:pathData="M55,32C55,29.2 57.2,27 60,27C62.8,27 65,29.2 65,32C65,34.8 62.8,37 60,37C57.2,37 55,34.8 55,32Z" />
-        
-        <path
-            android:fillColor="#4ECDC4"
-            android:pathData="M56,33C56,31.9 56.9,31 58,31C59.1,31 60,31.9 60,33C60,34.1 59.1,35 58,35C56.9,35 56,34.1 56,33Z" />
-        
-        <!-- Prayer gesture - hands coming together -->
-        <path
-            android:fillColor="#FFE66D"
-            android:pathData="M30,37C30,37 40,37 45,37C50,37 60,37 60,37C60,37 60,40 60,44C60,48 57,51 54,51C51,51 48,48 48,44C48,40 46,40 44,40C42,40 40,40 40,44C40,48 37,51 34,51C31,51 28,48 28,44C28,40 28,37 28,37C28,37 30,37 30,37Z" />
-        
-        <!-- Light rays representing spirituality -->
-        <path
-            android:strokeColor="#FFE66D"
-            android:strokeWidth="2"
-            android:strokeLineCap="round"
-            android:pathData="M45,8L45,16M45,24L45,32M38,12L45,20L52,12M38,28L45,36L52,28" />
-        
-        <!-- Subtle glow effect around hands -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:fillAlpha="0.3"
-            android:pathData="M30,37C30,37 40,37 45,37C50,37 60,37 60,37C60,37 60,40 60,44C60,48 57,51 54,51C51,51 48,48 48,44C48,40 46,40 44,40C42,40 40,40 40,44C40,48 37,51 34,51C31,51 28,48 28,44C28,40 28,37 28,37C28,37 30,37 30,37Z" />
-        
-        <!-- Additional spiritual elements -->
-        <path
-            android:fillColor="#FFE66D"
-            android:fillAlpha="0.6"
-            android:pathData="M45,60C45,60 42,60 39,60C36,60 33,60 33,60C33,60 33,62 33,64C33,66 35,68 37,68C39,68 41,66 41,64C41,62 42,62 44,62C46,62 47,62 47,64C47,66 49,68 51,68C53,68 55,66 55,64C55,62 55,60 55,60C55,60 52,60 49,60C46,60 45,60 45,60Z" />
-    </group>
+    <!-- Simple, elegant foreground for monochrome icon -->
+    <!-- This will work with the monochrome icon as the main visual element -->
     
-    <!-- Subtle corner flourishes -->
+    <!-- Very subtle inner glow circle -->
     <path
-        android:strokeColor="#FFE66D"
-        android:strokeWidth="1.5"
-        android:strokeAlpha="0.4"
-        android:pathData="M20,20L25,20L25,25L20,25Z" />
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.03"
+        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
+    
+    <!-- Minimal corner accents that complement the background -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.08"
+        android:pathData="M25,25L30,25L30,30L25,30Z" />
     
     <path
-        android:strokeColor="#FFE66D"
-        android:strokeWidth="1.5"
-        android:strokeAlpha="0.4"
-        android:pathData="M83,20L88,20L88,25L83,25Z" />
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.08"
+        android:pathData="M78,25L83,25L83,30L78,30Z" />
     
     <path
-        android:strokeColor="#FFE66D"
-        android:strokeWidth="1.5"
-        android:strokeAlpha="0.4"
-        android:pathData="M20,83L25,83L25,88L20,88Z" />
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.08"
+        android:pathData="M25,78L30,78L30,83L25,83Z" />
     
     <path
-        android:strokeColor="#FFE66D"
-        android:strokeWidth="1.5"
-        android:strokeAlpha="0.4"
-        android:pathData="M83,83L88,83L88,88L83,88Z" />
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.08"
+        android:pathData="M78,78L83,78L83,83L78,83Z" />
+    
+    <!-- Center accent dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.1"
+        android:pathData="M54,54m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
 </vector>
