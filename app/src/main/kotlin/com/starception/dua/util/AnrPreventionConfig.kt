@@ -24,7 +24,7 @@ object AnrPreventionConfig {
     
     // Initialization settings
     const val ENABLE_LAZY_INITIALIZATION = true
-    const val ENABLE_BACKGROUND_SYNC = false // Disabled to prevent ANR
+    const val ENABLE_BACKGROUND_SYNC = true // Temporarily enabled to populate topics data
     const val ENABLE_AUTO_SERVICE_START = true // Enabled for notifications
     
     // Performance monitoring
