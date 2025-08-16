@@ -43,6 +43,7 @@ class PrayerNotificationService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var isServiceRunning = false
     private var isInitializing = false
+    private var previousPrayerPhase: String? = null // Track previous phase for smart notifications
     
     companion object {
         private const val TAG = "PrayerNotificationService"
@@ -253,19 +254,27 @@ class PrayerNotificationService : Service() {
                 // Calculate progress for progress bar
                 val progress = calculateNotificationProgress(prayerData)
                 
-                PrayerNotificationManager.postDetailedPrayerNotification(
-                    title = title,
-                    content = content,
-                    detailedMessage = detailedMessage,
-                    progress = progress,
-                    isOngoing = true,
+                // Get current prayer phase for smart notifications
+                val currentPhase = getCurrentPrayerPhase(progress)
+                
+                // Use smart notification system - only alert on phase changes
+                PrayerNotificationManager.updatePrayerProgressSmart(
                     prayerName = if (content.contains(" since ")) {
                         content.split(" since ").lastOrNull()?.split(" • ")?.firstOrNull() ?: "Prayer"
                     } else {
                         "Prayer"
-                    }
+                    },
+                    progress = progress,
+                    previousPhase = previousPrayerPhase,
+                    title = title,
+                    content = content,
+                    detailedMessage = detailedMessage
                 )
-                Log.d(TAG, "Updated prayer notification with real data: $title (progress: $progress%)")
+                
+                // Update previous phase for next comparison
+                previousPrayerPhase = currentPhase
+                
+                Log.d(TAG, "Updated prayer notification with smart system: $title (progress: $progress%, phase: $currentPhase)")
             } else {
                 // Fallback if prayer data is not available
                 PrayerNotificationManager.postPrayerNotification("Prayer times unavailable", 0, true)
@@ -465,6 +474,17 @@ class PrayerNotificationService : Service() {
         }
     }
 
+    /**
+     * Get current prayer phase based on progress
+     */
+    private fun getCurrentPrayerPhase(progress: Int): String {
+        return when {
+            progress <= 20 -> "GO_TO_MOSQUE"
+            progress <= 60 -> "BEST_TIME_TO_PRAY"
+            else -> "MAKE_TIME_FOR_PRAYER"
+        }
+    }
+    
     /**
      * Calculate progress for the notification progress bar.
      * This shows the progress through the current prayer time using phase-based calculation.
