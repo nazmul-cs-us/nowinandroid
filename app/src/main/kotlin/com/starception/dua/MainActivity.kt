@@ -40,6 +40,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.metrics.performance.JankStats
 import androidx.tracing.trace
+import androidx.fragment.app.FragmentActivity
 import com.starception.submission.MainActivityUiState.Loading
 import com.starception.submission.core.analytics.AnalyticsHelper
 import com.starception.submission.core.analytics.LocalAnalyticsHelper
@@ -52,6 +53,7 @@ import com.starception.submission.ui.NiaApp
 import com.starception.submission.ui.rememberNiaAppState
 import com.starception.submission.services.PrayerNotificationService
 import com.starception.submission.util.isSystemInDarkTheme
+import com.starception.submission.util.PermissionManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -60,10 +62,11 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlinx.coroutines.delay
+import android.content.pm.PackageManager
 
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     /**
      * Lazily inject [JankStats], which is used to track jank throughout the app.
@@ -85,12 +88,18 @@ class MainActivity : ComponentActivity() {
     lateinit var userNewsResourceRepository: UserNewsResourceRepository
 
     private val viewModel: MainActivityViewModel by viewModels()
+    
+    // Permission manager for location and notification permissions
+    private lateinit var permissionManager: PermissionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.d("MainActivity", "onCreate started with modern Hilt optimization")
         
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        
+        // Initialize permission manager
+        permissionManager = PermissionManager(this)
 
         // We keep this as a mutable state, so that we can track changes inside the composition.
         // This allows us to react to dark/light mode changes.
@@ -179,6 +188,9 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 Log.d("MainActivity", "Prayer service already running in another process")
                             }
+                            
+                            // Check and request permissions after UI is loaded
+                            checkAndRequestPermissions()
                         }
                         is MainActivityUiState.Loading -> {
                             Log.d("MainActivity", "UI still loading, waiting...")
@@ -257,6 +269,20 @@ class MainActivity : ComponentActivity() {
         }
     }
     
+    /**
+     * Check and request necessary permissions (location and notifications)
+     */
+    private fun checkAndRequestPermissions() {
+        Log.d("MainActivity", "Checking and requesting permissions")
+        
+        // Check and request permissions
+        permissionManager.checkAndRequestPermissions()
+        
+        // Check if location services are enabled
+        permissionManager.checkLocationServices()
+        
+        Log.d("MainActivity", "Permission check completed")
+    }
 
     override fun onPause() {
         super.onPause()
@@ -265,6 +291,36 @@ class MainActivity : ComponentActivity() {
         lazyStats.get().isTrackingEnabled = false
         
         Log.d("MainActivity", "onPause completed with modern optimization")
+    }
+    
+    /**
+     * Handle permission request results
+     */
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        
+        when (requestCode) {
+            PermissionManager.LOCATION_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Log.d("MainActivity", "Location permission granted")
+                    // Check location services after permission is granted
+                    permissionManager.checkLocationServices()
+                } else {
+                    Log.w("MainActivity", "Location permission denied")
+                }
+            }
+            PermissionManager.NOTIFICATION_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Log.d("MainActivity", "Notification permission granted")
+                } else {
+                    Log.w("MainActivity", "Notification permission denied")
+                }
+            }
+        }
     }
 }
 
