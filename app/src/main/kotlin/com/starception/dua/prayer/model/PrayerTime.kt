@@ -44,16 +44,8 @@ data class DayPrayerTimes(
             val isCurrently = when {
                 // For Fajr to Maghrib prayers, check if we're between this prayer and the next
                 index < prayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(prayers[index + 1].time) -> true
-                // For Isha prayer, check if we're past Isha but before midnight (we don't show "currently" after midnight)
-                index == prayers.size - 1 && now.isAfter(prayer.time) && nextPrayerIndex == -1 && now.hour < 24 -> {
-                    // Only show Isha as "currently" until around 2-3 AM, then no prayer is "current"
-                    val hoursSinceIsha = if (now.hour >= prayer.time.hour) {
-                        now.hour - prayer.time.hour
-                    } else {
-                        24 - prayer.time.hour + now.hour
-                    }
-                    hoursSinceIsha < 4  // Show as current for max 4 hours after Isha
-                }
+                // For Isha prayer, only show as current for a reasonable time after it starts (max 2 hours)
+                index == prayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(prayer.time.plusHours(2)) -> true
                 else -> false
             }
             
@@ -92,15 +84,8 @@ data class DayPrayerTimes(
             val isCurrently = when {
                 // For Fajr to Maghrib prayers, check if we're between this prayer and the next
                 index < actualPrayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(actualPrayers[index + 1].time) -> true
-                // For Isha prayer, check if we're past Isha but before midnight
-                index == actualPrayers.size - 1 && now.isAfter(prayer.time) && nextPrayerIndex == -1 && now.hour < 24 -> {
-                    val hoursSinceIsha = if (now.hour >= prayer.time.hour) {
-                        now.hour - prayer.time.hour
-                    } else {
-                        24 - prayer.time.hour + now.hour
-                    }
-                    hoursSinceIsha < 4  // Show as current for max 4 hours after Isha
-                }
+                // For Isha prayer, only show as current for a reasonable time after it starts (max 2 hours)
+                index == actualPrayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(prayer.time.plusHours(2)) -> true
                 else -> false
             }
             
