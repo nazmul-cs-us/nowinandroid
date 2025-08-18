@@ -98,10 +98,41 @@ class PermissionManager(private val activity: FragmentActivity) {
             requestLocationPermission()
         }
         
-        // Request notification permission if not granted (Android 13+)
-        if (!isNotificationPermissionGranted()) {
+        // Note: Notification permission is NOT requested automatically on startup
+        // It will be requested when the prayer times page is opened
+    }
+    
+    /**
+     * Request notification permission when prayer times page is opened
+     * This is called when user navigates to prayer times
+     */
+    fun requestNotificationPermissionOnPrayerTimesOpen() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !isNotificationPermissionGranted()) {
             requestNotificationPermission()
         }
+    }
+    
+    /**
+     * Request notification permission during pull-to-refresh
+     * This is called when user actively interacts with the app
+     */
+    fun requestNotificationPermissionOnRefresh() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !isNotificationPermissionGranted()) {
+            requestNotificationPermission()
+        }
+    }
+    
+    /**
+     * Check and request only location permissions (for app startup)
+     */
+    fun checkAndRequestLocationPermissions() {
+        // Request location permission if not granted
+        if (!isLocationPermissionGranted()) {
+            requestLocationPermission()
+        }
+        
+        // Check if location services are enabled
+        checkLocationServices()
     }
     
     /**

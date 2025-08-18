@@ -16,6 +16,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.accompanist.permissions.rememberPermissionState
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.prayer.ui.PrayerTimesCard
 import com.starception.submission.prayer.viewmodel.PrayerTimesViewModel
@@ -39,6 +40,18 @@ fun PrayerTimesScreen(
             Manifest.permission.ACCESS_COARSE_LOCATION
         )
     )
+    
+    // Handle notification permission (Android 13+)
+    val notificationPermission = rememberPermissionState(
+        permission = Manifest.permission.POST_NOTIFICATIONS
+    )
+    
+    // Request notification permission when screen is opened
+    LaunchedEffect(Unit) {
+        if (notificationPermission.status is com.google.accompanist.permissions.PermissionStatus.Denied) {
+            notificationPermission.launchPermissionRequest()
+        }
+    }
     
     PrayerTimesContent(
         uiState = uiState,

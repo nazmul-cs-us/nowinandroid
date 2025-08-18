@@ -270,16 +270,19 @@ class MainActivity : FragmentActivity() {
     }
     
     /**
-     * Check and request necessary permissions (location and notifications)
+     * Check and request necessary permissions (location only)
      */
     private fun checkAndRequestPermissions() {
         Log.d("MainActivity", "Checking and requesting permissions")
         
-        // Check and request permissions
+        // Only check and request location permissions on startup
         permissionManager.checkAndRequestPermissions()
         
         // Check if location services are enabled
         permissionManager.checkLocationServices()
+        
+        // Note: Notification permissions are NOT requested automatically
+        // They will be requested during pull-to-refresh if needed
         
         Log.d("MainActivity", "Permission check completed")
     }
