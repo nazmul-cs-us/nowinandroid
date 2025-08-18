@@ -249,29 +249,22 @@ object PrayerNotificationManager {
     
     /**
      * Build prayer progress style for Live Updates
-     * Creates 3 segments: Mosque (0-20min), Best Time (20min-halfway), Make Time (halfway-end)
+     * Creates 3 segments: First (Blue), Second (Green), Third (Yellow)
      */
     @RequiresApi(35) // Android 16
     private fun buildPrayerProgressStyle(progress: Int): NotificationCompat.ProgressStyle {
-        // Colors for different prayer phases
-        val mosqueColor = Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()      // Green for mosque phase
-        val bestTimeColor = Color.valueOf(0.9f, 0.7f, 0.2f, 1f).toArgb()    // Gold for best time phase
-        val makeTimeColor = Color.valueOf(0.8f, 0.3f, 0.3f, 1f).toArgb()    // Red for make time phase
+        // Colors for different prayer phases - Blue, Green, Yellow
+        val firstColor = Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()      // Blue for first segment
+        val secondColor = Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()     // Green for second segment
+        val thirdColor = Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb()      // Yellow for third segment
         
         return try {
             NotificationCompat.ProgressStyle()
-                .setProgressPoints(
-                    listOf(
-                        NotificationCompat.ProgressStyle.Point(20).setColor(mosqueColor),      // Mosque reached (20 min)
-                        NotificationCompat.ProgressStyle.Point(50).setColor(bestTimeColor),    // Middle of prayer time
-                        NotificationCompat.ProgressStyle.Point(100).setColor(makeTimeColor)    // End of prayer time
-                    )
-                )
                 .setProgressSegments(
                     listOf(
-                        NotificationCompat.ProgressStyle.Segment(20).setColor(mosqueColor),    // 0-20 min: Go to mosque
-                        NotificationCompat.ProgressStyle.Segment(30).setColor(bestTimeColor),  // 20-50 min: Best time for prayer
-                        NotificationCompat.ProgressStyle.Segment(50).setColor(makeTimeColor)   // 50-100 min: Make time for prayer
+                        NotificationCompat.ProgressStyle.Segment(33).setColor(firstColor),     // 0-33%: Blue segment
+                        NotificationCompat.ProgressStyle.Segment(33).setColor(secondColor),    // 33-66%: Green segment
+                        NotificationCompat.ProgressStyle.Segment(34).setColor(thirdColor)      // 66-100%: Yellow segment
                     )
                 )
                 .setProgressTrackerIcon(
@@ -513,16 +506,9 @@ object PrayerNotificationManager {
                         .setProgress(progress)
                         .setProgressSegments(
                             listOf(
-                                NotificationCompat.ProgressStyle.Segment(20), // 0-20%: Go to mosque
-                                NotificationCompat.ProgressStyle.Segment(40), // 20-60%: Best time to pray
-                                NotificationCompat.ProgressStyle.Segment(40)  // 60-100%: Make time for prayer
-                            )
-                        )
-                        .setProgressPoints(
-                            listOf(
-                                NotificationCompat.ProgressStyle.Point(20),  // End of go to mosque phase
-                                NotificationCompat.ProgressStyle.Point(60),  // End of best time phase
-                                NotificationCompat.ProgressStyle.Point(100)  // End of prayer time
+                                NotificationCompat.ProgressStyle.Segment(33).setColor(Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()), // 0-33%: Blue segment
+                                NotificationCompat.ProgressStyle.Segment(33).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // 33-66%: Green segment
+                                NotificationCompat.ProgressStyle.Segment(34).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())  // 66-100%: Yellow segment
                             )
                         )
                     
@@ -783,22 +769,14 @@ object PrayerNotificationManager {
         return try {
             // Use NotificationCompat.ProgressStyle for official progressSegments
             // Following the exact pattern from the official Android platform sample
-            // No custom colors to prevent lock screen color issues
-            // Segments: 0-20% (Go to mosque), 20-60% (Best time), 60-100% (Make time)
+            // Segments: 0-33% (Blue), 33-66% (Green), 66-100% (Yellow)
             val progressStyle = NotificationCompat.ProgressStyle()
                 .setProgress(progress) // Set current progress value
                 .setProgressSegments(
                     listOf(
-                        NotificationCompat.ProgressStyle.Segment(20), // 0-20%: Go to mosque
-                        NotificationCompat.ProgressStyle.Segment(40), // 20-60%: Best time to pray
-                        NotificationCompat.ProgressStyle.Segment(40)  // 60-100%: Make time for prayer
-                    )
-                )
-                .setProgressPoints(
-                    listOf(
-                        NotificationCompat.ProgressStyle.Point(20),  // End of go to mosque phase
-                        NotificationCompat.ProgressStyle.Point(60),  // End of best time phase
-                        NotificationCompat.ProgressStyle.Point(100)  // End of prayer time
+                        NotificationCompat.ProgressStyle.Segment(33).setColor(Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()), // 0-33%: Blue segment
+                        NotificationCompat.ProgressStyle.Segment(33).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // 33-66%: Green segment
+                        NotificationCompat.ProgressStyle.Segment(34).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())  // 66-100%: Yellow segment
                     )
                 )
             
