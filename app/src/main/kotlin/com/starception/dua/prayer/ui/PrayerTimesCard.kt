@@ -80,6 +80,7 @@ fun PrayerTimesCard(
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
     onRefreshButton: () -> Unit = {},
+    onRequestNotificationPermission: () -> Unit = {}, // New parameter for permission request
     modifier: Modifier = Modifier
 ) {
     // Pull-to-refresh state exactly like ResistRoute
