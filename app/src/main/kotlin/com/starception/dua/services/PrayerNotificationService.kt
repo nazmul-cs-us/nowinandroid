@@ -101,14 +101,35 @@ class PrayerNotificationService : Service() {
         val serviceCount = getServiceInstanceCount(this)
         Log.d(TAG, "Starting service - current instance count: $serviceCount, startId: $startId")
         
-        // Start foreground service immediately
+        // Start foreground service IMMEDIATELY to prevent ANR
         startForeground(NOTIFICATION_ID, createInitialNotification())
         
         // Mark service as running
         isServiceRunning = true
         
-        // Start prayer time updates in background
-        startRealPrayerTimeUpdates()
+        // Small delay to ensure service is fully started
+        serviceScope.launch {
+            delay(100) // 100ms delay for service stability
+            
+            try {
+                // Add timeout to prevent hanging
+                withTimeout(AnrPreventionConfig.SERVICE_STARTUP_TIMEOUT_MS) {
+                    // Update notification with full features first
+                    updateNotificationWithFullFeatures()
+                    
+                    // Start prayer time updates in background
+                    startRealPrayerTimeUpdates()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting prayer time updates in background", e)
+                // Fallback: post simple notification if startup fails
+                try {
+                    PrayerNotificationManager.postPrayerNotification("Prayer tracker active", 0, true)
+                } catch (fallbackError: Exception) {
+                    Log.e(TAG, "Fallback notification also failed", fallbackError)
+                }
+            }
+        }
         
         Log.d(TAG, "Service started successfully - startId: $startId")
         return START_STICKY
@@ -134,24 +155,49 @@ class PrayerNotificationService : Service() {
     }
     
     private fun createInitialNotification(): Notification {
-        val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+        // Create minimal notification for fast startup - no heavy operations
+        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Prayer Time Tracker")
-            .setContentText("Initializing...")
+            .setContentText("Starting...")
             .setSmallIcon(R.drawable.ic_prayer)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setColor(Color.parseColor("#8B418F"))
-            .setColorized(true)
             .build()
-        
-        // Force refresh to ensure Live Updates are activated on Android 16
-        if (PrayerNotificationManager.supportsLiveUpdates()) {
-            PrayerNotificationManager.forceRefreshNotification()
+    }
+    
+    /**
+     * Update notification with full features after service is stable
+     */
+    private fun updateNotificationWithFullFeatures() {
+        serviceScope.launch {
+            try {
+                // Add color and other features
+                val enhancedNotification = NotificationCompat.Builder(this@PrayerNotificationService, NOTIFICATION_CHANNEL_ID)
+                    .setContentTitle("Prayer Time Tracker")
+                    .setContentText("Active")
+                    .setSmallIcon(R.drawable.ic_prayer)
+                    .setOngoing(true)
+                    .setCategory(NotificationCompat.CATEGORY_STATUS)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setColor(Color.parseColor("#8B418F"))
+                    .setColorized(true)
+                    .build()
+                
+                // Update the notification
+                val notificationManager = getSystemService(NotificationManager::class.java)
+                notificationManager.notify(NOTIFICATION_ID, enhancedNotification)
+                
+                // Force refresh in background
+                if (PrayerNotificationManager.supportsLiveUpdates()) {
+                    PrayerNotificationManager.forceRefreshNotification()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating notification with full features", e)
+            }
         }
-        
-        return notification
     }
     
     /**
