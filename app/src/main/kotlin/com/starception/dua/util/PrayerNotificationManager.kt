@@ -248,36 +248,21 @@ object PrayerNotificationManager {
     }
     
     /**
-     * Build prayer progress style for Live Updates
-     * Creates 3 segments: First (Blue), Second (Green), Third (Yellow)
+     * Build progress style for regular notifications
      */
-    @RequiresApi(35) // Android 16
     private fun buildPrayerProgressStyle(progress: Int): NotificationCompat.ProgressStyle {
-        // Colors for different prayer phases - Blue, Green, Yellow
-        val firstColor = Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()      // Blue for first segment
-        val secondColor = Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()     // Green for second segment
-        val thirdColor = Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb()      // Yellow for third segment
+        // Calculate proper segment proportions based on prayer time phases
+        val (blueEnd, greenEnd, yellowEnd) = calculatePrayerTimeSegments("current")
         
-        return try {
-            NotificationCompat.ProgressStyle()
-                .setProgressSegments(
-                    listOf(
-                        NotificationCompat.ProgressStyle.Segment(33).setColor(firstColor),     // 0-33%: Blue segment
-                        NotificationCompat.ProgressStyle.Segment(33).setColor(secondColor),    // 33-66%: Green segment
-                        NotificationCompat.ProgressStyle.Segment(34).setColor(thirdColor)      // 66-100%: Yellow segment
-                    )
+        return NotificationCompat.ProgressStyle()
+            .setProgress(progress)
+            .setProgressSegments(
+                listOf(
+                    NotificationCompat.ProgressStyle.Segment(blueEnd.toInt()).setColor(Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()), // Blue
+                    NotificationCompat.ProgressStyle.Segment((greenEnd - blueEnd).toInt()).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // Green  
+                    NotificationCompat.ProgressStyle.Segment((yellowEnd - greenEnd).toInt()).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())   // Yellow
                 )
-                .setProgressTrackerIcon(
-                    IconCompat.createWithResource(
-                        appContext, if (progress >= 100) R.drawable.ic_prayer_check else R.drawable.ic_prayer_progress
-                    )
-                )
-                .setProgress(progress)
-        } catch (e: Exception) {
-            Log.w(TAG, "Error building progress style: ${e.message}")
-            // Fallback to basic progress style
-            NotificationCompat.ProgressStyle().setProgress(progress)
-        }
+            )
     }
     
     /**
@@ -501,14 +486,18 @@ object PrayerNotificationManager {
             if (Build.VERSION.SDK_INT >= 35 && supportsLiveUpdates()) {
                 // Use Android 16 Live Update progress style with segments
                 try {
-                    // Create a ProgressStyle with segments for the beautiful progress bar
+                    // Calculate proper segment proportions based on prayer time phases
+                    val (blueEnd, greenEnd, yellowEnd) = calculatePrayerTimeSegments(prayerName)
+                    
+                    // Create progress style with proper segment proportions
+                    // Each segment represents a phase: Blue(0-20%), Green(20-60%), Yellow(60-100%)
                     val progressStyle = NotificationCompat.ProgressStyle()
-                        .setProgress(progress)
+                        .setProgress(progress) // Set current progress value
                         .setProgressSegments(
                             listOf(
-                                NotificationCompat.ProgressStyle.Segment(33).setColor(Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()), // 0-33%: Blue segment
-                                NotificationCompat.ProgressStyle.Segment(33).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // 33-66%: Green segment
-                                NotificationCompat.ProgressStyle.Segment(34).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())  // 66-100%: Yellow segment
+                                NotificationCompat.ProgressStyle.Segment(20).setColor(Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()), // Blue: 0-20%
+                                NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // Green: 20-60%  
+                                NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())   // Yellow: 60-100%
                             )
                         )
                     
@@ -729,68 +718,43 @@ object PrayerNotificationManager {
             setVisibility(Notification.VISIBILITY_PUBLIC)
             setPriority(NotificationCompat.PRIORITY_HIGH)
             
-            // Android 16 Live Update specific features (following official sample)
-            setRequestPromotedOngoing(true)
+            // Calculate proper segment proportions based on prayer time phases
+            val (blueEnd, greenEnd, yellowEnd) = calculatePrayerTimeSegments(prayerName)
             
-            // Set the ProgressStyle for Live Updates (this will show progress segments)
-            // Combine ProgressStyle with text content for both beautiful progress bar and readable text
-            val progressStyle = buildLiveUpdateProgressStyle(progress, detailedMessage, prayerName, content)
-            if (progressStyle is NotificationCompat.ProgressStyle) {
-                // Use ProgressStyle with text content
-                setStyle(progressStyle)
-                setContentText("$content\n$detailedMessage")
-                Log.d(TAG, "Applied ProgressStyle with progress=$progress%")
-            } else {
-                // Fallback to BigTextStyle if ProgressStyle fails
-                setStyle(progressStyle)
-                // Also add a basic progress bar as fallback
-                setProgress(100, progress, false)
-                Log.d(TAG, "Applied BigTextStyle with basic progress bar, progress=$progress%")
-            }
-            
-            // Add large icon for better Live Update appearance
-            setLargeIcon(IconCompat.createWithResource(appContext, R.drawable.ic_prayer).toIcon(appContext))
-            
-            // Additional settings for better lock screen display
-            setShowWhen(true)
-            setUsesChronometer(false)
-            setAutoCancel(false)
-            
-
-        }
-    }
-    
-    /**
-     * Build modern ProgressStyle with official Android 16 progressSegments
-     * Uses NotificationCompat.ProgressStyle following the official platform sample
-     */
-    @RequiresApi(35) // Android 16
-    private fun buildLiveUpdateProgressStyle(progress: Int, detailedMessage: String, prayerName: String, mainContent: String): NotificationCompat.Style {
-        return try {
-            // Use NotificationCompat.ProgressStyle for official progressSegments
-            // Following the exact pattern from the official Android platform sample
-            // Segments: 0-33% (Blue), 33-66% (Green), 66-100% (Yellow)
+            // Create progress style with proper segment proportions
+            // Each segment represents a phase: Blue(0-20%), Green(20-60%), Yellow(60-100%)
             val progressStyle = NotificationCompat.ProgressStyle()
                 .setProgress(progress) // Set current progress value
                 .setProgressSegments(
                     listOf(
-                        NotificationCompat.ProgressStyle.Segment(33).setColor(Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()), // 0-33%: Blue segment
-                        NotificationCompat.ProgressStyle.Segment(33).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // 33-66%: Green segment
-                        NotificationCompat.ProgressStyle.Segment(34).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())  // 66-100%: Yellow segment
+                        NotificationCompat.ProgressStyle.Segment(20).setColor(Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()), // Blue: 0-20%
+                        NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // Green: 20-60%  
+                        NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())   // Yellow: 60-100%
                     )
                 )
             
-            Log.d(TAG, "Created official Android 16 ProgressStyle with progressSegments and progressPoints, progress=$progress%")
-            
-            // Return the ProgressStyle to maintain the beautiful segmented progress bar
-            return progressStyle
-                        
-        } catch (e: Exception) {
-            Log.w(TAG, "Error building Live Update ProgressStyle: ${e.message}")
-            // Fallback to basic BigTextStyle
-            NotificationCompat.BigTextStyle()
-                .bigText("$mainContent\n$detailedMessage")
-                .setBigContentTitle("${progress}% $prayerName Prayer time passed")
+            setStyle(progressStyle)
         }
+    }
+    
+    /**
+     * Calculate prayer time segment proportions based on timing requirements
+     * 0-20% = Blue, 20-60% = Green, 60-100% = Yellow
+     * Segments are dynamic based on current progress
+     */
+    private fun calculatePrayerTimeSegments(prayerName: String): Triple<Float, Float, Float> {
+        // Segments match the service progress calculation:
+        // Blue: 0-20% (Go to mosque phase)
+        val blueEnd = 20f
+        
+        // Green: 20-60% (Best time phase) 
+        val greenEnd = 60f
+        
+        // Yellow: 60-100% (Make time phase)
+        val yellowEnd = 100f
+        
+        Log.d(TAG, "Prayer segments: Blue(0-${blueEnd}%), Green(${blueEnd}-${greenEnd}%), Yellow(${greenEnd}-${yellowEnd}%)")
+        
+        return Triple(blueEnd, greenEnd, yellowEnd)
     }
 }
