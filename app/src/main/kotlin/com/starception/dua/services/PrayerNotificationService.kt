@@ -199,6 +199,7 @@ class PrayerNotificationService : Service() {
             }
         }
     }
+
     
     /**
      * Initialize background prayer notification updates after foreground service is started
