@@ -52,9 +52,9 @@ enum class TopLevelDestination(
     val route: KClass<*>,
     val baseRoute: KClass<*> = route,
 ) {
-    PRAYER_TIMES(
-        selectedIcon = NiaIcons.PrayerTimes,
-        unselectedIcon = NiaIcons.PrayerTimesBorder,
+    HOME(
+        selectedIcon = NiaIcons.Home,
+        unselectedIcon = NiaIcons.HomeBorder,
         iconTextId = R.string.prayer_times_title,
         titleTextId = R.string.prayer_times_title,
         route = PrayerTimesRoute::class,

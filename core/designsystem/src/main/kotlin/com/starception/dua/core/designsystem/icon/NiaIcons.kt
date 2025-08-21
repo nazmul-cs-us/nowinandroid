@@ -22,10 +22,12 @@ import androidx.compose.material.icons.automirrored.rounded.ShortText
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Upcoming
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
@@ -62,7 +64,7 @@ object NiaIcons {
     val UpcomingBorder = Icons.Outlined.Upcoming
     val ViewDay = Icons.Rounded.ViewDay
     
-    // Prayer times icons - using Notifications icons which better represent prayer reminders and timing
-    val PrayerTimes = Icons.Filled.Notifications
-    val PrayerTimesBorder = Icons.Outlined.NotificationsActive
+    // Home tab icons - using Home icons which represent the main/home screen
+    val Home = Icons.Filled.Home
+    val HomeBorder = Icons.Outlined.Home
 }

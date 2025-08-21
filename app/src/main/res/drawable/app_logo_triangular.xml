@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    
+    <!-- Triangular A shape with gradient from light gray to dark gray -->
+    <path
+        android:fillColor="#D3D3D3"
+        android:pathData="M256,100 L400,400 L300,400 L256,300 L212,400 L112,400 Z" />
+    
+    <!-- Inner triangle for depth -->
+    <path
+        android:fillColor="#A0A0A0"
+        android:pathData="M256,140 L350,380 L280,380 L256,320 L232,380 L162,380 Z" />
+    
+    <!-- Darker accent -->
+    <path
+        android:fillColor="#505050"
+        android:pathData="M256,180 L300,340 L270,340 L256,300 L242,340 L212,340 Z" />
+        
+</vector>
