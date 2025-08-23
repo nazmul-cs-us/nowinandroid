@@ -61,9 +61,10 @@ androidx.compose.ui:ui:1.8.0-beta02
 androidx.compose:compose-bom-alpha:2025.02.00
 androidx.concurrent:concurrent-futures-ktx:1.1.0
 androidx.concurrent:concurrent-futures:1.1.0
-androidx.core:core-ktx:1.15.0
+androidx.core:core-ktx:1.17.0-alpha01
 androidx.core:core-splashscreen:1.0.1
-androidx.core:core:1.15.0
+androidx.core:core-viewtree:1.0.0
+androidx.core:core:1.17.0-alpha01
 androidx.cursoradapter:cursoradapter:1.0.0
 androidx.customview:customview-poolingcontainer:1.0.0
 androidx.customview:customview:1.0.0
@@ -160,6 +161,7 @@ com.google.android.gms:play-services-ads-identifier:18.0.0
 com.google.android.gms:play-services-base:18.5.0
 com.google.android.gms:play-services-basement:18.4.0
 com.google.android.gms:play-services-cloud-messaging:17.2.0
+com.google.android.gms:play-services-location:21.3.0
 com.google.android.gms:play-services-measurement-api:22.1.2
 com.google.android.gms:play-services-measurement-base:22.1.2
 com.google.android.gms:play-services-measurement-impl:22.1.2
