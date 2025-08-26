@@ -485,20 +485,40 @@ object PrayerNotificationManager {
             if (Build.VERSION.SDK_INT >= 35 && supportsLiveUpdates()) {
                 // Use Android 16 Live Update progress style with segments
                 try {
-                    // Calculate proper segment proportions based on prayer time phases
-                    val (blueEnd, greenEnd, yellowEnd) = calculatePrayerTimeSegments(prayerName)
-                    
-                    // Create progress style with proper segment proportions
+                    // Create progress style with 3 distinct segments showing actual progress within each phase
                     // Each segment represents a phase: Blue(0-20%), Green(20-60%), Yellow(60-100%)
+                    
+                    // Log the progress value and segment calculations
+                    Log.d(TAG, "🔍 DEBUG: Creating notification segments for progress: $progress%")
+                    
+                    val blueSegmentSize = 20
+                    val greenSegmentSize = 40
+                    val yellowSegmentSize = 40
+                    
+                    Log.d(TAG, "🔍 DEBUG: Segment sizes - Blue: $blueSegmentSize%, Green: $greenSegmentSize%, Yellow: $yellowSegmentSize%")
+                    
                     val progressStyle = NotificationCompat.ProgressStyle()
                         .setProgress(100) // Set max progress to 100
                         .setProgressSegments(
                             listOf(
-                                NotificationCompat.ProgressStyle.Segment(20).setColor(Color.valueOf(0.2f, 0.6f, 1f, 1f).toArgb()), // Blue: 0-20%
-                                NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // Green: 20-60%  
-                                NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())   // Yellow: 60-100%
+                                // Blue segment: 0-20% - always show as 20% but with progress indication
+                                NotificationCompat.ProgressStyle.Segment(blueSegmentSize).setColor(Color.valueOf(0.2f, 0.6f, 1f, 1f).toArgb()),
+                                
+                                // Green segment: 20-60% - always show as 40% but with progress indication
+                                NotificationCompat.ProgressStyle.Segment(greenSegmentSize).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()),
+                                
+                                // Yellow segment: 60-100% - always show as 40% but with progress indication
+                                NotificationCompat.ProgressStyle.Segment(yellowSegmentSize).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())
                             )
                         )
+                    
+                    Log.d(TAG, "🔍 DEBUG: Created ProgressStyle with ${progressStyle.progressSegments.size} segments")
+                    Log.d(TAG, "🔍 DEBUG: ProgressStyle max progress: ${progressStyle.progress}")
+                    
+                    // Log each segment details
+                    progressStyle.progressSegments.forEachIndexed { index, segment ->
+                        Log.d(TAG, "🔍 DEBUG: Segment $index - Size: ${segment.size}, Color: ${segment.color}")
+                    }
                     
                     // Apply the progress style to the main builder
                     builder.setStyle(progressStyle)
