@@ -443,10 +443,9 @@ class PrayerNotificationService : Service() {
         return buildString {
             if (nextPrayer != null) {
                 val timeRemaining = formatTimeRemaining(nextPrayer.time)
-                appendLine("⏭️ Next Prayer: ${nextPrayer.name}")
-                appendLine("⏰ Time remaining: $timeRemaining")
+                appendLine("Next • ${nextPrayer.name} in $timeRemaining")
             } else {
-                appendLine("📅 No upcoming prayers")
+                appendLine("No upcoming prayers")
             }
         }
     }
