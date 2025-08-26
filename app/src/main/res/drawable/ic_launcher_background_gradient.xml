@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Radial gradient background -->
+    <path
+        android:fillColor="#4A90E2"
+        android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
+    
+    <!-- Inner circle for depth -->
+    <path
+        android:fillColor="#357ABD"
+        android:pathData="M54,54 m-40,0 a40,40 0 1,0 80,0 a40,40 0 1,0 -80,0" />
+    
+    <!-- Center highlight -->
+    <path
+        android:fillColor="#5BA0F2"
+        android:pathData="M54,54 m-25,0 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0" />
+</vector>
