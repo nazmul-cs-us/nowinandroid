@@ -251,16 +251,15 @@ object PrayerNotificationManager {
      * Build progress style for regular notifications
      */
     private fun buildPrayerProgressStyle(progress: Int): NotificationCompat.ProgressStyle {
-        // Calculate proper segment proportions based on prayer time phases
-        val (blueEnd, greenEnd, yellowEnd) = calculatePrayerTimeSegments("current")
-        
+        // Create progress style with proper 3-segment proportions
+        // Each segment represents a phase: Blue(0-20%), Green(20-60%), Yellow(60-100%)
         return NotificationCompat.ProgressStyle()
-            .setProgress(progress)
+            .setProgress(100) // Set max progress to 100
             .setProgressSegments(
                 listOf(
-                    NotificationCompat.ProgressStyle.Segment(blueEnd.toInt()).setColor(Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()), // Blue
-                    NotificationCompat.ProgressStyle.Segment((greenEnd - blueEnd).toInt()).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // Green  
-                    NotificationCompat.ProgressStyle.Segment((yellowEnd - greenEnd).toInt()).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())   // Yellow
+                    NotificationCompat.ProgressStyle.Segment(20).setColor(Color.valueOf(0.2f, 0.6f, 1f, 1f).toArgb()), // Blue: 0-20%
+                    NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // Green: 20-60%  
+                    NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())   // Yellow: 60-100%
                 )
             )
     }
@@ -492,10 +491,10 @@ object PrayerNotificationManager {
                     // Create progress style with proper segment proportions
                     // Each segment represents a phase: Blue(0-20%), Green(20-60%), Yellow(60-100%)
                     val progressStyle = NotificationCompat.ProgressStyle()
-                        .setProgress(progress) // Set current progress value
+                        .setProgress(100) // Set max progress to 100
                         .setProgressSegments(
                             listOf(
-                                NotificationCompat.ProgressStyle.Segment(20).setColor(Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()), // Blue: 0-20%
+                                NotificationCompat.ProgressStyle.Segment(20).setColor(Color.valueOf(0.2f, 0.6f, 1f, 1f).toArgb()), // Blue: 0-20%
                                 NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // Green: 20-60%  
                                 NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())   // Yellow: 60-100%
                             )
@@ -724,10 +723,10 @@ object PrayerNotificationManager {
             // Create progress style with proper segment proportions
             // Each segment represents a phase: Blue(0-20%), Green(20-60%), Yellow(60-100%)
             val progressStyle = NotificationCompat.ProgressStyle()
-                .setProgress(progress) // Set current progress value
+                .setProgress(100) // Set max progress to 100
                 .setProgressSegments(
                     listOf(
-                        NotificationCompat.ProgressStyle.Segment(20).setColor(Color.valueOf(0.2f, 0.6f, 1.0f, 1f).toArgb()), // Blue: 0-20%
+                        NotificationCompat.ProgressStyle.Segment(20).setColor(Color.valueOf(0.2f, 0.6f, 1f, 1f).toArgb()), // Blue: 0-20%
                         NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // Green: 20-60%  
                         NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())   // Yellow: 60-100%
                     )
