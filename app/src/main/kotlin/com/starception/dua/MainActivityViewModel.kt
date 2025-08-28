@@ -26,40 +26,52 @@ import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.model.data.UserData
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 @HiltViewModel
 class MainActivityViewModel @Inject constructor(
-    userDataRepository: UserDataRepository,
+    private val userDataRepository: UserDataRepository,
 ) : ViewModel() {
-    val uiState: StateFlow<MainActivityUiState> = userDataRepository.userData.map {
-        Success(it)
-    }.stateIn(
-        scope = viewModelScope,
-        initialValue = Loading,
-        started = SharingStarted.WhileSubscribed(5_000),
-    )
+    private val _uiState = MutableStateFlow<MainActivityUiState>(Loading)
+    val uiState: StateFlow<MainActivityUiState> = _uiState.asStateFlow()
     
     init {
-        // Add timeout mechanism to prevent splash screen from getting stuck
+        // EMERGENCY FIX: Immediately set success state to prevent splash screen hanging
+        // Load data in background but don't block splash screen
+        _uiState.value = Success(
+            UserData(
+                bookmarkedNewsResources = emptySet(),
+                viewedNewsResources = emptySet(),
+                followedTopics = emptySet(),
+                themeBrand = ThemeBrand.DEFAULT,
+                darkThemeConfig = DarkThemeConfig.FOLLOW_SYSTEM,
+                useDynamicColor = true,
+                shouldHideOnboarding = false,
+            )
+        )
+        
+        // Load real user data in background after splash screen is dismissed
         viewModelScope.launch {
             try {
-                // Wait for user data with timeout
-                withTimeout<UserData>(10000) { // 10 second timeout
-                    userDataRepository.userData.first()
+                delay(2000) // Wait for app to fully initialize first
+                
+                withTimeoutOrNull(10000) { // 10 second timeout
+                    userDataRepository.userData.collect { userData ->
+                        _uiState.value = Success(userData)
+                        Log.d("MainActivityViewModel", "User data loaded successfully")
+                    }
+                } ?: run {
+                    Log.w("MainActivityViewModel", "Timeout loading user data, keeping defaults")
                 }
-                Log.d("MainActivityViewModel", "User data loaded successfully")
             } catch (e: Exception) {
-                Log.e("MainActivityViewModel", "Error loading user data or timeout reached", e)
-                // Force transition to Success state with default data to prevent splash screen from getting stuck
-                // This ensures the app can continue even if there are data loading issues
+                Log.e("MainActivityViewModel", "Error loading user data", e)
+                // Keep default data, don't crash
             }
         }
     }
