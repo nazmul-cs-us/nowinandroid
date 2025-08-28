@@ -515,11 +515,6 @@ object PrayerNotificationManager {
                     Log.d(TAG, "🔍 DEBUG: Created ProgressStyle with ${progressStyle.progressSegments.size} segments")
                     Log.d(TAG, "🔍 DEBUG: ProgressStyle max progress: ${progressStyle.progress}")
                     
-                    // Log each segment details
-                    progressStyle.progressSegments.forEachIndexed { index, segment ->
-                        Log.d(TAG, "🔍 DEBUG: Segment $index - Size: ${segment.size}, Color: ${segment.color}")
-                    }
-                    
                     // Apply the progress style to the main builder
                     builder.setStyle(progressStyle)
                     
