@@ -22,6 +22,7 @@ plugins {
 
 android {
     namespace = "com.starception.submission.core.designsystem"
+    testOptions.unitTests.isIncludeAndroidResources = true
 }
 
 dependencies {

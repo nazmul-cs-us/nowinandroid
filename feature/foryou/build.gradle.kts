@@ -23,6 +23,7 @@ plugins {
 
 android {
     namespace = "com.starception.submission.feature.foryou"
+    testOptions.unitTests.isIncludeAndroidResources = true
 }
 
 dependencies {
