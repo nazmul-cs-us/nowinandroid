@@ -55,23 +55,45 @@ import com.starception.submission.services.PrayerNotificationService
 import com.starception.submission.util.isSystemInDarkTheme
 import com.starception.submission.util.PermissionManager
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.EntryPointAccessors
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.ThemeBrand
+import androidx.compose.runtime.remember
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.delay
 import android.content.pm.PackageManager
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 
+/**
+ * EntryPoint for accessing UserDataRepository without ViewModel blocking
+ */
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface MainActivityEntryPoint {
+    fun getUserDataRepository(): UserDataRepository
+}
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
-    /**
-     * Lazily inject [JankStats], which is used to track jank throughout the app.
-     * Using lazy injection to prevent main thread blocking during startup
-     */
+    // NON-BLOCKING FIX: Use lazy injection to prevent main thread blocking
     @Inject
     lateinit var lazyStats: dagger.Lazy<JankStats>
 
@@ -87,119 +109,19 @@ class MainActivity : FragmentActivity() {
     @Inject
     lateinit var userNewsResourceRepository: UserNewsResourceRepository
 
-    private val viewModel: MainActivityViewModel by viewModels()
-    
-    // Permission manager for location and notification permissions
-    private lateinit var permissionManager: PermissionManager
+    // ULTRA-MINIMAL: Remove ViewModel entirely - it's causing blocking during by viewModels()
+    // private val viewModel: MainActivityViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        Log.d("MainActivity", "onCreate started with modern Hilt optimization")
+        Log.d("MainActivity", "ULTRA-MINIMAL onCreate - no ViewModel, no blocking operations")
         
-        val splashScreen = installSplashScreen()
+        // ULTRA-MINIMAL: Absolute minimum onCreate
         super.onCreate(savedInstanceState)
         
-        // Initialize permission manager
-        permissionManager = PermissionManager(this)
+        // Basic edge to edge
+        enableEdgeToEdge()
 
-        // We keep this as a mutable state, so that we can track changes inside the composition.
-        // This allows us to react to dark/light mode changes.
-        var themeSettings by mutableStateOf(
-            ThemeSettings(
-                darkTheme = resources.configuration.isSystemInDarkTheme,
-                androidTheme = Loading.shouldUseAndroidTheme,
-                disableDynamicTheming = Loading.shouldDisableDynamicTheming,
-            ),
-        )
-
-        // Update the uiState with modern optimization patterns
-        lifecycleScope.launch {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                combine(
-                    isSystemInDarkTheme(),
-                    viewModel.uiState,
-                ) { systemDark, uiState ->
-                    ThemeSettings(
-                        darkTheme = uiState.shouldUseDarkTheme(systemDark),
-                        androidTheme = uiState.shouldUseAndroidTheme,
-                        disableDynamicTheming = uiState.shouldDisableDynamicTheming,
-                    )
-                }
-                    .onEach { themeSettings = it }
-                    .map { it.darkTheme }
-                    .distinctUntilChanged()
-                    .collect { darkTheme ->
-                        trace("niaEdgeToEdge") {
-                            // Turn off the decor fitting system windows, which allows us to handle insets,
-                            // including IME animations, and go edge-to-edge.
-                            // This is the same parameters as the default enableEdgeToEdge call, but we manually
-                            // resolve whether or not to show dark theme using uiState, since it can be different
-                            // than the configuration's dark theme value based on the user preference.
-                            enableEdgeToEdge(
-                                statusBarStyle = SystemBarStyle.auto(
-                                    lightScrim = android.graphics.Color.TRANSPARENT,
-                                    darkScrim = android.graphics.Color.TRANSPARENT,
-                                ) { darkTheme },
-                                navigationBarStyle = SystemBarStyle.auto(
-                                    lightScrim = lightScrim,
-                                    darkScrim = darkScrim,
-                                ) { darkTheme },
-                            )
-                        }
-                    }
-            }
-        }
-
-        // Keep the splash screen on-screen until the UI state is loaded. This condition is
-        // evaluated each time the app needs to be redrawn so it should be fast to avoid blocking
-        // the UI.
-        var splashStartTime = System.currentTimeMillis()
-        splashScreen.setKeepOnScreenCondition { 
-            val shouldKeep = viewModel.uiState.value.shouldKeepSplashScreen()
-            val splashDuration = System.currentTimeMillis() - splashStartTime
-            
-            // Add fallback: force hide splash screen after 15 seconds to prevent getting stuck
-            val forceHide = splashDuration > 15000
-            
-            if (forceHide) {
-                Log.w("MainActivity", "Forcing splash screen to hide after ${splashDuration}ms timeout")
-            }
-            
-            Log.d("MainActivity", "Splash screen condition: $shouldKeep, duration: ${splashDuration}ms, forceHide: $forceHide")
-            
-            shouldKeep && !forceHide
-        }
-        
-        // Monitor UI state changes to start service once splash screen is hidden
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect { state ->
-                    when (state) {
-                        is MainActivityUiState.Success -> {
-                            Log.d("MainActivity", "UI loaded successfully, waiting before starting service")
-                            
-                            // Wait a bit more to ensure UI is fully stable
-                            delay(2000)
-                            
-                            // Only start service if not already running
-                            if (!PrayerNotificationService.isServiceRunningInAnotherProcess(this@MainActivity)) {
-                                startPrayerServiceIfNeeded()
-                                
-                                Log.d("MainActivity", "Prayer service started after UI load")
-                            } else {
-                                Log.d("MainActivity", "Prayer service already running in another process")
-                            }
-                            
-                            // Check and request permissions after UI is loaded
-                            checkAndRequestPermissions()
-                        }
-                        is MainActivityUiState.Loading -> {
-                            Log.d("MainActivity", "UI still loading, waiting...")
-                        }
-                    }
-                }
-            }
-        }
-
+        // NON-BLOCKING: Load theme settings dynamically without ViewModel
         setContent {
             val appState = rememberNiaAppState(
                 networkMonitor = networkMonitor,
@@ -209,119 +131,107 @@ class MainActivity : FragmentActivity() {
 
             val currentTimeZone by appState.currentTimeZone.collectAsStateWithLifecycle()
 
+            // NON-BLOCKING: Access UserDataRepository via EntryPoint to get theme settings
+            val userDataRepository = remember {
+                EntryPointAccessors.fromApplication(
+                    applicationContext,
+                    MainActivityEntryPoint::class.java
+                ).getUserDataRepository()
+            }
+            
+            val userData by userDataRepository.userData.collectAsStateWithLifecycle(
+                initialValue = null
+            )
+
             CompositionLocalProvider(
                 LocalAnalyticsHelper provides analyticsHelper,
                 LocalTimeZone provides currentTimeZone,
             ) {
+                // Use userData for dynamic theme settings, fallback to system defaults
+                val darkTheme = userData?.let { data ->
+                    when (data.darkThemeConfig) {
+                        DarkThemeConfig.FOLLOW_SYSTEM -> resources.configuration.isSystemInDarkTheme
+                        DarkThemeConfig.LIGHT -> false
+                        DarkThemeConfig.DARK -> true
+                    }
+                } ?: resources.configuration.isSystemInDarkTheme
+                
                 NiaTheme(
-                    darkTheme = themeSettings.darkTheme,
-                    androidTheme = themeSettings.androidTheme,
-                    disableDynamicTheming = themeSettings.disableDynamicTheming,
+                    darkTheme = darkTheme,
+                    androidTheme = userData?.themeBrand == com.starception.submission.core.model.data.ThemeBrand.ANDROID,
+                    disableDynamicTheming = userData?.useDynamicColor == false,
                 ) {
-                    // Full app functionality restored
+                    // FIXED: Full NiaApp with non-blocking permission handling in PrayerTimesScreen
                     NiaApp(appState)
                 }
             }
         }
         
-        Log.d("MainActivity", "Modern onCreate completed with optimized Hilt")
+        Log.d("MainActivity", "ULTRA-MINIMAL onCreate completed")
     }
 
     override fun onResume() {
         super.onResume()
         
-        // Use lazy stats access to prevent blocking
-        lazyStats.get().isTrackingEnabled = true
+        // NON-BLOCKING: Access JankStats lazily in background
+        lifecycleScope.launch {
+            try {
+                lazyStats.get().isTrackingEnabled = true
+                Log.d("MainActivity", "JankStats enabled successfully")
+            } catch (e: Exception) {
+                Log.w("MainActivity", "Failed to enable JankStats", e)
+            }
+        }
         
-        Log.d("MainActivity", "onResume completed with modern optimization")
+        // NON-BLOCKING: Start service in background after UI is stable
+        lifecycleScope.launch {
+            delay(1000) // Wait for UI to be fully loaded
+            startPrayerServiceIfNeeded()
+        }
+        
+        Log.d("MainActivity", "NON-BLOCKING onResume completed")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        
+        // NON-BLOCKING: Access JankStats lazily in background
+        lifecycleScope.launch {
+            try {
+                lazyStats.get().isTrackingEnabled = false
+                Log.d("MainActivity", "JankStats disabled successfully")
+            } catch (e: Exception) {
+                Log.w("MainActivity", "Failed to disable JankStats", e)
+            }
+        }
+        
+        Log.d("MainActivity", "NON-BLOCKING onPause completed")
     }
     
     /**
-     * Start prayer notification service when appropriate
-     * Enabled for notifications while maintaining ANR prevention
+     * NON-BLOCKING: Start prayer service in background coroutine
      */
     private fun startPrayerServiceIfNeeded() {
-        Log.d("MainActivity", "Starting prayer service for notifications")
+        Log.d("MainActivity", "Starting prayer service in background")
         
-        // Check if service is already running to prevent conflicts
-        if (PrayerNotificationService.isServiceRunningInAnotherProcess(this)) {
-            Log.w("MainActivity", "Service already running in another process, skipping startup to prevent conflicts")
-            return
-        }
-        
-        // Start the service in a background coroutine to prevent ANR
         lifecycleScope.launch {
             try {
-                // Add delay to ensure UI is fully loaded before starting service
-                delay(1000)
+                // Check if service is already running
+                if (PrayerNotificationService.isServiceRunningInAnotherProcess(this@MainActivity)) {
+                    Log.d("MainActivity", "Prayer service already running")
+                    return@launch
+                }
                 
-                // Start service in background to prevent main thread blocking
+                // Start service
                 val intent = Intent(this@MainActivity, PrayerNotificationService::class.java)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     startForegroundService(intent)
                 } else {
                     startService(intent)
                 }
-                Log.d("MainActivity", "Prayer service started in background for notifications")
+                Log.d("MainActivity", "Prayer service started successfully")
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error starting prayer service", e)
-            }
-        }
-    }
-    
-    /**
-     * Check and request necessary permissions (location only)
-     */
-    private fun checkAndRequestPermissions() {
-        Log.d("MainActivity", "Checking and requesting permissions")
-        
-        // Only check and request location permissions on startup
-        permissionManager.checkAndRequestPermissions()
-        
-        // Check if location services are enabled
-        permissionManager.checkLocationServices()
-        
-        // Note: Notification permissions are NOT requested automatically
-        // They will be requested during pull-to-refresh if needed
-        
-        Log.d("MainActivity", "Permission check completed")
-    }
-
-    override fun onPause() {
-        super.onPause()
-        
-        // Use lazy stats access to prevent blocking  
-        lazyStats.get().isTrackingEnabled = false
-        
-        Log.d("MainActivity", "onPause completed with modern optimization")
-    }
-    
-    /**
-     * Handle permission request results
-     */
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        
-        when (requestCode) {
-            PermissionManager.LOCATION_PERMISSION_REQUEST_CODE -> {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Log.d("MainActivity", "Location permission granted")
-                    // Check location services after permission is granted
-                    permissionManager.checkLocationServices()
-                } else {
-                    Log.w("MainActivity", "Location permission denied")
-                }
-            }
-            PermissionManager.NOTIFICATION_PERMISSION_REQUEST_CODE -> {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Log.d("MainActivity", "Notification permission granted")
-                } else {
-                    Log.w("MainActivity", "Notification permission denied")
-                }
             }
         }
     }
