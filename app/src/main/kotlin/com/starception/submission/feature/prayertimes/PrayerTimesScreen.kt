@@ -41,18 +41,31 @@ fun PrayerTimesScreen(
         permission = Manifest.permission.POST_NOTIFICATIONS
     )
     
-    // Request notification permission when screen opens (only on Android 13+)
+    // Request location permission for accurate prayer times
+    val locationPermissionState = rememberPermissionState(
+        permission = Manifest.permission.ACCESS_FINE_LOCATION
+    )
+    
+    // Request permissions when screen opens
     LaunchedEffect(Unit) {
+        // Request location permission first for accurate prayer times
+        val locationStatus = locationPermissionState.status
+        if (locationStatus is Denied && !locationStatus.shouldShowRationale) {
+            locationPermissionState.launchPermissionRequest()
+        }
+        
+        // Then request notification permission (Android 13+)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            val status = notificationPermissionState.status
-            if (status is Denied && !status.shouldShowRationale) {
+            val notificationStatus = notificationPermissionState.status
+            if (notificationStatus is Denied && !notificationStatus.shouldShowRationale) {
                 notificationPermissionState.launchPermissionRequest()
             }
         }
     }
     
     // Calculate prayer times in background to prevent blocking
-    LaunchedEffect(Unit) {
+    // Recalculate when permissions are granted
+    LaunchedEffect(locationPermissionState.status) {
         try {
             withContext(Dispatchers.Default) {
                 val calculator = PrayerTimesCalculator(context)

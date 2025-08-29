@@ -12,12 +12,14 @@ import dagger.hilt.components.SingletonComponent
 import java.time.LocalDate
 
 /**
- * EntryPoint for accessing PrayerTimeCalculatorService without ViewModel
+ * EntryPoint for accessing prayer services without ViewModel
  */
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface PrayerTimeCalculatorEntryPoint {
     fun prayerTimeCalculatorService(): PrayerTimeCalculatorService
+    fun enhancedLocationService(): com.starception.submission.prayer.service.EnhancedLocationService
+    fun prayerSettingsRepository(): com.starception.submission.prayer.repository.PrayerSettingsRepository
 }
 
 /**
@@ -26,39 +28,70 @@ interface PrayerTimeCalculatorEntryPoint {
 class PrayerTimesCalculator(private val context: Context) {
     
     /**
-     * Calculate prayer times using default settings and location
+     * Calculate prayer times using user settings and current location
      * @return Pair of DayPrayerTimes and location display name
      */
     suspend fun calculateDefaultPrayerTimes(): Pair<DayPrayerTimes?, String> {
         return try {
-            // Get prayer calculator service via EntryPoint
+            // Get services via EntryPoint
             val entryPoint = EntryPointAccessors.fromApplication(
                 context.applicationContext,
                 PrayerTimeCalculatorEntryPoint::class.java
             )
             val calculator = entryPoint.prayerTimeCalculatorService()
+            val locationService = entryPoint.enhancedLocationService()
+            val settingsRepository = entryPoint.prayerSettingsRepository()
             
-            // Use default location (Dubai) - can be improved with GPS later
-            val defaultLocation = Location(
-                latitude = 25.2048,  // Dubai coordinates as default
-                longitude = 55.2708,
-                timeZoneOffset = 4.0, // UAE timezone
-                city = "Dubai",
-                country = "UAE"
-            )
+            // Get user prayer settings
+            val userSettings = try {
+                settingsRepository.getSettings()
+            } catch (e: Exception) {
+                PrayerSettings() // Fallback to default
+            }
             
-            // Default prayer settings
-            val settings = PrayerSettings()
+            // Determine location to use with smart fallback strategy
+            val location = when {
+                // Use user's saved location if available
+                userSettings.location != null -> {
+                    userSettings.location!!
+                }
+                // Try to get current GPS location if permission granted
+                locationService.hasLocationPermission() -> {
+                    try {
+                        val androidLocation = locationService.getBestAvailableLocation().getOrNull()
+                        androidLocation?.let { 
+                            locationService.getLocationDetails(it)
+                        } ?: getDefaultLocation()
+                    } catch (e: Exception) {
+                        getDefaultLocation()
+                    }
+                }
+                // Fallback to default location
+                else -> getDefaultLocation()
+            }
             
             // Calculate for today
             val today = LocalDate.now()
-            val calculatedTimes = calculator.calculatePrayerTimes(today, defaultLocation, settings)
+            val calculatedTimes = calculator.calculatePrayerTimes(today, location, userSettings)
             
-            Pair(calculatedTimes, defaultLocation.getDisplayName())
+            Pair(calculatedTimes, location.getDisplayName())
         } catch (e: Exception) {
             // Return null if calculation fails
             Pair(null, "Unknown Location")
         }
+    }
+    
+    /**
+     * Get default location (Dubai) as fallback
+     */
+    private fun getDefaultLocation(): Location {
+        return Location(
+            latitude = 25.2048,  // Dubai coordinates as fallback
+            longitude = 55.2708,
+            timeZoneOffset = 4.0, // UAE timezone
+            city = "Dubai",
+            country = "UAE"
+        )
     }
     
     /**
