@@ -55,20 +55,12 @@ import com.starception.submission.services.PrayerNotificationService
 import com.starception.submission.util.isSystemInDarkTheme
 import com.starception.submission.util.PermissionManager
 import dagger.hilt.android.AndroidEntryPoint
-import dagger.hilt.android.EntryPointAccessors
-import com.starception.submission.core.data.repository.UserDataRepository
-import com.starception.submission.core.model.data.DarkThemeConfig
-import com.starception.submission.core.model.data.ThemeBrand
-import androidx.compose.runtime.remember
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.delay
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Box
@@ -80,15 +72,6 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
-
-/**
- * EntryPoint for accessing UserDataRepository without ViewModel blocking
- */
-@EntryPoint
-@InstallIn(SingletonComponent::class)
-interface MainActivityEntryPoint {
-    fun getUserDataRepository(): UserDataRepository
-}
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
@@ -135,7 +118,7 @@ class MainActivity : FragmentActivity() {
             }
         }
 
-        // NON-BLOCKING: Load theme settings dynamically without ViewModel
+        // MINIMAL: Static theme settings to prevent any blocking
         setContent {
             val appState = rememberNiaAppState(
                 networkMonitor = networkMonitor,
@@ -145,42 +128,15 @@ class MainActivity : FragmentActivity() {
 
             val currentTimeZone by appState.currentTimeZone.collectAsStateWithLifecycle()
 
-            // NON-BLOCKING: Access UserDataRepository via EntryPoint to get theme settings
-            val userDataRepository = remember {
-                try {
-                    EntryPointAccessors.fromApplication(
-                        applicationContext,
-                        MainActivityEntryPoint::class.java
-                    ).getUserDataRepository()
-                } catch (e: Exception) {
-                    Log.w("MainActivity", "Failed to access UserDataRepository, using defaults", e)
-                    null
-                }
-            }
-            
-            val userData by (userDataRepository?.userData?.collectAsStateWithLifecycle(
-                initialValue = null
-            ) ?: remember { mutableStateOf(null) })
-
             CompositionLocalProvider(
                 LocalAnalyticsHelper provides analyticsHelper,
                 LocalTimeZone provides currentTimeZone,
             ) {
-                // Use userData for dynamic theme settings, fallback to system defaults
-                val darkTheme = userData?.let { data ->
-                    when (data.darkThemeConfig) {
-                        DarkThemeConfig.FOLLOW_SYSTEM -> resources.configuration.isSystemInDarkTheme
-                        DarkThemeConfig.LIGHT -> false
-                        DarkThemeConfig.DARK -> true
-                    }
-                } ?: resources.configuration.isSystemInDarkTheme
-                
                 NiaTheme(
-                    darkTheme = darkTheme,
-                    androidTheme = userData?.themeBrand == com.starception.submission.core.model.data.ThemeBrand.ANDROID,
-                    disableDynamicTheming = userData?.useDynamicColor == false,
+                    darkTheme = resources.configuration.isSystemInDarkTheme,
+                    androidTheme = false,
+                    disableDynamicTheming = true,
                 ) {
-                    // FIXED: Full NiaApp with non-blocking permission handling in PrayerTimesScreen
                     NiaApp(appState)
                 }
             }
