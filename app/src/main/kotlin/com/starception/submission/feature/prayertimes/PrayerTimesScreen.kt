@@ -1,12 +1,26 @@
 package com.starception.submission.feature.prayertimes
 
 import android.Manifest
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -20,13 +34,14 @@ import com.starception.submission.feature.prayertimes.utils.getCurrentDate
 import com.starception.submission.feature.prayertimes.utils.formatTime
 import com.starception.submission.feature.prayertimes.data.PrayerTimesCalculator
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * Prayer Times screen showing daily prayer schedule
  * Settings are accessed via the main app's context-aware settings button
  */
-@OptIn(ExperimentalPermissionsApi::class)
+@OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PrayerTimesScreen(
     modifier: Modifier = Modifier,
@@ -35,6 +50,9 @@ fun PrayerTimesScreen(
     var prayerTimes by remember { mutableStateOf<com.starception.submission.prayer.model.DayPrayerTimes?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var location by remember { mutableStateOf("Loading location...") }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullToRefreshState = rememberPullToRefreshState()
+    val coroutineScope = rememberCoroutineScope()
     
     // Request notification permission for prayer alerts
     val notificationPermissionState = rememberPermissionState(
@@ -63,9 +81,8 @@ fun PrayerTimesScreen(
         }
     }
     
-    // Calculate prayer times in background to prevent blocking
-    // Recalculate when permissions are granted
-    LaunchedEffect(locationPermissionState.status) {
+    // Function to calculate prayer times
+    suspend fun calculatePrayerTimes() {
         try {
             withContext(Dispatchers.Default) {
                 val calculator = PrayerTimesCalculator(context)
@@ -73,59 +90,159 @@ fun PrayerTimesScreen(
                 
                 prayerTimes = result.first
                 location = result.second
-                isLoading = false
             }
         } catch (e: Exception) {
-            // Fallback to static times if calculation fails
-            isLoading = false
+            // Keep current values if calculation fails
         }
     }
     
-    // Use same layout pattern as other tabs
-    Box(
-        modifier = modifier.fillMaxSize()
+    // Calculate prayer times in background to prevent blocking
+    // Recalculate when permissions are granted
+    LaunchedEffect(locationPermissionState.status) {
+        isLoading = true
+        calculatePrayerTimes()
+        isLoading = false
+    }
+    
+    // Handle pull-to-refresh
+    suspend fun onRefresh() {
+        isRefreshing = true
+        calculatePrayerTimes()
+        isRefreshing = false
+    }
+    
+    // PNG File Icon Design with App Theme
+    Card(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        LazyVerticalStaggeredGrid(
-            columns = StaggeredGridCells.Adaptive(300.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalItemSpacing = 24.dp,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp)
-        ) {
-            // Prayer times header card
-            item(span = StaggeredGridItemSpan.FullLine) {
-                PrayerTimesHeaderCard(
-                    location = location,
-                    date = getCurrentDate()
-                )
-            }
-            
-            if (isLoading) {
-                // Loading card
-                item(span = StaggeredGridItemSpan.FullLine) {
-                    PrayerTimesLoadingCard()
+        if (isLoading) {
+            // Loading state centered
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Loading Prayer Times...",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            } else {
-                // Prayer times cards
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Top section with preview area using app theme
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "🕌",
+                                style = MaterialTheme.typography.displayMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Prayer Times",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "📍 $location",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = "📅 ${getCurrentDate()}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+                
+                // Prayer times list
                 val times = prayerTimes
-                if (times != null) {
-                    // Dynamic prayer times
-                    item { PrayerTimeCard("Fajr", formatTime(times.fajr)) }
-                    item { PrayerTimeCard("Sunrise", formatTime(times.sunrise)) }
-                    item { PrayerTimeCard("Dhuhr", formatTime(times.dhuhr)) }
-                    item { PrayerTimeCard("Asr", formatTime(times.asr)) }
-                    item { PrayerTimeCard("Maghrib", formatTime(times.maghrib)) }
-                    item { PrayerTimeCard("Isha", formatTime(times.isha)) }
+                val prayers = if (times != null) {
+                    listOf(
+                        "Fajr" to formatTime(times.fajr),
+                        "Sunrise" to formatTime(times.sunrise),
+                        "Dhuhr" to formatTime(times.dhuhr),
+                        "Asr" to formatTime(times.asr),
+                        "Maghrib" to formatTime(times.maghrib),
+                        "Isha" to formatTime(times.isha)
+                    )
                 } else {
-                    // Fallback static times
-                    item { PrayerTimeCard("Fajr", "5:30 AM") }
-                    item { PrayerTimeCard("Sunrise", "6:45 AM") }
-                    item { PrayerTimeCard("Dhuhr", "12:15 PM") }
-                    item { PrayerTimeCard("Asr", "3:45 PM") }
-                    item { PrayerTimeCard("Maghrib", "6:30 PM") }
-                    item { PrayerTimeCard("Isha", "8:00 PM") }
+                    listOf(
+                        "Fajr" to "5:30 AM",
+                        "Sunrise" to "6:45 AM",
+                        "Dhuhr" to "12:15 PM",
+                        "Asr" to "3:45 PM",
+                        "Maghrib" to "6:30 PM",
+                        "Isha" to "8:00 PM"
+                    )
+                }
+                
+                prayers.forEach { (name, time) ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = time,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+                
+                // Bottom label
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "PRAYER",
+                        style = MaterialTheme.typography.displaySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
                 }
             }
         }
