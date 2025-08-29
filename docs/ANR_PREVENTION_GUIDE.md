@@ -66,7 +66,7 @@ The notification system is now **ENABLED** and optimized for ANR prevention:
 ## Files Modified
 
 ### Core Application
-- `DuaApplication.kt` - Background initialization, thread management
+- `SubmissionApplication.kt` - Background initialization, thread management
 - `MainActivity.kt` - Service lifecycle management
 - `AnrPreventionConfig.kt` - Centralized configuration
 
@@ -135,7 +135,7 @@ Look for these log tags:
 - `AnrPreventionConfig` - Configuration verification
 - `PrayerNotificationService` - Service lifecycle
 - `MainActivity` - Activity lifecycle
-- `DuaApplication` - Application initialization
+- `SubmissionApplication` - Application initialization
 
 ### 3. Performance Monitoring
 - Check service startup times
