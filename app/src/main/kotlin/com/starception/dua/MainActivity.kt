@@ -111,6 +111,9 @@ class MainActivity : FragmentActivity() {
 
     // ULTRA-MINIMAL: Remove ViewModel entirely - it's causing blocking during by viewModels()
     // private val viewModel: MainActivityViewModel by viewModels()
+    
+    // Permission manager for handling location and notification permissions
+    private lateinit var permissionManager: PermissionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.d("MainActivity", "ULTRA-MINIMAL onCreate - no ViewModel, no blocking operations")
@@ -120,6 +123,17 @@ class MainActivity : FragmentActivity() {
         
         // Basic edge to edge
         enableEdgeToEdge()
+
+        // Initialize permission manager in background to avoid blocking
+        lifecycleScope.launch {
+            delay(2000) // Wait longer for UI to be fully stable
+            try {
+                permissionManager = PermissionManager(this@MainActivity)
+                permissionManager.checkAndRequestLocationPermissions()
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error initializing permissions", e)
+            }
+        }
 
         // NON-BLOCKING: Load theme settings dynamically without ViewModel
         setContent {
@@ -133,15 +147,20 @@ class MainActivity : FragmentActivity() {
 
             // NON-BLOCKING: Access UserDataRepository via EntryPoint to get theme settings
             val userDataRepository = remember {
-                EntryPointAccessors.fromApplication(
-                    applicationContext,
-                    MainActivityEntryPoint::class.java
-                ).getUserDataRepository()
+                try {
+                    EntryPointAccessors.fromApplication(
+                        applicationContext,
+                        MainActivityEntryPoint::class.java
+                    ).getUserDataRepository()
+                } catch (e: Exception) {
+                    Log.w("MainActivity", "Failed to access UserDataRepository, using defaults", e)
+                    null
+                }
             }
             
-            val userData by userDataRepository.userData.collectAsStateWithLifecycle(
+            val userData by (userDataRepository?.userData?.collectAsStateWithLifecycle(
                 initialValue = null
-            )
+            ) ?: remember { mutableStateOf(null) })
 
             CompositionLocalProvider(
                 LocalAnalyticsHelper provides analyticsHelper,
@@ -168,6 +187,36 @@ class MainActivity : FragmentActivity() {
         }
         
         Log.d("MainActivity", "ULTRA-MINIMAL onCreate completed")
+    }
+    
+    /**
+     * Handle permission request results
+     */
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        
+        when (requestCode) {
+            PermissionManager.LOCATION_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }) {
+                    Log.d("MainActivity", "Location permissions granted")
+                    // Check if location services are enabled
+                    permissionManager.checkLocationServices()
+                } else {
+                    Log.d("MainActivity", "Location permissions denied")
+                }
+            }
+            PermissionManager.NOTIFICATION_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    Log.d("MainActivity", "Notification permission granted")
+                } else {
+                    Log.d("MainActivity", "Notification permission denied")
+                }
+            }
+        }
     }
 
     override fun onResume() {

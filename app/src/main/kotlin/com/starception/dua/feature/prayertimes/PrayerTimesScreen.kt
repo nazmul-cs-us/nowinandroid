@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.PermissionStatus.Denied
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.rememberPermissionState
 import com.starception.submission.core.designsystem.theme.NiaTheme
@@ -92,6 +93,21 @@ fun PrayerTimesScreen(
     var prayerTimes by remember { mutableStateOf<com.starception.submission.prayer.model.DayPrayerTimes?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var location by remember { mutableStateOf("Loading location...") }
+    
+    // Request notification permission for prayer alerts
+    val notificationPermissionState = rememberPermissionState(
+        permission = Manifest.permission.POST_NOTIFICATIONS
+    )
+    
+    // Request notification permission when screen opens (only on Android 13+)
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            val status = notificationPermissionState.status
+            if (status is Denied && !status.shouldShowRationale) {
+                notificationPermissionState.launchPermissionRequest()
+            }
+        }
+    }
     
     // Calculate prayer times in background to prevent blocking
     LaunchedEffect(Unit) {
