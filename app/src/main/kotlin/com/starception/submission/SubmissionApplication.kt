@@ -34,7 +34,7 @@ import com.starception.submission.services.PrayerNotificationService
 import com.starception.submission.util.PrayerNotificationManager
 
 /**
- * [Application] class for DUA
+ * [Application] class for Submission
  */
 @HiltAndroidApp
 class SubmissionApplication : Application(), ImageLoaderFactory {
@@ -45,7 +45,7 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
     lateinit var profileVerifierLogger: ProfileVerifierLogger
 
     override fun onCreate() {
-        Log.d("DuaApplication", "Application onCreate started")
+        Log.d("SubmissionApplication", "Application onCreate started")
         super.onCreate()
 
         // Verify ANR prevention configuration
@@ -70,9 +70,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                     PrayerNotificationManager.initialize(this)
                 }
                 
-                Log.d("DuaApplication", "Background initialization completed")
+                Log.d("SubmissionApplication", "Background initialization completed")
             } catch (e: Exception) {
-                Log.e("DuaApplication", "Error during background initialization", e)
+                Log.e("SubmissionApplication", "Error during background initialization", e)
             }
         }.apply {
             // Set thread priority to prevent blocking main thread
@@ -80,11 +80,11 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
             name = "AppInitThread"
         }.start()
         
-        Log.d("DuaApplication", "Application onCreate completed")
+        Log.d("SubmissionApplication", "Application onCreate completed")
         
         // DISABLE automatic service startup from Application to prevent service timeout ANR
         // Service will only be started from MainActivity.onResume() after user interaction
-        Log.d("DuaApplication", "Application initialized, service will start only from MainActivity")
+        Log.d("SubmissionApplication", "Application initialized, service will start only from MainActivity")
     }
     
     /**
@@ -95,9 +95,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
             // Stop any existing prayer notification service to prevent conflicts
             val intent = Intent(this, PrayerNotificationService::class.java)
             stopService(intent)
-            Log.d("DuaApplication", "Cleaned up existing service instances")
+            Log.d("SubmissionApplication", "Cleaned up existing service instances")
         } catch (e: Exception) {
-            Log.e("DuaApplication", "Error cleaning up existing services", e)
+            Log.e("SubmissionApplication", "Error cleaning up existing services", e)
         }
     }
 

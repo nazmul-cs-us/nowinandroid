@@ -56,8 +56,8 @@ This is a fully modularized Android app following official Android architecture 
 
 ### App-Specific Features
 - **Prayer Times** - Islamic prayer times calculator and display
-  - Located in `app/src/main/kotlin/com/starception/dua/feature/prayertimes/`
-  - Components: `PrayerTimesScreen.kt`, `app/src/main/kotlin/com/starception/dua/prayer/ui/PrayerTimesCard.kt`
+  - Located in `app/src/main/kotlin/com/starception/submission/feature/prayertimes/`
+  - Components: `PrayerTimesScreen.kt`, prayer time components and cards
   - Features: Location-based prayer times, notifications, settings integration
 
 ### App Module
@@ -90,7 +90,7 @@ This is a fully modularized Android app following official Android architecture 
 - No mocking libraries - all test doubles implement production interfaces
 
 ### Package Structure
-The app uses `com.starception.dua` as the base package (originally forked from Google's Now in Android sample).
+The app uses `com.starception.submission` as the base package (originally forked from Google's Now in Android sample).
 
 ### Important Files
 - `gradle/libs.versions.toml` - Centralized dependency management
