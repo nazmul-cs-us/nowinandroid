@@ -101,13 +101,11 @@ class MainActivity : FragmentActivity() {
     private lateinit var permissionManager: PermissionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        Log.d("MainActivity", "ULTRA-MINIMAL onCreate - no ViewModel, no blocking operations")
+        Log.d("MainActivity", "EMERGENCY FIX: Skip splash screen completely")
         
-        // ULTRA-MINIMAL: Absolute minimum onCreate
         super.onCreate(savedInstanceState)
         
-        // DISABLED: Remove edge to edge to prevent any blocking
-        // enableEdgeToEdge()
+        enableEdgeToEdge()
 
         // DISABLED: Remove all permission handling to prevent blocking
         // lifecycleScope.launch {
@@ -131,12 +129,26 @@ class MainActivity : FragmentActivity() {
         //     }
         // }
 
-        // STEP 2: Add back CompositionLocalProvider
+        // Initialize ViewModel for theme handling (but without splash screen blocking)
+        val viewModel: MainActivityViewModel by viewModels()
+        
         setContent {
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            val isSystemDarkTheme = resources.configuration.isSystemInDarkTheme
+            
             NiaTheme(
-                darkTheme = resources.configuration.isSystemInDarkTheme,
-                androidTheme = false,
-                disableDynamicTheming = true,
+                darkTheme = when (uiState) {
+                    is MainActivityUiState.Success -> uiState.shouldUseDarkTheme(isSystemDarkTheme)
+                    is MainActivityUiState.Loading -> isSystemDarkTheme
+                },
+                androidTheme = when (uiState) {
+                    is MainActivityUiState.Success -> uiState.shouldUseAndroidTheme
+                    is MainActivityUiState.Loading -> false
+                },
+                disableDynamicTheming = when (uiState) {
+                    is MainActivityUiState.Success -> uiState.shouldDisableDynamicTheming
+                    is MainActivityUiState.Loading -> true
+                },
             ) {
                 val appState = rememberNiaAppState(
                     networkMonitor = networkMonitor,
@@ -202,10 +214,16 @@ class MainActivity : FragmentActivity() {
             }
         }
         
-        // NON-BLOCKING: Start service in background after UI is stable
+        // SAFE: Start prayer service after longer delay to prevent ANR
         lifecycleScope.launch {
-            delay(1000) // Wait for UI to be fully loaded
-            startPrayerServiceIfNeeded()
+            delay(5000) // Wait 5 seconds for app to be fully stable
+            try {
+                Log.d("MainActivity", "Starting prayer service after delay")
+                startPrayerServiceIfNeeded()
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to start prayer service, continuing without it", e)
+                // Don't crash if service fails - just continue without notifications
+            }
         }
         
         Log.d("MainActivity", "NON-BLOCKING onResume completed")

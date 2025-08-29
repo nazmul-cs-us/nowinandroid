@@ -38,40 +38,32 @@ import javax.inject.Inject
 class MainActivityViewModel @Inject constructor(
     private val userDataRepository: UserDataRepository,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow<MainActivityUiState>(Loading)
+    // Start with default state but load real data immediately (no splash blocking)
+    private val _uiState = MutableStateFlow<MainActivityUiState>(Success(
+        UserData(
+            bookmarkedNewsResources = emptySet(),
+            viewedNewsResources = emptySet(),
+            followedTopics = emptySet(),
+            themeBrand = ThemeBrand.DEFAULT,
+            darkThemeConfig = DarkThemeConfig.FOLLOW_SYSTEM,
+            useDynamicColor = true,
+            shouldHideOnboarding = false,
+        )
+    ))
     val uiState: StateFlow<MainActivityUiState> = _uiState.asStateFlow()
     
     init {
-        // EMERGENCY FIX: Immediately set success state to prevent splash screen hanging
-        // Load data in background but don't block splash screen
-        _uiState.value = Success(
-            UserData(
-                bookmarkedNewsResources = emptySet(),
-                viewedNewsResources = emptySet(),
-                followedTopics = emptySet(),
-                themeBrand = ThemeBrand.DEFAULT,
-                darkThemeConfig = DarkThemeConfig.FOLLOW_SYSTEM,
-                useDynamicColor = true,
-                shouldHideOnboarding = false,
-            )
-        )
-        
-        // Load real user data in background after splash screen is dismissed
+        // Load user preferences in background WITHOUT blocking app startup
         viewModelScope.launch {
             try {
-                delay(2000) // Wait for app to fully initialize first
-                
-                withTimeoutOrNull(10000) { // 10 second timeout
-                    userDataRepository.userData.collect { userData ->
-                        _uiState.value = Success(userData)
-                        Log.d("MainActivityViewModel", "User data loaded successfully")
-                    }
-                } ?: run {
-                    Log.w("MainActivityViewModel", "Timeout loading user data, keeping defaults")
+                Log.d("MainActivityViewModel", "Loading user data for theme preferences")
+                userDataRepository.userData.collect { userData ->
+                    _uiState.value = Success(userData)
+                    Log.d("MainActivityViewModel", "Theme updated: ${userData.darkThemeConfig}")
                 }
             } catch (e: Exception) {
-                Log.e("MainActivityViewModel", "Error loading user data", e)
-                // Keep default data, don't crash
+                Log.e("MainActivityViewModel", "Error loading user data, keeping defaults", e)
+                // Keep default data on error
             }
         }
     }
