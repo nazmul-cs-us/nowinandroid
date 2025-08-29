@@ -72,6 +72,8 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
@@ -92,8 +94,8 @@ class MainActivity : FragmentActivity() {
     @Inject
     lateinit var userNewsResourceRepository: UserNewsResourceRepository
 
-    // ULTRA-MINIMAL: Remove ViewModel entirely - it's causing blocking during by viewModels()
-    // private val viewModel: MainActivityViewModel by viewModels()
+    // DISABLED: No ViewModel to prevent blocking
+    // private var viewModel: MainActivityViewModel? = null
     
     // Permission manager for handling location and notification permissions
     private lateinit var permissionManager: PermissionManager
@@ -104,38 +106,49 @@ class MainActivity : FragmentActivity() {
         // ULTRA-MINIMAL: Absolute minimum onCreate
         super.onCreate(savedInstanceState)
         
-        // Basic edge to edge
-        enableEdgeToEdge()
+        // DISABLED: Remove edge to edge to prevent any blocking
+        // enableEdgeToEdge()
 
-        // Initialize permission manager in background to avoid blocking
-        lifecycleScope.launch {
-            delay(2000) // Wait longer for UI to be fully stable
-            try {
-                permissionManager = PermissionManager(this@MainActivity)
-                permissionManager.checkAndRequestLocationPermissions()
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Error initializing permissions", e)
-            }
-        }
+        // DISABLED: Remove all permission handling to prevent blocking
+        // lifecycleScope.launch {
+        //     delay(2000)
+        //     try {
+        //         permissionManager = PermissionManager(this@MainActivity)
+        //         permissionManager.checkAndRequestLocationPermissions()
+        //     } catch (e: Exception) {
+        //         Log.e("MainActivity", "Error initializing permissions", e)
+        //     }
+        // }
+        
+        // DISABLED: No ViewModel initialization to prevent any blocking
+        // lifecycleScope.launch {
+        //     delay(3000)
+        //     try {
+        //         viewModel = viewModels<MainActivityViewModel>().value
+        //         Log.d("MainActivity", "ViewModel initialized for theme support")
+        //     } catch (e: Exception) {
+        //         Log.w("MainActivity", "ViewModel initialization failed, using static theme", e)
+        //     }
+        // }
 
-        // MINIMAL: Static theme settings to prevent any blocking
+        // STEP 2: Add back CompositionLocalProvider
         setContent {
-            val appState = rememberNiaAppState(
-                networkMonitor = networkMonitor,
-                userNewsResourceRepository = userNewsResourceRepository,
-                timeZoneMonitor = timeZoneMonitor,
-            )
-
-            val currentTimeZone by appState.currentTimeZone.collectAsStateWithLifecycle()
-
-            CompositionLocalProvider(
-                LocalAnalyticsHelper provides analyticsHelper,
-                LocalTimeZone provides currentTimeZone,
+            NiaTheme(
+                darkTheme = resources.configuration.isSystemInDarkTheme,
+                androidTheme = false,
+                disableDynamicTheming = true,
             ) {
-                NiaTheme(
-                    darkTheme = resources.configuration.isSystemInDarkTheme,
-                    androidTheme = false,
-                    disableDynamicTheming = true,
+                val appState = rememberNiaAppState(
+                    networkMonitor = networkMonitor,
+                    userNewsResourceRepository = userNewsResourceRepository,
+                    timeZoneMonitor = timeZoneMonitor,
+                )
+                
+                val currentTimeZone by appState.currentTimeZone.collectAsStateWithLifecycle()
+
+                CompositionLocalProvider(
+                    LocalAnalyticsHelper provides analyticsHelper,
+                    LocalTimeZone provides currentTimeZone,
                 ) {
                     NiaApp(appState)
                 }
@@ -145,6 +158,7 @@ class MainActivity : FragmentActivity() {
         Log.d("MainActivity", "ULTRA-MINIMAL onCreate completed")
     }
     
+    // REMOVED: Helper function not needed for minimal version
     /**
      * Handle permission request results
      */
