@@ -3,45 +3,42 @@ package com.starception.submission.feature.prayertimes
 import android.Manifest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.sp
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus.Denied
 import com.google.accompanist.permissions.rememberPermissionState
-import com.starception.submission.feature.prayertimes.components.PrayerTimesHeaderCard
-import com.starception.submission.feature.prayertimes.components.PrayerTimesLoadingCard
-import com.starception.submission.feature.prayertimes.components.PrayerTimeCard
 import com.starception.submission.feature.prayertimes.utils.getCurrentDate
 import com.starception.submission.feature.prayertimes.utils.formatTime
 import com.starception.submission.feature.prayertimes.data.PrayerTimesCalculator
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.time.Duration
 
 /**
- * Prayer Times screen showing daily prayer schedule
+ * Beautiful Prayer Times screen using Material 3 expressive design
  * Settings are accessed via the main app's context-aware settings button
  */
-@OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun PrayerTimesScreen(
     modifier: Modifier = Modifier,
@@ -50,9 +47,9 @@ fun PrayerTimesScreen(
     var prayerTimes by remember { mutableStateOf<com.starception.submission.prayer.model.DayPrayerTimes?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var location by remember { mutableStateOf("Loading location...") }
-    var isRefreshing by remember { mutableStateOf(false) }
-    val pullToRefreshState = rememberPullToRefreshState()
-    val coroutineScope = rememberCoroutineScope()
+    
+    // Live update state
+    var currentTime by remember { mutableStateOf(LocalTime.now()) }
     
     // Request notification permission for prayer alerts
     val notificationPermissionState = rememberPermissionState(
@@ -81,6 +78,14 @@ fun PrayerTimesScreen(
         }
     }
     
+    // Live time updates every minute
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentTime = LocalTime.now()
+            kotlinx.coroutines.delay(60000) // Update every minute
+        }
+    }
+    
     // Function to calculate prayer times
     suspend fun calculatePrayerTimes() {
         try {
@@ -104,34 +109,114 @@ fun PrayerTimesScreen(
         isLoading = false
     }
     
-    // Handle pull-to-refresh
-    suspend fun onRefresh() {
-        isRefreshing = true
-        calculatePrayerTimes()
-        isRefreshing = false
+    // Get next prayer and current prayer
+    fun getNextPrayer(): Pair<String, LocalTime>? {
+        val times = prayerTimes ?: return null
+        
+        val prayers = listOf(
+            "Fajr" to times.fajr,
+            "Dhuhr" to times.dhuhr,
+            "Asr" to times.asr,
+            "Maghrib" to times.maghrib,
+            "Isha" to times.isha
+        )
+        
+        // Find next prayer today
+        val nextPrayer = prayers.find { it.second.isAfter(currentTime) }
+        return nextPrayer ?: prayers.first() // If no prayers left today, return Fajr (tomorrow)
     }
     
-    // PNG File Icon Design with App Theme
-    Card(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    fun getCurrentPrayer(): Pair<String, LocalTime>? {
+        val times = prayerTimes ?: return null
+        
+        val prayers = listOf(
+            "Fajr" to times.fajr,
+            "Dhuhr" to times.dhuhr,
+            "Asr" to times.asr,
+            "Maghrib" to times.maghrib,
+            "Isha" to times.isha
+        )
+        
+        // Find current prayer (the one we're in the time window for)
+        for (i in prayers.indices) {
+            val prayer = prayers[i]
+            val nextPrayer = if (i < prayers.size - 1) prayers[i + 1] else null
+            
+            if (nextPrayer != null) {
+                if (currentTime.isAfter(prayer.second) && currentTime.isBefore(nextPrayer.second)) {
+                    return prayer
+                }
+            } else {
+                // For Isha, check if we're within 2 hours after it starts
+                if (currentTime.isAfter(prayer.second) && currentTime.isBefore(prayer.second.plusHours(2))) {
+                    return prayer
+                }
+            }
+        }
+        return null
+    }
+    
+    // Calculate time until next prayer
+    fun getTimeUntilNextPrayer(): String {
+        val nextPrayer = getNextPrayer() ?: return "2:30 till Dhuhr"
+        
+        val duration = Duration.between(currentTime, nextPrayer.second)
+        val hours = duration.toHours()
+        val minutes = duration.toMinutesPart()
+        
+        return when {
+            hours > 0 -> "${hours}:${String.format("%02d", minutes)} till ${nextPrayer.first}"
+            minutes > 0 -> "${minutes}m till ${nextPrayer.first}"
+            else -> "Now"
+        }
+    }
+    
+    // Get prayer status
+    fun getPrayerStatus(prayerName: String): String {
+        val nextPrayer = getNextPrayer()
+        val currentPrayer = getCurrentPrayer()
+        
+        return when {
+            currentPrayer?.first == prayerName -> "Current"
+            nextPrayer?.first == prayerName -> "Next"
+            else -> "Upcoming"
+        }
+    }
+    
+    // Get prayer time display
+    fun getPrayerTimeDisplay(prayerName: String): String {
+        val times = prayerTimes ?: return "00:00 AM"
+        
+        val time = when (prayerName) {
+            "Fajr" -> times.fajr
+            "Dhuhr" -> times.dhuhr
+            "Asr" -> times.asr
+            "Maghrib" -> times.maghrib
+            "Isha" -> times.isha
+            else -> times.fajr
+        }
+        
+        return time.format(DateTimeFormatter.ofPattern("hh:mm a"))
+    }
+    
+    // Use the app's standard background for consistency
+    Box(
+        modifier = modifier.fillMaxSize()
     ) {
         if (isLoading) {
-            // Loading state centered
+            // Loading state with Material 3 design
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
                     CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(56.dp),
+                        strokeWidth = 4.dp
                     )
                     Text(
                         text = "Loading Prayer Times...",
@@ -144,105 +229,461 @@ fun PrayerTimesScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Top section with preview area using app theme
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                ) {
+                // Header using Material 3 expressive typography
+                Text(
+                    text = "Daily Prayers",
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // Main prayer section - shows next prayer or current prayer with expressive shape
+                val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
+                if (mainPrayer != null) {
+                    // Layered background effect with expressive asymmetrical shape
                     Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                    ) {
+                        // Background cream layer (peeking through) - positioned behind
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .offset(x = 8.dp, y = 8.dp)
+                                .zIndex(0f),
+                            shape = RoundedCornerShape(
+                                topStart = 32.dp,    // Large rounded corner
+                                topEnd = 16.dp,      // Smaller rounded corner
+                                bottomStart = 16.dp,  // Smaller rounded corner
+                                bottomEnd = 32.dp     // Large rounded corner
+                            ),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shadowElevation = 4.dp
+                        ) {}
+                        
+                        // Main prayer card with expressive asymmetrical shape - positioned on top
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .zIndex(1f),
+                            shape = RoundedCornerShape(
+                                topStart = 40.dp,    // Very large rounded corner (organic)
+                                topEnd = 20.dp,      // Smaller rounded corner
+                                bottomStart = 20.dp,  // Smaller rounded corner
+                                bottomEnd = 40.dp     // Very large rounded corner (organic)
+                            ),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shadowElevation = 12.dp
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // Left side - Prayer info
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    // Prayer name and status
+                                    Column {
+                                        Text(
+                                            text = mainPrayer.first,
+                                            style = MaterialTheme.typography.headlineMedium,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = getPrayerStatus(mainPrayer.first),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                    
+                                    // Prayer time
+                                    Text(
+                                        text = getPrayerTimeDisplay(mainPrayer.first),
+                                        style = MaterialTheme.typography.displaySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    
+                                    // Additional info for Fajr
+                                    if (mainPrayer.first == "Fajr") {
+                                        Column(
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                text = "Sunrise: ${prayerTimes?.sunrise?.format(DateTimeFormatter.ofPattern("hh:mm a")) ?: "06:30 AM"}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            )
+                                            Text(
+                                                text = "Iqamah: ${prayerTimes?.fajr?.plusMinutes(20)?.format(DateTimeFormatter.ofPattern("hh:mm a")) ?: "05:35 AM"}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            )
+                                        }
+                                    }
+                                }
+                                
+                                // Right side - Status and countdown
+                                Column(
+                                    horizontalAlignment = Alignment.End,
+                                    verticalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    // Status indicator using Material 3 design
+                                    Surface(
+                                        modifier = Modifier.size(40.dp),
+                                        shape = CircleShape,
+                                        color = when (getPrayerStatus(mainPrayer.first)) {
+                                            "Current" -> MaterialTheme.colorScheme.tertiary
+                                            "Next" -> MaterialTheme.colorScheme.primary
+                                            else -> MaterialTheme.colorScheme.outline
+                                        },
+                                        shadowElevation = 4.dp
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            val icon = when (getPrayerStatus(mainPrayer.first)) {
+                                                "Current" -> Icons.Filled.RadioButtonUnchecked
+                                                "Next" -> Icons.Filled.RadioButtonUnchecked
+                                                else -> Icons.Filled.Check
+                                            }
+                                            Icon(
+                                                imageVector = icon,
+                                                contentDescription = getPrayerStatus(mainPrayer.first),
+                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+                                    }
+                                    
+                                    // Countdown timer with Material 3 design
+                                    Surface(
+                                        modifier = Modifier.size(88.dp),
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        shadowElevation = 6.dp
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            // Progress indicator
+                                            CircularProgressIndicator(
+                                                progress = { 0.7f },
+                                                modifier = Modifier.size(80.dp),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                strokeWidth = 4.dp
+                                            )
+                                            
+                                            // Timer text
+                                            Text(
+                                                text = getTimeUntilNextPrayer(),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.padding(8.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Other prayer times using Material 3 design
+                // First row: Dhuhr and Asr
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Dhuhr prayer
+                    ElevatedCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(120.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = when (getPrayerStatus("Dhuhr")) {
+                                "Current" -> MaterialTheme.colorScheme.tertiaryContainer
+                                "Next" -> MaterialTheme.colorScheme.primaryContainer
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            }
+                        ),
+                        elevation = CardDefaults.elevatedCardElevation(
+                            defaultElevation = 4.dp
+                        )
                     ) {
                         Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
                         ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text(
+                                    text = "Dhuhr",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = when (getPrayerStatus("Dhuhr")) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    fontWeight = FontWeight.Medium
+                                )
+                                // Status indicator
+                                Surface(
+                                    modifier = Modifier.size(20.dp),
+                                    shape = CircleShape,
+                                    color = when (getPrayerStatus("Dhuhr")) {
+                                        "Current" -> MaterialTheme.colorScheme.tertiary
+                                        "Next" -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.outline
+                                    }
+                                ) {}
+                            }
                             Text(
-                                text = "🕌",
-                                style = MaterialTheme.typography.displayMedium
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Prayer Times",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                text = getPrayerTimeDisplay("Dhuhr"),
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = when (getPrayerStatus("Dhuhr")) {
+                                    "Current" -> MaterialTheme.colorScheme.tertiary
+                                    "Next" -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                                 fontWeight = FontWeight.Bold
                             )
+                        }
+                    }
+                    
+                    // Asr prayer
+                    ElevatedCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(120.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = when (getPrayerStatus("Asr")) {
+                                "Current" -> MaterialTheme.colorScheme.tertiaryContainer
+                                "Next" -> MaterialTheme.colorScheme.primaryContainer
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            }
+                        ),
+                        elevation = CardDefaults.elevatedCardElevation(
+                            defaultElevation = 4.dp
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text(
+                                    text = "Asr",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = when (getPrayerStatus("Asr")) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    fontWeight = FontWeight.Medium
+                                )
+                                // Status indicator
+                                Surface(
+                                    modifier = Modifier.size(20.dp),
+                                    shape = CircleShape,
+                                    color = when (getPrayerStatus("Asr")) {
+                                        "Current" -> MaterialTheme.colorScheme.tertiary
+                                        "Next" -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.outline
+                                    }
+                                ) {}
+                            }
                             Text(
-                                text = "📍 $location",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = "📅 ${getCurrentDate()}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                text = getPrayerTimeDisplay("Asr"),
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = when (getPrayerStatus("Asr")) {
+                                    "Current" -> MaterialTheme.colorScheme.tertiary
+                                    "Next" -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 }
                 
-                // Prayer times list
-                val times = prayerTimes
-                val prayers = if (times != null) {
-                    listOf(
-                        "Fajr" to formatTime(times.fajr),
-                        "Sunrise" to formatTime(times.sunrise),
-                        "Dhuhr" to formatTime(times.dhuhr),
-                        "Asr" to formatTime(times.asr),
-                        "Maghrib" to formatTime(times.maghrib),
-                        "Isha" to formatTime(times.isha)
-                    )
-                } else {
-                    listOf(
-                        "Fajr" to "5:30 AM",
-                        "Sunrise" to "6:45 AM",
-                        "Dhuhr" to "12:15 PM",
-                        "Asr" to "3:45 PM",
-                        "Maghrib" to "6:30 PM",
-                        "Isha" to "8:00 PM"
-                    )
-                }
-                
-                prayers.forEach { (name, time) ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                // Second row: Maghrib and Isha
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Maghrib prayer
+                    ElevatedCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(120.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = when (getPrayerStatus("Maghrib")) {
+                                "Current" -> MaterialTheme.colorScheme.tertiaryContainer
+                                "Next" -> MaterialTheme.colorScheme.primaryContainer
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            }
+                        ),
+                        elevation = CardDefaults.elevatedCardElevation(
+                            defaultElevation = 4.dp
+                        )
                     ) {
-                        Text(
-                            text = name,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Medium
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text(
+                                    text = "Maghrib",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = when (getPrayerStatus("Maghrib")) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    fontWeight = FontWeight.Medium
+                                )
+                                // Status indicator
+                                Surface(
+                                    modifier = Modifier.size(20.dp),
+                                    shape = CircleShape,
+                                    color = when (getPrayerStatus("Maghrib")) {
+                                        "Current" -> MaterialTheme.colorScheme.tertiary
+                                        "Next" -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.outline
+                                    }
+                                ) {}
+                            }
+                            Text(
+                                text = getPrayerTimeDisplay("Maghrib"),
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = when (getPrayerStatus("Maghrib")) {
+                                    "Current" -> MaterialTheme.colorScheme.tertiary
+                                    "Next" -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    
+                    // Isha prayer
+                    ElevatedCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(120.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = when (getPrayerStatus("Isha")) {
+                                "Current" -> MaterialTheme.colorScheme.tertiaryContainer
+                                "Next" -> MaterialTheme.colorScheme.primaryContainer
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            }
+                        ),
+                        elevation = CardDefaults.elevatedCardElevation(
+                            defaultElevation = 4.dp
                         )
-                        Text(
-                            text = time,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text(
+                                    text = "Isha",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = when (getPrayerStatus("Isha")) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    fontWeight = FontWeight.Medium
+                                )
+                                // Status indicator
+                                Surface(
+                                    modifier = Modifier.size(20.dp),
+                                    shape = CircleShape,
+                                    color = when (getPrayerStatus("Isha")) {
+                                        "Current" -> MaterialTheme.colorScheme.tertiary
+                                        "Next" -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.outline
+                                    }
+                                ) {}
+                            }
+                            Text(
+                                text = getPrayerTimeDisplay("Isha"),
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = when (getPrayerStatus("Isha")) {
+                                    "Current" -> MaterialTheme.colorScheme.tertiary
+                                    "Next" -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
                 
-                // Bottom label
-                Box(
+                // Location info using Material 3 design
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
-                    Text(
-                        text = "PRAYER",
-                        style = MaterialTheme.typography.displaySmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    )
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.LocationOn,
+                            contentDescription = "Location",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = location,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }

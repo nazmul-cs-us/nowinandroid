@@ -296,7 +296,9 @@ class PrayerNotificationService : Service() {
             val settings = prayerSettingsRepository.getSettings()
             val location = settings.location
             
+            // If no location is set, return null (will use fallback notification)
             if (location == null) {
+                Log.w(TAG, "No location set, returning null for fallback notification")
                 return null
             }
             
@@ -305,6 +307,7 @@ class PrayerNotificationService : Service() {
             val prayerTimes = prayerTimeCalculatorService.calculatePrayerTimes(today, location, settings)
             
             if (prayerTimes == null) {
+                Log.w(TAG, "Failed to calculate prayer times for location: ${location.getDisplayName()}, returning null for fallback")
                 return null
             }
             
@@ -340,9 +343,11 @@ class PrayerNotificationService : Service() {
             
         } catch (e: Exception) {
             Log.e(TAG, "Error getting current prayer data", e)
-            null
+            return null
         }
     }
+    
+
     
     /**
      * Calculate prayer time progress and phase
@@ -630,6 +635,8 @@ class PrayerNotificationService : Service() {
             0
         }
     }
+    
+
     
     override fun onDestroy() {
         Log.d(TAG, "Prayer notification service destroy started")
