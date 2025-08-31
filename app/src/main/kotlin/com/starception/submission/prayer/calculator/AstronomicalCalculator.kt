@@ -9,19 +9,64 @@ import javax.inject.Singleton
 import kotlin.math.*
 
 /**
- * Astronomical calculations for prayer times based on sun position
+ * ASTRONOMICAL CALCULATOR: Precise sun position calculations for Islamic prayer times
+ * 
+ * This class performs the complex astronomical calculations needed to determine
+ * exact prayer times based on the sun's position relative to Earth.
+ * 
+ * CORE CALCULATIONS:
+ * - Julian Day conversions for astronomical precision
+ * - Sun declination and equation of time
+ * - Hour angle calculations for specific sun elevations
+ * - Atmospheric refraction corrections
+ * - Geographic coordinate transformations
+ * 
+ * PRAYER TIME ASTRONOMY:
+ * - Fajr: Sun 18° below horizon (dawn)
+ * - Sunrise: Sun crosses horizon with refraction correction
+ * - Dhuhr: Sun reaches maximum elevation (solar noon)
+ * - Asr: Shadow length equals object height + noon shadow
+ * - Maghrib: Sun sets below horizon
+ * - Isha: Sun 17° below horizon (dusk)
+ * 
+ * ACCURACY:
+ * - Uses precise astronomical algorithms
+ * - Accounts for Earth's elliptical orbit
+ * - Includes atmospheric refraction
+ * - Handles high latitude adjustments
+ * 
+ * EDIT THIS TO:
+ * - Add more calculation methods
+ * - Modify astronomical constants
+ * - Include advanced atmospheric models
  */
 @Singleton
 class AstronomicalCalculator @Inject constructor() {
     
     companion object {
         private const val TAG = "AstronomicalCalculator"
-        private const val JULIAN_EPOCH = 1721425.5
-        private const val EARTH_RADIUS_KM = 6371.0
+        
+        // ASTRONOMICAL CONSTANTS - Edit these to adjust calculation precision
+        private const val JULIAN_EPOCH = 1721425.5    // Julian Day epoch reference
+        private const val EARTH_RADIUS_KM = 6371.0    // Earth's mean radius in kilometers
     }
     
     /**
-     * Calculates Julian Day from given date
+     * JULIAN DAY CALCULATOR: Converts calendar date to astronomical Julian Day
+     * 
+     * Julian Days provide a continuous count of days since January 1, 4713 BCE,
+     * essential for accurate astronomical calculations.
+     * 
+     * FEATURES:
+     * - Handles Gregorian calendar corrections
+     * - Accounts for leap years automatically  
+     * - Includes time-of-day precision
+     * - Uses standard astronomical algorithms
+     * 
+     * EDIT THIS TO:
+     * - Add validation for date ranges
+     * - Include Julian/Gregorian calendar transition
+     * - Add support for different calendar systems
      */
     fun calculateJulianDay(date: LocalDate, time: LocalTime = LocalTime.MIDNIGHT): Double {
         var year = date.year
@@ -31,20 +76,25 @@ class AstronomicalCalculator @Inject constructor() {
         val minute = time.minute.toDouble()
         val second = time.second.toDouble()
         
-        // Adjust for January and February being months 13 and 14 of the previous year
+        // CALENDAR ADJUSTMENT: January and February are treated as months 13 and 14 of the previous year
+        // This simplifies the leap year calculation in the Julian Day formula
         if (month <= 2) {
             year -= 1
             month += 12
         }
         
+        // Convert time to Universal Time fraction of day
         val ut = hour + minute / 60.0 + second / 3600.0
         
-        // More precise Julian Day calculation
-        val a = floor(year / 100.0)
-        val b = 2 - a + floor(a / 4.0) // Gregorian calendar correction
+        // JULIAN DAY CALCULATION with Gregorian calendar correction
+        val a = floor(year / 100.0)              // Century
+        val b = 2 - a + floor(a / 4.0)           // Gregorian calendar correction for leap years
         
-        return floor(365.25 * (year + 4716)) + floor(30.6001 * (month + 1)) + 
-               day + b - 1524.5 + ut / 24.0
+        // Standard astronomical Julian Day formula
+        return floor(365.25 * (year + 4716)) +    // Years since epoch
+               floor(30.6001 * (month + 1)) +     // Months adjustment
+               day + b - 1524.5 +                  // Days and epoch offset
+               ut / 24.0                          // Time fraction
     }
     
     /**

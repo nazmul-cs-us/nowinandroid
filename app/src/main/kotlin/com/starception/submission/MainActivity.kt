@@ -75,29 +75,56 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 
+/**
+ * MAIN ACTIVITY: Entry point for the Islamic prayer times app
+ * 
+ * This activity serves as the foundation for the entire application, handling:
+ * 
+ * CURRENT STATE (Emergency Fix Mode):
+ * - Simplified startup to prevent ANR (Application Not Responding)
+ * - Lazy injection to avoid main thread blocking
+ * - Disabled splash screen for faster startup
+ * - Minimal permission handling
+ * 
+ * APP COORDINATION:
+ * - Hosts the main Compose UI with NiaApp
+ * - Manages system services (analytics, network monitoring)
+ * - Handles theme and edge-to-edge display
+ * 
+ * PRAYER FEATURES:
+ * - Initializes prayer notification service
+ * - Manages location and notification permissions
+ * - Coordinates between prayer times and main app
+ * 
+ * EDIT THIS TO:
+ * - Re-enable features after fixing performance issues
+ * - Add new initialization steps
+ * - Modify service startup sequence
+ */
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
-    // NON-BLOCKING FIX: Use lazy injection to prevent main thread blocking
+    // LAZY DEPENDENCY INJECTION - Prevents main thread blocking during startup
     @Inject
-    lateinit var lazyStats: dagger.Lazy<JankStats>
+    lateinit var lazyStats: dagger.Lazy<JankStats>        // Performance monitoring (lazy loaded)
 
     @Inject
-    lateinit var networkMonitor: NetworkMonitor
+    lateinit var networkMonitor: NetworkMonitor           // Internet connectivity monitoring
 
     @Inject
-    lateinit var timeZoneMonitor: TimeZoneMonitor
+    lateinit var timeZoneMonitor: TimeZoneMonitor        // System timezone change detection
 
     @Inject
-    lateinit var analyticsHelper: AnalyticsHelper
+    lateinit var analyticsHelper: AnalyticsHelper        // App usage analytics
 
     @Inject
-    lateinit var userNewsResourceRepository: UserNewsResourceRepository
+    lateinit var userNewsResourceRepository: UserNewsResourceRepository  // News data access
 
-    // DISABLED: No ViewModel to prevent blocking
+    // EMERGENCY FIX: ViewModel disabled to prevent main thread blocking
+    // TODO: Re-enable after fixing performance issues
     // private var viewModel: MainActivityViewModel? = null
     
-    // Permission manager for handling location and notification permissions
+    // PERMISSION MANAGEMENT - Handles location and notification permissions for prayer features
     private lateinit var permissionManager: PermissionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -105,14 +132,16 @@ class MainActivity : FragmentActivity() {
         
         super.onCreate(savedInstanceState)
         
+        // EDGE-TO-EDGE DISPLAY - Modern Android UI extending behind system bars
         enableEdgeToEdge()
 
-        // DISABLED: Remove all permission handling to prevent blocking
+        // PERMISSION HANDLING (Currently disabled for performance)
+        // TODO: Re-enable after optimizing to prevent ANR
         // lifecycleScope.launch {
-        //     delay(2000)
+        //     delay(2000)  // Wait 2 seconds before requesting permissions
         //     try {
         //         permissionManager = PermissionManager(this@MainActivity)
-        //         permissionManager.checkAndRequestLocationPermissions()
+        //         permissionManager.checkAndRequestLocationPermissions()  // For accurate prayer times
         //     } catch (e: Exception) {
         //         Log.e("MainActivity", "Error initializing permissions", e)
         //     }

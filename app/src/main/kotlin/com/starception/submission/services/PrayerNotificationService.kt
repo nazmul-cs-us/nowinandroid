@@ -47,8 +47,10 @@ class PrayerNotificationService : Service() {
     
     companion object {
         private const val TAG = "PrayerNotificationService"
+        
+        // NOTIFICATION CONFIGURATION - Edit these to change notification behavior
         private const val NOTIFICATION_CHANNEL_ID = "prayer_live_update_channel"
-        private const val NOTIFICATION_ID = 1001
+        private const val NOTIFICATION_ID = 1001  // Single ID ensures updates replace previous notifications
         
         // Check if service is running in another process
         fun isServiceRunningInAnotherProcess(context: android.content.Context): Boolean {
@@ -155,7 +157,19 @@ class PrayerNotificationService : Service() {
     }
     
     /**
-     * Initialize background prayer notification updates after foreground service is started
+     * MAIN FEATURE: Initialize background prayer notification updates
+     * 
+     * This is the core function that starts the prayer tracking system.
+     * 
+     * KEY FEATURES:
+     * - Checks for Android 16+ Live Update support
+     * - Starts the main prayer time update loop
+     * - Handles service initialization errors gracefully
+     * 
+     * EDIT THIS SECTION TO:
+     * - Change Live Update detection logic
+     * - Modify initialization behavior
+     * - Add new notification features
      */
     private fun startRealPrayerTimeUpdates() {
         serviceScope.launch {
@@ -181,12 +195,26 @@ class PrayerNotificationService : Service() {
     }
     
     /**
-     * Start simplified prayer time updates
+     * CORE UPDATE LOOP: The heart of the prayer notification system
+     * 
+     * This function runs continuously to update prayer notifications.
+     * 
+     * SAFETY FEATURES:
+     * - Auto-stops after 24 hours to prevent battery drain
+     * - Limits to 60 updates maximum
+     * - Smart timing: 1-minute updates for notifications, 6-minute for always-on display
+     * 
+     * EDIT THESE VALUES TO:
+     * - Change service runtime limit (maxServiceTime)
+     * - Adjust maximum update count (maxUpdates) 
+     * - Modify update intervals in AnrPreventionConfig
      */
     private suspend fun startPrayerTimeUpdateLoop() {
         val startTime = System.currentTimeMillis()
-        val maxServiceTime = 24 * 60 * 60 * 1000L // 24 hours max
-        val maxUpdates = 60 // Max 60 updates
+        
+        // CONFIGURABLE LIMITS - Edit these values to change service behavior
+        val maxServiceTime = 24 * 60 * 60 * 1000L // 24 hours max - prevents battery drain
+        val maxUpdates = 60 // Max 60 updates - prevents excessive notifications
         var updateCount = 0
         
         try {
@@ -211,8 +239,15 @@ class PrayerNotificationService : Service() {
                     }
                 }
                 
-                // Smart update strategy: 1-minute updates for notification content, 6-minute updates for always-on display
-                // This prevents color flashing on always-on display while keeping notifications battery-efficient
+                // SMART UPDATE STRATEGY - Edit this logic to change update timing
+                // 
+                // CURRENT BEHAVIOR:
+                // - Every 1 minute: Update notification content (battery efficient)
+                // - Every 6 minutes: Update always-on display (prevents color flashing)
+                // 
+                // EDIT THIS TO:
+                // - Change update frequencies by modifying the modulo operation (updateCount % 6)
+                // - Adjust intervals in AnrPreventionConfig class
                 val updateInterval = if (updateCount % 6 == 0) {
                     // Every 6th update (6 minutes), update the always-on display content
                     AnrPreventionConfig.ALWAYS_ON_DISPLAY_UPDATE_INTERVAL_MS
@@ -237,11 +272,25 @@ class PrayerNotificationService : Service() {
     }
     
     /**
-     * Update prayer notification with real prayer data
+     * NOTIFICATION UPDATE ENGINE: Updates the notification with current prayer data
+     * 
+     * This is where the actual prayer information gets calculated and displayed.
+     * 
+     * KEY PROCESSES:
+     * 1. Gets current prayer data (which prayer is active, time remaining, etc.)
+     * 2. Calculates progress percentage for progress bar
+     * 3. Determines prayer phase (Go to Mosque/Best Time/Make Time)
+     * 4. Uses smart notification system (only alerts on phase changes)
+     * 
+     * EDIT THIS SECTION TO:
+     * - Change how prayer data is calculated
+     * - Modify notification content format
+     * - Adjust smart notification behavior
+     * - Add new notification features
      */
     private suspend fun updatePrayerNotificationWithRealData() {
         try {
-            // Ensure PrayerNotificationManager is initialized before use
+            // SAFETY CHECK - Ensure notification manager is ready
             if (!PrayerNotificationManager.isInitialized()) {
                 PrayerNotificationManager.initialize(applicationContext)
             }
@@ -257,15 +306,23 @@ class PrayerNotificationService : Service() {
                 // Get current prayer phase for smart notifications
                 val currentPhase = getCurrentPrayerPhase(progress)
                 
-                // Use smart notification system - only alert on phase changes
+                // SMART NOTIFICATION SYSTEM - Only alerts when prayer phase changes
+                // 
+                // BEHAVIOR:
+                // - Silent updates when in same phase (no sound/vibration)
+                // - Alert with sound/vibration when phase changes
+                // - Phases: Go to Mosque (0-20min) → Best Time (20min-halfway) → Make Time (halfway+)
+                // 
+                // EDIT updatePrayerProgressSmart() in PrayerNotificationManager to change this behavior
                 PrayerNotificationManager.updatePrayerProgressSmart(
                     prayerName = if (content.contains(" since ")) {
+                        // Extract prayer name from content (e.g., "15 minutes since Dhuhr" → "Dhuhr")
                         content.split(" since ").lastOrNull()?.split(" • ")?.firstOrNull() ?: "Prayer"
                     } else {
                         "Prayer"
                     },
                     progress = progress,
-                    previousPhase = previousPrayerPhase,
+                    previousPhase = previousPrayerPhase, // Used to detect phase changes
                     title = title,
                     content = content,
                     detailedMessage = detailedMessage
@@ -350,7 +407,19 @@ class PrayerNotificationService : Service() {
 
     
     /**
-     * Calculate prayer time progress and phase
+     * PRAYER PROGRESS CALCULATOR: Determines how far through a prayer time we are
+     * 
+     * This calculates the progress percentage and determines which phase we're in.
+     * 
+     * PHASES EXPLAINED:
+     * - GO_TO_MOSQUE (0-20 minutes): Time to prepare and go to mosque
+     * - BEST_TIME (20 minutes to halfway): Optimal time for prayer
+     * - MAKE_TIME (halfway to end): Ensure you make time for prayer
+     * 
+     * EDIT THESE VALUES TO:
+     * - Change phase durations (currently 20 minutes for first phase)
+     * - Modify phase logic
+     * - Adjust progress calculation
      */
     private fun calculatePrayerProgress(currentPrayer: PrayerTime, nextPrayer: PrayerTime?): PrayerProgress {
         val now = LocalTime.now()
@@ -396,10 +465,11 @@ class PrayerNotificationService : Service() {
         val totalDuration = Duration.between(prayerStart, prayerEnd).toMinutes()
         val remainingMinutes = Duration.between(now, prayerEnd).toMinutes()
         
+        // PHASE DETERMINATION - Edit these conditions to change when phases switch
         val progressPhase = when {
-            elapsedMinutes < 20 -> PrayerPhase.GO_TO_MOSQUE
-            elapsedMinutes < (totalDuration / 2) -> PrayerPhase.BEST_TIME
-            else -> PrayerPhase.MAKE_TIME
+            elapsedMinutes < 20 -> PrayerPhase.GO_TO_MOSQUE    // First 20 minutes: Go to mosque
+            elapsedMinutes < (totalDuration / 2) -> PrayerPhase.BEST_TIME    // 20min to halfway: Best time
+            else -> PrayerPhase.MAKE_TIME    // Halfway to end: Make time
         }
         
         val progressPercentage = (elapsedMinutes.toFloat() / totalDuration.toFloat() * 100).coerceIn(0f, 100f)
@@ -466,10 +536,20 @@ class PrayerNotificationService : Service() {
         val phase: PrayerPhase
     )
     
+    /**
+     * PRAYER PHASES: The three stages of prayer time
+     * 
+     * These phases determine the notification message and color.
+     * 
+     * EDIT THESE TO:
+     * - Add new phases
+     * - Change phase names
+     * - Modify phase behavior in calculatePrayerProgress()
+     */
     private enum class PrayerPhase {
-        GO_TO_MOSQUE,    // 0-20 minutes: Go to mosque
-        BEST_TIME,       // 20+ minutes to halfway: Best time for prayer
-        MAKE_TIME        // Halfway+: Make time for prayer
+        GO_TO_MOSQUE,    // 0-20 minutes: Go to mosque (Blue color in progress bar)
+        BEST_TIME,       // 20+ minutes to halfway: Best time for prayer (Green color)
+        MAKE_TIME        // Halfway+: Make time for prayer (Yellow color)
     }
     
     /**

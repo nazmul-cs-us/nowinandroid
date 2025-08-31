@@ -22,14 +22,39 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Repository for managing prayer settings and preferences
+ * PRAYER SETTINGS REPOSITORY: Persistent storage for user preferences and prayer data
+ * 
+ * This repository handles all data persistence for the prayer times app including:
+ * 
+ * SETTINGS MANAGEMENT:
+ * - User prayer calculation preferences
+ * - Location settings (GPS vs manual)
+ * - Notification preferences
+ * - Custom time adjustments
+ * 
+ * CACHING SYSTEM:
+ * - Stores calculated prayer times for instant app startup
+ * - Date-aware cache validation
+ * - Automatic cache expiry at midnight
+ * 
+ * DATA FLOW:
+ * - Uses Kotlin Flow for reactive UI updates
+ * - Background loading to prevent main thread blocking
+ * - SharedPreferences for persistent storage
+ * 
+ * EDIT THIS TO:
+ * - Add new settings categories
+ * - Modify cache strategy
+ * - Change storage backend (from SharedPreferences)
+ * - Add data export/import functionality
  */
 @Singleton
 class PrayerSettingsRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object {
-        private const val PREFS_NAME = "prayer_settings"
+        // STORAGE CONFIGURATION - Edit these to change storage behavior
+        private const val PREFS_NAME = "prayer_settings"  // SharedPreferences file name
         private const val KEY_CALCULATION_METHOD = "calculation_method"
         private const val KEY_ASR_MADHHAB = "asr_madhhab"
         private const val KEY_HIGH_LATITUDE_ADJUSTMENT = "high_latitude_adjustment"
@@ -43,61 +68,75 @@ class PrayerSettingsRepository @Inject constructor(
         private const val KEY_MANUAL_COUNTRY = "manual_country"
         private const val KEY_MANUAL_TIMEZONE_OFFSET = "manual_timezone_offset"
         
-        // Time offset keys
-        private const val KEY_OFFSET_FAJR = "offset_fajr"
-        private const val KEY_OFFSET_SUNRISE = "offset_sunrise"
-        private const val KEY_OFFSET_DHUHR = "offset_dhuhr"
-        private const val KEY_OFFSET_ASR = "offset_asr"
-        private const val KEY_OFFSET_MAGHRIB = "offset_maghrib"
-        private const val KEY_OFFSET_ISHA = "offset_isha"
+        // TIME OFFSET STORAGE KEYS - Per-prayer minute adjustments
+        private const val KEY_OFFSET_FAJR = "offset_fajr"        // Fajr offset in minutes
+        private const val KEY_OFFSET_SUNRISE = "offset_sunrise"  // Sunrise offset in minutes
+        private const val KEY_OFFSET_DHUHR = "offset_dhuhr"      // Dhuhr offset in minutes
+        private const val KEY_OFFSET_ASR = "offset_asr"          // Asr offset in minutes
+        private const val KEY_OFFSET_MAGHRIB = "offset_maghrib"  // Maghrib offset in minutes
+        private const val KEY_OFFSET_ISHA = "offset_isha"        // Isha offset in minutes
         
-        // Notification settings
-        private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
-        private const val KEY_NOTIFY_BEFORE_MINUTES = "notify_before_minutes"
+        // NOTIFICATION SETTINGS - Alert preferences
+        private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"    // Master notification toggle
+        private const val KEY_NOTIFY_BEFORE_MINUTES = "notify_before_minutes"   // Minutes before prayer to notify
         
-        // Prayer times cache keys
-        private const val KEY_CACHED_PRAYER_DATE = "cached_prayer_date"
-        private const val KEY_CACHED_FAJR = "cached_fajr"
-        private const val KEY_CACHED_SUNRISE = "cached_sunrise"
-        private const val KEY_CACHED_DHUHR = "cached_dhuhr"
-        private const val KEY_CACHED_ASR = "cached_asr"
-        private const val KEY_CACHED_MAGHRIB = "cached_maghrib"
-        private const val KEY_CACHED_ISHA = "cached_isha"
-        private const val KEY_CACHED_LOCATION_LAT = "cached_location_lat"
-        private const val KEY_CACHED_LOCATION_LON = "cached_location_lon"
-        private const val KEY_CACHED_LOCATION_CITY = "cached_location_city"
-        private const val KEY_CACHED_LOCATION_COUNTRY = "cached_location_country"
-        private const val KEY_CACHED_LOCATION_TIMEZONE = "cached_location_timezone"
+        // PRAYER TIMES CACHE KEYS - For instant app startup
+        private const val KEY_CACHED_PRAYER_DATE = "cached_prayer_date"          // Date prayers were calculated for
+        private const val KEY_CACHED_FAJR = "cached_fajr"                        // Cached Fajr time (minutes from midnight)
+        private const val KEY_CACHED_SUNRISE = "cached_sunrise"                  // Cached Sunrise time
+        private const val KEY_CACHED_DHUHR = "cached_dhuhr"                      // Cached Dhuhr time
+        private const val KEY_CACHED_ASR = "cached_asr"                          // Cached Asr time
+        private const val KEY_CACHED_MAGHRIB = "cached_maghrib"                  // Cached Maghrib time
+        private const val KEY_CACHED_ISHA = "cached_isha"                        // Cached Isha time
+        private const val KEY_CACHED_LOCATION_LAT = "cached_location_lat"        // Cached location latitude
+        private const val KEY_CACHED_LOCATION_LON = "cached_location_lon"        // Cached location longitude
+        private const val KEY_CACHED_LOCATION_CITY = "cached_location_city"      // Cached location city name
+        private const val KEY_CACHED_LOCATION_COUNTRY = "cached_location_country" // Cached location country
+        private const val KEY_CACHED_LOCATION_TIMEZONE = "cached_location_timezone" // Cached timezone offset
     }
     
-    // Use lazy initialization to prevent main thread blocking during repository creation
+    // LAZY INITIALIZATION - Prevents main thread blocking during repository creation
+    // This ensures app startup remains fast even with large preference files
     private val prefs: SharedPreferences by lazy { 
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
     
+    // REACTIVE DATA FLOW - UI automatically updates when settings change
     private val _settingsFlow = MutableStateFlow<PrayerSettings?>(null)
     val settingsFlow: StateFlow<PrayerSettings> = _settingsFlow
-        .filterNotNull()
+        .filterNotNull()  // Only emit when settings are loaded
         .stateIn(
             scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-            started = SharingStarted.Eagerly, // Back to Eagerly to load settings immediately
-            initialValue = getDefaultSettings()
+            started = SharingStarted.Eagerly, // Load settings immediately for fast app startup
+            initialValue = getDefaultSettings()  // Default settings while loading
         )
     
-    // Initialize settings on startup in background
+    // BACKGROUND INITIALIZATION - Loads settings without blocking main thread
+    // This prevents ANR (Application Not Responding) during app startup
     init {
-        // Load settings in background to avoid StrictMode issues
+        // Load settings in background to avoid StrictMode violations and main thread blocking
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
-            _settingsFlow.value = loadSettings()
+            _settingsFlow.value = loadSettings()  // Loads from SharedPreferences on background thread
         }
     }
     
     /**
-     * Gets current prayer settings
-     * Returns default settings if async loading is not complete yet to prevent main thread blocking
+     * SETTINGS GETTER: Gets current prayer settings with fast fallback
+     * 
+     * This provides immediate access to settings without waiting for async loading.
+     * 
+     * BEHAVIOR:
+     * - Returns loaded settings if available
+     * - Returns default settings if still loading (prevents UI blocking)
+     * - Never blocks the calling thread
+     * 
+     * EDIT THIS TO:
+     * - Add settings validation
+     * - Include migration logic for old settings
+     * - Add error handling for corrupted settings
      */
     fun getSettings(): PrayerSettings {
-        return _settingsFlow.value ?: PrayerSettings() // Return default settings instead of blocking main thread
+        return _settingsFlow.value ?: PrayerSettings() // Fast fallback to prevent main thread blocking
     }
     
     /**
@@ -308,7 +347,25 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Caches prayer times for quick loading on app startup
+     * PRAYER TIMES CACHING: Stores calculated prayer times for instant app startup
+     * 
+     * This is a key performance feature that makes the app start instantly.
+     * 
+     * CACHING STRATEGY:
+     * - Stores prayer times as minutes from midnight (precise, compact)
+     * - Includes date validation to ensure data is current
+     * - Stores location information for context
+     * - Automatically expires at midnight (new day = new calculations)
+     * 
+     * BENEFITS:
+     * - Instant app startup (no "Calculating..." screen)
+     * - Works offline (no network/GPS required)
+     * - Battery efficient (avoids repeated calculations)
+     * 
+     * EDIT THIS TO:
+     * - Cache multiple days of prayer times
+     * - Add compression for large data
+     * - Include calculation settings used
      */
     fun cachePrayerTimes(prayerTimes: DayPrayerTimes) {
         prefs.edit().apply {
@@ -335,7 +392,24 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Gets cached prayer times if available and valid for today
+     * CACHED PRAYER TIMES RETRIEVAL: Gets stored prayer times for instant display
+     * 
+     * This enables instant app startup by showing cached prayer times immediately.
+     * 
+     * VALIDATION PROCESS:
+     * 1. Checks if cached data exists
+     * 2. Validates cached date is today
+     * 3. Ensures all prayer times are present
+     * 4. Reconstructs DayPrayerTimes object
+     * 
+     * RETURNS:
+     * - Valid DayPrayerTimes if cached data is current
+     * - null if no cache, expired, or corrupted (triggers fresh calculation)
+     * 
+     * EDIT THIS TO:
+     * - Add timezone-aware date validation
+     * - Include cache health checks
+     * - Support partial cache recovery
      */
     fun getCachedPrayerTimes(): DayPrayerTimes? {
         return try {
