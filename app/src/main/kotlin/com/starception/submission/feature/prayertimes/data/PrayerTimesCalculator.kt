@@ -20,6 +20,7 @@ interface PrayerTimeCalculatorEntryPoint {
     fun prayerTimeCalculatorService(): PrayerTimeCalculatorService
     fun enhancedLocationService(): com.starception.submission.prayer.service.EnhancedLocationService
     fun prayerSettingsRepository(): com.starception.submission.prayer.repository.PrayerSettingsRepository
+    fun locationCache(): com.starception.submission.prayer.cache.LocationCache
 }
 
 /**
@@ -28,7 +29,7 @@ interface PrayerTimeCalculatorEntryPoint {
 class PrayerTimesCalculator(private val context: Context) {
     
     /**
-     * Calculate prayer times using user settings and current location
+     * Calculate prayer times using user settings and current location with caching
      * @return Pair of DayPrayerTimes and location display name
      */
     suspend fun calculateDefaultPrayerTimes(): Pair<DayPrayerTimes?, String> {
@@ -41,6 +42,16 @@ class PrayerTimesCalculator(private val context: Context) {
             val calculator = entryPoint.prayerTimeCalculatorService()
             val locationService = entryPoint.enhancedLocationService()
             val settingsRepository = entryPoint.prayerSettingsRepository()
+            val cache = entryPoint.locationCache()
+            
+            // Check if we have valid cached data for today
+            val cachedData = cache.getCachedPrayerTimes()
+            if (cachedData != null) {
+                val (cachedPrayerTimes, cachedDate, cachedLocationName) = cachedData
+                if (cachedPrayerTimes != null && cachedLocationName != null) {
+                    return Pair(cachedPrayerTimes, cachedLocationName)
+                }
+            }
             
             // Get user prayer settings
             val userSettings = try {
@@ -55,29 +66,60 @@ class PrayerTimesCalculator(private val context: Context) {
                 userSettings.location != null -> {
                     userSettings.location!!
                 }
-                // Try to get current GPS location if permission granted
+                // Try to get current GPS location if permission granted (with quick timeout)
                 locationService.hasLocationPermission() -> {
                     try {
-                        val androidLocation = locationService.getBestAvailableLocation().getOrNull()
-                        androidLocation?.let { 
-                            locationService.getLocationDetails(it)
-                        } ?: getDefaultLocation()
+                        // First try cached location if recent
+                        val cachedLocation = cache.getCachedLocation()
+                        if (cachedLocation != null) {
+                            cachedLocation
+                        } else {
+                            // Use the quick location method with 3-second timeout
+                            val androidLocation = locationService.getLocationQuick().getOrNull()
+                            androidLocation?.let { androidLoc ->
+                                val detailedLocation = locationService.getLocationDetails(androidLoc)
+                                cache.cacheLocation(detailedLocation) // Cache for future use
+                                detailedLocation
+                            } ?: getDefaultLocation()
+                        }
                     } catch (e: Exception) {
-                        getDefaultLocation()
+                        // Try cached location before falling back to default
+                        cache.getCachedLocation() ?: getDefaultLocation()
                     }
                 }
-                // Fallback to default location
-                else -> getDefaultLocation()
+                // Fallback to cached location or default
+                else -> cache.getCachedLocation() ?: getDefaultLocation()
             }
             
             // Calculate for today
             val today = LocalDate.now()
             val calculatedTimes = calculator.calculatePrayerTimes(today, location, userSettings)
+            val locationName = location.getDisplayName()
             
-            Pair(calculatedTimes, location.getDisplayName())
+            // Cache the results
+            if (calculatedTimes != null) {
+                cache.cachePrayerTimes(calculatedTimes, today, locationName)
+            }
+            
+            Pair(calculatedTimes, locationName)
         } catch (e: Exception) {
-            // Return null if calculation fails
-            Pair(null, "Unknown Location")
+            // Try to return cached data as last resort
+            val entryPoint = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                PrayerTimeCalculatorEntryPoint::class.java
+            )
+            val cache = entryPoint.locationCache()
+            val cachedData = cache.getCachedPrayerTimes()
+            
+            if (cachedData != null) {
+                val (cachedPrayerTimes, _, cachedLocationName) = cachedData
+                if (cachedPrayerTimes != null && cachedLocationName != null) {
+                    return Pair(cachedPrayerTimes, "$cachedLocationName (Cached)")
+                }
+            }
+            
+            // Final fallback
+            Pair(null, "Dubai, UAE (Default)")
         }
     }
     
