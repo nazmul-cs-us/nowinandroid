@@ -62,13 +62,13 @@ fun NiaNavHost(
             )
         }
         bookmarksScreen(
-            onTopicClick = navController::navigateToInterests,
+            onTopicClick = navController::navigateToTopic,
             onShowSnackbar = onShowSnackbar,
         )
         searchScreen(
             onBackClick = navController::popBackStack,
             onInterestsClick = { appState.navigateToTopLevelDestination(INTERESTS) },
-            onTopicClick = navController::navigateToInterests,
+            onTopicClick = navController::navigateToTopic,
         )
         interestsListDetailScreen()
         prayerTimesScreen()

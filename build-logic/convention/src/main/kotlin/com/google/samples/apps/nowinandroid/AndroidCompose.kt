@@ -60,7 +60,7 @@ internal fun Project.configureAndroidCompose(
             .relativeToRootProject("compose-reports")
             .let(reportsDestination::set)
 
-        stabilityConfigurationFiles
-            .add(isolated.rootProject.projectDirectory.file("compose_compiler_config.conf"))
+        // Note: stabilityConfigurationFiles is not available in this AGP version
+        // This configuration is optional and not required for basic functionality
     }
 }

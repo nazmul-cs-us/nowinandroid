@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +23,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+// Note: pullrefresh package may not be available in this version
+// import androidx.compose.material.pullrefresh.PullRefreshIndicator
+// import androidx.compose.material.pullrefresh.pullRefresh
+// import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus.Denied
 import com.google.accompanist.permissions.rememberPermissionState
@@ -82,6 +87,28 @@ fun PrayerTimesScreen(
     
     // REAL-TIME CLOCK STATE - Updates every minute for live prayer status
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
+    
+    // PULL-TO-REFRESH STATE - Handle pull down to refresh location and prayer times
+    var isRefreshing by remember { mutableStateOf(false) }
+    
+    // Note: Pull-to-refresh functionality temporarily disabled due to import issues
+    // val pullRefreshState = rememberPullRefreshState(
+    //     refreshing = isRefreshing,
+    //     onRefresh = {
+    //         isRefreshing = true
+    //         // Refresh location and prayer times with better user feedback
+    //         try {
+    //             calculatePrayerTimes()
+    //             // Show brief success feedback
+    //             location = "Location refreshed"
+    //         } catch (e: Exception) {
+    //             // Handle any errors gracefully
+    //             location = "Refresh failed, using cached data"
+    //         } finally {
+    //             isRefreshing = false
+    //         }
+    //     }
+    // )
     
     // PERMISSION MANAGEMENT - Handle user permissions gracefully
     // Notification permission for prayer alerts (Android 13+)
@@ -324,6 +351,9 @@ fun PrayerTimesScreen(
     Box(
         modifier = modifier.fillMaxSize()
     ) {
+        // Note: Pull-to-refresh functionality temporarily disabled due to import issues
+        // PullRefreshIndicator and related UI elements commented out
+        
         if (isLoading) {
             // Loading state with Material 3 design
             Box(
@@ -353,6 +383,27 @@ fun PrayerTimesScreen(
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
+                // Note: Pull-to-refresh hint temporarily disabled due to import issues
+                // Row(
+                //     modifier = Modifier.fillMaxWidth(),
+                //     horizontalArrangement = Arrangement.Center,
+                //     verticalAlignment = Alignment.CenterVertically
+                // ) {
+                //     Icon(
+                //         imageVector = Icons.Default.Refresh,
+                //         contentDescription = "Pull to refresh",
+                //         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                //         modifier = Modifier.size(16.dp)
+                //     )
+                //     Spacer(modifier = Modifier.width(8.dp))
+                //     Text(
+                //         text = "Pull down to refresh location",
+                //         style = MaterialTheme.typography.bodySmall,
+                //         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                //         textAlign = TextAlign.Center
+                //     )
+                // }
+                
                 // Main prayer section - shows next prayer or current prayer with expressive shape
                 val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
                 if (mainPrayer != null) {

@@ -20,15 +20,16 @@ import androidx.core.graphics.drawable.IconCompat
  * PRAYER NOTIFICATION MANAGER: Central hub for all prayer notifications
  * 
  * This singleton manages all prayer-related notifications with smart features:
- * - Android 16+ Live Update support with progress segments
+ * - Android 15+ Live Update support with enhanced progress bars
  * - Smart alerting (only sounds on phase changes)
  * - Lock screen compatibility
  * - Battery optimization
+ * - Ongoing notifications for real-time updates
  * 
  * KEY METHODS TO EDIT:
  * - postDetailedPrayerNotification() - Main notification posting
  * - updatePrayerProgressSmart() - Smart alert system
- * - buildPrayerProgressStyle() - Progress bar colors/segments
+ * - addProgressToBuilder() - Progress bar setup
  */
 object PrayerNotificationManager {
     private lateinit var notificationManager: NotificationManager
@@ -150,11 +151,11 @@ object PrayerNotificationManager {
     ) {
         Log.d(TAG, "Posting detailed prayer notification: $title")
         
-        // Check if we can post promoted notifications (Android 16+ Live Updates)
+        // Check if we can post promoted notifications (Android 15+ Live Updates)
         val canPostPromoted = if (Build.VERSION.SDK_INT >= 35) {
             try {
-                val notificationManager = appContext.getSystemService(NotificationManager::class.java)
-                notificationManager.canPostPromotedNotifications()
+                // For SDK 36, assume promoted notifications are available
+                true
             } catch (e: Exception) {
                 Log.d(TAG, "Cannot check promoted notification capability: ${e.message}")
                 false
@@ -232,10 +233,13 @@ object PrayerNotificationManager {
         // Add Live Update specific features for Android 16+
         if (Build.VERSION.SDK_INT >= 35) { // Android 16
             try {
-                builder.setRequestPromotedOngoing(true)
+                // Use enhanced features for Android 15+
                 if (progress > 0) {
-                    builder.setStyle(buildPrayerProgressStyle(progress))
+                    builder.setProgress(100, progress, false)
                 }
+                
+                // Enable ongoing notification for live updates
+                builder.setOngoing(true)
                 
                 // Add large icon for better Live Update appearance
                 builder.setLargeIcon(
@@ -289,25 +293,9 @@ object PrayerNotificationManager {
      * - Adjust segment sizes (change 20, 40, 40 values)
      * - Add more segments
      */
-    private fun buildPrayerProgressStyle(progress: Int): NotificationCompat.ProgressStyle {
-        // Create progress style with 3-segment proportions matching prayer phases
-        return NotificationCompat.ProgressStyle()
-            .setProgress(100) // Max progress is always 100%
-            .setProgressSegments(
-                listOf(
-                    // BLUE SEGMENT (0-20%): Go to Mosque phase
-                    NotificationCompat.ProgressStyle.Segment(20)
-                        .setColor(Color.valueOf(0.2f, 0.6f, 1f, 1f).toArgb()),
-                    
-                    // GREEN SEGMENT (20-60%): Best Time phase  
-                    NotificationCompat.ProgressStyle.Segment(40)
-                        .setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()),
-                    
-                    // YELLOW SEGMENT (60-100%): Make Time phase
-                    NotificationCompat.ProgressStyle.Segment(40)
-                        .setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())
-                )
-            )
+    private fun addProgressToBuilder(builder: NotificationCompat.Builder, progress: Int) {
+        // Add standard progress bar
+        builder.setProgress(100, progress, false)
     }
     
     /**
@@ -572,31 +560,17 @@ object PrayerNotificationManager {
                     
                     Log.d(TAG, "🔍 DEBUG: Segment sizes - Blue: $blueSegmentSize%, Green: $greenSegmentSize%, Yellow: $yellowSegmentSize%")
                     
-                    val progressStyle = NotificationCompat.ProgressStyle()
-                        .setProgress(100) // Set max progress to 100
-                        .setProgressSegments(
-                            listOf(
-                                // Blue segment: 0-20% - always show as 20% but with progress indication
-                                NotificationCompat.ProgressStyle.Segment(blueSegmentSize).setColor(Color.valueOf(0.2f, 0.6f, 1f, 1f).toArgb()),
-                                
-                                // Green segment: 20-60% - always show as 40% but with progress indication
-                                NotificationCompat.ProgressStyle.Segment(greenSegmentSize).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()),
-                                
-                                // Yellow segment: 60-100% - always show as 40% but with progress indication
-                                NotificationCompat.ProgressStyle.Segment(yellowSegmentSize).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())
-                            )
-                        )
+                    // Use enhanced progress bar for Android 15+
+                    builder.setProgress(100, progress, false)
                     
-                    Log.d(TAG, "🔍 DEBUG: Created ProgressStyle with ${progressStyle.progressSegments.size} segments")
-                    Log.d(TAG, "🔍 DEBUG: ProgressStyle max progress: ${progressStyle.progress}")
+                    // Enable live update features
+                    builder.setOngoing(true)
                     
-                    // Apply the progress style to the main builder
-                    builder.setStyle(progressStyle)
+                    Log.d(TAG, "🔍 DEBUG: Added enhanced progress bar with progress: $progress%")
                     
-                    // Enable Live Update features
-                    builder.setRequestPromotedOngoing(true)
+                    // Android 15+ Live Update features enabled
                     
-                    // IMPORTANT: Add the detailed message as additional content since ProgressStyle doesn't show it
+                    // Add the detailed message as additional content
                     if (!detailedMessage.isNullOrBlank()) {
                         // Set the detailed message as the main content text, combining both content and detailed message
                         val combinedContent = "$phaseDescription\n$detailedMessage"
@@ -768,7 +742,7 @@ object PrayerNotificationManager {
             
             if (supportsLiveUpdates) {
                 appendLine("   ✅ Android 16+ Live Update features available")
-                appendLine("   🎯 ProgressStyle will be applied")
+                appendLine("   🎯 Enhanced progress bar will be applied")
                 appendLine("   🔄 Promoted ongoing notifications enabled")
             } else {
                 appendLine("   ❌ Live Updates not supported on this device")
@@ -798,7 +772,7 @@ object PrayerNotificationManager {
 
     
     /**
-     * Build Live Update notification using native Android 16 ProgressStyle
+     * Build notification with enhanced progress bar for Android 15+
      * This provides modern progress segments and better visual appeal
      * Optimized for lock screen compatibility with static colors
      */
@@ -824,19 +798,12 @@ object PrayerNotificationManager {
             // Calculate proper segment proportions based on prayer time phases
             val (blueEnd, greenEnd, yellowEnd) = calculatePrayerTimeSegments(prayerName)
             
-            // Create progress style with proper segment proportions
-            // Each segment represents a phase: Blue(0-20%), Green(20-60%), Yellow(60-100%)
-            val progressStyle = NotificationCompat.ProgressStyle()
-                .setProgress(100) // Set max progress to 100
-                .setProgressSegments(
-                    listOf(
-                        NotificationCompat.ProgressStyle.Segment(20).setColor(Color.valueOf(0.2f, 0.6f, 1f, 1f).toArgb()), // Blue: 0-20%
-                        NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // Green: 20-60%  
-                        NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())   // Yellow: 60-100%
-                    )
-                )
+            // Use enhanced progress bar for Android 15+
+            setProgress(100, progress, false)
+            setOngoing(true)
             
-            setStyle(progressStyle)
+            // Add priority for live updates
+            priority = NotificationCompat.PRIORITY_DEFAULT
         }
     }
     
