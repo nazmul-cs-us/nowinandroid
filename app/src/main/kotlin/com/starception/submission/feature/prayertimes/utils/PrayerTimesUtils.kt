@@ -48,8 +48,9 @@ fun calculateQiblaDirection(
     
     var qibla = Math.toDegrees(kotlin.math.atan2(y, x))
     
-    // Normalize to 0-360 degrees
+    // ANGLE NORMALIZATION: Ensure result is between 0° and 360°
+    // atan2 can return negative angles, so we add 360° if negative
     if (qibla < 0) qibla += 360.0
     
-    return qibla
+    return qibla  // Direction to Qibla in degrees from North
 }

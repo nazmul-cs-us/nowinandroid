@@ -16,15 +16,31 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 
+/**
+ * PRAYER NOTIFICATION MANAGER: Central hub for all prayer notifications
+ * 
+ * This singleton manages all prayer-related notifications with smart features:
+ * - Android 16+ Live Update support with progress segments
+ * - Smart alerting (only sounds on phase changes)
+ * - Lock screen compatibility
+ * - Battery optimization
+ * 
+ * KEY METHODS TO EDIT:
+ * - postDetailedPrayerNotification() - Main notification posting
+ * - updatePrayerProgressSmart() - Smart alert system
+ * - buildPrayerProgressStyle() - Progress bar colors/segments
+ */
 object PrayerNotificationManager {
     private lateinit var notificationManager: NotificationManager
     private lateinit var appContext: Context
     private var initialized: Boolean = false
     
     private const val TAG = "PrayerNotificationMgr"
+    
+    // NOTIFICATION CONFIGURATION - Edit these to change notification behavior
     private const val CHANNEL_ID = "prayer_live_update_channel"
-    private const val CHANNEL_NAME = "Prayer Notifications"
-    private const val NOTIFICATION_ID = 1001
+    private const val CHANNEL_NAME = "Prayer Notifications" 
+    private const val NOTIFICATION_ID = 1001  // Same ID = updates replace previous notifications
     
     fun initialize(context: Context) {
         appContext = context.applicationContext
@@ -86,11 +102,22 @@ object PrayerNotificationManager {
     }
     
     /**
-     * Check if device supports Live Update notifications (Android 16+)
-     * Future-ready detection for when AndroidX APIs are available
+     * ANDROID 16 LIVE UPDATE DETECTION
+     * 
+     * Detects if the device supports Android 16's new Live Update notifications.
+     * 
+     * FEATURES ENABLED ON ANDROID 16+:
+     * - Progress segments with colors (Blue/Green/Yellow phases)
+     * - Promoted ongoing notifications (better visibility)
+     * - Enhanced always-on display integration
+     * 
+     * EDIT THIS TO:
+     * - Change minimum API level for Live Updates
+     * - Add feature detection logic
+     * - Modify fallback behavior
      */
     fun supportsLiveUpdates(): Boolean {
-        val supported = Build.VERSION.SDK_INT >= 35 // Android 16
+        val supported = Build.VERSION.SDK_INT >= 35 // Android 16 API level
         Log.d(TAG, "Live Updates supported: $supported (API ${Build.VERSION.SDK_INT})")
         return supported
     }
@@ -248,18 +275,37 @@ object PrayerNotificationManager {
     }
     
     /**
-     * Build progress style for regular notifications
+     * PROGRESS BAR BUILDER: Creates the colored segments for Android 16+ notifications
+     * 
+     * This creates the three-color progress bar that shows prayer phases visually.
+     * 
+     * SEGMENT COLORS & MEANINGS:
+     * - Blue (0-20%): Go to Mosque phase - Time to prepare
+     * - Green (20-60%): Best Time phase - Optimal for prayer
+     * - Yellow (60-100%): Make Time phase - Ensure you pray
+     * 
+     * EDIT THIS TO:
+     * - Change segment colors (modify Color.valueOf values)
+     * - Adjust segment sizes (change 20, 40, 40 values)
+     * - Add more segments
      */
     private fun buildPrayerProgressStyle(progress: Int): NotificationCompat.ProgressStyle {
-        // Create progress style with proper 3-segment proportions
-        // Each segment represents a phase: Blue(0-20%), Green(20-60%), Yellow(60-100%)
+        // Create progress style with 3-segment proportions matching prayer phases
         return NotificationCompat.ProgressStyle()
-            .setProgress(100) // Set max progress to 100
+            .setProgress(100) // Max progress is always 100%
             .setProgressSegments(
                 listOf(
-                    NotificationCompat.ProgressStyle.Segment(20).setColor(Color.valueOf(0.2f, 0.6f, 1f, 1f).toArgb()), // Blue: 0-20%
-                    NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()), // Green: 20-60%  
-                    NotificationCompat.ProgressStyle.Segment(40).setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())   // Yellow: 60-100%
+                    // BLUE SEGMENT (0-20%): Go to Mosque phase
+                    NotificationCompat.ProgressStyle.Segment(20)
+                        .setColor(Color.valueOf(0.2f, 0.6f, 1f, 1f).toArgb()),
+                    
+                    // GREEN SEGMENT (20-60%): Best Time phase  
+                    NotificationCompat.ProgressStyle.Segment(40)
+                        .setColor(Color.valueOf(0.2f, 0.8f, 0.4f, 1f).toArgb()),
+                    
+                    // YELLOW SEGMENT (60-100%): Make Time phase
+                    NotificationCompat.ProgressStyle.Segment(40)
+                        .setColor(Color.valueOf(1.0f, 0.8f, 0.2f, 1f).toArgb())
                 )
             )
     }
@@ -340,7 +386,24 @@ object PrayerNotificationManager {
     }
     
     /**
-     * Smart notification update - only popup/sound when phase changes
+     * SMART NOTIFICATION SYSTEM: The core intelligence of prayer notifications
+     * 
+     * This prevents notification spam by only alerting when prayer phases change.
+     * 
+     * SMART BEHAVIOR:
+     * - SILENT updates when staying in same phase (no sound/vibration)
+     * - ALERT with sound/vibration when phase changes
+     * - Progress bar updates continuously regardless
+     * 
+     * PHASES:
+     * - 0-20%: GO_TO_MOSQUE (Blue) - Time to prepare and go
+     * - 20-60%: BEST_TIME_TO_PRAY (Green) - Optimal prayer time
+     * - 60-100%: MAKE_TIME_FOR_PRAYER (Yellow) - Ensure you pray
+     * 
+     * EDIT THIS TO:
+     * - Change phase transition logic
+     * - Modify alert behavior
+     * - Add new notification types
      */
     fun updatePrayerProgressSmart(
         prayerName: String, 
@@ -352,7 +415,7 @@ object PrayerNotificationManager {
     ) {
         val currentPhase = getCurrentPrayerPhase(progress)
         
-        // Check if this is a new phase (phase transition)
+        // PHASE CHANGE DETECTION - This determines if we should alert or stay silent
         val isPhaseTransition = previousPhase != null && previousPhase != currentPhase
         
         if (isPhaseTransition) {
@@ -367,13 +430,25 @@ object PrayerNotificationManager {
     }
     
     /**
-     * Get current prayer phase based on progress
+     * PHASE CALCULATOR: Determines which prayer phase we're in
+     * 
+     * This maps progress percentage to prayer phases.
+     * 
+     * CURRENT MAPPING:
+     * - 0-20%: GO_TO_MOSQUE (Blue progress segment)
+     * - 21-60%: BEST_TIME_TO_PRAY (Green progress segment)
+     * - 61-100%: MAKE_TIME_FOR_PRAYER (Yellow progress segment)
+     * 
+     * EDIT THESE PERCENTAGES TO:
+     * - Change when phases switch
+     * - Add new phases
+     * - Modify phase behavior
      */
     private fun getCurrentPrayerPhase(progress: Int): String {
         return when {
-            progress <= 20 -> "GO_TO_MOSQUE"
-            progress <= 60 -> "BEST_TIME_TO_PRAY"
-            else -> "MAKE_TIME_FOR_PRAYER"
+            progress <= 20 -> "GO_TO_MOSQUE"           // First 20% - Blue segment
+            progress <= 60 -> "BEST_TIME_TO_PRAY"      // 21-60% - Green segment
+            else -> "MAKE_TIME_FOR_PRAYER"             // 61-100% - Yellow segment
         }
     }
     
@@ -566,26 +641,40 @@ object PrayerNotificationManager {
     }
     
     /**
-     * Get human-readable phase title
+     * PHASE TITLE FORMATTER: Converts phase codes to user-friendly titles
+     * 
+     * This formats the internal phase names into readable notification titles.
+     * 
+     * EDIT THESE STRINGS TO:
+     * - Change notification titles
+     * - Translate to different languages
+     * - Add new phase titles
      */
     private fun getPhaseTitle(phase: String): String {
         return when (phase) {
-            "GO_TO_MOSQUE" -> "Go to Mosque"
-            "BEST_TIME_TO_PRAY" -> "Best Time to Pray"
-            "MAKE_TIME_FOR_PRAYER" -> "Make Time for Prayer"
-            else -> "Prayer Time"
+            "GO_TO_MOSQUE" -> "Go to Mosque"              // Blue phase title
+            "BEST_TIME_TO_PRAY" -> "Best Time to Pray"    // Green phase title
+            "MAKE_TIME_FOR_PRAYER" -> "Make Time for Prayer"  // Yellow phase title
+            else -> "Prayer Time"                         // Fallback title
         }
     }
     
     /**
-     * Get phase description
+     * PHASE DESCRIPTION FORMATTER: Provides detailed phase descriptions
+     * 
+     * This creates the descriptive text that appears in notification content.
+     * 
+     * EDIT THESE DESCRIPTIONS TO:
+     * - Change notification content text
+     * - Add more detailed guidance
+     * - Translate to different languages
      */
     private fun getPhaseDescription(phase: String): String {
         return when (phase) {
-            "GO_TO_MOSQUE" -> "Time to prepare and go to the mosque"
-            "BEST_TIME_TO_PRAY" -> "Optimal time for prayer"
-            "MAKE_TIME_FOR_PRAYER" -> "Ensure you make time for prayer"
-            else -> "Prayer time in progress"
+            "GO_TO_MOSQUE" -> "Time to prepare and go to the mosque"    // Blue phase description
+            "BEST_TIME_TO_PRAY" -> "Optimal time for prayer"           // Green phase description
+            "MAKE_TIME_FOR_PRAYER" -> "Ensure you make time for prayer" // Yellow phase description
+            else -> "Prayer time in progress"                            // Fallback description
         }
     }
     

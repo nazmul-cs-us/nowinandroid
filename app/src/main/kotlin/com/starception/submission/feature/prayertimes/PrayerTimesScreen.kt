@@ -35,8 +35,38 @@ import java.time.format.DateTimeFormatter
 import java.time.Duration
 
 /**
- * Beautiful Prayer Times screen using Material 3 expressive design
- * Settings are accessed via the main app's context-aware settings button
+ * PRAYER TIMES SCREEN: Main UI for displaying Islamic prayer times with Material 3 design
+ * 
+ * This is the primary user interface for the prayer times feature, providing:
+ * 
+ * VISUAL DESIGN:
+ * - Material 3 expressive design with asymmetrical shapes
+ * - Real-time prayer status updates (Current/Next/Upcoming)
+ * - Layered background with gradient effects
+ * - Responsive layout for different screen sizes
+ * 
+ * FUNCTIONALITY:
+ * - Live prayer time calculations with 3-second location timeout
+ * - Smart permission handling (location and notifications)
+ * - Real-time clock updates every minute
+ * - Automatic refresh when permissions change
+ * - Fallback to cached data or Dubai default
+ * 
+ * STATE MANAGEMENT:
+ * - Uses Compose state for reactive UI updates
+ * - Background calculation to prevent UI blocking
+ * - Error handling with graceful fallbacks
+ * 
+ * PERMISSIONS:
+ * - Requests location permission for accurate prayer times
+ * - Requests notification permission for prayer alerts (Android 13+)
+ * - Continues working without permissions using defaults
+ * 
+ * EDIT THIS TO:
+ * - Change UI design and colors
+ * - Modify permission request strategy
+ * - Add new prayer time display formats
+ * - Include additional Islamic features
  */
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -44,32 +74,36 @@ fun PrayerTimesScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var prayerTimes by remember { mutableStateOf<com.starception.submission.prayer.model.DayPrayerTimes?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
-    var location by remember { mutableStateOf("Loading location...") }
     
-    // Live update state
+    // UI STATE MANAGEMENT - These control what the user sees
+    var prayerTimes by remember { mutableStateOf<com.starception.submission.prayer.model.DayPrayerTimes?>(null) }  // Calculated prayer times
+    var isLoading by remember { mutableStateOf(true) }      // Loading indicator state
+    var location by remember { mutableStateOf("Loading location...") }  // Location display text
+    
+    // REAL-TIME CLOCK STATE - Updates every minute for live prayer status
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
     
-    // Request notification permission for prayer alerts
+    // PERMISSION MANAGEMENT - Handle user permissions gracefully
+    // Notification permission for prayer alerts (Android 13+)
     val notificationPermissionState = rememberPermissionState(
         permission = Manifest.permission.POST_NOTIFICATIONS
     )
     
-    // Request location permission for accurate prayer times
+    // Location permission for accurate prayer times (or fallback to default)
     val locationPermissionState = rememberPermissionState(
         permission = Manifest.permission.ACCESS_FINE_LOCATION
     )
     
-    // Request permissions when screen opens
+    // PERMISSION REQUEST STRATEGY - Request permissions politely on first screen load
     LaunchedEffect(Unit) {
-        // Request location permission first for accurate prayer times
+        // STEP 1: Request location permission for accurate prayer times
         val locationStatus = locationPermissionState.status
         if (locationStatus is Denied && !locationStatus.shouldShowRationale) {
             locationPermissionState.launchPermissionRequest()
         }
         
-        // Then request notification permission (Android 13+)
+        // STEP 2: Request notification permission for prayer alerts (Android 13+)
+        // Only request if we're on Android 13+ where this permission is required
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             val notificationStatus = notificationPermissionState.status
             if (notificationStatus is Denied && !notificationStatus.shouldShowRationale) {
@@ -78,42 +112,50 @@ fun PrayerTimesScreen(
         }
     }
     
-    // Live time updates every minute
+    // LIVE CLOCK UPDATES - Updates current time every minute for real-time prayer status
     LaunchedEffect(Unit) {
         while (true) {
-            currentTime = LocalTime.now()
-            kotlinx.coroutines.delay(60000) // Update every minute
+            currentTime = LocalTime.now()      // Update current time
+            kotlinx.coroutines.delay(60000)   // Wait 1 minute (60,000 milliseconds)
+            // This enables real-time updates like "Next prayer in 15 minutes"
         }
     }
     
-    // Function to calculate prayer times with quick timeout
+    // PRAYER TIMES CALCULATION ENGINE - Background calculation with 3-second location timeout
     suspend fun calculatePrayerTimes() {
         try {
+            // Run calculation on background thread to prevent UI blocking
             withContext(Dispatchers.Default) {
                 val calculator = PrayerTimesCalculator(context)
+                // This uses our improved 3-second timeout system
                 val result = calculator.calculateDefaultPrayerTimes()
                 
-                prayerTimes = result.first
-                location = result.second
+                prayerTimes = result.first   // Calculated prayer times (or null if failed)
+                location = result.second     // Location name for display
             }
         } catch (e: Exception) {
+            // GRACEFUL ERROR HANDLING - Never crash, always show something useful
             // Keep current values if calculation fails
-            // Set default location if we don't have any data
             if (prayerTimes == null) {
+                // Set default location if we don't have any data at all
                 location = "Dubai, UAE (Default)"
             }
+            // Note: Prayer times remain null, which will show appropriate fallback UI
         }
     }
     
-    // Calculate prayer times in background to prevent blocking
-    // Recalculate when permissions are granted with short loading state
+    // SMART LOADING STRATEGY - Recalculate when permissions change, show loading only when needed
     LaunchedEffect(locationPermissionState.status) {
-        // Show loading only if we don't have existing data
+        // SMART LOADING: Only show loading spinner if we don't have existing data to display
+        // This prevents flickering when permissions change after data is already loaded
         if (prayerTimes == null) {
-            isLoading = true
+            isLoading = true  // Show loading spinner for first load
         }
         
+        // Calculate prayer times with our improved 3-second timeout system
         calculatePrayerTimes()
+        
+        // Hide loading spinner after calculation completes (success or failure)
         isLoading = false
     }
     

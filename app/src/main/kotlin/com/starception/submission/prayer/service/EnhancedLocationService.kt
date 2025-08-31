@@ -119,10 +119,22 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Internal method to get location with specified priority
+     * LOCATION REQUEST WITH TIMEOUT: Core location fetching with elevator-friendly timeout
+     * 
+     * This is the key improvement that prevents the app from hanging in elevators!
+     * 
+     * TIMEOUT BEHAVIOR:
+     * - 3 seconds maximum wait (instead of previous 15 seconds)
+     * - Prevents app freezing in elevators, underground areas, poor signal
+     * - Returns null after timeout, triggering fallback to cached location
+     * 
+     * EDIT THIS TO:
+     * - Change timeout duration (currently 3000ms = 3 seconds)
+     * - Modify fallback behavior
+     * - Add different timeouts for different priorities
      */
     private suspend fun getCurrentLocationInternal(priority: Int): android.location.Location? {
-        return withTimeoutOrNull(3000) { // 3 second timeout to prevent long waits in elevators/poor signal areas
+        return withTimeoutOrNull(3000) { // 3 second timeout - EDIT THIS VALUE to change timeout duration
             suspendCancellableCoroutine { continuation ->
                 val cancellationTokenSource = CancellationTokenSource()
                 
@@ -310,50 +322,84 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Gets the best available location using multiple strategies with fast timeout
+     * SMART LOCATION STRATEGY: Multi-level fallback system for reliable location
+     * 
+     * This implements a smart strategy to get location quickly and reliably:
+     * 
+     * STRATEGY PRIORITY:
+     * 1. Recent cached location (within 10 minutes) - INSTANT
+     * 2. Current GPS location (3-second timeout) - FAST
+     * 3. Any available cached location - RELIABLE FALLBACK
+     * 
+     * BENEFITS:
+     * - No more waiting in elevators
+     * - Uses recent cached data when GPS is slow
+     * - Always provides a location (fallback to any cached)
+     * 
+     * EDIT THIS TO:
+     * - Change cache validity period (currently 10 minutes)
+     * - Modify strategy order
+     * - Add new location sources
      */
     suspend fun getBestAvailableLocation(): Result<android.location.Location> {
         if (!hasLocationPermission()) {
             return Result.failure(SecurityException("Location permission not granted"))
         }
         
-        // Strategy 1: Try last known location first (fastest)
+        // STRATEGY 1: Try recent cached location first (fastest - no network/GPS delay)
         getLastKnownLocation().fold(
             onSuccess = { lastKnown ->
-                // Only use if it's recent (within 10 minutes) or if we can't get current location
+                // Check if cached location is recent enough to use immediately
                 val ageMs = System.currentTimeMillis() - lastKnown.time
-                if (ageMs <= 10 * 60 * 1000) { // 10 minutes
+                if (ageMs <= 10 * 60 * 1000) { // 10 minutes - EDIT THIS to change cache validity
                     return Result.success(lastKnown)
                 }
             },
             onFailure = { /* Continue to next strategy */ }
         )
         
-        // Strategy 2: Try balanced accuracy current location with 3s timeout
+        // STRATEGY 2: Try current GPS location with 3-second timeout
         getCurrentLocation().fold(
             onSuccess = { return Result.success(it) },
-            onFailure = { /* Continue to next strategy */ }
+            onFailure = { /* Continue to final fallback if GPS fails/times out */ }
         )
         
-        // Strategy 3: Use any available last known location as final fallback
+        // STRATEGY 3: Final fallback - use any available cached location (even if old)
+        // This ensures we always have a location, even if it's not perfectly current
         return getLastKnownLocation()
     }
     
     /**
-     * Gets location with very fast timeout - ideal for UI updates
+     * QUICK LOCATION FOR UI: Super-fast location for responsive UI updates
+     * 
+     * This is optimized for immediate UI updates without blocking the user interface.
+     * 
+     * BEHAVIOR:
+     * - Always tries cached location first (instant response)
+     * - Falls back to 3-second GPS if no cache available
+     * - Perfect for prayer time calculations during app startup
+     * 
+     * USE THIS METHOD WHEN:
+     * - User is waiting for prayer times to load
+     * - App needs location for immediate display
+     * - You want to avoid any UI blocking
+     * 
+     * EDIT THIS TO:
+     * - Change fallback behavior
+     * - Add different timeout for UI updates
      */
     suspend fun getLocationQuick(): Result<android.location.Location> {
         if (!hasLocationPermission()) {
             return Result.failure(SecurityException("Location permission not granted"))
         }
         
-        // Always try last known location first
+        // PRIORITY 1: Try cached location first (instant - no waiting)
         getLastKnownLocation().fold(
             onSuccess = { return Result.success(it) },
-            onFailure = { /* Continue to current location */ }
+            onFailure = { /* No cached location available, try GPS */ }
         )
         
-        // Try current location with 3s timeout
+        // PRIORITY 2: Try current GPS location with 3-second timeout
         return getCurrentLocation()
     }
 }
