@@ -86,7 +86,7 @@ fun PrayerTimesScreen(
         }
     }
     
-    // Function to calculate prayer times
+    // Function to calculate prayer times with quick timeout
     suspend fun calculatePrayerTimes() {
         try {
             withContext(Dispatchers.Default) {
@@ -98,13 +98,21 @@ fun PrayerTimesScreen(
             }
         } catch (e: Exception) {
             // Keep current values if calculation fails
+            // Set default location if we don't have any data
+            if (prayerTimes == null) {
+                location = "Dubai, UAE (Default)"
+            }
         }
     }
     
     // Calculate prayer times in background to prevent blocking
-    // Recalculate when permissions are granted
+    // Recalculate when permissions are granted with short loading state
     LaunchedEffect(locationPermissionState.status) {
-        isLoading = true
+        // Show loading only if we don't have existing data
+        if (prayerTimes == null) {
+            isLoading = true
+        }
+        
         calculatePrayerTimes()
         isLoading = false
     }
@@ -199,6 +207,77 @@ fun PrayerTimesScreen(
         return time.format(DateTimeFormatter.ofPattern("hh:mm a"))
     }
     
+    // Get main message for the notification format (same as notification service)
+    fun getMainMessage(prayerName: String): String {
+        val times = prayerTimes ?: return "Live Updates Active"
+        val now = currentTime
+        
+        val prayerTime = when (prayerName) {
+            "Fajr" -> times.fajr
+            "Dhuhr" -> times.dhuhr
+            "Asr" -> times.asr
+            "Maghrib" -> times.maghrib
+            "Isha" -> times.isha
+            else -> times.fajr
+        }
+        
+        // Calculate elapsed time since prayer started
+        val elapsedMinutes = Duration.between(prayerTime, now).toMinutes()
+        
+        // Use same logic as notification service
+        return when {
+            elapsedMinutes < 20 -> "Go to Mosque for $prayerName"
+            elapsedMinutes < 60 -> "Best Time to Pray $prayerName"
+            else -> "Make Time for $prayerName"
+        }
+    }
+
+    // Get current status for the notification format (same as notification service)
+    fun getCurrentStatus(prayerName: String): String {
+        val times = prayerTimes ?: return "Live Updates Active"
+        val now = currentTime
+        
+        val prayerTime = when (prayerName) {
+            "Fajr" -> times.fajr
+            "Dhuhr" -> times.dhuhr
+            "Asr" -> times.asr
+            "Maghrib" -> times.maghrib
+            "Isha" -> times.isha
+            else -> times.fajr
+        }
+        
+        // Calculate elapsed time since prayer started
+        val elapsedMinutes = Duration.between(prayerTime, now).toMinutes()
+        
+        // Use same format as notification service
+        val elapsedText = when {
+            elapsedMinutes == 0L -> "just started"
+            elapsedMinutes == 1L -> "1 minute"
+            elapsedMinutes < 60 -> "${elapsedMinutes} minutes"
+            else -> {
+                val hours = elapsedMinutes / 60
+                val minutes = elapsedMinutes % 60
+                when {
+                    minutes == 0L -> "${hours}h"
+                    else -> "${hours}h ${minutes}m"
+                }
+            }
+        }
+        
+        return "$elapsedText since $prayerName"
+    }
+
+    // Get next prayer info for the notification format (same as notification service)
+    fun getNextPrayerInfo(): String {
+        val nextPrayer = getNextPrayer()
+        return if (nextPrayer != null) {
+            val timeRemaining = getTimeUntilNextPrayer()
+            "Next • ${nextPrayer.first} in $timeRemaining"
+        } else {
+            "No upcoming prayers"
+        }
+    }
+    
     // Use the app's standard background for consistency
     Box(
         modifier = modifier.fillMaxSize()
@@ -219,7 +298,7 @@ fun PrayerTimesScreen(
                         strokeWidth = 4.dp
                     )
                     Text(
-                        text = "Loading Prayer Times...",
+                        text = "Live Updates Active",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -232,16 +311,6 @@ fun PrayerTimesScreen(
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Header using Material 3 expressive typography
-                Text(
-                    text = "Daily Prayers",
-                    style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
                 // Main prayer section - shows next prayer or current prayer with expressive shape
                 val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
                 if (mainPrayer != null) {

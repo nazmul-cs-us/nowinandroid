@@ -27,7 +27,8 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(chmod:*)",
-      "Bash(./rename_package.sh)"
+      "Bash(./rename_package.sh)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

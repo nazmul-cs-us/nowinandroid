@@ -28,6 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `./gradlew lint` - Run lint checks on default variant
 - `./gradlew lintDemoDebug` - Run lint on demo debug variant
 - `./gradlew check` - Run all verification tasks (tests, lint, etc.)
+- `./gradlew assembleRelease -PenableComposeCompilerMetrics=true` - Generate Compose compiler metrics
 
 ## Architecture
 
@@ -55,10 +56,22 @@ This is a fully modularized Android app following official Android architecture 
 - **feature:topic** - Individual topic detail screens
 
 ### App-Specific Features
-- **Prayer Times** - Islamic prayer times calculator and display
-  - Located in `app/src/main/kotlin/com/starception/submission/feature/prayertimes/`
-  - Components: `PrayerTimesScreen.kt`, prayer time components and cards
-  - Features: Location-based prayer times, notifications, settings integration
+- **Prayer Times** - Islamic prayer times calculator and display with comprehensive architecture
+  - **UI Layer**: Located in `app/src/main/kotlin/com/starception/submission/feature/prayertimes/`
+    - `PrayerTimesScreen.kt` - Main screen with Material 3 design and real-time updates
+    - Components: `AnalogWatchComponents.kt`, `PrayerTimeCards.kt`
+    - Navigation: `PrayerTimesNavigation.kt`
+    - Utilities: `PrayerTimesUtils.kt`
+  - **Core Prayer System**: Located in `app/src/main/kotlin/com/starception/submission/prayer/`
+    - **Model**: Data classes for `CalculationMethod`, `Location`, `PrayerSettings`, `PrayerTime`
+    - **Calculator**: `AstronomicalCalculator.kt` for precise prayer time calculations
+    - **Repository**: `PrayerSettingsRepository.kt` for settings persistence
+    - **Services**: Enhanced location services and prayer time calculation services
+    - **ViewModels**: `PrayerTimesViewModel.kt` for state management
+    - **UI**: Prayer settings screens and dialogs
+  - **Notification System**: `PrayerNotificationService.kt` with background updates
+  - **Permissions**: Location and notification permission handling
+  - **Features**: Location-based calculations, real-time updates, notification alerts, Material 3 design
 
 ### App Module
 - **app** - Main application module, navigation, and dependency injection setup
@@ -71,9 +84,12 @@ This is a fully modularized Android app following official Android architecture 
 - Unidirectional data flow with Kotlin Flows
 - Repository pattern for data access
 - Use cases for business logic
-- Jetpack Compose for UI
+- Jetpack Compose for UI with Material 3 design system
 - Dependency injection with Hilt
 - No mocking in tests - uses test doubles implementing real interfaces
+- MVVM architecture with ViewModels for state management
+- Comprehensive permission management system
+- Background services for real-time updates
 
 ## Development Notes
 
@@ -92,10 +108,24 @@ This is a fully modularized Android app following official Android architecture 
 ### Package Structure
 The app uses `com.starception.submission` as the base package (originally forked from Google's Now in Android sample).
 
+**Prayer Times Package Structure:**
+- `feature.prayertimes` - UI layer with screens, components, and navigation
+- `prayer.model` - Core data models and entities
+- `prayer.calculator` - Astronomical calculations for prayer times
+- `prayer.repository` - Data persistence and settings management
+- `prayer.service` - Location and calculation services
+- `prayer.viewmodel` - State management with ViewModels
+- `prayer.ui` - Reusable prayer-related UI components
+- `services` - Background services and notifications
+- `util` - Utility classes for permissions and extensions
+
 ### Important Files
-- `gradle/libs.versions.toml` - Centralized dependency management
+- `gradle/libs.versions.toml` - Centralized dependency management (updated to latest versions)
 - `build-logic/convention/` - Gradle convention plugins for consistent module setup
 - `app/src/main/baseline-prof.txt` - Baseline profile for app startup optimization
+- `gradle.properties` - Optimized Gradle configuration with memory settings
+- `app/src/main/kotlin/com/starception/submission/prayer/` - Core prayer times system
+- `app/src/main/kotlin/com/starception/submission/feature/prayertimes/PrayerTimesScreen.kt` - Main prayer times UI
 
 ## UI Design System
 
@@ -108,5 +138,10 @@ All cards in the app follow a consistent design pattern:
 - **Click handling**: Cards should have `onClick` functionality where applicable
 
 ### Recent Updates
-- Fixed Prayer Times card margins and design consistency (August 2025)
-- Updated card colors to match design system used in NewsResourceCard and other components
+- Enhanced Prayer Times feature with comprehensive architecture (August 2025)
+- Implemented Material 3 expressive design with asymmetrical shapes and layered backgrounds
+- Added real-time prayer status tracking (Current/Next/Upcoming prayers)
+- Integrated enhanced location services with permission management
+- Added comprehensive notification system with prayer alerts
+- Updated dependency versions to latest stable releases (Kotlin 2.1.10, Compose BOM 2025.02.00)
+- Improved build configuration with optimized Gradle settings

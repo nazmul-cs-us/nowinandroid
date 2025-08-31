@@ -122,7 +122,7 @@ class EnhancedLocationService @Inject constructor(
      * Internal method to get location with specified priority
      */
     private suspend fun getCurrentLocationInternal(priority: Int): android.location.Location? {
-        return withTimeoutOrNull(15000) { // 15 second timeout
+        return withTimeoutOrNull(3000) { // 3 second timeout to prevent long waits in elevators/poor signal areas
             suspendCancellableCoroutine { continuation ->
                 val cancellationTokenSource = CancellationTokenSource()
                 
@@ -214,7 +214,7 @@ class EnhancedLocationService @Inject constructor(
         
         return try {
             geocoder?.let { gc ->
-                withTimeoutOrNull(10000) { // 10 second timeout for geocoding
+                withTimeoutOrNull(3000) { // 3 second timeout for geocoding to prevent delays
                     val addresses = gc.getFromLocation(
                         androidLocation.latitude,
                         androidLocation.longitude,
@@ -241,7 +241,7 @@ class EnhancedLocationService @Inject constructor(
     suspend fun searchLocation(query: String): Result<List<Location>> {
         return try {
             geocoder?.let { gc ->
-                withTimeoutOrNull(10000) {
+                withTimeoutOrNull(5000) { // 5 seconds for search is reasonable
                     val addresses = gc.getFromLocationName(query, 5)
                     val locations = addresses?.map { address ->
                         Location(
@@ -310,26 +310,50 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Gets the best available location using multiple strategies
+     * Gets the best available location using multiple strategies with fast timeout
      */
     suspend fun getBestAvailableLocation(): Result<android.location.Location> {
         if (!hasLocationPermission()) {
             return Result.failure(SecurityException("Location permission not granted"))
         }
         
-        // Strategy 1: Try high accuracy current location
-        getCurrentLocationHighAccuracy().fold(
-            onSuccess = { return Result.success(it) },
+        // Strategy 1: Try last known location first (fastest)
+        getLastKnownLocation().fold(
+            onSuccess = { lastKnown ->
+                // Only use if it's recent (within 10 minutes) or if we can't get current location
+                val ageMs = System.currentTimeMillis() - lastKnown.time
+                if (ageMs <= 10 * 60 * 1000) { // 10 minutes
+                    return Result.success(lastKnown)
+                }
+            },
             onFailure = { /* Continue to next strategy */ }
         )
         
-        // Strategy 2: Try balanced accuracy current location  
+        // Strategy 2: Try balanced accuracy current location with 3s timeout
         getCurrentLocation().fold(
             onSuccess = { return Result.success(it) },
             onFailure = { /* Continue to next strategy */ }
         )
         
-        // Strategy 3: Use last known location
+        // Strategy 3: Use any available last known location as final fallback
         return getLastKnownLocation()
+    }
+    
+    /**
+     * Gets location with very fast timeout - ideal for UI updates
+     */
+    suspend fun getLocationQuick(): Result<android.location.Location> {
+        if (!hasLocationPermission()) {
+            return Result.failure(SecurityException("Location permission not granted"))
+        }
+        
+        // Always try last known location first
+        getLastKnownLocation().fold(
+            onSuccess = { return Result.success(it) },
+            onFailure = { /* Continue to current location */ }
+        )
+        
+        // Try current location with 3s timeout
+        return getCurrentLocation()
     }
 }
