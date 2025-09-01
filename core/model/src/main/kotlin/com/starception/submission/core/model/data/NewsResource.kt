@@ -19,7 +19,41 @@ package com.starception.submission.core.model.data
 import kotlinx.datetime.Instant
 
 /**
- * External data layer representation of a fully populated NiA news resource
+ * NEWS RESOURCE MODEL: Complete representation of a news article
+ * 
+ * This data class represents a news article with all its associated metadata,
+ * content, and relationships. It serves as the core content model throughout
+ * the app's data and UI layers.
+ * 
+ * CONTENT STRUCTURE:
+ * - Basic metadata: ID, title, publish date
+ * - Content: Full article text and external URL
+ * - Media: Optional header image
+ * - Classification: Type and associated topics
+ * 
+ * DATA SOURCES:
+ * - Network API: Fetched from remote content management system
+ * - Local database: Cached for offline access
+ * - Demo data: Static content for development/testing
+ * 
+ * UI INTEGRATION:
+ * - Used in article lists, detail views, search results
+ * - Supports bookmarking and read status tracking
+ * - Enables content filtering by topics
+ * 
+ * IMMUTABILITY:
+ * - Immutable data class for thread-safe operations
+ * - Changes require creating new instances
+ * - Safe to share across multiple UI components
+ * 
+ * @param id Unique identifier for the news article
+ * @param title Display title for the article
+ * @param content Full article text content
+ * @param url External URL to the full article (for web view)
+ * @param headerImageUrl Optional URL to article's featured image
+ * @param publishDate When the article was published (as Instant for timezone handling)
+ * @param type Content type classification (e.g., "article", "video", "podcast")
+ * @param topics List of topics this article covers (for categorization and filtering)
  */
 data class NewsResource(
     val id: String,

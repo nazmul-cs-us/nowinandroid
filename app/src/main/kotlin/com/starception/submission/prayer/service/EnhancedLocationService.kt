@@ -19,7 +19,42 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * Enhanced location service using FusedLocationProviderClient for better accuracy
+ * ENHANCED LOCATION SERVICE: Advanced GPS/Network location provider for prayer times
+ * 
+ * This service provides reliable, fast location acquisition optimized for prayer time
+ * calculations. It includes smart timeout handling and multi-strategy location fetching.
+ * 
+ * KEY FEATURES:
+ * - Multiple location strategies (GPS, Network, Cached)
+ * - Smart timeout handling (prevents app hanging in elevators)
+ * - Fallback systems for reliable location acquisition
+ * - Google Play Services integration for high accuracy
+ * - Permission and service availability checking
+ * - Geocoding support for city/country names
+ * - Timezone estimation for accurate prayer times
+ * 
+ * LOCATION STRATEGIES:
+ * 1. getBestAvailableLocation() - Smart multi-level fallback system
+ * 2. getLocationQuick() - Optimized for instant UI updates
+ * 3. getCurrentLocation() - Standard GPS location with timeout
+ * 4. getCurrentLocationHighAccuracy() - High precision GPS
+ * 5. getLastKnownLocation() - Fastest cached location
+ * 
+ * TIMEOUT HANDLING:
+ * - All location requests have 3-second timeouts
+ * - Prevents app freezing in poor signal areas
+ * - Graceful fallbacks when GPS is unavailable
+ * 
+ * PERMISSION REQUIREMENTS:
+ * - ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION
+ * - Location services must be enabled on device
+ * 
+ * EDIT THIS SERVICE TO:
+ * - Change timeout durations (currently 3 seconds)
+ * - Modify fallback behavior
+ * - Add new location providers
+ * - Customize timezone calculations
+ * - Add location caching strategies
  */
 @Singleton
 class EnhancedLocationService @Inject constructor(
@@ -43,7 +78,16 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Checks if location permissions are granted
+     * PERMISSION CHECKER: Validates location permissions for the app
+     * 
+     * This checks whether the app has been granted location permissions by the user.
+     * Required before any location operations can be performed.
+     * 
+     * PERMISSIONS CHECKED:
+     * - ACCESS_FINE_LOCATION (GPS + Network)
+     * - ACCESS_COARSE_LOCATION (Network only)
+     * 
+     * @return true if either fine or coarse location permission is granted
      */
     fun hasLocationPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
@@ -57,7 +101,16 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Checks if location services are enabled
+     * LOCATION SERVICES CHECKER: Validates if device location services are enabled
+     * 
+     * This checks whether location services are turned on at the device level.
+     * Even with permissions, location won't work if services are disabled.
+     * 
+     * SERVICES CHECKED:
+     * - GPS Provider (satellite-based location)
+     * - Network Provider (cell towers + WiFi)
+     * 
+     * @return true if at least one location provider is enabled
      */
     fun isLocationEnabled(): Boolean {
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
@@ -65,7 +118,23 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Gets current location with high accuracy using FusedLocationProviderClient
+     * HIGH ACCURACY LOCATION: Gets precise GPS location with power-intensive method
+     * 
+     * This method prioritizes accuracy over battery life, using GPS satellites
+     * for the most precise location possible. Has fallback to balanced accuracy.
+     * 
+     * ACCURACY PRIORITY:
+     * 1. PRIORITY_HIGH_ACCURACY (GPS satellites)
+     * 2. Fallback to PRIORITY_BALANCED_POWER_ACCURACY
+     * 
+     * USE WHEN:
+     * - Initial setup or location verification
+     * - User explicitly requests high accuracy
+     * - Battery life is not a concern
+     * 
+     * TIMEOUT: 3 seconds to prevent UI blocking
+     * 
+     * @return Result containing high-accuracy Location or error
      */
     suspend fun getCurrentLocationHighAccuracy(): Result<android.location.Location> {
         if (!hasLocationPermission()) {
@@ -95,7 +164,25 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Gets current location with balanced accuracy (faster, less battery)
+     * BALANCED ACCURACY LOCATION: Gets location optimized for speed and battery
+     * 
+     * This method balances accuracy with power consumption, typically using
+     * network-based location (cell towers + WiFi) with GPS as secondary.
+     * 
+     * CHARACTERISTICS:
+     * - Faster than high accuracy mode
+     * - Lower battery consumption
+     * - Good accuracy for prayer time calculations
+     * - Uses PRIORITY_BALANCED_POWER_ACCURACY
+     * 
+     * RECOMMENDED FOR:
+     * - Regular prayer time calculations
+     * - Background location updates
+     * - Battery-conscious operations
+     * 
+     * TIMEOUT: 3 seconds to prevent UI blocking
+     * 
+     * @return Result containing balanced-accuracy Location or error
      */
     suspend fun getCurrentLocation(): Result<android.location.Location> {
         if (!hasLocationPermission()) {
@@ -172,7 +259,28 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Gets last known location (fastest, but may be stale)
+     * CACHED LOCATION RETRIEVAL: Gets previously stored location (instant)
+     * 
+     * This returns the last known location stored by the system, providing
+     * instant results without any GPS or network activity.
+     * 
+     * CHARACTERISTICS:
+     * - Instant response (no network/GPS delay)
+     * - No battery usage
+     * - May be stale (minutes to hours old)
+     * - Perfect for app startup scenarios
+     * 
+     * USE CASES:
+     * - App startup before GPS is available
+     * - Fallback when current location fails
+     * - When you need immediate location estimate
+     * 
+     * LIMITATIONS:
+     * - Location may be outdated
+     * - May not exist if location was never used
+     * - Accuracy depends on when it was cached
+     * 
+     * @return Result containing cached Location or error if none available
      */
     suspend fun getLastKnownLocation(): Result<android.location.Location> {
         if (!hasLocationPermission()) {
@@ -214,7 +322,30 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Gets location details with city and country information
+     * LOCATION ENRICHMENT: Adds city/country names to GPS coordinates
+     * 
+     * This function takes raw GPS coordinates and enriches them with human-readable
+     * location information using reverse geocoding.
+     * 
+     * ENRICHMENT PROCESS:
+     * 1. Takes raw android.location.Location (lat/lon only)
+     * 2. Calculates timezone offset for the location
+     * 3. Uses Geocoder to find city and country names
+     * 4. Returns enhanced Location object with all details
+     * 
+     * FALLBACK BEHAVIOR:
+     * - If geocoding fails, returns location with coordinates only
+     * - 3-second timeout prevents delays
+     * - Always returns a valid Location object
+     * 
+     * ENHANCED DATA:
+     * - City name (e.g., "Dubai", "New York")
+     * - Country name (e.g., "UAE", "United States")
+     * - Timezone offset (e.g., +4.0 for UAE)
+     * - Altitude if available
+     * 
+     * @param androidLocation Raw GPS location from system
+     * @return Enhanced Location with city, country, and timezone
      */
     suspend fun getLocationDetails(androidLocation: android.location.Location): Location {
         val baseLocation = Location(
@@ -248,7 +379,30 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Searches for locations by name using Geocoder
+     * LOCATION SEARCH: Find coordinates by searching city/address names
+     * 
+     * This function performs forward geocoding - converting place names or addresses
+     * into GPS coordinates and location details.
+     * 
+     * SEARCH CAPABILITIES:
+     * - City names (e.g., "Dubai", "New York")
+     * - Addresses (e.g., "123 Main St, Dubai")
+     * - Landmarks (e.g., "Burj Khalifa")
+     * - Countries (e.g., "United Arab Emirates")
+     * 
+     * SEARCH BEHAVIOR:
+     * - Returns up to 5 matching locations
+     * - Sorted by relevance
+     * - 5-second timeout for network requests
+     * - Includes timezone calculation for each result
+     * 
+     * USE CASES:
+     * - User manual location selection
+     * - Location picker in settings
+     * - Address validation
+     * 
+     * @param query Search term (city, address, landmark, etc.)
+     * @return Result containing list of matching Locations or error
      */
     suspend fun searchLocation(query: String): Result<List<Location>> {
         return try {
@@ -274,7 +428,33 @@ class EnhancedLocationService @Inject constructor(
     }
     
     /**
-     * Gets timezone offset with corrections for major cities/regions
+     * TIMEZONE CALCULATOR: Determines UTC offset for prayer time calculations
+     * 
+     * This function calculates the timezone offset needed for accurate prayer times.
+     * It uses a two-tier approach: known regions first, then longitude estimation.
+     * 
+     * CALCULATION METHOD:
+     * 1. Check if coordinates match known regions (high accuracy)
+     * 2. Fall back to longitude-based estimation (approximate)
+     * 
+     * KNOWN REGIONS (exact timezones):
+     * - Middle East: UAE (+4), Saudi Arabia (+3), Qatar (+3), etc.
+     * - South Asia: Pakistan (+5), India (+5.5), Bangladesh (+6)
+     * - Southeast Asia: Malaysia/Singapore (+8)
+     * - And more...
+     * 
+     * LONGITUDE FALLBACK:
+     * - Divides longitude by 15 degrees per hour
+     * - Rounds to nearest half-hour
+     * - Clamps to valid range (-12 to +12)
+     * 
+     * ACCURACY:
+     * - Known regions: Exact (accounts for political boundaries)
+     * - Longitude estimate: ±30 minutes typically
+     * 
+     * @param latitude GPS latitude coordinate
+     * @param longitude GPS longitude coordinate
+     * @return UTC offset in hours (e.g., 4.0 for GMT+4, -5.0 for GMT-5)
      */
     private fun getTimezoneOffset(latitude: Double, longitude: Double): Double {
         // Known timezone corrections for major cities/regions

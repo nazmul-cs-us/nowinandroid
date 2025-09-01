@@ -1,28 +1,55 @@
-![Now in Android](docs/images/nia-splash.jpg "Now in Android")
+![Starception Submission](docs/images/nia-splash.jpg "Starception Submission")
 
-<a href="https://play.google.com/store/apps/details?id=com.google.samples.apps.nowinandroid"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="70"></a>
+Starception Submission App
+==========================
 
-Now in Android App
-==================
+**An enhanced Android app based on Google's Now in Android architecture, featuring comprehensive Islamic prayer times functionality.**
 
-**Learn how this app was designed and built in the [design case study](https://goo.gle/nia-figma), [architecture learning journey](docs/ArchitectureLearningJourney.md) and [modularization learning journey](docs/ModularizationLearningJourney.md).**
+This repository contains the **Starception Submission** app - a fully functional Android application built entirely with Kotlin and Jetpack Compose. It extends Google's Now in Android sample with a complete Islamic prayer times system while maintaining all original functionality.
 
-This is the repository for the [Now in Android](https://developer.android.com/series/now-in-android)
-app. It is a **work in progress** 🚧.
+**Learn about the original architecture in the [architecture learning journey](docs/ArchitectureLearningJourney.md) and [modularization learning journey](docs/ModularizationLearningJourney.md).**
 
-**Now in Android** is a fully functional Android app built entirely with Kotlin and Jetpack Compose. It
-follows Android design and development best practices and is intended to be a useful reference
-for developers. As a running app, it's intended to help developers keep up-to-date with the world
-of Android development by providing regular news updates.
-
-The app is currently in development. The `prodRelease` variant is [available on the Play Store](https://play.google.com/store/apps/details?id=com.google.samples.apps.nowinandroid).
+The app demonstrates modern Android development practices and serves as both a functional news app and a comprehensive prayer times calculator for Muslims worldwide.
 
 # Features
 
-**Now in Android** displays content from the
-[Now in Android](https://developer.android.com/series/now-in-android) series. Users can browse for
-links to recent videos, articles and other content. Users can also follow topics they are interested
-in, and be notified when new content is published which matches interests they are following.
+## Core News App Features
+**Starception Submission** retains all original Now in Android functionality:
+- Browse content from the [Now in Android](https://developer.android.com/series/now-in-android) series
+- Follow topics of interest and receive notifications for new content
+- Bookmark articles for later reading
+- Dark/light theme support with Material You dynamic colors
+- Offline-first architecture with local caching
+
+## Islamic Prayer Times (New Feature)
+**Comprehensive prayer times system with advanced features:**
+
+### Prayer Time Calculations
+- **Multiple Calculation Methods**: Muslim World League, ISNA, Umm al-Qura, Egyptian Authority, University of Islamic Sciences (Karachi), MUIS, Shia Ithna Ashari, and Institute of Geophysics (Tehran)
+- **Madhab Support**: Standard (Shafi'i, Maliki, Hanbali) and Hanafi methods for Asr calculation
+- **High Latitude Adjustments**: Multiple methods for polar regions including Middle of Night, One-Seventh of Night, Angle Based, and Nearest Latitude
+- **Custom Adjustments**: Manual time offsets for each prayer and custom sun angle overrides
+
+### Location Services
+- **Smart Location Detection**: Multi-strategy location acquisition with 3-second timeouts to prevent UI blocking
+- **Enhanced GPS Service**: Prevents app hanging in elevators and poor signal areas
+- **Manual Location Setting**: Search and set location manually with geocoding support
+- **Automatic Location Updates**: Background location monitoring every 30 minutes
+- **Timezone Calculation**: Accurate timezone detection for worldwide locations
+
+### User Experience
+- **Instant Startup**: Cached prayer times for immediate display
+- **Real-time Updates**: Current/next prayer status with time-until-next calculations
+- **Material 3 Design**: Modern UI with expressive design elements
+- **Analog Watch Component**: Visual prayer time display with smooth animations
+- **Pull-to-refresh**: Manual refresh with smooth animations
+- **Notification Support**: Prayer time alerts and reminders
+
+### Technical Features
+- **Offline-first Architecture**: Works without internet connection
+- **Background Services**: Automatic prayer time updates and notifications
+- **Performance Optimized**: Efficient calculations with smart caching
+- **Memory Efficient**: Proper resource management and leak prevention
 
 ## Screenshots
 
@@ -78,7 +105,26 @@ The `prod` flavor makes real network calls to a backend server, providing up-to-
 this time, there is not a public backend available.
 
 For normal development use the `demoDebug` variant. For UI performance testing use the
-`demoRelease` variant. 
+`demoRelease` variant.
+
+## Prayer Times Development
+The Islamic prayer times functionality is fully integrated into the existing architecture:
+
+### Build Configuration
+- All prayer times code is included in both `demo` and `prod` flavors
+- Uses the same modular architecture as the original app
+- Prayer times work offline and don't require backend connectivity
+
+### Key Build Commands for Prayer Times
+- `./gradlew assembleDemoDebug` - Build with prayer times functionality
+- `./gradlew installDemoDebug` - Install on device for testing prayer times
+- `adb -s 4B221FDAP002T6 install -r app/build/outputs/apk/demo/debug/app-demo-debug.apk` - Install on specific Pixel 9 Pro device
+
+### Testing Prayer Times
+- Prayer times use real GPS location when available
+- Falls back to default location (Mecca) when GPS is unavailable
+- Manual location testing available through settings
+- All calculation methods can be tested and compared 
 
 # Testing
 
