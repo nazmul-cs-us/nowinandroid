@@ -366,7 +366,7 @@ fun PrayerTimesScreen(
     
 
     
-    // Pull-to-refresh from anywhere on the screen
+    // Full page pull-to-refresh - only top to bottom
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -374,7 +374,7 @@ fun PrayerTimesScreen(
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { offset ->
-                        // Start pull-to-refresh from anywhere on the screen
+                        // Start pull-to-refresh from anywhere on the full page
                         isPulling = true
                     },
                     onDragEnd = {
@@ -385,9 +385,14 @@ fun PrayerTimesScreen(
                         isPulling = false
                     },
                     onDrag = { change, _ ->
+                        // Only activate when pulling down (top to bottom)
                         if (isPulling && change.position.y > 0) {
                             // Direct 1:1 mapping for immediate response
                             pullOffset = change.position.y.coerceAtMost(80f)
+                        } else if (change.position.y <= 0) {
+                            // Reset if dragging upward (bottom to top)
+                            pullOffset = 0f
+                            isPulling = false
                         }
                     }
                 )
