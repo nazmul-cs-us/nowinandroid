@@ -658,32 +658,16 @@ fun PrayerTimesScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Text(
-                                    text = "Dhuhr",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = when (getPrayerStatus("Dhuhr")) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    fontWeight = FontWeight.Medium
-                                )
-                                // Status indicator
-                                Surface(
-                                    modifier = Modifier.size(20.dp),
-                                    shape = CircleShape,
-                                    color = when (getPrayerStatus("Dhuhr")) {
-                                        "Current" -> MaterialTheme.colorScheme.tertiary
-                                        "Next" -> MaterialTheme.colorScheme.primary
-                                        else -> MaterialTheme.colorScheme.outline
-                                    }
-                                ) {}
-                            }
+                            Text(
+                                text = "Dhuhr",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = when (getPrayerStatus("Dhuhr")) {
+                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontWeight = FontWeight.Medium
+                            )
                             Text(
                                 text = getPrayerTimeDisplay("Dhuhr"),
                                 style = MaterialTheme.typography.headlineSmall,
@@ -720,32 +704,16 @@ fun PrayerTimesScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Text(
-                                    text = "Asr",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = when (getPrayerStatus("Asr")) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    fontWeight = FontWeight.Medium
-                                )
-                                // Status indicator
-                                Surface(
-                                    modifier = Modifier.size(20.dp),
-                                    shape = CircleShape,
-                                    color = when (getPrayerStatus("Asr")) {
-                                        "Current" -> MaterialTheme.colorScheme.tertiary
-                                        "Next" -> MaterialTheme.colorScheme.primary
-                                        else -> MaterialTheme.colorScheme.outline
-                                    }
-                                ) {}
-                            }
+                            Text(
+                                text = "Asr",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = when (getPrayerStatus("Asr")) {
+                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontWeight = FontWeight.Medium
+                            )
                             Text(
                                 text = getPrayerTimeDisplay("Asr"),
                                 style = MaterialTheme.typography.headlineSmall,
@@ -788,32 +756,16 @@ fun PrayerTimesScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Text(
-                                    text = "Maghrib",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = when (getPrayerStatus("Maghrib")) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    fontWeight = FontWeight.Medium
-                                )
-                                // Status indicator
-                                Surface(
-                                    modifier = Modifier.size(20.dp),
-                                    shape = CircleShape,
-                                    color = when (getPrayerStatus("Maghrib")) {
-                                        "Current" -> MaterialTheme.colorScheme.tertiary
-                                        "Next" -> MaterialTheme.colorScheme.primary
-                                        else -> MaterialTheme.colorScheme.outline
-                                    }
-                                ) {}
-                            }
+                            Text(
+                                text = "Maghrib",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = when (getPrayerStatus("Maghrib")) {
+                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontWeight = FontWeight.Medium
+                            )
                             Text(
                                 text = getPrayerTimeDisplay("Maghrib"),
                                 style = MaterialTheme.typography.headlineSmall,
@@ -850,32 +802,16 @@ fun PrayerTimesScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Text(
-                                    text = "Isha",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = when (getPrayerStatus("Isha")) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    fontWeight = FontWeight.Medium
-                                )
-                                // Status indicator
-                                Surface(
-                                    modifier = Modifier.size(20.dp),
-                                    shape = CircleShape,
-                                    color = when (getPrayerStatus("Isha")) {
-                                        "Current" -> MaterialTheme.colorScheme.tertiary
-                                        "Next" -> MaterialTheme.colorScheme.primary
-                                        else -> MaterialTheme.colorScheme.outline
-                                    }
-                                ) {}
-                            }
+                            Text(
+                                text = "Isha",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = when (getPrayerStatus("Isha")) {
+                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontWeight = FontWeight.Medium
+                            )
                             Text(
                                 text = getPrayerTimeDisplay("Isha"),
                                 style = MaterialTheme.typography.headlineSmall,
