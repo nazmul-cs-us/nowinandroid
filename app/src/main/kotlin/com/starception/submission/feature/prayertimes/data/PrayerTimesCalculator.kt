@@ -76,8 +76,12 @@ class PrayerTimesCalculator(private val context: Context) {
      * - Change error handling strategy
      */
     suspend fun calculateDefaultPrayerTimes(): Pair<DayPrayerTimes?, String> {
+        val startTime = System.currentTimeMillis()
+        android.util.Log.d("PrayerCalculation", "=== STARTING PRAYER TIMES CALCULATION ===")
+        
         return try {
             // STEP 1: Get all required services
+            android.util.Log.d("PrayerCalculation", "STEP 1: Getting required services")
             val entryPoint = EntryPointAccessors.fromApplication(
                 context.applicationContext,
                 PrayerTimeCalculatorEntryPoint::class.java
@@ -86,26 +90,42 @@ class PrayerTimesCalculator(private val context: Context) {
             val locationService = entryPoint.enhancedLocationService()
             val settingsRepository = entryPoint.prayerSettingsRepository()
             val cache = entryPoint.locationCache()
+            android.util.Log.d("PrayerCalculation", "✓ All services obtained successfully")
             
             // STEP 2: Check cache first for instant results
+            android.util.Log.d("PrayerCalculation", "STEP 2: Checking cached prayer times")
             val cachedData = cache.getCachedPrayerTimes()
             if (cachedData != null) {
                 val (cachedPrayerTimes, cachedDate, cachedLocationName) = cachedData
+                android.util.Log.d("PrayerCalculation", "Found cached data: date=$cachedDate, location=$cachedLocationName")
                 if (cachedPrayerTimes != null && cachedLocationName != null) {
+                    android.util.Log.d("PrayerCalculation", "✓ Using cached prayer times - INSTANT RETURN")
+                    android.util.Log.d("PrayerCalculation", "Cached times: Fajr=${cachedPrayerTimes.fajr}, Dhuhr=${cachedPrayerTimes.dhuhr}, Asr=${cachedPrayerTimes.asr}, Maghrib=${cachedPrayerTimes.maghrib}, Isha=${cachedPrayerTimes.isha}")
                     // Return cached data immediately - no waiting!
                     return Pair(cachedPrayerTimes, cachedLocationName)
                 }
             }
+            android.util.Log.d("PrayerCalculation", "No valid cached data found, proceeding with fresh calculation")
             
-            // Get user prayer settings
+            // STEP 3: Get user prayer settings
+            android.util.Log.d("PrayerCalculation", "STEP 3: Loading user prayer settings")
             val userSettings = try {
-                settingsRepository.getSettings()
+                val settings = settingsRepository.getSettings()
+                android.util.Log.d("PrayerCalculation", "✓ User settings loaded:")
+                android.util.Log.d("PrayerCalculation", "  - Calculation Method: ${settings.calculationMethod.name}")
+                android.util.Log.d("PrayerCalculation", "  - Asr Madhab: ${settings.asrMadhhab.name}")
+                android.util.Log.d("PrayerCalculation", "  - High Latitude Adjustment: ${settings.highLatitudeAdjustment.name}")
+                android.util.Log.d("PrayerCalculation", "  - User Location: ${if (settings.location != null) "${settings.location?.getDisplayName()}" else "Not set"}")
+                settings
             } catch (e: Exception) {
+                android.util.Log.w("PrayerCalculation", "Failed to load user settings, using defaults: ${e.message}")
                 PrayerSettings() // Fallback to default
             }
             
             // STEP 4: SMART LOCATION DETERMINATION - Multi-level fallback system
-            // 
+            android.util.Log.d("PrayerCalculation", "STEP 4: Determining location using priority fallback system")
+            android.util.Log.d("PrayerCalculation", "Location permission granted: ${locationService.hasLocationPermission()}")
+            
             // PRIORITY ORDER:
             // 1. User's manually saved location (highest priority - user choice)
             // 2. Recent cached GPS location (fast - within 30 minutes)
@@ -117,49 +137,125 @@ class PrayerTimesCalculator(private val context: Context) {
             val location = when {
                 // PRIORITY 1: User's saved location (user manually set their location)
                 userSettings.location != null -> {
+                    android.util.Log.d("PrayerCalculation", "✓ PRIORITY 1: Using user's saved location")
+                    android.util.Log.d("PrayerCalculation", "  Location: ${userSettings.location!!.getDisplayName()}")
+                    android.util.Log.d("PrayerCalculation", "  Coordinates: ${userSettings.location!!.latitude}, ${userSettings.location!!.longitude}")
                     userSettings.location!!
                 }
                 
                 // PRIORITY 2-4: GPS and cached location strategies (if user granted permission)
                 locationService.hasLocationPermission() -> {
+                    android.util.Log.d("PrayerCalculation", "User granted location permission, trying GPS strategies")
                     try {
                         // PRIORITY 2: Try recent cached location first (instant, no GPS wait)
                         val cachedLocation = cache.getCachedLocation()
                         if (cachedLocation != null) {
+                            android.util.Log.d("PrayerCalculation", "✓ PRIORITY 2: Using recent cached GPS location")
+                            android.util.Log.d("PrayerCalculation", "  Location: ${cachedLocation.getDisplayName()}")
+                            android.util.Log.d("PrayerCalculation", "  Coordinates: ${cachedLocation.latitude}, ${cachedLocation.longitude}")
                             cachedLocation // Use cached if it's fresh (within 30 minutes)
                         } else {
+                            android.util.Log.d("PrayerCalculation", "No recent cached location, trying fresh GPS...")
                             // PRIORITY 3: Try fresh GPS with 3-second timeout (fast, prevents hangs)
+                            val gpsStartTime = System.currentTimeMillis()
                             val androidLocation = locationService.getLocationQuick().getOrNull()
+                            val gpsTime = System.currentTimeMillis() - gpsStartTime
+                            
                             androidLocation?.let { androidLoc ->
+                                android.util.Log.d("PrayerCalculation", "✓ PRIORITY 3: GPS location obtained in ${gpsTime}ms")
+                                android.util.Log.d("PrayerCalculation", "  GPS Coordinates: ${androidLoc.latitude}, ${androidLoc.longitude}")
+                                android.util.Log.d("PrayerCalculation", "  GPS Accuracy: ${androidLoc.accuracy}m")
+                                
                                 val detailedLocation = locationService.getLocationDetails(androidLoc)
+                                android.util.Log.d("PrayerCalculation", "  Resolved Location: ${detailedLocation.getDisplayName()}")
                                 cache.cacheLocation(detailedLocation) // Cache for next time
                                 detailedLocation
-                            } ?: getDefaultLocation() // Fallback if GPS fails
+                            } ?: run {
+                                android.util.Log.w("PrayerCalculation", "GPS failed after ${gpsTime}ms, using default location")
+                                getDefaultLocation() // Fallback if GPS fails
+                            }
                         }
                     } catch (e: Exception) {
+                        android.util.Log.w("PrayerCalculation", "GPS strategy failed: ${e.message}")
                         // PRIORITY 4: Try any cached location before giving up
-                        cache.getCachedLocation() ?: getDefaultLocation()
+                        val fallbackLocation = cache.getCachedLocation()
+                        if (fallbackLocation != null) {
+                            android.util.Log.d("PrayerCalculation", "✓ PRIORITY 4: Using old cached location as fallback")
+                            android.util.Log.d("PrayerCalculation", "  Location: ${fallbackLocation.getDisplayName()}")
+                            fallbackLocation
+                        } else {
+                            android.util.Log.d("PrayerCalculation", "No cached location available, using default")
+                            getDefaultLocation()
+                        }
                     }
                 }
                 
                 // PRIORITY 5: Final fallback - use any cached location or Dubai default
-                else -> cache.getCachedLocation() ?: getDefaultLocation()
+                else -> {
+                    android.util.Log.d("PrayerCalculation", "No location permission, trying cached or default")
+                    val fallbackLocation = cache.getCachedLocation()
+                    if (fallbackLocation != null) {
+                        android.util.Log.d("PrayerCalculation", "✓ PRIORITY 5a: Using cached location (no permission)")
+                        android.util.Log.d("PrayerCalculation", "  Location: ${fallbackLocation.getDisplayName()}")
+                        fallbackLocation
+                    } else {
+                        android.util.Log.d("PrayerCalculation", "✓ PRIORITY 5b: Using Dubai default location")
+                        getDefaultLocation()
+                    }
+                }
             }
             
             // STEP 5: CALCULATE PRAYER TIMES using astronomical formulas
+            android.util.Log.d("PrayerCalculation", "STEP 5: Calculating prayer times using astronomical formulas")
             val today = LocalDate.now()
+            android.util.Log.d("PrayerCalculation", "Calculation date: $today")
+            android.util.Log.d("PrayerCalculation", "Final location: ${location.getDisplayName()}")
+            android.util.Log.d("PrayerCalculation", "Final coordinates: ${location.latitude}, ${location.longitude}")
+            android.util.Log.d("PrayerCalculation", "Calculation method: ${userSettings.calculationMethod.name}")
+            
+            val calcStartTime = System.currentTimeMillis()
             val calculatedTimes = calculator.calculatePrayerTimes(today, location, userSettings)
+            val calcDuration = System.currentTimeMillis() - calcStartTime
             val locationName = location.getDisplayName()
             
-            // STEP 6: CACHE THE RESULTS for instant future access
             if (calculatedTimes != null) {
-                cache.cachePrayerTimes(calculatedTimes, today, locationName)
-                // This cached data will be returned immediately on next app launch
+                android.util.Log.d("PrayerCalculation", "✓ Prayer times calculated successfully in ${calcDuration}ms:")
+                android.util.Log.d("PrayerCalculation", "  Fajr:    ${calculatedTimes.fajr}")
+                android.util.Log.d("PrayerCalculation", "  Dhuhr:   ${calculatedTimes.dhuhr}")  
+                android.util.Log.d("PrayerCalculation", "  Asr:     ${calculatedTimes.asr}")
+                android.util.Log.d("PrayerCalculation", "  Maghrib: ${calculatedTimes.maghrib}")
+                android.util.Log.d("PrayerCalculation", "  Isha:    ${calculatedTimes.isha}")
+            } else {
+                android.util.Log.w("PrayerCalculation", "✗ Prayer times calculation returned null after ${calcDuration}ms")
             }
+            
+            // STEP 6: CACHE THE RESULTS for instant future access
+            android.util.Log.d("PrayerCalculation", "STEP 6: Caching results for future use")
+            if (calculatedTimes != null) {
+                try {
+                    cache.cachePrayerTimes(calculatedTimes, today, locationName)
+                    android.util.Log.d("PrayerCalculation", "✓ Prayer times cached successfully for instant future access")
+                    // This cached data will be returned immediately on next app launch
+                } catch (e: Exception) {
+                    android.util.Log.w("PrayerCalculation", "Failed to cache prayer times: ${e.message}")
+                }
+            } else {
+                android.util.Log.w("PrayerCalculation", "Skipping cache - no valid prayer times to cache")
+            }
+            
+            val totalTime = System.currentTimeMillis() - startTime
+            android.util.Log.d("PrayerCalculation", "=== CALCULATION COMPLETE ===")
+            android.util.Log.d("PrayerCalculation", "Total calculation time: ${totalTime}ms")
+            android.util.Log.d("PrayerCalculation", "Result: ${if (calculatedTimes != null) "SUCCESS" else "FAILED"}")
             
             Pair(calculatedTimes, locationName)
         } catch (e: Exception) {
+            val totalTime = System.currentTimeMillis() - startTime
+            android.util.Log.e("PrayerCalculation", "=== CALCULATION FAILED AFTER ${totalTime}ms ===")
+            android.util.Log.e("PrayerCalculation", "Error during prayer times calculation: ${e.message}", e)
+            
             // ERROR RECOVERY: Try cached data as emergency fallback
+            android.util.Log.d("PrayerCalculation", "Attempting error recovery using cached data...")
             // 
             // This ensures the app never completely fails - it will show something
             // even if all location and calculation services fail.
@@ -172,16 +268,22 @@ class PrayerTimesCalculator(private val context: Context) {
                 val cachedData = cache.getCachedPrayerTimes()
                 
                 if (cachedData != null) {
-                    val (cachedPrayerTimes, _, cachedLocationName) = cachedData
+                    val (cachedPrayerTimes, cachedDate, cachedLocationName) = cachedData
+                    android.util.Log.d("PrayerCalculation", "Found emergency cached data: date=$cachedDate, location=$cachedLocationName")
                     if (cachedPrayerTimes != null && cachedLocationName != null) {
+                        android.util.Log.d("PrayerCalculation", "✓ Using emergency cached data as fallback")
+                        android.util.Log.d("PrayerCalculation", "Emergency cached times: Fajr=${cachedPrayerTimes.fajr}, Dhuhr=${cachedPrayerTimes.dhuhr}, Asr=${cachedPrayerTimes.asr}, Maghrib=${cachedPrayerTimes.maghrib}, Isha=${cachedPrayerTimes.isha}")
                         // Return cached data with clear indication it's cached
                         return Pair(cachedPrayerTimes, "$cachedLocationName (Cached)")
                     }
                 }
+                android.util.Log.w("PrayerCalculation", "No valid emergency cached data available")
             } catch (cacheError: Exception) {
+                android.util.Log.e("PrayerCalculation", "Emergency cache recovery also failed: ${cacheError.message}")
                 // Even cache failed - this is very rare
             }
             
+            android.util.Log.w("PrayerCalculation", "All recovery methods failed, returning default fallback")
             // ABSOLUTE FINAL FALLBACK: Return null but with clear location indicator
             // This will trigger the app to show Dubai prayer times from PrayerTimeCalculatorService
             Pair(null, "Dubai, UAE (Default)")

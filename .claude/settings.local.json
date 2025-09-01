@@ -29,7 +29,8 @@
       "Bash(chmod:*)",
       "Bash(./rename_package.sh)",
       "Bash(git checkout:*)",
-      "Bash(git stash push:*)"
+      "Bash(git stash push:*)",
+      "Bash(./install_and_run.sh)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
