@@ -1,6 +1,7 @@
 package com.starception.submission.feature.prayertimes
 
 import android.Manifest
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -24,18 +25,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.EaseInOutCubic
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.ui.graphics.graphicsLayer
 
 
 
@@ -45,8 +38,14 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.starception.submission.feature.prayertimes.utils.getCurrentDate
 import com.starception.submission.feature.prayertimes.utils.formatTime
 import com.starception.submission.feature.prayertimes.data.PrayerTimesCalculator
+import com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint
+import com.starception.submission.feature.prayertimes.animations.RefreshIndicator
+import com.starception.submission.feature.prayertimes.animations.FlowingArrowsAnimation
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.Duration
@@ -100,54 +99,77 @@ fun PrayerTimesScreen(
     // REAL-TIME CLOCK STATE - Updates every minute for live prayer status
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
     
-    // PULL-TO-REFRESH STATE - Handle pull down to refresh location and prayer times
+    // PULL-TO-REFRESH STATE - Simple implementation
     var isRefreshing by remember { mutableStateOf(false) }
     var pullOffset by remember { mutableStateOf(0f) }
-    var isPulling by remember { mutableStateOf(false) }
+    var isDragging by remember { mutableStateOf(false) }
     
     // Smooth animation for pull offset
     val animatedPullOffset by animateFloatAsState(
         targetValue = pullOffset,
-        animationSpec = tween(durationMillis = 200),
+        animationSpec = tween(durationMillis = 100),
         label = "pullOffset"
     )
-    
-    // Smooth arrow flow with calculated lifecycle
-    val infiniteTransition = rememberInfiniteTransition(label = "arrowHint")
-    val arrow1 by infiniteTransition.animateFloat(
-        initialValue = -12f,
-        targetValue = 12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "arrow1"
-    )
-    val arrow2 by infiniteTransition.animateFloat(
-        initialValue = -12f,
-        targetValue = 12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, delayMillis = 1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "arrow2"
-    )
-    
 
     
-
-    
-
-    
-
-    
-    // Custom pull-to-refresh implementation
-    fun onRefresh() {
-        isRefreshing = true
-        // Refresh location and prayer times
-        // Note: calculatePrayerTimes is a suspend function, so we'll trigger it via LaunchedEffect
+    // REFRESH LOGIC - Handle pull-to-refresh action with real prayer time recalculation
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            try {
+                // IMPROVED REFRESH: Clear cached data and recalculate with timeout
+                android.util.Log.d("PullToRefresh", "=== STARTING PULL-TO-REFRESH ===")
+                android.util.Log.d("PullToRefresh", "User initiated prayer times refresh with 3-second timeout")
+                
+                // Clear cached prayer times and location to force fresh calculation
+                android.util.Log.d("PullToRefresh", "Clearing in-memory cache to force fresh calculation...")
+                try {
+                    // Access the LocationCache service through Hilt EntryPoint
+                    val entryPoint = EntryPointAccessors.fromApplication(
+                        context.applicationContext,
+                        PrayerTimeCalculatorEntryPoint::class.java
+                    )
+                    val cache = entryPoint.locationCache()
+                    cache.clearCache()
+                    android.util.Log.d("PullToRefresh", "✓ Cache cleared successfully - fresh calculation will be forced")
+                } catch (e: Exception) {
+                    android.util.Log.e("PullToRefresh", "Failed to clear cache: ${e.message}", e)
+                }
+                
+                // Set loading state
+                isLoading = true
+                
+                // Calculate with 3-second timeout to prevent infinite loading
+                val startTime = System.currentTimeMillis()
+                try {
+                    // Run calculation with timeout
+                    withTimeout(3000L) { // 3 second timeout
+                        withContext(Dispatchers.Default) {
+                            val calculator = PrayerTimesCalculator(context)
+                            val result = calculator.calculateDefaultPrayerTimes()
+                            
+                            prayerTimes = result.first   // Calculated prayer times (or null if failed)
+                            location = result.second     // Location name for display
+                        }
+                    }
+                    android.util.Log.d("PullToRefresh", "Calculation completed successfully in ${System.currentTimeMillis() - startTime}ms")
+                } catch (e: TimeoutCancellationException) {
+                    android.util.Log.w("PullToRefresh", "Calculation timed out after 3 seconds, keeping existing data")
+                    // Keep current prayer times if they exist, or show default location
+                    if (prayerTimes == null) {
+                        location = "Location unavailable"
+                    }
+                }
+            } catch (e: Exception) {
+                // Handle any other errors gracefully
+                android.util.Log.e("PullToRefresh", "Error during refresh: ${e.message}")
+            } finally {
+                // Always reset loading and refresh states after timeout
+                isLoading = false
+                isRefreshing = false
+            }
+        }
     }
-    
+
     // PERMISSION MANAGEMENT - Handle user permissions gracefully
     // Notification permission for prayer alerts (Android 13+)
     val notificationPermissionState = rememberPermissionState(
@@ -224,18 +246,6 @@ fun PrayerTimesScreen(
         isLoading = false
     }
     
-    // Handle refresh when pull-to-refresh is triggered
-    LaunchedEffect(isRefreshing) {
-        if (isRefreshing) {
-            try {
-                calculatePrayerTimes()
-            } catch (e: Exception) {
-                // Handle any errors during refresh
-            } finally {
-                isRefreshing = false
-            }
-        }
-    }
     
     // Get next prayer and current prayer
     fun getNextPrayer(): Pair<String, LocalTime>? {
@@ -400,62 +410,54 @@ fun PrayerTimesScreen(
     
 
     
-    // Full page pull-to-refresh - only top to bottom
+    // Simple pull-to-refresh implementation - simplified approach
     Box(
         modifier = modifier
             .fillMaxSize()
-            .offset(y = animatedPullOffset.dp)
             .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        // Start pull-to-refresh from anywhere on the full page
-                        isPulling = true
+                detectVerticalDragGestures(
+                    onDragStart = { 
+                        isDragging = true
                     },
                     onDragEnd = {
-                        if (pullOffset > 30f && isPulling) {
-                            onRefresh()
+                        if (pullOffset > 100f) {
+                            isRefreshing = true
                         }
                         pullOffset = 0f
-                        isPulling = false
+                        isDragging = false
                     },
-                    onDrag = { change, _ ->
-                        // Only activate when pulling down (top to bottom)
-                        if (isPulling && change.position.y > 0) {
-                            // Direct 1:1 mapping for immediate response
-                            pullOffset = change.position.y.coerceAtMost(80f)
-                        } else if (change.position.y <= 0) {
-                            // Reset if dragging upward (bottom to top)
-                            pullOffset = 0f
-                            isPulling = false
+                    onVerticalDrag = { _, dragAmount ->
+                        if (dragAmount > 0) {
+                            val newOffset = (pullOffset + dragAmount * 0.5f).coerceAtMost(150f)
+                            pullOffset = newOffset
+                        } else {
+                            val newOffset = (pullOffset + dragAmount).coerceAtLeast(0f)
+                            pullOffset = newOffset
                         }
                     }
                 )
             }
     ) {
-
-        
-        // Refresh indicator when actually refreshing
-        if (isRefreshing) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 120.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Updating location and prayer times...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+        // PROFESSIONAL pull-to-refresh indicator with enhanced animations
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .zIndex(10f),
+            contentAlignment = Alignment.Center
+        ) {
+            // Show professional refresh indicator when pulling or refreshing
+            RefreshIndicator(
+                isRefreshing = isRefreshing,
+                pullOffset = pullOffset
+            )
+            
+            // Show elegant flowing arrow hint when not pulling
+            if (!isRefreshing && pullOffset < 30f) {
+                FlowingArrowsAnimation(
+                    isPulling = isDragging,
+                    pullOffset = pullOffset,
+                    isRefreshing = isRefreshing
+                )
             }
         }
         
@@ -466,132 +468,34 @@ fun PrayerTimesScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(56.dp),
-                        strokeWidth = 4.dp
+                        color = MaterialTheme.colorScheme.primary
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Live Updates Active",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Loading prayer times...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
         } else {
+            // REMOVE SCROLL - it conflicts with pull-to-refresh detection
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                    .padding(horizontal = 24.dp)
+                    .padding(
+                        top = (100 + (animatedPullOffset * 0.5f)).dp, // Dynamic padding: base 100dp + extra space when pulling (reduced for consistent spacing)
+                        bottom = 16.dp
+                    )
+                    .offset(y = (animatedPullOffset * 0.2f).dp), // Reduced content movement to prevent overlap
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
 
-                // Flowing arrows animation
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .offset(y = (-8).dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (isPulling && pullOffset > 25f) {
-                        // Show refresh icon when pulling
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Pull to refresh",
-                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Release to refresh",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    } else {
-                        // Show flowing arrows on the left side of text
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (!isPulling && !isRefreshing && pullOffset == 0f) {
-                                // Flowing arrows on the left
-                                Box(
-                                    modifier = Modifier
-                                        .width(20.dp)
-                                        .height(24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    // Arrow 1 with calculated lifecycle
-                                    Icon(
-                                        imageVector = Icons.Default.KeyboardArrowDown,
-                                        contentDescription = "Pull down",
-                                        tint = MaterialTheme.colorScheme.primary.copy(
-                                            alpha = when {
-                                                arrow1 < -10f -> 0f
-                                                arrow1 < -6f -> (arrow1 + 10f) / 4f * 0.7f // Fade in
-                                                arrow1 > 6f -> (12f - arrow1) / 6f * 0.7f   // Fade out
-                                                arrow1 > 10f -> 0f
-                                                else -> 0.7f // Full opacity
-                                            }
-                                        ),
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .offset(y = arrow1.dp)
-                                    )
-                                    // Arrow 2 with calculated lifecycle
-                                    Icon(
-                                        imageVector = Icons.Default.KeyboardArrowDown,
-                                        contentDescription = "Pull down",
-                                        tint = MaterialTheme.colorScheme.primary.copy(
-                                            alpha = when {
-                                                arrow2 < -10f -> 0f
-                                                arrow2 < -6f -> (arrow2 + 10f) / 4f * 0.6f // Fade in
-                                                arrow2 > 6f -> (12f - arrow2) / 6f * 0.6f   // Fade out
-                                                arrow2 > 10f -> 0f
-                                                else -> 0.6f // Full opacity
-                                            }
-                                        ),
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .offset(y = arrow2.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                            } else {
-                                // Static single arrow when pulling but not at threshold
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Pull to refresh",
-                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                            }
-                            
-                            Text(
-                                text = "Pull down to refresh location",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
+
                 
                 // Main prayer section - shows next prayer or current prayer with expressive shape
                 val mainPrayer = getNextPrayer() ?: getCurrentPrayer()

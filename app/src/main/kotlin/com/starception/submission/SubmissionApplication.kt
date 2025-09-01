@@ -59,9 +59,12 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
         // Use background thread for heavy initialization to prevent ANR
         Thread {
             try {
-                // DISABLE Sync initialization to prevent WorkManager ANR after app closure
+                // ENABLE Sync initialization to populate topics data for interests pages
                 if (AnrPreventionConfig.ENABLE_BACKGROUND_SYNC) {
                     Sync.initialize(context = this)
+                    Log.d("SubmissionApplication", "Sync initialized to populate topics data")
+                } else {
+                    Log.w("SubmissionApplication", "Sync disabled - interests pages will be empty")
                 }
                 profileVerifierLogger()
                 
