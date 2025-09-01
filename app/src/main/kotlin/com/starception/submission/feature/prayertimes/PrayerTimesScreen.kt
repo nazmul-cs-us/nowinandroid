@@ -23,10 +23,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-// Note: pullrefresh package may not be available in this version
-// import androidx.compose.material.pullrefresh.PullRefreshIndicator
-// import androidx.compose.material.pullrefresh.pullRefresh
-// import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus.Denied
 import com.google.accompanist.permissions.rememberPermissionState
@@ -90,25 +92,22 @@ fun PrayerTimesScreen(
     
     // PULL-TO-REFRESH STATE - Handle pull down to refresh location and prayer times
     var isRefreshing by remember { mutableStateOf(false) }
+    var pullOffset by remember { mutableStateOf(0f) }
+    var isPulling by remember { mutableStateOf(false) }
     
-    // Note: Pull-to-refresh functionality temporarily disabled due to import issues
-    // val pullRefreshState = rememberPullRefreshState(
-    //     refreshing = isRefreshing,
-    //     onRefresh = {
-    //         isRefreshing = true
-    //         // Refresh location and prayer times with better user feedback
-    //         try {
-    //             calculatePrayerTimes()
-    //             // Show brief success feedback
-    //             location = "Location refreshed"
-    //         } catch (e: Exception) {
-    //             // Handle any errors gracefully
-    //             location = "Refresh failed, using cached data"
-    //         } finally {
-    //             isRefreshing = false
-    //         }
-    //     }
-    // )
+    // Smooth animation for pull offset
+    val animatedPullOffset by animateFloatAsState(
+        targetValue = pullOffset,
+        animationSpec = tween(durationMillis = 200),
+        label = "pullOffset"
+    )
+    
+    // Custom pull-to-refresh implementation
+    fun onRefresh() {
+        isRefreshing = true
+        // Refresh location and prayer times
+        // Note: calculatePrayerTimes is a suspend function, so we'll trigger it via LaunchedEffect
+    }
     
     // PERMISSION MANAGEMENT - Handle user permissions gracefully
     // Notification permission for prayer alerts (Android 13+)
@@ -184,6 +183,19 @@ fun PrayerTimesScreen(
         
         // Hide loading spinner after calculation completes (success or failure)
         isLoading = false
+    }
+    
+    // Handle refresh when pull-to-refresh is triggered
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            try {
+                calculatePrayerTimes()
+            } catch (e: Exception) {
+                // Handle any errors during refresh
+            } finally {
+                isRefreshing = false
+            }
+        }
     }
     
     // Get next prayer and current prayer
@@ -347,12 +359,80 @@ fun PrayerTimesScreen(
         }
     }
     
-    // Use the app's standard background for consistency
+    // Custom pull-to-refresh container
     Box(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .offset(y = animatedPullOffset.dp)
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { isPulling = true },
+                    onDragEnd = {
+                        if (pullOffset > 80f) {
+                            onRefresh()
+                        }
+                        // Animate back to original position
+                        pullOffset = 0f
+                        isPulling = false
+                    },
+                    onDrag = { change, _ ->
+                        if (change.position.y > 0) {
+                            // Enhanced pull resistance for smoother feel
+                            pullOffset = (change.position.y * 0.4f).coerceAtMost(180f)
+                        }
+                    }
+                )
+            }
     ) {
-        // Note: Pull-to-refresh functionality temporarily disabled due to import issues
-        // PullRefreshIndicator and related UI elements commented out
+        // Custom pull-to-refresh indicator
+        if (isPulling && pullOffset > 10f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 60.dp)
+            ) {
+                Text(
+                    text = if (pullOffset > 80f) "Release to refresh" else "Pull to refresh",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .background(
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                            RoundedCornerShape(16.dp)
+                        )
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                )
+            }
+        }
+        
+        // Refresh indicator when actually refreshing
+        if (isRefreshing) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 120.dp)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Updating location and prayer times...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
         
         if (isLoading) {
             // Loading state with Material 3 design
@@ -383,26 +463,31 @@ fun PrayerTimesScreen(
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
+
                 // Note: Pull-to-refresh hint temporarily disabled due to import issues
-                // Row(
-                //     modifier = Modifier.fillMaxWidth(),
-                //     horizontalArrangement = Arrangement.Center,
-                //     verticalAlignment = Alignment.CenterVertically
-                // ) {
-                //     Icon(
-                //         imageVector = Icons.Default.Refresh,
-                //         contentDescription = "Pull to refresh",
-                //         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                //         modifier = Modifier.size(16.dp)
-                //     )
-                //     Spacer(modifier = Modifier.width(8.dp))
-                //     Text(
-                //         text = "Pull down to refresh location",
-                //         style = MaterialTheme.typography.bodySmall,
-                //         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                //         textAlign = TextAlign.Center
-                //     )
-                // }
+                // Enhanced pull-to-refresh hint
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Pull to refresh",
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Pull down to refresh location",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
+                }
                 
                 // Main prayer section - shows next prayer or current prayer with expressive shape
                 val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
