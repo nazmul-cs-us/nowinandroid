@@ -17,7 +17,39 @@
 package com.starception.submission.core.model.data
 
 /**
- * Class summarizing user interest data
+ * USER DATA MODEL: Complete representation of user preferences and app state
+ * 
+ * This data class contains all user-specific settings, preferences, and behavioral data
+ * that persists across app sessions. It serves as the single source of truth for
+ * personalizing the user experience.
+ * 
+ * DATA CATEGORIES:
+ * 1. Content Preferences: What topics to follow, articles bookmarked/viewed
+ * 2. Theme Preferences: Visual appearance and color schemes
+ * 3. App Behavior: Onboarding status and feature preferences
+ * 
+ * IMMUTABILITY:
+ * - Uses immutable data class pattern for predictable state management
+ * - Changes create new instances rather than modifying existing ones
+ * - Enables safe sharing across multiple UI components
+ * 
+ * PERSISTENCE:
+ * - Typically stored using Proto DataStore for type safety
+ * - Automatically synchronized across app components
+ * - Survives app restarts and device reboots
+ * 
+ * REACTIVE UPDATES:
+ * - Changes trigger Flow emissions in UserDataRepository
+ * - UI automatically updates when preferences change
+ * - Enables real-time personalization
+ * 
+ * @param bookmarkedNewsResources Set of news article IDs that user has bookmarked
+ * @param viewedNewsResources Set of news article IDs that user has viewed/read
+ * @param followedTopics Set of topic IDs that user wants to see content for
+ * @param themeBrand Selected theme branding (Default, Android, etc.)
+ * @param darkThemeConfig Dark mode preference (Follow System, Light, Dark)
+ * @param useDynamicColor Whether to use Material You dynamic colors (Android 12+)
+ * @param shouldHideOnboarding Whether onboarding has been completed (hide on startup)
  */
 data class UserData(
     val bookmarkedNewsResources: Set<String>,

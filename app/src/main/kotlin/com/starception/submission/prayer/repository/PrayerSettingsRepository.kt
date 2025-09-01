@@ -140,7 +140,21 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Updates prayer settings
+     * SETTINGS UPDATE: Saves new prayer settings and notifies UI
+     * 
+     * This function updates prayer settings both in memory and persistent storage,
+     * then notifies all UI components about the change.
+     * 
+     * OPERATIONS:
+     * 1. Saves to SharedPreferences (persistent storage)
+     * 2. Updates in-memory cache (_settingsFlow)
+     * 3. Triggers UI updates via Flow emission
+     * 
+     * UI NOTIFICATION:
+     * Uses both setValue and tryEmit to ensure all UI components
+     * receive the update, even if they're subscribed differently.
+     * 
+     * @param settings The new settings to save and apply
      */
     fun updateSettings(settings: PrayerSettings) {
         android.util.Log.d("PrayerSettingsRepository", "Updating settings - ASR: ${settings.asrMadhhab}")
@@ -151,7 +165,12 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Updates calculation method
+     * CALCULATION METHOD UPDATE: Changes the Islamic prayer calculation method
+     * 
+     * This updates which organization's calculation parameters to use for prayer times.
+     * Different methods use different sun angle calculations.
+     * 
+     * @param method The new calculation method (e.g., Muslim World League, ISNA)
      */
     fun updateCalculationMethod(method: CalculationMethod) {
         val updated = getSettings().copy(calculationMethod = method)
@@ -159,7 +178,13 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Updates Asr madhhab
+     * ASR MADHHAB UPDATE: Changes the Islamic school of thought for Asr calculation
+     * 
+     * This affects when Asr prayer time is calculated:
+     * - Standard (Shafi'i, Maliki, Hanbali): Shadow length = object length
+     * - Hanafi: Shadow length = 2x object length (later time)
+     * 
+     * @param madhhab The Islamic school of thought for Asr calculation
      */
     fun updateAsrMadhhab(madhhab: AsrMadhhab) {
         val updated = getSettings().copy(asrMadhhab = madhhab)
@@ -167,7 +192,12 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Updates high latitude adjustment method
+     * HIGH LATITUDE ADJUSTMENT UPDATE: Changes calculation method for polar regions
+     * 
+     * In locations above ~48° latitude, the sun may not reach required angles.
+     * This setting determines how to handle such cases.
+     * 
+     * @param adjustment Method for adjusting prayer times at high latitudes
      */
     fun updateHighLatitudeAdjustment(adjustment: HighLatitudeAdjustment) {
         val updated = getSettings().copy(highLatitudeAdjustment = adjustment)
@@ -175,7 +205,12 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Updates time offsets
+     * TIME OFFSETS UPDATE: Changes custom minute adjustments for prayer times
+     * 
+     * Allows users to fine-tune calculated prayer times to match local customs,
+     * mosque schedules, or personal preferences.
+     * 
+     * @param offsets Per-prayer minute adjustments (positive = later, negative = earlier)
      */
     fun updateTimeOffsets(offsets: PrayerTimeOffsets) {
         val updated = getSettings().copy(timeOffsets = offsets)
@@ -183,7 +218,13 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Updates location settings
+     * LOCATION SETTINGS UPDATE: Changes GPS usage and manual location preferences
+     * 
+     * This controls whether to use GPS location or a manually set location
+     * for prayer time calculations.
+     * 
+     * @param useGps Whether to use GPS location when available
+     * @param location Manual location to use (if GPS is disabled or unavailable)
      */
     fun updateLocationSettings(useGps: Boolean, location: Location? = null) {
         val currentSettings = getSettings()
@@ -195,7 +236,13 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Updates notification settings
+     * NOTIFICATION SETTINGS UPDATE: Changes prayer notification preferences
+     * 
+     * This controls whether users receive notifications for prayer times
+     * and how many minutes before each prayer to notify.
+     * 
+     * @param enabled Whether to show prayer time notifications
+     * @param beforeMinutes How many minutes before prayer time to notify (default: 10)
      */
     fun updateNotificationSettings(enabled: Boolean, beforeMinutes: Int = 10) {
         prefs.edit()
@@ -205,13 +252,33 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Gets notification settings
+     * NOTIFICATION SETTINGS GETTER: Retrieves current notification preferences
+     * 
+     * These functions provide access to current notification settings without
+     * loading the full PrayerSettings object.
+     * 
+     * @return Current notification preferences
      */
     fun isNotificationsEnabled(): Boolean = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)
     fun getNotifyBeforeMinutes(): Int = prefs.getInt(KEY_NOTIFY_BEFORE_MINUTES, 10)
     
     /**
-     * Loads settings from SharedPreferences
+     * SETTINGS LOADER: Loads user preferences from persistent storage
+     * 
+     * This function reads all prayer settings from SharedPreferences and constructs
+     * a complete PrayerSettings object. It includes error handling for corrupted
+     * or missing settings.
+     * 
+     * ERROR HANDLING:
+     * - Uses try/catch for enum parsing
+     * - Falls back to default values on errors
+     * - Logs errors for debugging
+     * 
+     * PERFORMANCE:
+     * - Should only be called on background threads
+     * - Uses lazy initialization to avoid blocking app startup
+     * 
+     * @return Complete PrayerSettings object with all user preferences
      */
     private fun loadSettings(): PrayerSettings {
         android.util.Log.d("PrayerSettingsRepository", "Loading settings from SharedPreferences")
@@ -269,7 +336,19 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Gets default prayer settings without disk I/O
+     * DEFAULT SETTINGS PROVIDER: Creates default settings without disk access
+     * 
+     * This provides a fast fallback when settings are still loading or corrupted.
+     * Used during app startup to prevent UI blocking.
+     * 
+     * DEFAULTS:
+     * - Muslim World League calculation method (widely used)
+     * - Standard Asr madhhab (most common)
+     * - No high latitude adjustments
+     * - GPS location enabled
+     * - All custom angles/offsets disabled
+     * 
+     * @return PrayerSettings with sensible defaults for immediate use
      */
     private fun getDefaultSettings(): PrayerSettings {
         return PrayerSettings(
@@ -286,7 +365,19 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Saves settings to SharedPreferences
+     * SETTINGS SAVER: Persists user preferences to disk storage
+     * 
+     * This function writes all prayer settings to SharedPreferences for persistence
+     * across app restarts. It handles null values appropriately and includes
+     * logging for debugging.
+     * 
+     * STORAGE STRATEGY:
+     * - Enum values stored as strings (future-proof)
+     * - Null custom values are removed (saves space)
+     * - Location data only saved when present
+     * - Uses atomic operations for consistency
+     * 
+     * @param settings The settings to save to persistent storage
      */
     private fun saveSettings(settings: PrayerSettings) {
         android.util.Log.d("PrayerSettingsRepository", "Saving settings - ASR: ${settings.asrMadhhab.name}")
@@ -331,7 +422,17 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Resets all settings to defaults
+     * SETTINGS RESET: Clears all saved preferences and returns to defaults
+     * 
+     * This function completely removes all saved preferences and reloads
+     * settings from defaults. Useful for troubleshooting or user preference.
+     * 
+     * OPERATIONS:
+     * 1. Clears all SharedPreferences data
+     * 2. Reloads settings (will use defaults since nothing is saved)
+     * 3. Updates UI via Flow emission
+     * 
+     * WARNING: This action is irreversible!
      */
     fun resetToDefaults() {
         prefs.edit().clear().apply()
@@ -339,7 +440,17 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Force sets ASR method to Standard (for debugging/fixing incorrect settings)
+     * ASR DEBUG FIX: Forces Asr madhhab to Standard method
+     * 
+     * This is a debugging function to fix issues with Asr calculation settings.
+     * It bypasses normal validation and forces the setting to Standard madhhab.
+     * 
+     * USE CASES:
+     * - Fixing corrupted settings
+     * - Debugging calculation issues
+     * - Emergency reset for Asr method only
+     * 
+     * NOTE: This is a maintenance function, not for normal user operation
      */
     fun forceSetAsrToStandard() {
         val updated = getSettings().copy(asrMadhhab = AsrMadhhab.STANDARD)
@@ -464,7 +575,17 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Clears cached prayer times
+     * CACHE CLEARER: Removes all cached prayer times from storage
+     * 
+     * This forces the app to recalculate prayer times on next startup.
+     * Useful when location changes or settings change significantly.
+     * 
+     * CLEARED DATA:
+     * - Cached prayer times for current day
+     * - Associated location information
+     * - Cache validity date
+     * 
+     * RESULT: Next app startup will show "Calculating..." and compute fresh times
      */
     fun clearPrayerTimesCache() {
         prefs.edit().apply {
@@ -485,7 +606,21 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Checks if cached prayer times are available and valid for today
+     * CACHE VALIDATOR: Checks if valid cached prayer times exist for today
+     * 
+     * This function performs a quick check to see if cached prayer times
+     * are available and valid for the current date.
+     * 
+     * VALIDATION CHECKS:
+     * 1. Cache exists in SharedPreferences
+     * 2. Cached date matches today's date
+     * 3. Essential prayer time data is present
+     * 
+     * PERFORMANCE:
+     * - Fast operation (no object construction)
+     * - Used to decide whether to show cached times or "Calculating..."
+     * 
+     * @return true if valid cached times exist for today, false otherwise
      */
     fun hasCachedPrayerTimesForToday(): Boolean {
         val cachedDateStr = prefs.getString(KEY_CACHED_PRAYER_DATE, null) ?: return false

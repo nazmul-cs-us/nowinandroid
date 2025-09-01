@@ -19,7 +19,50 @@ import java.time.LocalDate
 import javax.inject.Inject
 
 /**
- * ViewModel for prayer times functionality
+ * PRAYER TIMES VIEW MODEL: Core state management for prayer times feature
+ * 
+ * This ViewModel orchestrates all prayer times functionality, managing state between
+ * UI, location services, settings, and calculations. It provides reactive data flows
+ * for real-time UI updates and handles complex location/calculation scenarios.
+ * 
+ * KEY RESPONSIBILITIES:
+ * - Prayer time calculation and caching
+ * - Location acquisition and management
+ * - Settings synchronization and persistence
+ * - Error handling and user feedback
+ * - Automatic background updates
+ * - Real-time prayer status tracking
+ * 
+ * ARCHITECTURE PATTERN:
+ * Uses MVVM (Model-View-ViewModel) with reactive programming:
+ * - StateFlow for UI state management
+ * - Coroutines for async operations
+ * - Repository pattern for data access
+ * - Dependency injection with Hilt
+ * 
+ * LOCATION STRATEGIES:
+ * 1. Cached prayer times (instant app startup)
+ * 2. GPS location (when enabled and available)
+ * 3. Manual location (user-selected)
+ * 4. Default location (Mecca - always available)
+ * 
+ * AUTOMATIC UPDATES:
+ * - Settings changes trigger recalculation
+ * - GPS location updates every 30 minutes
+ * - Cache validation for daily refresh
+ * - Background location monitoring
+ * 
+ * ERROR HANDLING:
+ * - Graceful fallbacks for all operations
+ * - User-friendly error messages
+ * - Permission and service availability checks
+ * - Network timeout protection
+ * 
+ * PERFORMANCE OPTIMIZATIONS:
+ * - Instant startup with cached times
+ * - Background loading for smooth UX
+ * - Smart caching to avoid repeated calculations
+ * - Timeout protection for location services
  */
 @HiltViewModel
 class PrayerTimesViewModel @Inject constructor(
@@ -443,7 +486,45 @@ class PrayerTimesViewModel @Inject constructor(
 }
 
 /**
- * UI state for prayer times screen
+ * PRAYER TIMES UI STATE: Complete state representation for prayer times screen
+ * 
+ * This data class represents all possible states of the prayer times UI,
+ * enabling reactive UI updates and proper loading/error state management.
+ * 
+ * STATE MANAGEMENT:
+ * - Uses immutable data class pattern for predictable state changes
+ * - Each field represents a specific aspect of the UI
+ * - Supports multiple loading states for better UX
+ * 
+ * LOADING STATES:
+ * - isLoading: Prayer time calculations in progress
+ * - isLoadingLocation: GPS/location acquisition in progress
+ * - isRefreshing: Pull-to-refresh or manual refresh in progress
+ * 
+ * DATA STATES:
+ * - prayerTimes: Calculated prayer times for current day
+ * - timeUntilNext: Human-readable time until next prayer
+ * - location: Current location used for calculations
+ * - calculationMethod: Selected calculation method for transparency
+ * 
+ * ERROR HANDLING:
+ * - error: User-friendly error message (null when no error)
+ * - Designed to show actionable error messages to guide users
+ * 
+ * UI RENDERING LOGIC:
+ * - Non-null prayerTimes = show prayer times
+ * - isLoading = show loading indicators
+ * - error != null = show error message with actions
+ * - Multiple states can be active (e.g., showing data while refreshing)
+ * 
+ * @param isLoading True when prayer calculations are in progress
+ * @param isLoadingLocation True when acquiring GPS location
+ * @param isRefreshing True during pull-to-refresh or manual refresh
+ * @param prayerTimes Calculated prayer times for the day (null if none available)
+ * @param timeUntilNext Human-readable time until next prayer (e.g., "2h 30m")
+ * @param location Location used for calculations (for display purposes)
+ * @param calculationMethod Calculation method used (for transparency)
+ * @param error User-friendly error message (null when no error)
  */
 data class PrayerTimesUiState(
     val isLoading: Boolean = false,
