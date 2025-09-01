@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus.Denied
@@ -464,18 +466,26 @@ fun PrayerTimesScreen(
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
 
-                // Note: Pull-to-refresh hint temporarily disabled due to import issues
-                // Enhanced pull-to-refresh hint
+                // Dynamic pull-to-refresh hint with animated icon
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Animated icon transition
+                    val iconRotation by animateFloatAsState(
+                        targetValue = if (isPulling && pullOffset > 10f) 180f else 0f,
+                        animationSpec = tween(durationMillis = 200),
+                        label = "iconRotation"
+                    )
+                    
                     Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Pull to refresh",
+                        imageVector = if (isPulling && pullOffset > 10f) Icons.Default.Refresh else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (isPulling && pullOffset > 10f) "Refreshing" else "Pull to refresh",
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier
+                            .size(18.dp)
+                            .graphicsLayer(rotationZ = iconRotation)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
