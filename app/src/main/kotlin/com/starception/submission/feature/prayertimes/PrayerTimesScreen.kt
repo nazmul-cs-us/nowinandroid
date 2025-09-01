@@ -29,7 +29,13 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.EaseInOutCubic
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.graphics.graphicsLayer
+
 
 
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -104,6 +110,44 @@ fun PrayerTimesScreen(
         animationSpec = tween(durationMillis = 200),
         label = "pullOffset"
     )
+    
+    // Apple-style swipe-up hint animation with multiple effects
+    val infiniteTransition = rememberInfiniteTransition(label = "swipeHint")
+    val swipeHintOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2000, easing = EaseInOutCubic),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "swipeHintOffset"
+    )
+    
+    // Scale effect for the hint text
+    val swipeHintScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2000, easing = EaseInOutCubic),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "swipeHintScale"
+    )
+    
+    // Opacity effect for the hint text
+    val swipeHintAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2000, easing = EaseInOutCubic),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "swipeHintAlpha"
+    )
+    
+
+    
+
     
 
     
@@ -451,30 +495,38 @@ fun PrayerTimesScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
 
-                // Dynamic pull-to-refresh hint
+                // Dynamic pull-to-refresh hint with enhanced Apple-style animation
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = if (!isPulling && !isRefreshing) (swipeHintOffset - 8f).dp else (-8).dp)
+                        .graphicsLayer(
+                            scaleX = if (!isPulling && !isRefreshing) swipeHintScale else 1f,
+                            scaleY = if (!isPulling && !isRefreshing) swipeHintScale else 1f,
+                            alpha = if (!isPulling && !isRefreshing) swipeHintAlpha else 0.7f
+                        ),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = if (isPulling && pullOffset > 25f) Icons.Default.Refresh else Icons.Default.KeyboardArrowDown,
                         contentDescription = "Pull to refresh",
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = if (!isPulling && !isRefreshing) swipeHintAlpha else 0.7f),
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
+                    
                     Text(
                         text = if (isPulling && pullOffset > 25f) "Release to refresh" else "Pull down to refresh location",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
                         ),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = if (!isPulling && !isRefreshing) swipeHintAlpha else 0.7f),
                         textAlign = TextAlign.Center
                     )
                 }
