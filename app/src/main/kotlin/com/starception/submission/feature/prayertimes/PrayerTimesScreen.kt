@@ -366,55 +366,34 @@ fun PrayerTimesScreen(
     
 
     
-    // Custom pull-to-refresh container
+    // Pull-to-refresh from anywhere on the screen
     Box(
         modifier = modifier
             .fillMaxSize()
             .offset(y = animatedPullOffset.dp)
             .pointerInput(Unit) {
                 detectDragGestures(
-                    onDragStart = { isPulling = true },
+                    onDragStart = { offset ->
+                        // Start pull-to-refresh from anywhere on the screen
+                        isPulling = true
+                    },
                     onDragEnd = {
-                        if (pullOffset > 80f) {
+                        if (pullOffset > 30f && isPulling) {
                             onRefresh()
                         }
-                        // Animate back to original position
                         pullOffset = 0f
                         isPulling = false
                     },
                     onDrag = { change, _ ->
-                        if (change.position.y > 0) {
-                            // Enhanced pull resistance for smoother feel
-                            pullOffset = (change.position.y * 0.4f).coerceAtMost(180f)
+                        if (isPulling && change.position.y > 0) {
+                            // Direct 1:1 mapping for immediate response
+                            pullOffset = change.position.y.coerceAtMost(80f)
                         }
                     }
                 )
             }
     ) {
-        // Custom pull-to-refresh indicator
-        if (isPulling && pullOffset > 10f) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 60.dp)
-            ) {
-                Text(
-                    text = if (pullOffset > 80f) "Release to refresh" else "Pull to refresh",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .background(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                            RoundedCornerShape(16.dp)
-                        )
-                        .padding(horizontal = 20.dp, vertical = 12.dp)
-                )
-            }
-        }
+
         
         // Refresh indicator when actually refreshing
         if (isRefreshing) {
@@ -471,30 +450,21 @@ fun PrayerTimesScreen(
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
 
-                // Dynamic pull-to-refresh hint with animated icon
+                // Dynamic pull-to-refresh hint
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Animated icon transition
-                    val iconRotation by animateFloatAsState(
-                        targetValue = if (isPulling && pullOffset > 10f) 180f else 0f,
-                        animationSpec = tween(durationMillis = 200),
-                        label = "iconRotation"
-                    )
-                    
                     Icon(
-                        imageVector = if (isPulling && pullOffset > 10f) Icons.Default.Refresh else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (isPulling && pullOffset > 10f) "Refreshing" else "Pull to refresh",
+                        imageVector = if (isPulling && pullOffset > 25f) Icons.Default.Refresh else Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Pull to refresh",
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                        modifier = Modifier
-                            .size(18.dp)
-                            .graphicsLayer(rotationZ = iconRotation)
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Pull down to refresh location",
+                        text = if (isPulling && pullOffset > 25f) "Release to refresh" else "Pull down to refresh location",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
