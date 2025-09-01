@@ -32,6 +32,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.EaseInOutCubic
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.graphics.graphicsLayer
@@ -111,39 +112,28 @@ fun PrayerTimesScreen(
         label = "pullOffset"
     )
     
-    // Apple-style swipe-up hint animation with multiple effects
-    val infiniteTransition = rememberInfiniteTransition(label = "swipeHint")
-    val swipeHintOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 8f,
+    // Smooth arrow flow with calculated lifecycle
+    val infiniteTransition = rememberInfiniteTransition(label = "arrowHint")
+    val arrow1 by infiniteTransition.animateFloat(
+        initialValue = -12f,
+        targetValue = 12f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2000, easing = EaseInOutCubic),
-            repeatMode = RepeatMode.Reverse
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
         ),
-        label = "swipeHintOffset"
+        label = "arrow1"
+    )
+    val arrow2 by infiniteTransition.animateFloat(
+        initialValue = -12f,
+        targetValue = 12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, delayMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "arrow2"
     )
     
-    // Scale effect for the hint text
-    val swipeHintScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2000, easing = EaseInOutCubic),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "swipeHintScale"
-    )
-    
-    // Opacity effect for the hint text
-    val swipeHintAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2000, easing = EaseInOutCubic),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "swipeHintAlpha"
-    )
+
     
 
     
@@ -499,36 +489,108 @@ fun PrayerTimesScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
 
-                // Dynamic pull-to-refresh hint with enhanced Apple-style animation
-                Row(
+                // Flowing arrows animation
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(y = if (!isPulling && !isRefreshing) (swipeHintOffset - 8f).dp else (-8).dp)
-                        .graphicsLayer(
-                            scaleX = if (!isPulling && !isRefreshing) swipeHintScale else 1f,
-                            scaleY = if (!isPulling && !isRefreshing) swipeHintScale else 1f,
-                            alpha = if (!isPulling && !isRefreshing) swipeHintAlpha else 0.7f
-                        ),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                        .offset(y = (-8).dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = if (isPulling && pullOffset > 25f) Icons.Default.Refresh else Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Pull to refresh",
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = if (!isPulling && !isRefreshing) swipeHintAlpha else 0.7f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    Text(
-                        text = if (isPulling && pullOffset > 25f) "Release to refresh" else "Pull down to refresh location",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        ),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = if (!isPulling && !isRefreshing) swipeHintAlpha else 0.7f),
-                        textAlign = TextAlign.Center
-                    )
+                    if (isPulling && pullOffset > 25f) {
+                        // Show refresh icon when pulling
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Pull to refresh",
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Release to refresh",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        // Show flowing arrows on the left side of text
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (!isPulling && !isRefreshing && pullOffset == 0f) {
+                                // Flowing arrows on the left
+                                Box(
+                                    modifier = Modifier
+                                        .width(20.dp)
+                                        .height(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Arrow 1 with calculated lifecycle
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Pull down",
+                                        tint = MaterialTheme.colorScheme.primary.copy(
+                                            alpha = when {
+                                                arrow1 < -10f -> 0f
+                                                arrow1 < -6f -> (arrow1 + 10f) / 4f * 0.7f // Fade in
+                                                arrow1 > 6f -> (12f - arrow1) / 6f * 0.7f   // Fade out
+                                                arrow1 > 10f -> 0f
+                                                else -> 0.7f // Full opacity
+                                            }
+                                        ),
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .offset(y = arrow1.dp)
+                                    )
+                                    // Arrow 2 with calculated lifecycle
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Pull down",
+                                        tint = MaterialTheme.colorScheme.primary.copy(
+                                            alpha = when {
+                                                arrow2 < -10f -> 0f
+                                                arrow2 < -6f -> (arrow2 + 10f) / 4f * 0.6f // Fade in
+                                                arrow2 > 6f -> (12f - arrow2) / 6f * 0.6f   // Fade out
+                                                arrow2 > 10f -> 0f
+                                                else -> 0.6f // Full opacity
+                                            }
+                                        ),
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .offset(y = arrow2.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                            } else {
+                                // Static single arrow when pulling but not at threshold
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Pull to refresh",
+                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            
+                            Text(
+                                text = "Pull down to refresh location",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                 }
                 
                 // Main prayer section - shows next prayer or current prayer with expressive shape
