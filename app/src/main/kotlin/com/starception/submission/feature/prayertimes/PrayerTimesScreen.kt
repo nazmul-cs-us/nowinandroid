@@ -592,37 +592,11 @@ fun PrayerTimesScreen(
                                     }
                                 }
                                 
-                                // Right side - Status and countdown
+                                // Right side - Countdown only (status indicator removed)
                                 Column(
                                     horizontalAlignment = Alignment.End,
                                     verticalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    // Status indicator using Material 3 design
-                                    Surface(
-                                        modifier = Modifier.size(40.dp),
-                                        shape = CircleShape,
-                                        color = when (getPrayerStatus(mainPrayer.first)) {
-                                            "Current" -> MaterialTheme.colorScheme.tertiary
-                                            "Next" -> MaterialTheme.colorScheme.primary
-                                            else -> MaterialTheme.colorScheme.outline
-                                        },
-                                        shadowElevation = 4.dp
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            val icon = when (getPrayerStatus(mainPrayer.first)) {
-                                                "Current" -> Icons.Filled.RadioButtonUnchecked
-                                                "Next" -> Icons.Filled.RadioButtonUnchecked
-                                                else -> Icons.Filled.Check
-                                            }
-                                            Icon(
-                                                imageVector = icon,
-                                                contentDescription = getPrayerStatus(mainPrayer.first),
-                                                tint = MaterialTheme.colorScheme.onPrimary,
-                                                modifier = Modifier.size(24.dp)
-                                            )
-                                        }
-                                    }
-                                    
                                     // Countdown timer with Material 3 design
                                     Surface(
                                         modifier = Modifier.size(88.dp),
