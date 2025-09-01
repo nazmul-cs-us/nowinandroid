@@ -31,6 +31,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.graphicsLayer
 
+
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus.Denied
 import com.google.accompanist.permissions.rememberPermissionState
@@ -103,6 +104,8 @@ fun PrayerTimesScreen(
         animationSpec = tween(durationMillis = 200),
         label = "pullOffset"
     )
+    
+
     
     // Custom pull-to-refresh implementation
     fun onRefresh() {
@@ -360,6 +363,8 @@ fun PrayerTimesScreen(
             "No upcoming prayers"
         }
     }
+    
+
     
     // Custom pull-to-refresh container
     Box(
