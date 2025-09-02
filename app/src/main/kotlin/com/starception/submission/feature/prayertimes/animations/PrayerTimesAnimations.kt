@@ -25,7 +25,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Pull-to-refresh state management
+ * Pull-to-refresh state management data class
+ * 
+ * This holds all the state needed to manage pull-to-refresh gestures and animations.
+ * Use this state to track drag distance, animation progress, and trigger refresh actions.
+ * 
+ * @param pullOffset Current pull distance in dp (0f = no pull, 150f = max pull)
+ * @param isPulling True when user is actively dragging downward
+ * @param animatedPullOffset Smoothly animated version of pullOffset for fluid animations
+ * @param onRefresh Callback function triggered when refresh threshold is reached (80dp)
+ * @param setPullOffset Internal function to update pull distance - called by gesture detector
+ * @param setIsPulling Internal function to update pulling state - called by gesture detector
+ * 
+ * DEBUG TIPS:
+ * - Monitor pullOffset values: 0-80 = pulling, 80+ = ready to refresh
+ * - Check isPulling state for gesture tracking issues
+ * - animatedPullOffset should smoothly follow pullOffset changes
  */
 @Stable
 data class PullToRefreshState(
@@ -38,26 +53,46 @@ data class PullToRefreshState(
 )
 
 /**
- * Remember pull-to-refresh state
+ * Creates and remembers pull-to-refresh state for gesture handling
+ * 
+ * This composable function manages the internal state of pull-to-refresh gestures
+ * and provides smooth animations for visual feedback.
+ * 
+ * @param onRefresh Callback function invoked when refresh is triggered (pull > 80dp)
+ * @return PullToRefreshState object containing all pull-to-refresh state and controls
+ * 
+ * ANIMATION BEHAVIOR:
+ * - During pull: Fast tracking (50ms tween) for immediate visual feedback
+ * - On release: Smooth spring animation (0.8 damping) for professional feel
+ * 
+ * DEBUG CHECKLIST:
+ * - Verify onRefresh callback is called when pullOffset > 80dp
+ * - Check animation smoothness during pull and release
+ * - Monitor state recomposition frequency (should be minimal)
+ * - Ensure state persists across recompositions using remember()
  */
 @Composable
 fun rememberPullToRefreshState(
     onRefresh: () -> Unit
 ): PullToRefreshState {
+    // Core state values - persist across recompositions
     var pullOffset by remember { mutableStateOf(0f) }
     var isPulling by remember { mutableStateOf(false) }
     
-    // Smooth animation for pull offset with better release animation
+    // Smooth animation for pull offset with context-aware animation specs
     val animatedPullOffset by animateFloatAsState(
         targetValue = pullOffset,
         animationSpec = if (pullOffset == 0f) {
+            // Release animation: Smooth spring for professional feel
             spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
         } else {
+            // Pull animation: Fast tracking for immediate response
             tween(durationMillis = 50, easing = LinearEasing)
         },
         label = "pullOffset"
     )
     
+    // Return remembered state object to prevent unnecessary recreations
     return remember(onRefresh) {
         PullToRefreshState(
             pullOffset = pullOffset,
@@ -71,7 +106,33 @@ fun rememberPullToRefreshState(
 }
 
 /**
- * PROFESSIONAL Flowing arrows animation with enhanced visual feedback
+ * Professional flowing arrows animation for pull-to-refresh visual feedback
+ * 
+ * Creates a sophisticated "rain effect" animation with continuously flowing arrows
+ * that guide users to pull down for refresh. Includes dynamic text feedback
+ * based on pull progress and refreshing state.
+ * 
+ * @param isPulling True when user is actively dragging downward
+ * @param pullOffset Current pull distance (0f to 150f) - affects text messaging
+ * @param isRefreshing True when refresh operation is in progress
+ * 
+ * ANIMATION MECHANICS:
+ * - Two arrows with 1-second phase offset create continuous flow
+ * - 4-second master cycle prevents repetitive visual patterns
+ * - Mathematical positioning using sine waves for smooth motion
+ * - Arrows fade in/out at edges (15% fade zones) for seamless effect
+ * 
+ * TEXT STATES:
+ * - Default: "Pull to Update Location" + description
+ * - Pulling (0-70dp): "Keep Pulling..."
+ * - Ready (70dp+): "Release to Refresh"
+ * - Refreshing: Animation hidden, replaced by loading indicator
+ * 
+ * DEBUG POINTS:
+ * - Monitor animationTime for smooth 0-4000ms cycling
+ * - Check arrow positions: should range from -18dp to +18dp
+ * - Verify fade calculations at position extremes
+ * - Test text transitions at 70dp threshold
  */
 @Composable
 fun FlowingArrowsAnimation(
@@ -196,7 +257,41 @@ fun FlowingArrowsAnimation(
 }
 
 /**
- * PROFESSIONAL Refresh indicator with enhanced animations and visual feedback
+ * Professional refresh indicator with enhanced animations and visual feedback
+ * 
+ * Displays a sophisticated Material 3 card-based indicator that responds to pull gestures
+ * with smooth animations, dynamic content, and contextual visual feedback.
+ * 
+ * @param isRefreshing True when refresh operation is active (shows loading spinner)
+ * @param pullOffset Current pull distance in dp (0-150) - controls visibility and positioning
+ * @param modifier Optional Modifier for customization
+ * 
+ * VISIBILITY THRESHOLDS:
+ * - pullOffset 0-20dp: Indicator hidden (alpha = 0f)
+ * - pullOffset 20-60dp: Gradual fade in (alpha = 0.3f to 1f)
+ * - pullOffset 60dp+: Full visibility (alpha = 1f)
+ * - pullOffset 70dp+: "Almost There..." state
+ * - pullOffset 80dp+: "Release to Refresh" state with icon rotation
+ * 
+ * ANIMATION STATES:
+ * - Static: Shows refresh icon with "Pull to Refresh" text
+ * - Pulling: Progress bar fills based on pullOffset/80dp ratio
+ * - Near threshold: "Almost There..." with elevated card
+ * - Ready: Rotated arrow icon + "Release to Refresh" + primary colors
+ * - Refreshing: Spinning indicator + "Updating Prayer Times" + detailed status
+ * 
+ * VISUAL FEATURES:
+ * - Dynamic card elevation (1-6dp based on state)
+ * - Smooth icon rotation animation (0° to 180°)
+ * - Progress bar tracking pull distance
+ * - No shadow (elevation = 0dp) for clean appearance
+ * 
+ * DEBUG CHECKLIST:
+ * - Verify visibility transitions at 20dp, 60dp thresholds
+ * - Check progress bar fills correctly (pullOffset/80dp)
+ * - Monitor icon rotation at 80dp threshold
+ * - Test card elevation changes during different states
+ * - Ensure text updates match pullOffset ranges
  */
 @Composable
 fun RefreshIndicator(
@@ -401,7 +496,44 @@ fun LoadingState() {
 }
 
 /**
- * IMPROVED Pull-to-refresh gesture detector
+ * Advanced pull-to-refresh gesture detector with resistance and threshold logic
+ * 
+ * This modifier function implements sophisticated touch gesture recognition
+ * for pull-to-refresh functionality with resistance effects and threshold-based triggering.
+ * 
+ * @param pullToRefreshState State object containing gesture data and callbacks
+ * @return Modified Modifier with gesture detection capabilities
+ * 
+ * GESTURE MECHANICS:
+ * - Detects vertical drag gestures using detectDragGestures
+ * - Applies 0.6f resistance factor (reduces perceived sensitivity)
+ * - Maximum pull distance: 150dp (prevents excessive stretching)
+ * - Refresh threshold: 80dp (triggers onRefresh callback)
+ * - Only responds to downward drags (ignores upward gestures)
+ * 
+ * STATE MANAGEMENT:
+ * - onDragStart: Resets totalDragDistance, sets isPulling = true
+ * - onDrag: Updates pullOffset with resistance calculation
+ * - onDragEnd: Triggers refresh if threshold met, resets all state
+ * 
+ * RESISTANCE CALCULATION:
+ * totalDragDistance * resistance (0.6f) = visual pull distance
+ * Example: 100dp actual drag = 60dp visual pull
+ * 
+ * THRESHOLD LOGIC:
+ * - pullOffset > 80dp: Triggers refresh and calls onRefresh()
+ * - pullOffset <= 80dp: Animation returns to rest position
+ * 
+ * DEBUG LOGGING:
+ * - "PullToRefresh" tag tracks all gesture events
+ * - Logs drag start, drag progress with distances, drag end with decisions
+ * - Monitor totalDragDistance vs newOffset for resistance verification
+ * 
+ * COMMON DEBUG ISSUES:
+ * - Gesture not detected: Check for conflicting scroll modifiers
+ * - No refresh trigger: Verify pullOffset exceeds 80dp threshold
+ * - Jerky animations: Check resistance calculation and state updates
+ * - State not resetting: Ensure onDragEnd resets all values
  */
 fun Modifier.pullToRefreshGesture(
     pullToRefreshState: PullToRefreshState
