@@ -124,22 +124,43 @@ class PrayerTimesCalculator(private val context: Context) {
             
             // STEP 4: SMART LOCATION DETERMINATION - Multi-level fallback system
             android.util.Log.d("PrayerCalculation", "STEP 4: Determining location using priority fallback system")
+            android.util.Log.d("PrayerCalculation", "=== LOCATION PERMISSION DEBUG ===")
             android.util.Log.d("PrayerCalculation", "Location permission granted: ${locationService.hasLocationPermission()}")
+            android.util.Log.d("PrayerCalculation", "User saved location exists: ${userSettings.location != null}")
+            if (userSettings.location != null) {
+                android.util.Log.d("PrayerCalculation", "  Saved location: ${userSettings.location!!.getDisplayName()}")
+            }
             
-            // PRIORITY ORDER:
+            // DEBUG: Check cache status regardless of permissions
+            val freshCachedLocation = cache.getCachedLocation()
+            val anyCachedLocation = cache.getAnyCachedLocation()
+            android.util.Log.d("PrayerCalculation", "Fresh cached location available (<30min): ${freshCachedLocation != null}")
+            android.util.Log.d("PrayerCalculation", "Any cached location available (any age): ${anyCachedLocation != null}")
+            if (anyCachedLocation != null) {
+                android.util.Log.d("PrayerCalculation", "  Any cached location: ${anyCachedLocation.getDisplayName()}")
+                val cacheAge = cache.getCacheStatus()
+                android.util.Log.d("PrayerCalculation", "  Cache age: $cacheAge")
+            }
+            
+            // NEW IMPROVED PRIORITY ORDER (Prefers cached over Dubai):
             // 1. User's manually saved location (highest priority - user choice)
-            // 2. Recent cached GPS location (fast - within 30 minutes)
+            // 2. Recent cached GPS location (fast - within 30 minutes) 
             // 3. Fresh GPS location with 3-second timeout (prevents elevator hangs)
-            // 4. Any available cached location (even if old)
-            // 5. Dubai default location (final fallback)
+            // 4. ANY cached location (even if old) - KEEPS USER'S LAST KNOWN LOCATION
+            // 5. Dubai default location (final fallback - only if never cached)
             // 
-            // EDIT THIS PRIORITY ORDER to change location selection behavior
+            // KEY IMPROVEMENT: We now prefer old cached location over Dubai default!
+            // This means if user was previously in New York and disables location,
+            // we keep showing New York prayer times instead of switching to Dubai.
+            // Only use Dubai if user never enabled location before.
             val location = when {
                 // PRIORITY 1: User's saved location (user manually set their location)
                 userSettings.location != null -> {
                     android.util.Log.d("PrayerCalculation", "✓ PRIORITY 1: Using user's saved location")
                     android.util.Log.d("PrayerCalculation", "  Location: ${userSettings.location!!.getDisplayName()}")
                     android.util.Log.d("PrayerCalculation", "  Coordinates: ${userSettings.location!!.latitude}, ${userSettings.location!!.longitude}")
+                    android.util.Log.w("PrayerCalculation", "⚠️  LOCATION DISABLED ISSUE: This succeeds even with location off!")
+                    android.util.Log.w("PrayerCalculation", "   Because user has a previously saved location in settings")
                     userSettings.location!!
                 }
                 
@@ -156,6 +177,11 @@ class PrayerTimesCalculator(private val context: Context) {
                             cachedLocation // Use cached if it's fresh (within 30 minutes)
                         } else {
                             android.util.Log.d("PrayerCalculation", "No recent cached location, trying fresh GPS...")
+                            
+                            // Check if we have ANY cached location (even if old) before trying GPS
+                            val oldCachedLocation = cache.getAnyCachedLocation()
+                            android.util.Log.d("PrayerCalculation", "Any cached location available (even old): ${oldCachedLocation != null}")
+                            
                             // PRIORITY 3: Try fresh GPS with 3-second timeout (fast, prevents hangs)
                             val gpsStartTime = System.currentTimeMillis()
                             val androidLocation = locationService.getLocationQuick().getOrNull()
@@ -171,20 +197,31 @@ class PrayerTimesCalculator(private val context: Context) {
                                 cache.cacheLocation(detailedLocation) // Cache for next time
                                 detailedLocation
                             } ?: run {
-                                android.util.Log.w("PrayerCalculation", "GPS failed after ${gpsTime}ms, using default location")
-                                getDefaultLocation() // Fallback if GPS fails
+                                android.util.Log.w("PrayerCalculation", "GPS failed after ${gpsTime}ms")
+                                
+                                // PRIORITY 4: Use any cached location (even if old) instead of Dubai
+                                if (oldCachedLocation != null) {
+                                    android.util.Log.d("PrayerCalculation", "✓ PRIORITY 4: Using old cached location instead of Dubai fallback")
+                                    android.util.Log.d("PrayerCalculation", "  Cached Location: ${oldCachedLocation.getDisplayName()}")
+                                    android.util.Log.d("PrayerCalculation", "  Strategy: Keep using last known location until GPS works again")
+                                    oldCachedLocation
+                                } else {
+                                    android.util.Log.w("PrayerCalculation", "No cached location available, must use Dubai default")
+                                    getDefaultLocation()
+                                }
                             }
                         }
                     } catch (e: Exception) {
                         android.util.Log.w("PrayerCalculation", "GPS strategy failed: ${e.message}")
-                        // PRIORITY 4: Try any cached location before giving up
-                        val fallbackLocation = cache.getCachedLocation()
+                        // PRIORITY 4: Try any cached location (even old) before giving up
+                        val fallbackLocation = cache.getAnyCachedLocation()
                         if (fallbackLocation != null) {
-                            android.util.Log.d("PrayerCalculation", "✓ PRIORITY 4: Using old cached location as fallback")
+                            android.util.Log.d("PrayerCalculation", "✓ PRIORITY 4: Using any cached location as fallback")
                             android.util.Log.d("PrayerCalculation", "  Location: ${fallbackLocation.getDisplayName()}")
+                            android.util.Log.d("PrayerCalculation", "  Strategy: Prefer cached over Dubai default")
                             fallbackLocation
                         } else {
-                            android.util.Log.d("PrayerCalculation", "No cached location available, using default")
+                            android.util.Log.d("PrayerCalculation", "No cached location available, using Dubai default")
                             getDefaultLocation()
                         }
                     }
@@ -192,14 +229,24 @@ class PrayerTimesCalculator(private val context: Context) {
                 
                 // PRIORITY 5: Final fallback - use any cached location or Dubai default
                 else -> {
-                    android.util.Log.d("PrayerCalculation", "No location permission, trying cached or default")
-                    val fallbackLocation = cache.getCachedLocation()
+                    android.util.Log.w("PrayerCalculation", "=== LOCATION PERMISSION DENIED OR DISABLED ===")
+                    android.util.Log.w("PrayerCalculation", "User has turned off location permission or location services")
+                    android.util.Log.w("PrayerCalculation", "Checking for ANY cached location from previous sessions...")
+                    
+                    // Try any cached location (regardless of age) before falling back to Dubai
+                    val fallbackLocation = cache.getAnyCachedLocation()
                     if (fallbackLocation != null) {
-                        android.util.Log.d("PrayerCalculation", "✓ PRIORITY 5a: Using cached location (no permission)")
-                        android.util.Log.d("PrayerCalculation", "  Location: ${fallbackLocation.getDisplayName()}")
+                        android.util.Log.w("PrayerCalculation", "✓ PRIORITY 5a: FOUND OLD CACHED LOCATION - Using instead of Dubai!")
+                        android.util.Log.w("PrayerCalculation", "  Cached Location: ${fallbackLocation.getDisplayName()}")
+                        android.util.Log.w("PrayerCalculation", "  Coordinates: ${fallbackLocation.latitude}, ${fallbackLocation.longitude}")
+                        android.util.Log.w("PrayerCalculation", "  ⚠️  STRATEGY: Keep using last known location until GPS works again")
+                        android.util.Log.w("PrayerCalculation", "  This is better than Dubai default for user experience")
                         fallbackLocation
                     } else {
-                        android.util.Log.d("PrayerCalculation", "✓ PRIORITY 5b: Using Dubai default location")
+                        android.util.Log.w("PrayerCalculation", "✓ PRIORITY 5b: No cached location available - must use Dubai default")
+                        android.util.Log.w("PrayerCalculation", "  This means user never enabled location OR cache was cleared")
+                        android.util.Log.w("PrayerCalculation", "  Dubai coordinates: 25.2048, 55.2708")
+                        android.util.Log.w("PrayerCalculation", "  NOTE: Once user enables location, we'll cache and use their actual location")
                         getDefaultLocation()
                     }
                 }

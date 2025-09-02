@@ -181,13 +181,19 @@ fun PrayerTimesScreen(
                 isLoading = true
                 
                 // Calculate with 3-second timeout to prevent infinite loading
+                android.util.Log.d("PullToRefresh", "STEP 2: Starting prayer time calculation with 3-second timeout...")
                 val startTime = System.currentTimeMillis()
                 try {
-                    // Run calculation with timeout
-                    withTimeout(3000L) { // 3 second timeout
+                    // Run calculation with timeout protection
+                    android.util.Log.d("PullToRefresh", "TIMEOUT PROTECTION: Calculation has maximum 3000ms to complete")
+                    withTimeout(3000L) { 
                         withContext(Dispatchers.Default) {
+                            android.util.Log.d("PullToRefresh", "CALCULATION START: Creating PrayerTimesCalculator and running calculation")
                             val calculator = PrayerTimesCalculator(context)
                             val result = calculator.calculateDefaultPrayerTimes()
+                            
+                            android.util.Log.d("PullToRefresh", "CALCULATION RESULT: Prayer times = ${if (result.first != null) "SUCCESS" else "NULL"}")
+                            android.util.Log.d("PullToRefresh", "CALCULATION RESULT: Location = \"${result.second}\"")
                             
                             prayerTimes = result.first   // Calculated prayer times (or null if failed)
                             location = result.second     // Location name for display

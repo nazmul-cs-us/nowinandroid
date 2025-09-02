@@ -345,27 +345,63 @@ class PrayerNotificationService : Service() {
     }
     
     /**
-     * Get current prayer data for notification
+     * Get current prayer data for notification with detailed location debugging
      */
     private suspend fun getCurrentPrayerData(): Triple<String, String, String>? {
         return try {
-            // Get current location and settings
-            val settings = prayerSettingsRepository.getSettings()
-            val location = settings.location
+            Log.d(TAG, "=== NOTIFICATION PRAYER DATA DEBUG START ===")
             
-            // If no location is set, return null (will use fallback notification)
+            // Get current location and settings with detailed logging
+            Log.d(TAG, "STEP 1: Getting prayer settings from repository...")
+            val settings = prayerSettingsRepository.getSettings()
+            Log.d(TAG, "Settings retrieved: calculation method=${settings.calculationMethod.name}")
+            
+            val location = settings.location
+            Log.d(TAG, "STEP 2: Location check - Location is ${if (location != null) "AVAILABLE" else "NULL"}")
+            
+            // Enhanced location debugging
             if (location == null) {
-                Log.w(TAG, "No location set, returning null for fallback notification")
+                Log.w(TAG, "❌ CRITICAL: No location set in settings")
+                Log.w(TAG, "This means:")
+                Log.w(TAG, "  - User hasn't granted location permission OR")
+                Log.w(TAG, "  - Location services are disabled OR") 
+                Log.w(TAG, "  - GPS couldn't get a fix OR")
+                Log.w(TAG, "  - Location cache is empty")
+                Log.w(TAG, "Notification will show fallback message")
                 return null
             }
             
-            // Calculate today's prayer times
+            // Log detailed location information
+            Log.d(TAG, "✓ Location found: ${location.getDisplayName()}")
+            Log.d(TAG, "  Coordinates: ${location.latitude}, ${location.longitude}")
+            Log.d(TAG, "  Location type: ${location::class.java.simpleName}")
+            Log.d(TAG, "  Location source: ${if (location.getDisplayName().contains("GPS")) "GPS" else "Manual/Default"}")
+            
+            // Calculate today's prayer times with detailed logging
             val today = LocalDate.now()
+            Log.d(TAG, "STEP 3: Calculating prayer times for date: $today")
+            Log.d(TAG, "Using location: ${location.getDisplayName()} (${location.latitude}, ${location.longitude})")
+            
+            val calculationStartTime = System.currentTimeMillis()
             val prayerTimes = prayerTimeCalculatorService.calculatePrayerTimes(today, location, settings)
+            val calculationTime = System.currentTimeMillis() - calculationStartTime
             
             if (prayerTimes == null) {
-                Log.w(TAG, "Failed to calculate prayer times for location: ${location.getDisplayName()}, returning null for fallback")
+                Log.e(TAG, "❌ PRAYER CALCULATION FAILED after ${calculationTime}ms")
+                Log.e(TAG, "Location: ${location.getDisplayName()}")
+                Log.e(TAG, "Calculation method: ${settings.calculationMethod.name}")
+                Log.e(TAG, "This indicates:")
+                Log.e(TAG, "  - Astronomical calculation error OR")
+                Log.e(TAG, "  - Invalid coordinates OR")
+                Log.e(TAG, "  - Internal calculation service failure")
+                Log.e(TAG, "Notification will use fallback message")
                 return null
+            }
+            
+            Log.d(TAG, "✓ Prayer times calculated successfully in ${calculationTime}ms")
+            Log.d(TAG, "Prayer times for ${location.getDisplayName()}:")
+            prayerTimes.getActualPrayers().forEach { prayer ->
+                Log.d(TAG, "  ${prayer.name}: ${prayer.time} ${if (prayer.isCurrently) "[CURRENT]" else ""}")
             }
             
             // Get current and next prayer
