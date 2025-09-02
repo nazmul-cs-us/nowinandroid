@@ -263,7 +263,7 @@ class PrayerTimeCalculatorService @Inject constructor(
         // Hanafi: 2.0 (later time), Shafi/Maliki/Hanbali: 1.0 (earlier time)
         val shadowFactor = settings.asrMadhhab.shadowFactor
         Log.d(TAG, "⏰ ASR CALCULATION: Using shadow factor: $shadowFactor")
-        Log.d(TAG, "  Madhhab: ${settings.asrMadhhab} (${if (shadowFactor == 2.0) "later" else "earlier"} Asr)")
+        Log.d(TAG, "  Madhhab: ${settings.asrMadhhab} (${if (shadowFactor == 2) "later" else "earlier"} Asr)")
         
         // Calculate when object's shadow equals (shadowFactor × object height + original noon shadow)
         // This involves complex trigonometry with sun's position and geographic location

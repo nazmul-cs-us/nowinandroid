@@ -107,7 +107,7 @@ fun FlowingArrowsAnimation(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 16.dp), // Increased bottom padding to match tile spacing
+            .padding(top = 16.dp, bottom = 24.dp), // Increased padding to prevent overlap
         contentAlignment = Alignment.Center
     ) {
         if (!isRefreshing) {
@@ -249,7 +249,7 @@ fun RefreshIndicator(
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .offset(y = (pullOffset * 0.3f - 16).dp)
+                .offset(y = (pullOffset * 0.4f - 32).dp)
                 .graphicsLayer {
                     alpha = indicatorAlpha
                     scaleX = scale
@@ -257,17 +257,12 @@ fun RefreshIndicator(
                 },
             contentAlignment = Alignment.Center
         ) {
-            // Professional background with consistent shadow effect
+            // Professional background with no shadow
             Card(
                 modifier = Modifier
                     .padding(horizontal = 16.dp),
                 elevation = CardDefaults.cardElevation(
-                    defaultElevation = when {
-                        isRefreshing -> 12.dp
-                        canRelease -> 8.dp
-                        isNearThreshold -> 6.dp
-                        else -> 4.dp
-                    }
+                    defaultElevation = 0.dp
                 ),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
