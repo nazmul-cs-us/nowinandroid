@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +37,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.PaddingValues
 
 
 
@@ -700,8 +703,8 @@ fun PrayerTimesScreen(
                     .fillMaxSize()
                     .padding(horizontal = 24.dp)
                     .padding(
-                        top = (100 + (animatedPullOffset * 0.5f)).dp, // Dynamic padding: base 100dp + extra space when pulling (reduced for consistent spacing)
-                        bottom = 16.dp
+                        top = (80 + (animatedPullOffset * 0.5f)).dp, // Adjusted base padding to 80dp for optimal spacing
+                        bottom = 24.dp // Increased from 16.dp to accommodate swipe hint
                     )
                     .offset(y = (animatedPullOffset * 0.2f).dp), // Reduced content movement to prevent overlap
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -709,48 +712,29 @@ fun PrayerTimesScreen(
 
 
                 
-                // Swipeable Big Tiles - HorizontalPager with 3 tiles
-                val pagerState = rememberPagerState(pageCount = { 3 })
+                // Swipeable Big Tiles - HorizontalPager with 3 tiles and infinite scroll
+                val pagerState = rememberPagerState(
+                    pageCount = { Int.MAX_VALUE }, // Enable infinite scrolling
+                    initialPage = Int.MAX_VALUE / 2 // Start in the middle for smooth infinite scroll
+                )
                 
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(200.dp),
-                    pageSpacing = 16.dp
+                    pageSpacing = 16.dp,
+                    contentPadding = PaddingValues(horizontal = 8.dp)
                 ) { page ->
-                    when (page) {
+                    val actualPage = page % 3 // Map infinite pages to our 3 actual tiles
+                        when (actualPage) {
                         0 -> {
                             // Tile 1: Next Prayer Information
                             val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
                             if (mainPrayer != null) {
-                                // Layered background effect with expressive asymmetrical shape
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(200.dp)
-                                ) {
-                                    // Background layer
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .offset(x = 8.dp, y = 8.dp)
-                                            .zIndex(0f),
-                                        shape = RoundedCornerShape(
-                                            topStart = 32.dp,
-                                            topEnd = 16.dp,
-                                            bottomStart = 16.dp,
-                                            bottomEnd = 32.dp
-                                        ),
-                                        color = MaterialTheme.colorScheme.surfaceVariant,
-                                        shadowElevation = 4.dp
-                                    ) {}
-                                    
-                                    // Main prayer card
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .zIndex(1f),
+                                // Single prayer card without layered background
+                                Surface(
+                                    modifier = Modifier.fillMaxSize(),
                                         shape = RoundedCornerShape(
                                             topStart = 40.dp,
                                             topEnd = 20.dp,
@@ -825,7 +809,6 @@ fun PrayerTimesScreen(
                                             }
                                         }
                                     }
-                                }
                             } else {
                                 // Fallback if no prayer data
                                 Surface(
@@ -990,7 +973,7 @@ fun PrayerTimesScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     repeat(3) { index ->
-                        val isSelected = pagerState.currentPage == index
+                        val isSelected = (pagerState.currentPage % 3) == index
                         Box(
                             modifier = Modifier
                                 .size(if (isSelected) 12.dp else 8.dp)
@@ -1006,6 +989,36 @@ fun PrayerTimesScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                         }
                     }
+                }
+                
+                // Professional swipe hint
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = "Swipe left",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Swipe for more insights",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Swipe right",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
                 
                 // Other prayer times using Material 3 design
