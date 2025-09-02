@@ -169,6 +169,24 @@ class LocationCache @Inject constructor() {
     }
     
     /**
+     * GET ANY CACHED LOCATION: Retrieve cached location regardless of age
+     * 
+     * This method returns cached location even if it's older than 30 minutes.
+     * Use this as a fallback when GPS fails but you need some location data.
+     * 
+     * USAGE SCENARIOS:
+     * - Location services are disabled
+     * - GPS timeout or failure
+     * - Offline scenarios
+     * - Better than Dubai default if user was previously in a different location
+     * 
+     * @return Cached location regardless of age, or null if never cached
+     */
+    fun getAnyCachedLocation(): Location? {
+        return cachedLocation  // Return location regardless of age
+    }
+    
+    /**
      * Get cache status for debugging
      */
     fun getCacheStatus(): String {
