@@ -84,6 +84,47 @@ import java.time.Duration
  * - Add new prayer time display formats
  * - Include additional Islamic features
  */
+/**
+ * Main prayer times screen with comprehensive Islamic prayer time display
+ * 
+ * This composable creates a full-screen prayer times interface with pull-to-refresh,
+ * real-time updates, location services, and permission management.
+ * 
+ * @param modifier Optional Modifier for customization
+ * 
+ * SCREEN COMPONENTS:
+ * - Header: Shows current location and date
+ * - Prayer Cards: Individual prayer times with status indicators
+ * - Real-time Clock: Updates every minute to show current prayer status
+ * - Pull-to-Refresh: Manual location/calculation refresh
+ * - Permission Handlers: Location and notification permission requests
+ * 
+ * STATE MANAGEMENT:
+ * - prayerTimes: Calculated Islamic prayer times for current location/date
+ * - isLoading: Controls loading indicator visibility
+ * - location: Human-readable location string for display
+ * - currentTime: Live clock updated every minute
+ * - Pull-to-refresh states: isRefreshing, pullOffset, isDragging
+ * 
+ * CALCULATION FLOW:
+ * 1. Request location permission if needed
+ * 2. Get GPS coordinates or use cached location
+ * 3. Calculate prayer times using astronomical algorithms
+ * 4. Display results with real-time status updates
+ * 5. Handle errors gracefully with fallback to defaults
+ * 
+ * REFRESH BEHAVIOR:
+ * - Automatic: Runs calculation on screen load and permission changes
+ * - Manual: Pull-to-refresh gesture clears cache and recalculates
+ * - Timeout: 3-second limit prevents infinite loading states
+ * 
+ * DEBUG MONITORING:
+ * - Watch LaunchedEffect blocks for initialization and refresh logic
+ * - Monitor permission state changes and their effects
+ * - Check pullOffset values during gesture interactions
+ * - Verify currentTime updates every minute
+ * - Track calculation timeouts and error handling
+ */
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun PrayerTimesScreen(
@@ -116,23 +157,24 @@ fun PrayerTimesScreen(
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
             try {
-                // IMPROVED REFRESH: Clear cached data and recalculate with timeout
-                android.util.Log.d("PullToRefresh", "=== STARTING PULL-TO-REFRESH ===")
-                android.util.Log.d("PullToRefresh", "User initiated prayer times refresh with 3-second timeout")
+                // CACHE CLEARING: Force fresh calculation by clearing all cached data
+                android.util.Log.d("PullToRefresh", "=== STARTING PULL-TO-REFRESH DEBUG ===")
+                android.util.Log.d("PullToRefresh", "User initiated prayer times refresh with 3-second timeout protection")
                 
-                // Clear cached prayer times and location to force fresh calculation
-                android.util.Log.d("PullToRefresh", "Clearing in-memory cache to force fresh calculation...")
+                // Step 1: Clear in-memory cache to force GPS location fetch and prayer calculation
+                android.util.Log.d("PullToRefresh", "STEP 1: Clearing LocationCache to force fresh GPS and calculations...")
                 try {
-                    // Access the LocationCache service through Hilt EntryPoint
+                    // Access the LocationCache service through Hilt dependency injection
                     val entryPoint = EntryPointAccessors.fromApplication(
                         context.applicationContext,
                         PrayerTimeCalculatorEntryPoint::class.java
                     )
                     val cache = entryPoint.locationCache()
                     cache.clearCache()
-                    android.util.Log.d("PullToRefresh", "✓ Cache cleared successfully - fresh calculation will be forced")
+                    android.util.Log.d("PullToRefresh", "✓ Cache cleared - next calculation will fetch fresh GPS location")
                 } catch (e: Exception) {
-                    android.util.Log.e("PullToRefresh", "Failed to clear cache: ${e.message}", e)
+                    android.util.Log.e("PullToRefresh", "❌ CRITICAL: Failed to clear cache: ${e.message}", e)
+                    // Continue anyway - calculation may still work with cached data
                 }
                 
                 // Set loading state
