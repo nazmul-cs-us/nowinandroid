@@ -47,10 +47,14 @@ fun rememberPullToRefreshState(
     var pullOffset by remember { mutableStateOf(0f) }
     var isPulling by remember { mutableStateOf(false) }
     
-    // Smooth animation for pull offset
+    // Smooth animation for pull offset with better release animation
     val animatedPullOffset by animateFloatAsState(
         targetValue = pullOffset,
-        animationSpec = tween(durationMillis = 100, easing = LinearEasing),
+        animationSpec = if (pullOffset == 0f) {
+            spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
+        } else {
+            tween(durationMillis = 50, easing = LinearEasing)
+        },
         label = "pullOffset"
     )
     
@@ -78,34 +82,20 @@ fun FlowingArrowsAnimation(
     // Enhanced animation parameters for more professional feel
     val infiniteTransition = rememberInfiniteTransition(label = "arrowHint")
     
-    // Slower, more elegant animation cycle
-    val arrow1 by infiniteTransition.animateFloat(
-        initialValue = -16f,
-        targetValue = 16f,
+    // True continuous rain effect - no jumps or restarts
+    val animationTime by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 4000f, // 4 second full cycle
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = EaseInOutSine),
+            animation = tween(durationMillis = 4000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "arrow1"
+        label = "rainTime"
     )
-    val arrow2 by infiniteTransition.animateFloat(
-        initialValue = -16f,
-        targetValue = 16f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, delayMillis = 1000, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "arrow2"
-    )
-    val arrow3 by infiniteTransition.animateFloat(
-        initialValue = -16f,
-        targetValue = 16f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, delayMillis = 2000, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "arrow3"
-    )
+    
+    // Calculate arrow positions using continuous sine wave for perfect rain effect
+    val arrow1 = ((animationTime % 2000f) / 2000f * 36f) - 18f // Full range every 2 seconds
+    val arrow2 = (((animationTime + 1000f) % 2000f) / 2000f * 36f) - 18f // 1 second offset
     
     // Smooth fade animation for text
     val textAlpha by animateFloatAsState(
@@ -117,47 +107,52 @@ fun FlowingArrowsAnimation(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 16.dp), // Increased to match Column's spacedBy(16.dp) for consistent spacing
+            .padding(top = 8.dp, bottom = 16.dp), // Increased bottom padding to match tile spacing
         contentAlignment = Alignment.Center
     ) {
         if (!isRefreshing) {
             Row(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.graphicsLayer { alpha = textAlpha }
+                modifier = Modifier
+                    .graphicsLayer { alpha = textAlpha }
             ) {
                 if (!isPulling && pullOffset == 0f) {
-                    // Professional flowing arrow stack
+                    // Professional flowing arrow stack on the left - height matches text
                     Box(
-                        modifier = Modifier
-                            .width(32.dp)
-                            .height(28.dp),
+                        modifier = Modifier.width(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Enhanced arrow animations with smoother lifecycle
+                        // Smooth rain effect with continuous arrow flow
                         listOf(
-                            Triple(arrow1, 0.8f, 20.dp),
-                            Triple(arrow2, 0.6f, 18.dp),
-                            Triple(arrow3, 0.4f, 16.dp)
+                            Triple(arrow1, 1f, 20.dp),
+                            Triple(arrow2, 0.8f, 18.dp)
                         ).forEach { (position, maxAlpha, size) ->
+                            val normalizedPosition = position / 18f // Normalize to -1 to 1 based on new range
+                            
+                            // Smooth continuous visibility - no harsh cutoffs
+                            val visibilityAlpha = when {
+                                kotlin.math.abs(normalizedPosition) > 0.85f -> {
+                                    // Gentle fade at edges (15% of range) 
+                                    val fadeRange = (kotlin.math.abs(normalizedPosition) - 0.85f) / 0.15f
+                                    (1f - fadeRange * 0.6f).coerceIn(0.4f, 1f)
+                                }
+                                else -> 1f // Full visibility in center 85%
+                            }
+                            
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowDown,
                                 contentDescription = "Pull down hint",
                                 tint = MaterialTheme.colorScheme.primary.copy(
-                                    alpha = when {
-                                        position < -14f -> 0f
-                                        position < -12f -> ((position + 14f) / 2f) * maxAlpha
-                                        position > 12f -> ((14f - position) / 2f) * maxAlpha
-                                        position > 14f -> 0f
-                                        else -> maxAlpha
-                                    }.coerceIn(0f, maxAlpha)
+                                    alpha = (visibilityAlpha * maxAlpha).coerceIn(0.4f, maxAlpha)
                                 ),
                                 modifier = Modifier
                                     .size(size)
                                     .offset(y = position.dp)
                                     .graphicsLayer {
-                                        scaleX = 0.9f + 0.1f * (1f - kotlin.math.abs(position) / 16f)
-                                        scaleY = 0.9f + 0.1f * (1f - kotlin.math.abs(position) / 16f)
+                                        val centerScale = 0.95f + 0.05f * (1f - kotlin.math.abs(normalizedPosition))
+                                        scaleX = centerScale
+                                        scaleY = centerScale
                                     }
                             )
                         }
@@ -188,7 +183,7 @@ fun FlowingArrowsAnimation(
                     
                     if (!isPulling) {
                         Text(
-                            text = "Get fresh prayer times for your current location",
+                            text = "Get fresh prayer times for your current GPS location",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             textAlign = TextAlign.Center
@@ -210,14 +205,22 @@ fun RefreshIndicator(
     modifier: Modifier = Modifier
 ) {
     // Enhanced visibility thresholds for better UX
-    val shouldShow = isRefreshing || pullOffset > 30f
+    val shouldShow = isRefreshing || pullOffset > 20f
     val isNearThreshold = pullOffset > 70f
     val canRelease = pullOffset > 80f
     
-    // Smooth animations for professional feel
+    // Smooth animations for professional feel with better transitions
     val indicatorAlpha by animateFloatAsState(
-        targetValue = if (shouldShow) 1f else 0f,
-        animationSpec = tween(durationMillis = 200, easing = LinearEasing),
+        targetValue = when {
+            isRefreshing -> 1f
+            pullOffset > 60f -> 1f
+            pullOffset > 20f -> 0.3f + (pullOffset - 20f) / 40f * 0.7f
+            else -> 0f
+        },
+        animationSpec = spring(
+            dampingRatio = if (isRefreshing) 0.7f else 0.8f, 
+            stiffness = if (isRefreshing) Spring.StiffnessLow else Spring.StiffnessMedium
+        ),
         label = "indicatorAlpha"
     )
     
@@ -229,17 +232,24 @@ fun RefreshIndicator(
     
     val progressAlpha = (pullOffset / 80f).coerceIn(0f, 1f)
     val scale by animateFloatAsState(
-        targetValue = if (shouldShow) (0.8f + 0.2f * progressAlpha) else 0.6f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
+        targetValue = when {
+            isRefreshing -> 1f
+            shouldShow -> 0.85f + 0.15f * progressAlpha
+            else -> 0f
+        },
+        animationSpec = spring(
+            dampingRatio = if (isRefreshing) 0.6f else 0.75f, 
+            stiffness = if (isRefreshing) Spring.StiffnessLow else Spring.StiffnessMedium
+        ),
         label = "scale"
     )
     
-    if (indicatorAlpha > 0f) {
+    
+    if (indicatorAlpha > 0.01f || scale > 0.01f) {
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp)
-                .offset(y = (pullOffset * 0.3f).dp) // Controlled movement to prevent overlap
+                .offset(y = (pullOffset * 0.3f - 16).dp)
                 .graphicsLayer {
                     alpha = indicatorAlpha
                     scaleX = scale
@@ -247,11 +257,18 @@ fun RefreshIndicator(
                 },
             contentAlignment = Alignment.Center
         ) {
-            // Professional background with subtle shadow effect
+            // Professional background with consistent shadow effect
             Card(
                 modifier = Modifier
                     .padding(horizontal = 16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = if (isNearThreshold) 8.dp else 4.dp),
+                elevation = CardDefaults.cardElevation(
+                    defaultElevation = when {
+                        isRefreshing -> 12.dp
+                        canRelease -> 8.dp
+                        isNearThreshold -> 6.dp
+                        else -> 4.dp
+                    }
+                ),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
@@ -327,7 +344,7 @@ fun RefreshIndicator(
                         
                         if (isRefreshing) {
                             Text(
-                                text = "Getting fresh location & times...",
+                                text = "Accessing your location & calculating fresh prayer times...",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
