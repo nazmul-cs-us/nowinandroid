@@ -2,6 +2,8 @@ package com.starception.submission.feature.prayertimes
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -13,6 +15,7 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -134,7 +137,7 @@ fun PrayerTimesScreen(
     
     // UI STATE MANAGEMENT - These control what the user sees
     var prayerTimes by remember { mutableStateOf<com.starception.submission.prayer.model.DayPrayerTimes?>(null) }  // Calculated prayer times
-    var isLoading by remember { mutableStateOf(true) }      // Loading indicator state
+    var isLoading by remember { mutableStateOf(false) }     // Start with no loading - only show for first-time users
     var location by remember { mutableStateOf("Loading location...") }  // Location display text
     
     // REAL-TIME CLOCK STATE - Updates every minute for live prayer status
@@ -145,6 +148,10 @@ fun PrayerTimesScreen(
     var pullOffset by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
     
+    // LOCATION SERVICE PROMPT STATE
+    var showLocationServiceDialog by remember { mutableStateOf(false) }
+    var locationServiceCheckPending by remember { mutableStateOf(false) }
+    
     // Smooth animation for pull offset
     val animatedPullOffset by animateFloatAsState(
         targetValue = pullOffset,
@@ -153,13 +160,47 @@ fun PrayerTimesScreen(
     )
 
     
-    // REFRESH LOGIC - Handle pull-to-refresh action with real prayer time recalculation
+    // REFRESH LOGIC - Handle pull-to-refresh action with location service checking
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
             try {
-                // CACHE CLEARING: Force fresh calculation by clearing all cached data
+                // LOCATION SERVICE CHECK: Verify location services before proceeding
                 android.util.Log.d("PullToRefresh", "=== STARTING PULL-TO-REFRESH DEBUG ===")
-                android.util.Log.d("PullToRefresh", "User initiated prayer times refresh with 3-second timeout protection")
+                android.util.Log.d("PullToRefresh", "User initiated prayer times refresh with location service validation")
+                
+                // Get location service to check if services are enabled
+                val entryPoint = EntryPointAccessors.fromApplication(
+                    context.applicationContext,
+                    PrayerTimeCalculatorEntryPoint::class.java
+                )
+                val locationService = entryPoint.enhancedLocationService()
+                
+                val hasPermission = locationService.hasLocationPermission()
+                val servicesEnabled = locationService.isLocationEnabled()
+                
+                android.util.Log.d("PullToRefresh", "Location permission granted: $hasPermission")
+                android.util.Log.d("PullToRefresh", "Location services enabled: $servicesEnabled")
+                
+                // CHECK: If location services are not fully available, prompt user
+                if (!hasPermission) {
+                    android.util.Log.w("PullToRefresh", "⚠️  LOCATION PERMISSION NOT GRANTED!")
+                    android.util.Log.w("PullToRefresh", "User has not granted location permission")
+                    android.util.Log.w("PullToRefresh", "Will proceed with cached/default location but showing advisory")
+                    
+                    // Continue with cached/default but don't show dialog for permission (handled by permission UI)
+                } else if (!servicesEnabled) {
+                    android.util.Log.w("PullToRefresh", "⚠️  LOCATION SERVICES DISABLED!")
+                    android.util.Log.w("PullToRefresh", "User has granted permission but turned off location services")
+                    android.util.Log.w("PullToRefresh", "Showing dialog to prompt user to enable location services")
+                    
+                    // Stop refresh and show dialog
+                    isRefreshing = false
+                    isLoading = false
+                    showLocationServiceDialog = true
+                    return@LaunchedEffect
+                } else {
+                    android.util.Log.d("PullToRefresh", "✅ Location permission and services are both available")
+                }
                 
                 // Step 1: Clear in-memory cache to force GPS location fetch and prayer calculation
                 android.util.Log.d("PullToRefresh", "STEP 1: Clearing LocationCache to force fresh GPS and calculations...")
@@ -279,19 +320,60 @@ fun PrayerTimesScreen(
         }
     }
     
-    // SMART LOADING STRATEGY - Recalculate when permissions change, show loading only when needed
-    LaunchedEffect(locationPermissionState.status) {
-        // SMART LOADING: Only show loading spinner if we don't have existing data to display
-        // This prevents flickering when permissions change after data is already loaded
-        if (prayerTimes == null) {
-            isLoading = true  // Show loading spinner for first load
+    // INSTANT LOAD STRATEGY - Show cached data immediately, update in background
+    LaunchedEffect(Unit) {
+        android.util.Log.d("PrayerScreen", "=== INSTANT LOAD STRATEGY ===")
+        
+        // STEP 1: Try to load cached data instantly (no loading screen)
+        android.util.Log.d("PrayerScreen", "STEP 1: Checking for instant cached data...")
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                PrayerTimeCalculatorEntryPoint::class.java
+            )
+            val cache = entryPoint.locationCache()
+            
+            // Check if we have cached prayer times for today
+            val cachedData = cache.getCachedPrayerTimes()
+            if (cachedData != null) {
+                val (cachedPrayerTimes, cachedDate, cachedLocationName) = cachedData
+                if (cachedPrayerTimes != null && cachedLocationName != null) {
+                    android.util.Log.d("PrayerScreen", "✓ INSTANT LOAD: Found cached prayer times for today!")
+                    android.util.Log.d("PrayerScreen", "  Location: $cachedLocationName")
+                    android.util.Log.d("PrayerScreen", "  Date: $cachedDate")
+                    
+                    // Show cached data immediately - NO LOADING SCREEN!
+                    prayerTimes = cachedPrayerTimes
+                    location = cachedLocationName
+                    isLoading = false
+                    
+                    android.util.Log.d("PrayerScreen", "✓ UI updated instantly with cached data")
+                }
+            } else {
+                android.util.Log.d("PrayerScreen", "No cached data found - this is first time use")
+                isLoading = true  // Only show loading for brand new users
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("PrayerScreen", "Failed to load cached data: ${e.message}")
+            isLoading = true  // Show loading if cache access fails
         }
         
-        // Calculate prayer times with our improved 3-second timeout system
+        // STEP 2: Update with fresh GPS data in background (doesn't affect UI loading state)
+        android.util.Log.d("PrayerScreen", "STEP 2: Starting background GPS update...")
         calculatePrayerTimes()
+        android.util.Log.d("PrayerScreen", "Background update completed")
         
-        // Hide loading spinner after calculation completes (success or failure)
-        isLoading = false
+        // Only turn off loading if we didn't have cached data
+        if (prayerTimes == null) {
+            isLoading = false
+        }
+    }
+    
+    // PERMISSION CHANGE HANDLER - Update data when permissions change
+    LaunchedEffect(locationPermissionState.status) {
+        android.util.Log.d("PrayerScreen", "Permission status changed, running background update...")
+        // Don't show loading screen - just update in background
+        calculatePrayerTimes()
     }
     
     
@@ -900,5 +982,90 @@ fun PrayerTimesScreen(
                 }
             }
         }
+    }
+    
+    // NATIVE-STYLE LOCATION SERVICE DIALOG
+    if (showLocationServiceDialog) {
+        AlertDialog(
+            onDismissRequest = { showLocationServiceDialog = false },
+            title = {
+                Text(
+                    text = "Enable Location Services?",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Prayer Times needs location access to calculate accurate prayer times for your area.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 20.sp
+                    )
+                    
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.LocationOn,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "Your location will be used to determine prayer times",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLocationServiceDialog = false
+                        // Open device location settings
+                        val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                        context.startActivity(intent)
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text(
+                        text = "ENABLE",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        showLocationServiceDialog = false
+                        // Continue with cached/default location
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Text(
+                        text = "NOT NOW",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(28.dp)
+        )
     }
 }
