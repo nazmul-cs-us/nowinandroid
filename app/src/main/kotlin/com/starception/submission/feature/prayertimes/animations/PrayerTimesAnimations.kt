@@ -226,9 +226,9 @@ fun FlowingArrowsAnimation(
                 ) {
                     Text(
                         text = when {
-                            isPulling && pullOffset > 70f -> "Release to Refresh"
-                            isPulling -> "Keep Pulling..."
-                            else -> "Pull to Update Location"
+                            isPulling && pullOffset > 70f -> "Release to update prayer times"
+                            isPulling -> "Keep pulling..."
+                            else -> "Pull to update prayer times"
                         },
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.Medium,
@@ -244,7 +244,7 @@ fun FlowingArrowsAnimation(
                     
                     if (!isPulling) {
                         Text(
-                            text = "Get fresh prayer times for your current GPS location",
+                            text = "Get updated prayer times for your current location",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             textAlign = TextAlign.Center
@@ -394,7 +394,7 @@ fun RefreshIndicator(
                         } else {
                             Icon(
                                 imageVector = if (canRelease) Icons.Default.KeyboardArrowDown else Icons.Default.Refresh,
-                                contentDescription = if (canRelease) "Release to refresh" else "Pull to refresh",
+                                contentDescription = if (canRelease) "Release to update prayer times" else "Pull to update prayer times",
                                 tint = if (canRelease) {
                                     MaterialTheme.colorScheme.onPrimaryContainer
                                 } else {
@@ -418,9 +418,9 @@ fun RefreshIndicator(
                         Text(
                             text = when {
                                 isRefreshing -> "Updating Prayer Times"
-                                canRelease -> "Release to Refresh"
+                                canRelease -> "Release to update prayer times"
                                 isNearThreshold -> "Almost There..."
-                                else -> "Pull to Refresh"
+                                else -> "Pull to update prayer times"
                             },
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.SemiBold
