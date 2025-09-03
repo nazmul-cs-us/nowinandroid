@@ -44,7 +44,15 @@
  */
 package com.starception.submission.feature.prayertimes
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +62,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -65,6 +74,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -72,15 +83,131 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.starception.submission.prayer.model.DayPrayerTimes
 import java.time.LocalTime
+
+/**
+ * SMART GLOW EFFECTS FOR AI-POWERED TILES
+ * 
+ * These helper functions create professional glow effects that indicate the tiles are
+ * intelligent, AI-powered components that update based on machine learning and real-time data.
+ */
+
+@Composable
+fun EdgeGlowModifier(
+    color: Color,
+    intensity: Float = 1f
+): Modifier {
+    val infiniteTransition = rememberInfiniteTransition(label = "edge_glow")
+    
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 3000,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow_alpha"
+    )
+    
+    return Modifier.border(
+        width = 2.dp,
+        brush = Brush.linearGradient(
+            colors = listOf(
+                color.copy(alpha = glowAlpha * intensity * 0.8f),
+                color.copy(alpha = glowAlpha * intensity * 0.4f),
+                color.copy(alpha = glowAlpha * intensity * 0.8f)
+            )
+        ),
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
+
+
+@Composable
+fun SmartIndicator(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "smart_indicator")
+    val sparkleRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "sparkle_rotation"
+    )
+    
+    val sparkleAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "sparkle_alpha"
+    )
+
+    Row(
+        modifier = modifier
+            .background(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        color.copy(alpha = 0.1f),
+                        color.copy(alpha = 0.2f),
+                        color.copy(alpha = 0.1f)
+                    )
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = color.copy(alpha = sparkleAlpha),
+            modifier = Modifier
+                .size(14.dp)
+                .graphicsLayer(rotationZ = sparkleRotation)
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = color.copy(alpha = 0.8f),
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
 
 @Composable
 fun SwipeableBigTiles(
@@ -124,18 +251,30 @@ fun SwipeableBigTiles(
                     getCurrentPrayer = getCurrentPrayer,
                     getPrayerStatus = getPrayerStatus,
                     getPrayerTimeDisplay = getPrayerTimeDisplay,
-                    getTimeUntilNextPrayer = getTimeUntilNextPrayer
+                    getTimeUntilNextPrayer = getTimeUntilNextPrayer,
+                    glowModifier = EdgeGlowModifier(
+                        color = MaterialTheme.colorScheme.primary,
+                        intensity = 1f
+                    )
                 )
                 1 -> SmartInfoTile(
                     getSmartTitle = getSmartTitle,
                     getSmartContent = getSmartContent,
                     getCurrentDate = getCurrentDate,
-                    getSmartFooter = getSmartFooter
+                    getSmartFooter = getSmartFooter,
+                    glowModifier = EdgeGlowModifier(
+                        color = MaterialTheme.colorScheme.secondary,
+                        intensity = 0.8f
+                    )
                 )
                 2 -> DailyStatsTile(
                     getPrayerProgress = getPrayerProgress,
                     getDailyStatsTitle = getDailyStatsTitle,
-                    getDailyStatsMessage = getDailyStatsMessage
+                    getDailyStatsMessage = getDailyStatsMessage,
+                    glowModifier = EdgeGlowModifier(
+                        color = MaterialTheme.colorScheme.tertiary,
+                        intensity = 0.9f
+                    )
                 )
             }
         }
@@ -206,13 +345,15 @@ private fun NextPrayerTile(
     getCurrentPrayer: () -> Pair<String, LocalTime>?,
     getPrayerStatus: (String) -> String,
     getPrayerTimeDisplay: (String) -> String,
-    getTimeUntilNextPrayer: () -> String
+    getTimeUntilNextPrayer: () -> String,
+    glowModifier: Modifier = Modifier
 ) {
     val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
     if (mainPrayer != null) {
-        // Single prayer card without layered background
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(glowModifier),
             shape = RoundedCornerShape(
                 topStart = 40.dp,
                 topEnd = 20.dp,
@@ -220,20 +361,31 @@ private fun NextPrayerTile(
                 bottomEnd = 40.dp
             ),
             color = MaterialTheme.colorScheme.primaryContainer,
-            shadowElevation = 12.dp
+            shadowElevation = 2.dp
         ) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Prayer info
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.SpaceBetween
+                // Smart AI indicator
+                SmartIndicator(
+                    icon = Icons.Default.Psychology,
+                    label = "Smart Prediction",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    // Prayer info
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Text(
                             text = mainPrayer.first,
                             style = MaterialTheme.typography.headlineMedium,
@@ -246,26 +398,23 @@ private fun NextPrayerTile(
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                             fontWeight = FontWeight.Medium
                         )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Text(
+                            text = getPrayerTimeDisplay(mainPrayer.first),
+                            style = MaterialTheme.typography.displaySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                     
-                    Text(
-                        text = getPrayerTimeDisplay(mainPrayer.first),
-                        style = MaterialTheme.typography.displaySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                
-                // Countdown timer
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
+                    // Countdown timer with enhanced glow
                     Surface(
                         modifier = Modifier.size(88.dp),
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        shadowElevation = 6.dp
+                        shadowElevation = 1.dp
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(
@@ -280,6 +429,7 @@ private fun NextPrayerTile(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
+                                fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(8.dp)
                             )
                         }
@@ -309,10 +459,13 @@ private fun SmartInfoTile(
     getSmartTitle: () -> String,
     getSmartContent: () -> String,
     getCurrentDate: () -> String,
-    getSmartFooter: () -> String
+    getSmartFooter: () -> String,
+    glowModifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .then(glowModifier),
         shape = RoundedCornerShape(
             topStart = 20.dp,
             topEnd = 40.dp,
@@ -320,7 +473,7 @@ private fun SmartInfoTile(
             bottomEnd = 20.dp
         ),
         color = MaterialTheme.colorScheme.secondaryContainer,
-        shadowElevation = 8.dp
+        shadowElevation = 2.dp
     ) {
         Column(
             modifier = Modifier
@@ -328,6 +481,14 @@ private fun SmartInfoTile(
                 .padding(24.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // Smart ML indicator
+            SmartIndicator(
+                icon = Icons.Default.AutoAwesome,
+                label = "AI Content",
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.align(Alignment.Start)
+            )
+            
             // Dynamic title based on time of day
             Text(
                 text = getSmartTitle(),
@@ -372,13 +533,15 @@ private fun SmartInfoTile(
 private fun DailyStatsTile(
     getPrayerProgress: () -> Pair<Int, Int>,
     getDailyStatsTitle: () -> String,
-    getDailyStatsMessage: () -> String
+    getDailyStatsMessage: () -> String,
+    glowModifier: Modifier = Modifier
 ) {
     val (completed, total) = getPrayerProgress()
     val progress = if (total > 0) completed.toFloat() / total.toFloat() else 0f
-    
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .then(glowModifier),
         shape = RoundedCornerShape(
             topStart = 32.dp,
             topEnd = 16.dp,
@@ -386,7 +549,7 @@ private fun DailyStatsTile(
             bottomEnd = 32.dp
         ),
         color = MaterialTheme.colorScheme.tertiaryContainer,
-        shadowElevation = 8.dp
+        shadowElevation = 2.dp
     ) {
         Column(
             modifier = Modifier
@@ -394,6 +557,14 @@ private fun DailyStatsTile(
                 .padding(24.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // Smart analytics indicator
+            SmartIndicator(
+                icon = Icons.Default.AutoAwesome,
+                label = "Smart Analytics",
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.align(Alignment.Start)
+            )
+            
             // Dynamic title based on progress
             Text(
                 text = getDailyStatsTitle(),

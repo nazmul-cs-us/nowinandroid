@@ -30,7 +30,8 @@
       "Bash(./rename_package.sh)",
       "Bash(git checkout:*)",
       "Bash(git stash push:*)",
-      "Bash(./install_and_run.sh)"
+      "Bash(./install_and_run.sh)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
