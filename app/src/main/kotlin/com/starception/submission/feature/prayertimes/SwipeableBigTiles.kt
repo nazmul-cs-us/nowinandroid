@@ -44,15 +44,7 @@
  */
 package com.starception.submission.feature.prayertimes
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -92,13 +84,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -106,45 +91,6 @@ import androidx.compose.ui.unit.dp
 import com.starception.submission.prayer.model.DayPrayerTimes
 import java.time.LocalTime
 
-/**
- * SMART GLOW EFFECTS FOR AI-POWERED TILES
- * 
- * These helper functions create professional glow effects that indicate the tiles are
- * intelligent, AI-powered components that update based on machine learning and real-time data.
- */
-
-@Composable
-fun EdgeGlowModifier(
-    color: Color,
-    intensity: Float = 1f
-): Modifier {
-    val infiniteTransition = rememberInfiniteTransition(label = "edge_glow")
-    
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = 3000,
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow_alpha"
-    )
-    
-    return Modifier.border(
-        width = 2.dp,
-        brush = Brush.linearGradient(
-            colors = listOf(
-                color.copy(alpha = glowAlpha * intensity * 0.8f),
-                color.copy(alpha = glowAlpha * intensity * 0.4f),
-                color.copy(alpha = glowAlpha * intensity * 0.8f)
-            )
-        ),
-        shape = RoundedCornerShape(16.dp)
-    )
-}
 
 
 
@@ -155,26 +101,6 @@ fun SmartIndicator(
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "smart_indicator")
-    val sparkleRotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "sparkle_rotation"
-    )
-    
-    val sparkleAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "sparkle_alpha"
-    )
 
     Row(
         modifier = modifier
@@ -195,10 +121,8 @@ fun SmartIndicator(
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = color.copy(alpha = sparkleAlpha),
-            modifier = Modifier
-                .size(14.dp)
-                .graphicsLayer(rotationZ = sparkleRotation)
+            tint = color,
+            modifier = Modifier.size(16.dp)
         )
         Text(
             text = label,
@@ -251,30 +175,18 @@ fun SwipeableBigTiles(
                     getCurrentPrayer = getCurrentPrayer,
                     getPrayerStatus = getPrayerStatus,
                     getPrayerTimeDisplay = getPrayerTimeDisplay,
-                    getTimeUntilNextPrayer = getTimeUntilNextPrayer,
-                    glowModifier = EdgeGlowModifier(
-                        color = MaterialTheme.colorScheme.primary,
-                        intensity = 1f
-                    )
+                    getTimeUntilNextPrayer = getTimeUntilNextPrayer
                 )
                 1 -> SmartInfoTile(
                     getSmartTitle = getSmartTitle,
                     getSmartContent = getSmartContent,
                     getCurrentDate = getCurrentDate,
-                    getSmartFooter = getSmartFooter,
-                    glowModifier = EdgeGlowModifier(
-                        color = MaterialTheme.colorScheme.secondary,
-                        intensity = 0.8f
-                    )
+                    getSmartFooter = getSmartFooter
                 )
                 2 -> DailyStatsTile(
                     getPrayerProgress = getPrayerProgress,
                     getDailyStatsTitle = getDailyStatsTitle,
-                    getDailyStatsMessage = getDailyStatsMessage,
-                    glowModifier = EdgeGlowModifier(
-                        color = MaterialTheme.colorScheme.tertiary,
-                        intensity = 0.9f
-                    )
+                    getDailyStatsMessage = getDailyStatsMessage
                 )
             }
         }
@@ -345,15 +257,13 @@ private fun NextPrayerTile(
     getCurrentPrayer: () -> Pair<String, LocalTime>?,
     getPrayerStatus: (String) -> String,
     getPrayerTimeDisplay: (String) -> String,
-    getTimeUntilNextPrayer: () -> String,
-    glowModifier: Modifier = Modifier
+    getTimeUntilNextPrayer: () -> String
 ) {
     val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
-    if (mainPrayer != null) {
+    // Show prayer tile if we have prayer data, even if mainPrayer logic fails
+    if (mainPrayer != null || prayerTimes != null) {
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(glowModifier),
+            modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(
                 topStart = 40.dp,
                 topEnd = 20.dp,
@@ -386,27 +296,52 @@ private fun NextPrayerTile(
                     Column(
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(
-                            text = mainPrayer.first,
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = getPrayerStatus(mainPrayer.first),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                            fontWeight = FontWeight.Medium
-                        )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        Text(
-                            text = getPrayerTimeDisplay(mainPrayer.first),
-                            style = MaterialTheme.typography.displaySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
+                        if (mainPrayer != null) {
+                            Text(
+                                text = mainPrayer.first,
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = getPrayerStatus(mainPrayer.first),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                                fontWeight = FontWeight.Medium
+                            )
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Text(
+                                text = getPrayerTimeDisplay(mainPrayer.first),
+                                style = MaterialTheme.typography.displaySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        } else if (prayerTimes != null) {
+                            // Show Fajr as fallback when no current/next prayer is found
+                            Text(
+                                text = "Fajr",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "Tomorrow",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                                fontWeight = FontWeight.Medium
+                            )
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Text(
+                                text = getPrayerTimeDisplay("Fajr"),
+                                style = MaterialTheme.typography.displaySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                     
                     // Countdown timer with enhanced glow
@@ -425,7 +360,7 @@ private fun NextPrayerTile(
                             )
                             
                             Text(
-                                text = getTimeUntilNextPrayer(),
+                                text = if (mainPrayer != null) getTimeUntilNextPrayer() else "Ready",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
@@ -438,16 +373,43 @@ private fun NextPrayerTile(
             }
         }
     } else {
-        // Fallback if no prayer data
+        // Fallback if no prayer data - Beautiful loading state
         Surface(
             modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant
+            shape = RoundedCornerShape(
+                topStart = 40.dp,
+                topEnd = 20.dp,
+                bottomStart = 20.dp,
+                bottomEnd = 40.dp
+            ),
+            color = MaterialTheme.colorScheme.surface
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Beautiful loading indicator
+                CircularProgressIndicator(
+                    modifier = Modifier.size(32.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 3.dp
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 Text(
-                    text = "Loading prayer times...",
-                    style = MaterialTheme.typography.bodyLarge
+                    text = "Calculating Prayer Times",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                Text(
+                    text = "Getting your location...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -459,13 +421,10 @@ private fun SmartInfoTile(
     getSmartTitle: () -> String,
     getSmartContent: () -> String,
     getCurrentDate: () -> String,
-    getSmartFooter: () -> String,
-    glowModifier: Modifier = Modifier
+    getSmartFooter: () -> String
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .then(glowModifier),
+        modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(
             topStart = 20.dp,
             topEnd = 40.dp,
@@ -533,15 +492,12 @@ private fun SmartInfoTile(
 private fun DailyStatsTile(
     getPrayerProgress: () -> Pair<Int, Int>,
     getDailyStatsTitle: () -> String,
-    getDailyStatsMessage: () -> String,
-    glowModifier: Modifier = Modifier
+    getDailyStatsMessage: () -> String
 ) {
     val (completed, total) = getPrayerProgress()
     val progress = if (total > 0) completed.toFloat() / total.toFloat() else 0f
     Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .then(glowModifier),
+        modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(
             topStart = 32.dp,
             topEnd = 16.dp,
