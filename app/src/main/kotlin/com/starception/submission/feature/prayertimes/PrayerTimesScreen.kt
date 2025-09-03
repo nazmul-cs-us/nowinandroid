@@ -58,6 +58,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.Duration
@@ -145,9 +146,92 @@ fun PrayerTimesScreen(
     val context = LocalContext.current
     
     // UI STATE MANAGEMENT - These control what the user sees
-    var prayerTimes by remember { mutableStateOf<com.starception.submission.prayer.model.DayPrayerTimes?>(null) }  // Calculated prayer times
-    var isLoading by remember { mutableStateOf(false) }     // Start with no loading - only show for first-time users
-    var location by remember { mutableStateOf("Loading location...") }  // Location display text
+    // Try to load cached data immediately, with Dubai fallback for instant startup
+    val (initialPrayerTimes, initialLocation, initialLoading) = remember {
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                PrayerTimeCalculatorEntryPoint::class.java
+            )
+            val cache = entryPoint.locationCache()
+            val cachedData = cache.getCachedPrayerTimes()
+            
+            if (cachedData != null) {
+                val (cachedPrayerTimes, _, cachedLocationName) = cachedData
+                if (cachedPrayerTimes != null && cachedLocationName != null) {
+                    android.util.Log.d("PrayerScreen", "🚀 INSTANT STARTUP: Loaded cached data immediately!")
+                    Triple(cachedPrayerTimes, cachedLocationName, false)
+                } else {
+                    // Provide Dubai fallback for instant startup
+                    val dubaiLocation = com.starception.submission.prayer.model.Location(
+                        latitude = 25.2048,
+                        longitude = 55.2708,
+                        timeZoneOffset = 4.0,
+                        city = "Dubai",
+                        country = "UAE"
+                    )
+                    val defaultTimes = com.starception.submission.prayer.model.DayPrayerTimes(
+                        date = LocalDateTime.now(),
+                        fajr = LocalTime.of(5, 15),
+                        sunrise = LocalTime.of(6, 45),
+                        dhuhr = LocalTime.of(12, 15),
+                        asr = LocalTime.of(15, 45),
+                        maghrib = LocalTime.of(18, 30),
+                        isha = LocalTime.of(19, 45),
+                        location = dubaiLocation
+                    )
+                    android.util.Log.d("PrayerScreen", "🕌 Using Dubai default prayer times for instant startup")
+                    Triple(defaultTimes, "Dubai (Default)", false)
+                }
+            } else {
+                // Provide Dubai fallback for instant startup
+                val dubaiLocation = com.starception.submission.prayer.model.Location(
+                    latitude = 25.2048,
+                    longitude = 55.2708,
+                    timeZoneOffset = 4.0,
+                    city = "Dubai",
+                    country = "UAE"
+                )
+                val defaultTimes = com.starception.submission.prayer.model.DayPrayerTimes(
+                    date = LocalDateTime.now(),
+                    fajr = LocalTime.of(5, 15),
+                    sunrise = LocalTime.of(6, 45),
+                    dhuhr = LocalTime.of(12, 15),
+                    asr = LocalTime.of(15, 45),
+                    maghrib = LocalTime.of(18, 30),
+                    isha = LocalTime.of(19, 45),
+                    location = dubaiLocation
+                )
+                android.util.Log.d("PrayerScreen", "🕌 Using Dubai default prayer times for first-time startup")
+                Triple(defaultTimes, "Dubai (Default)", false)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("PrayerScreen", "Failed to load cache, using Dubai fallback: ${e.message}")
+            // Always provide fallback data - never show loading
+            val dubaiLocation = com.starception.submission.prayer.model.Location(
+                latitude = 25.2048,
+                longitude = 55.2708,
+                timeZoneOffset = 4.0,
+                city = "Dubai",
+                country = "UAE"
+            )
+            val defaultTimes = com.starception.submission.prayer.model.DayPrayerTimes(
+                date = LocalDateTime.now(),
+                fajr = LocalTime.of(5, 15),
+                sunrise = LocalTime.of(6, 45),
+                dhuhr = LocalTime.of(12, 15),
+                asr = LocalTime.of(15, 45),
+                maghrib = LocalTime.of(18, 30),
+                isha = LocalTime.of(19, 45),
+                location = dubaiLocation
+            )
+            Triple(defaultTimes, "Dubai (Default)", false)
+        }
+    }
+    
+    var prayerTimes by remember { mutableStateOf<com.starception.submission.prayer.model.DayPrayerTimes?>(initialPrayerTimes) }  // Calculated prayer times
+    var isLoading by remember { mutableStateOf(initialLoading) }     // Start with no loading if we have cached data
+    var location by remember { mutableStateOf(initialLocation) }  // Location display text
     
     // REAL-TIME CLOCK STATE - Updates every minute for live prayer status
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
