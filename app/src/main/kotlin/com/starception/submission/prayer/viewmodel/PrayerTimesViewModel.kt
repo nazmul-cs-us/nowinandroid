@@ -378,7 +378,7 @@ class PrayerTimesViewModel @Inject constructor(
                             calculatePrayerTimes(showLoading = false, clearLoadingImmediately = true)
                         } catch (e: Exception) {
                             _uiState.value = _uiState.value.copy(
-                                error = e.message ?: "Failed to refresh prayer times"
+                                error = e.message ?: "Failed to update prayer times"
                             )
                         }
                     }
