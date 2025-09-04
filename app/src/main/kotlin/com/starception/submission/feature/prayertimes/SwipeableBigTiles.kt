@@ -78,6 +78,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -87,11 +88,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -103,6 +109,114 @@ import java.time.LocalTime
 
 
 
+
+@Composable
+fun Modifier.sunshineAura(): Modifier {
+    val infiniteTransition = rememberInfiniteTransition(label = "sunshineAura")
+    
+    val primaryGlow by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(5000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "primaryGlow"
+    )
+    
+    val secondaryPulse by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "secondaryPulse"
+    )
+    
+    val divineShimmer by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2 * kotlin.math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "divineShimmer"
+    )
+    
+    return this.drawBehind {
+        val cornerRadius = 20.dp.toPx()
+        
+        // Divine golden aura with enhanced layers (contained within tile bounds)
+        val auralayers = listOf(
+            Triple(8.dp.toPx(), primaryGlow * 0.8f, Color(0xFFFFD700)),       // Inner gold
+            Triple(12.dp.toPx(), primaryGlow * 0.6f, Color(0xFFFFE55C)),      // Mid gold  
+            Triple(16.dp.toPx(), primaryGlow * 0.4f, Color(0xFFFFF8DC)),      // Light cream
+            Triple(20.dp.toPx(), secondaryPulse * 0.25f, Color(0xFFFFFAF0)),  // Softest outer
+        )
+        
+        // Draw each aura layer
+        auralayers.forEachIndexed { index, (glowSize, intensity, baseColor) ->
+            val shimmerBoost = kotlin.math.sin(divineShimmer + index * 1.5f) * 0.15f + 0.85f
+            val finalAlpha = intensity * shimmerBoost
+            
+            if (finalAlpha > 0.05f) {
+                // Create more sophisticated gradient
+                val gradientColors = listOf(
+                    baseColor.copy(alpha = finalAlpha * 0.9f),
+                    baseColor.copy(alpha = finalAlpha * 0.6f),
+                    baseColor.copy(alpha = finalAlpha * 0.3f),
+                    baseColor.copy(alpha = finalAlpha * 0.1f),
+                    Color.Transparent
+                )
+                
+                drawRoundRect(
+                    brush = Brush.radialGradient(
+                        colors = gradientColors,
+                        center = Offset(size.width / 2, size.height / 2),
+                        radius = glowSize + (kotlin.math.sin(divineShimmer * 0.7f + index) * 2.dp.toPx())
+                    ),
+                    topLeft = Offset(-glowSize / 2, -glowSize / 2),
+                    size = androidx.compose.ui.geometry.Size(
+                        width = size.width + glowSize,
+                        height = size.height + glowSize
+                    ),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(
+                        x = cornerRadius + glowSize / 10,
+                        y = cornerRadius + glowSize / 10
+                    )
+                )
+            }
+        }
+        
+        // Divine highlights with celestial sparkles (contained)
+        val sparklePhase = kotlin.math.sin(divineShimmer * 1.3f) * 0.5f + 0.5f
+        val highlightAlpha = primaryGlow * sparklePhase * 0.15f
+        
+        if (highlightAlpha > 0.03f) {
+            drawRoundRect(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFFFFFFFF).copy(alpha = highlightAlpha * 0.6f),
+                        Color(0xFFFFE55C).copy(alpha = highlightAlpha * 0.3f),
+                        Color.Transparent
+                    ),
+                    start = Offset(0f, 0f),
+                    end = Offset(size.width, size.height)
+                ),
+                topLeft = Offset(-1.dp.toPx(), -1.dp.toPx()),
+                size = androidx.compose.ui.geometry.Size(
+                    width = size.width + 2.dp.toPx(),
+                    height = size.height + 2.dp.toPx()
+                ),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(
+                    x = cornerRadius + 1.dp.toPx(),
+                    y = cornerRadius + 1.dp.toPx()
+                )
+            )
+        }
+    }
+}
 
 @Composable
 fun SparklingStars(
@@ -435,7 +549,9 @@ private fun NextPrayerTile(
     // Show prayer tile if we have prayer data, even if mainPrayer logic fails
     if (mainPrayer != null || prayerTimes != null) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .sunshineAura(),
             shape = RoundedCornerShape(
                 topStart = 40.dp,
                 topEnd = 20.dp,
@@ -596,7 +712,9 @@ private fun SmartInfoTile(
     getSmartFooter: () -> String
 ) {
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .sunshineAura(),
         shape = RoundedCornerShape(
             topStart = 20.dp,
             topEnd = 40.dp,
@@ -683,7 +801,9 @@ private fun DailyStatsTile(
     val (completed, total) = getPrayerProgress()
     val progress = if (total > 0) completed.toFloat() / total.toFloat() else 0f
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .sunshineAura(),
         shape = RoundedCornerShape(
             topStart = 32.dp,
             topEnd = 16.dp,
