@@ -44,10 +44,12 @@
  */
 package com.starception.submission.feature.prayertimes
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -76,23 +78,92 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.starception.submission.prayer.model.DayPrayerTimes
 import java.time.LocalTime
 
 
 
+
+@Composable
+fun SparklingStars(
+    sparkleAnimation: Float,
+    color: Color,
+    containerSize: Dp
+) {
+    // Create 4 star shapes around the icon
+    val sparklePositions = listOf(
+        Pair(-0.35f, -0.35f), // Top-left
+        Pair(0.35f, -0.35f),  // Top-right  
+        Pair(-0.35f, 0.35f),  // Bottom-left
+        Pair(0.35f, 0.35f)    // Bottom-right
+    )
+    
+    sparklePositions.forEachIndexed { index, (offsetX, offsetY) ->
+        // Stagger the sparkle timing for each star
+        val staggeredAlpha = ((sparkleAnimation + index * 0.25f) % 1f).coerceIn(0f, 1f)
+        val sparkleAlpha = if (staggeredAlpha < 0.5f) staggeredAlpha * 2f else (1f - staggeredAlpha) * 2f
+        val sparkleScale = 0.3f + sparkleAlpha * 0.7f
+        
+        Canvas(
+            modifier = Modifier
+                .offset(
+                    x = (containerSize.value * offsetX).dp,
+                    y = (containerSize.value * offsetY).dp
+                )
+                .size(6.dp)
+                .graphicsLayer {
+                    scaleX = sparkleScale
+                    scaleY = sparkleScale
+                    alpha = sparkleAlpha * 0.9f
+                    rotationZ = sparkleAnimation * 360f + index * 45f
+                }
+        ) {
+            // Draw a 4-pointed star shape
+            val centerX = size.width / 2
+            val centerY = size.height / 2
+            val outerRadius = size.width / 2
+            val innerRadius = outerRadius * 0.4f
+            
+            val starPath = androidx.compose.ui.graphics.Path().apply {
+                // Create 4-pointed star
+                moveTo(centerX, centerY - outerRadius) // Top point
+                lineTo(centerX + innerRadius * 0.3f, centerY - innerRadius * 0.3f)
+                lineTo(centerX + outerRadius, centerY) // Right point
+                lineTo(centerX + innerRadius * 0.3f, centerY + innerRadius * 0.3f)
+                lineTo(centerX, centerY + outerRadius) // Bottom point
+                lineTo(centerX - innerRadius * 0.3f, centerY + innerRadius * 0.3f)
+                lineTo(centerX - outerRadius, centerY) // Left point
+                lineTo(centerX - innerRadius * 0.3f, centerY - innerRadius * 0.3f)
+                close()
+            }
+            
+            drawPath(
+                path = starPath,
+                color = color.copy(alpha = sparkleAlpha * 0.8f)
+            )
+        }
+    }
+}
 
 @Composable
 fun SmartIndicator(
@@ -101,34 +172,135 @@ fun SmartIndicator(
     color: Color,
     modifier: Modifier = Modifier
 ) {
-
+    val infiniteTransition = rememberInfiniteTransition(label = "aiWorking")
+    
+    // Different animations based on the type of AI work
+    val (iconAnimation, backgroundAnimation) = when (label) {
+        "Smart Prediction" -> {
+            // Gentle pulsing to show prediction processing
+            val pulse by infiniteTransition.animateFloat(
+                initialValue = 0.8f,
+                targetValue = 1.0f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "predictionPulse"
+            )
+            val bgPulse by infiniteTransition.animateFloat(
+                initialValue = 0.1f,
+                targetValue = 0.2f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "predictionBgPulse"
+            )
+            Pair(pulse, bgPulse)
+        }
+        "AI Content" -> {
+            // Sparkling effect - slower, more elegant fade
+            val sparkle1 by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(3500),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "contentSparkle1"
+            )
+            val bgPulse by infiniteTransition.animateFloat(
+                initialValue = 0.1f,
+                targetValue = 0.18f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(3500),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "contentBgPulse"
+            )
+            Pair(sparkle1, bgPulse)
+        }
+        else -> { // Smart Analytics
+            // Sparkling effect - slower, more elegant twinkling stars
+            val sparkle by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(3000),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "analyticsSparkle"
+            )
+            val bgPulse by infiniteTransition.animateFloat(
+                initialValue = 0.1f,
+                targetValue = 0.16f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(3000),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "analysisBgPulse"
+            )
+            Pair(sparkle, bgPulse)
+        }
+    }
+    
     Row(
         modifier = modifier
             .background(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        color.copy(alpha = 0.1f),
-                        color.copy(alpha = 0.2f),
-                        color.copy(alpha = 0.1f)
-                    )
-                ),
-                shape = RoundedCornerShape(12.dp)
+                color = color.copy(alpha = backgroundAnimation),
+                shape = RoundedCornerShape(16.dp)
             )
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = color,
-            modifier = Modifier.size(16.dp)
-        )
+        // Animated icon showing AI is working
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .background(
+                    color = color.copy(alpha = 0.15f),
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            // Main icon
+            Icon(
+                imageVector = icon,
+                contentDescription = "$label - AI Working",
+                tint = color,
+                modifier = Modifier
+                    .size(12.dp)
+                    .graphicsLayer {
+                        when (label) {
+                            "Smart Prediction" -> {
+                                scaleX = iconAnimation
+                                scaleY = iconAnimation
+                                alpha = iconAnimation
+                            }
+                            "AI Content", "Smart Analytics" -> {
+                                // Keep main icon stable for sparkling effects
+                                alpha = 1f
+                            }
+                        }
+                    }
+            )
+            
+            // Sparkling effects for AI Content and Smart Analytics
+            if (label == "AI Content" || label == "Smart Analytics") {
+                SparklingStars(
+                    sparkleAnimation = iconAnimation,
+                    color = color,
+                    containerSize = 20.dp
+                )
+            }
+        }
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = color.copy(alpha = 0.8f),
-            fontWeight = FontWeight.Medium
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Medium
+            ),
+            color = color
         )
     }
 }
@@ -437,8 +609,8 @@ private fun SmartInfoTile(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Smart ML indicator
             SmartIndicator(
@@ -453,19 +625,23 @@ private fun SmartInfoTile(
                 text = getSmartTitle(),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(0.3f, fill = false)
             )
             
             // Contextual content and guidance
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(0.4f, fill = false)
             ) {
                 Text(
                     text = getSmartContent(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
                 )
                 
                 // Current date for context
@@ -476,14 +652,22 @@ private fun SmartInfoTile(
                 )
             }
             
-            // Prayer context footer
-            Text(
-                text = getSmartFooter(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.secondary,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
+            // Prayer context footer with more space
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = getSmartFooter(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
         }
     }
 }
