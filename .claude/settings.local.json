@@ -31,7 +31,14 @@
       "Bash(git checkout:*)",
       "Bash(git stash push:*)",
       "Bash(./install_and_run.sh)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Read(/Users/smarterai/Documents/GitHub/Compass-main/**)",
+      "Read(/Users/smarterai/Documents/GitHub/Compass-main/app/src/main/java/com/akarsh/compassapp/**)",
+      "Read(/Users/smarterai/Documents/GitHub/Compass-main/app/src/main/res/layout/**)",
+      "Read(/Users/smarterai/Documents/GitHub/Compass-main/app/src/main/**)",
+      "Read(/Users/smarterai/Documents/GitHub/Compass-main/app/src/main/res/drawable/**)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

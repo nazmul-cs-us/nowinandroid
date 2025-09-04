@@ -106,6 +106,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.prayer.model.DayPrayerTimes
+import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
+import com.starception.submission.prayer.service.EnhancedLocationService
 import java.time.LocalTime
 
 
@@ -484,6 +486,7 @@ fun SmartIndicator(
 fun SwipeableBigTiles(
     prayerTimes: DayPrayerTimes?,
     currentTime: LocalTime,
+    locationService: EnhancedLocationService,
     getNextPrayer: () -> Pair<String, LocalTime>?,
     getCurrentPrayer: () -> Pair<String, LocalTime>?,
     getPrayerStatus: (String) -> String,
@@ -518,6 +521,7 @@ fun SwipeableBigTiles(
             when (actualPage) {
                 0 -> NextPrayerTile(
                     prayerTimes = prayerTimes,
+                    locationService = locationService,
                     getNextPrayer = getNextPrayer,
                     getCurrentPrayer = getCurrentPrayer,
                     getPrayerStatus = getPrayerStatus,
@@ -600,6 +604,7 @@ fun SwipeableBigTiles(
 @Composable
 private fun NextPrayerTile(
     prayerTimes: DayPrayerTimes?,
+    locationService: EnhancedLocationService,
     getNextPrayer: () -> Pair<String, LocalTime>?,
     getCurrentPrayer: () -> Pair<String, LocalTime>?,
     getPrayerStatus: (String) -> String,
@@ -698,31 +703,14 @@ private fun NextPrayerTile(
                         }
                     }
                     
-                    // Countdown timer with enhanced glow
-                    Surface(
-                        modifier = Modifier.size(88.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shadowElevation = 1.dp
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(
-                                progress = { 0.7f },
-                                modifier = Modifier.size(80.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 4.dp
-                            )
-                            
-                            Text(
-                                text = if (mainPrayer != null) getTimeUntilNextPrayer() else "Ready",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(8.dp)
-                            )
-                        }
-                    }
+                    // Countdown timer with integrated Qibla compass
+                    CompassProgressIndicator(
+                        progress = 0.7f,
+                        timeText = if (mainPrayer != null) getTimeUntilNextPrayer() else "Ready",
+                        modifier = Modifier,
+                        size = 88.dp,
+                        locationService = locationService
+                    )
                 }
             }
         }
