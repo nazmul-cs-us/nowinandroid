@@ -143,20 +143,21 @@ fun FlowingArrowsAnimation(
     // Enhanced animation parameters for more professional feel
     val infiniteTransition = rememberInfiniteTransition(label = "arrowHint")
     
-    // True continuous rain effect - no jumps or restarts
+    // Improved continuous rain effect with better smoothness
     val animationTime by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 4000f, // 4 second full cycle
+        targetValue = 1f, // Use 0-1 range for better precision
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4000, easing = LinearEasing),
+            animation = tween(durationMillis = 3000, easing = LinearEasing), // Slightly faster for smoother feel
             repeatMode = RepeatMode.Restart
         ),
         label = "rainTime"
     )
     
-    // Calculate arrow positions using continuous sine wave for perfect rain effect
-    val arrow1 = ((animationTime % 2000f) / 2000f * 36f) - 18f // Full range every 2 seconds
-    val arrow2 = (((animationTime + 1000f) % 2000f) / 2000f * 36f) - 18f // 1 second offset
+    // Calculate arrow positions using smooth linear progression without modulo operations
+    val totalRange = 40f // Total vertical range for movement
+    val arrow1Position = (animationTime * totalRange) - (totalRange / 2f) // -20 to +20
+    val arrow2Position = (((animationTime + 0.5f) % 1f) * totalRange) - (totalRange / 2f) // 0.5 offset for stagger
     
     // Smooth fade animation for text
     val textAlpha by animateFloatAsState(
@@ -184,43 +185,50 @@ fun FlowingArrowsAnimation(
                         modifier = Modifier.width(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Smooth rain effect with continuous arrow flow
+                        // Smooth rain effect with refined continuous arrow flow
                         listOf(
-                            Triple(arrow1, 1f, 20.dp),
-                            Triple(arrow2, 0.8f, 18.dp)
+                            Triple(arrow1Position, 1f, 20.dp),
+                            Triple(arrow2Position, 0.9f, 18.dp)
                         ).forEach { (position, maxAlpha, size) ->
-                            val normalizedPosition = position / 18f // Normalize to -1 to 1 based on new range
+                            val normalizedPosition = position / 20f // Normalize to -1 to 1 range
                             
-                            // Smooth continuous visibility - no harsh cutoffs
+                            // Improved smooth visibility calculation - eliminates blinks
                             val visibilityAlpha = when {
-                                kotlin.math.abs(normalizedPosition) > 0.85f -> {
-                                    // Gentle fade at edges (15% of range) 
-                                    val fadeRange = (kotlin.math.abs(normalizedPosition) - 0.85f) / 0.15f
-                                    (1f - fadeRange * 0.6f).coerceIn(0.4f, 1f)
+                                kotlin.math.abs(normalizedPosition) > 1f -> 0f // Completely hidden outside range
+                                kotlin.math.abs(normalizedPosition) > 0.8f -> {
+                                    // Smoother fade at edges (20% of range)
+                                    val fadeDistance = kotlin.math.abs(normalizedPosition) - 0.8f
+                                    val fadeProgress = fadeDistance / 0.2f // 0f to 1f
+                                    (1f - fadeProgress).coerceIn(0f, 1f)
                                 }
-                                else -> 1f // Full visibility in center 85%
+                                else -> 1f // Full visibility in center 80%
                             }
                             
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Pull down hint",
-                                tint = MaterialTheme.colorScheme.primary.copy(
-                                    alpha = (visibilityAlpha * maxAlpha).coerceIn(0.4f, maxAlpha)
-                                ),
-                                modifier = Modifier
-                                    .size(size)
-                                    .offset(y = position.dp)
-                                    .graphicsLayer {
-                                        val centerScale = 0.95f + 0.05f * (1f - kotlin.math.abs(normalizedPosition))
-                                        scaleX = centerScale
-                                        scaleY = centerScale
-                                    }
-                            )
+                            // Only render if visible to prevent unnecessary rendering
+                            if (visibilityAlpha > 0.01f) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Pull down hint",
+                                    tint = MaterialTheme.colorScheme.primary.copy(
+                                        alpha = (visibilityAlpha * maxAlpha).coerceIn(0.1f, maxAlpha)
+                                    ),
+                                    modifier = Modifier
+                                        .size(size)
+                                        .offset(y = position.dp)
+                                        .graphicsLayer {
+                                            val centerScale = 0.9f + 0.1f * (1f - kotlin.math.abs(normalizedPosition).coerceIn(0f, 1f))
+                                            scaleX = centerScale
+                                            scaleY = centerScale
+                                            alpha = visibilityAlpha
+                                        }
+                                )
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                 }
                 
+                // Text content - centered within available space
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
