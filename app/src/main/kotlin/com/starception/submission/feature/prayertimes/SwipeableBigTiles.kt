@@ -97,6 +97,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -111,7 +112,12 @@ import java.time.LocalTime
 
 
 @Composable
-fun Modifier.sunshineAura(): Modifier {
+fun Modifier.sunshineAura(
+    topStart: Dp = 20.dp,
+    topEnd: Dp = 20.dp,
+    bottomStart: Dp = 20.dp,
+    bottomEnd: Dp = 20.dp
+): Modifier {
     val infiniteTransition = rememberInfiniteTransition(label = "sunshineAura")
     
     val primaryGlow by infiniteTransition.animateFloat(
@@ -145,14 +151,18 @@ fun Modifier.sunshineAura(): Modifier {
     )
     
     return this.drawBehind {
-        val cornerRadius = 20.dp.toPx()
+        // Convert custom corner radii to pixels
+        val topStartPx = topStart.toPx()
+        val topEndPx = topEnd.toPx()
+        val bottomStartPx = bottomStart.toPx()
+        val bottomEndPx = bottomEnd.toPx()
         
-        // Divine golden aura with enhanced layers (contained within tile bounds)
+        // Divine golden aura with enhanced layers (slightly more prominent)
         val auralayers = listOf(
-            Triple(8.dp.toPx(), primaryGlow * 0.8f, Color(0xFFFFD700)),       // Inner gold
-            Triple(12.dp.toPx(), primaryGlow * 0.6f, Color(0xFFFFE55C)),      // Mid gold  
-            Triple(16.dp.toPx(), primaryGlow * 0.4f, Color(0xFFFFF8DC)),      // Light cream
-            Triple(20.dp.toPx(), secondaryPulse * 0.25f, Color(0xFFFFFAF0)),  // Softest outer
+            Triple(16.dp.toPx(), primaryGlow * 1.1f, Color(0xFFFFD700)),      // Inner gold
+            Triple(26.dp.toPx(), primaryGlow * 0.9f, Color(0xFFFFE55C)),      // Mid gold  
+            Triple(36.dp.toPx(), primaryGlow * 0.7f, Color(0xFFFFF8DC)),      // Light cream
+            Triple(46.dp.toPx(), secondaryPulse * 0.5f, Color(0xFFFFFAF0)),   // Softest outer
         )
         
         // Draw each aura layer
@@ -170,48 +180,99 @@ fun Modifier.sunshineAura(): Modifier {
                     Color.Transparent
                 )
                 
-                drawRoundRect(
-                    brush = Brush.radialGradient(
-                        colors = gradientColors,
-                        center = Offset(size.width / 2, size.height / 2),
-                        radius = glowSize + (kotlin.math.sin(divineShimmer * 0.7f + index) * 2.dp.toPx())
-                    ),
-                    topLeft = Offset(-glowSize / 2, -glowSize / 2),
+                // Create custom rounded rect path with asymmetric corners
+                val glowRect = androidx.compose.ui.geometry.Rect(
+                    offset = Offset(-glowSize / 2, -glowSize / 2),
                     size = androidx.compose.ui.geometry.Size(
                         width = size.width + glowSize,
                         height = size.height + glowSize
-                    ),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(
-                        x = cornerRadius + glowSize / 10,
-                        y = cornerRadius + glowSize / 10
+                    )
+                )
+                
+                val glowPath = androidx.compose.ui.graphics.Path().apply {
+                    addRoundRect(
+                        roundRect = androidx.compose.ui.geometry.RoundRect(
+                            rect = glowRect,
+                            topLeft = androidx.compose.ui.geometry.CornerRadius(
+                                x = topStartPx + glowSize / 8,
+                                y = topStartPx + glowSize / 8
+                            ),
+                            topRight = androidx.compose.ui.geometry.CornerRadius(
+                                x = topEndPx + glowSize / 8,
+                                y = topEndPx + glowSize / 8
+                            ),
+                            bottomLeft = androidx.compose.ui.geometry.CornerRadius(
+                                x = bottomStartPx + glowSize / 8,
+                                y = bottomStartPx + glowSize / 8
+                            ),
+                            bottomRight = androidx.compose.ui.geometry.CornerRadius(
+                                x = bottomEndPx + glowSize / 8,
+                                y = bottomEndPx + glowSize / 8
+                            )
+                        )
+                    )
+                }
+                
+                drawPath(
+                    path = glowPath,
+                    brush = Brush.radialGradient(
+                        colors = gradientColors,
+                        center = Offset(size.width / 2, size.height / 2),
+                        radius = glowSize + (kotlin.math.sin(divineShimmer * 0.7f + index) * 8.dp.toPx())
                     )
                 )
             }
         }
         
-        // Divine highlights with celestial sparkles (contained)
+        // Divine highlights with celestial sparkles (more visible)
         val sparklePhase = kotlin.math.sin(divineShimmer * 1.3f) * 0.5f + 0.5f
-        val highlightAlpha = primaryGlow * sparklePhase * 0.15f
+        val highlightAlpha = primaryGlow * sparklePhase * 0.45f
         
-        if (highlightAlpha > 0.03f) {
-            drawRoundRect(
+        if (highlightAlpha > 0.05f) {
+            val highlightSize = 6.dp.toPx()
+            val highlightRect = androidx.compose.ui.geometry.Rect(
+                offset = Offset(-highlightSize, -highlightSize),
+                size = androidx.compose.ui.geometry.Size(
+                    width = size.width + highlightSize * 2,
+                    height = size.height + highlightSize * 2
+                )
+            )
+            
+            val highlightPath = androidx.compose.ui.graphics.Path().apply {
+                addRoundRect(
+                    roundRect = androidx.compose.ui.geometry.RoundRect(
+                        rect = highlightRect,
+                        topLeft = androidx.compose.ui.geometry.CornerRadius(
+                            x = topStartPx + highlightSize,
+                            y = topStartPx + highlightSize
+                        ),
+                        topRight = androidx.compose.ui.geometry.CornerRadius(
+                            x = topEndPx + highlightSize,
+                            y = topEndPx + highlightSize
+                        ),
+                        bottomLeft = androidx.compose.ui.geometry.CornerRadius(
+                            x = bottomStartPx + highlightSize,
+                            y = bottomStartPx + highlightSize
+                        ),
+                        bottomRight = androidx.compose.ui.geometry.CornerRadius(
+                            x = bottomEndPx + highlightSize,
+                            y = bottomEndPx + highlightSize
+                        )
+                    )
+                )
+            }
+            
+            drawPath(
+                path = highlightPath,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        Color(0xFFFFFFFF).copy(alpha = highlightAlpha * 0.6f),
-                        Color(0xFFFFE55C).copy(alpha = highlightAlpha * 0.3f),
+                        Color(0xFFFFFFFF).copy(alpha = highlightAlpha * 0.8f),
+                        Color(0xFFFFE55C).copy(alpha = highlightAlpha * 0.5f),
+                        Color(0xFFFFD700).copy(alpha = highlightAlpha * 0.3f),
                         Color.Transparent
                     ),
                     start = Offset(0f, 0f),
                     end = Offset(size.width, size.height)
-                ),
-                topLeft = Offset(-1.dp.toPx(), -1.dp.toPx()),
-                size = androidx.compose.ui.geometry.Size(
-                    width = size.width + 2.dp.toPx(),
-                    height = size.height + 2.dp.toPx()
-                ),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(
-                    x = cornerRadius + 1.dp.toPx(),
-                    y = cornerRadius + 1.dp.toPx()
                 )
             )
         }
@@ -551,7 +612,12 @@ private fun NextPrayerTile(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .sunshineAura(),
+                .sunshineAura(
+                    topStart = 40.dp,
+                    topEnd = 20.dp,
+                    bottomStart = 20.dp,
+                    bottomEnd = 40.dp
+                ),
             shape = RoundedCornerShape(
                 topStart = 40.dp,
                 topEnd = 20.dp,
@@ -714,7 +780,12 @@ private fun SmartInfoTile(
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .sunshineAura(),
+            .sunshineAura(
+                topStart = 20.dp,
+                topEnd = 40.dp,
+                bottomStart = 40.dp,
+                bottomEnd = 20.dp
+            ),
         shape = RoundedCornerShape(
             topStart = 20.dp,
             topEnd = 40.dp,
@@ -803,7 +874,12 @@ private fun DailyStatsTile(
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .sunshineAura(),
+            .sunshineAura(
+                topStart = 32.dp,
+                topEnd = 16.dp,
+                bottomStart = 16.dp,
+                bottomEnd = 32.dp
+            ),
         shape = RoundedCornerShape(
             topStart = 32.dp,
             topEnd = 16.dp,
