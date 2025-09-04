@@ -245,6 +245,15 @@ fun PrayerTimesScreen(
     var showLocationServiceDialog by remember { mutableStateOf(false) }
     var locationServiceCheckPending by remember { mutableStateOf(false) }
     
+    // LOCATION SERVICE - For Qibla compass functionality
+    val locationService = remember {
+        val entryPoint = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            PrayerTimeCalculatorEntryPoint::class.java
+        )
+        entryPoint.enhancedLocationService()
+    }
+    
     // Smooth animation for pull offset
     val animatedPullOffset by animateFloatAsState(
         targetValue = pullOffset,
@@ -561,10 +570,11 @@ fun PrayerTimesScreen(
 
 
                 
-                // Swipeable Big Tiles - Using extracted component
+                // Swipeable Big Tiles - Using extracted component with Qibla compass
                 SwipeableBigTiles(
                     prayerTimes = prayerTimes,
                     currentTime = currentTime,
+                    locationService = locationService,
                     getNextPrayer = { PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes) },
                     getCurrentPrayer = { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) },
                     getPrayerStatus = { prayerName -> PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes) },
