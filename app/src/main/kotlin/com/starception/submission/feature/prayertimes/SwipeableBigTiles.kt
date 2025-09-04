@@ -626,14 +626,16 @@ private fun SmartInfoTile(
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(0.3f, fill = false)
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(0.4f, fill = false)
             )
             
             // Contextual content and guidance
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.weight(0.4f, fill = false)
+                modifier = Modifier.weight(0.3f, fill = false)
             ) {
                 Text(
                     text = getSmartContent(),
