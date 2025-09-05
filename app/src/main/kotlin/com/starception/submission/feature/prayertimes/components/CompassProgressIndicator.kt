@@ -174,23 +174,6 @@ fun CompassProgressIndicator(
         }
     }
     
-    // Helper functions for sensor accuracy
-    fun getAccuracyColor(accuracy: Int): Color = when(accuracy) {
-        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> Color(0xFF10B981)
-        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> Color(0xFFFFA500)
-        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> Color(0xFFFF6B6B)
-        else -> Color(0xFFFF4444)
-    }
-    
-    fun getAccuracyText(accuracy: Int): String = when(accuracy) {
-        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> "High Accuracy"
-        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> "Medium Accuracy"
-        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> "Low Accuracy - Calibrate"
-        else -> "Move in Figure-8"
-    }
-    
-    val accuracyColor = getAccuracyColor(sensorAccuracy)
-    val needsCalibration = sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
     
     // ENHANCED DESIGN - Better Qibla identification with accuracy feedback
     Box(
@@ -211,42 +194,23 @@ fun CompassProgressIndicator(
                 center = center
             )
             
-            // Accuracy indication border
+            // Subtle inner shadow/border
             drawCircle(
-                color = accuracyColor.copy(alpha = 0.3f),
+                color = Color.Black.copy(alpha = 0.1f),
                 radius = backgroundRadius,
                 center = center,
-                style = Stroke(width = 2.dp.toPx())
+                style = Stroke(width = 1.dp.toPx())
             )
             
-            // Kaaba direction marker at the end of progress arc
-            val qiblaAngle = Math.toRadians((animatedCompassDegree + 36.0)) // 10% of 360° = 36°
-            val markerRadius = backgroundRadius - 12.dp.toPx()
-            val markerX = center.x + cos(qiblaAngle).toFloat() * markerRadius
-            val markerY = center.y + sin(qiblaAngle).toFloat() * markerRadius
-            
-            // Kaaba symbol (small black square)
-            drawRect(
-                color = Color.Black,
-                topLeft = Offset(markerX - 4.dp.toPx(), markerY - 4.dp.toPx()),
-                size = androidx.compose.ui.geometry.Size(8.dp.toPx(), 8.dp.toPx())
-            )
-            
-            // Glow effect around Kaaba marker
-            drawCircle(
-                color = Color(0xFFFFD700).copy(alpha = 0.4f),
-                radius = 6.dp.toPx(),
-                center = Offset(markerX, markerY)
-            )
         }
         
-        // QIBLA DIRECTION INDICATOR - Enhanced circular progress
+        // QIBLA DIRECTION INDICATOR - Clean circular progress
         CircularProgressIndicator(
             progress = { 0.1f }, // 10% progress pointing to Qibla
             modifier = Modifier
                 .size(size - 16.dp)
                 .rotate(animatedCompassDegree),
-            color = if (needsCalibration) Color(0xFFFF6B6B) else Color(0xFF10B981),
+            color = Color(0xFF10B981), // Always Islamic green
             strokeWidth = 8.dp,
             trackColor = Color.Black.copy(alpha = 0.1f),
             strokeCap = StrokeCap.Round,
@@ -288,26 +252,6 @@ fun CompassProgressIndicator(
             }
         }
         
-        // ACCURACY STATUS - Bottom indicator
-        if (needsCalibration) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 8.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(accuracyColor.copy(alpha = 0.9f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = getAccuracyText(sensorAccuracy),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
     }
 }
 
