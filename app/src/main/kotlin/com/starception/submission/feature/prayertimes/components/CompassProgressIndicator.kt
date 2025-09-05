@@ -7,9 +7,12 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +69,7 @@ fun CompassProgressIndicator(
     var currentDegree by remember { mutableFloatStateOf(0f) }
     var qiblaDirection by remember { mutableFloatStateOf(0f) } // Direction to Qibla from North
     var userLocation by remember { mutableStateOf<android.location.Location?>(null) }
+    var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_UNRELIABLE) }
     
     // SENSOR MANAGEMENT - Exact copy from original CompassActivity
     val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
@@ -81,7 +85,7 @@ fun CompassProgressIndicator(
             }
             
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // Same empty implementation as original
+                sensorAccuracy = accuracy
             }
         }
     }
@@ -170,77 +174,137 @@ fun CompassProgressIndicator(
         }
     }
     
-    // NEW DESIGN - Circular progress indicator as Qibla pointer with time inside
+    // Helper functions for sensor accuracy
+    fun getAccuracyColor(accuracy: Int): Color = when(accuracy) {
+        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> Color(0xFF10B981)
+        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> Color(0xFFFFA500)
+        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> Color(0xFFFF6B6B)
+        else -> Color(0xFFFF4444)
+    }
+    
+    fun getAccuracyText(accuracy: Int): String = when(accuracy) {
+        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> "High Accuracy"
+        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> "Medium Accuracy"
+        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> "Low Accuracy - Calibrate"
+        else -> "Move in Figure-8"
+    }
+    
+    val accuracyColor = getAccuracyColor(sensorAccuracy)
+    val needsCalibration = sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
+    
+    // ENHANCED DESIGN - Better Qibla identification with accuracy feedback
     Box(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
-        // Perfect circle background
+        // Perfect circle background with accuracy indication
         Canvas(
             modifier = Modifier.size(size)
         ) {
             val center = Offset(this.size.width / 2, this.size.height / 2)
             val backgroundRadius = (this.size.minDimension / 2) - 2.dp.toPx()
             
-            // Perfect circle background matching design
+            // Perfect circle background
             drawCircle(
                 color = Color.White,
                 radius = backgroundRadius,
                 center = center
             )
             
-            // Subtle inner shadow/border
+            // Accuracy indication border
             drawCircle(
-                color = Color.Black.copy(alpha = 0.1f),
+                color = accuracyColor.copy(alpha = 0.3f),
                 radius = backgroundRadius,
                 center = center,
-                style = Stroke(width = 1.dp.toPx())
+                style = Stroke(width = 2.dp.toPx())
+            )
+            
+            // Kaaba direction marker at the end of progress arc
+            val qiblaAngle = Math.toRadians((animatedCompassDegree + 36.0)) // 10% of 360° = 36°
+            val markerRadius = backgroundRadius - 12.dp.toPx()
+            val markerX = center.x + cos(qiblaAngle).toFloat() * markerRadius
+            val markerY = center.y + sin(qiblaAngle).toFloat() * markerRadius
+            
+            // Kaaba symbol (small black square)
+            drawRect(
+                color = Color.Black,
+                topLeft = Offset(markerX - 4.dp.toPx(), markerY - 4.dp.toPx()),
+                size = androidx.compose.ui.geometry.Size(8.dp.toPx(), 8.dp.toPx())
+            )
+            
+            // Glow effect around Kaaba marker
+            drawCircle(
+                color = Color(0xFFFFD700).copy(alpha = 0.4f),
+                radius = 6.dp.toPx(),
+                center = Offset(markerX, markerY)
             )
         }
         
-        // QIBLA DIRECTION INDICATOR - Circular progress that points to Qibla
+        // QIBLA DIRECTION INDICATOR - Enhanced circular progress
         CircularProgressIndicator(
-            progress = { 0.1f }, // 10% progress as requested
+            progress = { 0.1f }, // 10% progress pointing to Qibla
             modifier = Modifier
                 .size(size - 16.dp)
-                .rotate(animatedCompassDegree), // Rotate to point toward Qibla
-            color = Color(0xFF10B981), // Islamic green
-            strokeWidth = 6.dp,
-            trackColor = Color.Transparent,
+                .rotate(animatedCompassDegree),
+            color = if (needsCalibration) Color(0xFFFF6B6B) else Color(0xFF10B981),
+            strokeWidth = 8.dp,
+            trackColor = Color.Black.copy(alpha = 0.1f),
             strokeCap = StrokeCap.Round,
         )
         
-        // REMAINING TIME - Displayed inside the watch
+        // MAIN CONTENT - Time and direction info
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp),
+                .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+                // Main time display
                 Text(
                     text = timeText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Black.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 
-                // Small Qibla direction text
+                // Qibla direction with Kaaba emoji
                 Text(
-                    text = "→ Qibla",
+                    text = "🕋 Qibla",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFF10B981),
                     textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 10.sp,
-                    modifier = Modifier.padding(top = 4.dp)
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+        
+        // ACCURACY STATUS - Bottom indicator
+        if (needsCalibration) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(accuracyColor.copy(alpha = 0.9f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = getAccuracyText(sensorAccuracy),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
                 )
             }
         }
