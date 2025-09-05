@@ -653,7 +653,9 @@ private fun NextPrayerTile(
                 ) {
                     // Prayer info
                     Column(
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 16.dp) // Add space between text and compass
                     ) {
                         if (mainPrayer != null) {
                             Text(
@@ -704,13 +706,18 @@ private fun NextPrayerTile(
                     }
                     
                     // Countdown timer with integrated Qibla compass
-                    CompassProgressIndicator(
-                        progress = 0.7f,
-                        timeText = if (mainPrayer != null) getTimeUntilNextPrayer() else "Ready",
-                        modifier = Modifier,
-                        size = 88.dp,
-                        locationService = locationService
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(120.dp) // Constrain the compass size to fit within tile padding
+                    ) {
+                        CompassProgressIndicator(
+                            progress = 0.7f,
+                            timeText = if (mainPrayer != null) getTimeUntilNextPrayer() else "Ready",
+                            modifier = Modifier.fillMaxSize(),
+                            size = 120.dp,
+                            locationService = locationService
+                        )
+                    }
                 }
             }
         }
@@ -783,69 +790,56 @@ private fun SmartInfoTile(
         color = MaterialTheme.colorScheme.secondaryContainer,
         shadowElevation = 2.dp
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(20.dp)
         ) {
-            // Smart ML indicator
-            SmartIndicator(
-                icon = Icons.Default.AutoAwesome,
-                label = "AI Content",
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.align(Alignment.Start)
-            )
-            
-            // Dynamic title based on time of day
-            Text(
-                text = getSmartTitle(),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(0.4f, fill = false)
-            )
-            
-            // Contextual content and guidance
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.weight(0.3f, fill = false)
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = getSmartContent(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    textAlign = TextAlign.Center,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
+                // Smart ML indicator
+                SmartIndicator(
+                    icon = Icons.Default.AutoAwesome,
+                    label = "AI Content",
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.align(Alignment.Start)
                 )
                 
-                // Current date for context
+                // Dynamic title based on time of day
                 Text(
-                    text = getCurrentDate(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                )
-            }
-            
-            // Prayer context footer with more space
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = getSmartFooter(),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
+                    text = getSmartTitle(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
+                
+                // Contextual content and guidance
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = getSmartContent(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    
+                    // Current date for context
+                    Text(
+                        text = getCurrentDate(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
             }
         }
     }
@@ -937,9 +931,11 @@ private fun DailyStatsTile(
             // Contextual message
             Text(
                 text = getDailyStatsMessage(),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

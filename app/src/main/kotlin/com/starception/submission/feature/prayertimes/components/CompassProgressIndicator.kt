@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -24,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -167,118 +169,300 @@ fun CompassProgressIndicator(
         }
     }
     
-    // UI COMPONENT - Combines progress and compass
-    Surface(
+    // UI COMPONENT - Perfect circle compass matching design
+    Box(
         modifier = modifier.size(size),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shadowElevation = 1.dp
+        contentAlignment = Alignment.Center
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            // COMPASS CANVAS - Custom drawing with needle
-            Canvas(
-                modifier = Modifier.size(size)
+        // COMPASS CANVAS - Custom drawing with perfect circle background
+        Canvas(
+            modifier = Modifier.size(size)
+        ) {
+            val center = Offset(this.size.width / 2, this.size.height / 2)
+            val backgroundRadius = (this.size.minDimension / 2) - 2.dp.toPx()
+            val progressRadius = backgroundRadius - 8.dp.toPx()
+            
+            // Perfect circle background matching design
+            drawCircle(
+                color = Color.White,
+                radius = backgroundRadius,
+                center = center
+            )
+            
+            // Subtle inner shadow/border
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.1f),
+                radius = backgroundRadius,
+                center = center,
+                style = Stroke(width = 1.dp.toPx())
+            )
+            
+            // PROGRESS RING - Time remaining indicator
+            drawProgressRing(
+                center = center,
+                radius = progressRadius,
+                progress = progress
+            )
+            
+            // COMPASS NEEDLE - Rotates with device orientation
+            rotate(
+                degrees = animatedCompassDegree,
+                pivot = center
             ) {
-                val center = Offset(this.size.width / 2, this.size.height / 2)
-                val radius = (this.size.minDimension / 2) - 16.dp.toPx()
-                
-                // PROGRESS RING - Time remaining indicator
-                drawProgressRing(
+                drawCompassNeedle(
                     center = center,
-                    radius = radius,
-                    progress = progress
-                )
-                
-                // COMPASS NEEDLE - Rotates with device orientation
-                rotate(
-                    degrees = animatedCompassDegree,
-                    pivot = center
-                ) {
-                    drawCompassNeedle(
-                        center = center,
-                        radius = radius * 0.7f
-                    )
-                }
-                
-                // Qibla "Q" marker (simple dot)
-                drawCircle(
-                    color = Color(0xFF006400), // Dark green for Qibla
-                    radius = 2.dp.toPx(),
-                    center = Offset(center.x, center.y - radius * 0.85f)
+                    radius = progressRadius * 0.7f
                 )
             }
             
-            // TIME TEXT - Overlaid in center
+            // Qibla direction marker (green dot at top)
+            drawCircle(
+                color = Color(0xFF10B981),
+                radius = 3.dp.toPx(),
+                center = Offset(center.x, center.y - progressRadius * 0.9f)
+            )
+        }
+        
+        // TIME TEXT - Properly positioned and sized for compass
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
                 text = timeText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Black.copy(alpha = 0.8f),
                 textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(8.dp)
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.wrapContentSize()
             )
         }
     }
 }
 
 /**
- * Draw the circular progress ring showing time remaining
+ * Enhanced progress ring with Islamic luxury styling
  */
 private fun DrawScope.drawProgressRing(
     center: Offset,
     radius: Float,
     progress: Float
 ) {
-    // Background track
+    // Background track with Islamic pattern inspiration
     drawCircle(
-        color = Color.Gray.copy(alpha = 0.3f),
+        brush = Brush.sweepGradient(
+            colors = listOf(
+                Color(0xFF374151).copy(alpha = 0.4f),
+                Color(0xFF4B5563).copy(alpha = 0.3f),
+                Color(0xFF6B7280).copy(alpha = 0.2f),
+                Color(0xFF374151).copy(alpha = 0.4f)
+            ),
+            center = center
+        ),
         radius = radius,
         center = center,
-        style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+        style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
     )
     
-    // Progress arc
-    val sweepAngle = progress * 360f
-    drawArc(
-        color = Color.Blue,
-        startAngle = -90f, // Start from top
-        sweepAngle = sweepAngle,
-        useCenter = false,
-        topLeft = Offset(center.x - radius, center.y - radius),
-        size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-        style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+    // Inner shadow ring for depth
+    drawCircle(
+        color = Color(0xFF1F2937).copy(alpha = 0.5f),
+        radius = radius - 3.dp.toPx(),
+        center = center,
+        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
     )
+    
+    if (progress > 0f) {
+        val sweepAngle = progress * 360f
+        
+        // Progress glow effect
+        drawArc(
+            brush = Brush.sweepGradient(
+                colors = listOf(
+                    Color(0xFF10B981).copy(alpha = 0.3f),
+                    Color(0xFFFFD700).copy(alpha = 0.4f),
+                    Color(0xFF059669).copy(alpha = 0.3f)
+                ),
+                center = center
+            ),
+            startAngle = -90f,
+            sweepAngle = sweepAngle,
+            useCenter = false,
+            topLeft = Offset(center.x - radius - 2.dp.toPx(), center.y - radius - 2.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size((radius + 2.dp.toPx()) * 2, (radius + 2.dp.toPx()) * 2),
+            style = Stroke(width = 10.dp.toPx(), cap = StrokeCap.Round)
+        )
+        
+        // Main progress arc with Islamic colors
+        drawArc(
+            brush = Brush.sweepGradient(
+                colors = listOf(
+                    Color(0xFF10B981),
+                    Color(0xFFFFD700),
+                    Color(0xFF059669)
+                ),
+                center = center
+            ),
+            startAngle = -90f,
+            sweepAngle = sweepAngle,
+            useCenter = false,
+            topLeft = Offset(center.x - radius, center.y - radius),
+            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
+            style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
+        )
+        
+        // Inner bright highlight
+        drawArc(
+            color = Color(0xFFFFFFFF).copy(alpha = 0.7f),
+            startAngle = -90f,
+            sweepAngle = sweepAngle,
+            useCenter = false,
+            topLeft = Offset(center.x - radius + 1.dp.toPx(), center.y - radius + 1.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size((radius - 1.dp.toPx()) * 2, (radius - 1.dp.toPx()) * 2),
+            style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round)
+        )
+    }
 }
 
 /**
- * Draw compass needle pointing to Qibla (Mecca direction)
+ * Enhanced Islamic Qibla compass needle with luxury styling
  */
 private fun DrawScope.drawCompassNeedle(
     center: Offset,
     radius: Float
 ) {
-    // Qibla needle (pointing to Mecca) - Green like Islamic tradition
+    val qiblaEnd = Offset(center.x, center.y - radius)
+    val oppositeEnd = Offset(center.x, center.y + radius * 0.6f)
+    
+    // Sacred Qibla direction needle with glow effect
+    // Glow/shadow effect
     drawLine(
-        color = Color(0xFF006400), // Dark green for Qibla direction
+        color = Color(0xFF10B981).copy(alpha = 0.4f),
         start = center,
-        end = Offset(center.x, center.y - radius),
+        end = qiblaEnd,
+        strokeWidth = 8.dp.toPx(),
+        cap = StrokeCap.Round
+    )
+    
+    // Main Qibla needle with Islamic green and gold gradient
+    drawLine(
+        brush = Brush.linearGradient(
+            colors = listOf(
+                Color(0xFFFFD700),
+                Color(0xFF10B981),
+                Color(0xFF059669)
+            ),
+            start = center,
+            end = qiblaEnd
+        ),
+        start = center,
+        end = qiblaEnd,
+        strokeWidth = 5.dp.toPx(),
+        cap = StrokeCap.Round
+    )
+    
+    // Bright highlight on Qibla needle
+    drawLine(
+        color = Color(0xFFFFFFFF).copy(alpha = 0.9f),
+        start = center,
+        end = qiblaEnd,
+        strokeWidth = 1.5.dp.toPx(),
+        cap = StrokeCap.Round
+    )
+    
+    // Enhanced opposite direction needle
+    drawLine(
+        brush = Brush.linearGradient(
+            colors = listOf(
+                Color(0xFF6B7280),
+                Color(0xFF4B5563)
+            ),
+            start = center,
+            end = oppositeEnd
+        ),
+        start = center,
+        end = oppositeEnd,
         strokeWidth = 3.dp.toPx(),
         cap = StrokeCap.Round
     )
     
-    // Opposite direction needle (pointing away from Qibla)
+    // Sacred Qibla arrowhead
+    val arrowSize = 8.dp.toPx()
+    val arrowAngle = kotlin.math.PI / 6
+    
+    val leftArrow = Offset(
+        qiblaEnd.x - sin(arrowAngle).toFloat() * arrowSize,
+        qiblaEnd.y + cos(arrowAngle).toFloat() * arrowSize
+    )
+    
+    val rightArrow = Offset(
+        qiblaEnd.x + sin(arrowAngle).toFloat() * arrowSize,
+        qiblaEnd.y + cos(arrowAngle).toFloat() * arrowSize
+    )
+    
+    // Arrowhead with Islamic styling
     drawLine(
-        color = Color.Gray,
-        start = center,
-        end = Offset(center.x, center.y + radius * 0.7f),
-        strokeWidth = 2.dp.toPx(),
+        brush = Brush.linearGradient(
+            colors = listOf(
+                Color(0xFFFFD700),
+                Color(0xFF10B981)
+            )
+        ),
+        start = qiblaEnd,
+        end = leftArrow,
+        strokeWidth = 3.dp.toPx(),
         cap = StrokeCap.Round
     )
     
-    // Center dot
+    drawLine(
+        brush = Brush.linearGradient(
+            colors = listOf(
+                Color(0xFFFFD700),
+                Color(0xFF10B981)
+            )
+        ),
+        start = qiblaEnd,
+        end = rightArrow,
+        strokeWidth = 3.dp.toPx(),
+        cap = StrokeCap.Round
+    )
+    
+    // Enhanced center with Islamic geometric design
+    // Outer glow
     drawCircle(
-        color = Color.Black,
-        radius = 3.dp.toPx(),
+        brush = Brush.radialGradient(
+            colors = listOf(
+                Color(0xFFFFD700).copy(alpha = 0.3f),
+                Color.Transparent
+            ),
+            radius = 8.dp.toPx()
+        ),
+        radius = 6.dp.toPx(),
+        center = center
+    )
+    
+    // Main center circle
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                Color(0xFFFFD700),
+                Color(0xFF10B981),
+                Color(0xFF1E293B)
+            )
+        ),
+        radius = 4.dp.toPx(),
+        center = center
+    )
+    
+    // Inner bright center
+    drawCircle(
+        color = Color(0xFFFFFFFF).copy(alpha = 0.9f),
+        radius = 1.5.dp.toPx(),
         center = center
     )
 }

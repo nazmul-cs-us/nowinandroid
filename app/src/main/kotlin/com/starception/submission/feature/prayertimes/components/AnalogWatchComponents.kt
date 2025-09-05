@@ -27,15 +27,14 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.*
 
 /**
- * Premium hour markers with enhanced design for the analog watch
+ * Enhanced luxury hour markers with Islamic geometric patterns
  */
 @Composable
 fun PremiumHourMarkers(watchSize: Dp) {
-    // Premium cardinal directions with enhanced design
     val center = watchSize.value / 2f
     val radius = watchSize.value / 2f - 20.dp.value
     
-    // Cardinal and intercardinal directions
+    // Cardinal and intercardinal directions with Islamic compass styling
     val directions = listOf(
         "N" to 0f,
         "NE" to 45f,
@@ -49,45 +48,81 @@ fun PremiumHourMarkers(watchSize: Dp) {
     
     directions.forEach { (direction, angle) ->
         val angleRad = Math.toRadians(angle.toDouble())
+        val isCardinal = angle % 90f == 0f
         
         Box(
             modifier = Modifier
                 .offset(
-                    x = (center + (cos(angleRad) * (radius - 50.dp.value)) - 18.dp.value).dp,
-                    y = (center + (sin(angleRad) * (radius - 50.dp.value)) - 18.dp.value).dp
+                    x = (center + (cos(angleRad) * (radius - 50.dp.value)) - if (isCardinal) 20.dp.value else 16.dp.value).dp,
+                    y = (center + (sin(angleRad) * (radius - 50.dp.value)) - if (isCardinal) 20.dp.value else 16.dp.value).dp
                 )
-                .size(36.dp),
+                .size(if (isCardinal) 40.dp else 32.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Premium background circle
+            // Luxury multi-layer background with Islamic pattern inspiration
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(if (isCardinal) 40.dp else 32.dp)
                     .clip(CircleShape)
                     .background(
                         Brush.radialGradient(
                             colors = listOf(
-                                Color(0xFF3B82F6).copy(alpha = 0.2f),
+                                Color(0xFF1E293B).copy(alpha = 0.95f),
+                                Color(0xFF334155).copy(alpha = 0.8f),
+                                Color(0xFF475569).copy(alpha = 0.6f)
+                            ),
+                            radius = if (isCardinal) 60f else 48f
+                        )
+                    )
+            )
+            
+            // Inner glow ring
+            Box(
+                modifier = Modifier
+                    .size(if (isCardinal) 36.dp else 28.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFFFFD700).copy(alpha = 0.3f),
                                 Color.Transparent
                             )
                         )
                     )
             )
             
-            // Direction text with premium styling
+            // Direction text with enhanced Islamic styling
             Text(
                 text = direction,
                 style = MaterialTheme.typography.labelLarge,
-                color = Color(0xFF60A5FA),
+                color = if (isCardinal) Color(0xFFFFD700) else Color(0xFF60A5FA),
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                fontSize = if (isCardinal) 20.sp else 16.sp
             )
+            
+            // Special Qibla indicator for North
+            if (direction == "N") {
+                Box(
+                    modifier = Modifier
+                        .offset(y = (-14).dp)
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    Color(0xFF10B981),
+                                    Color(0xFF059669)
+                                )
+                            )
+                        )
+                )
+            }
         }
     }
 }
 
 /**
- * Premium prayer time progress ring
+ * Luxury Islamic prayer progress ring with enhanced animations
  */
 @Composable
 fun PremiumPrayerProgressRing(prayerTimes: DayPrayerTimes, watchSize: Dp) {
@@ -119,44 +154,108 @@ fun PremiumPrayerProgressRing(prayerTimes: DayPrayerTimes, watchSize: Dp) {
         (elapsed.toMinutes().toFloat() / totalDuration.toMinutes().toFloat()).coerceIn(0f, 1f)
     }
     
+    // Smooth animation for progress
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(1000, easing = EaseOutCubic)
+    )
+    
     Canvas(modifier = Modifier.size(watchSize)) {
         val center = Offset(size.width / 2, size.height / 2)
-        val radius = size.width / 2 - 50f
+        val outerRadius = size.width / 2 - 40f
+        val innerRadius = size.width / 2 - 60f
         
-        // Premium background ring with gradient
+        // Multi-layer background rings for depth
+        // Outer shadow ring
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0xFF374151).copy(alpha = 0.4f),
-                    Color(0xFF1F2937).copy(alpha = 0.2f)
-                )
+                    Color(0xFF000000).copy(alpha = 0.2f),
+                    Color.Transparent
+                ),
+                radius = outerRadius + 10f
             ),
             center = center,
-            radius = radius,
-            style = Stroke(width = 12f, cap = StrokeCap.Round)
+            radius = outerRadius + 5f,
+            style = Stroke(width = 20f, cap = StrokeCap.Round)
         )
         
-        // Premium progress arc with multiple effects
-        val startAngle = -90f
-        val sweepAngle = 360f * progress
-        
-        // Main progress arc
-        drawArc(
+        // Main background ring with Islamic pattern colors
+        drawCircle(
             brush = Brush.sweepGradient(
                 colors = listOf(
-                    Color(0xFFFF4444),
-                    Color(0xFFFF6B6B),
-                    Color(0xFFFF8E8E)
+                    Color(0xFF1E293B).copy(alpha = 0.8f),
+                    Color(0xFF334155).copy(alpha = 0.6f),
+                    Color(0xFF475569).copy(alpha = 0.7f),
+                    Color(0xFF1E293B).copy(alpha = 0.8f)
                 ),
                 center = center
             ),
-            startAngle = startAngle,
-            sweepAngle = sweepAngle,
-            useCenter = false,
-            topLeft = Offset(center.x - radius, center.y - radius),
-            size = Size(radius * 2, radius * 2),
-            style = Stroke(width = 12f, cap = StrokeCap.Round)
+            center = center,
+            radius = outerRadius,
+            style = Stroke(width = 18f, cap = StrokeCap.Round)
         )
+        
+        // Inner highlight ring
+        drawCircle(
+            color = Color(0xFFFFD700).copy(alpha = 0.3f),
+            center = center,
+            radius = innerRadius,
+            style = Stroke(width = 2f, cap = StrokeCap.Round)
+        )
+        
+        // Enhanced progress arc with Islamic green and gold gradient
+        val startAngle = -90f
+        val sweepAngle = 360f * animatedProgress
+        
+        if (sweepAngle > 0f) {
+            // Progress glow effect
+            drawArc(
+                brush = Brush.sweepGradient(
+                    colors = listOf(
+                        Color(0xFF10B981).copy(alpha = 0.3f),
+                        Color(0xFFFFD700).copy(alpha = 0.5f),
+                        Color(0xFF059669).copy(alpha = 0.3f)
+                    ),
+                    center = center
+                ),
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = false,
+                topLeft = Offset(center.x - outerRadius - 5f, center.y - outerRadius - 5f),
+                size = Size((outerRadius + 5f) * 2, (outerRadius + 5f) * 2),
+                style = Stroke(width = 28f, cap = StrokeCap.Round)
+            )
+            
+            // Main progress arc with Islamic colors
+            drawArc(
+                brush = Brush.sweepGradient(
+                    colors = listOf(
+                        Color(0xFF10B981),
+                        Color(0xFFFFD700),
+                        Color(0xFF059669)
+                    ),
+                    center = center
+                ),
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = false,
+                topLeft = Offset(center.x - outerRadius, center.y - outerRadius),
+                size = Size(outerRadius * 2, outerRadius * 2),
+                style = Stroke(width = 18f, cap = StrokeCap.Round)
+            )
+            
+            // Inner bright highlight
+            drawArc(
+                color = Color(0xFFFFFFFF).copy(alpha = 0.8f),
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = false,
+                topLeft = Offset(center.x - innerRadius, center.y - innerRadius),
+                size = Size(innerRadius * 2, innerRadius * 2),
+                style = Stroke(width = 3f, cap = StrokeCap.Round)
+            )
+        }
     }
 }
 
@@ -223,20 +322,19 @@ fun PremiumPrayerIndicators(prayerTimes: DayPrayerTimes, watchSize: Dp) {
 }
 
 /**
- * Premium Qibla compass hand with animation
+ * Luxury Islamic Qibla compass hand with enhanced sacred styling
  */
 @Composable
 fun PremiumQiblaCompassHand(qiblaDirection: Float, watchSize: Dp) {
-    // Animate the rotation for smooth movement
+    // Smooth animated rotation with Islamic aesthetic
     val animatedDirection by animateFloatAsState(
         targetValue = qiblaDirection,
-        animationSpec = tween(300, easing = EaseOutCubic)
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 300f)
     )
     
     Canvas(modifier = Modifier.size(watchSize)) {
         val center = Offset(size.width / 2, size.height / 2)
-        val handLength = size.width / 2 - 50f
-        // Fix Qibla direction calculation - North should be at top (0°), East at right (90°)
+        val handLength = size.width / 2 - 60f
         val angle = Math.toRadians((animatedDirection - 90).toDouble())
         
         val endPoint = Offset(
@@ -244,25 +342,80 @@ fun PremiumQiblaCompassHand(qiblaDirection: Float, watchSize: Dp) {
             (center.y + sin(angle) * handLength).toFloat()
         )
         
-        // Draw main compass hand
+        // Sacred Qibla direction indicator with multiple layers
+        
+        // Shadow/glow effect for the main hand
         drawLine(
-            color = Color(0xFFFFD700),
+            color = Color(0xFF10B981).copy(alpha = 0.3f),
             start = center,
             end = endPoint,
-            strokeWidth = 8f,
+            strokeWidth = 16f,
             cap = StrokeCap.Round
         )
         
-        // Draw center dot
+        // Main sacred hand with Islamic green and gold gradient effect
+        drawLine(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFFFFD700),
+                    Color(0xFF10B981),
+                    Color(0xFFFFD700)
+                ),
+                start = center,
+                end = endPoint
+            ),
+            start = center,
+            end = endPoint,
+            strokeWidth = 10f,
+            cap = StrokeCap.Round
+        )
+        
+        // Inner highlight line
+        drawLine(
+            color = Color(0xFFFFFFFF).copy(alpha = 0.9f),
+            start = center,
+            end = endPoint,
+            strokeWidth = 2f,
+            cap = StrokeCap.Round
+        )
+        
+        // Enhanced center design with Islamic geometric pattern
+        // Outer glow ring
         drawCircle(
-            color = Color(0xFFFFD700),
-            radius = 6f,
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFFFD700).copy(alpha = 0.4f),
+                    Color.Transparent
+                ),
+                radius = 20f
+            ),
+            radius = 15f,
             center = center
         )
         
-        // Draw arrowhead
-        val arrowLength = 25f
-        val arrowAngle = PI / 5
+        // Main center circle with gradient
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFFFD700),
+                    Color(0xFF10B981),
+                    Color(0xFF1E293B)
+                )
+            ),
+            radius = 10f,
+            center = center
+        )
+        
+        // Inner bright center
+        drawCircle(
+            color = Color(0xFFFFFFFF).copy(alpha = 0.9f),
+            radius = 4f,
+            center = center
+        )
+        
+        // Sacred Kaaba-inspired arrowhead design
+        val arrowLength = 35f
+        val arrowAngle = PI / 4.5  // Slightly narrower for elegance
         
         val leftArrow = Offset(
             (endPoint.x - cos(angle - arrowAngle) * arrowLength).toFloat(),
@@ -274,27 +427,70 @@ fun PremiumQiblaCompassHand(qiblaDirection: Float, watchSize: Dp) {
             (endPoint.y - sin(angle + arrowAngle) * arrowLength).toFloat()
         )
         
-        // Draw arrowhead
+        // Arrowhead shadow/glow
         drawLine(
-            color = Color(0xFFFFD700),
+            color = Color(0xFF10B981).copy(alpha = 0.3f),
             start = endPoint,
             end = leftArrow,
-            strokeWidth = 5f,
+            strokeWidth = 10f,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = Color(0xFF10B981).copy(alpha = 0.3f),
+            start = endPoint,
+            end = rightArrow,
+            strokeWidth = 10f,
+            cap = StrokeCap.Round
+        )
+        
+        // Main arrowhead with Islamic colors
+        drawLine(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFFFFD700),
+                    Color(0xFF10B981)
+                )
+            ),
+            start = endPoint,
+            end = leftArrow,
+            strokeWidth = 7f,
             cap = StrokeCap.Round
         )
         
         drawLine(
-            color = Color(0xFFFFD700),
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFFFFD700),
+                    Color(0xFF10B981)
+                )
+            ),
             start = endPoint,
             end = rightArrow,
-            strokeWidth = 5f,
+            strokeWidth = 7f,
+            cap = StrokeCap.Round
+        )
+        
+        // Bright arrowhead highlights
+        drawLine(
+            color = Color(0xFFFFFFFF).copy(alpha = 0.8f),
+            start = endPoint,
+            end = leftArrow,
+            strokeWidth = 1.5f,
+            cap = StrokeCap.Round
+        )
+        
+        drawLine(
+            color = Color(0xFFFFFFFF).copy(alpha = 0.8f),
+            start = endPoint,
+            end = rightArrow,
+            strokeWidth = 1.5f,
             cap = StrokeCap.Round
         )
     }
 }
 
 /**
- * Premium center design for the analog watch
+ * Luxury Islamic geometric center design for the analog watch
  */
 @Composable
 fun PremiumCenterDesign(watchSize: Dp) {
@@ -302,47 +498,151 @@ fun PremiumCenterDesign(watchSize: Dp) {
         modifier = Modifier.size(watchSize),
         contentAlignment = Alignment.Center
     ) {
-        // Real compass center with crosshair
+        // Multi-layered center design inspired by Islamic architecture
+        
+        // Outer shadow ring
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF000000).copy(alpha = 0.2f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+        
+        // Main center with Islamic geometric pattern colors
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF1E293B),
+                            Color(0xFF334155),
+                            Color(0xFF475569)
+                        )
+                    )
+                )
+        )
+        
+        // Inner golden ring
         Box(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF374151))
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFFFD700).copy(alpha = 0.3f),
+                            Color.Transparent
+                        )
+                    )
+                )
         )
         
-        // Crosshair lines
-        Canvas(modifier = Modifier.size(40.dp)) {
+        // Islamic compass crosshair with enhanced design
+        Canvas(modifier = Modifier.size(50.dp)) {
             val center = Offset(size.width / 2, size.height / 2)
+            val crossLength = size.width / 2 - 5f
             
-            // Horizontal line
+            // Horizontal crosshair with gradient
             drawLine(
-                color = Color.White,
-                start = Offset(0f, center.y),
-                end = Offset(size.width, center.y),
-                strokeWidth = 2.dp.value
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color(0xFFFFD700).copy(alpha = 0.8f),
+                        Color.Transparent
+                    )
+                ),
+                start = Offset(center.x - crossLength, center.y),
+                end = Offset(center.x + crossLength, center.y),
+                strokeWidth = 3f,
+                cap = StrokeCap.Round
             )
             
-            // Vertical line
+            // Vertical crosshair with gradient
             drawLine(
-                color = Color.White,
-                start = Offset(center.x, 0f),
-                end = Offset(center.x, size.height),
-                strokeWidth = 2.dp.value
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color(0xFFFFD700).copy(alpha = 0.8f),
+                        Color.Transparent
+                    )
+                ),
+                start = Offset(center.x, center.y - crossLength),
+                end = Offset(center.x, center.y + crossLength),
+                strokeWidth = 3f,
+                cap = StrokeCap.Round
+            )
+            
+            // Diagonal crosshairs for 8-point Islamic star pattern
+            val diagonalLength = crossLength * 0.7f
+            
+            // NE-SW diagonal
+            drawLine(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color(0xFF10B981).copy(alpha = 0.6f),
+                        Color.Transparent
+                    )
+                ),
+                start = Offset(center.x - diagonalLength * cos(PI / 4).toFloat(), center.y - diagonalLength * sin(PI / 4).toFloat()),
+                end = Offset(center.x + diagonalLength * cos(PI / 4).toFloat(), center.y + diagonalLength * sin(PI / 4).toFloat()),
+                strokeWidth = 2f,
+                cap = StrokeCap.Round
+            )
+            
+            // NW-SE diagonal
+            drawLine(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color(0xFF10B981).copy(alpha = 0.6f),
+                        Color.Transparent
+                    )
+                ),
+                start = Offset(center.x - diagonalLength * cos(PI / 4).toFloat(), center.y + diagonalLength * sin(PI / 4).toFloat()),
+                end = Offset(center.x + diagonalLength * cos(PI / 4).toFloat(), center.y - diagonalLength * sin(PI / 4).toFloat()),
+                strokeWidth = 2f,
+                cap = StrokeCap.Round
             )
         }
         
-        // Center dot
+        // Sacred center dot with Islamic styling
         Box(
             modifier = Modifier
-                .size(8.dp)
+                .size(12.dp)
                 .clip(CircleShape)
-                .background(Color.White)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFFFD700),
+                            Color(0xFF10B981),
+                            Color(0xFF1E293B)
+                        )
+                    )
+                )
+        )
+        
+        // Inner bright center
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFFFFFFF).copy(alpha = 0.9f))
         )
     }
 }
 
 /**
- * Premium current time info display
+ * Luxury Islamic current time display with Material 3 enhancements
  */
 @Composable
 fun PremiumCurrentTimeInfo(prayerTimes: DayPrayerTimes, timeUntilNext: String?, watchSize: Dp) {
@@ -360,44 +660,100 @@ fun PremiumCurrentTimeInfo(prayerTimes: DayPrayerTimes, timeUntilNext: String?, 
         currentTime >= time && (nextPrayer?.let { currentTime < it.second } ?: true)
     }?.first ?: "Fajr"
     
-    Box(
+    // Enhanced Material 3 styled container
+    Surface(
         modifier = Modifier
-            .offset(y = (watchSize.value * 0.25f).dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xFF1E293B).copy(alpha = 0.95f),
-                        Color(0xFF334155).copy(alpha = 0.9f)
+            .offset(y = (watchSize.value * 0.25f).dp),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.Transparent,
+        shadowElevation = 8.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFF1E293B).copy(alpha = 0.98f),
+                            Color(0xFF334155).copy(alpha = 0.95f),
+                            Color(0xFF475569).copy(alpha = 0.92f)
+                        )
                     )
                 )
-            )
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "🕌 $currentPrayer",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color(0xFFFFD700),
-                fontWeight = FontWeight.Bold
-            )
-            if (timeUntilNext != null) {
-                Text(
-                    text = "Next in $timeUntilNext",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontWeight = FontWeight.Medium
-                )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Current prayer with enhanced Islamic styling
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Islamic geometric accent
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xFFFFD700),
+                                        Color(0xFF10B981)
+                                    )
+                                )
+                            )
+                    )
+                    
+                    Text(
+                        text = "🕌 $currentPrayer",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color(0xFFFFD700),
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    // Matching accent
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xFFFFD700),
+                                        Color(0xFF10B981)
+                                    )
+                                )
+                            )
+                    )
+                }
+                
+                if (timeUntilNext != null) {
+                    // Enhanced time display with subtle background
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Color(0xFF10B981).copy(alpha = 0.2f)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "Next in $timeUntilNext",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF10B981),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 /**
- * Floating prayer labels around the watch
+ * Luxury floating prayer labels with Material 3 elevation and Islamic styling
  */
 @Composable
 fun FloatingPrayerLabels(prayerTimes: DayPrayerTimes, watchSize: Dp) {
@@ -422,55 +778,76 @@ fun FloatingPrayerLabels(prayerTimes: DayPrayerTimes, watchSize: Dp) {
         val isActive = currentTime >= time && 
             prayers.find { it.second > time }?.let { currentTime < it.second } ?: true
         
-        Box(
+        // Enhanced Material 3 Surface with elevation
+        Surface(
             modifier = Modifier
                 .offset(
                     x = (cos(angleRad) * radius.value).dp,
                     y = (sin(angleRad) * radius.value).dp
                 )
-                .size(if (isActive) 70.dp else 50.dp),
-            contentAlignment = Alignment.Center
+                .size(if (isActive) 80.dp else 60.dp),
+            shape = RoundedCornerShape(20.dp),
+            shadowElevation = if (isActive) 12.dp else 6.dp,
+            color = Color.Transparent
         ) {
-            // Floating label background
             Box(
                 modifier = Modifier
-                    .size(if (isActive) 70.dp else 50.dp)
-                    .clip(RoundedCornerShape(16.dp))
                     .background(
                         if (isActive) {
                             Brush.radialGradient(
                                 colors = listOf(
-                                    Color(0xFFFF4444).copy(alpha = 0.9f),
-                                    Color(0xFFFF6B6B).copy(alpha = 0.8f)
+                                    Color(0xFF10B981).copy(alpha = 0.95f),
+                                    Color(0xFF059669).copy(alpha = 0.9f),
+                                    Color(0xFF047857).copy(alpha = 0.85f)
                                 )
                             )
                         } else {
                             Brush.radialGradient(
                                 colors = listOf(
-                                    Color(0xFF3B82F6).copy(alpha = 0.8f),
-                                    Color(0xFF1E40AF).copy(alpha = 0.7f)
+                                    Color(0xFF1E293B).copy(alpha = 0.9f),
+                                    Color(0xFF334155).copy(alpha = 0.8f),
+                                    Color(0xFF475569).copy(alpha = 0.7f)
                                 )
                             )
                         }
-                    )
-            )
-            
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White,
-                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = if (isActive) 14.sp else 12.sp
-                )
-                Text(
-                    text = time.format(DateTimeFormatter.ofPattern("HH:mm")),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 10.sp
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Prayer name with enhanced typography
+                    Text(
+                        text = name,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (isActive) Color.White else Color(0xFFFFD700),
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
+                        fontSize = if (isActive) 16.sp else 13.sp
+                    )
+                    
+                    // Time display with subtle background
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isActive) {
+                                    Color.White.copy(alpha = 0.2f)
+                                } else {
+                                    Color(0xFFFFD700).copy(alpha = 0.2f)
+                                }
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = time.format(DateTimeFormatter.ofPattern("HH:mm")),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isActive) Color.White else Color(0xFFFFD700),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = if (isActive) 12.sp else 10.sp
+                        )
+                    }
+                }
             }
         }
     }
