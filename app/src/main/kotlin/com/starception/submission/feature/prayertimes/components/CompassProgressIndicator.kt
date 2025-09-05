@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -169,18 +170,17 @@ fun CompassProgressIndicator(
         }
     }
     
-    // UI COMPONENT - Perfect circle compass matching design
+    // NEW DESIGN - Circular progress indicator as Qibla pointer with time inside
     Box(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
-        // COMPASS CANVAS - Custom drawing with perfect circle background
+        // Perfect circle background
         Canvas(
             modifier = Modifier.size(size)
         ) {
             val center = Offset(this.size.width / 2, this.size.height / 2)
             val backgroundRadius = (this.size.minDimension / 2) - 2.dp.toPx()
-            val progressRadius = backgroundRadius - 8.dp.toPx()
             
             // Perfect circle background matching design
             drawCircle(
@@ -196,51 +196,53 @@ fun CompassProgressIndicator(
                 center = center,
                 style = Stroke(width = 1.dp.toPx())
             )
-            
-            // PROGRESS RING - Time remaining indicator
-            drawProgressRing(
-                center = center,
-                radius = progressRadius,
-                progress = progress
-            )
-            
-            // COMPASS NEEDLE - Rotates with device orientation
-            rotate(
-                degrees = animatedCompassDegree,
-                pivot = center
-            ) {
-                drawCompassNeedle(
-                    center = center,
-                    radius = progressRadius * 0.7f
-                )
-            }
-            
-            // Qibla direction marker (green dot at top)
-            drawCircle(
-                color = Color(0xFF10B981),
-                radius = 3.dp.toPx(),
-                center = Offset(center.x, center.y - progressRadius * 0.9f)
-            )
         }
         
-        // TIME TEXT - Properly positioned and sized for compass
+        // QIBLA DIRECTION INDICATOR - Circular progress that points to Qibla
+        CircularProgressIndicator(
+            progress = { 0.1f }, // 10% progress as requested
+            modifier = Modifier
+                .size(size - 16.dp)
+                .rotate(animatedCompassDegree), // Rotate to point toward Qibla
+            color = Color(0xFF10B981), // Islamic green
+            strokeWidth = 6.dp,
+            trackColor = Color.Transparent,
+            strokeCap = StrokeCap.Round,
+        )
+        
+        // REMAINING TIME - Displayed inside the watch
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(20.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = timeText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.Black.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.wrapContentSize()
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = timeText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Black.copy(alpha = 0.9f),
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                // Small Qibla direction text
+                Text(
+                    text = "→ Qibla",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF10B981),
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
         }
     }
 }
