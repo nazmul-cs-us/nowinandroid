@@ -279,7 +279,7 @@ fun CompassProgressIndicator(
                     color = Color.Black.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold,
-                    fontSize = if (size >= 280.dp) 18.sp else 14.sp, // Larger in popup
+                    fontSize = if (size >= 280.dp) 22.sp else 16.sp, // Even larger in popup
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -291,20 +291,20 @@ fun CompassProgressIndicator(
                     color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981),
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = if (size >= 280.dp) 14.sp else 11.sp, // Larger in popup
+                    fontSize = if (size >= 280.dp) 16.sp else 12.sp, // Larger in popup
                     modifier = Modifier.padding(top = 4.dp)
                 )
                 
                 // Guidance text for popup - only show when compass is large enough
-                if (size >= 280.dp) {
+                if (size >= 260.dp) {
                     Text(
                         text = "Turn until green arc\npoints up ↑",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Black.copy(alpha = 0.6f),
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Medium,
-                        fontSize = 11.sp,
-                        lineHeight = 13.sp,
+                        fontSize = 13.sp,
+                        lineHeight = 15.sp,
                         modifier = Modifier.padding(top = 6.dp)
                     )
                 }
