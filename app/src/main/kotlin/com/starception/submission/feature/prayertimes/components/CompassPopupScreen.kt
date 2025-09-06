@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -18,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import android.util.Log
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -25,6 +27,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -59,8 +62,12 @@ fun CompassPopupScreen(
     locationService: EnhancedLocationService?,
     onDismiss: () -> Unit
 ) {
+    Log.d("CompassPopup", "CompassPopupScreen created with onDismiss: $onDismiss")
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { 
+            Log.d("CompassPopup", "Dialog onDismissRequest triggered")
+            onDismiss()
+        },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false
@@ -77,19 +84,26 @@ fun CompassPopupScreen(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 16.dp, end = 16.dp)
-                    .size(48.dp)
+                    .size(56.dp) // Increased touch target size
                     .background(
-                        Color.White.copy(alpha = 0.2f),
+                        Color.White.copy(alpha = 0.4f),
                         RoundedCornerShape(50)
                     )
-                    .clickable { onDismiss() },
+                    .clickable(
+                        onClick = { 
+                            Log.d("CompassPopup", "Close button clicked!")
+                            onDismiss()
+                            Log.d("CompassPopup", "onDismiss() called")
+                        }
+                    )
+                    .zIndex(100f), // Ensure it's on top
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = "Close",
                     tint = Color.White,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(28.dp)
                 )
             }
 
