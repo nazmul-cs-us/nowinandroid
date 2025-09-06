@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.util.Log
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -624,7 +625,10 @@ fun PrayerTimesScreen(
                         val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
                         SmartContentUtils.getDailyStatsMessage(completed, total) 
                     },
-                    onCompassClick = { showCompassPopup = true }
+                    onCompassClick = { 
+                        Log.d("PrayerTimes", "Compass clicked, showing popup")
+                        showCompassPopup = true 
+                    }
                 )
                 
                 // Other prayer times using Material 3 design
@@ -941,6 +945,7 @@ fun PrayerTimesScreen(
     
     // COMPASS POPUP - Shows large compass with calibration guidance
     if (showCompassPopup) {
+        Log.d("PrayerTimes", "showCompassPopup is true, rendering CompassPopupScreen")
         CompassPopupScreen(
             progress = prayerTimes?.let { times ->
                 PrayerTimeHelpers.getNextPrayer(currentTime, times)?.let { nextPrayer ->
@@ -956,7 +961,10 @@ fun PrayerTimesScreen(
             } ?: 0.7f,
             timeText = PrayerTimeHelpers.getTimeUntilNextPrayer(currentTime, prayerTimes),
             locationService = locationService,
-            onDismiss = { showCompassPopup = false }
+            onDismiss = { 
+                Log.d("PrayerTimes", "onDismiss called, hiding compass popup")
+                showCompassPopup = false 
+            }
         )
     }
 }
