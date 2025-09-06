@@ -46,6 +46,7 @@ package com.starception.submission.feature.prayertimes
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -498,7 +499,8 @@ fun SwipeableBigTiles(
     getSmartFooter: () -> String,
     getPrayerProgress: () -> Pair<Int, Int>,
     getDailyStatsTitle: () -> String,
-    getDailyStatsMessage: () -> String
+    getDailyStatsMessage: () -> String,
+    onCompassClick: () -> Unit
 ) {
     // Swipeable Big Tiles - HorizontalPager with 3 tiles and infinite scroll
     val pagerState = rememberPagerState(
@@ -526,7 +528,8 @@ fun SwipeableBigTiles(
                     getCurrentPrayer = getCurrentPrayer,
                     getPrayerStatus = getPrayerStatus,
                     getPrayerTimeDisplay = getPrayerTimeDisplay,
-                    getTimeUntilNextPrayer = getTimeUntilNextPrayer
+                    getTimeUntilNextPrayer = getTimeUntilNextPrayer,
+                    onCompassClick = onCompassClick
                 )
                 1 -> SmartInfoTile(
                     getSmartTitle = getSmartTitle,
@@ -609,7 +612,8 @@ private fun NextPrayerTile(
     getCurrentPrayer: () -> Pair<String, LocalTime>?,
     getPrayerStatus: (String) -> String,
     getPrayerTimeDisplay: (String) -> String,
-    getTimeUntilNextPrayer: () -> String
+    getTimeUntilNextPrayer: () -> String,
+    onCompassClick: () -> Unit
 ) {
     val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
     // Show prayer tile if we have prayer data, even if mainPrayer logic fails
@@ -709,6 +713,7 @@ private fun NextPrayerTile(
                     Box(
                         modifier = Modifier
                             .size(120.dp) // Constrain the compass size to fit within tile padding
+                            .clickable { onCompassClick() }
                     ) {
                         CompassProgressIndicator(
                             progress = 0.7f,

@@ -103,7 +103,9 @@ fun CompassProgressIndicator(
             }
             
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                sensorAccuracy = accuracy
+                // FOR TESTING: Force lowest sensor accuracy to test UI feedback
+                sensorAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE
+                // Original code: sensorAccuracy = accuracy
             }
         }
     }
@@ -193,6 +195,24 @@ fun CompassProgressIndicator(
     }
     
     
+    // Helper functions for sensor accuracy testing
+    fun getAccuracyColor(accuracy: Int): Color = when(accuracy) {
+        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> Color(0xFF10B981)
+        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> Color(0xFFFFA500)
+        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> Color(0xFFFF6B6B)
+        else -> Color(0xFFFF4444) // UNRELIABLE - Red
+    }
+    
+    fun getAccuracyText(accuracy: Int): String = when(accuracy) {
+        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> "High Accuracy"
+        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> "Medium Accuracy"
+        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> "Low Accuracy - Calibrate"
+        else -> "Move in Figure-8 Pattern" // UNRELIABLE
+    }
+    
+    val accuracyColor = getAccuracyColor(sensorAccuracy)
+    val needsCalibration = sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
+    
     // ENHANCED DESIGN - Better Qibla identification with accuracy feedback
     Box(
         modifier = modifier.size(size),
@@ -212,23 +232,31 @@ fun CompassProgressIndicator(
                 center = center
             )
             
-            // Subtle inner shadow/border
+            // Accuracy indication border (changes color based on sensor strength)
+            drawCircle(
+                color = accuracyColor.copy(alpha = 0.6f),
+                radius = backgroundRadius,
+                center = center,
+                style = Stroke(width = 3.dp.toPx())
+            )
+            
+            // Inner border for definition
             drawCircle(
                 color = Color.Black.copy(alpha = 0.1f),
-                radius = backgroundRadius,
+                radius = backgroundRadius - 2.dp.toPx(),
                 center = center,
                 style = Stroke(width = 1.dp.toPx())
             )
             
         }
         
-        // QIBLA DIRECTION INDICATOR - Clean circular progress
+        // QIBLA DIRECTION INDICATOR - Color changes based on sensor accuracy
         CircularProgressIndicator(
             progress = { 0.1f }, // 10% progress pointing to Qibla
             modifier = Modifier
                 .size(size - 16.dp)
                 .rotate(animatedCompassDegree),
-            color = Color(0xFF10B981), // Always Islamic green
+            color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981), // Red when unreliable, green when accurate
             strokeWidth = 8.dp,
             trackColor = Color.Black.copy(alpha = 0.1f),
             strokeCap = StrokeCap.Round,
@@ -245,30 +273,47 @@ fun CompassProgressIndicator(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Main time display
+                // Main time display - larger text for better visibility
                 Text(
                     text = timeText,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = Color.Black.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    fontSize = if (size >= 280.dp) 18.sp else 14.sp, // Larger in popup
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 
-                // Qibla direction with Kaaba emoji
+                // Qibla direction with Kaaba emoji and sensor status
                 Text(
                     text = "🕋 Qibla",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF10B981),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981),
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(top = 2.dp)
+                    fontSize = if (size >= 280.dp) 14.sp else 11.sp, // Larger in popup
+                    modifier = Modifier.padding(top = 4.dp)
                 )
+                
+                // Guidance text for popup - only show when compass is large enough
+                if (size >= 280.dp) {
+                    Text(
+                        text = "Turn until green arc\npoints up ↑",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Black.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
             }
         }
+        
+        // Note: Calibration message removed - now handled by CompassPopupScreen
+        // The popup will automatically show when sensor accuracy is poor
         
     }
 }

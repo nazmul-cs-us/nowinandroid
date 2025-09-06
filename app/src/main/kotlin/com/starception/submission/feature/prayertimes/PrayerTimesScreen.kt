@@ -80,6 +80,7 @@ import com.starception.submission.feature.prayertimes.animations.FlowingArrowsAn
 import com.starception.submission.feature.prayertimes.SwipeableBigTiles
 import com.starception.submission.feature.prayertimes.SmartContentUtils
 import com.starception.submission.feature.prayertimes.PrayerTimeHelpers
+import com.starception.submission.feature.prayertimes.components.CompassPopupScreen
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -271,6 +272,9 @@ fun PrayerTimesScreen(
     // LOCATION SERVICE PROMPT STATE
     var showLocationServiceDialog by remember { mutableStateOf(false) }
     var locationServiceCheckPending by remember { mutableStateOf(false) }
+    
+    // COMPASS POPUP STATE - Shows large compass with calibration guidance
+    var showCompassPopup by remember { mutableStateOf(false) }
     
     // LOCATION SERVICE - For Qibla compass functionality
     val locationService = remember {
@@ -619,7 +623,8 @@ fun PrayerTimesScreen(
                     getDailyStatsMessage = { 
                         val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
                         SmartContentUtils.getDailyStatsMessage(completed, total) 
-                    }
+                    },
+                    onCompassClick = { showCompassPopup = true }
                 )
                 
                 // Other prayer times using Material 3 design
@@ -931,6 +936,27 @@ fun PrayerTimesScreen(
             },
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(28.dp)
+        )
+    }
+    
+    // COMPASS POPUP - Shows large compass with calibration guidance
+    if (showCompassPopup) {
+        CompassPopupScreen(
+            progress = prayerTimes?.let { times ->
+                PrayerTimeHelpers.getNextPrayer(currentTime, times)?.let { nextPrayer ->
+                    // Calculate progress based on current time and next prayer time
+                    val now = currentTime.toSecondOfDay().toFloat()
+                    val nextPrayerTime = nextPrayer.second.toSecondOfDay().toFloat()
+                    if (nextPrayerTime > now) {
+                        val totalDaySeconds = 24 * 60 * 60f
+                        val timeUntilNext = nextPrayerTime - now
+                        1f - (timeUntilNext / totalDaySeconds).coerceIn(0f, 1f)
+                    } else 0.7f
+                } ?: 0.7f
+            } ?: 0.7f,
+            timeText = PrayerTimeHelpers.getTimeUntilNextPrayer(currentTime, prayerTimes),
+            locationService = locationService,
+            onDismiss = { showCompassPopup = false }
         )
     }
 }
