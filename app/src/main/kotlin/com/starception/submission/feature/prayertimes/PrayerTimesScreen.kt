@@ -1,3 +1,30 @@
+/**
+ * Prayer Times Screen - Main UI for Islamic Prayer Times Application
+ * 
+ * This file contains the complete prayer times interface implementation with:
+ * - Real-time prayer time calculations
+ * - Location-based services
+ * - Qibla direction compass
+ * - Interactive prayer tiles
+ * - Permission management
+ * - Material 3 design system
+ * 
+ * ## Architecture:
+ * - **MVVM Pattern**: Uses ViewModels for state management
+ * - **Compose UI**: Modern declarative UI with Material 3
+ * - **Dependency Injection**: Hilt for dependency management
+ * - **Permissions**: Location permissions with graceful degradation
+ * - **Services**: Background location and prayer calculation services
+ * 
+ * ## Key Components:
+ * - `PrayerTimesScreen`: Main screen composable with permission handling
+ * - `SwipeableBigTiles`: Interactive prayer time cards with smooth animations
+ * - `CompassProgressIndicator`: Enhanced Qibla direction compass
+ * - Location services integration for accurate prayer time calculation
+ * 
+ * @author Prayer Times Development Team
+ * @version 2.0 - Enhanced with Material 3 and improved UX
+ */
 package com.starception.submission.feature.prayertimes
 
 import android.Manifest
