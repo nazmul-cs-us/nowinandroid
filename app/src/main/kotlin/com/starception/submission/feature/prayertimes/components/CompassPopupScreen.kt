@@ -21,6 +21,17 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.geometry.center
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import kotlin.math.*
 import com.starception.submission.prayer.service.EnhancedLocationService
 
 /**
@@ -62,29 +73,33 @@ fun CompassPopupScreen(
                 .windowInsetsPadding(WindowInsets.systemBars) // Handle camera cutouts and system bars
         ) {
             // Close button - positioned to avoid camera cutout and status bar
-            IconButton(
-                onClick = onDismiss,
+            Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 16.dp, end = 16.dp) // System bars padding handles cutout
+                    .padding(top = 16.dp, end = 16.dp)
+                    .size(48.dp)
                     .background(
                         Color.White.copy(alpha = 0.2f),
                         RoundedCornerShape(50)
                     )
+                    .clickable { onDismiss() },
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = "Close",
-                    tint = Color.White
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Top
             ) {
                 // Title
                 Text(
@@ -93,16 +108,16 @@ fun CompassPopupScreen(
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 32.dp)
+                    modifier = Modifier.padding(top = 16.dp, bottom = 12.dp)
                 )
 
                 // Large compass
                 CompassProgressIndicator(
                     progress = progress,
                     timeText = timeText,
-                    size = 280.dp,
+                    size = 260.dp,
                     locationService = locationService,
-                    modifier = Modifier.padding(bottom = 40.dp)
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
 
                 // Calibration guidance card
@@ -115,27 +130,14 @@ fun CompassPopupScreen(
                     )
                 ) {
                     Column(
-                        modifier = Modifier.padding(24.dp),
+                        modifier = Modifier.padding(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Calibration icon with animation
-                        val infiniteTransition = rememberInfiniteTransition(label = "figure8")
-                        val animatedAlpha by infiniteTransition.animateFloat(
-                            initialValue = 0.4f,
-                            targetValue = 1f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(1500),
-                                repeatMode = RepeatMode.Reverse
-                            ),
-                            label = "alpha"
-                        )
-
-                        Text(
-                            text = "∞",
-                            fontSize = 48.sp,
-                            color = Color(0xFF10B981).copy(alpha = animatedAlpha),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 16.dp)
+                        // Animated calibration demonstration
+                        Figure8AnimationDemo(
+                            modifier = Modifier
+                                .size(100.dp)
+                                .padding(bottom = 6.dp)
                         )
 
                         Text(
@@ -144,7 +146,7 @@ fun CompassPopupScreen(
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(bottom = 12.dp)
+                            modifier = Modifier.padding(bottom = 6.dp)
                         )
 
                         Text(
@@ -152,8 +154,8 @@ fun CompassPopupScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                             textAlign = TextAlign.Center,
-                            lineHeight = 20.sp,
-                            modifier = Modifier.padding(bottom = 20.dp)
+                            lineHeight = 18.sp,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
 
                         // Steps
@@ -310,5 +312,105 @@ private fun ColorIndicatorRow(
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
             fontSize = 12.sp
         )
+    }
+}
+
+/**
+ * Simple and subtle figure-8 calibration animation
+ * Clean demonstration showing phone movement in figure-8 pattern
+ */
+@Composable
+private fun Figure8AnimationDemo(
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "figure8Animation")
+    
+    // Simple smooth animation progress
+    val progress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "figure8Progress"
+    )
+    
+    Canvas(modifier = modifier) {
+        val center = size.center
+        val radius = size.minDimension / 2.5f
+        
+        // Simple figure-8 path
+        val path = Path().apply {
+            reset()
+            for (i in 0..360 step 3) {
+                val t = i * PI / 180.0
+                val x = center.x + radius * sin(t)
+                val y = center.y + radius * sin(t) * cos(t)
+                if (i == 0) moveTo(x.toFloat(), y.toFloat())
+                else lineTo(x.toFloat(), y.toFloat())
+            }
+        }
+        
+        // Simple dashed path
+        drawPath(
+            path = path,
+            color = Color(0xFF10B981).copy(alpha = 0.4f),
+            style = Stroke(
+                width = 2.dp.toPx(),
+                cap = StrokeCap.Round,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
+            )
+        )
+        
+        // Calculate current position
+        val t = progress * 2 * PI
+        val currentX = center.x + radius * sin(t).toFloat()
+        val currentY = center.y + radius * sin(t).toFloat() * cos(t).toFloat()
+        
+        // Calculate direction for phone alignment
+        val nextT = ((progress + 0.01f) % 1f) * 2 * PI
+        val nextX = center.x + radius * sin(nextT).toFloat()
+        val nextY = center.y + radius * sin(nextT).toFloat() * cos(nextT).toFloat()
+        
+        val dx = nextX - currentX
+        val dy = nextY - currentY
+        val angle = atan2(dy, dx)
+        
+        // Phone aligned with movement direction
+        val phoneWidth = 8.dp.toPx()
+        val phoneHeight = 12.dp.toPx()
+        
+        rotate(
+            degrees = Math.toDegrees(angle.toDouble()).toFloat(),
+            pivot = androidx.compose.ui.geometry.Offset(currentX, currentY)
+        ) {
+            // Phone body
+            drawRoundRect(
+                color = Color(0xFF10B981),
+                topLeft = androidx.compose.ui.geometry.Offset(
+                    currentX - phoneWidth / 2,
+                    currentY - phoneHeight / 2
+                ),
+                size = androidx.compose.ui.geometry.Size(phoneWidth, phoneHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
+            )
+            
+            // Phone screen
+            drawRoundRect(
+                color = Color.White,
+                topLeft = androidx.compose.ui.geometry.Offset(
+                    currentX - phoneWidth / 2 + 1.dp.toPx(),
+                    currentY - phoneHeight / 2 + 1.5.dp.toPx()
+                ),
+                size = androidx.compose.ui.geometry.Size(
+                    phoneWidth - 2.dp.toPx(),
+                    phoneHeight - 3.dp.toPx()
+                ),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx())
+            )
+        }
+        
+        // Center circle removed for cleaner look
     }
 }
