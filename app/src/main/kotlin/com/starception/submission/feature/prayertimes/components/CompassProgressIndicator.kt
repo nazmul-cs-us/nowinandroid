@@ -103,9 +103,8 @@ fun CompassProgressIndicator(
             }
             
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // FOR TESTING: Force lowest sensor accuracy to test UI feedback
-                sensorAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE
-                // Original code: sensorAccuracy = accuracy
+                // Normal sensor accuracy tracking - testing override removed
+                sensorAccuracy = accuracy
             }
         }
     }

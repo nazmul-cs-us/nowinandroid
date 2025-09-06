@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import com.starception.submission.prayer.service.EnhancedLocationService
 
 /**
@@ -56,13 +59,14 @@ fun CompassPopupScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.85f))
+                .windowInsetsPadding(WindowInsets.systemBars) // Handle camera cutouts and system bars
         ) {
-            // Close button - positioned to avoid status bar overlap
+            // Close button - positioned to avoid camera cutout and status bar
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 56.dp, end = 16.dp) // Extra top padding to clear status bar
+                    .padding(top = 16.dp, end = 16.dp) // System bars padding handles cutout
                     .background(
                         Color.White.copy(alpha = 0.2f),
                         RoundedCornerShape(50)
