@@ -40,17 +40,35 @@ import kotlinx.coroutines.launch
 import kotlin.math.*
 
 /**
- * QIBLA COMPASS PROGRESS INDICATOR: Circular progress with integrated Qibla compass
+ * Enhanced Qibla Compass Component
  * 
- * This component combines the time remaining circular progress indicator 
- * with Qibla direction compass functionality.
+ * A modern Islamic compass that combines prayer time countdown with Qibla direction indicator.
+ * Uses Material 3 design principles with Islamic theming for religious applications.
  * 
- * FEATURES:
- * - Circular progress showing time remaining until next prayer
- * - Compass needle pointing to Qibla (Mecca) direction
- * - Location-based Qibla calculation using user's GPS coordinates
- * - Same smooth sensor management and rotation animation
- * - Integrated seamlessly into your existing prayer times UI
+ * ## Key Features:
+ * - **Circular Progress Arc**: 10% arc that rotates to point toward Mecca (Qibla direction)
+ * - **Prayer Time Display**: Shows remaining time until next prayer inside the compass
+ * - **Islamic Theming**: Green color scheme with 🕋 Kaaba emoji for religious context
+ * - **Real-time Updates**: Responds to device orientation changes via magnetometer sensor
+ * - **Material 3 Design**: Clean, modern UI that integrates seamlessly with prayer apps
+ * 
+ * ## Design Philosophy:
+ * - **Clean & Minimal**: No sensor status indicators or visual clutter
+ * - **Islamic Colors**: Traditional green (#10B981) representing Islamic culture
+ * - **Perfect Circle**: Clean white background with subtle border
+ * - **Responsive**: Smooth animations using spring physics for natural feel
+ * 
+ * ## Technical Implementation:
+ * - Uses `CircularProgressIndicator` for the Qibla direction arc
+ * - Integrates with device magnetometer for compass functionality
+ * - Location-based Qibla calculation using GPS coordinates
+ * - Lifecycle-aware sensor management to preserve battery
+ * 
+ * @param progress Float value representing prayer time progress (not used for arc display)
+ * @param timeText String showing time remaining until next prayer (e.g., "2h 57m")
+ * @param modifier Modifier for styling and layout customization
+ * @param size Dp size of the compass component (default: 88.dp, recommended: 120.dp+)
+ * @param locationService Enhanced location service for GPS and Qibla calculations
  */
 @Composable
 fun CompassProgressIndicator(
@@ -255,225 +273,45 @@ fun CompassProgressIndicator(
     }
 }
 
-/**
- * Enhanced progress ring with Islamic luxury styling
- */
-private fun DrawScope.drawProgressRing(
-    center: Offset,
-    radius: Float,
-    progress: Float
-) {
-    // Background track with Islamic pattern inspiration
-    drawCircle(
-        brush = Brush.sweepGradient(
-            colors = listOf(
-                Color(0xFF374151).copy(alpha = 0.4f),
-                Color(0xFF4B5563).copy(alpha = 0.3f),
-                Color(0xFF6B7280).copy(alpha = 0.2f),
-                Color(0xFF374151).copy(alpha = 0.4f)
-            ),
-            center = center
-        ),
-        radius = radius,
-        center = center,
-        style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
-    )
-    
-    // Inner shadow ring for depth
-    drawCircle(
-        color = Color(0xFF1F2937).copy(alpha = 0.5f),
-        radius = radius - 3.dp.toPx(),
-        center = center,
-        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
-    )
-    
-    if (progress > 0f) {
-        val sweepAngle = progress * 360f
-        
-        // Progress glow effect
-        drawArc(
-            brush = Brush.sweepGradient(
-                colors = listOf(
-                    Color(0xFF10B981).copy(alpha = 0.3f),
-                    Color(0xFFFFD700).copy(alpha = 0.4f),
-                    Color(0xFF059669).copy(alpha = 0.3f)
-                ),
-                center = center
-            ),
-            startAngle = -90f,
-            sweepAngle = sweepAngle,
-            useCenter = false,
-            topLeft = Offset(center.x - radius - 2.dp.toPx(), center.y - radius - 2.dp.toPx()),
-            size = androidx.compose.ui.geometry.Size((radius + 2.dp.toPx()) * 2, (radius + 2.dp.toPx()) * 2),
-            style = Stroke(width = 10.dp.toPx(), cap = StrokeCap.Round)
-        )
-        
-        // Main progress arc with Islamic colors
-        drawArc(
-            brush = Brush.sweepGradient(
-                colors = listOf(
-                    Color(0xFF10B981),
-                    Color(0xFFFFD700),
-                    Color(0xFF059669)
-                ),
-                center = center
-            ),
-            startAngle = -90f,
-            sweepAngle = sweepAngle,
-            useCenter = false,
-            topLeft = Offset(center.x - radius, center.y - radius),
-            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-            style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
-        )
-        
-        // Inner bright highlight
-        drawArc(
-            color = Color(0xFFFFFFFF).copy(alpha = 0.7f),
-            startAngle = -90f,
-            sweepAngle = sweepAngle,
-            useCenter = false,
-            topLeft = Offset(center.x - radius + 1.dp.toPx(), center.y - radius + 1.dp.toPx()),
-            size = androidx.compose.ui.geometry.Size((radius - 1.dp.toPx()) * 2, (radius - 1.dp.toPx()) * 2),
-            style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round)
-        )
-    }
-}
+// Note: drawProgressRing function removed as we now use Material 3 CircularProgressIndicator
+// for better performance and consistency with modern Android design guidelines.
 
-/**
- * Enhanced Islamic Qibla compass needle with luxury styling
- */
-private fun DrawScope.drawCompassNeedle(
-    center: Offset,
-    radius: Float
-) {
-    val qiblaEnd = Offset(center.x, center.y - radius)
-    val oppositeEnd = Offset(center.x, center.y + radius * 0.6f)
-    
-    // Sacred Qibla direction needle with glow effect
-    // Glow/shadow effect
-    drawLine(
-        color = Color(0xFF10B981).copy(alpha = 0.4f),
-        start = center,
-        end = qiblaEnd,
-        strokeWidth = 8.dp.toPx(),
-        cap = StrokeCap.Round
-    )
-    
-    // Main Qibla needle with Islamic green and gold gradient
-    drawLine(
-        brush = Brush.linearGradient(
-            colors = listOf(
-                Color(0xFFFFD700),
-                Color(0xFF10B981),
-                Color(0xFF059669)
-            ),
-            start = center,
-            end = qiblaEnd
-        ),
-        start = center,
-        end = qiblaEnd,
-        strokeWidth = 5.dp.toPx(),
-        cap = StrokeCap.Round
-    )
-    
-    // Bright highlight on Qibla needle
-    drawLine(
-        color = Color(0xFFFFFFFF).copy(alpha = 0.9f),
-        start = center,
-        end = qiblaEnd,
-        strokeWidth = 1.5.dp.toPx(),
-        cap = StrokeCap.Round
-    )
-    
-    // Enhanced opposite direction needle
-    drawLine(
-        brush = Brush.linearGradient(
-            colors = listOf(
-                Color(0xFF6B7280),
-                Color(0xFF4B5563)
-            ),
-            start = center,
-            end = oppositeEnd
-        ),
-        start = center,
-        end = oppositeEnd,
-        strokeWidth = 3.dp.toPx(),
-        cap = StrokeCap.Round
-    )
-    
-    // Sacred Qibla arrowhead
-    val arrowSize = 8.dp.toPx()
-    val arrowAngle = kotlin.math.PI / 6
-    
-    val leftArrow = Offset(
-        qiblaEnd.x - sin(arrowAngle).toFloat() * arrowSize,
-        qiblaEnd.y + cos(arrowAngle).toFloat() * arrowSize
-    )
-    
-    val rightArrow = Offset(
-        qiblaEnd.x + sin(arrowAngle).toFloat() * arrowSize,
-        qiblaEnd.y + cos(arrowAngle).toFloat() * arrowSize
-    )
-    
-    // Arrowhead with Islamic styling
-    drawLine(
-        brush = Brush.linearGradient(
-            colors = listOf(
-                Color(0xFFFFD700),
-                Color(0xFF10B981)
-            )
-        ),
-        start = qiblaEnd,
-        end = leftArrow,
-        strokeWidth = 3.dp.toPx(),
-        cap = StrokeCap.Round
-    )
-    
-    drawLine(
-        brush = Brush.linearGradient(
-            colors = listOf(
-                Color(0xFFFFD700),
-                Color(0xFF10B981)
-            )
-        ),
-        start = qiblaEnd,
-        end = rightArrow,
-        strokeWidth = 3.dp.toPx(),
-        cap = StrokeCap.Round
-    )
-    
-    // Enhanced center with Islamic geometric design
-    // Outer glow
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(
-                Color(0xFFFFD700).copy(alpha = 0.3f),
-                Color.Transparent
-            ),
-            radius = 8.dp.toPx()
-        ),
-        radius = 6.dp.toPx(),
-        center = center
-    )
-    
-    // Main center circle
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(
-                Color(0xFFFFD700),
-                Color(0xFF10B981),
-                Color(0xFF1E293B)
-            )
-        ),
-        radius = 4.dp.toPx(),
-        center = center
-    )
-    
-    // Inner bright center
-    drawCircle(
-        color = Color(0xFFFFFFFF).copy(alpha = 0.9f),
-        radius = 1.5.dp.toPx(),
-        center = center
-    )
-}
+// Note: drawCompassNeedle function removed as we replaced the traditional compass needle
+// with a cleaner Material 3 CircularProgressIndicator approach for better UX and performance.
+// 
+// ## Design Evolution:
+// - Old: Traditional compass needle with arrowhead pointing to Qibla
+// - New: 10% circular progress arc that rotates to indicate Qibla direction
+// - Benefits: Cleaner design, no visual clutter, better Material 3 integration
+
+/* ============================================================================
+ * COMPONENT ARCHITECTURE & USAGE
+ * ============================================================================
+ * 
+ * ## Integration Example:
+ * ```kotlin
+ * CompassProgressIndicator(
+ *     progress = 0.7f,              // Current prayer progress (0-1)
+ *     timeText = "2h 57m",           // Time remaining until next prayer
+ *     size = 120.dp,                // Compass diameter
+ *     locationService = locationService
+ * )
+ * ```
+ * 
+ * ## State Management:
+ * - **Sensor Management**: Automatic lifecycle-aware sensor registration/unregistration
+ * - **Location Updates**: Real-time Qibla calculation based on GPS coordinates
+ * - **Orientation Changes**: Smooth animation response to device rotation
+ * - **Battery Optimization**: Sensors only active when component is visible
+ * 
+ * ## Color Scheme:
+ * - **Primary Green**: #10B981 (Islamic traditional color)
+ * - **Background**: White with subtle black border
+ * - **Text**: High contrast black with Islamic green accent
+ * 
+ * ## Performance Notes:
+ * - Uses hardware-accelerated Canvas drawing for smooth animations
+ * - Spring-based physics for natural movement feel
+ * - Optimized sensor sampling to balance accuracy with battery life
+ * ============================================================================ */
 
