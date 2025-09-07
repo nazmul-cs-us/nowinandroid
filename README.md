@@ -25,10 +25,38 @@ The app demonstrates modern Android development practices and serves as both a f
 **Comprehensive prayer times system with advanced features:**
 
 ### Prayer Time Calculations
-- **Multiple Calculation Methods**: Muslim World League, ISNA, Umm al-Qura, Egyptian Authority, University of Islamic Sciences (Karachi), MUIS, Shia Ithna Ashari, and Institute of Geophysics (Tehran)
+Our app implements precise Islamic prayer time calculations using advanced astronomical algorithms:
+
+#### **Astronomical Foundation**
+- **Julian Day Conversion**: Converts calendar dates to astronomical time scale for precise calculations
+- **Solar Position Calculations**: Real-time sun declination, equation of time, and hour angle calculations
+- **Geographic Corrections**: Accounts for Earth's elliptical orbit, atmospheric refraction, and altitude adjustments
+- **Coordinate Transformations**: Accurate geographic coordinate handling with timezone calculations
+
+#### **Islamic Prayer Time Rules**
+Each prayer follows specific astronomical criteria:
+- **Fajr (Pre-dawn)**: Sun at -15° to -19.5° below horizon (varies by calculation method)
+- **Sunrise**: Sun crosses geometric horizon with atmospheric refraction correction (-0.833°)
+- **Dhuhr (Noon)**: Sun reaches maximum elevation (solar noon with equation of time correction)
+- **Asr (Afternoon)**: Shadow length equals 1x or 2x object height (depending on madhab)
+- **Maghrib (Sunset)**: Sun sets below geometric horizon (same angle as sunrise)
+- **Isha (Night)**: Sun at -15° to -18° below horizon OR fixed minutes after Maghrib
+
+#### **Supported Calculation Methods**
+- **Muslim World League (MWL)**: Fajr -18°, Isha -17° - Most widely used globally
+- **ISNA**: Fajr -15°, Isha -15° - Used in North America
+- **Umm al-Qura (Makkah)**: Fajr -18.5°, Isha 90 min after Maghrib - Official method of Saudi Arabia
+- **Egyptian Authority**: Fajr -19.5°, Isha -17.5° - Used in Egypt and nearby regions
+- **University of Islamic Sciences (Karachi)**: Fajr -18°, Isha -18° - Used in Pakistan and India
+- **MUIS (Singapore)**: Fajr -20°, Isha -18° - Used in Singapore, Malaysia, Brunei
+- **Shia Ithna Ashari**: Fajr -16°, Isha -14°, Maghrib +4 min - Used by Shia communities
+- **Institute of Geophysics (Tehran)**: Fajr -17.7°, Isha -14°, Maghrib +4 min - Used in Iran
+
+#### **Advanced Features**
 - **Madhab Support**: Standard (Shafi'i, Maliki, Hanbali) and Hanafi methods for Asr calculation
 - **High Latitude Adjustments**: Multiple methods for polar regions including Middle of Night, One-Seventh of Night, Angle Based, and Nearest Latitude
 - **Custom Adjustments**: Manual time offsets for each prayer and custom sun angle overrides
+- **Error Handling**: Comprehensive fallback systems for edge cases and calculation failures
 
 ### Location Services
 - **Smart Location Detection**: Multi-strategy location acquisition with 3-second timeouts to prevent UI blocking

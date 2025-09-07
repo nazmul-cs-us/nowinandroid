@@ -47,6 +47,8 @@ The prayer times system is built with a multi-layered architecture that provides
 
 ## Prayer Times Calculation Engine
 
+> **📖 For detailed calculation methodology, see [PRAYER_CALCULATION_METHODOLOGY.md](PRAYER_CALCULATION_METHODOLOGY.md)**
+
 ### 1. Astronomical Foundation
 
 The system uses precise astronomical calculations based on the sun's position relative to Earth:

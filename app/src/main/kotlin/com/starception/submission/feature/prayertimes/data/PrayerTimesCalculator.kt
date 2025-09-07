@@ -298,8 +298,26 @@ class PrayerTimesCalculator(private val context: Context) {
                 android.util.Log.w("PrayerCalculation", "✗ Prayer times calculation returned null after ${calcDuration}ms")
             }
             
-            // STEP 6: CACHE THE RESULTS for instant future access
-            android.util.Log.d("PrayerCalculation", "STEP 6: Caching results for future use")
+            // STEP 6: SAVE LOCATION TO SETTINGS for notification service access
+            android.util.Log.d("PrayerCalculation", "STEP 6a: Saving location to settings for notification service")
+            try {
+                // Only save location to settings if we got it from GPS (not from user's saved location)
+                val shouldSaveLocation = userSettings.location == null || 
+                    (location != userSettings.location && !location.getDisplayName().contains("Dubai"))
+                
+                if (shouldSaveLocation) {
+                    android.util.Log.d("PrayerCalculation", "Saving GPS location to settings: ${location.getDisplayName()}")
+                    settingsRepository.updateSettings(userSettings.copy(location = location))
+                    android.util.Log.d("PrayerCalculation", "✓ Location saved to settings - notification service can now access it")
+                } else {
+                    android.util.Log.d("PrayerCalculation", "Using existing saved location from settings: ${location.getDisplayName()}")
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("PrayerCalculation", "Failed to save location to settings: ${e.message}")
+            }
+            
+            // STEP 7: CACHE THE RESULTS for instant future access
+            android.util.Log.d("PrayerCalculation", "STEP 7: Caching results for future use")
             if (calculatedTimes != null) {
                 try {
                     cache.cachePrayerTimes(calculatedTimes, today, locationName)

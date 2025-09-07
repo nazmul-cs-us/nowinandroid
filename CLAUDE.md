@@ -128,6 +128,11 @@ The app uses `com.starception.submission` as the base package (originally forked
 - `app/src/main/kotlin/com/starception/submission/prayer/` - Core prayer times system
 - `app/src/main/kotlin/com/starception/submission/feature/prayertimes/PrayerTimesScreen.kt` - Main prayer times UI
 
+### Documentation
+- `docs/PRAYER_TIMES_TECHNICAL_GUIDE.md` - Comprehensive technical guide for the prayer times system
+- `docs/PRAYER_CALCULATION_METHODOLOGY.md` - Detailed explanation of Islamic prayer time calculations
+- `README.md` - Updated with detailed prayer time features and capabilities
+
 ## UI Design System
 
 ### Card Design Guidelines
