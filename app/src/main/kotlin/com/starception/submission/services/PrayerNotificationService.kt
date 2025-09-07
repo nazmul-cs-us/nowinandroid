@@ -211,25 +211,39 @@ class PrayerNotificationService : Service() {
      */
     private suspend fun startPrayerTimeUpdateLoop() {
         val startTime = System.currentTimeMillis()
+        Log.d(TAG, "=== STARTING PRAYER NOTIFICATION UPDATE LOOP ===")
+        Log.d(TAG, "Loop start time: ${java.time.LocalDateTime.now()}")
         
         // CONFIGURABLE LIMITS - Edit these values to change service behavior
         val maxServiceTime = 24 * 60 * 60 * 1000L // 24 hours max - prevents battery drain
         val maxUpdates = 60 // Max 60 updates - prevents excessive notifications
         var updateCount = 0
         
+        Log.d(TAG, "Service limits configured: maxTime=${maxServiceTime/1000}s, maxUpdates=$maxUpdates")
+        
         try {
             while (isServiceRunning && updateCount < maxUpdates) {
+                val iterationStartTime = System.currentTimeMillis()
+                Log.d(TAG, "--- Update Loop Iteration #${updateCount + 1} ---")
+                
                 try {
                     // Check if service has been running too long
-                    if (System.currentTimeMillis() - startTime > maxServiceTime) {
-                        Log.d(TAG, "Service exceeded max time limit (${maxServiceTime / 1000}s), stopping automatically")
+                    val currentRuntime = System.currentTimeMillis() - startTime
+                    if (currentRuntime > maxServiceTime) {
+                        Log.w(TAG, "Service exceeded max time limit (${maxServiceTime / 1000}s), stopping automatically")
+                        Log.w(TAG, "Current runtime: ${currentRuntime/1000}s")
                         break
                     }
                     
+                    Log.d(TAG, "Calling updatePrayerNotificationWithRealData()...")
                     updatePrayerNotificationWithRealData()
                     updateCount++
+                    
+                    val iterationDuration = System.currentTimeMillis() - iterationStartTime
+                    Log.d(TAG, "✓ Prayer update #$updateCount/$maxUpdates completed in ${iterationDuration}ms")
+                    
                     if (AnrPreventionConfig.LOG_SERVICE_LIFECYCLE) {
-                        Log.d(TAG, "Prayer update #$updateCount/$maxUpdates")
+                        Log.d(TAG, "Service runtime: ${(System.currentTimeMillis() - startTime)/1000}s")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error updating prayer notification", e)
@@ -289,14 +303,26 @@ class PrayerNotificationService : Service() {
      * - Add new notification features
      */
     private suspend fun updatePrayerNotificationWithRealData() {
+        val updateStartTime = System.currentTimeMillis()
+        Log.d(TAG, "=== UPDATING PRAYER NOTIFICATION WITH REAL DATA ===")
+        Log.d(TAG, "Update time: ${java.time.LocalTime.now()}")
+        
         try {
             // SAFETY CHECK - Ensure notification manager is ready
             if (!PrayerNotificationManager.isInitialized()) {
+                Log.d(TAG, "PrayerNotificationManager not initialized, initializing...")
                 PrayerNotificationManager.initialize(applicationContext)
+                Log.d(TAG, "✓ PrayerNotificationManager initialized")
+            } else {
+                Log.d(TAG, "✓ PrayerNotificationManager already initialized")
             }
             
             // Get current prayer data
+            Log.d(TAG, "Getting current prayer data...")
+            val prayerDataStartTime = System.currentTimeMillis()
             val prayerData = getCurrentPrayerData()
+            val prayerDataDuration = System.currentTimeMillis() - prayerDataStartTime
+            Log.d(TAG, "✓ Prayer data retrieved in ${prayerDataDuration}ms")
             if (prayerData != null) {
                 val (title, content, detailedMessage) = prayerData
                 
@@ -460,26 +486,44 @@ class PrayerNotificationService : Service() {
     private fun calculatePrayerProgress(currentPrayer: PrayerTime, nextPrayer: PrayerTime?): PrayerProgress {
         val now = LocalTime.now()
         val prayerStart = currentPrayer.time
+        Log.d(TAG, "=== CALCULATING PRAYER PROGRESS ===")
+        Log.d(TAG, "Current time: $now")
+        Log.d(TAG, "Current prayer: ${currentPrayer.name} at $prayerStart")
+        Log.d(TAG, "Next prayer: ${nextPrayer?.name ?: "None"} at ${nextPrayer?.time ?: "N/A"}")
         
         // Check if the current prayer time has already passed
-        if (now.isAfter(prayerStart.plusHours(2))) {
+        val prayerEndThreshold = prayerStart.plusHours(2)
+        Log.d(TAG, "Prayer time threshold (end): $prayerEndThreshold")
+        Log.d(TAG, "Has prayer passed 2-hour threshold? ${now.isAfter(prayerEndThreshold)}")
+        
+        if (now.isAfter(prayerEndThreshold)) {
+            Log.d(TAG, "Prayer time has passed 2-hour threshold, calculating progress towards next prayer")
             // Prayer time has passed, calculate progress towards next prayer
             if (nextPrayer != null) {
                 val timeUntilNext = Duration.between(now, nextPrayer.time)
+                Log.d(TAG, "Time until next prayer: ${timeUntilNext.toMinutes()} minutes")
+                
                 if (timeUntilNext.isNegative.not()) {
                     // Calculate progress based on time since last prayer
                     val totalTime = Duration.between(prayerStart, nextPrayer.time)
                     val elapsedTime = Duration.between(prayerStart, now)
                     
+                    Log.d(TAG, "Total time between prayers: ${totalTime.toMinutes()} minutes")
+                    Log.d(TAG, "Elapsed time since current prayer: ${elapsedTime.toMinutes()} minutes")
+                    
                     if (totalTime.toMinutes() > 0) {
                         val progressPercentage = (elapsedTime.toMinutes().toFloat() / totalTime.toMinutes().toFloat() * 100f).coerceIn(0f, 100f)
-                        return PrayerProgress(
+                        Log.d(TAG, "Calculated progress: ${progressPercentage}% (MAKE_TIME phase)")
+                        
+                        val prayerProgress = PrayerProgress(
                             elapsedMinutes = elapsedTime.toMinutes(),
                             remainingMinutes = timeUntilNext.toMinutes(),
                             totalDuration = totalTime.toMinutes(),
                             progressPercentage = progressPercentage,
                             phase = PrayerPhase.MAKE_TIME // Since prayer time has passed
                         )
+                        Log.d(TAG, "✓ Returning prayer progress: $prayerProgress")
+                        return prayerProgress
                     }
                 }
             }

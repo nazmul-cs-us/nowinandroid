@@ -44,11 +44,19 @@ object PrayerNotificationManager {
     private const val NOTIFICATION_ID = 1001  // Same ID = updates replace previous notifications
     
     fun initialize(context: Context) {
+        Log.d(TAG, "=== INITIALIZING PRAYER NOTIFICATION MANAGER ===")
+        Log.d(TAG, "Context: ${context.javaClass.simpleName}")
+        
         appContext = context.applicationContext
         notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        
+        Log.d(TAG, "Creating notification channel...")
         createNotificationChannel()
         initialized = true
-        Log.d(TAG, "PrayerNotificationManager initialized")
+        
+        Log.d(TAG, "✓ PrayerNotificationManager initialized successfully")
+        Log.d(TAG, "NotificationManager: ${notificationManager.javaClass.simpleName}")
+        Log.d(TAG, "Live Updates supported: ${supportsLiveUpdates()}")
     }
     
     /**
@@ -401,18 +409,29 @@ object PrayerNotificationManager {
         content: String? = null,
         detailedMessage: String? = null
     ) {
+        Log.d(TAG, "=== SMART PRAYER NOTIFICATION UPDATE ===")
+        Log.d(TAG, "Prayer: $prayerName")
+        Log.d(TAG, "Progress: $progress%")
+        Log.d(TAG, "Previous phase: ${previousPhase ?: "None"}")
+        Log.d(TAG, "Title: ${title ?: "None"}")
+        Log.d(TAG, "Content: ${content ?: "None"}")
+        Log.d(TAG, "Detailed message length: ${detailedMessage?.length ?: 0} characters")
+        
         val currentPhase = getCurrentPrayerPhase(progress)
+        Log.d(TAG, "Current phase determined: $currentPhase")
         
         // PHASE CHANGE DETECTION - This determines if we should alert or stay silent
         val isPhaseTransition = previousPhase != null && previousPhase != currentPhase
+        Log.d(TAG, "Phase transition check: previous='$previousPhase', current='$currentPhase', isTransition=$isPhaseTransition")
         
         if (isPhaseTransition) {
             // New phase - show popup and sound
-            Log.d(TAG, "Phase transition detected: $previousPhase -> $currentPhase")
+            Log.i(TAG, "🔊 PHASE TRANSITION DETECTED: $previousPhase -> $currentPhase")
+            Log.i(TAG, "Posting notification WITH ALERT (sound/vibration)")
             postPrayerNotificationWithAlert(prayerName, progress, currentPhase, title, content, detailedMessage)
         } else {
             // Same phase - silent update
-            Log.d(TAG, "Same phase ($currentPhase) - silent update")
+            Log.d(TAG, "🔇 SAME PHASE ($currentPhase) - posting silent update")
             postPrayerNotificationSilent(prayerName, progress, currentPhase, title, content, detailedMessage)
         }
     }
@@ -451,14 +470,25 @@ object PrayerNotificationManager {
         content: String? = null,
         detailedMessage: String? = null
     ) {
+        Log.d(TAG, "=== POSTING ALERT NOTIFICATION ===")
+        Log.d(TAG, "Input parameters:")
+        Log.d(TAG, "  Prayer: $prayerName")
+        Log.d(TAG, "  Progress: $progress%")
+        Log.d(TAG, "  Phase: $phase")
+        Log.d(TAG, "  Title provided: ${title != null}")
+        Log.d(TAG, "  Content provided: ${content != null}")
+        Log.d(TAG, "  Detailed message provided: ${detailedMessage != null}")
+        
         // Use actual prayer data if available, otherwise fall back to generic phase info
         val notificationTitle = title ?: "$prayerName - ${getPhaseTitle(phase)}"
         val notificationContent = content ?: getPhaseDescription(phase)
         val notificationDetailed = detailedMessage ?: getPhaseDescription(phase)
         
-        Log.d(TAG, "🔔 ALERT NOTIFICATION - Phase: $phase")
-        Log.d(TAG, "   📝 Title: '$notificationTitle' (${notificationTitle.length} chars)")
-        Log.d(TAG, "   📝 Content: '$notificationContent' (${notificationContent.length} chars)")
+        Log.d(TAG, "Final notification content:")
+        Log.i(TAG, "🔔 ALERT NOTIFICATION - Phase: $phase")
+        Log.i(TAG, "   📝 Title: '$notificationTitle' (${notificationTitle.length} chars)")
+        Log.i(TAG, "   📝 Content: '$notificationContent' (${notificationContent.length} chars)")
+        Log.d(TAG, "   📝 Detailed: '${notificationDetailed.take(100)}...' (${notificationDetailed.length} chars)")
         Log.d(TAG, "   📝 Detailed: '$notificationDetailed' (${notificationDetailed.length} chars)")
         Log.d(TAG, "   📊 Progress: $progress%")
         
@@ -480,14 +510,26 @@ object PrayerNotificationManager {
         content: String? = null,
         detailedMessage: String? = null
     ) {
+        Log.d(TAG, "=== POSTING SILENT NOTIFICATION ===")
+        Log.d(TAG, "Input parameters:")
+        Log.d(TAG, "  Prayer: $prayerName")
+        Log.d(TAG, "  Progress: $progress%")
+        Log.d(TAG, "  Phase: $phase")
+        Log.d(TAG, "  Title provided: ${title != null}")
+        Log.d(TAG, "  Content provided: ${content != null}")
+        Log.d(TAG, "  Detailed message provided: ${detailedMessage != null}")
+        
         // Use actual prayer data if available, otherwise fall back to generic phase info
         val notificationTitle = title ?: "$prayerName - ${getPhaseDescription(phase)}"
         val notificationContent = content ?: getPhaseDescription(phase)
         val notificationDetailed = detailedMessage ?: getPhaseDescription(phase)
         
+        Log.d(TAG, "Final notification content:")
         Log.d(TAG, "🔇 SILENT NOTIFICATION - Phase: $phase")
         Log.d(TAG, "   📝 Title: '$notificationTitle' (${notificationTitle.length} chars)")
         Log.d(TAG, "   📝 Content: '$notificationContent' (${notificationContent.length} chars)")
+        Log.d(TAG, "   📝 Detailed: '${notificationDetailed.take(100)}...' (${notificationDetailed.length} chars)")
+        Log.d(TAG, "   📊 Progress: $progress%")
         Log.d(TAG, "   📝 Detailed: '$notificationDetailed' (${notificationDetailed.length} chars)")
         Log.d(TAG, "   📊 Progress: $progress%")
         
