@@ -85,32 +85,32 @@ internal val Teal80 = Color(0xFFA2CED9)
 internal val Teal90 = Color(0xFFBEEAF6)
 
 /**
- * Coastal Serenity theme colors - inspired by ocean coastal scenes
- * Features calming blues, seafoam greens, and sandy beiges
+ * Elegant Serenity theme colors - sophisticated palette for prayer and meditation
+ * Features deep forest greens, warm golds, and soft sage tones
  */
-// Ocean Blue Family - Refined elegant blue palette
-internal val OceanBlue10 = Color(0xFF0A1B2E)  // Deep ocean depths
-internal val OceanBlue20 = Color(0xFF1A2F47)  // Dark ocean water
-internal val OceanBlue30 = Color(0xFF2A4560)  // Medium ocean depth  
-internal val OceanBlue40 = Color(0xFF2E5984)  // Rich ocean blue - more vibrant
-internal val OceanBlue80 = Color(0xFF6BB6FF)  // Bright ocean blue - more premium
-internal val OceanBlue90 = Color(0xFFB8DCFF)  // Elegant light blue
+// Forest Green Family - Deep, sophisticated greens
+internal val ForestGreen10 = Color(0xFF0D1B0F)  // Deep forest shadow
+internal val ForestGreen20 = Color(0xFF1A2F1D)  // Dark forest green
+internal val ForestGreen30 = Color(0xFF2E4B32)  // Medium forest green
+internal val ForestGreen40 = Color(0xFF3E5B41)  // Elegant forest green - sophisticated
+internal val ForestGreen80 = Color(0xFF9BB99E)  // Light sage green - calming
+internal val ForestGreen90 = Color(0xFFC8D4CA)  // Pale sage green
 
-// Seafoam Family - Refined seafoam palette
-internal val Seafoam10 = Color(0xFF0F2E2A)    // Deep seafoam
-internal val Seafoam20 = Color(0xFF1F4A43)    // Dark seafoam
-internal val Seafoam30 = Color(0xFF2F685C)    // Medium seafoam
-internal val Seafoam40 = Color(0xFF3B9985)    // Elegant seafoam - more teal
-internal val Seafoam80 = Color(0xFF7BD3C1)    // Premium seafoam
-internal val Seafoam90 = Color(0xFFBDECE1)    // Soft seafoam
+// Warm Gold Family - Elegant metallic accents
+internal val WarmGold10 = Color(0xFF2A1F0A)     // Deep bronze
+internal val WarmGold20 = Color(0xFF4A3B18)     // Dark gold
+internal val WarmGold30 = Color(0xFF6B5526)     // Medium gold
+internal val WarmGold40 = Color(0xFF8B6914)     // Rich warm gold - luxurious
+internal val WarmGold80 = Color(0xFFD4C078)     // Light champagne gold
+internal val WarmGold90 = Color(0xFFE8DFB8)     // Pale golden cream
 
-// Sand Family - Elegant warm accents
-internal val Sand10 = Color(0xFF2B251C)       // Dark sand/rock
-internal val Sand20 = Color(0xFF4A3F2E)       // Medium dark sand
-internal val Sand30 = Color(0xFF6B5943)       // Medium sand
-internal val Sand40 = Color(0xFF9B8269)       // Warm golden sand - more refined
-internal val Sand80 = Color(0xFFE6D7C3)       // Elegant light sand
-internal val Sand90 = Color(0xFFF2ECDE)       // Sophisticated pale sand
+// Soft Sage Family - Peaceful natural tones
+internal val SoftSage10 = Color(0xFF1C1F1A)     // Deep sage shadow
+internal val SoftSage20 = Color(0xFF2F332B)     // Dark sage
+internal val SoftSage30 = Color(0xFF4A523E)     // Medium sage
+internal val SoftSage40 = Color(0xFF5C6B4F)     // Gentle sage - peaceful
+internal val SoftSage80 = Color(0xFFB8C3AC)     // Light sage
+internal val SoftSage90 = Color(0xFFD6DFD0)     // Pale sage cream
 
 // Wave Gray Family - Premium neutral tones
 internal val WaveGray10 = Color(0xFF1C1E20)   // Dark wave shadow
