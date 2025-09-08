@@ -87,7 +87,8 @@ fun CompassProgressIndicator(
     var currentDegree by remember { mutableFloatStateOf(0f) }
     var qiblaDirection by remember { mutableFloatStateOf(0f) } // Direction to Qibla from North
     var userLocation by remember { mutableStateOf<android.location.Location?>(null) }
-    var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_UNRELIABLE) }
+    var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
+    var isInitializing by remember { mutableStateOf(true) }
     
     // SENSOR MANAGEMENT - Exact copy from original CompassActivity
     val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
@@ -100,12 +101,27 @@ fun CompassProgressIndicator(
                 // Get device's magnetic north direction
                 val magneticNorth = Math.round(event!!.values[0]).toFloat()
                 compassDegree = magneticNorth
+                // Mark as no longer initializing once we get sensor data
+                if (isInitializing) {
+                    isInitializing = false
+                }
             }
             
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // Normal sensor accuracy tracking - testing override removed
-                sensorAccuracy = accuracy
+                // Only update accuracy after initialization period to prevent red flicker
+                if (!isInitializing) {
+                    sensorAccuracy = accuracy
+                }
             }
+        }
+    }
+    
+    // INITIALIZATION DELAY - Prevent red flicker on refresh
+    LaunchedEffect(Unit) {
+        // Allow sensor to initialize properly before showing accuracy colors
+        kotlinx.coroutines.delay(800) // 800ms delay
+        if (isInitializing) {
+            isInitializing = false
         }
     }
     
@@ -209,8 +225,8 @@ fun CompassProgressIndicator(
         else -> "Move in Figure-8 Pattern" // UNRELIABLE
     }
     
-    val accuracyColor = getAccuracyColor(sensorAccuracy)
-    val needsCalibration = sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
+    val accuracyColor = if (isInitializing) Color(0xFF10B981) else getAccuracyColor(sensorAccuracy)
+    val needsCalibration = !isInitializing && sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
     
     // ENHANCED DESIGN - Better Qibla identification with accuracy feedback
     Box(
