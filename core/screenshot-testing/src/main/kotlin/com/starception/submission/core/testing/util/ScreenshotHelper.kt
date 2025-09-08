@@ -47,6 +47,7 @@ import com.google.android.apps.common.testing.accessibility.framework.Accessibil
 import com.google.android.apps.common.testing.accessibility.framework.integrations.espresso.AccessibilityViewCheckException
 import com.google.android.apps.common.testing.accessibility.framework.utils.contrast.BitmapImage
 import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.model.data.ThemeBrand
 import org.hamcrest.Matcher
 import org.hamcrest.Matchers
 import org.robolectric.RuntimeEnvironment
@@ -174,7 +175,7 @@ fun <A : ComponentActivity> AndroidComposeTestRule<ActivityScenarioRule<A>, A>.c
             LocalInspectionMode provides true,
         ) {
             NiaTheme(
-                androidTheme = androidTheme,
+                themeBrand = if (androidTheme) ThemeBrand.ANDROID else ThemeBrand.DEFAULT,
                 darkTheme = darkMode,
                 disableDynamicTheming = !dynamicTheming,
             ) {

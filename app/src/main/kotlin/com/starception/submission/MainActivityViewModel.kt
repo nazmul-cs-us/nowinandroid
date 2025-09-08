@@ -75,10 +75,7 @@ sealed interface MainActivityUiState {
     data class Success(val userData: UserData) : MainActivityUiState {
         override val shouldDisableDynamicTheming = !userData.useDynamicColor
 
-        override val shouldUseAndroidTheme: Boolean = when (userData.themeBrand) {
-            ThemeBrand.DEFAULT -> false
-            ThemeBrand.ANDROID -> true
-        }
+        override val themeBrand: ThemeBrand = userData.themeBrand
 
         override fun shouldUseDarkTheme(isSystemDarkTheme: Boolean) =
             when (userData.darkThemeConfig) {
@@ -99,9 +96,9 @@ sealed interface MainActivityUiState {
     val shouldDisableDynamicTheming: Boolean get() = true
 
     /**
-     * Returns `true` if the Android theme should be used.
+     * Returns the theme brand to be used.
      */
-    val shouldUseAndroidTheme: Boolean get() = false
+    val themeBrand: ThemeBrand get() = ThemeBrand.DEFAULT
 
     /**
      * Returns `true` if dark theme should be used.

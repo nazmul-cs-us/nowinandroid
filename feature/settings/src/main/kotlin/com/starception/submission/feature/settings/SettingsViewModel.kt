@@ -16,6 +16,7 @@
 
 package com.starception.submission.feature.settings
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.core.data.repository.UserDataRepository
@@ -92,8 +93,10 @@ class SettingsViewModel @Inject constructor(
      * @param themeBrand The new theme brand to apply
      */
     fun updateThemeBrand(themeBrand: ThemeBrand) {
+        Log.d("SettingsViewModel", "updateThemeBrand called with: $themeBrand")
         viewModelScope.launch {
             userDataRepository.setThemeBrand(themeBrand)
+            Log.d("SettingsViewModel", "setThemeBrand completed for: $themeBrand")
         }
     }
 
@@ -108,8 +111,10 @@ class SettingsViewModel @Inject constructor(
      * @param darkThemeConfig The dark theme configuration to apply
      */
     fun updateDarkThemeConfig(darkThemeConfig: DarkThemeConfig) {
+        Log.d("SettingsViewModel", "updateDarkThemeConfig called with: $darkThemeConfig")
         viewModelScope.launch {
             userDataRepository.setDarkThemeConfig(darkThemeConfig)
+            Log.d("SettingsViewModel", "setDarkThemeConfig completed for: $darkThemeConfig")
         }
     }
 

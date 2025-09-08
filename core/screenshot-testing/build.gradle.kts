@@ -31,4 +31,5 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.robolectric)
     implementation(projects.core.designsystem)
+    implementation(projects.core.model)
 }

@@ -42,6 +42,7 @@ class NiaPreferencesDataSource @Inject constructor(
                     ThemeBrandProto.THEME_BRAND_DEFAULT,
                     -> ThemeBrand.DEFAULT
                     ThemeBrandProto.THEME_BRAND_ANDROID -> ThemeBrand.ANDROID
+                    ThemeBrandProto.THEME_BRAND_COASTAL -> ThemeBrand.COASTAL
                 },
                 darkThemeConfig = when (it.darkThemeConfig) {
                     null,
@@ -96,6 +97,7 @@ class NiaPreferencesDataSource @Inject constructor(
                 this.themeBrand = when (themeBrand) {
                     ThemeBrand.DEFAULT -> ThemeBrandProto.THEME_BRAND_DEFAULT
                     ThemeBrand.ANDROID -> ThemeBrandProto.THEME_BRAND_ANDROID
+                    ThemeBrand.COASTAL -> ThemeBrandProto.THEME_BRAND_COASTAL
                 }
             }
         }
