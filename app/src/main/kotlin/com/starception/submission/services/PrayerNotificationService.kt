@@ -172,9 +172,12 @@ class PrayerNotificationService : Service() {
      * - Add new notification features
      */
     private fun startRealPrayerTimeUpdates() {
-        serviceScope.launch {
+        serviceScope.launch(Dispatchers.IO) { // Ensure background thread
             try {
-                Log.d(TAG, "Starting real prayer time updates")
+                Log.d(TAG, "Starting real prayer time updates on background thread")
+                
+                // Add delay to prevent ANR during app startup
+                delay(1000) // Wait 1 second for app initialization
                 
                 // Check if device supports Live Updates
                 if (PrayerNotificationManager.supportsLiveUpdates()) {
@@ -377,9 +380,15 @@ class PrayerNotificationService : Service() {
         return try {
             Log.d(TAG, "=== NOTIFICATION PRAYER DATA DEBUG START ===")
             
-            // Get current location and settings with detailed logging
+            // Get current location and settings with detailed logging (with timeout to prevent ANR)
             Log.d(TAG, "STEP 1: Getting prayer settings from repository...")
-            val settings = prayerSettingsRepository.getSettings()
+            val settings = withTimeoutOrNull(2000L) { // 2 second timeout
+                prayerSettingsRepository.getSettings()
+            }
+            if (settings == null) {
+                Log.w(TAG, "Settings loading timed out, returning null to prevent ANR")
+                return null
+            }
             Log.d(TAG, "Settings retrieved: calculation method=${settings.calculationMethod.name}")
             
             val location = settings.location
@@ -409,17 +418,27 @@ class PrayerNotificationService : Service() {
             Log.d(TAG, "Using location: ${location.getDisplayName()} (${location.latitude}, ${location.longitude})")
             
             val calculationStartTime = System.currentTimeMillis()
-            val prayerTimes = prayerTimeCalculatorService.calculatePrayerTimes(today, location, settings)
+            val prayerTimes = withTimeoutOrNull(3000L) { // 3 second timeout for prayer calculation
+                prayerTimeCalculatorService.calculatePrayerTimes(today, location, settings)
+            }
             val calculationTime = System.currentTimeMillis() - calculationStartTime
             
             if (prayerTimes == null) {
-                Log.e(TAG, "❌ PRAYER CALCULATION FAILED after ${calculationTime}ms")
+                if (calculationTime >= 3000L) {
+                    Log.w(TAG, "❌ PRAYER CALCULATION TIMED OUT after ${calculationTime}ms to prevent ANR")
+                } else {
+                    Log.e(TAG, "❌ PRAYER CALCULATION FAILED after ${calculationTime}ms")
+                }
                 Log.e(TAG, "Location: ${location.getDisplayName()}")
                 Log.e(TAG, "Calculation method: ${settings.calculationMethod.name}")
                 Log.e(TAG, "This indicates:")
-                Log.e(TAG, "  - Astronomical calculation error OR")
-                Log.e(TAG, "  - Invalid coordinates OR")
-                Log.e(TAG, "  - Internal calculation service failure")
+                if (calculationTime >= 3000L) {
+                    Log.e(TAG, "  - Prayer calculation is taking too long (ANR prevention)")
+                } else {
+                    Log.e(TAG, "  - Astronomical calculation error OR")
+                    Log.e(TAG, "  - Invalid coordinates OR")
+                    Log.e(TAG, "  - Internal calculation service failure")
+                }
                 Log.e(TAG, "Notification will use fallback message")
                 return null
             }
@@ -689,15 +708,27 @@ class PrayerNotificationService : Service() {
      */
     private fun calculateNotificationProgress(prayerData: Triple<String, String, String>): Int {
         return try {
-            // Get current location and settings
-            val settings = prayerSettingsRepository.getSettings()
+            // Get current location and settings (with ANR prevention)
+            val settings = runBlocking {
+                withTimeoutOrNull(2000L) { // 2 second timeout
+                    prayerSettingsRepository.getSettings()
+                }
+            }
+            if (settings == null) {
+                Log.w(TAG, "Settings access timed out in calculateNotificationProgress, returning 0")
+                return 0
+            }
             val location = settings.location
             
             if (location == null) return 0
             
-            // Calculate today's prayer times
+            // Calculate today's prayer times (with ANR prevention)
             val today = LocalDate.now()
-            val prayerTimes = prayerTimeCalculatorService.calculatePrayerTimes(today, location, settings)
+            val prayerTimes = runBlocking {
+                withTimeoutOrNull(3000L) { // 3 second timeout
+                    prayerTimeCalculatorService.calculatePrayerTimes(today, location, settings)
+                }
+            }
             
             if (prayerTimes == null) return 0
             

@@ -75,26 +75,34 @@ class PrayerTimesViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PrayerTimesUiState())
     val uiState: StateFlow<PrayerTimesUiState> = _uiState.asStateFlow()
     
-    private val _settings = MutableStateFlow(PrayerSettings()) // Use default settings initially
-    val settings: StateFlow<PrayerSettings> = _settings.asStateFlow()
+    // Connect to repository's settings flow with proper scoping to prevent ANR
+    val settings: StateFlow<PrayerSettings> = settingsRepository.settingsFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Lazily, // Only start when first subscriber appears
+            initialValue = PrayerSettings() // Default settings to prevent blocking
+        )
     
     init {
         // Load cached prayer times first for instant display
         loadCachedPrayerTimes()
         
-        // Load initial settings asynchronously to prevent main thread blocking
-        loadSettingsAsync()
         
-        // Observe settings changes
-        viewModelScope.launch {
+        // Observe settings changes and recalculate prayer times when settings change (async to prevent ANR)
+        viewModelScope.launch(Dispatchers.IO) {
             settingsRepository.settingsFlow.collect { newSettings ->
-                _settings.value = newSettings
+                android.util.Log.d("PrayerTimesViewModel", "Settings changed - Method: ${newSettings.calculationMethod.name}")
+                // Delay to prevent blocking during app startup
+                kotlinx.coroutines.delay(100) 
                 calculatePrayerTimes(showLoading = false, clearLoadingImmediately = true) // Background update, no loading state
             }
         }
         
-        // Calculate fresh prayer times (will update cache if needed)
-        calculatePrayerTimes()
+        // Calculate fresh prayer times (will update cache if needed) - async to prevent ANR during startup
+        viewModelScope.launch(Dispatchers.IO) {
+            kotlinx.coroutines.delay(200) // Extra delay for startup
+            calculatePrayerTimes()
+        }
         
         // Start automatic location updates if GPS is enabled
         startAutomaticLocationUpdates()
@@ -103,19 +111,6 @@ class PrayerTimesViewModel @Inject constructor(
     /**
      * Load settings asynchronously to prevent blocking main thread during ViewModel initialization
      */
-    private fun loadSettingsAsync() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val settings = settingsRepository.getSettings()
-                _settings.value = settings
-                android.util.Log.d("PrayerTimesViewModel", "Settings loaded asynchronously")
-            } catch (e: Exception) {
-                android.util.Log.e("PrayerTimesViewModel", "Error loading settings asynchronously", e)
-                // Provide default settings if loading fails
-                _settings.value = PrayerSettings()
-            }
-        }
-    }
     
     /**
      * Calculates prayer times for today
@@ -127,7 +122,7 @@ class PrayerTimesViewModel @Inject constructor(
             }
             
             try {
-                val currentSettings = _settings.value
+                val currentSettings = settings.value
                 val location = getCurrentLocation(currentSettings)
                 
                 val prayerTimes = prayerCalculatorService.calculatePrayerTimes(date, location, currentSettings)
@@ -166,7 +161,9 @@ class PrayerTimesViewModel @Inject constructor(
      * Updates prayer settings
      */
     fun updateSettings(newSettings: PrayerSettings) {
-        settingsRepository.updateSettings(newSettings)
+        android.util.Log.d("PrayerTimesViewModel", "updateSettings called - Method: ${newSettings.calculationMethod.name}")
+        settingsRepository.updateSettings(newSettings, forceCommit = true) // User-triggered action needs immediate persistence
+        android.util.Log.d("PrayerTimesViewModel", "Repository updateSettings completed")
     }
     
     /**
@@ -200,7 +197,7 @@ class PrayerTimesViewModel @Inject constructor(
                         val locationWithDetails = enhancedLocationService.getLocationDetails(androidLocation)
                         
                         // Update settings with new location
-                        val updatedSettings = _settings.value.copy(
+                        val updatedSettings = settings.value.copy(
                             location = locationWithDetails,
                             useGpsLocation = true
                         )
@@ -323,12 +320,12 @@ class PrayerTimesViewModel @Inject constructor(
                     settingsRepository.clearPrayerTimesCache()
                     
                     // If using GPS, get fresh location first
-                    if (_settings.value.useGpsLocation && enhancedLocationService.hasLocationPermission()) {
+                    if (settings.value.useGpsLocation && enhancedLocationService.hasLocationPermission()) {
                         val result = enhancedLocationService.getCurrentLocation()
                         result.fold(
                             onSuccess = { androidLocation ->
                                 val newLocation = enhancedLocationService.getLocationDetails(androidLocation)
-                                val updatedSettings = _settings.value.copy(location = newLocation)
+                                val updatedSettings = settings.value.copy(location = newLocation)
                                 updateSettings(updatedSettings)
                             },
                             onFailure = {
@@ -360,12 +357,12 @@ class PrayerTimesViewModel @Inject constructor(
                             settingsRepository.clearPrayerTimesCache()
                             
                             // If using GPS, get fresh location first
-                            if (_settings.value.useGpsLocation && enhancedLocationService.hasLocationPermission()) {
+                            if (settings.value.useGpsLocation && enhancedLocationService.hasLocationPermission()) {
                                 val result = enhancedLocationService.getCurrentLocation()
                                 result.fold(
                                     onSuccess = { androidLocation ->
                                         val newLocation = enhancedLocationService.getLocationDetails(androidLocation)
-                                        val updatedSettings = _settings.value.copy(location = newLocation)
+                                        val updatedSettings = settings.value.copy(location = newLocation)
                                         updateSettings(updatedSettings)
                                     },
                                     onFailure = {
@@ -402,7 +399,7 @@ class PrayerTimesViewModel @Inject constructor(
                     // Wait 30 minutes between location updates
                     kotlinx.coroutines.delay(30 * 60 * 1000L)
                     
-                    val currentSettings = _settings.value
+                    val currentSettings = settings.value
                     
                     // Only update if GPS is enabled and we have permissions
                     if (currentSettings.useGpsLocation && 
@@ -471,7 +468,7 @@ class PrayerTimesViewModel @Inject constructor(
     private fun loadCachedPrayerTimes() {
         val cachedPrayerTimes = settingsRepository.getCachedPrayerTimes()
         cachedPrayerTimes?.let { times ->
-            val currentSettings = _settings.value
+            val currentSettings = settings.value
             val timeUntilNext = prayerCalculatorService.getTimeUntilNextPrayer(times)
             
             _uiState.value = _uiState.value.copy(

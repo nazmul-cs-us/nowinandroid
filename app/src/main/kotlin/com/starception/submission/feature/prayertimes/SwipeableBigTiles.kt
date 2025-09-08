@@ -77,8 +77,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -497,6 +496,7 @@ fun SwipeableBigTiles(
     getSmartTitle: () -> String,
     getSmartContent: () -> String,
     getSmartFooter: () -> String,
+    getTimeSinceAsr: () -> String,
     getPrayerProgress: () -> Pair<Int, Int>,
     getDailyStatsTitle: () -> String,
     getDailyStatsMessage: () -> String,
@@ -529,6 +529,7 @@ fun SwipeableBigTiles(
                     getPrayerStatus = getPrayerStatus,
                     getPrayerTimeDisplay = getPrayerTimeDisplay,
                     getTimeUntilNextPrayer = getTimeUntilNextPrayer,
+                    getTimeSinceAsr = getTimeSinceAsr,
                     onCompassClick = onCompassClick
                 )
                 1 -> SmartInfoTile(
@@ -613,6 +614,7 @@ private fun NextPrayerTile(
     getPrayerStatus: (String) -> String,
     getPrayerTimeDisplay: (String) -> String,
     getTimeUntilNextPrayer: () -> String,
+    getTimeSinceAsr: () -> String,
     onCompassClick: () -> Unit
 ) {
     val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
@@ -683,6 +685,24 @@ private fun NextPrayerTile(
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
+                            
+                            // Time since Asr prayer (memoized to prevent ANRs)
+                            val timeSinceAsr = remember(prayerTimes) { 
+                                try {
+                                    getTimeSinceAsr()
+                                } catch (e: Exception) {
+                                    ""
+                                }
+                            }
+                            if (timeSinceAsr.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = timeSinceAsr,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         } else if (prayerTimes != null) {
                             // Show Fajr as fallback when no current/next prayer is found
                             Text(
@@ -836,6 +856,7 @@ private fun SmartInfoTile(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                    
                     
                     // Current date for context
                     Text(

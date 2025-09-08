@@ -107,7 +107,7 @@ class PrayerSettingsRepository @Inject constructor(
         .filterNotNull()  // Only emit when settings are loaded
         .stateIn(
             scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-            started = SharingStarted.Eagerly, // Load settings immediately for fast app startup
+            started = SharingStarted.Lazily, // Load settings when first subscriber connects (prevents ANR)
             initialValue = getDefaultSettings()  // Default settings while loading
         )
     
@@ -116,7 +116,19 @@ class PrayerSettingsRepository @Inject constructor(
     init {
         // Load settings in background to avoid StrictMode violations and main thread blocking
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
-            _settingsFlow.value = loadSettings()  // Loads from SharedPreferences on background thread
+            try {
+                // Add timeout to prevent ANR if SharedPreferences access hangs
+                kotlinx.coroutines.withTimeoutOrNull(5000L) { // 5 second timeout
+                    _settingsFlow.value = loadSettings()
+                } ?: run {
+                    // If timeout occurs, use default settings to prevent ANR
+                    android.util.Log.w("PrayerSettingsRepository", "Settings loading timed out, using defaults")
+                    _settingsFlow.value = getDefaultSettings()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("PrayerSettingsRepository", "Error loading settings, using defaults", e)
+                _settingsFlow.value = getDefaultSettings()
+            }
         }
     }
     
@@ -155,10 +167,11 @@ class PrayerSettingsRepository @Inject constructor(
      * receive the update, even if they're subscribed differently.
      * 
      * @param settings The new settings to save and apply
+     * @param forceCommit Whether to use synchronous commit() for immediate persistence
      */
-    fun updateSettings(settings: PrayerSettings) {
-        android.util.Log.d("PrayerSettingsRepository", "Updating settings - ASR: ${settings.asrMadhhab}")
-        saveSettings(settings)
+    fun updateSettings(settings: PrayerSettings, forceCommit: Boolean = false) {
+        android.util.Log.d("PrayerSettingsRepository", "Updating settings - ASR: ${settings.asrMadhhab}, forceCommit: $forceCommit")
+        saveSettings(settings, forceCommit)
         _settingsFlow.value = settings
         // Force trigger flow for UI updates
         _settingsFlow.tryEmit(settings)
@@ -379,8 +392,8 @@ class PrayerSettingsRepository @Inject constructor(
      * 
      * @param settings The settings to save to persistent storage
      */
-    private fun saveSettings(settings: PrayerSettings) {
-        android.util.Log.d("PrayerSettingsRepository", "Saving settings - ASR: ${settings.asrMadhhab.name}")
+    private fun saveSettings(settings: PrayerSettings, forceCommit: Boolean = true) {
+        android.util.Log.d("PrayerSettingsRepository", "Saving settings - ASR: ${settings.asrMadhhab.name}, forceCommit: $forceCommit")
         prefs.edit().apply {
             putString(KEY_CALCULATION_METHOD, settings.calculationMethod.name)
             putString(KEY_ASR_MADHHAB, settings.asrMadhhab.name)
@@ -415,9 +428,14 @@ class PrayerSettingsRepository @Inject constructor(
                 remove(KEY_MANUAL_TIMEZONE_OFFSET)
             }
             
-            apply()
+            if (forceCommit) {
+                commit() // Use commit() for immediate synchronous write when persistence is critical
+            } else {
+                apply() // Use apply() for async write when immediate persistence is not required
+            }
         }.also {
-            android.util.Log.d("PrayerSettingsRepository", "Settings saved to SharedPreferences - ASR: ${settings.asrMadhhab.name}")
+            val method = if (forceCommit) "committed synchronously" else "applied asynchronously"
+            android.util.Log.d("PrayerSettingsRepository", "Settings $method to SharedPreferences - ASR: ${settings.asrMadhhab.name}")
         }
     }
     
@@ -435,7 +453,7 @@ class PrayerSettingsRepository @Inject constructor(
      * WARNING: This action is irreversible!
      */
     fun resetToDefaults() {
-        prefs.edit().clear().apply()
+        prefs.edit().clear().apply() // Use apply() - reset is usually not time-critical during startup
         _settingsFlow.value = loadSettings()
     }
     
@@ -498,7 +516,7 @@ class PrayerSettingsRepository @Inject constructor(
             putString(KEY_CACHED_LOCATION_COUNTRY, prayerTimes.location.country)
             putFloat(KEY_CACHED_LOCATION_TIMEZONE, prayerTimes.location.timeZoneOffset.toFloat())
             
-            apply()
+            apply() // Use apply() for cache - no need for immediate synchronous write during startup
         }
     }
     

@@ -69,6 +69,7 @@ package com.starception.submission.feature.prayertimes
 import com.starception.submission.prayer.model.DayPrayerTimes
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import java.time.Duration
 
 object SmartContentUtils {
     
@@ -142,6 +143,58 @@ object SmartContentUtils {
             remaining == 1 -> "1 prayer remaining today"
             remaining > 1 -> "$remaining prayers remaining today"
             else -> "Ready to begin the day with prayer"
+        }
+    }
+    
+    /**
+     * Calculate minutes since Asr prayer (optimized to prevent ANRs)
+     * Returns positive if Asr has passed, negative if Asr is upcoming, null if no prayer times
+     */
+    fun getMinutesSinceAsr(
+        prayerTimes: DayPrayerTimes?,
+        currentTime: LocalTime
+    ): Int? {
+        return try {
+            val times = prayerTimes ?: return null
+            
+            // Calculate duration from Asr to current time with error handling
+            val duration = Duration.between(times.asr, currentTime)
+            val minutes = duration.toMinutes().toInt()
+            
+            // Limit to reasonable range to prevent display issues
+            return when {
+                minutes < -720 -> null // More than 12 hours before Asr - don't show
+                minutes > 720 -> null  // More than 12 hours after Asr - don't show
+                else -> minutes
+            }
+        } catch (e: Exception) {
+            null // Return null on any error
+        }
+    }
+    
+    /**
+     * Format minutes since Asr for display (optimized to prevent ANRs)
+     */
+    fun formatTimeSinceAsr(minutesSinceAsr: Int?): String {
+        // Return empty string if calculation fails to prevent ANRs
+        return try {
+            when {
+                minutesSinceAsr == null -> ""
+                minutesSinceAsr == 0 -> "Just now"
+                minutesSinceAsr < 0 -> "Asr in ${-minutesSinceAsr}m"
+                minutesSinceAsr < 60 -> "${minutesSinceAsr}m since Asr"
+                else -> {
+                    val hours = minutesSinceAsr / 60
+                    val remainingMinutes = minutesSinceAsr % 60
+                    when {
+                        remainingMinutes == 0 -> "${hours}h since Asr"
+                        hours == 1 -> "1h ${remainingMinutes}m since Asr"
+                        else -> "${hours}h ${remainingMinutes}m since Asr"
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            "" // Return empty on any error to prevent crashes
         }
     }
 }
