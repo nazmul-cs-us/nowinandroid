@@ -162,67 +162,67 @@ val DarkAndroidColorScheme = darkColorScheme(
 )
 
 /**
- * Light Coastal theme color scheme - inspired by ocean coastal scenes
+ * Light Elegant theme color scheme - sophisticated and peaceful for prayer times
  */
 @VisibleForTesting
 val LightCoastalColorScheme = lightColorScheme(
-    primary = OceanBlue40,
+    primary = ForestGreen40,
     onPrimary = Color.White,
-    primaryContainer = OceanBlue90,
-    onPrimaryContainer = OceanBlue10,
-    secondary = Seafoam40,
+    primaryContainer = ForestGreen90,
+    onPrimaryContainer = ForestGreen10,
+    secondary = WarmGold40,
     onSecondary = Color.White,
-    secondaryContainer = Seafoam90,
-    onSecondaryContainer = Seafoam10,
-    tertiary = Sand40,
+    secondaryContainer = WarmGold90,
+    onSecondaryContainer = WarmGold10,
+    tertiary = SoftSage40,
     onTertiary = Color.White,
-    tertiaryContainer = Sand90,
-    onTertiaryContainer = Sand10,
+    tertiaryContainer = SoftSage90,
+    onTertiaryContainer = SoftSage10,
     error = Red40,
     onError = Color.White,
     errorContainer = Red90,
     onErrorContainer = Red10,
-    background = WaveGray99,
-    onBackground = WaveGray10,
-    surface = WaveGray95,
-    onSurface = WaveGray10,
-    surfaceVariant = WaveGray90,
-    onSurfaceVariant = WaveGray30,
-    inverseSurface = WaveGray20,
-    inverseOnSurface = WaveGray95,
-    outline = WaveGray50,
+    background = Color(0xFFFBFCF9),
+    onBackground = ForestGreen10,
+    surface = Color(0xFFF6F8F5),
+    onSurface = ForestGreen10,
+    surfaceVariant = Color(0xFFF0F2EF),
+    onSurfaceVariant = SoftSage30,
+    inverseSurface = ForestGreen20,
+    inverseOnSurface = ForestGreen90,
+    outline = SoftSage40,
 )
 
 /**
- * Dark Coastal theme color scheme - inspired by ocean coastal scenes at night
+ * Dark Elegant theme color scheme - sophisticated dark mode for peaceful reflection
  */
 @VisibleForTesting
 val DarkCoastalColorScheme = darkColorScheme(
-    primary = OceanBlue80,
-    onPrimary = OceanBlue20,
-    primaryContainer = OceanBlue30,
-    onPrimaryContainer = OceanBlue90,
-    secondary = Seafoam80,
-    onSecondary = Seafoam20,
-    secondaryContainer = Seafoam30,
-    onSecondaryContainer = Seafoam90,
-    tertiary = Sand80,
-    onTertiary = Sand20,
-    tertiaryContainer = Sand30,
-    onTertiaryContainer = Sand90,
+    primary = ForestGreen80,
+    onPrimary = ForestGreen10,
+    primaryContainer = ForestGreen30,
+    onPrimaryContainer = ForestGreen90,
+    secondary = WarmGold80,
+    onSecondary = WarmGold10,
+    secondaryContainer = WarmGold30,
+    onSecondaryContainer = WarmGold90,
+    tertiary = SoftSage80,
+    onTertiary = SoftSage10,
+    tertiaryContainer = SoftSage30,
+    onTertiaryContainer = SoftSage90,
     error = Red80,
     onError = Red20,
     errorContainer = Red30,
     onErrorContainer = Red90,
-    background = WaveGray10,
-    onBackground = WaveGray90,
-    surface = WaveGray10,
-    onSurface = WaveGray90,
-    surfaceVariant = WaveGray30,
-    onSurfaceVariant = WaveGray80,
-    inverseSurface = WaveGray90,
-    inverseOnSurface = WaveGray10,
-    outline = WaveGray60,
+    background = Color(0xFF0F130E),
+    onBackground = Color(0xFFF2F4F0),
+    surface = Color(0xFF171B16),
+    onSurface = Color(0xFFF2F4F0),
+    surfaceVariant = Color(0xFF1F241E),
+    onSurfaceVariant = SoftSage80,
+    inverseSurface = ForestGreen90,
+    inverseOnSurface = ForestGreen10,
+    outline = SoftSage40,
 )
 
 /**
@@ -246,24 +246,24 @@ val LightAndroidBackgroundTheme = BackgroundTheme(color = DarkGreenGray95)
 val DarkAndroidBackgroundTheme = BackgroundTheme(color = Color.Black)
 
 /**
- * Light Coastal gradient colors
+ * Light Elegant gradient colors
  */
-val LightCoastalGradientColors = GradientColors(container = Color(0xFFF4F6F8))
+val LightCoastalGradientColors = GradientColors(container = Color(0xFFF8F9F7))
 
 /**
- * Dark Coastal gradient colors
+ * Dark Elegant gradient colors
  */
-val DarkCoastalGradientColors = GradientColors(container = WaveGray10)
+val DarkCoastalGradientColors = GradientColors(container = Color(0xFF0F130E))
 
 /**
- * Light Coastal background theme
+ * Light Elegant background theme
  */
-val LightCoastalBackgroundTheme = BackgroundTheme(color = Color(0xFFF8FAFB))
+val LightCoastalBackgroundTheme = BackgroundTheme(color = Color(0xFFFBFCF9))
 
 /**
- * Dark Coastal background theme
+ * Dark Elegant background theme
  */
-val DarkCoastalBackgroundTheme = BackgroundTheme(color = WaveGray10)
+val DarkCoastalBackgroundTheme = BackgroundTheme(color = Color(0xFF0F130E))
 
 /**
  * Now in Android theme with support for multiple theme brands.
