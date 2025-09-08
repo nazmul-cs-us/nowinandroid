@@ -616,6 +616,7 @@ fun PrayerTimesScreen(
                     getSmartTitle = { SmartContentUtils.getSmartTitle(currentTime) },
                     getSmartContent = { SmartContentUtils.getSmartContent(currentTime) },
                     getSmartFooter = { SmartContentUtils.getSmartFooter(PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes), PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes)) },
+                    getTimeSinceAsr = { SmartContentUtils.formatTimeSinceAsr(SmartContentUtils.getMinutesSinceAsr(prayerTimes, currentTime)) },
                     getPrayerProgress = { SmartContentUtils.getPrayerProgress(prayerTimes, currentTime) },
                     getDailyStatsTitle = { 
                         val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)

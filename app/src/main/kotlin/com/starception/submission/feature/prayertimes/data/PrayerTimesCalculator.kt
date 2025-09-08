@@ -307,8 +307,8 @@ class PrayerTimesCalculator(private val context: Context) {
                 
                 if (shouldSaveLocation) {
                     android.util.Log.d("PrayerCalculation", "Saving GPS location to settings: ${location.getDisplayName()}")
-                    settingsRepository.updateSettings(userSettings.copy(location = location))
-                    android.util.Log.d("PrayerCalculation", "✓ Location saved to settings - notification service can now access it")
+                    settingsRepository.updateSettings(userSettings.copy(location = location), forceCommit = false)
+                    android.util.Log.d("PrayerCalculation", "✓ Location saved to settings (async) - notification service can now access it")
                 } else {
                     android.util.Log.d("PrayerCalculation", "Using existing saved location from settings: ${location.getDisplayName()}")
                 }
