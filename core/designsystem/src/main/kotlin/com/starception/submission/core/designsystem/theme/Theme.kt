@@ -31,6 +31,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.model.data.ThemeBrand
 
 /**
  * Light default theme color scheme
@@ -161,6 +162,70 @@ val DarkAndroidColorScheme = darkColorScheme(
 )
 
 /**
+ * Light Coastal theme color scheme - inspired by ocean coastal scenes
+ */
+@VisibleForTesting
+val LightCoastalColorScheme = lightColorScheme(
+    primary = OceanBlue40,
+    onPrimary = Color.White,
+    primaryContainer = OceanBlue90,
+    onPrimaryContainer = OceanBlue10,
+    secondary = Seafoam40,
+    onSecondary = Color.White,
+    secondaryContainer = Seafoam90,
+    onSecondaryContainer = Seafoam10,
+    tertiary = Sand40,
+    onTertiary = Color.White,
+    tertiaryContainer = Sand90,
+    onTertiaryContainer = Sand10,
+    error = Red40,
+    onError = Color.White,
+    errorContainer = Red90,
+    onErrorContainer = Red10,
+    background = WaveGray99,
+    onBackground = WaveGray10,
+    surface = WaveGray95,
+    onSurface = WaveGray10,
+    surfaceVariant = WaveGray90,
+    onSurfaceVariant = WaveGray30,
+    inverseSurface = WaveGray20,
+    inverseOnSurface = WaveGray95,
+    outline = WaveGray50,
+)
+
+/**
+ * Dark Coastal theme color scheme - inspired by ocean coastal scenes at night
+ */
+@VisibleForTesting
+val DarkCoastalColorScheme = darkColorScheme(
+    primary = OceanBlue80,
+    onPrimary = OceanBlue20,
+    primaryContainer = OceanBlue30,
+    onPrimaryContainer = OceanBlue90,
+    secondary = Seafoam80,
+    onSecondary = Seafoam20,
+    secondaryContainer = Seafoam30,
+    onSecondaryContainer = Seafoam90,
+    tertiary = Sand80,
+    onTertiary = Sand20,
+    tertiaryContainer = Sand30,
+    onTertiaryContainer = Sand90,
+    error = Red80,
+    onError = Red20,
+    errorContainer = Red30,
+    onErrorContainer = Red90,
+    background = WaveGray10,
+    onBackground = WaveGray90,
+    surface = WaveGray10,
+    onSurface = WaveGray90,
+    surfaceVariant = WaveGray30,
+    onSurfaceVariant = WaveGray80,
+    inverseSurface = WaveGray90,
+    inverseOnSurface = WaveGray10,
+    outline = WaveGray60,
+)
+
+/**
  * Light Android gradient colors
  */
 val LightAndroidGradientColors = GradientColors(container = DarkGreenGray95)
@@ -181,30 +246,54 @@ val LightAndroidBackgroundTheme = BackgroundTheme(color = DarkGreenGray95)
 val DarkAndroidBackgroundTheme = BackgroundTheme(color = Color.Black)
 
 /**
- * Now in Android theme.
+ * Light Coastal gradient colors
+ */
+val LightCoastalGradientColors = GradientColors(container = Color(0xFFF4F6F8))
+
+/**
+ * Dark Coastal gradient colors
+ */
+val DarkCoastalGradientColors = GradientColors(container = WaveGray10)
+
+/**
+ * Light Coastal background theme
+ */
+val LightCoastalBackgroundTheme = BackgroundTheme(color = Color(0xFFF8FAFB))
+
+/**
+ * Dark Coastal background theme
+ */
+val DarkCoastalBackgroundTheme = BackgroundTheme(color = WaveGray10)
+
+/**
+ * Now in Android theme with support for multiple theme brands.
  *
  * @param darkTheme Whether the theme should use a dark color scheme (follows system by default).
- * @param androidTheme Whether the theme should use the Android theme color scheme instead of the
- *        default theme.
+ * @param themeBrand Which theme brand to use:
+ *        - DEFAULT: Custom purple/orange theme
+ *        - ANDROID: Green-based Android theme  
+ *        - COASTAL: Ocean-inspired blue/seafoam theme
  * @param disableDynamicTheming If `true`, disables the use of dynamic theming, even when it is
- *        supported. This parameter has no effect if [androidTheme] is `true`.
+ *        supported. This parameter has no effect if [themeBrand] is not DEFAULT.
  */
 @Composable
 fun NiaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    androidTheme: Boolean = false,
+    themeBrand: ThemeBrand = ThemeBrand.DEFAULT,
     disableDynamicTheming: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     // Color scheme
-    val colorScheme = when {
-        androidTheme -> if (darkTheme) DarkAndroidColorScheme else LightAndroidColorScheme
-        !disableDynamicTheming && supportsDynamicTheming() -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    val colorScheme = when (themeBrand) {
+        ThemeBrand.DEFAULT -> when {
+            !disableDynamicTheming && supportsDynamicTheming() -> {
+                val context = LocalContext.current
+                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            }
+            else -> if (darkTheme) DarkDefaultColorScheme else LightDefaultColorScheme
         }
-
-        else -> if (darkTheme) DarkDefaultColorScheme else LightDefaultColorScheme
+        ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidColorScheme else LightAndroidColorScheme
+        ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalColorScheme else LightCoastalColorScheme
     }
     // Gradient colors
     val emptyGradientColors = GradientColors(container = colorScheme.surfaceColorAtElevation(2.dp))
@@ -213,24 +302,31 @@ fun NiaTheme(
         bottom = colorScheme.primaryContainer,
         container = colorScheme.surface,
     )
-    val gradientColors = when {
-        androidTheme -> if (darkTheme) DarkAndroidGradientColors else LightAndroidGradientColors
-        !disableDynamicTheming && supportsDynamicTheming() -> emptyGradientColors
-        else -> defaultGradientColors
+    val gradientColors = when (themeBrand) {
+        ThemeBrand.DEFAULT -> when {
+            !disableDynamicTheming && supportsDynamicTheming() -> emptyGradientColors
+            else -> defaultGradientColors
+        }
+        ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidGradientColors else LightAndroidGradientColors
+        ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalGradientColors else LightCoastalGradientColors
     }
     // Background theme
     val defaultBackgroundTheme = BackgroundTheme(
         color = colorScheme.surface,
         tonalElevation = 2.dp,
     )
-    val backgroundTheme = when {
-        androidTheme -> if (darkTheme) DarkAndroidBackgroundTheme else LightAndroidBackgroundTheme
-        else -> defaultBackgroundTheme
+    val backgroundTheme = when (themeBrand) {
+        ThemeBrand.DEFAULT -> defaultBackgroundTheme
+        ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidBackgroundTheme else LightAndroidBackgroundTheme
+        ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalBackgroundTheme else LightCoastalBackgroundTheme
     }
-    val tintTheme = when {
-        androidTheme -> TintTheme()
-        !disableDynamicTheming && supportsDynamicTheming() -> TintTheme(colorScheme.primary)
-        else -> TintTheme()
+    val tintTheme = when (themeBrand) {
+        ThemeBrand.DEFAULT -> when {
+            !disableDynamicTheming && supportsDynamicTheming() -> TintTheme(colorScheme.primary)
+            else -> TintTheme()
+        }
+        ThemeBrand.ANDROID -> TintTheme()
+        ThemeBrand.COASTAL -> TintTheme()
     }
     // Composition locals
     CompositionLocalProvider(
@@ -245,6 +341,7 @@ fun NiaTheme(
         )
     }
 }
+
 
 @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
 fun supportsDynamicTheming() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S

@@ -83,3 +83,42 @@ internal val Teal30 = Color(0xFF214D56)
 internal val Teal40 = Color(0xFF3A656F)
 internal val Teal80 = Color(0xFFA2CED9)
 internal val Teal90 = Color(0xFFBEEAF6)
+
+/**
+ * Coastal Serenity theme colors - inspired by ocean coastal scenes
+ * Features calming blues, seafoam greens, and sandy beiges
+ */
+// Ocean Blue Family - Refined elegant blue palette
+internal val OceanBlue10 = Color(0xFF0A1B2E)  // Deep ocean depths
+internal val OceanBlue20 = Color(0xFF1A2F47)  // Dark ocean water
+internal val OceanBlue30 = Color(0xFF2A4560)  // Medium ocean depth  
+internal val OceanBlue40 = Color(0xFF2E5984)  // Rich ocean blue - more vibrant
+internal val OceanBlue80 = Color(0xFF6BB6FF)  // Bright ocean blue - more premium
+internal val OceanBlue90 = Color(0xFFB8DCFF)  // Elegant light blue
+
+// Seafoam Family - Refined seafoam palette
+internal val Seafoam10 = Color(0xFF0F2E2A)    // Deep seafoam
+internal val Seafoam20 = Color(0xFF1F4A43)    // Dark seafoam
+internal val Seafoam30 = Color(0xFF2F685C)    // Medium seafoam
+internal val Seafoam40 = Color(0xFF3B9985)    // Elegant seafoam - more teal
+internal val Seafoam80 = Color(0xFF7BD3C1)    // Premium seafoam
+internal val Seafoam90 = Color(0xFFBDECE1)    // Soft seafoam
+
+// Sand Family - Elegant warm accents
+internal val Sand10 = Color(0xFF2B251C)       // Dark sand/rock
+internal val Sand20 = Color(0xFF4A3F2E)       // Medium dark sand
+internal val Sand30 = Color(0xFF6B5943)       // Medium sand
+internal val Sand40 = Color(0xFF9B8269)       // Warm golden sand - more refined
+internal val Sand80 = Color(0xFFE6D7C3)       // Elegant light sand
+internal val Sand90 = Color(0xFFF2ECDE)       // Sophisticated pale sand
+
+// Wave Gray Family - Premium neutral tones
+internal val WaveGray10 = Color(0xFF1C1E20)   // Dark wave shadow
+internal val WaveGray20 = Color(0xFF2F3133)   // Medium dark gray
+internal val WaveGray30 = Color(0xFF424547)   // Medium gray
+internal val WaveGray50 = Color(0xFF707578)   // Neutral gray
+internal val WaveGray60 = Color(0xFF8A8E91)   // Light medium gray
+internal val WaveGray80 = Color(0xFFC4C7CA)   // Premium light gray
+internal val WaveGray90 = Color(0xFFE4E6E9)   // Elegant very light gray
+internal val WaveGray95 = Color(0xFFF2F4F6)   // Sophisticated near white
+internal val WaveGray99 = Color(0xFFFAFBFC)   // Pure coastal white

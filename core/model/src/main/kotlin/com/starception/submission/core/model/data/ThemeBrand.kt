@@ -19,4 +19,5 @@ package com.starception.submission.core.model.data
 enum class ThemeBrand {
     DEFAULT,
     ANDROID,
+    COASTAL,
 }

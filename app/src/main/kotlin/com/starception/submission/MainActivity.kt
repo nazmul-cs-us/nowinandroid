@@ -48,6 +48,7 @@ import com.starception.submission.core.data.repository.UserNewsResourceRepositor
 import com.starception.submission.core.data.util.NetworkMonitor
 import com.starception.submission.core.data.util.TimeZoneMonitor
 import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.ui.LocalTimeZone
 import com.starception.submission.ui.NiaApp
 import com.starception.submission.ui.rememberNiaAppState
@@ -165,14 +166,24 @@ class MainActivity : FragmentActivity() {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val isSystemDarkTheme = resources.configuration.isSystemInDarkTheme
             
+            // Debug logging
+            when (uiState) {
+                is MainActivityUiState.Success -> {
+                    Log.d("MainActivity", "Theme state - Brand: ${uiState.themeBrand}, DarkTheme: ${uiState.shouldUseDarkTheme(isSystemDarkTheme)}, DynamicColor: ${!uiState.shouldDisableDynamicTheming}")
+                }
+                is MainActivityUiState.Loading -> {
+                    Log.d("MainActivity", "Theme state - Loading with defaults")
+                }
+            }
+            
             NiaTheme(
                 darkTheme = when (uiState) {
                     is MainActivityUiState.Success -> uiState.shouldUseDarkTheme(isSystemDarkTheme)
                     is MainActivityUiState.Loading -> isSystemDarkTheme
                 },
-                androidTheme = when (uiState) {
-                    is MainActivityUiState.Success -> uiState.shouldUseAndroidTheme
-                    is MainActivityUiState.Loading -> false
+                themeBrand = when (uiState) {
+                    is MainActivityUiState.Success -> uiState.themeBrand
+                    is MainActivityUiState.Loading -> ThemeBrand.DEFAULT
                 },
                 disableDynamicTheming = when (uiState) {
                     is MainActivityUiState.Success -> uiState.shouldDisableDynamicTheming

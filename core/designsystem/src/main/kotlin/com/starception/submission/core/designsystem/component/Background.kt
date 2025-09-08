@@ -38,6 +38,7 @@ import com.starception.submission.core.designsystem.theme.GradientColors
 import com.starception.submission.core.designsystem.theme.LocalBackgroundTheme
 import com.starception.submission.core.designsystem.theme.LocalGradientColors
 import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.model.data.ThemeBrand
 import kotlin.math.tan
 
 /**
@@ -166,7 +167,7 @@ fun BackgroundDynamic() {
 @ThemePreviews
 @Composable
 fun BackgroundAndroid() {
-    NiaTheme(androidTheme = true) {
+    NiaTheme(themeBrand = ThemeBrand.ANDROID) {
         NiaBackground(Modifier.size(100.dp), content = {})
     }
 }
@@ -190,7 +191,7 @@ fun GradientBackgroundDynamic() {
 @ThemePreviews
 @Composable
 fun GradientBackgroundAndroid() {
-    NiaTheme(androidTheme = true) {
+    NiaTheme(themeBrand = ThemeBrand.ANDROID) {
         NiaGradientBackground(Modifier.size(100.dp), content = {})
     }
 }
