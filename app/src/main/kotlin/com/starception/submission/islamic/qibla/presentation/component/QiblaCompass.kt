@@ -36,17 +36,15 @@ import kotlin.math.*
  * Islamic Qibla Compass Component
  * 
  * A modern Islamic compass that shows the direction to Mecca (Qibla) for prayer.
- * Combines prayer time countdown with accurate Qibla direction indicator using device sensors.
+ * Provides accurate Qibla direction indicator using device sensors.
  * 
  * ## Key Features:
  * - **Qibla Direction**: 10% circular arc pointing toward Mecca
- * - **Prayer Time Display**: Shows remaining time until next prayer
  * - **Islamic Theming**: Green color scheme with 🕋 Kaaba emoji
  * - **Real-time Updates**: Responds to device orientation via magnetometer
  * - **Material 3 Design**: Clean, modern Islamic UI design
  * 
  * @param progress Prayer time progress (for future use)
- * @param timeText Time remaining until next prayer (e.g., "2h 57m")
  * @param modifier Modifier for styling
  * @param size Compass size (default: 88.dp, recommended: 120.dp+)
  * @param locationService Enhanced location service for GPS and Qibla calculations
@@ -54,7 +52,6 @@ import kotlin.math.*
 @Composable
 fun QiblaCompass(
     progress: Float,
-    timeText: String,
     modifier: Modifier = Modifier,
     size: Dp = 88.dp,
     locationService: EnhancedLocationService? = null
@@ -238,18 +235,6 @@ fun QiblaCompass(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Time display
-                Text(
-                    text = timeText,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.Black.copy(alpha = 0.9f),
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = if (size >= 280.dp) 22.sp else 16.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
                 // Qibla direction with Kaaba emoji
                 Text(
                     text = "🕋 Qibla",
@@ -257,8 +242,7 @@ fun QiblaCompass(
                     color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981),
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = if (size >= 280.dp) 16.sp else 12.sp,
-                    modifier = Modifier.padding(top = 4.dp)
+                    fontSize = if (size >= 280.dp) 16.sp else 12.sp
                 )
                 
                 // Guidance text for larger compasses

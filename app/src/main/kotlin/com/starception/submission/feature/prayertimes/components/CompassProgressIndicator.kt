@@ -73,7 +73,6 @@ import kotlin.math.*
 @Composable
 fun CompassProgressIndicator(
     progress: Float,
-    timeText: String,
     modifier: Modifier = Modifier,
     size: androidx.compose.ui.unit.Dp = 88.dp,
     locationService: EnhancedLocationService? = null
@@ -288,18 +287,6 @@ fun CompassProgressIndicator(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Main time display - larger text for better visibility
-                Text(
-                    text = timeText,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.Black.copy(alpha = 0.9f),
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = if (size >= 280.dp) 22.sp else 16.sp, // Even larger in popup
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
                 // Qibla direction with Kaaba emoji and sensor status
                 Text(
                     text = "🕋 Qibla",
@@ -308,7 +295,6 @@ fun CompassProgressIndicator(
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = if (size >= 280.dp) 16.sp else 12.sp, // Larger in popup
-                    modifier = Modifier.padding(top = 4.dp)
                 )
                 
                 // Guidance text for popup - only show when compass is large enough

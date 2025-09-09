@@ -215,7 +215,6 @@ private fun NextPrayerCard(
             // Qibla compass
             QiblaCompass(
                 progress = 0f,
-                timeText = timeUntilNext ?: "",
                 size = 120.dp,
                 locationService = locationService
             )

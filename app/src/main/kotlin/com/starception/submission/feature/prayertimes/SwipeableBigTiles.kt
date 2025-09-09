@@ -664,7 +664,77 @@ private fun NextPrayerTile(
                             .weight(1f)
                             .padding(end = 16.dp) // Add space between text and compass
                     ) {
-                        if (mainPrayer != null) {
+                        // Get notification-synchronized content
+                        val currentTime = remember { LocalTime.now() }
+                        val syncContent = remember(prayerTimes, currentTime) {
+                            SmartContentUtils.getNotificationSyncContent(prayerTimes, currentTime)
+                        }
+                        
+                        if (syncContent != null) {
+                            // Optimized dynamic layout with visually balanced spacing
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                // Prayer phase title - accurate length-based sizing  
+                                Text(
+                                    text = syncContent.title,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontSize = when {
+                                            syncContent.title.length >= 25 -> 13.sp // "Best Time to Pray Maghrib" (25 chars)
+                                            syncContent.title.length >= 23 -> 14.sp // "Go to Mosque for Maghrib" (23 chars)
+                                            syncContent.title.length >= 20 -> 15.sp // "Best Time to Pray Fajr" (22 chars)
+                                            else -> 16.sp // "Make Time for Fajr" (18 chars)
+                                        }
+                                    ),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                // Main prayer time - very conservative font sizes
+                                Text(
+                                    text = syncContent.content,
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontSize = when {
+                                            syncContent.content.length >= 20 -> 14.sp // "12h 59m since Maghrib" (20 chars)
+                                            syncContent.content.length >= 19 -> 15.sp // "1h 30m since Maghrib" (19 chars)
+                                            syncContent.content.length >= 16 -> 16.sp // "59m since Maghrib" (16 chars)
+                                            syncContent.content.length >= 13 -> 18.sp // "30m since Asr" (13 chars)
+                                            else -> 20.sp // "5m since Asr" (12 chars)
+                                        }
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                
+                                if (syncContent.nextPrayerInfo.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = syncContent.nextPrayerInfo,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = when {
+                                                syncContent.nextPrayerInfo.length > 22 -> 14.sp // "Next • Maghrib in 12h 59m"
+                                                syncContent.nextPrayerInfo.length > 18 -> 15.sp // "Next • Maghrib in 2h 9m"
+                                                else -> 16.sp // Shorter next prayer info
+                                            }
+                                        ),
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        fontWeight = FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        } else if (mainPrayer != null) {
+                            // Fallback to legacy display if sync fails
                             Text(
                                 text = mainPrayer.first,
                                 style = MaterialTheme.typography.headlineMedium,
@@ -686,26 +756,6 @@ private fun NextPrayerTile(
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
-                            
-                            // Time since current prayer (memoized to prevent ANRs)
-                            val timeSinceCurrentPrayer = remember(prayerTimes) { 
-                                try {
-                                    getTimeSinceCurrentPrayer()
-                                } catch (e: Exception) {
-                                    ""
-                                }
-                            }
-                            if (timeSinceCurrentPrayer.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = timeSinceCurrentPrayer,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
                         } else if (prayerTimes != null) {
                             // Show Fajr as fallback when no current/next prayer is found
                             Text(
@@ -740,7 +790,6 @@ private fun NextPrayerTile(
                     ) {
                         CompassProgressIndicator(
                             progress = 0.7f,
-                            timeText = if (mainPrayer != null) getTimeUntilNextPrayer() else "Ready",
                             modifier = Modifier.fillMaxSize(),
                             size = 120.dp,
                             locationService = locationService
