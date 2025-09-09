@@ -71,6 +71,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -496,7 +497,7 @@ fun SwipeableBigTiles(
     getSmartTitle: () -> String,
     getSmartContent: () -> String,
     getSmartFooter: () -> String,
-    getTimeSinceAsr: () -> String,
+    getTimeSinceCurrentPrayer: () -> String,
     getPrayerProgress: () -> Pair<Int, Int>,
     getDailyStatsTitle: () -> String,
     getDailyStatsMessage: () -> String,
@@ -529,7 +530,7 @@ fun SwipeableBigTiles(
                     getPrayerStatus = getPrayerStatus,
                     getPrayerTimeDisplay = getPrayerTimeDisplay,
                     getTimeUntilNextPrayer = getTimeUntilNextPrayer,
-                    getTimeSinceAsr = getTimeSinceAsr,
+                    getTimeSinceCurrentPrayer = getTimeSinceCurrentPrayer,
                     onCompassClick = onCompassClick
                 )
                 1 -> SmartInfoTile(
@@ -614,7 +615,7 @@ private fun NextPrayerTile(
     getPrayerStatus: (String) -> String,
     getPrayerTimeDisplay: (String) -> String,
     getTimeUntilNextPrayer: () -> String,
-    getTimeSinceAsr: () -> String,
+    getTimeSinceCurrentPrayer: () -> String,
     onCompassClick: () -> Unit
 ) {
     val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
@@ -686,21 +687,23 @@ private fun NextPrayerTile(
                                 fontWeight = FontWeight.Bold
                             )
                             
-                            // Time since Asr prayer (memoized to prevent ANRs)
-                            val timeSinceAsr = remember(prayerTimes) { 
+                            // Time since current prayer (memoized to prevent ANRs)
+                            val timeSinceCurrentPrayer = remember(prayerTimes) { 
                                 try {
-                                    getTimeSinceAsr()
+                                    getTimeSinceCurrentPrayer()
                                 } catch (e: Exception) {
                                     ""
                                 }
                             }
-                            if (timeSinceAsr.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(8.dp))
+                            if (timeSinceCurrentPrayer.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = timeSinceAsr,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    text = timeSinceCurrentPrayer,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.secondary,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         } else if (prayerTimes != null) {
@@ -818,54 +821,65 @@ private fun SmartInfoTile(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(24.dp)
         ) {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Smart ML indicator
+                // Smart indicator
                 SmartIndicator(
-                    icon = Icons.Default.AutoAwesome,
-                    label = "AI Content",
-                    color = MaterialTheme.colorScheme.secondary,
+                    icon = Icons.Default.Schedule,
+                    label = "Prayer Status",
+                    color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.align(Alignment.Start)
                 )
                 
-                // Dynamic title based on time of day
-                Text(
-                    text = getSmartTitle(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-                
-                // Contextual content and guidance
+                // Main content section - takes more space
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // Dynamic title based on time of day
+                    Text(
+                        text = getSmartTitle(),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Main prayer time content
                     Text(
                         text = getSmartContent(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        style = MaterialTheme.typography.displaySmall,
+                        color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    
-                    
-                    // Current date for context
-                    Text(
-                        text = getCurrentDate(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
-                        modifier = Modifier.padding(bottom = 4.dp)
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
+                
+                // Bottom section - date context
+                Text(
+                    text = getCurrentDate(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
