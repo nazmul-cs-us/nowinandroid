@@ -85,9 +85,31 @@ object SmartContentUtils {
         }
     }
     
-    fun getSmartContent(currentTime: LocalTime): String {
-        val hour = currentTime.hour
+    fun getSmartContent(
+        currentTime: LocalTime,
+        prayerTimes: DayPrayerTimes? = null,
+        getCurrentPrayer: (() -> Pair<String, LocalTime>?)? = null
+    ): String {
+        // Try to show time since current prayer if data is available
+        if (prayerTimes != null && getCurrentPrayer != null) {
+            val currentPrayer = getCurrentPrayer()
+            if (currentPrayer != null) {
+                val (prayerName, prayerTime) = currentPrayer
+                val timeSince = Duration.between(prayerTime, currentTime)
+                if (!timeSince.isNegative && timeSince.toMinutes() > 0) {
+                    val hours = timeSince.toHours()
+                    val minutes = timeSince.toMinutes() % 60
+                    return when {
+                        hours > 0 -> "${hours}h ${minutes}m since $prayerName"
+                        minutes > 0 -> "${minutes}m since $prayerName"
+                        else -> "Just finished $prayerName"
+                    }
+                }
+            }
+        }
         
+        // Fallback to time-based spiritual guidance
+        val hour = currentTime.hour
         return when {
             hour in 5..11 -> "Start your day with intention and gratitude"
             hour in 12..17 -> "Keep Allah in your thoughts as you work"

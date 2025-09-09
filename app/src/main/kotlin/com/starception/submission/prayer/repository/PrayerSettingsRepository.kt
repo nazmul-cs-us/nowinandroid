@@ -187,7 +187,7 @@ class PrayerSettingsRepository @Inject constructor(
      */
     fun updateCalculationMethod(method: CalculationMethod) {
         val updated = getSettings().copy(calculationMethod = method)
-        updateSettings(updated)
+        updateSettings(updated, forceCommit = true) // UI-triggered action needs immediate persistence
     }
     
     /**
@@ -201,7 +201,7 @@ class PrayerSettingsRepository @Inject constructor(
      */
     fun updateAsrMadhhab(madhhab: AsrMadhhab) {
         val updated = getSettings().copy(asrMadhhab = madhhab)
-        updateSettings(updated)
+        updateSettings(updated, forceCommit = true) // UI-triggered action needs immediate persistence
     }
     
     /**
@@ -214,7 +214,7 @@ class PrayerSettingsRepository @Inject constructor(
      */
     fun updateHighLatitudeAdjustment(adjustment: HighLatitudeAdjustment) {
         val updated = getSettings().copy(highLatitudeAdjustment = adjustment)
-        updateSettings(updated)
+        updateSettings(updated, forceCommit = true) // UI-triggered action needs immediate persistence
     }
     
     /**
@@ -227,7 +227,7 @@ class PrayerSettingsRepository @Inject constructor(
      */
     fun updateTimeOffsets(offsets: PrayerTimeOffsets) {
         val updated = getSettings().copy(timeOffsets = offsets)
-        updateSettings(updated)
+        updateSettings(updated, forceCommit = true) // UI-triggered action needs immediate persistence
     }
     
     /**
@@ -245,7 +245,7 @@ class PrayerSettingsRepository @Inject constructor(
             useGpsLocation = useGps,
             location = location ?: currentSettings.location
         )
-        updateSettings(updated)
+        updateSettings(updated, forceCommit = true) // UI-triggered action needs immediate persistence
     }
     
     /**
@@ -345,7 +345,12 @@ class PrayerSettingsRepository @Inject constructor(
             timeOffsets = timeOffsets,
             useGpsLocation = prefs.getBoolean(KEY_USE_GPS_LOCATION, true),
             location = location
-        )
+        ).also { loadedSettings ->
+            android.util.Log.d("PrayerSettingsRepository", "Settings loaded from SharedPreferences:")
+            android.util.Log.d("PrayerSettingsRepository", "  GPS: ${loadedSettings.useGpsLocation}")
+            android.util.Log.d("PrayerSettingsRepository", "  Calculation Method: ${loadedSettings.calculationMethod.name}")
+            android.util.Log.d("PrayerSettingsRepository", "  Time Offsets: Fajr=${loadedSettings.timeOffsets.fajr}, Dhuhr=${loadedSettings.timeOffsets.dhuhr}, Asr=${loadedSettings.timeOffsets.asr}")
+        }
     }
     
     /**
@@ -394,6 +399,10 @@ class PrayerSettingsRepository @Inject constructor(
      */
     private fun saveSettings(settings: PrayerSettings, forceCommit: Boolean = true) {
         android.util.Log.d("PrayerSettingsRepository", "Saving settings - ASR: ${settings.asrMadhhab.name}, forceCommit: $forceCommit")
+        android.util.Log.d("PrayerSettingsRepository", "Settings being saved:")
+        android.util.Log.d("PrayerSettingsRepository", "  GPS: ${settings.useGpsLocation}")
+        android.util.Log.d("PrayerSettingsRepository", "  Calculation Method: ${settings.calculationMethod.name}")
+        android.util.Log.d("PrayerSettingsRepository", "  Time Offsets: Fajr=${settings.timeOffsets.fajr}, Dhuhr=${settings.timeOffsets.dhuhr}, Asr=${settings.timeOffsets.asr}")
         prefs.edit().apply {
             putString(KEY_CALCULATION_METHOD, settings.calculationMethod.name)
             putString(KEY_ASR_MADHHAB, settings.asrMadhhab.name)
@@ -435,7 +444,10 @@ class PrayerSettingsRepository @Inject constructor(
             }
         }.also {
             val method = if (forceCommit) "committed synchronously" else "applied asynchronously"
-            android.util.Log.d("PrayerSettingsRepository", "Settings $method to SharedPreferences - ASR: ${settings.asrMadhhab.name}")
+            android.util.Log.d("PrayerSettingsRepository", "Settings $method to SharedPreferences:")
+            android.util.Log.d("PrayerSettingsRepository", "  GPS: ${settings.useGpsLocation}")
+            android.util.Log.d("PrayerSettingsRepository", "  Calculation Method: ${settings.calculationMethod.name}")
+            android.util.Log.d("PrayerSettingsRepository", "  Time Offsets: Fajr=${settings.timeOffsets.fajr}, Dhuhr=${settings.timeOffsets.dhuhr}, Asr=${settings.timeOffsets.asr}")
         }
     }
     
@@ -472,7 +484,7 @@ class PrayerSettingsRepository @Inject constructor(
      */
     fun forceSetAsrToStandard() {
         val updated = getSettings().copy(asrMadhhab = AsrMadhhab.STANDARD)
-        updateSettings(updated)
+        updateSettings(updated, forceCommit = true) // Important setting change needs immediate persistence
     }
     
     /**

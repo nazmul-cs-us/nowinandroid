@@ -614,7 +614,7 @@ fun PrayerTimesScreen(
                     getTimeUntilNextPrayer = { PrayerTimeHelpers.getTimeUntilNextPrayer(currentTime, prayerTimes) },
                     getCurrentDate = { PrayerTimeHelpers.getCurrentDate() },
                     getSmartTitle = { SmartContentUtils.getSmartTitle(currentTime) },
-                    getSmartContent = { SmartContentUtils.getSmartContent(currentTime) },
+                    getSmartContent = { SmartContentUtils.getSmartContent(currentTime, prayerTimes) { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) } },
                     getSmartFooter = { SmartContentUtils.getSmartFooter(PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes), PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes)) },
                     getTimeSinceAsr = { SmartContentUtils.formatTimeSinceAsr(SmartContentUtils.getMinutesSinceAsr(prayerTimes, currentTime)) },
                     getPrayerProgress = { SmartContentUtils.getPrayerProgress(prayerTimes, currentTime) },

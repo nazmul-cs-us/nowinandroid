@@ -29,6 +29,7 @@ fun PrayerSettingsScreen(
     modifier: Modifier = Modifier,
     showAsDialog: Boolean = false
 ) {
+    android.util.Log.d("PrayerSettingsScreen", "PrayerSettingsScreen composed with GPS: ${settings.useGpsLocation}")
     if (showAsDialog) {
         // Dialog mode - no Scaffold, just content
         PrayerSettingsContent(
@@ -163,7 +164,12 @@ private fun PrayerSettingsContent(
                 useGps = settings.useGpsLocation,
                 location = settings.location,
                 onUseGpsChanged = { useGps ->
-                    onSettingsChanged(settings.copy(useGpsLocation = useGps))
+                    android.util.Log.d("PrayerSettingsScreen", "GPS toggle: ${settings.useGpsLocation} -> $useGps")
+                    val newSettings = settings.copy(useGpsLocation = useGps)
+                    android.util.Log.d("PrayerSettingsScreen", "New settings GPS value: ${newSettings.useGpsLocation}")
+                    android.util.Log.d("PrayerSettingsScreen", "Calling onSettingsChanged...")
+                    onSettingsChanged(newSettings)
+                    android.util.Log.d("PrayerSettingsScreen", "onSettingsChanged called successfully")
                 }
             )
         }
