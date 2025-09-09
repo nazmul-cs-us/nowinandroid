@@ -196,10 +196,10 @@ class PrayerTimesViewModel @Inject constructor(
                     onSuccess = { androidLocation ->
                         val locationWithDetails = enhancedLocationService.getLocationDetails(androidLocation)
                         
-                        // Update settings with new location
+                        // Update settings with new location (preserve user's GPS preference)
                         val updatedSettings = settings.value.copy(
-                            location = locationWithDetails,
-                            useGpsLocation = true
+                            location = locationWithDetails
+                            // Don't override user's useGpsLocation preference
                         )
                         updateSettings(updatedSettings)
                         
