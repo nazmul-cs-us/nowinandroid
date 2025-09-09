@@ -128,7 +128,6 @@ fun CompassPopupScreen(
                 // Large compass
                 CompassProgressIndicator(
                     progress = progress,
-                    timeText = timeText,
                     size = 260.dp,
                     locationService = locationService,
                     modifier = Modifier.padding(bottom = 16.dp)

@@ -90,7 +90,7 @@ object SmartContentUtils {
         prayerTimes: DayPrayerTimes? = null,
         getCurrentPrayer: (() -> Pair<String, LocalTime>?)? = null
     ): String {
-        // Use the new formatTimeSinceCurrentPrayer function for consistent display
+        // Use the formatTimeSinceCurrentPrayer function for consistent display
         val timeSinceCurrentPrayer = getMinutesSinceCurrentPrayer(prayerTimes, currentTime, getCurrentPrayer)
         val formatted = formatTimeSinceCurrentPrayer(timeSinceCurrentPrayer)
         
@@ -302,4 +302,117 @@ object SmartContentUtils {
             "" // Return empty on any error to prevent crashes
         }
     }
+    
+    /**
+     * Get notification-synchronized prayer content
+     * Returns the exact same text that appears in prayer time notifications
+     * This ensures consistency between the Smart Prediction tile and notifications
+     */
+    fun getNotificationSyncContent(
+        prayerTimes: DayPrayerTimes?,
+        currentTime: LocalTime
+    ): NotificationSyncContent? {
+        return try {
+            val times = prayerTimes ?: return null
+            
+            // Find current and next prayer using the same logic as notification service
+            val allPrayers = listOf(
+                "Fajr" to times.fajr,
+                "Dhuhr" to times.dhuhr,
+                "Asr" to times.asr,
+                "Maghrib" to times.maghrib,
+                "Isha" to times.isha
+            )
+            
+            // Find current prayer (one that's happening now or recently passed)
+            val currentPrayer = allPrayers.find { (_, time) -> 
+                val endTime = time.plusHours(2) // Same 2-hour window as notification service
+                currentTime.isAfter(time) && currentTime.isBefore(endTime)
+            }
+            
+            // Find next prayer
+            val nextPrayer = allPrayers.find { (_, time) -> 
+                currentTime.isBefore(time)
+            } ?: allPrayers.first() // Wrap to next day if needed
+            
+            if (currentPrayer != null) {
+                val (prayerName, prayerTime) = currentPrayer
+                val elapsedDuration = Duration.between(prayerTime, currentTime)
+                val elapsedMinutes = elapsedDuration.toMinutes()
+                
+                // Format elapsed time exactly like notification service
+                val elapsedText = formatNotificationElapsedTime(elapsedMinutes)
+                val content = "$elapsedText since $prayerName"
+                
+                // Calculate prayer phase (same logic as notification service)
+                val phase = when {
+                    elapsedMinutes <= 20 -> "Go to Mosque for $prayerName"
+                    elapsedMinutes <= 60 -> "Best Time to Pray $prayerName" 
+                    else -> "Make Time for $prayerName"
+                }
+                
+                // Next prayer countdown
+                val nextPrayerText = if (nextPrayer != null) {
+                    val (nextName, nextTime) = nextPrayer
+                    val timeUntilNext = Duration.between(currentTime, nextTime)
+                    val nextFormatted = formatNotificationTimeRemaining(timeUntilNext.toMinutes())
+                    "Next • $nextName in $nextFormatted"
+                } else ""
+                
+                return NotificationSyncContent(
+                    title = phase,
+                    content = content,
+                    nextPrayerInfo = nextPrayerText
+                )
+            }
+            
+            return null
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    /**
+     * Format elapsed time exactly like the notification service
+     */
+    private fun formatNotificationElapsedTime(minutes: Long): String {
+        return when {
+            minutes < 60 -> "${minutes}m"
+            else -> {
+                val hours = minutes / 60
+                val remainingMinutes = minutes % 60
+                when {
+                    remainingMinutes == 0L -> "${hours}h"
+                    hours == 1L -> "1h ${remainingMinutes}m"
+                    else -> "${hours}h ${remainingMinutes}m"
+                }
+            }
+        }
+    }
+    
+    /**
+     * Format time remaining exactly like the notification service
+     */
+    private fun formatNotificationTimeRemaining(minutes: Long): String {
+        return when {
+            minutes < 60 -> "${minutes}m"
+            else -> {
+                val hours = minutes / 60
+                val remainingMinutes = minutes % 60
+                when {
+                    remainingMinutes == 0L -> "${hours}h"
+                    else -> "${hours}h ${remainingMinutes}m"
+                }
+            }
+        }
+    }
 }
+
+/**
+ * Data class to hold notification-synchronized content
+ */
+data class NotificationSyncContent(
+    val title: String,          // e.g., "Best Time to Pray Fajr"
+    val content: String,        // e.g., "6h 51m since Fajr"
+    val nextPrayerInfo: String  // e.g., "Next • Dhuhr in 2h 15m"
+)
