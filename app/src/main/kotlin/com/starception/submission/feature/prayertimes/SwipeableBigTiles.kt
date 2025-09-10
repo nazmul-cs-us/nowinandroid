@@ -671,62 +671,36 @@ private fun NextPrayerTile(
                         }
                         
                         if (syncContent != null) {
-                            // Optimized dynamic layout with visually balanced spacing
+                            // Clean layout with readable fonts and shorter text
                             Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 8.dp, vertical = 12.dp),
-                                verticalArrangement = Arrangement.Center
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // Prayer phase title - accurate length-based sizing  
+                                // Prayer phase title - now much shorter, can use larger font
                                 Text(
                                     text = syncContent.title,
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        fontSize = when {
-                                            syncContent.title.length >= 25 -> 13.sp // "Best Time to Pray Maghrib" (25 chars)
-                                            syncContent.title.length >= 23 -> 14.sp // "Go to Mosque for Maghrib" (23 chars)
-                                            syncContent.title.length >= 20 -> 15.sp // "Best Time to Pray Fajr" (22 chars)
-                                            else -> 16.sp // "Make Time for Fajr" (18 chars)
-                                        }
-                                    ),
+                                    style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
-                                // Main prayer time - very conservative font sizes
+                                // Main prayer time content - readable size
                                 Text(
                                     text = syncContent.content,
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontSize = when {
-                                            syncContent.content.length >= 20 -> 14.sp // "12h 59m since Maghrib" (20 chars)
-                                            syncContent.content.length >= 19 -> 15.sp // "1h 30m since Maghrib" (19 chars)
-                                            syncContent.content.length >= 16 -> 16.sp // "59m since Maghrib" (16 chars)
-                                            syncContent.content.length >= 13 -> 18.sp // "30m since Asr" (13 chars)
-                                            else -> 20.sp // "5m since Asr" (12 chars)
-                                        }
-                                    ),
+                                    style = MaterialTheme.typography.headlineMedium,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 
+                                // Next prayer info - clean and readable
                                 if (syncContent.nextPrayerInfo.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(10.dp))
                                     Text(
                                         text = syncContent.nextPrayerInfo,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontSize = when {
-                                                syncContent.nextPrayerInfo.length > 22 -> 14.sp // "Next • Maghrib in 12h 59m"
-                                                syncContent.nextPrayerInfo.length > 18 -> 15.sp // "Next • Maghrib in 2h 9m"
-                                                else -> 16.sp // Shorter next prayer info
-                                            }
-                                        ),
-                                        color = MaterialTheme.colorScheme.secondary,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                                         fontWeight = FontWeight.Normal,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
