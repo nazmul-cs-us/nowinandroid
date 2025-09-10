@@ -3,9 +3,10 @@ package com.starception.submission.feature.prayertimes.components
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,12 +29,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.scale
 import kotlin.math.*
 import com.starception.submission.prayer.service.EnhancedLocationService
 
@@ -49,6 +54,7 @@ import com.starception.submission.prayer.service.EnhancedLocationService
  * - **Islamic Theming**: Traditional green colors with Kaaba emoji
  * - **Real-time Feedback**: Visual indicators showing sensor status improvements
  * - **Prayer Integration**: Shows current prayer time countdown within the compass
+ * - **Pull-to-Close Gesture**: Drag down 100dp to close the popup naturally
  * 
  * @param progress Current prayer time progress (0-1)
  * @param timeText Time remaining until next prayer
@@ -62,6 +68,18 @@ fun CompassPopupScreen(
     locationService: EnhancedLocationService?,
     onDismiss: () -> Unit
 ) {
+    val density = LocalDensity.current
+    var dragState by remember { mutableFloatStateOf(0f) }
+    val dragThreshold = with(density) { 60.dp.toPx() } // Reduced threshold for easier closing
+    
+    // Visual feedback for drag gesture
+    val dragProgress = (dragState / dragThreshold).coerceIn(0f, 1f)
+    val handleScale by animateFloatAsState(
+        targetValue = 1f + (dragProgress * 0.2f), // Slightly grow handle during drag
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        label = "handleScale"
+    )
+    
     Log.d("CompassPopup", "CompassPopupScreen created with onDismiss: $onDismiss")
     Dialog(
         onDismissRequest = { 
@@ -76,54 +94,120 @@ fun CompassPopupScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.85f))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
                 .windowInsetsPadding(WindowInsets.systemBars) // Handle camera cutouts and system bars
         ) {
-            // Close button - positioned to avoid camera cutout and status bar
+            // Close button - minimal styling to match settings icon exactly
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 16.dp, end = 16.dp)
-                    .size(56.dp) // Increased touch target size
-                    .background(
-                        Color.White.copy(alpha = 0.4f),
-                        RoundedCornerShape(50)
-                    )
-                    .clickable(
-                        onClick = { 
-                            Log.d("CompassPopup", "Close button clicked!")
-                            onDismiss()
-                            Log.d("CompassPopup", "onDismiss() called")
-                        }
-                    )
-                    .zIndex(100f), // Ensure it's on top
-                contentAlignment = Alignment.Center
+                    .zIndex(100f)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
+                IconButton(
+                    onClick = { 
+                        Log.d("CompassPopup", "Close button clicked!")
+                        onDismiss()
+                        Log.d("CompassPopup", "onDismiss() called")
+                    },
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = "Close",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp), // More bottom padding
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Top
             ) {
-                // Title
-                Text(
-                    text = "🕋 Qibla Compass",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 12.dp)
-                )
+                // Pull-down handle and title area
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // More prominent pull-down handle indicator with drag gesture
+                        Box(
+                            modifier = Modifier
+                                .width(80.dp) // Wider drag area
+                                .height(20.dp) // Taller drag area 
+                                .pointerInput(Unit) {
+                                    detectVerticalDragGestures(
+                                        onDragEnd = {
+                                            // If user dragged down far enough, close the popup
+                                            if (dragState > dragThreshold) {
+                                                Log.d("CompassPopup", "Pull-down gesture detected (${dragState}px > ${dragThreshold}px), closing popup")
+                                                onDismiss()
+                                            }
+                                            // Reset drag state
+                                            dragState = 0f
+                                        }
+                                    ) { _, dragAmount ->
+                                        // Only track downward drags (positive Y direction)
+                                        if (dragAmount > 0) {
+                                            dragState = maxOf(0f, dragState + dragAmount)
+                                            Log.d("CompassPopup", "Drag down: ${dragAmount}px, total: ${dragState}px")
+                                        } else {
+                                            // Reset if user drags upward
+                                            dragState = 0f
+                                        }
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Visual handle bar with animation feedback
+                            Box(
+                                modifier = Modifier
+                                    .width(60.dp)
+                                    .height(6.dp)
+                                    .scale(handleScale) // Animated scale feedback
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(
+                                        Color.White.copy(
+                                            alpha = 0.8f + (dragProgress * 0.2f) // Brightens during drag
+                                        )
+                                    )
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // Pull instruction text
+                        Text(
+                            text = "Pull down to close",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            fontSize = 12.sp
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Title
+                        Text(
+                            text = "🕋 Qibla Compass",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                    }
+                }
 
                 // Large compass
                 CompassProgressIndicator(
@@ -246,15 +330,15 @@ fun CompassPopupScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Islamic context note
                 Text(
                     text = "The green arc points toward the Kaaba in Mecca, Saudi Arabia",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 24.dp) // Added bottom padding
                 )
             }
         }
