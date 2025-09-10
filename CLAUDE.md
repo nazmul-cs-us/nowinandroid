@@ -151,3 +151,51 @@ All cards in the app follow a consistent design pattern:
 - Added comprehensive notification system with prayer alerts
 - Updated dependency versions to latest stable releases (Kotlin 2.1.10, Compose BOM 2025.02.00)
 - Improved build configuration with optimized Gradle settings
+
+## Prayer Times Recent UI Improvements (September 2025)
+
+### Qibla Compass Enhancements
+- **Removed Time Display**: Eliminated remaining prayer time text from Qibla compass components to prevent visual clutter
+  - Updated `QiblaCompass.kt` and `CompassProgressIndicator.kt` to remove `timeText` parameter and display
+  - Modified `SwipeableBigTiles.kt` and `SalahDashboard.kt` to remove time text from component calls
+
+### Compass Popup Improvements  
+- **Pull-down Gesture**: Added intuitive pull-down to close gesture for the compass popup window
+  - Implemented `detectVerticalDragGestures` with visual feedback using a draggable handle bar
+  - Added drag threshold detection to trigger popup dismissal on sufficient downward swipe
+  - Isolated gesture handling to specific handle area to prevent conflicts with scroll views
+
+- **UI Consistency**: Fixed close button sizing to match the settings icon from the home page
+  - Standardized button sizing using consistent Material 3 `IconButton` components
+  - Ensured visual harmony between navigation elements across the app
+
+- **Theme Integration**: Updated popup to use Material 3 theme colors instead of hardcoded black
+  - Replaced hardcoded black background with `MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)`
+  - Updated all text colors to use theme-aware color schemes (`MaterialTheme.colorScheme.onSurface`)
+  - Enables proper light/dark mode support and maintains design consistency
+
+### Smart Content Optimization
+- **Text Display Improvements**: Resolved text truncation issues in Smart Prediction tiles
+  - Modified content generation functions to produce shorter, more display-friendly text
+  - Optimized layout to prevent text cutoff while maintaining readability
+  - Updated `SmartContentUtils.kt` with better content formatting for various tile sizes
+
+## Country-Based Prayer Calculation Methods
+
+### JSON Data Integration
+- **Comprehensive Database**: Added `country_prayer_methods.json` in `app/src/main/assets/`
+  - Contains 80+ countries with appropriate calculation methods and madhab selections
+  - Includes calculation method parameters (Fajr/Isha angles, offsets) for precise astronomical calculations
+  - Provides madhhab-specific Asr calculation ratios and regional information
+
+### Location-Based Auto-Configuration
+- **Smart Defaults**: Automatic prayer calculation method selection based on detected country location
+  - Example: UAE → Uses "Umm_al_Qura_University_Makkah" method with "Maliki" madhhab
+  - Each country entry includes appropriate calculation method, madhhab, and geographic coordinates
+  - Supports 6 different madhhab options: Hanafi, Shafi, Maliki, Hanbali, Jafari, Ibadi
+
+### Data Structure Features
+- **Countries**: ISO country codes mapped to prayer calculation preferences
+- **Calculation Methods**: 25+ recognized Islamic calculation methods with precise parameters
+- **Madhhab Options**: Shadow ratio configurations for different schools of Islamic jurisprudence
+- **Geographic Data**: Coordinate information for location-based validation and defaults

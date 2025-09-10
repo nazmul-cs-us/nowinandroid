@@ -34,6 +34,13 @@ data class PrayerSettings(
     val asrMadhhab: AsrMadhhab = AsrMadhhab.STANDARD,                                   // Asr shadow calculation method
     val highLatitudeAdjustment: HighLatitudeAdjustment = HighLatitudeAdjustment.NONE,   // For polar regions
     
+    // AUTO-DETECTION INFO - Shows if settings were automatically configured
+    val isMethodAutoDetected: Boolean = false,       // Whether calculation method was auto-detected from location
+    val isMadhhabAutoDetected: Boolean = false,      // Whether madhhab was auto-detected from location  
+    val autoDetectedCountryName: String? = null,     // Name of the auto-detected country
+    val autoDetectedCountryCode: String? = null,     // Code of the auto-detected country
+    val areCustomAnglesAutoDetected: Boolean = false, // Whether custom angles were auto-detected from JSON
+    
     // CUSTOM ANGLE OVERRIDES - Advanced user customizations
     val customFajrAngle: Double? = null,        // Override Fajr sun angle (degrees below horizon)
     val customIshaAngle: Double? = null,        // Override Isha sun angle (degrees below horizon)

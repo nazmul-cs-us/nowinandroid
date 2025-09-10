@@ -29,7 +29,7 @@ fun PrayerSettingsDialog(
     ) {
         PrayerSettingsScreen(
             settings = settings,
-            onSettingsChanged = viewModel::updateSettings,
+            onSettingsChanged = viewModel::updateSettingsManually,
             onBackClick = onDismiss,
             showAsDialog = false, // Use full screen mode with scaffold
             modifier = Modifier.fillMaxSize()
