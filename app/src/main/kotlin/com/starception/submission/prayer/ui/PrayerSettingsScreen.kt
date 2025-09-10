@@ -116,7 +116,9 @@ private fun PrayerSettingsContent(
                 selectedMethod = settings.calculationMethod,
                 onMethodSelected = { method ->
                     onSettingsChanged(settings.copy(calculationMethod = method))
-                }
+                },
+                isAutoDetected = settings.isMethodAutoDetected,
+                autoDetectedCountry = settings.autoDetectedCountryName
             )
         }
         
@@ -126,7 +128,9 @@ private fun PrayerSettingsContent(
                 selectedMadhhab = settings.asrMadhhab,
                 onMadhhabSelected = { madhhab ->
                     onSettingsChanged(settings.copy(asrMadhhab = madhhab))
-                }
+                },
+                isAutoDetected = settings.isMadhhabAutoDetected,
+                autoDetectedCountry = settings.autoDetectedCountryName
             )
         }
         
@@ -199,48 +203,63 @@ private fun SettingsSection(
 private fun CalculationMethodDropdown(
     selectedMethod: CalculationMethod,
     onMethodSelected: (CalculationMethod) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isAutoDetected: Boolean = false,
+    autoDetectedCountry: String? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = it },
-        modifier = modifier.fillMaxWidth()
-    ) {
-        OutlinedTextField(
-            value = selectedMethod.displayName,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Method") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor()
-        )
-        
-        ExposedDropdownMenu(
+    Column(modifier = modifier) {
+        ExposedDropdownMenuBox(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onExpandedChange = { expanded = it },
+            modifier = Modifier.fillMaxWidth()
         ) {
-            CalculationMethod.values().forEach { method ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(method.displayName)
-                            Text(
-                                text = method.description,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+            OutlinedTextField(
+                value = selectedMethod.displayName,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Method") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor()
+            )
+        
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                CalculationMethod.values().forEach { method ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(method.displayName)
+                                Text(
+                                    text = method.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        },
+                        onClick = {
+                            onMethodSelected(method)
+                            expanded = false
                         }
-                    },
-                    onClick = {
-                        onMethodSelected(method)
-                        expanded = false
-                    }
-                )
+                    )
+                }
             }
+        }
+        
+        // Show auto-detection indicator
+        if (isAutoDetected && autoDetectedCountry != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "🌍 Auto-detected for $autoDetectedCountry",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 4.dp)
+            )
         }
     }
 }
@@ -249,7 +268,9 @@ private fun CalculationMethodDropdown(
 private fun AsrMadhhabSelector(
     selectedMadhhab: AsrMadhhab,
     onMadhhabSelected: (AsrMadhhab) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isAutoDetected: Boolean = false,
+    autoDetectedCountry: String? = null
 ) {
     Column(modifier = modifier) {
         AsrMadhhab.values().forEach { madhhab ->
@@ -274,6 +295,17 @@ private fun AsrMadhhabSelector(
                     )
                 }
             }
+        }
+        
+        // Show auto-detection indicator
+        if (isAutoDetected && autoDetectedCountry != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "🌍 Auto-detected for $autoDetectedCountry",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 8.dp)
+            )
         }
     }
 }

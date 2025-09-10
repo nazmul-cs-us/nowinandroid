@@ -1,0 +1,1738 @@
+{
+  "countries": {
+    "AD": {
+      "name": "Andorra",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 42.5462, "longitude": 1.6016 }
+    },
+    "AE": {
+      "name": "United Arab Emirates",
+      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 23.4241, "longitude": 53.8478 }
+    },
+    "AF": {
+      "name": "Afghanistan",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 33.9391, "longitude": 67.7100 }
+    },
+    "AG": {
+      "name": "Antigua and Barbuda",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 17.0608, "longitude": -61.7964 }
+    },
+    "AI": {
+      "name": "Anguilla",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 18.2206, "longitude": -63.0686 }
+    },
+    "AL": {
+      "name": "Albania",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 41.1533, "longitude": 20.1683 }
+    },
+    "AM": {
+      "name": "Armenia",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 40.0691, "longitude": 45.0382 }
+    },
+    "AO": {
+      "name": "Angola",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -11.2027, "longitude": 17.8739 }
+    },
+    "AQ": {
+      "name": "Antarctica",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -75.2509, "longitude": -0.0715 }
+    },
+    "AR": {
+      "name": "Argentina",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -38.4161, "longitude": -63.6167 }
+    },
+    "AS": {
+      "name": "American Samoa",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -14.2710, "longitude": -170.1322 }
+    },
+    "AT": {
+      "name": "Austria",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 47.5162, "longitude": 14.5501 }
+    },
+    "AU": {
+      "name": "Australia",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -25.2744, "longitude": 133.7751 }
+    },
+    "AW": {
+      "name": "Aruba",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 12.5211, "longitude": -69.9683 }
+    },
+    "AX": {
+      "name": "Åland Islands",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 60.1785, "longitude": 19.9156 }
+    },
+    "AZ": {
+      "name": "Azerbaijan",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Jafari",
+      "coordinates": { "latitude": 40.1431, "longitude": 47.5769 }
+    },
+    "BA": {
+      "name": "Bosnia and Herzegovina",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 43.9159, "longitude": 17.6791 }
+    },
+    "BB": {
+      "name": "Barbados",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 13.1939, "longitude": -59.5432 }
+    },
+    "BD": {
+      "name": "Bangladesh",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 23.6850, "longitude": 90.3563 }
+    },
+    "BE": {
+      "name": "Belgium",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 50.5039, "longitude": 4.4699 }
+    },
+    "BF": {
+      "name": "Burkina Faso",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 12.2383, "longitude": -1.5616 }
+    },
+    "BG": {
+      "name": "Bulgaria",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 42.7339, "longitude": 25.4858 }
+    },
+    "BH": {
+      "name": "Bahrain",
+      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 25.9304, "longitude": 50.6378 }
+    },
+    "BI": {
+      "name": "Burundi",
+      "calculationMethod": "Egypt",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -3.3731, "longitude": 29.9189 }
+    },
+    "BJ": {
+      "name": "Benin",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 9.3077, "longitude": 2.3158 }
+    },
+    "BL": {
+      "name": "Saint Barthélemy",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 17.9000, "longitude": -62.8333 }
+    },
+    "BM": {
+      "name": "Bermuda",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 32.3078, "longitude": -64.7505 }
+    },
+    "BN": {
+      "name": "Brunei",
+      "calculationMethod": "Brunei",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 4.5353, "longitude": 114.7277 }
+    },
+    "BO": {
+      "name": "Bolivia",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -16.2902, "longitude": -63.5887 }
+    },
+    "BQ": {
+      "name": "Bonaire, Sint Eustatius and Saba",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 12.1784, "longitude": -68.2385 }
+    },
+    "BR": {
+      "name": "Brazil",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -14.2350, "longitude": -51.9253 }
+    },
+    "BS": {
+      "name": "Bahamas",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 25.0343, "longitude": -77.3963 }
+    },
+    "BT": {
+      "name": "Bhutan",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 27.5142, "longitude": 90.4336 }
+    },
+    "BV": {
+      "name": "Bouvet Island",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -54.4208, "longitude": 3.3464 }
+    },
+    "BW": {
+      "name": "Botswana",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -22.3285, "longitude": 24.6849 }
+    },
+    "BY": {
+      "name": "Belarus",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 53.7098, "longitude": 27.9534 }
+    },
+    "BZ": {
+      "name": "Belize",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 17.1899, "longitude": -88.4976 }
+    },
+    "CA": {
+      "name": "Canada",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 56.1304, "longitude": -106.3468 }
+    },
+    "CC": {
+      "name": "Cocos (Keeling) Islands",
+      "calculationMethod": "Australia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -12.1642, "longitude": 96.8710 }
+    },
+    "CD": {
+      "name": "Congo (Democratic Republic)",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": -4.0383, "longitude": 21.7587 }
+    },
+    "CF": {
+      "name": "Central African Republic",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 6.6111, "longitude": 20.9394 }
+    },
+    "CG": {
+      "name": "Congo (Republic)",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": -0.2280, "longitude": 15.8277 }
+    },
+    "CH": {
+      "name": "Switzerland",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 46.8182, "longitude": 8.2275 }
+    },
+    "CI": {
+      "name": "Côte d'Ivoire",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 7.5400, "longitude": -5.5471 }
+    },
+    "CK": {
+      "name": "Cook Islands",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -21.2367, "longitude": -159.7777 }
+    },
+    "CL": {
+      "name": "Chile",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -35.6751, "longitude": -71.5430 }
+    },
+    "CM": {
+      "name": "Cameroon",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 7.3697, "longitude": 12.3547 }
+    },
+    "CN": {
+      "name": "China",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 35.8617, "longitude": 104.1954 }
+    },
+    "CO": {
+      "name": "Colombia",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 4.5709, "longitude": -74.2973 }
+    },
+    "CR": {
+      "name": "Costa Rica",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 9.7489, "longitude": -83.7534 }
+    },
+    "CU": {
+      "name": "Cuba",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 21.5218, "longitude": -77.7812 }
+    },
+    "CV": {
+      "name": "Cape Verde",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 16.5388, "longitude": -24.0132 }
+    },
+    "CW": {
+      "name": "Curaçao",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 12.1696, "longitude": -68.9900 }
+    },
+    "CX": {
+      "name": "Christmas Island",
+      "calculationMethod": "Australia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -10.4475, "longitude": 105.6904 }
+    },
+    "CY": {
+      "name": "Cyprus",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 35.1264, "longitude": 33.4299 }
+    },
+    "CZ": {
+      "name": "Czech Republic",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 49.8175, "longitude": 15.4730 }
+    },
+    "DE": {
+      "name": "Germany",
+      "calculationMethod": "Germany_Turkish_Islamic_Union",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 51.1657, "longitude": 10.4515 }
+    },
+    "DJ": {
+      "name": "Djibouti",
+      "calculationMethod": "Egypt",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 11.8251, "longitude": 42.5903 }
+    },
+    "DK": {
+      "name": "Denmark",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 56.2639, "longitude": 9.5018 }
+    },
+    "DM": {
+      "name": "Dominica",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 15.4150, "longitude": -61.3710 }
+    },
+    "DO": {
+      "name": "Dominican Republic",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 18.7357, "longitude": -70.1627 }
+    },
+    "DZ": {
+      "name": "Algeria",
+      "calculationMethod": "Algeria",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 28.0339, "longitude": 1.6596 }
+    },
+    "EC": {
+      "name": "Ecuador",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -1.8312, "longitude": -78.1834 }
+    },
+    "EE": {
+      "name": "Estonia",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 58.5953, "longitude": 25.0136 }
+    },
+    "EG": {
+      "name": "Egypt",
+      "calculationMethod": "Egyptian_General_Authority_of_Survey",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 26.0975, "longitude": 31.4867 }
+    },
+    "EH": {
+      "name": "Western Sahara",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 24.2155, "longitude": -12.8858 }
+    },
+    "ER": {
+      "name": "Eritrea",
+      "calculationMethod": "Egypt",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 15.1794, "longitude": 39.7823 }
+    },
+    "ES": {
+      "name": "Spain",
+      "calculationMethod": "Europe",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 40.4637, "longitude": -3.7492 }
+    },
+    "ET": {
+      "name": "Ethiopia",
+      "calculationMethod": "Egypt",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 9.1450, "longitude": 40.4897 }
+    },
+    "FI": {
+      "name": "Finland",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 61.9241, "longitude": 25.7482 }
+    },
+    "FJ": {
+      "name": "Fiji",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -16.5780, "longitude": 179.4144 }
+    },
+    "FK": {
+      "name": "Falkland Islands",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -51.7963, "longitude": -59.5236 }
+    },
+    "FM": {
+      "name": "Micronesia",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 7.4256, "longitude": 150.5508 }
+    },
+    "FO": {
+      "name": "Faroe Islands",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 61.8926, "longitude": -6.9118 }
+    },
+    "FR": {
+      "name": "France",
+      "calculationMethod": "France_Union_of_Islamic_Organizations",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 46.6034, "longitude": 1.8883 }
+    },
+    "GA": {
+      "name": "Gabon",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": -0.8037, "longitude": 11.6094 }
+    },
+    "GB": {
+      "name": "United Kingdom",
+      "calculationMethod": "London_Unified_Islamic_Society",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 55.3781, "longitude": -3.4360 }
+    },
+    "GD": {
+      "name": "Grenada",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 12.1165, "longitude": -61.6790 }
+    },
+    "GE": {
+      "name": "Georgia",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 42.3154, "longitude": 43.3569 }
+    },
+    "GF": {
+      "name": "French Guiana",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 3.9339, "longitude": -53.1258 }
+    },
+    "GG": {
+      "name": "Guernsey",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 49.4658, "longitude": -2.5854 }
+    },
+    "GH": {
+      "name": "Ghana",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 7.9465, "longitude": -1.0232 }
+    },
+    "GI": {
+      "name": "Gibraltar",
+      "calculationMethod": "Europe",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 36.1408, "longitude": -5.3536 }
+    },
+    "GL": {
+      "name": "Greenland",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 71.7069, "longitude": -42.6043 }
+    },
+    "GM": {
+      "name": "Gambia",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 13.4432, "longitude": -15.3101 }
+    },
+    "GN": {
+      "name": "Guinea",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 9.9456, "longitude": -9.6966 }
+    },
+    "GP": {
+      "name": "Guadeloupe",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 16.9950, "longitude": -62.0670 }
+    },
+    "GQ": {
+      "name": "Equatorial Guinea",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 1.6508, "longitude": 10.2679 }
+    },
+    "GR": {
+      "name": "Greece",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 39.0742, "longitude": 21.8243 }
+    },
+    "GS": {
+      "name": "South Georgia and South Sandwich Islands",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -54.4296, "longitude": -36.5879 }
+    },
+    "GT": {
+      "name": "Guatemala",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 15.7835, "longitude": -90.2308 }
+    },
+    "GU": {
+      "name": "Guam",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 13.4443, "longitude": 144.7937 }
+    },
+    "GW": {
+      "name": "Guinea-Bissau",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 11.8037, "longitude": -15.1804 }
+    },
+    "GY": {
+      "name": "Guyana",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 4.8604, "longitude": -58.9302 }
+    },
+    "HK": {
+      "name": "Hong Kong",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 22.3193, "longitude": 114.1694 }
+    },
+    "HM": {
+      "name": "Heard Island and McDonald Islands",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -53.1814, "longitude": 73.5118 }
+    },
+    "HN": {
+      "name": "Honduras",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 15.2000, "longitude": -86.2419 }
+    },
+    "HR": {
+      "name": "Croatia",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 45.1000, "longitude": 15.2000 }
+    },
+    "HT": {
+      "name": "Haiti",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 18.9712, "longitude": -72.2852 }
+    },
+    "HU": {
+      "name": "Hungary",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 47.1625, "longitude": 19.5033 }
+    },
+    "ID": {
+      "name": "Indonesia",
+      "calculationMethod": "Indonesia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -0.7893, "longitude": 113.9213 }
+    },
+    "IE": {
+      "name": "Ireland",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 53.4129, "longitude": -8.2439 }
+    },
+    "IL": {
+      "name": "Israel",
+      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 31.0461, "longitude": 34.8516 }
+    },
+    "IM": {
+      "name": "Isle of Man",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 54.2361, "longitude": -4.5481 }
+    },
+    "IN": {
+      "name": "India",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 20.5937, "longitude": 78.9629 }
+    },
+    "IO": {
+      "name": "British Indian Ocean Territory",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -6.3432, "longitude": 71.8765 }
+    },
+    "IQ": {
+      "name": "Iraq",
+      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "madhhab": "Jafari",
+      "coordinates": { "latitude": 33.2232, "longitude": 43.6793 }
+    },
+    "IR": {
+      "name": "Iran",
+      "calculationMethod": "Institute_of_Geophysics_University_of_Tehran",
+      "madhhab": "Jafari",
+      "coordinates": { "latitude": 32.4279, "longitude": 53.6880 }
+    },
+    "IS": {
+      "name": "Iceland",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 64.9631, "longitude": -19.0208 }
+    },
+    "IT": {
+      "name": "Italy",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 41.8719, "longitude": 12.5674 }
+    },
+    "JE": {
+      "name": "Jersey",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 49.2144, "longitude": -2.1312 }
+    },
+    "JM": {
+      "name": "Jamaica",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 18.1096, "longitude": -77.2975 }
+    },
+    "JO": {
+      "name": "Jordan",
+      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 30.5852, "longitude": 36.2384 }
+    },
+    "JP": {
+      "name": "Japan",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 36.2048, "longitude": 138.2529 }
+    },
+    "KE": {
+      "name": "Kenya",
+      "calculationMethod": "Egypt",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -0.0236, "longitude": 37.9062 }
+    },
+    "KG": {
+      "name": "Kyrgyzstan",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 41.2044, "longitude": 74.7661 }
+    },
+    "KH": {
+      "name": "Cambodia",
+      "calculationMethod": "Department_of_Islamic_Advancement_Malaysia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 12.5657, "longitude": 104.9910 }
+    },
+    "KI": {
+      "name": "Kiribati",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -3.3704, "longitude": -168.7340 }
+    },
+    "KM": {
+      "name": "Comoros",
+      "calculationMethod": "Egypt",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -11.6455, "longitude": 43.3333 }
+    },
+    "KN": {
+      "name": "Saint Kitts and Nevis",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 17.3578, "longitude": -62.7830 }
+    },
+    "KP": {
+      "name": "North Korea",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 40.3399, "longitude": 127.5101 }
+    },
+    "KR": {
+      "name": "South Korea",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 35.9078, "longitude": 127.7669 }
+    },
+    "KW": {
+      "name": "Kuwait",
+      "calculationMethod": "Kuwait",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 29.3117, "longitude": 47.4818 }
+    },
+    "KY": {
+      "name": "Cayman Islands",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 19.3133, "longitude": -81.2546 }
+    },
+    "KZ": {
+      "name": "Kazakhstan",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 48.0196, "longitude": 66.9237 }
+    },
+    "LA": {
+      "name": "Laos",
+      "calculationMethod": "Department_of_Islamic_Advancement_Malaysia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 19.8563, "longitude": 102.4955 }
+    },
+    "LB": {
+      "name": "Lebanon",
+      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 33.8547, "longitude": 35.8623 }
+    },
+    "LC": {
+      "name": "Saint Lucia",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 13.9094, "longitude": -60.9789 }
+    },
+    "LI": {
+      "name": "Liechtenstein",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 47.1660, "longitude": 9.5554 }
+    },
+    "LK": {
+      "name": "Sri Lanka",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 7.8731, "longitude": 80.7718 }
+    },
+    "LR": {
+      "name": "Liberia",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 6.4281, "longitude": -9.4295 }
+    },
+    "LS": {
+      "name": "Lesotho",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -29.6100, "longitude": 28.2336 }
+    },
+    "LT": {
+      "name": "Lithuania",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 55.1694, "longitude": 23.8813 }
+    },
+    "LU": {
+      "name": "Luxembourg",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 49.8153, "longitude": 6.1296 }
+    },
+    "LV": {
+      "name": "Latvia",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 56.8796, "longitude": 24.6032 }
+    },
+    "LY": {
+      "name": "Libya",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 26.3351, "longitude": 17.2283 }
+    },
+    "MA": {
+      "name": "Morocco",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 31.7917, "longitude": -7.0926 }
+    },
+    "MC": {
+      "name": "Monaco",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 43.7384, "longitude": 7.4246 }
+    },
+    "MD": {
+      "name": "Moldova",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 47.4116, "longitude": 28.3699 }
+    },
+    "ME": {
+      "name": "Montenegro",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 42.7087, "longitude": 19.3744 }
+    },
+    "MF": {
+      "name": "Saint Martin (French part)",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 18.0708, "longitude": -63.0501 }
+    },
+    "MG": {
+      "name": "Madagascar",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -18.7669, "longitude": 46.8691 }
+    },
+    "MH": {
+      "name": "Marshall Islands",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 7.1315, "longitude": 171.1845 }
+    },
+    "MK": {
+      "name": "North Macedonia",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 41.6086, "longitude": 21.7453 }
+    },
+    "ML": {
+      "name": "Mali",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 17.5707, "longitude": -3.9962 }
+    },
+    "MM": {
+      "name": "Myanmar",
+      "calculationMethod": "Department_of_Islamic_Advancement_Malaysia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 21.9162, "longitude": 95.9560 }
+    },
+    "MN": {
+      "name": "Mongolia",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 46.8625, "longitude": 103.8467 }
+    },
+    "MO": {
+      "name": "Macao",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 22.1987, "longitude": 113.5439 }
+    },
+    "MP": {
+      "name": "Northern Mariana Islands",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 17.3308, "longitude": 145.3846 }
+    },
+    "MQ": {
+      "name": "Martinique",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 14.6415, "longitude": -61.0242 }
+    },
+    "MR": {
+      "name": "Mauritania",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 21.0079, "longitude": -10.9408 }
+    },
+    "MS": {
+      "name": "Montserrat",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 16.7425, "longitude": -62.1874 }
+    },
+    "MT": {
+      "name": "Malta",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 35.9375, "longitude": 14.3754 }
+    },
+    "MU": {
+      "name": "Mauritius",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -20.3484, "longitude": 57.5522 }
+    },
+    "MV": {
+      "name": "Maldives",
+      "calculationMethod": "Maldives",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 3.2028, "longitude": 73.2207 }
+    },
+    "MW": {
+      "name": "Malawi",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -13.2543, "longitude": 34.3015 }
+    },
+    "MX": {
+      "name": "Mexico",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 23.6345, "longitude": -102.5528 }
+    },
+    "MY": {
+      "name": "Malaysia",
+      "calculationMethod": "Department_of_Islamic_Advancement_Malaysia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 4.2105, "longitude": 101.9758 }
+    },
+    "MZ": {
+      "name": "Mozambique",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -18.6657, "longitude": 35.5296 }
+    },
+    "NA": {
+      "name": "Namibia",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -22.9576, "longitude": 18.4904 }
+    },
+    "NC": {
+      "name": "New Caledonia",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -20.9043, "longitude": 165.6180 }
+    },
+    "NE": {
+      "name": "Niger",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 17.6078, "longitude": 8.0817 }
+    },
+    "NF": {
+      "name": "Norfolk Island",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -29.0408, "longitude": 167.9547 }
+    },
+    "NG": {
+      "name": "Nigeria",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 9.0820, "longitude": 8.6753 }
+    },
+    "NI": {
+      "name": "Nicaragua",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 12.2650, "longitude": -85.2072 }
+    },
+    "NL": {
+      "name": "Netherlands",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 52.1326, "longitude": 5.2913 }
+    },
+    "NO": {
+      "name": "Norway",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 60.4720, "longitude": 8.4689 }
+    },
+    "NP": {
+      "name": "Nepal",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 28.3949, "longitude": 84.1240 }
+    },
+    "NR": {
+      "name": "Nauru",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -0.5228, "longitude": 166.9315 }
+    },
+    "NU": {
+      "name": "Niue",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -19.0544, "longitude": -169.8672 }
+    },
+    "NZ": {
+      "name": "New Zealand",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -40.9006, "longitude": 174.8860 }
+    },
+    "OM": {
+      "name": "Oman",
+      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "madhhab": "Ibadi",
+      "coordinates": { "latitude": 21.4735, "longitude": 55.9754 }
+    },
+    "PA": {
+      "name": "Panama",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 8.5380, "longitude": -80.7821 }
+    },
+    "PE": {
+      "name": "Peru",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -9.1900, "longitude": -75.0152 }
+    },
+    "PF": {
+      "name": "French Polynesia",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -17.6797, "longitude": -149.4068 }
+    },
+    "PG": {
+      "name": "Papua New Guinea",
+      "calculationMethod": "Australia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -6.3150, "longitude": 143.9555 }
+    },
+    "PH": {
+      "name": "Philippines",
+      "calculationMethod": "Department_of_Islamic_Advancement_Malaysia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 12.8797, "longitude": 121.7740 }
+    },
+    "PK": {
+      "name": "Pakistan",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 30.3753, "longitude": 69.3451 }
+    },
+    "PL": {
+      "name": "Poland",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 51.9194, "longitude": 19.1451 }
+    },
+    "PM": {
+      "name": "Saint Pierre and Miquelon",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 46.8852, "longitude": -56.3159 }
+    },
+    "PN": {
+      "name": "Pitcairn",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -24.7036, "longitude": -127.4393 }
+    },
+    "PR": {
+      "name": "Puerto Rico",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 18.2208, "longitude": -66.5901 }
+    },
+    "PS": {
+      "name": "Palestine",
+      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 31.9522, "longitude": 35.2332 }
+    },
+    "PT": {
+      "name": "Portugal",
+      "calculationMethod": "Europe",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 39.3999, "longitude": -8.2245 }
+    },
+    "PW": {
+      "name": "Palau",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 7.5150, "longitude": 134.5825 }
+    },
+    "PY": {
+      "name": "Paraguay",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -23.4425, "longitude": -58.4438 }
+    },
+    "QA": {
+      "name": "Qatar",
+      "calculationMethod": "Qatar",
+      "madhhab": "Hanbali",
+      "coordinates": { "latitude": 25.3548, "longitude": 51.1839 }
+    },
+    "RE": {
+      "name": "Réunion",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -21.1151, "longitude": 55.5364 }
+    },
+    "RO": {
+      "name": "Romania",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 45.9432, "longitude": 24.9668 }
+    },
+    "RS": {
+      "name": "Serbia",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 44.0165, "longitude": 21.0059 }
+    },
+    "RU": {
+      "name": "Russia",
+      "calculationMethod": "Russia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 61.5240, "longitude": 105.3188 }
+    },
+    "RW": {
+      "name": "Rwanda",
+      "calculationMethod": "Egypt",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -1.9403, "longitude": 29.8739 }
+    },
+    "SA": {
+      "name": "Saudi Arabia",
+      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "madhhab": "Hanbali",
+      "coordinates": { "latitude": 23.8859, "longitude": 45.0792 }
+    },
+    "SB": {
+      "name": "Solomon Islands",
+      "calculationMethod": "Australia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -9.6457, "longitude": 160.1562 }
+    },
+    "SC": {
+      "name": "Seychelles",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -4.6796, "longitude": 55.4920 }
+    },
+    "SD": {
+      "name": "Sudan",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 12.8628, "longitude": 30.2176 }
+    },
+    "SE": {
+      "name": "Sweden",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 60.1282, "longitude": 18.6435 }
+    },
+    "SG": {
+      "name": "Singapore",
+      "calculationMethod": "Singapore",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 1.3521, "longitude": 103.8198 }
+    },
+    "SH": {
+      "name": "Saint Helena, Ascension and Tristan da Cunha",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -24.1434, "longitude": -10.0307 }
+    },
+    "SI": {
+      "name": "Slovenia",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 46.1512, "longitude": 14.9955 }
+    },
+    "SJ": {
+      "name": "Svalbard and Jan Mayen",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 77.5536, "longitude": 23.6703 }
+    },
+    "SK": {
+      "name": "Slovakia",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 48.6690, "longitude": 19.6990 }
+    },
+    "SL": {
+      "name": "Sierra Leone",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 8.4606, "longitude": -11.7799 }
+    },
+    "SM": {
+      "name": "San Marino",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 43.9424, "longitude": 12.4578 }
+    },
+    "SN": {
+      "name": "Senegal",
+      "calculationMethod": "Morocco",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 14.4974, "longitude": -14.4524 }
+    },
+    "SO": {
+      "name": "Somalia",
+      "calculationMethod": "Egypt",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 5.1521, "longitude": 46.1996 }
+    },
+    "SR": {
+      "name": "Suriname",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 3.9193, "longitude": -56.0278 }
+    },
+    "SS": {
+      "name": "South Sudan",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 6.8770, "longitude": 31.3070 }
+    },
+    "ST": {
+      "name": "São Tomé and Príncipe",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 0.1864, "longitude": 6.6131 }
+    },
+    "SV": {
+      "name": "El Salvador",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 13.7942, "longitude": -88.8965 }
+    },
+    "SX": {
+      "name": "Sint Maarten (Dutch part)",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 18.0425, "longitude": -63.0548 }
+    },
+    "SY": {
+      "name": "Syria",
+      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 34.8021, "longitude": 38.9968 }
+    },
+    "SZ": {
+      "name": "Eswatini",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -26.5225, "longitude": 31.4659 }
+    },
+    "TC": {
+      "name": "Turks and Caicos Islands",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 21.6940, "longitude": -71.7979 }
+    },
+    "TD": {
+      "name": "Chad",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 15.4542, "longitude": 18.7322 }
+    },
+    "TF": {
+      "name": "French Southern Territories",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -49.2804, "longitude": 69.3486 }
+    },
+    "TG": {
+      "name": "Togo",
+      "calculationMethod": "Egypt",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 8.6195, "longitude": 0.8248 }
+    },
+    "TH": {
+      "name": "Thailand",
+      "calculationMethod": "Department_of_Islamic_Advancement_Malaysia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 15.8700, "longitude": 100.9925 }
+    },
+    "TJ": {
+      "name": "Tajikistan",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 38.8610, "longitude": 71.2761 }
+    },
+    "TK": {
+      "name": "Tokelau",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -8.9670, "longitude": -171.8555 }
+    },
+    "TL": {
+      "name": "Timor-Leste",
+      "calculationMethod": "Indonesia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -8.8742, "longitude": 125.7275 }
+    },
+    "TM": {
+      "name": "Turkmenistan",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 38.9697, "longitude": 59.5563 }
+    },
+    "TN": {
+      "name": "Tunisia",
+      "calculationMethod": "Tunisia",
+      "madhhab": "Maliki",
+      "coordinates": { "latitude": 33.8869, "longitude": 9.5375 }
+    },
+    "TO": {
+      "name": "Tonga",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -21.1789, "longitude": -175.1982 }
+    },
+    "TR": {
+      "name": "Turkey",
+      "calculationMethod": "Turkey",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 38.9637, "longitude": 35.2433 }
+    },
+    "TT": {
+      "name": "Trinidad and Tobago",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 10.6918, "longitude": -61.2225 }
+    },
+    "TV": {
+      "name": "Tuvalu",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -7.1095, "longitude": 177.6493 }
+    },
+    "TW": {
+      "name": "Taiwan",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 23.6978, "longitude": 120.9605 }
+    },
+    "TZ": {
+      "name": "Tanzania",
+      "calculationMethod": "Egypt",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -6.3690, "longitude": 34.8888 }
+    },
+    "UA": {
+      "name": "Ukraine",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 48.3794, "longitude": 31.1656 }
+    },
+    "UG": {
+      "name": "Uganda",
+      "calculationMethod": "Egypt",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 1.3733, "longitude": 32.2903 }
+    },
+    "UM": {
+      "name": "United States Minor Outlying Islands",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 19.2823, "longitude": 166.6470 }
+    },
+    "US": {
+      "name": "United States",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 37.0902, "longitude": -95.7129 }
+    },
+    "UY": {
+      "name": "Uruguay",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -32.5228, "longitude": -55.7658 }
+    },
+    "UZ": {
+      "name": "Uzbekistan",
+      "calculationMethod": "University_of_Karachi",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 41.3775, "longitude": 64.5853 }
+    },
+    "VA": {
+      "name": "Vatican City",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 41.9029, "longitude": 12.4534 }
+    },
+    "VC": {
+      "name": "Saint Vincent and the Grenadines",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 12.9843, "longitude": -61.2872 }
+    },
+    "VE": {
+      "name": "Venezuela",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 6.4238, "longitude": -66.5897 }
+    },
+    "VG": {
+      "name": "Virgin Islands (British)",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 18.4207, "longitude": -64.6399 }
+    },
+    "VI": {
+      "name": "Virgin Islands (U.S.)",
+      "calculationMethod": "Islamic_Society_of_North_America",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 18.3358, "longitude": -64.8963 }
+    },
+    "VN": {
+      "name": "Vietnam",
+      "calculationMethod": "Department_of_Islamic_Advancement_Malaysia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 14.0583, "longitude": 108.2772 }
+    },
+    "VU": {
+      "name": "Vanuatu",
+      "calculationMethod": "Australia",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -15.3767, "longitude": 166.9592 }
+    },
+    "WF": {
+      "name": "Wallis and Futuna",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -13.7687, "longitude": -177.1562 }
+    },
+    "WS": {
+      "name": "Samoa",
+      "calculationMethod": "Australia",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": -13.7590, "longitude": -172.1046 }
+    },
+    "XK": {
+      "name": "Kosovo",
+      "calculationMethod": "Europe",
+      "madhhab": "Hanafi",
+      "coordinates": { "latitude": 42.6026, "longitude": 20.9030 }
+    },
+    "YE": {
+      "name": "Yemen",
+      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": 15.5527, "longitude": 48.5164 }
+    },
+    "YT": {
+      "name": "Mayotte",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -12.8275, "longitude": 45.1662 }
+    },
+    "ZA": {
+      "name": "South Africa",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -30.5595, "longitude": 22.9375 }
+    },
+    "ZM": {
+      "name": "Zambia",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -13.1339, "longitude": 27.8493 }
+    },
+    "ZW": {
+      "name": "Zimbabwe",
+      "calculationMethod": "South_Africa",
+      "madhhab": "Shafi",
+      "coordinates": { "latitude": -19.0154, "longitude": 29.1549 }
+    }
+  },
+  "calculationMethods": {
+    "Muslim_World_League": {
+      "name": "Muslim World League",
+      "fajrAngle": 18,
+      "ishaAngle": 17,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Global"
+    },
+    "Egyptian_General_Authority_of_Survey": {
+      "name": "Egyptian General Authority of Survey",
+      "fajrAngle": 19.5,
+      "ishaAngle": 17.5,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Egypt, Syria, Iraq, Lebanon, Malaysia, Parts of Indonesia"
+    },
+    "University_of_Karachi": {
+      "name": "University of Karachi",
+      "fajrAngle": 18,
+      "ishaAngle": 18,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Pakistan, Bangladesh, India, Afghanistan, Parts of Europe"
+    },
+    "Umm_al_Qura_University_Makkah": {
+      "name": "Umm al-Qura University, Makkah",
+      "fajrAngle": 18.5,
+      "ishaAngle": 0,
+      "maghribOffset": 0,
+      "ishaOffset": 90,
+      "region": "Saudi Arabia"
+    },
+    "Institute_of_Geophysics_University_of_Tehran": {
+      "name": "Institute of Geophysics, University of Tehran",
+      "fajrAngle": 17.7,
+      "ishaAngle": 14,
+      "maghribOffset": 4.5,
+      "ishaOffset": 0,
+      "region": "Iran, Some parts of Afghanistan"
+    },
+    "Islamic_Society_of_North_America": {
+      "name": "Islamic Society of North America (ISNA)",
+      "fajrAngle": 15,
+      "ishaAngle": 15,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "North America"
+    },
+    "Turkey": {
+      "name": "Turkey",
+      "fajrAngle": 18,
+      "ishaAngle": 17,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Turkey"
+    },
+    "Kuwait": {
+      "name": "Kuwait",
+      "fajrAngle": 18,
+      "ishaAngle": 17.5,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Kuwait"
+    },
+    "Qatar": {
+      "name": "Qatar",
+      "fajrAngle": 18,
+      "ishaAngle": 0,
+      "maghribOffset": 0,
+      "ishaOffset": 90,
+      "region": "Qatar"
+    },
+    "Singapore": {
+      "name": "Singapore",
+      "fajrAngle": 20,
+      "ishaAngle": 18,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Singapore"
+    },
+    "France_Union_of_Islamic_Organizations": {
+      "name": "Union of Islamic Organizations of France",
+      "fajrAngle": 12,
+      "ishaAngle": 12,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "France"
+    },
+    "London_Unified_Islamic_Society": {
+      "name": "London Unified Islamic Society",
+      "fajrAngle": 18,
+      "ishaAngle": 18,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "United Kingdom"
+    },
+    "Germany_Turkish_Islamic_Union": {
+      "name": "Diyanet İşleri Türk İslam Birliği",
+      "fajrAngle": 18,
+      "ishaAngle": 17,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Germany"
+    },
+    "Russia": {
+      "name": "Russia",
+      "fajrAngle": 16,
+      "ishaAngle": 15,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Russia"
+    },
+    "Europe": {
+      "name": "Europe",
+      "fajrAngle": 18,
+      "ishaAngle": 18,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Europe (General)"
+    },
+    "Morocco": {
+      "name": "Morocco",
+      "fajrAngle": 19,
+      "ishaAngle": 17,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Morocco"
+    },
+    "Algeria": {
+      "name": "Algeria",
+      "fajrAngle": 18,
+      "ishaAngle": 17,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Algeria"
+    },
+    "Tunisia": {
+      "name": "Tunisia",
+      "fajrAngle": 18,
+      "ishaAngle": 18,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Tunisia"
+    },
+    "Egypt": {
+      "name": "Egypt",
+      "fajrAngle": 19.5,
+      "ishaAngle": 17.5,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Egypt"
+    },
+    "Indonesia": {
+      "name": "Indonesia",
+      "fajrAngle": 20,
+      "ishaAngle": 18,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Indonesia"
+    },
+    "Department_of_Islamic_Advancement_Malaysia": {
+      "name": "Department of Islamic Advancement, Malaysia (JAKIM)",
+      "fajrAngle": 20,
+      "ishaAngle": 18,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Malaysia"
+    },
+    "Brunei": {
+      "name": "Brunei",
+      "fajrAngle": 20,
+      "ishaAngle": 18,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Brunei"
+    },
+    "Maldives": {
+      "name": "Maldives",
+      "fajrAngle": 18,
+      "ishaAngle": 18,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Maldives"
+    },
+    "Australia": {
+      "name": "Australia",
+      "fajrAngle": 18,
+      "ishaAngle": 18,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "Australia, New Zealand"
+    },
+    "South_Africa": {
+      "name": "South Africa",
+      "fajrAngle": 18,
+      "ishaAngle": 18,
+      "maghribOffset": 0,
+      "ishaOffset": 0,
+      "region": "South Africa"
+    }
+  },
+  "madhhabOptions": {
+    "Hanafi": {
+      "name": "Hanafi",
+      "asrShadowRatio": 2,
+      "regions": ["Pakistan", "India", "Bangladesh", "Afghanistan", "Turkey", "Central Asia", "Parts of Middle East", "Europe", "North America"]
+    },
+    "Shafi": {
+      "name": "Shafi",
+      "asrShadowRatio": 1,
+      "regions": ["Indonesia", "Malaysia", "Egypt", "Jordan", "Lebanon", "Palestine", "Yemen", "East Africa", "Southeast Asia"]
+    },
+    "Maliki": {
+      "name": "Maliki",
+      "asrShadowRatio": 1,
+      "regions": ["North Africa", "West Africa", "Sudan", "UAE", "Kuwait", "Bahrain", "Parts of Saudi Arabia"]
+    },
+    "Hanbali": {
+      "name": "Hanbali",
+      "asrShadowRatio": 1,
+      "regions": ["Saudi Arabia", "Qatar"]
+    },
+    "Jafari": {
+      "name": "Jafari (Shia)",
+      "asrShadowRatio": 1,
+      "regions": ["Iran", "Iraq", "Azerbaijan", "Parts of Lebanon", "Bahrain (Shia population)"]
+    },
+    "Ibadi": {
+      "name": "Ibadi",
+      "asrShadowRatio": 1,
+      "regions": ["Oman"]
+    }
+  }
+}

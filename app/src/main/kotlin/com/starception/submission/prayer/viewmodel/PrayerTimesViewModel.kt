@@ -11,6 +11,7 @@ import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.prayer.service.LocationService
 import com.starception.submission.prayer.service.EnhancedLocationService
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
+import com.starception.submission.prayer.service.CountryPrayerMethodService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -69,7 +70,8 @@ class PrayerTimesViewModel @Inject constructor(
     private val prayerCalculatorService: PrayerTimeCalculatorService,
     private val locationService: LocationService,
     private val enhancedLocationService: EnhancedLocationService,
-    private val settingsRepository: PrayerSettingsRepository
+    private val settingsRepository: PrayerSettingsRepository,
+    private val countryPrayerMethodService: CountryPrayerMethodService
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PrayerTimesUiState())
@@ -101,6 +103,19 @@ class PrayerTimesViewModel @Inject constructor(
         // Calculate fresh prayer times (will update cache if needed) - async to prevent ANR during startup
         viewModelScope.launch(Dispatchers.IO) {
             kotlinx.coroutines.delay(200) // Extra delay for startup
+            
+            // Try to auto-configure prayer method based on location during initial startup
+            tryInitialLocationBasedConfiguration()
+            
+            // If no auto-detection happened, test with UAE location for demo purposes
+            kotlinx.coroutines.delay(2000) // Wait a bit for initial config
+            val currentSettings = settings.value
+            if (!currentSettings.isMethodAutoDetected && 
+                currentSettings.calculationMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE) {
+                android.util.Log.d("PrayerTimesViewModel", "No auto-detection occurred, testing with UAE location")
+                testAutoDetectionWithUAELocation()
+            }
+            
             calculatePrayerTimes()
         }
         
@@ -167,6 +182,34 @@ class PrayerTimesViewModel @Inject constructor(
     }
     
     /**
+     * Updates settings and clears auto-detection info when user manually changes calculation method or madhhab
+     */
+    fun updateSettingsManually(newSettings: PrayerSettings) {
+        val currentSettings = settings.value
+        
+        // Clear auto-detection flags if user manually changed calculation method, madhhab, or custom angles
+        val clearedAutoDetectionSettings = if (
+            newSettings.calculationMethod != currentSettings.calculationMethod ||
+            newSettings.asrMadhhab != currentSettings.asrMadhhab ||
+            newSettings.customFajrAngle != currentSettings.customFajrAngle ||
+            newSettings.customIshaAngle != currentSettings.customIshaAngle ||
+            newSettings.customIshaDelay != currentSettings.customIshaDelay
+        ) {
+            newSettings.copy(
+                isMethodAutoDetected = false,
+                isMadhhabAutoDetected = false,
+                areCustomAnglesAutoDetected = false,
+                autoDetectedCountryName = null,
+                autoDetectedCountryCode = null
+            )
+        } else {
+            newSettings
+        }
+        
+        updateSettings(clearedAutoDetectionSettings)
+    }
+    
+    /**
      * Requests current GPS location with enhanced accuracy
      */
     fun requestCurrentLocation() {
@@ -196,12 +239,68 @@ class PrayerTimesViewModel @Inject constructor(
                     onSuccess = { androidLocation ->
                         val locationWithDetails = enhancedLocationService.getLocationDetails(androidLocation)
                         
-                        // Update settings with new location (preserve user's GPS preference)
+                        // Get country-specific prayer method recommendations
+                        android.util.Log.d("PrayerTimesViewModel", "Calling countryPrayerMethodService for location: ${androidLocation.latitude}, ${androidLocation.longitude}")
+                        val locationBasedSettings = countryPrayerMethodService.getPrayerMethodForLocation(androidLocation)
+                        android.util.Log.d("PrayerTimesViewModel", "Got location-based settings: ${locationBasedSettings.countryName}, isAutoDetected: ${locationBasedSettings.isAutoDetected}")
+                        
+                        // Update settings with new location and auto-detected prayer method
+                        val shouldAutoUpdate = shouldAutoUpdateMethod(locationBasedSettings)
                         val updatedSettings = settings.value.copy(
-                            location = locationWithDetails
+                            location = locationWithDetails,
+                            // Only auto-update calculation method if user hasn't manually changed it
+                            calculationMethod = if (shouldAutoUpdate) {
+                                locationBasedSettings.calculationMethod
+                            } else {
+                                settings.value.calculationMethod
+                            },
+                            asrMadhhab = if (shouldAutoUpdate) {
+                                locationBasedSettings.madhhab
+                            } else {
+                                settings.value.asrMadhhab
+                            },
+                            // Auto-populate custom angle fields from JSON data
+                            customFajrAngle = if (shouldAutoUpdate && locationBasedSettings.isAutoDetected) {
+                                locationBasedSettings.customFajrAngle
+                            } else {
+                                settings.value.customFajrAngle
+                            },
+                            customIshaAngle = if (shouldAutoUpdate && locationBasedSettings.isAutoDetected) {
+                                locationBasedSettings.customIshaAngle
+                            } else {
+                                settings.value.customIshaAngle
+                            },
+                            customIshaDelay = if (shouldAutoUpdate && locationBasedSettings.isAutoDetected) {
+                                locationBasedSettings.customIshaOffset
+                            } else {
+                                settings.value.customIshaDelay
+                            },
+                            // Store auto-detection information
+                            isMethodAutoDetected = shouldAutoUpdate && locationBasedSettings.isAutoDetected,
+                            isMadhhabAutoDetected = shouldAutoUpdate && locationBasedSettings.isAutoDetected,
+                            areCustomAnglesAutoDetected = shouldAutoUpdate && locationBasedSettings.isAutoDetected && 
+                                (locationBasedSettings.customFajrAngle != null || locationBasedSettings.customIshaAngle != null || locationBasedSettings.customIshaOffset != null),
+                            autoDetectedCountryName = if (locationBasedSettings.isAutoDetected) {
+                                locationBasedSettings.countryName
+                            } else {
+                                null
+                            },
+                            autoDetectedCountryCode = if (locationBasedSettings.isAutoDetected) {
+                                locationBasedSettings.countryCode
+                            } else {
+                                null
+                            }
                             // Don't override user's useGpsLocation preference
                         )
                         updateSettings(updatedSettings)
+                        
+                        // Show user feedback about auto-detected settings
+                        if (locationBasedSettings.isAutoDetected) {
+                            android.util.Log.i("PrayerTimesViewModel", 
+                                "Auto-detected ${locationBasedSettings.countryName}: " +
+                                "${locationBasedSettings.calculationMethod.displayName} + ${locationBasedSettings.madhhab.displayName}"
+                            )
+                        }
                         
                         _uiState.value = _uiState.value.copy(
                             isLoadingLocation = false,
@@ -262,6 +361,67 @@ class PrayerTimesViewModel @Inject constructor(
         }
     }
     
+    /**
+     * Tries to configure prayer method based on location during initial app startup
+     * This gives users auto-configuration even if GPS is disabled for ongoing updates
+     */
+    private suspend fun tryInitialLocationBasedConfiguration() {
+        try {
+            // Only attempt if current method is default and no country has been detected yet
+            val currentSettings = settings.value
+            if (currentSettings.isMethodAutoDetected || 
+                currentSettings.calculationMethod != CalculationMethod.MUSLIM_WORLD_LEAGUE ||
+                currentSettings.autoDetectedCountryName != null) {
+                android.util.Log.d("PrayerTimesViewModel", "Skipping initial location config - already configured")
+                return // Already configured
+            }
+            
+            // Attempt to get location for initial configuration
+            android.util.Log.d("PrayerTimesViewModel", "Attempting initial location-based configuration...")
+            if (enhancedLocationService.hasLocationPermission() && enhancedLocationService.isLocationEnabled()) {
+                val result = enhancedLocationService.getCurrentLocation()
+                result.fold(
+                    onSuccess = { androidLocation ->
+                        android.util.Log.d("PrayerTimesViewModel", "Got initial location: ${androidLocation.latitude}, ${androidLocation.longitude}")
+                        updateLocationWithAutoMethod(androidLocation)
+                    },
+                    onFailure = { exception ->
+                        android.util.Log.d("PrayerTimesViewModel", "Initial location failed: ${exception.message}")
+                    }
+                )
+            } else {
+                android.util.Log.d("PrayerTimesViewModel", "No location permission or location disabled")
+            }
+        } catch (e: Exception) {
+            android.util.Log.d("PrayerTimesViewModel", "Initial location configuration error: ${e.message}")
+        }
+    }
+
+    /**
+     * Manual test function to demonstrate auto-detection with UAE location
+     * This can be used for testing without requiring actual GPS location
+     */
+    fun testAutoDetectionWithUAELocation() {
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("PrayerTimesViewModel", "Testing auto-detection with UAE location (Dubai)")
+                
+                // Create a test location for UAE (Dubai coordinates)
+                val testLocation = android.location.Location("test").apply {
+                    latitude = 25.2048  // Dubai latitude
+                    longitude = 55.2708 // Dubai longitude
+                }
+                
+                // Trigger the country detection
+                updateLocationWithAutoMethod(testLocation)
+                
+                android.util.Log.d("PrayerTimesViewModel", "Test auto-detection completed")
+            } catch (e: Exception) {
+                android.util.Log.e("PrayerTimesViewModel", "Test auto-detection failed: ${e.message}", e)
+            }
+        }
+    }
+
     /**
      * Clears current error
      */
@@ -324,9 +484,7 @@ class PrayerTimesViewModel @Inject constructor(
                         val result = enhancedLocationService.getCurrentLocation()
                         result.fold(
                             onSuccess = { androidLocation ->
-                                val newLocation = enhancedLocationService.getLocationDetails(androidLocation)
-                                val updatedSettings = settings.value.copy(location = newLocation)
-                                updateSettings(updatedSettings)
+                                updateLocationWithAutoMethod(androidLocation)
                             },
                             onFailure = {
                                 // Continue with existing location if GPS fails
@@ -361,9 +519,7 @@ class PrayerTimesViewModel @Inject constructor(
                                 val result = enhancedLocationService.getCurrentLocation()
                                 result.fold(
                                     onSuccess = { androidLocation ->
-                                        val newLocation = enhancedLocationService.getLocationDetails(androidLocation)
-                                        val updatedSettings = settings.value.copy(location = newLocation)
-                                        updateSettings(updatedSettings)
+                                        updateLocationWithAutoMethod(androidLocation)
                                     },
                                     onFailure = {
                                         // Continue with existing location if GPS fails
@@ -414,8 +570,8 @@ class PrayerTimesViewModel @Inject constructor(
                                 
                                 // Only update if location has changed significantly (>100m)
                                 if (existingLocation == null || hasLocationChangedSignificantly(existingLocation, newLocation)) {
-                                    val updatedSettings = currentSettings.copy(location = newLocation)
-                                    updateSettings(updatedSettings)
+                                    // Update location with auto-method detection
+                                    updateLocationWithAutoMethod(androidLocation)
                                     
                                     // Silently recalculate prayer times with new location (no loading state)
                                     calculatePrayerTimes(showLoading = false, clearLoadingImmediately = true)
@@ -460,6 +616,60 @@ class PrayerTimesViewModel @Inject constructor(
         val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
         
         return earthRadius * c
+    }
+    
+    /**
+     * Determines whether to auto-update calculation method based on location
+     * Only auto-updates if user hasn't manually customized their method
+     */
+    private fun shouldAutoUpdateMethod(locationBasedSettings: com.starception.submission.prayer.service.LocationBasedPrayerSettings): Boolean {
+        val currentSettings = settings.value
+        
+        // Auto-update if:
+        // 1. Location was auto-detected successfully
+        // 2. Current method is still using defaults (likely first time or using regional defaults)
+        // 3. User hasn't explicitly set a custom method
+        return locationBasedSettings.isAutoDetected && 
+               (currentSettings.calculationMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE || 
+                currentSettings.location == null)
+    }
+    
+    /**
+     * Updates location with country-specific prayer method detection (for background updates)
+     */
+    private suspend fun updateLocationWithAutoMethod(androidLocation: android.location.Location) {
+        try {
+            val locationWithDetails = enhancedLocationService.getLocationDetails(androidLocation)
+            val locationBasedSettings = countryPrayerMethodService.getPrayerMethodForLocation(androidLocation)
+            
+            val updatedSettings = settings.value.copy(
+                location = locationWithDetails,
+                calculationMethod = if (shouldAutoUpdateMethod(locationBasedSettings)) {
+                    locationBasedSettings.calculationMethod
+                } else {
+                    settings.value.calculationMethod
+                },
+                asrMadhhab = if (shouldAutoUpdateMethod(locationBasedSettings)) {
+                    locationBasedSettings.madhhab
+                } else {
+                    settings.value.asrMadhhab
+                }
+            )
+            
+            updateSettings(updatedSettings)
+            
+            if (locationBasedSettings.isAutoDetected) {
+                android.util.Log.i("PrayerTimesViewModel", 
+                    "Background auto-update for ${locationBasedSettings.countryName}: " +
+                    "${locationBasedSettings.calculationMethod.displayName} + ${locationBasedSettings.madhhab.displayName}"
+                )
+            }
+        } catch (e: Exception) {
+            // Fallback to simple location update if country detection fails
+            val locationWithDetails = enhancedLocationService.getLocationDetails(androidLocation)
+            val updatedSettings = settings.value.copy(location = locationWithDetails)
+            updateSettings(updatedSettings)
+        }
     }
     
     /**
