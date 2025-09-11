@@ -1,5 +1,7 @@
 package com.starception.submission.prayer.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * PRAYER SETTINGS MODEL: User preferences for personalized prayer time calculations
  * 
@@ -28,6 +30,7 @@ package com.starception.submission.prayer.model
  * - Add prayer name customizations
  * - Include reminder settings
  */
+@Serializable
 data class PrayerSettings(
     // CALCULATION METHOD SETTINGS - Core astronomical parameters
     val calculationMethod: CalculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,  // Primary calculation standard
@@ -40,6 +43,7 @@ data class PrayerSettings(
     val autoDetectedCountryName: String? = null,     // Name of the auto-detected country
     val autoDetectedCountryCode: String? = null,     // Code of the auto-detected country
     val areCustomAnglesAutoDetected: Boolean = false, // Whether custom angles were auto-detected from JSON
+    val originalAutoDetectedSettingsJson: String? = null, // JSON backup of original auto-detected settings for restore
     
     // CUSTOM ANGLE OVERRIDES - Advanced user customizations
     val customFajrAngle: Double? = null,        // Override Fajr sun angle (degrees below horizon)
@@ -133,6 +137,7 @@ data class PrayerSettings(
  * - Include seasonal offset support
  * - Add location-based default offsets
  */
+@Serializable
 data class PrayerTimeOffsets(
     val fajr: Int = 0,      // Fajr (Dawn) offset in minutes
     val sunrise: Int = 0,   // Sunrise offset in minutes
@@ -163,3 +168,22 @@ data class PrayerTimeOffsets(
         }
     }
 }
+
+/**
+ * BACKUP DATA FOR RESTORE FUNCTIONALITY
+ * 
+ * Stores the original auto-detected settings for restore functionality.
+ * This is serialized to JSON and stored in PrayerSettings.originalAutoDetectedSettingsJson
+ */
+@Serializable
+data class AutoDetectedSettingsBackup(
+    val calculationMethod: CalculationMethod,
+    val asrMadhhab: AsrMadhhab,
+    val customFajrAngle: Double? = null,
+    val customIshaAngle: Double? = null,
+    val customIshaDelay: Int? = null,
+    val timeOffsets: PrayerTimeOffsets,
+    val countryName: String,
+    val countryCode: String,
+    val backupTimestamp: Long = System.currentTimeMillis()
+)

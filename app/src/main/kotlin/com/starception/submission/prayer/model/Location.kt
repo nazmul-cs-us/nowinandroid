@@ -1,5 +1,7 @@
 package com.starception.submission.prayer.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * LOCATION MODEL: Represents a geographical location for prayer time calculations
  * 
@@ -22,6 +24,7 @@ package com.starception.submission.prayer.model
  * - Modify validation rules
  * - Change display name formatting
  */
+@Serializable
 data class Location(
     // GPS COORDINATES - Core data for astronomical calculations
     val latitude: Double,        // North/South position (-90 to +90 degrees)

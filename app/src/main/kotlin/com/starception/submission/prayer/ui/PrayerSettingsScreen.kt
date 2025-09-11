@@ -9,10 +9,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -51,7 +53,10 @@ fun PrayerSettingsScreen(
     onSettingsChanged: (PrayerSettings) -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
-    showAsDialog: Boolean = false
+    showAsDialog: Boolean = false,
+    hasSettingsChanged: Boolean = false,
+    onRestoreClick: () -> Unit = {},
+    onSaveCurrentSettings: () -> Unit = {}
 ) {
     // Log screen composition with auto-detection status
     PrayerSettingsLogger.logScreenComposition(settings.useGpsLocation)
@@ -68,12 +73,30 @@ fun PrayerSettingsScreen(
     LaunchedEffect(settings.areCustomAnglesAutoDetected, settings.autoDetectedCountryName) {
         PrayerSettingsLogger.logAutoDetectionChange("Custom Angles", settings.areCustomAnglesAutoDetected, settings.autoDetectedCountryName)
     }
+    
+    // Handle back gesture properly - dismiss dialog and return to previous screen
+    BackHandler {
+        Log.d("PrayerSettingsScreen", "🔙 Back gesture detected - calling onBackClick")
+        onSaveCurrentSettings()
+        onBackClick()
+    }
+    
+    // Save current settings when screen is disposed (user navigates away)
+    DisposableEffect(Unit) {
+        onDispose {
+            Log.d("PrayerSettingsScreen", "💾 Screen disposed - saving current settings")
+            onSaveCurrentSettings()
+        }
+    }
+    
     if (showAsDialog) {
         // Dialog mode - no Scaffold, just content
         PrayerSettingsContent(
             settings = settings,
             onSettingsChanged = onSettingsChanged,
             onBackClick = onBackClick,
+            hasSettingsChanged = hasSettingsChanged,
+            onRestoreClick = onRestoreClick,
             modifier = modifier,
             showTopBar = true
         )
@@ -99,6 +122,8 @@ fun PrayerSettingsScreen(
                 settings = settings,
                 onSettingsChanged = onSettingsChanged,
                 onBackClick = onBackClick,
+                hasSettingsChanged = hasSettingsChanged,
+                onRestoreClick = onRestoreClick,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
@@ -115,7 +140,9 @@ private fun PrayerSettingsContent(
     onSettingsChanged: (PrayerSettings) -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
-    showTopBar: Boolean = false
+    showTopBar: Boolean = false,
+    hasSettingsChanged: Boolean = false,
+    onRestoreClick: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -146,6 +173,15 @@ private fun PrayerSettingsContent(
             }
             Divider()
             Spacer(modifier = Modifier.height(8.dp))
+        }
+        
+        // Restore Auto-Detected Settings - Show at top when available
+        if (hasSettingsChanged && settings.autoDetectedCountryName?.isNotEmpty() == true) {
+            RestoreAutoSettingsButton(
+                countryName = settings.autoDetectedCountryName ?: "",
+                onRestoreClick = onRestoreClick,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
         
         // Calculation Method Section
@@ -224,6 +260,8 @@ private fun PrayerSettingsContent(
                 }
             )
         }
+        
+        // Restore button moved to top of screen for better visibility
     }
 }
 
@@ -407,43 +445,87 @@ private fun CustomAnglesSection(
     modifier: Modifier = Modifier
 ) {
     android.util.Log.d("CustomAnglesSection", "📱 UI Debug: customFajrAngle=${settings.customFajrAngle}, customIshaAngle=${settings.customIshaAngle}, customIshaDelay=${settings.customIshaDelay}, areCustomAnglesAutoDetected=${settings.areCustomAnglesAutoDetected}")
+    
+    // Local state to handle text input properly - only reset when settings change from external source
+    var fajrAngleText by remember { mutableStateOf(settings.customFajrAngle?.toString() ?: "") }
+    var ishaAngleText by remember { mutableStateOf(settings.customIshaAngle?.toString() ?: "") }
+    var ishaDelayText by remember { mutableStateOf(settings.customIshaDelay?.toString() ?: "") }
+    
+    // Update text fields only when settings change from external sources (like restore)
+    LaunchedEffect(settings.customFajrAngle) {
+        // Only update if the current text doesn't represent the same value
+        val currentValue = fajrAngleText.toDoubleOrNull()
+        if (currentValue != settings.customFajrAngle) {
+            fajrAngleText = settings.customFajrAngle?.toString() ?: ""
+        }
+    }
+    
+    LaunchedEffect(settings.customIshaAngle) {
+        val currentValue = ishaAngleText.toDoubleOrNull()
+        if (currentValue != settings.customIshaAngle) {
+            ishaAngleText = settings.customIshaAngle?.toString() ?: ""
+        }
+    }
+    
+    LaunchedEffect(settings.customIshaDelay) {
+        val currentValue = ishaDelayText.toIntOrNull()
+        if (currentValue != settings.customIshaDelay) {
+            ishaDelayText = settings.customIshaDelay?.toString() ?: ""
+        }
+    }
+    
     Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
-                value = settings.customFajrAngle?.toString() ?: "",
+                value = fajrAngleText,
                 onValueChange = { value ->
-                    val angle = value.toDoubleOrNull()
-                    onSettingsChanged(settings.copy(customFajrAngle = angle))
+                    fajrAngleText = value
+                    // Only update settings when value is valid or empty
+                    val angle = if (value.isEmpty()) null else value.toDoubleOrNull()
+                    if (value.isEmpty() || angle != null) {
+                        onSettingsChanged(settings.copy(customFajrAngle = angle))
+                    }
                 },
                 label = { Text("Fajr Angle (°)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                isError = fajrAngleText.isNotEmpty() && fajrAngleText.toDoubleOrNull() == null
             )
             
             OutlinedTextField(
-                value = settings.customIshaAngle?.toString() ?: "",
+                value = ishaAngleText,
                 onValueChange = { value ->
-                    val angle = value.toDoubleOrNull()
-                    onSettingsChanged(settings.copy(customIshaAngle = angle))
+                    ishaAngleText = value
+                    // Only update settings when value is valid or empty
+                    val angle = if (value.isEmpty()) null else value.toDoubleOrNull()
+                    if (value.isEmpty() || angle != null) {
+                        onSettingsChanged(settings.copy(customIshaAngle = angle))
+                    }
                 },
                 label = { Text("Isha Angle (°)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                isError = ishaAngleText.isNotEmpty() && ishaAngleText.toDoubleOrNull() == null
             )
         }
         
         OutlinedTextField(
-            value = settings.customIshaDelay?.toString() ?: "",
+            value = ishaDelayText,
             onValueChange = { value ->
-                val delay = value.toIntOrNull()
-                onSettingsChanged(settings.copy(customIshaDelay = delay))
+                ishaDelayText = value
+                // Only update settings when value is valid or empty
+                val delay = if (value.isEmpty()) null else value.toIntOrNull()
+                if (value.isEmpty() || delay != null) {
+                    onSettingsChanged(settings.copy(customIshaDelay = delay))
+                }
             },
             label = { Text("Isha Delay (minutes after Maghrib)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            isError = ishaDelayText.isNotEmpty() && ishaDelayText.toIntOrNull() == null
         )
         
     }
@@ -509,14 +591,6 @@ private fun LocationSection(
             Text("Use GPS Location")
         }
         
-        if (location != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Current: ${location.getDisplayName()}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
     }
 }
 
@@ -551,6 +625,82 @@ private fun AutoDetectionBadge(
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium
             )
+        }
+    }
+}
+
+/**
+ * Restore button for auto-generated prayer settings
+ * Shows when user has auto-detected settings that can be restored
+ */
+@Composable
+private fun RestoreAutoSettingsButton(
+    countryName: String,
+    onRestoreClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+        ),
+        border = null
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoMode,
+                    contentDescription = "Auto-detected settings",
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(20.dp)
+                )
+                
+                Text(
+                    text = "Auto-configured for $countryName",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            
+            // Show what will be restored (always show all available options)
+            val restoredItems = listOf("Calculation Method", "Asr Calculation", "Custom Angles")
+            
+            Text(
+                text = "Will restore country-based settings: ${restoredItems.joinToString(", ")}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            OutlinedButton(
+                onClick = onRestoreClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Restore",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Restore Auto-Generated Settings",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
         }
     }
 }

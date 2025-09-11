@@ -32,6 +32,9 @@ fun PrayerSettingsDialog(
             onSettingsChanged = viewModel::updateSettingsManually,
             onBackClick = onDismiss,
             showAsDialog = false, // Use full screen mode with scaffold
+            hasSettingsChanged = viewModel.hasSettingsChanged(),
+            onRestoreClick = viewModel::restoreAutoDetectedSettings,
+            onSaveCurrentSettings = viewModel::saveCurrentSettings,
             modifier = Modifier.fillMaxSize()
         )
     }

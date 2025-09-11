@@ -1,8 +1,11 @@
 package com.starception.submission.prayer.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Prayer time calculation methods with their specific parameters
  */
+@Serializable
 enum class CalculationMethod(
     val displayName: String,
     val fajrAngle: Double,
@@ -87,6 +90,7 @@ enum class CalculationMethod(
 /**
  * Madhhab rules for Asr prayer calculation
  */
+@Serializable
 enum class AsrMadhhab(
     val displayName: String,
     val shadowFactor: Int,
@@ -108,6 +112,7 @@ enum class AsrMadhhab(
 /**
  * High latitude adjustment methods
  */
+@Serializable
 enum class HighLatitudeAdjustment(
     val displayName: String,
     val description: String
