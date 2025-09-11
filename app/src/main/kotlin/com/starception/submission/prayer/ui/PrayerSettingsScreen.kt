@@ -367,6 +367,7 @@ private fun CustomAnglesSection(
     onSettingsChanged: (PrayerSettings) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    android.util.Log.d("CustomAnglesSection", "📱 UI Debug: customFajrAngle=${settings.customFajrAngle}, customIshaAngle=${settings.customIshaAngle}, customIshaDelay=${settings.customIshaDelay}, areCustomAnglesAutoDetected=${settings.areCustomAnglesAutoDetected}")
     Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -405,6 +406,17 @@ private fun CustomAnglesSection(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
+        
+        // Show auto-detection indicator for custom angles
+        if (settings.areCustomAnglesAutoDetected && settings.autoDetectedCountryName != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "🌍 Custom angles auto-detected for ${settings.autoDetectedCountryName}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+        }
     }
 }
 
