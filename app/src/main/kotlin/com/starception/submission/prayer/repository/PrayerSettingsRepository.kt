@@ -15,11 +15,15 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 
 /**
  * PRAYER SETTINGS REPOSITORY: Persistent storage for user preferences and prayer data
@@ -53,30 +57,11 @@ class PrayerSettingsRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object {
-        // STORAGE CONFIGURATION - Edit these to change storage behavior
+        // STORAGE CONFIGURATION - JSON-based persistence system
         private const val PREFS_NAME = "prayer_settings"  // SharedPreferences file name
-        private const val KEY_CALCULATION_METHOD = "calculation_method"
-        private const val KEY_ASR_MADHHAB = "asr_madhhab"
-        private const val KEY_HIGH_LATITUDE_ADJUSTMENT = "high_latitude_adjustment"
-        private const val KEY_CUSTOM_FAJR_ANGLE = "custom_fajr_angle"
-        private const val KEY_CUSTOM_ISHA_ANGLE = "custom_isha_angle"
-        private const val KEY_CUSTOM_ISHA_DELAY = "custom_isha_delay"
-        private const val KEY_USE_GPS_LOCATION = "use_gps_location"
-        private const val KEY_MANUAL_LATITUDE = "manual_latitude"
-        private const val KEY_MANUAL_LONGITUDE = "manual_longitude"
-        private const val KEY_MANUAL_CITY = "manual_city"
-        private const val KEY_MANUAL_COUNTRY = "manual_country"
-        private const val KEY_MANUAL_TIMEZONE_OFFSET = "manual_timezone_offset"
+        private const val KEY_CURRENT_SETTINGS_JSON = "current_settings_json"  // Current user settings as JSON
         
-        // TIME OFFSET STORAGE KEYS - Per-prayer minute adjustments
-        private const val KEY_OFFSET_FAJR = "offset_fajr"        // Fajr offset in minutes
-        private const val KEY_OFFSET_SUNRISE = "offset_sunrise"  // Sunrise offset in minutes
-        private const val KEY_OFFSET_DHUHR = "offset_dhuhr"      // Dhuhr offset in minutes
-        private const val KEY_OFFSET_ASR = "offset_asr"          // Asr offset in minutes
-        private const val KEY_OFFSET_MAGHRIB = "offset_maghrib"  // Maghrib offset in minutes
-        private const val KEY_OFFSET_ISHA = "offset_isha"        // Isha offset in minutes
-        
-        // NOTIFICATION SETTINGS - Alert preferences
+        // NOTIFICATION SETTINGS - Alert preferences (kept separate for simplicity)
         private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"    // Master notification toggle
         private const val KEY_NOTIFY_BEFORE_MINUTES = "notify_before_minutes"   // Minutes before prayer to notify
         
@@ -101,8 +86,17 @@ class PrayerSettingsRepository @Inject constructor(
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
     
+    // JSON SERIALIZATION CONFIGURATION - Handles serialization/deserialization
+    private val json = Json {
+        ignoreUnknownKeys = true    // For backward compatibility
+        prettyPrint = false         // Compact storage
+    }
+    
     // REACTIVE DATA FLOW - UI automatically updates when settings change
     private val _settingsFlow = MutableStateFlow<PrayerSettings?>(null)
+    
+    // Flag to track when settings are fully loaded from storage
+    private var _settingsLoaded = false
     val settingsFlow: StateFlow<PrayerSettings> = _settingsFlow
         .filterNotNull()  // Only emit when settings are loaded
         .stateIn(
@@ -120,14 +114,18 @@ class PrayerSettingsRepository @Inject constructor(
                 // Add timeout to prevent ANR if SharedPreferences access hangs
                 kotlinx.coroutines.withTimeoutOrNull(5000L) { // 5 second timeout
                     _settingsFlow.value = loadSettings()
+                    _settingsLoaded = true // Mark as loaded
+                    android.util.Log.w("PrayerSettingsRepository", "🔥 SETTINGS LOADING COMPLETED - Flag set to true")
                 } ?: run {
                     // If timeout occurs, use default settings to prevent ANR
                     android.util.Log.w("PrayerSettingsRepository", "Settings loading timed out, using defaults")
                     _settingsFlow.value = getDefaultSettings()
+                    _settingsLoaded = true // Mark as loaded even with defaults
                 }
             } catch (e: Exception) {
                 android.util.Log.e("PrayerSettingsRepository", "Error loading settings, using defaults", e)
                 _settingsFlow.value = getDefaultSettings()
+                _settingsLoaded = true // Mark as loaded even with defaults
             }
         }
     }
@@ -152,6 +150,32 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
+     * AWAITABLE SETTINGS GETTER: Waits for settings to be properly loaded
+     * 
+     * This method waits for settings to be loaded from storage before returning.
+     * Use this when you need to ensure you're getting actual saved settings, not defaults.
+     * 
+     * BEHAVIOR:
+     * - Suspends until settings are loaded from storage
+     * - Returns actual saved settings (not defaults)
+     * - Safe to call from background coroutines
+     * 
+     * @return Properly loaded PrayerSettings (never defaults)
+     */
+    suspend fun getLoadedSettings(): PrayerSettings {
+        android.util.Log.w("PrayerSettingsRepository", "🔥 getLoadedSettings CALLED - loaded flag: $_settingsLoaded")
+        
+        // Wait until settings are loaded from storage
+        while (!_settingsLoaded) {
+            kotlinx.coroutines.delay(10) // Small delay to prevent busy waiting
+        }
+        
+        val loadedSettings = _settingsFlow.value ?: PrayerSettings()
+        android.util.Log.w("PrayerSettingsRepository", "🔥 getLoadedSettings RETURNING - Custom Isha: ${loadedSettings.customIshaAngle}")
+        return loadedSettings
+    }
+    
+    /**
      * SETTINGS UPDATE: Saves new prayer settings and notifies UI
      * 
      * This function updates prayer settings both in memory and persistent storage,
@@ -170,7 +194,18 @@ class PrayerSettingsRepository @Inject constructor(
      * @param forceCommit Whether to use synchronous commit() for immediate persistence
      */
     fun updateSettings(settings: PrayerSettings, forceCommit: Boolean = false) {
-        android.util.Log.d("PrayerSettingsRepository", "Updating settings - ASR: ${settings.asrMadhhab}, forceCommit: $forceCommit")
+        android.util.Log.w("PrayerSettingsRepository", "🔥🔥 UPDATE SETTINGS CALLED:")
+        android.util.Log.w("PrayerSettingsRepository", "  ASR: ${settings.asrMadhhab}")
+        android.util.Log.w("PrayerSettingsRepository", "  Custom Isha: ${settings.customIshaAngle}")
+        android.util.Log.w("PrayerSettingsRepository", "  Custom Fajr: ${settings.customFajrAngle}")
+        android.util.Log.w("PrayerSettingsRepository", "  Force Commit: $forceCommit")
+        
+        // STACK TRACE TO IDENTIFY CALLER
+        android.util.Log.w("PrayerSettingsRepository", "🔥 CALLER STACK TRACE:")
+        Thread.currentThread().stackTrace.take(8).forEach { element ->
+            android.util.Log.w("PrayerSettingsRepository", "  at ${element.className}.${element.methodName}(${element.fileName}:${element.lineNumber})")
+        }
+        
         saveSettings(settings, forceCommit)
         _settingsFlow.value = settings
         // Force trigger flow for UI updates
@@ -276,14 +311,13 @@ class PrayerSettingsRepository @Inject constructor(
     fun getNotifyBeforeMinutes(): Int = prefs.getInt(KEY_NOTIFY_BEFORE_MINUTES, 10)
     
     /**
-     * SETTINGS LOADER: Loads user preferences from persistent storage
+     * SETTINGS LOADER: Loads user preferences from JSON storage
      * 
-     * This function reads all prayer settings from SharedPreferences and constructs
-     * a complete PrayerSettings object. It includes error handling for corrupted
-     * or missing settings.
+     * This function reads prayer settings from JSON stored in SharedPreferences.
+     * It includes error handling for corrupted or missing JSON data.
      * 
      * ERROR HANDLING:
-     * - Uses try/catch for enum parsing
+     * - Uses try/catch for JSON parsing
      * - Falls back to default values on errors
      * - Logs errors for debugging
      * 
@@ -294,62 +328,30 @@ class PrayerSettingsRepository @Inject constructor(
      * @return Complete PrayerSettings object with all user preferences
      */
     private fun loadSettings(): PrayerSettings {
-        android.util.Log.d("PrayerSettingsRepository", "Loading settings from SharedPreferences")
-        val calculationMethod = try {
-            CalculationMethod.valueOf(prefs.getString(KEY_CALCULATION_METHOD, CalculationMethod.MUSLIM_WORLD_LEAGUE.name) ?: CalculationMethod.MUSLIM_WORLD_LEAGUE.name)
+        android.util.Log.w("PrayerSettingsRepository", "🔥 LOAD SETTINGS CALLED")
+        
+        return try {
+            val settingsJson = prefs.getString(KEY_CURRENT_SETTINGS_JSON, null)
+            android.util.Log.w("PrayerSettingsRepository", "🔥 JSON FROM STORAGE: ${if (settingsJson != null) "EXISTS (${settingsJson.length} chars)" else "NULL"}")
+            
+            if (settingsJson != null) {
+                android.util.Log.w("PrayerSettingsRepository", "🔥 JSON CONTENT: ${settingsJson.take(200)}...")
+                
+                val settings = json.decodeFromString<PrayerSettings>(settingsJson)
+                android.util.Log.w("PrayerSettingsRepository", "🔥 Settings loaded from JSON:")
+                android.util.Log.w("PrayerSettingsRepository", "  Calculation Method: ${settings.calculationMethod.name}")
+                android.util.Log.w("PrayerSettingsRepository", "  ASR Madhhab: ${settings.asrMadhhab.name}")
+                android.util.Log.w("PrayerSettingsRepository", "  Custom Isha Angle: ${settings.customIshaAngle}")
+                android.util.Log.w("PrayerSettingsRepository", "  Use GPS: ${settings.useGpsLocation}")
+                android.util.Log.w("PrayerSettingsRepository", "  Is Method Auto-Detected: ${settings.isMethodAutoDetected}")
+                settings
+            } else {
+                android.util.Log.w("PrayerSettingsRepository", "🔥 No JSON settings found, using defaults")
+                getDefaultSettings()
+            }
         } catch (e: Exception) {
-            CalculationMethod.MUSLIM_WORLD_LEAGUE
-        }
-        
-        val asrMadhhab = try {
-            val asrValue = prefs.getString(KEY_ASR_MADHHAB, AsrMadhhab.STANDARD.name) ?: AsrMadhhab.STANDARD.name
-            android.util.Log.d("PrayerSettingsRepository", "Loading ASR madhhab: $asrValue")
-            AsrMadhhab.valueOf(asrValue)
-        } catch (e: Exception) {
-            android.util.Log.e("PrayerSettingsRepository", "Error loading ASR madhhab: ${e.message}")
-            AsrMadhhab.STANDARD
-        }
-        
-        val highLatitudeAdjustment = try {
-            HighLatitudeAdjustment.valueOf(prefs.getString(KEY_HIGH_LATITUDE_ADJUSTMENT, HighLatitudeAdjustment.NONE.name) ?: HighLatitudeAdjustment.NONE.name)
-        } catch (e: Exception) {
-            HighLatitudeAdjustment.NONE
-        }
-        
-        val timeOffsets = PrayerTimeOffsets(
-            fajr = prefs.getInt(KEY_OFFSET_FAJR, 0),
-            sunrise = prefs.getInt(KEY_OFFSET_SUNRISE, 0),
-            dhuhr = prefs.getInt(KEY_OFFSET_DHUHR, 0),
-            asr = prefs.getInt(KEY_OFFSET_ASR, 0),
-            maghrib = prefs.getInt(KEY_OFFSET_MAGHRIB, 0),
-            isha = prefs.getInt(KEY_OFFSET_ISHA, 0)
-        )
-        
-        val location = if (prefs.contains(KEY_MANUAL_LATITUDE) && prefs.contains(KEY_MANUAL_LONGITUDE)) {
-            Location(
-                latitude = prefs.getFloat(KEY_MANUAL_LATITUDE, 0f).toDouble(),
-                longitude = prefs.getFloat(KEY_MANUAL_LONGITUDE, 0f).toDouble(),
-                city = prefs.getString(KEY_MANUAL_CITY, "") ?: "",
-                country = prefs.getString(KEY_MANUAL_COUNTRY, "") ?: "",
-                timeZoneOffset = prefs.getFloat(KEY_MANUAL_TIMEZONE_OFFSET, 0f).toDouble()
-            )
-        } else null
-        
-        return PrayerSettings(
-            calculationMethod = calculationMethod,
-            asrMadhhab = asrMadhhab,
-            highLatitudeAdjustment = highLatitudeAdjustment,
-            customFajrAngle = if (prefs.contains(KEY_CUSTOM_FAJR_ANGLE)) prefs.getFloat(KEY_CUSTOM_FAJR_ANGLE, 0f).toDouble() else null,
-            customIshaAngle = if (prefs.contains(KEY_CUSTOM_ISHA_ANGLE)) prefs.getFloat(KEY_CUSTOM_ISHA_ANGLE, 0f).toDouble() else null,
-            customIshaDelay = if (prefs.contains(KEY_CUSTOM_ISHA_DELAY)) prefs.getInt(KEY_CUSTOM_ISHA_DELAY, 0) else null,
-            timeOffsets = timeOffsets,
-            useGpsLocation = prefs.getBoolean(KEY_USE_GPS_LOCATION, true),
-            location = location
-        ).also { loadedSettings ->
-            android.util.Log.d("PrayerSettingsRepository", "Settings loaded from SharedPreferences:")
-            android.util.Log.d("PrayerSettingsRepository", "  GPS: ${loadedSettings.useGpsLocation}")
-            android.util.Log.d("PrayerSettingsRepository", "  Calculation Method: ${loadedSettings.calculationMethod.name}")
-            android.util.Log.d("PrayerSettingsRepository", "  Time Offsets: Fajr=${loadedSettings.timeOffsets.fajr}, Dhuhr=${loadedSettings.timeOffsets.dhuhr}, Asr=${loadedSettings.timeOffsets.asr}")
+            android.util.Log.e("PrayerSettingsRepository", "🔥 ERROR loading settings from JSON, using defaults", e)
+            getDefaultSettings()
         }
     }
     
@@ -373,6 +375,14 @@ class PrayerSettingsRepository @Inject constructor(
             calculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,
             asrMadhhab = AsrMadhhab.STANDARD,
             highLatitudeAdjustment = HighLatitudeAdjustment.NONE,
+            // Auto-detection information - default to not auto-detected
+            isMethodAutoDetected = false,
+            isMadhhabAutoDetected = false,
+            autoDetectedCountryName = null,
+            autoDetectedCountryCode = null,
+            areCustomAnglesAutoDetected = false,
+            originalAutoDetectedSettingsJson = null,
+            // Custom settings
             customFajrAngle = null,
             customIshaAngle = null,
             customIshaDelay = null,
@@ -383,71 +393,54 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * SETTINGS SAVER: Persists user preferences to disk storage
+     * SETTINGS SAVER: Persists user preferences to JSON storage
      * 
-     * This function writes all prayer settings to SharedPreferences for persistence
-     * across app restarts. It handles null values appropriately and includes
-     * logging for debugging.
+     * This function serializes all prayer settings to JSON and stores them
+     * in SharedPreferences for persistence across app restarts.
      * 
      * STORAGE STRATEGY:
-     * - Enum values stored as strings (future-proof)
-     * - Null custom values are removed (saves space)
-     * - Location data only saved when present
+     * - Complete settings object serialized to JSON
+     * - Compact storage format
      * - Uses atomic operations for consistency
      * 
      * @param settings The settings to save to persistent storage
+     * @param forceCommit Whether to use synchronous commit for immediate persistence
      */
     private fun saveSettings(settings: PrayerSettings, forceCommit: Boolean = true) {
-        android.util.Log.d("PrayerSettingsRepository", "Saving settings - ASR: ${settings.asrMadhhab.name}, forceCommit: $forceCommit")
-        android.util.Log.d("PrayerSettingsRepository", "Settings being saved:")
-        android.util.Log.d("PrayerSettingsRepository", "  GPS: ${settings.useGpsLocation}")
-        android.util.Log.d("PrayerSettingsRepository", "  Calculation Method: ${settings.calculationMethod.name}")
-        android.util.Log.d("PrayerSettingsRepository", "  Time Offsets: Fajr=${settings.timeOffsets.fajr}, Dhuhr=${settings.timeOffsets.dhuhr}, Asr=${settings.timeOffsets.asr}")
-        prefs.edit().apply {
-            putString(KEY_CALCULATION_METHOD, settings.calculationMethod.name)
-            putString(KEY_ASR_MADHHAB, settings.asrMadhhab.name)
-            putString(KEY_HIGH_LATITUDE_ADJUSTMENT, settings.highLatitudeAdjustment.name)
-            putBoolean(KEY_USE_GPS_LOCATION, settings.useGpsLocation)
+        android.util.Log.w("PrayerSettingsRepository", "🔥 SAVE SETTINGS CALLED - ASR: ${settings.asrMadhhab.name}, Custom Isha: ${settings.customIshaAngle}")
+        
+        try {
+            val settingsJson = json.encodeToString(settings)
+            android.util.Log.w("PrayerSettingsRepository", "🔥 JSON GENERATED: ${settingsJson.take(200)}...")
             
-            // Custom angles
-            settings.customFajrAngle?.let { putFloat(KEY_CUSTOM_FAJR_ANGLE, it.toFloat()) } ?: remove(KEY_CUSTOM_FAJR_ANGLE)
-            settings.customIshaAngle?.let { putFloat(KEY_CUSTOM_ISHA_ANGLE, it.toFloat()) } ?: remove(KEY_CUSTOM_ISHA_ANGLE)
-            settings.customIshaDelay?.let { putInt(KEY_CUSTOM_ISHA_DELAY, it) } ?: remove(KEY_CUSTOM_ISHA_DELAY)
+            val editor = prefs.edit()
+            editor.putString(KEY_CURRENT_SETTINGS_JSON, settingsJson)
             
-            // Time offsets
-            putInt(KEY_OFFSET_FAJR, settings.timeOffsets.fajr)
-            putInt(KEY_OFFSET_SUNRISE, settings.timeOffsets.sunrise)
-            putInt(KEY_OFFSET_DHUHR, settings.timeOffsets.dhuhr)
-            putInt(KEY_OFFSET_ASR, settings.timeOffsets.asr)
-            putInt(KEY_OFFSET_MAGHRIB, settings.timeOffsets.maghrib)
-            putInt(KEY_OFFSET_ISHA, settings.timeOffsets.isha)
-            
-            // Location
-            settings.location?.let { location ->
-                putFloat(KEY_MANUAL_LATITUDE, location.latitude.toFloat())
-                putFloat(KEY_MANUAL_LONGITUDE, location.longitude.toFloat())
-                putString(KEY_MANUAL_CITY, location.city)
-                putString(KEY_MANUAL_COUNTRY, location.country)
-                putFloat(KEY_MANUAL_TIMEZONE_OFFSET, location.timeZoneOffset.toFloat())
-            } ?: run {
-                remove(KEY_MANUAL_LATITUDE)
-                remove(KEY_MANUAL_LONGITUDE)
-                remove(KEY_MANUAL_CITY)
-                remove(KEY_MANUAL_COUNTRY)
-                remove(KEY_MANUAL_TIMEZONE_OFFSET)
-            }
-            
-            if (forceCommit) {
-                commit() // Use commit() for immediate synchronous write when persistence is critical
+            val result = if (forceCommit) {
+                val committed = editor.commit()
+                android.util.Log.w("PrayerSettingsRepository", "🔥 COMMIT RESULT: $committed")
+                committed
             } else {
-                apply() // Use apply() for async write when immediate persistence is not required
+                editor.apply()
+                android.util.Log.w("PrayerSettingsRepository", "🔥 APPLY CALLED")
+                true
             }
-        }.also {
-            val method = if (forceCommit) "committed synchronously" else "applied asynchronously"
-            android.util.Log.d("PrayerSettingsRepository", "Settings $method to SharedPreferences:")
-            android.util.Log.d("PrayerSettingsRepository", "  GPS: ${settings.useGpsLocation}")
-            android.util.Log.d("PrayerSettingsRepository", "  Calculation Method: ${settings.calculationMethod.name}")
-            android.util.Log.d("PrayerSettingsRepository", "  Time Offsets: Fajr=${settings.timeOffsets.fajr}, Dhuhr=${settings.timeOffsets.dhuhr}, Asr=${settings.timeOffsets.asr}")
+            
+            // Verify it was saved
+            val savedJson = prefs.getString(KEY_CURRENT_SETTINGS_JSON, null)
+            if (savedJson != null) {
+                android.util.Log.w("PrayerSettingsRepository", "🔥 VERIFICATION: JSON WAS SAVED SUCCESSFULLY - Length: ${savedJson.length}")
+            } else {
+                android.util.Log.e("PrayerSettingsRepository", "🔥 ERROR: JSON WAS NOT SAVED!")
+            }
+            
+            android.util.Log.w("PrayerSettingsRepository", "🔥 Settings saved to JSON storage:")
+            android.util.Log.w("PrayerSettingsRepository", "  Calculation Method: ${settings.calculationMethod.name}")
+            android.util.Log.w("PrayerSettingsRepository", "  ASR Madhhab: ${settings.asrMadhhab.name}")
+            android.util.Log.w("PrayerSettingsRepository", "  Custom Isha Angle: ${settings.customIshaAngle}")
+            
+        } catch (e: Exception) {
+            android.util.Log.e("PrayerSettingsRepository", "🔥 ERROR saving settings to JSON", e)
         }
     }
     

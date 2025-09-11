@@ -129,15 +129,17 @@ class PrayerTimesCalculator(private val context: Context) {
             }
             android.util.Log.d("PrayerCalculation", "No valid cached data found, proceeding with fresh calculation")
             
-            // STEP 3: Get user prayer settings
-            android.util.Log.d("PrayerCalculation", "STEP 3: Loading user prayer settings")
+            // STEP 3: Get user prayer settings (wait for proper loading)
+            android.util.Log.d("PrayerCalculation", "STEP 3: Loading user prayer settings (waiting for proper load)")
             val userSettings = try {
-                val settings = settingsRepository.getSettings()
-                android.util.Log.d("PrayerCalculation", "✓ User settings loaded:")
-                android.util.Log.d("PrayerCalculation", "  - Calculation Method: ${settings.calculationMethod.name}")
-                android.util.Log.d("PrayerCalculation", "  - Asr Madhab: ${settings.asrMadhhab.name}")
-                android.util.Log.d("PrayerCalculation", "  - High Latitude Adjustment: ${settings.highLatitudeAdjustment.name}")
-                android.util.Log.d("PrayerCalculation", "  - User Location: ${if (settings.location != null) "${settings.location?.getDisplayName()}" else "Not set"}")
+                val settings = settingsRepository.getLoadedSettings() // NEW: Wait for actual loaded settings
+                android.util.Log.w("PrayerCalculation", "✓ LOADED User settings (not defaults):")
+                android.util.Log.w("PrayerCalculation", "  - Calculation Method: ${settings.calculationMethod.name}")
+                android.util.Log.w("PrayerCalculation", "  - Asr Madhab: ${settings.asrMadhhab.name}")
+                android.util.Log.w("PrayerCalculation", "  - High Latitude Adjustment: ${settings.highLatitudeAdjustment.name}")
+                android.util.Log.w("PrayerCalculation", "  - Custom Fajr Angle: ${settings.customFajrAngle}")
+                android.util.Log.w("PrayerCalculation", "  - Custom Isha Angle: ${settings.customIshaAngle}")
+                android.util.Log.w("PrayerCalculation", "  - User Location: ${if (settings.location != null) "${settings.location?.getDisplayName()}" else "Not set"}")
                 settings
             } catch (e: Exception) {
                 android.util.Log.w("PrayerCalculation", "Failed to load user settings, using defaults: ${e.message}")
@@ -306,9 +308,12 @@ class PrayerTimesCalculator(private val context: Context) {
                     (location != userSettings.location && !location.getDisplayName().contains("Dubai"))
                 
                 if (shouldSaveLocation) {
-                    android.util.Log.d("PrayerCalculation", "Saving GPS location to settings: ${location.getDisplayName()}")
-                    settingsRepository.updateSettings(userSettings.copy(location = location), forceCommit = false)
-                    android.util.Log.d("PrayerCalculation", "✓ Location saved to settings (async) - notification service can now access it")
+                    android.util.Log.w("PrayerCalculation", "🔥 Saving GPS location to settings: ${location.getDisplayName()}")
+                    android.util.Log.w("PrayerCalculation", "🔥 BEFORE COPY - Custom Isha: ${userSettings.customIshaAngle}")
+                    val updatedSettings = userSettings.copy(location = location)
+                    android.util.Log.w("PrayerCalculation", "🔥 AFTER COPY - Custom Isha: ${updatedSettings.customIshaAngle}")
+                    settingsRepository.updateSettings(updatedSettings, forceCommit = false)
+                    android.util.Log.w("PrayerCalculation", "🔥 Location update call completed")
                 } else {
                     android.util.Log.d("PrayerCalculation", "Using existing saved location from settings: ${location.getDisplayName()}")
                 }

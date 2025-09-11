@@ -3,6 +3,7 @@ package com.starception.submission.prayer.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.prayer.model.AsrMadhhab
+import com.starception.submission.prayer.model.AutoDetectedSettingsBackup
 import com.starception.submission.prayer.model.CalculationMethod
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.Location
@@ -16,6 +17,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -102,7 +106,9 @@ class PrayerTimesViewModel @Inject constructor(
         
         // Calculate fresh prayer times (will update cache if needed) - async to prevent ANR during startup
         viewModelScope.launch(Dispatchers.IO) {
-            kotlinx.coroutines.delay(200) // Extra delay for startup
+            // Wait for settings to actually load from storage before running any initialization
+            val loadedSettings = settingsRepository.getLoadedSettings() // NEW: Wait for real settings
+            android.util.Log.w("PrayerTimesViewModel", "🔥 STARTING INITIALIZATION - Custom Isha: ${loadedSettings.customIshaAngle}")
             
             // Try to auto-configure prayer method based on location during initial startup
             tryInitialLocationBasedConfiguration()
@@ -110,10 +116,27 @@ class PrayerTimesViewModel @Inject constructor(
             // If no auto-detection happened, test with UAE location for demo purposes
             kotlinx.coroutines.delay(2000) // Wait a bit for initial config
             val currentSettings = settings.value
+            
+            // Check if user has customizations before testing with UAE location
+            val hasCustomAngles = currentSettings.customFajrAngle != null ||
+                                currentSettings.customIshaAngle != null ||
+                                currentSettings.customIshaDelay != null
+            
+            // Only skip if user has explicitly made changes AND we have backup data to distinguish from fresh install
+            val hasUserCustomizations = hasCustomAngles ||
+                                      // Skip if user previously had auto-detection but manually changed settings 
+                                      (currentSettings.originalAutoDetectedSettingsJson != null && 
+                                       (!currentSettings.isMethodAutoDetected || 
+                                        !currentSettings.isMadhhabAutoDetected || 
+                                        !currentSettings.areCustomAnglesAutoDetected))
+            
             if (!currentSettings.isMethodAutoDetected && 
-                currentSettings.calculationMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE) {
+                currentSettings.calculationMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE &&
+                !hasUserCustomizations) {
                 android.util.Log.d("PrayerTimesViewModel", "No auto-detection occurred, testing with UAE location")
                 testAutoDetectionWithUAELocation()
+            } else if (hasUserCustomizations) {
+                android.util.Log.w("PrayerTimesViewModel", "🔥 Skipping UAE test - user has customizations")
             }
             
             calculatePrayerTimes()
@@ -176,9 +199,11 @@ class PrayerTimesViewModel @Inject constructor(
      * Updates prayer settings
      */
     fun updateSettings(newSettings: PrayerSettings) {
-        android.util.Log.d("PrayerTimesViewModel", "updateSettings called - Method: ${newSettings.calculationMethod.name}")
+        android.util.Log.w("PrayerTimesViewModel", "🔥 UPDATE SETTINGS CALLED - Method: ${newSettings.calculationMethod.name}")
+        android.util.Log.w("PrayerTimesViewModel", "🔥 UPDATE SETTINGS - ASR: ${newSettings.asrMadhhab.name}")
+        android.util.Log.w("PrayerTimesViewModel", "🔥 UPDATE SETTINGS - Custom Isha: ${newSettings.customIshaAngle}")
         settingsRepository.updateSettings(newSettings, forceCommit = true) // User-triggered action needs immediate persistence
-        android.util.Log.d("PrayerTimesViewModel", "Repository updateSettings completed")
+        android.util.Log.w("PrayerTimesViewModel", "🔥 Repository updateSettings completed")
     }
     
     /**
@@ -188,6 +213,7 @@ class PrayerTimesViewModel @Inject constructor(
         val currentSettings = settings.value
         
         // Clear auto-detection flags if user manually changed calculation method, madhhab, or custom angles
+        // BUT preserve backup JSON and country information for restore functionality
         val clearedAutoDetectionSettings = if (
             newSettings.calculationMethod != currentSettings.calculationMethod ||
             newSettings.asrMadhhab != currentSettings.asrMadhhab ||
@@ -195,12 +221,15 @@ class PrayerTimesViewModel @Inject constructor(
             newSettings.customIshaAngle != currentSettings.customIshaAngle ||
             newSettings.customIshaDelay != currentSettings.customIshaDelay
         ) {
+            android.util.Log.i("PrayerTimesViewModel", "🔧 Manual settings change detected - preserving backup for restore")
             newSettings.copy(
                 isMethodAutoDetected = false,
                 isMadhhabAutoDetected = false,
                 areCustomAnglesAutoDetected = false,
-                autoDetectedCountryName = null,
-                autoDetectedCountryCode = null
+                // PRESERVE backup JSON and country data for restore functionality
+                originalAutoDetectedSettingsJson = currentSettings.originalAutoDetectedSettingsJson,
+                autoDetectedCountryName = currentSettings.autoDetectedCountryName,
+                autoDetectedCountryCode = currentSettings.autoDetectedCountryCode
             )
         } else {
             newSettings
@@ -370,12 +399,37 @@ class PrayerTimesViewModel @Inject constructor(
     private suspend fun tryInitialLocationBasedConfiguration() {
         try {
             // Only attempt if current method is default and no country has been detected yet
-            val currentSettings = settings.value
+            val currentSettings = settingsRepository.getLoadedSettings() // NEW: Use loaded settings
+            
+            // Skip if already auto-detected or user has made manual customizations
+            val hasCustomAngles = currentSettings.customFajrAngle != null ||
+                                currentSettings.customIshaAngle != null ||
+                                currentSettings.customIshaDelay != null
+            
+            // Only skip if user has explicitly made changes AND we have backup data to distinguish from fresh install
+            val hasUserCustomizations = hasCustomAngles ||
+                                      // Skip if user previously had auto-detection but manually changed settings 
+                                      (currentSettings.originalAutoDetectedSettingsJson != null && 
+                                       (!currentSettings.isMethodAutoDetected || 
+                                        !currentSettings.isMadhhabAutoDetected || 
+                                        !currentSettings.areCustomAnglesAutoDetected))
+            
+            android.util.Log.w("PrayerTimesViewModel", "🔥 AUTO-DETECTION CHECK:")
+            android.util.Log.w("PrayerTimesViewModel", "🔥 customFajrAngle: ${currentSettings.customFajrAngle}")
+            android.util.Log.w("PrayerTimesViewModel", "🔥 customIshaAngle: ${currentSettings.customIshaAngle}")
+            android.util.Log.w("PrayerTimesViewModel", "🔥 customIshaDelay: ${currentSettings.customIshaDelay}")
+            android.util.Log.w("PrayerTimesViewModel", "🔥 hasCustomAngles: $hasCustomAngles")
+            android.util.Log.w("PrayerTimesViewModel", "🔥 originalAutoDetectedSettingsJson != null: ${currentSettings.originalAutoDetectedSettingsJson != null}")
+            android.util.Log.w("PrayerTimesViewModel", "🔥 hasUserCustomizations: $hasUserCustomizations")
+            
             if (currentSettings.isMethodAutoDetected || 
                 currentSettings.calculationMethod != CalculationMethod.MUSLIM_WORLD_LEAGUE ||
-                currentSettings.autoDetectedCountryName != null) {
-                android.util.Log.d("PrayerTimesViewModel", "Skipping initial location config - already configured")
-                return // Already configured
+                currentSettings.autoDetectedCountryName != null ||
+                hasUserCustomizations) {
+                android.util.Log.w("PrayerTimesViewModel", "🔥 Skipping initial location config - user has customizations or already configured")
+                android.util.Log.w("PrayerTimesViewModel", "🔥 customFajrAngle: ${currentSettings.customFajrAngle}, customIshaAngle: ${currentSettings.customIshaAngle}")
+                android.util.Log.w("PrayerTimesViewModel", "🔥 isMethodAutoDetected: ${currentSettings.isMethodAutoDetected}, autoDetectedCountryName: ${currentSettings.autoDetectedCountryName}")
+                return // Already configured or user has customizations
             }
             
             // Attempt to get location for initial configuration
@@ -625,17 +679,40 @@ class PrayerTimesViewModel @Inject constructor(
      * Determines whether to auto-update calculation method based on location
      * Only auto-updates if user hasn't manually customized their method
      */
-    private fun shouldAutoUpdateMethod(locationBasedSettings: com.starception.submission.prayer.service.LocationBasedPrayerSettings): Boolean {
-        val currentSettings = settings.value
+    private suspend fun shouldAutoUpdateMethod(locationBasedSettings: com.starception.submission.prayer.service.LocationBasedPrayerSettings): Boolean {
+        val currentSettings = settingsRepository.getLoadedSettings() // NEW: Use loaded settings
         
-        // Auto-update if:
+        // Check if user has made manual customizations
+        val hasCustomAngles = currentSettings.customFajrAngle != null ||
+                            currentSettings.customIshaAngle != null ||
+                            currentSettings.customIshaDelay != null
+        
+        // Check if user has manually changed settings (has backup data but flags are false)
+        val hasUserCustomizations = hasCustomAngles ||
+                                   (currentSettings.originalAutoDetectedSettingsJson != null && 
+                                    (!currentSettings.isMethodAutoDetected || 
+                                     !currentSettings.isMadhhabAutoDetected || 
+                                     !currentSettings.areCustomAnglesAutoDetected))
+        
+        android.util.Log.w("PrayerTimesViewModel", "🔥 shouldAutoUpdateMethod CHECK:")
+        android.util.Log.w("PrayerTimesViewModel", "  customFajrAngle: ${currentSettings.customFajrAngle}")
+        android.util.Log.w("PrayerTimesViewModel", "  customIshaAngle: ${currentSettings.customIshaAngle}")
+        android.util.Log.w("PrayerTimesViewModel", "  hasCustomAngles: $hasCustomAngles")
+        android.util.Log.w("PrayerTimesViewModel", "  hasUserCustomizations: $hasUserCustomizations")
+        android.util.Log.w("PrayerTimesViewModel", "  isAutoDetected: ${locationBasedSettings.isAutoDetected}")
+        android.util.Log.w("PrayerTimesViewModel", "  currentMethod: ${currentSettings.calculationMethod}")
+        android.util.Log.w("PrayerTimesViewModel", "  currentLocation: ${currentSettings.location}")
+        
+        // Auto-update ONLY if:
         // 1. Location was auto-detected successfully
         // 2. Current method is still using defaults (likely first time or using regional defaults)
-        // 3. User hasn't explicitly set a custom method
+        // 3. User hasn't explicitly made customizations
         val result = locationBasedSettings.isAutoDetected && 
-               (currentSettings.calculationMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE || 
-                currentSettings.location == null)
-        android.util.Log.d("PrayerTimesViewModel", "⚡ shouldAutoUpdateMethod: result=$result, isAutoDetected=${locationBasedSettings.isAutoDetected}, currentMethod=${currentSettings.calculationMethod}, currentLocation=${currentSettings.location}")
+                   (currentSettings.calculationMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE || 
+                    currentSettings.location == null) &&
+                   !hasUserCustomizations  // NEW: Don't override user customizations
+        
+        android.util.Log.w("PrayerTimesViewModel", "🔥 shouldAutoUpdateMethod RESULT: $result")
         return result
     }
     
@@ -644,38 +721,44 @@ class PrayerTimesViewModel @Inject constructor(
      */
     private suspend fun updateLocationWithAutoMethod(androidLocation: android.location.Location) {
         try {
+            android.util.Log.w("PrayerTimesViewModel", "🔥 updateLocationWithAutoMethod CALLED")
+            val beforeSettings = settingsRepository.getLoadedSettings() // Check loaded settings
+            android.util.Log.w("PrayerTimesViewModel", "  Current Custom Isha BEFORE: ${beforeSettings.customIshaAngle}")
+            
             val locationWithDetails = enhancedLocationService.getLocationDetails(androidLocation)
             val locationBasedSettings = countryPrayerMethodService.getPrayerMethodForLocation(androidLocation)
             
             val shouldAutoUpdate = shouldAutoUpdateMethod(locationBasedSettings)
-            android.util.Log.d("PrayerTimesViewModel", "🔧 FIXED: Processing angles - Fajr=${locationBasedSettings.customFajrAngle}°, Isha=${locationBasedSettings.customIshaAngle}°, IshaDelay=${locationBasedSettings.customIshaOffset}min")
-            val updatedSettings = settings.value.copy(
+            android.util.Log.w("PrayerTimesViewModel", "🔥 Processing angles - shouldAutoUpdate: $shouldAutoUpdate")
+            android.util.Log.w("PrayerTimesViewModel", "🔥 Fajr=${locationBasedSettings.customFajrAngle}°, Isha=${locationBasedSettings.customIshaAngle}°, IshaDelay=${locationBasedSettings.customIshaOffset}min")
+            val currentSettings = settingsRepository.getLoadedSettings() // NEW: Use loaded settings
+            val updatedSettings = currentSettings.copy(
                 location = locationWithDetails,
                 calculationMethod = if (shouldAutoUpdate) {
                     locationBasedSettings.calculationMethod
                 } else {
-                    settings.value.calculationMethod
+                    currentSettings.calculationMethod
                 },
                 asrMadhhab = if (shouldAutoUpdate) {
                     locationBasedSettings.madhhab
                 } else {
-                    settings.value.asrMadhhab
+                    currentSettings.asrMadhhab
                 },
                 // Auto-populate custom angle fields from JSON data
                 customFajrAngle = if (shouldAutoUpdate && locationBasedSettings.isAutoDetected) {
                     locationBasedSettings.customFajrAngle
                 } else {
-                    settings.value.customFajrAngle
+                    currentSettings.customFajrAngle
                 },
                 customIshaAngle = if (shouldAutoUpdate && locationBasedSettings.isAutoDetected) {
                     locationBasedSettings.customIshaAngle
                 } else {
-                    settings.value.customIshaAngle
+                    currentSettings.customIshaAngle
                 },
                 customIshaDelay = if (shouldAutoUpdate && locationBasedSettings.isAutoDetected) {
                     locationBasedSettings.customIshaOffset
                 } else {
-                    settings.value.customIshaDelay
+                    currentSettings.customIshaDelay
                 },
                 // Store auto-detection information
                 isMethodAutoDetected = shouldAutoUpdate && locationBasedSettings.isAutoDetected,
@@ -694,8 +777,20 @@ class PrayerTimesViewModel @Inject constructor(
                 }
             )
             
-            android.util.Log.d("PrayerTimesViewModel", "🔧 FINAL: Saving angles - Fajr=${updatedSettings.customFajrAngle}°, Isha=${updatedSettings.customIshaAngle}°, IshaDelay=${updatedSettings.customIshaDelay}min, autoDetected=${updatedSettings.areCustomAnglesAutoDetected}")
-            updateSettings(updatedSettings)
+            // Create JSON backup if this is a new auto-detection
+            val finalSettings = if (shouldAutoUpdate && locationBasedSettings.isAutoDetected && 
+                                   currentSettings.originalAutoDetectedSettingsJson == null) {
+                val backupJson = createSettingsBackup(updatedSettings, locationBasedSettings.countryName, locationBasedSettings.countryCode)
+                android.util.Log.i("PrayerTimesViewModel", "💾 Creating backup for auto-detected settings: ${locationBasedSettings.countryName}")
+                updatedSettings.copy(originalAutoDetectedSettingsJson = backupJson)
+            } else {
+                updatedSettings
+            }
+            
+            android.util.Log.w("PrayerTimesViewModel", "🔥 FINAL: Saving angles - Fajr=${finalSettings.customFajrAngle}°, Isha=${finalSettings.customIshaAngle}°, IshaDelay=${finalSettings.customIshaDelay}min, autoDetected=${finalSettings.areCustomAnglesAutoDetected}")
+            updateSettings(finalSettings)
+            android.util.Log.w("PrayerTimesViewModel", "🔥 updateLocationWithAutoMethod COMPLETED")
+            android.util.Log.w("PrayerTimesViewModel", "  Current Custom Isha AFTER: ${settings.value.customIshaAngle}")
             
             if (locationBasedSettings.isAutoDetected) {
                 android.util.Log.i("PrayerTimesViewModel", 
@@ -728,6 +823,101 @@ class PrayerTimesViewModel @Inject constructor(
                 error = null
             )
         }
+    }
+
+    // =============================================
+    // BACKUP & RESTORE SYSTEM FOR AUTO-DETECTED SETTINGS
+    // =============================================
+    
+    private val json = Json { ignoreUnknownKeys = true }
+    
+    /**
+     * Creates a JSON backup of the current settings after auto-detection
+     */
+    private fun createSettingsBackup(settings: PrayerSettings, countryName: String, countryCode: String): String {
+        val backup = AutoDetectedSettingsBackup(
+            calculationMethod = settings.calculationMethod,
+            asrMadhhab = settings.asrMadhhab,
+            customFajrAngle = settings.customFajrAngle,
+            customIshaAngle = settings.customIshaAngle,
+            customIshaDelay = settings.customIshaDelay,
+            timeOffsets = settings.timeOffsets,
+            countryName = countryName,
+            countryCode = countryCode
+        )
+        return json.encodeToString(backup)
+    }
+    
+    /**
+     * Checks if current settings differ from the backed-up original settings
+     */
+    fun hasSettingsChanged(): Boolean {
+        val current = settings.value
+        val backupJson = current.originalAutoDetectedSettingsJson ?: return false
+        
+        try {
+            val backup = json.decodeFromString<AutoDetectedSettingsBackup>(backupJson)
+            
+            return current.calculationMethod != backup.calculationMethod ||
+                   current.asrMadhhab != backup.asrMadhhab ||
+                   current.customFajrAngle != backup.customFajrAngle ||
+                   current.customIshaAngle != backup.customIshaAngle ||
+                   current.customIshaDelay != backup.customIshaDelay ||
+                   current.timeOffsets != backup.timeOffsets
+        } catch (e: Exception) {
+            android.util.Log.e("PrayerTimesViewModel", "Failed to parse backup JSON", e)
+            return false
+        }
+    }
+    
+    /**
+     * Restores settings from the JSON backup
+     */
+    fun restoreAutoDetectedSettings() {
+        val current = settings.value
+        val backupJson = current.originalAutoDetectedSettingsJson ?: return
+        
+        try {
+            val backup = json.decodeFromString<AutoDetectedSettingsBackup>(backupJson)
+            
+            android.util.Log.i("PrayerTimesViewModel", "🔄 Restoring auto-detected settings for ${backup.countryName}")
+            
+            val restoredSettings = current.copy(
+                calculationMethod = backup.calculationMethod,
+                asrMadhhab = backup.asrMadhhab,
+                customFajrAngle = backup.customFajrAngle,
+                customIshaAngle = backup.customIshaAngle,
+                customIshaDelay = backup.customIshaDelay,
+                timeOffsets = backup.timeOffsets,
+                // Keep the backup and country info
+                autoDetectedCountryName = backup.countryName,
+                autoDetectedCountryCode = backup.countryCode,
+                // Reset auto-detection flags since we're restoring
+                isMethodAutoDetected = true,
+                isMadhhabAutoDetected = true,
+                areCustomAnglesAutoDetected = backup.customFajrAngle != null || backup.customIshaAngle != null || backup.customIshaDelay != null
+            )
+            
+            updateSettings(restoredSettings)
+            android.util.Log.i("PrayerTimesViewModel", "✅ Successfully restored settings to original auto-detected values")
+        } catch (e: Exception) {
+            android.util.Log.e("PrayerTimesViewModel", "❌ Failed to restore settings from backup", e)
+        }
+    }
+    
+    /**
+     * SAVE CURRENT SETTINGS: Forces immediate save of current settings
+     * 
+     * This function ensures the current settings are saved immediately,
+     * typically called when the user navigates away from the settings page
+     * to prevent losing any changes they made.
+     */
+    fun saveCurrentSettings() {
+        android.util.Log.w("PrayerTimesViewModel", "🔥 💾 SAVE CURRENT SETTINGS CALLED")
+        android.util.Log.w("PrayerTimesViewModel", "🔥 Current settings - Method: ${settings.value.calculationMethod.name}")
+        android.util.Log.w("PrayerTimesViewModel", "🔥 Current settings - ASR: ${settings.value.asrMadhhab.name}")
+        android.util.Log.w("PrayerTimesViewModel", "🔥 Current settings - Custom Isha: ${settings.value.customIshaAngle}")
+        updateSettings(settings.value)
     }
 }
 
