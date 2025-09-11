@@ -3,6 +3,7 @@ package com.starception.submission.prayer.service
 import android.content.Context
 import android.location.Geocoder
 import android.location.Location as AndroidLocation
+import android.util.Log
 import com.starception.submission.prayer.model.CalculationMethod
 import com.starception.submission.prayer.model.AsrMadhhab
 import com.starception.submission.prayer.model.Location
@@ -44,6 +45,17 @@ import javax.inject.Singleton
 class CountryPrayerMethodService @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    
+    companion object {
+        private const val TAG = "CountryPrayerMethodService"
+        private const val JSON_FILE = "country_prayer_methods.json"
+        
+        // Logging levels for different operations
+        private fun logInfo(message: String) = Log.i(TAG, message)
+        private fun logDebug(message: String) = Log.d(TAG, message)
+        private fun logWarning(message: String) = Log.w(TAG, message)
+        private fun logError(message: String, throwable: Throwable? = null) = Log.e(TAG, message, throwable)
+    }
 
     private var countryData: CountryPrayerData? = null
     private val json = Json { ignoreUnknownKeys = true }
@@ -54,26 +66,41 @@ class CountryPrayerMethodService @Inject constructor(
     suspend fun getPrayerMethodForLocation(
         location: AndroidLocation
     ): LocationBasedPrayerSettings = withContext(Dispatchers.IO) {
-        android.util.Log.d("CountryPrayerMethodService", "Getting prayer method for location: ${location.latitude}, ${location.longitude}")
+        logInfo("🌍 Starting auto-detection for coordinates: ${String.format("%.6f", location.latitude)}, ${String.format("%.6f", location.longitude)}")
+        
         try {
             // Load country data if not already loaded
             if (countryData == null) {
-                android.util.Log.d("CountryPrayerMethodService", "Loading country data...")
+                logDebug("📦 Loading country prayer methods database...")
+                val startTime = System.currentTimeMillis()
                 loadCountryData()
+                val loadTime = System.currentTimeMillis() - startTime
+                logDebug("✅ Country data loaded successfully in ${loadTime}ms (${countryData?.countries?.size} countries, ${countryData?.calculationMethods?.size} methods)")
             }
 
             // Get country code from coordinates
-            android.util.Log.d("CountryPrayerMethodService", "Getting country code from location...")
+            logDebug("🔍 Performing reverse geocoding...")
             val countryCode = getCountryCodeFromLocation(location)
-            android.util.Log.d("CountryPrayerMethodService", "Detected country code: $countryCode")
+            
+            if (countryCode != null) {
+                logInfo("🏳️ Country detected: $countryCode")
+            } else {
+                logWarning("⚠️ Unable to detect country from coordinates")
+            }
             
             // Get country-specific settings
             val countrySettings = if (countryCode != null) {
                 val settings = countryData?.countries?.get(countryCode)
-                android.util.Log.d("CountryPrayerMethodService", "Country settings for $countryCode: ${settings?.name}")
+                if (settings != null) {
+                    logInfo("📋 Found prayer settings for ${settings.name} ($countryCode)")
+                    logDebug("   - Calculation Method: ${settings.calculationMethod}")
+                    logDebug("   - Madhhab: ${settings.madhhab}")
+                } else {
+                    logWarning("❌ No prayer settings found for country code: $countryCode")
+                }
                 settings
             } else {
-                android.util.Log.d("CountryPrayerMethodService", "No country code detected, using regional default")
+                logDebug("🌐 Falling back to regional defaults")
                 null
             }
             
@@ -81,9 +108,16 @@ class CountryPrayerMethodService @Inject constructor(
                 // Get calculation method details from JSON
                 val calculationMethodDetails = countryData?.calculationMethods?.get(countrySettings.calculationMethod)
                 
+                // Map the calculation method and madhhab
+                val mappedCalculationMethod = mapCalculationMethod(countrySettings.calculationMethod)
+                val mappedMadhhab = mapMadhhab(countrySettings.madhhab)
+                
+                logDebug("🔄 Mapping calculation method: ${countrySettings.calculationMethod} → ${mappedCalculationMethod.displayName}")
+                logDebug("🔄 Mapping madhhab: ${countrySettings.madhhab} → $mappedMadhhab")
+                
                 val result = LocationBasedPrayerSettings(
-                    calculationMethod = mapCalculationMethod(countrySettings.calculationMethod),
-                    madhhab = mapMadhhab(countrySettings.madhhab),
+                    calculationMethod = mappedCalculationMethod,
+                    madhhab = mappedMadhhab,
                     countryName = countrySettings.name,
                     countryCode = countryCode ?: "UNKNOWN",
                     isAutoDetected = true,
@@ -100,16 +134,29 @@ class CountryPrayerMethodService @Inject constructor(
                         if (method.ishaOffset != 0.0) method.ishaOffset.toInt() else null
                     }
                 )
-                android.util.Log.d("CountryPrayerMethodService", 
-                    "Returning auto-detected settings: ${result.countryName} - ${result.calculationMethod.displayName}" +
-                    " (Fajr: ${result.customFajrAngle}°, Isha: ${result.customIshaAngle ?: "offset ${result.customIshaOffset}min"})")
+                
+                // Log comprehensive result
+                logInfo("✅ Auto-detection successful for ${result.countryName}")
+                logDebug("📊 Final Settings:")
+                logDebug("   - Method: ${result.calculationMethod.displayName}")
+                logDebug("   - Madhhab: ${result.madhhab}")
+                logDebug("   - Fajr Angle: ${result.customFajrAngle ?: "default"}°")
+                logDebug("   - Isha: ${result.customIshaAngle?.let { "${it}°" } ?: result.customIshaOffset?.let { "${it}min offset" } ?: "default"}")
+                logDebug("   - Maghrib Offset: ${result.customMaghribOffset ?: "default"}min")
+                
                 result
             } else {
                 // Fallback to regional defaults based on coordinates
+                logDebug("🌐 Using regional defaults for unknown country")
                 getRegionalDefault(location)
             }
         } catch (e: Exception) {
-            // Ultimate fallback
+            // Ultimate fallback with comprehensive error logging
+            logError("❌ Auto-detection failed - using ultimate fallback", e)
+            logError("   - Error type: ${e.javaClass.simpleName}")
+            logError("   - Message: ${e.message}")
+            logWarning("🔧 Using Muslim World League method as safe default")
+            
             LocationBasedPrayerSettings(
                 calculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,
                 madhhab = AsrMadhhab.STANDARD,
@@ -125,12 +172,25 @@ class CountryPrayerMethodService @Inject constructor(
      */
     private suspend fun loadCountryData() = withContext(Dispatchers.IO) {
         try {
-            val inputStream = context.assets.open("country_prayer_methods.json")
+            logDebug("📂 Reading $JSON_FILE from assets...")
+            val inputStream = context.assets.open(JSON_FILE)
             val jsonString = inputStream.bufferedReader().use { it.readText() }
+            
+            logDebug("🔍 Parsing JSON data...")
             countryData = json.decodeFromString<CountryPrayerData>(jsonString)
+            
+            logInfo("✅ Successfully loaded prayer methods database")
+            logDebug("   - Countries: ${countryData?.countries?.size}")
+            logDebug("   - Calculation Methods: ${countryData?.calculationMethods?.size}")
+            logDebug("   - Madhhab Options: ${countryData?.madhhabOptions?.size}")
+            
+        } catch (e: IOException) {
+            logError("❌ Failed to read $JSON_FILE from assets", e)
+            logError("   - Check if file exists in app/src/main/assets/")
         } catch (e: Exception) {
-            // Log error but continue with fallback system
-            android.util.Log.e("CountryPrayerMethodService", "Failed to load country data", e)
+            logError("❌ Failed to parse country data JSON", e)
+            logError("   - File: $JSON_FILE")
+            logError("   - Error: ${e.message}")
         }
     }
 
@@ -140,14 +200,28 @@ class CountryPrayerMethodService @Inject constructor(
     private suspend fun getCountryCodeFromLocation(location: AndroidLocation): String? = withContext(Dispatchers.IO) {
         try {
             if (!Geocoder.isPresent()) {
+                logWarning("⚠️ Geocoder service not available on this device")
                 return@withContext null
             }
 
+            logDebug("🌐 Performing reverse geocoding for coordinates...")
             val geocoder = Geocoder(context, Locale.getDefault())
             val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
             
-            return@withContext addresses?.firstOrNull()?.countryCode
+            val countryCode = addresses?.firstOrNull()?.countryCode
+            if (countryCode != null) {
+                val countryName = addresses.firstOrNull()?.countryName
+                logDebug("🏳️ Geocoding successful: $countryName ($countryCode)")
+            } else {
+                logWarning("⚠️ Geocoding returned no results for location")
+            }
+            
+            return@withContext countryCode
         } catch (e: IOException) {
+            logError("❌ Geocoding failed due to network/service issue", e)
+            null
+        } catch (e: Exception) {
+            logError("❌ Unexpected error during geocoding", e)
             null
         }
     }
