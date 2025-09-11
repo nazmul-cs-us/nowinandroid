@@ -199,3 +199,39 @@ All cards in the app follow a consistent design pattern:
 - **Calculation Methods**: 25+ recognized Islamic calculation methods with precise parameters
 - **Madhhab Options**: Shadow ratio configurations for different schools of Islamic jurisprudence
 - **Geographic Data**: Coordinate information for location-based validation and defaults
+
+## Auto-Detection System Logging
+
+### Comprehensive Logging Framework
+- **Structured Logs**: Emoji-based categorization for easy identification and filtering
+- **Performance Monitoring**: Database loading times, geocoding performance tracking
+- **Debug Support**: Complete flow visibility from GPS coordinates to final settings
+- **Error Tracking**: Detailed error reporting with fallback scenario logging
+
+### Logging Categories
+- **🌍 Location Detection**: GPS processing and reverse geocoding status
+- **📦 Data Loading**: JSON database loading and parsing performance  
+- **🔄 Method Mapping**: Calculation method and madhhab mapping process
+- **📊 Final Results**: Complete auto-detection results summary
+- **⚠️ Error Handling**: Warning and error scenarios with context
+- **🔧 UI Interactions**: Settings screen auto-detection indicator updates
+
+### Development Commands
+```bash
+# View all auto-detection logs
+adb logcat -s "CountryPrayerMethodService" "PrayerSettingsScreen"
+
+# View only errors and warnings  
+adb logcat "*:W" -s "CountryPrayerMethodService"
+
+# View location detection flow
+adb logcat -s "CountryPrayerMethodService" | grep "🌍\|🔍\|🏳️"
+
+# Monitor performance
+adb logcat -s "CountryPrayerMethodService" | grep "✅.*ms"
+```
+
+### Documentation
+- `docs/AUTO_DETECTION_LOGGING_GUIDE.md` - Complete logging guide with debugging examples
+- Structured log format enables integration with crash reporting and analytics
+- Performance benchmarks for database loading (<50ms optimal) and geocoding (<2s normal)

@@ -1,11 +1,14 @@
 package com.starception.submission.prayer.ui
 
+import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +23,27 @@ import com.starception.submission.prayer.model.*
 /**
  * Prayer settings configuration screen
  */
+
+private object PrayerSettingsLogger {
+    private const val TAG = "PrayerSettingsScreen"
+    
+    fun logAutoDetectionChange(setting: String, isAutoDetected: Boolean, country: String?) {
+        if (isAutoDetected && country != null) {
+            Log.i(TAG, "🔧 Auto-detection activated: $setting for $country")
+        } else {
+            Log.d(TAG, "🔧 Auto-detection status: $setting = ${if (isAutoDetected) "enabled" else "manual"}")
+        }
+    }
+    
+    fun logSettingChange(setting: String, oldValue: Any?, newValue: Any?) {
+        Log.d(TAG, "⚙️ Setting changed: $setting = $oldValue → $newValue")
+    }
+    
+    fun logScreenComposition(gpsEnabled: Boolean) {
+        Log.d(TAG, "📱 Prayer Settings screen composed (GPS: ${if (gpsEnabled) "enabled" else "disabled"})")
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrayerSettingsScreen(
@@ -29,7 +53,21 @@ fun PrayerSettingsScreen(
     modifier: Modifier = Modifier,
     showAsDialog: Boolean = false
 ) {
-    android.util.Log.d("PrayerSettingsScreen", "PrayerSettingsScreen composed with GPS: ${settings.useGpsLocation}")
+    // Log screen composition with auto-detection status
+    PrayerSettingsLogger.logScreenComposition(settings.useGpsLocation)
+    
+    // Log auto-detection status for all supported settings
+    LaunchedEffect(settings.isMethodAutoDetected, settings.autoDetectedCountryName) {
+        PrayerSettingsLogger.logAutoDetectionChange("Calculation Method", settings.isMethodAutoDetected, settings.autoDetectedCountryName)
+    }
+    
+    LaunchedEffect(settings.isMadhhabAutoDetected, settings.autoDetectedCountryName) {
+        PrayerSettingsLogger.logAutoDetectionChange("Asr Madhhab", settings.isMadhhabAutoDetected, settings.autoDetectedCountryName)
+    }
+    
+    LaunchedEffect(settings.areCustomAnglesAutoDetected, settings.autoDetectedCountryName) {
+        PrayerSettingsLogger.logAutoDetectionChange("Custom Angles", settings.areCustomAnglesAutoDetected, settings.autoDetectedCountryName)
+    }
     if (showAsDialog) {
         // Dialog mode - no Scaffold, just content
         PrayerSettingsContent(
@@ -111,7 +149,10 @@ private fun PrayerSettingsContent(
         }
         
         // Calculation Method Section
-        SettingsSection(title = "Calculation Method") {
+        SettingsSection(
+            title = "Calculation Method",
+            showAutoDetectedBadge = settings.isMethodAutoDetected
+        ) {
             CalculationMethodDropdown(
                 selectedMethod = settings.calculationMethod,
                 onMethodSelected = { method ->
@@ -123,7 +164,10 @@ private fun PrayerSettingsContent(
         }
         
         // Asr Madhhab Section
-        SettingsSection(title = "Asr Calculation") {
+        SettingsSection(
+            title = "Asr Calculation",
+            showAutoDetectedBadge = settings.isMadhhabAutoDetected
+        ) {
             AsrMadhhabSelector(
                 selectedMadhhab = settings.asrMadhhab,
                 onMadhhabSelected = { madhhab ->
@@ -145,7 +189,10 @@ private fun PrayerSettingsContent(
         }
         
         // Custom Angles Section
-        SettingsSection(title = "Custom Angles") {
+        SettingsSection(
+            title = "Custom Angles",
+            showAutoDetectedBadge = settings.areCustomAnglesAutoDetected
+        ) {
             CustomAnglesSection(
                 settings = settings,
                 onSettingsChanged = onSettingsChanged
@@ -184,16 +231,28 @@ private fun PrayerSettingsContent(
 private fun SettingsSection(
     title: String,
     modifier: Modifier = Modifier,
+    showAutoDetectedBadge: Boolean = false,
     content: @Composable () -> Unit
 ) {
     Column(modifier = modifier) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            if (showAutoDetectedBadge) {
+                AutoDetectionBadge()
+            }
+        }
         content()
     }
 }
@@ -251,16 +310,6 @@ private fun CalculationMethodDropdown(
             }
         }
         
-        // Show auto-detection indicator
-        if (isAutoDetected && autoDetectedCountry != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "🌍 Auto-detected for $autoDetectedCountry",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 4.dp)
-            )
-        }
     }
 }
 
@@ -297,16 +346,6 @@ private fun AsrMadhhabSelector(
             }
         }
         
-        // Show auto-detection indicator
-        if (isAutoDetected && autoDetectedCountry != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "🌍 Auto-detected for $autoDetectedCountry",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 8.dp)
-            )
-        }
     }
 }
 
@@ -407,16 +446,6 @@ private fun CustomAnglesSection(
             modifier = Modifier.fillMaxWidth()
         )
         
-        // Show auto-detection indicator for custom angles
-        if (settings.areCustomAnglesAutoDetected && settings.autoDetectedCountryName != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "🌍 Custom angles auto-detected for ${settings.autoDetectedCountryName}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 4.dp)
-            )
-        }
     }
 }
 
@@ -486,6 +515,41 @@ private fun LocationSection(
                 text = "Current: ${location.getDisplayName()}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * Compact inline auto-detection badge
+ * Shows as a small badge next to option labels
+ */
+@Composable
+private fun AutoDetectionBadge(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+        shape = MaterialTheme.shapes.small,
+        tonalElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.AutoMode,
+                contentDescription = "Auto-detected",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(12.dp)
+            )
+            Text(
+                text = "Auto-detected",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium
             )
         }
     }
