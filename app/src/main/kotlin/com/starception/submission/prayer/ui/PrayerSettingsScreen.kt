@@ -56,8 +56,7 @@ fun PrayerSettingsScreen(
     modifier: Modifier = Modifier,
     showAsDialog: Boolean = false,
     hasSettingsChanged: Boolean = false,
-    onRestoreClick: () -> Unit = {},
-    onSaveCurrentSettings: () -> Unit = {}
+    onRestoreClick: () -> Unit = {}
 ) {
     // Log screen composition with auto-detection status
     PrayerSettingsLogger.logScreenComposition(settings.useGpsLocation)
@@ -78,16 +77,7 @@ fun PrayerSettingsScreen(
     // Handle back gesture properly - dismiss dialog and return to previous screen
     BackHandler {
         Log.d("PrayerSettingsScreen", "🔙 Back gesture detected - calling onBackClick")
-        onSaveCurrentSettings()
         onBackClick()
-    }
-    
-    // Save current settings when screen is disposed (user navigates away)
-    DisposableEffect(Unit) {
-        onDispose {
-            Log.d("PrayerSettingsScreen", "💾 Screen disposed - saving current settings")
-            onSaveCurrentSettings()
-        }
     }
     
     if (showAsDialog) {
