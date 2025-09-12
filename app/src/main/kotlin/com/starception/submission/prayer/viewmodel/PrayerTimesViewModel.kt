@@ -852,20 +852,42 @@ class PrayerTimesViewModel @Inject constructor(
      * Checks if current settings differ from the backed-up original settings
      */
     fun hasSettingsChanged(): Boolean {
+        android.util.Log.w("PrayerTimesViewModel", "🔍🔍 CHECKING IF SETTINGS CHANGED (for restore button visibility)")
+        
         val current = settings.value
-        val backupJson = current.originalAutoDetectedSettingsJson ?: return false
+        val backupJson = current.originalAutoDetectedSettingsJson
+        
+        if (backupJson == null) {
+            android.util.Log.w("PrayerTimesViewModel", "❌ No backup JSON available - restore button will NOT show")
+            return false
+        }
+        
+        android.util.Log.w("PrayerTimesViewModel", "📋 BACKUP JSON EXISTS - analyzing changes...")
         
         try {
             val backup = json.decodeFromString<AutoDetectedSettingsBackup>(backupJson)
             
-            return current.calculationMethod != backup.calculationMethod ||
-                   current.asrMadhhab != backup.asrMadhhab ||
-                   current.customFajrAngle != backup.customFajrAngle ||
-                   current.customIshaAngle != backup.customIshaAngle ||
-                   current.customIshaDelay != backup.customIshaDelay ||
-                   current.timeOffsets != backup.timeOffsets
+            android.util.Log.w("PrayerTimesViewModel", "📋 COMPARISON - CURRENT vs ORIGINAL AUTO-DETECTED:")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Calculation Method: ${current.calculationMethod} vs ${backup.calculationMethod} -> Changed: ${current.calculationMethod != backup.calculationMethod}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Asr Madhhab: ${current.asrMadhhab} vs ${backup.asrMadhhab} -> Changed: ${current.asrMadhhab != backup.asrMadhhab}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Fajr Angle: ${current.customFajrAngle} vs ${backup.customFajrAngle} -> Changed: ${current.customFajrAngle != backup.customFajrAngle}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Isha Angle: ${current.customIshaAngle} vs ${backup.customIshaAngle} -> Changed: ${current.customIshaAngle != backup.customIshaAngle}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Isha Delay: ${current.customIshaDelay} vs ${backup.customIshaDelay} -> Changed: ${current.customIshaDelay != backup.customIshaDelay}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Time Offsets: ${current.timeOffsets} vs ${backup.timeOffsets} -> Changed: ${current.timeOffsets != backup.timeOffsets}")
+            
+            val hasChanged = current.calculationMethod != backup.calculationMethod ||
+                           current.asrMadhhab != backup.asrMadhhab ||
+                           current.customFajrAngle != backup.customFajrAngle ||
+                           current.customIshaAngle != backup.customIshaAngle ||
+                           current.customIshaDelay != backup.customIshaDelay ||
+                           current.timeOffsets != backup.timeOffsets
+                           
+            android.util.Log.w("PrayerTimesViewModel", "🎯 FINAL RESULT: Settings have changed = $hasChanged")
+            android.util.Log.w("PrayerTimesViewModel", "🎯 RESTORE BUTTON VISIBILITY: ${if (hasChanged) "WILL SHOW" else "WILL NOT SHOW"}")
+            
+            return hasChanged
         } catch (e: Exception) {
-            android.util.Log.e("PrayerTimesViewModel", "Failed to parse backup JSON", e)
+            android.util.Log.e("PrayerTimesViewModel", "❌ Failed to parse backup JSON for comparison", e)
             return false
         }
     }
@@ -874,11 +896,37 @@ class PrayerTimesViewModel @Inject constructor(
      * Restores settings from the JSON backup
      */
     fun restoreAutoDetectedSettings() {
+        android.util.Log.w("PrayerTimesViewModel", "🔄🔄 RESTORE AUTO-DETECTED SETTINGS CALLED")
+        
         val current = settings.value
-        val backupJson = current.originalAutoDetectedSettingsJson ?: return
+        android.util.Log.w("PrayerTimesViewModel", "📋 CURRENT SETTINGS STATE BEFORE RESTORE:")
+        android.util.Log.w("PrayerTimesViewModel", "   📋 Calculation Method: ${current.calculationMethod}")
+        android.util.Log.w("PrayerTimesViewModel", "   📋 Asr Madhhab: ${current.asrMadhhab}")
+        android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Fajr Angle: ${current.customFajrAngle}")
+        android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Isha Angle: ${current.customIshaAngle}")
+        android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Isha Delay: ${current.customIshaDelay}")
+        android.util.Log.w("PrayerTimesViewModel", "   📋 Is Method Auto-Detected: ${current.isMethodAutoDetected}")
+        android.util.Log.w("PrayerTimesViewModel", "   📋 Auto-Detected Country: ${current.autoDetectedCountryName}")
+        
+        val backupJson = current.originalAutoDetectedSettingsJson
+        if (backupJson == null) {
+            android.util.Log.e("PrayerTimesViewModel", "❌ No backup JSON found - cannot restore")
+            return
+        }
+        
+        android.util.Log.w("PrayerTimesViewModel", "📋 FOUND BACKUP JSON (${backupJson.length} chars): ${backupJson.take(200)}...")
         
         try {
             val backup = json.decodeFromString<AutoDetectedSettingsBackup>(backupJson)
+            
+            android.util.Log.w("PrayerTimesViewModel", "📋 PARSED BACKUP DATA:")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Country: ${backup.countryName} (${backup.countryCode})")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Calculation Method: ${backup.calculationMethod}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Asr Madhhab: ${backup.asrMadhhab}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Fajr Angle: ${backup.customFajrAngle}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Isha Angle: ${backup.customIshaAngle}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Isha Delay: ${backup.customIshaDelay}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Time Offsets: ${backup.timeOffsets}")
             
             android.util.Log.i("PrayerTimesViewModel", "🔄 Restoring auto-detected settings for ${backup.countryName}")
             
@@ -897,6 +945,14 @@ class PrayerTimesViewModel @Inject constructor(
                 isMadhhabAutoDetected = true,
                 areCustomAnglesAutoDetected = backup.customFajrAngle != null || backup.customIshaAngle != null || backup.customIshaDelay != null
             )
+            
+            android.util.Log.w("PrayerTimesViewModel", "📋 RESTORED SETTINGS TO APPLY:")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Calculation Method: ${restoredSettings.calculationMethod}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Asr Madhhab: ${restoredSettings.asrMadhhab}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Fajr Angle: ${restoredSettings.customFajrAngle}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Isha Angle: ${restoredSettings.customIshaAngle}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Custom Isha Delay: ${restoredSettings.customIshaDelay}")
+            android.util.Log.w("PrayerTimesViewModel", "   📋 Are Custom Angles Auto-Detected: ${restoredSettings.areCustomAnglesAutoDetected}")
             
             updateSettings(restoredSettings)
             android.util.Log.i("PrayerTimesViewModel", "✅ Successfully restored settings to original auto-detected values")

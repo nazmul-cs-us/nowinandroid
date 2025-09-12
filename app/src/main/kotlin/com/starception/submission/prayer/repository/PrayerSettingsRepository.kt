@@ -163,7 +163,7 @@ class PrayerSettingsRepository @Inject constructor(
      * @return Properly loaded PrayerSettings (never defaults)
      */
     suspend fun getLoadedSettings(): PrayerSettings {
-        android.util.Log.w("PrayerSettingsRepository", "🔥 getLoadedSettings CALLED - loaded flag: $_settingsLoaded")
+        android.util.Log.w("PrayerSettingsRepository", "🔥🔥 getLoadedSettings CALLED - loaded flag: $_settingsLoaded")
         
         // Wait until settings are loaded from storage
         while (!_settingsLoaded) {
@@ -171,7 +171,20 @@ class PrayerSettingsRepository @Inject constructor(
         }
         
         val loadedSettings = _settingsFlow.value ?: PrayerSettings()
-        android.util.Log.w("PrayerSettingsRepository", "🔥 getLoadedSettings RETURNING - Custom Isha: ${loadedSettings.customIshaAngle}")
+        android.util.Log.w("PrayerSettingsRepository", "🔥🔥 getLoadedSettings RETURNING - DETAILED DATA:")
+        android.util.Log.w("PrayerSettingsRepository", "   📋 Calculation Method: ${loadedSettings.calculationMethod}")
+        android.util.Log.w("PrayerSettingsRepository", "   📋 Asr Madhhab: ${loadedSettings.asrMadhhab}")
+        android.util.Log.w("PrayerSettingsRepository", "   📋 Custom Fajr Angle: ${loadedSettings.customFajrAngle}")
+        android.util.Log.w("PrayerSettingsRepository", "   📋 Custom Isha Angle: ${loadedSettings.customIshaAngle}")
+        android.util.Log.w("PrayerSettingsRepository", "   📋 Custom Isha Delay: ${loadedSettings.customIshaDelay}")
+        android.util.Log.w("PrayerSettingsRepository", "   📋 Is Method Auto-Detected: ${loadedSettings.isMethodAutoDetected}")
+        android.util.Log.w("PrayerSettingsRepository", "   📋 Is Madhhab Auto-Detected: ${loadedSettings.isMadhhabAutoDetected}")
+        android.util.Log.w("PrayerSettingsRepository", "   📋 Are Custom Angles Auto-Detected: ${loadedSettings.areCustomAnglesAutoDetected}")
+        android.util.Log.w("PrayerSettingsRepository", "   📋 Auto-Detected Country: ${loadedSettings.autoDetectedCountryName}")
+        android.util.Log.w("PrayerSettingsRepository", "   📋 Has Backup JSON: ${loadedSettings.originalAutoDetectedSettingsJson != null}")
+        if (loadedSettings.originalAutoDetectedSettingsJson != null) {
+            android.util.Log.w("PrayerSettingsRepository", "   📋 Backup JSON Preview: ${loadedSettings.originalAutoDetectedSettingsJson?.take(100)}...")
+        }
         return loadedSettings
     }
     
