@@ -38,6 +38,7 @@ fun PrayerSettingsDialog(
     
     // Load real settings from repository without using ViewModel to prevent ANR
     var settings by remember { mutableStateOf(PrayerSettings()) }
+    var originalSettings by remember { mutableStateOf(PrayerSettings()) }
     var isLoading by remember { mutableStateOf(true) }
     
     // Load settings in background without blocking main thread
@@ -52,12 +53,29 @@ fun PrayerSettingsDialog(
             Log.d("PrayerSettingsDialog", "   - Auto-detected: ${loadedSettings.isMethodAutoDetected}")
             Log.d("PrayerSettingsDialog", "   - Country: ${loadedSettings.autoDetectedCountryName}")
             settings = loadedSettings
+            originalSettings = loadedSettings // Store original settings for comparison
             isLoading = false
             Log.d("PrayerSettingsDialog", "✅ Settings applied to UI")
         } catch (e: Exception) {
             // Fallback to defaults if loading fails
             Log.w("PrayerSettingsDialog", "Failed to load settings", e)
             isLoading = false
+        }
+    }
+    
+    // Check if settings have changed from original auto-detected values
+    val hasSettingsChanged = remember(settings, originalSettings) {
+        if (!originalSettings.isMethodAutoDetected && !originalSettings.isMadhhabAutoDetected && !originalSettings.areCustomAnglesAutoDetected) {
+            false // No auto-detected settings to compare against
+        } else {
+            // Check if any auto-detected setting has changed
+            (originalSettings.isMethodAutoDetected && settings.calculationMethod != originalSettings.calculationMethod) ||
+            (originalSettings.isMadhhabAutoDetected && settings.asrMadhhab != originalSettings.asrMadhhab) ||
+            (originalSettings.areCustomAnglesAutoDetected && (
+                settings.customFajrAngle != originalSettings.customFajrAngle ||
+                settings.customIshaAngle != originalSettings.customIshaAngle ||
+                settings.customIshaDelay != originalSettings.customIshaDelay
+            ))
         }
     }
     
@@ -78,35 +96,54 @@ fun PrayerSettingsDialog(
             PrayerSettingsScreen(
                 settings = settings,
                 onSettingsChanged = { newSettings ->
+                    Log.i("PrayerSettingsDialog", "🔄 SETTINGS CHANGE TRIGGERED:")
+                    Log.i("PrayerSettingsDialog", "   - Old Method: ${settings.calculationMethod.displayName}")
+                    Log.i("PrayerSettingsDialog", "   - New Method: ${newSettings.calculationMethod.displayName}")
+                    Log.i("PrayerSettingsDialog", "   - Old Madhhab: ${settings.asrMadhhab}")
+                    Log.i("PrayerSettingsDialog", "   - New Madhhab: ${newSettings.asrMadhhab}")
+                    Log.i("PrayerSettingsDialog", "   - Old Custom Fajr: ${settings.customFajrAngle}")
+                    Log.i("PrayerSettingsDialog", "   - New Custom Fajr: ${newSettings.customFajrAngle}")
+                    
+                    // Clear auto-detection flags when settings are manually changed
+                    val updatedSettings = clearAutoDetectionFlags(newSettings, settings)
+                    Log.i("PrayerSettingsDialog", "🔄 Auto-detection flags cleared, updating repository...")
+                    
                     // Update settings in background to prevent ANR
                     GlobalScope.launch(Dispatchers.IO) {
                         try {
+                            Log.d("PrayerSettingsDialog", "📤 Calling repository.updateSettings()...")
                             val repository = com.starception.submission.prayer.repository.PrayerSettingsRepository(context)
-                            repository.updateSettings(newSettings)
+                            repository.updateSettings(updatedSettings)
+                            Log.i("PrayerSettingsDialog", "✅ Repository updateSettings() completed")
+                            
                             // Update local state
                             withContext(Dispatchers.Main) {
-                                settings = newSettings
+                                settings = updatedSettings
+                                Log.i("PrayerSettingsDialog", "✅ Local UI settings updated")
                             }
                         } catch (e: Exception) {
-                            Log.w("PrayerSettingsDialog", "Failed to update settings", e)
+                            Log.e("PrayerSettingsDialog", "❌ Failed to update settings", e)
                         }
                     }
                 },
-                onBackClick = onDismiss,
+                onBackClick = {
+                    Log.i("PrayerSettingsDialog", "🔙 Prayer Settings Dialog CLOSED - changes should now take effect")
+                    onDismiss()
+                },
                 showAsDialog = false,
-                hasSettingsChanged = false,
+                hasSettingsChanged = hasSettingsChanged,
                 onRestoreClick = {
-                    // Reset to defaults
+                    // Restore original auto-detected settings
                     GlobalScope.launch(Dispatchers.IO) {
                         try {
                             val repository = com.starception.submission.prayer.repository.PrayerSettingsRepository(context)
-                            val defaultSettings = PrayerSettings()
-                            repository.updateSettings(defaultSettings)
+                            repository.updateSettings(originalSettings)
                             withContext(Dispatchers.Main) {
-                                settings = defaultSettings
+                                settings = originalSettings
+                                Log.d("PrayerSettingsDialog", "✅ Auto-detected settings restored")
                             }
                         } catch (e: Exception) {
-                            Log.w("PrayerSettingsDialog", "Failed to restore settings", e)
+                            Log.w("PrayerSettingsDialog", "Failed to restore auto-detected settings", e)
                         }
                     }
                 },
@@ -114,4 +151,35 @@ fun PrayerSettingsDialog(
             )
         }
     }
+}
+
+/**
+ * Clear auto-detection flags when settings are manually changed
+ */
+private fun clearAutoDetectionFlags(newSettings: PrayerSettings, oldSettings: PrayerSettings): PrayerSettings {
+    var updatedSettings = newSettings
+    
+    // Clear calculation method auto-detection flag if method changed
+    if (oldSettings.isMethodAutoDetected && newSettings.calculationMethod != oldSettings.calculationMethod) {
+        updatedSettings = updatedSettings.copy(isMethodAutoDetected = false)
+        Log.d("PrayerSettingsDialog", "🔄 Cleared auto-detection flag for calculation method")
+    }
+    
+    // Clear madhhab auto-detection flag if madhhab changed
+    if (oldSettings.isMadhhabAutoDetected && newSettings.asrMadhhab != oldSettings.asrMadhhab) {
+        updatedSettings = updatedSettings.copy(isMadhhabAutoDetected = false)
+        Log.d("PrayerSettingsDialog", "🔄 Cleared auto-detection flag for Asr madhhab")
+    }
+    
+    // Clear custom angles auto-detection flag if any angle changed
+    if (oldSettings.areCustomAnglesAutoDetected && (
+        newSettings.customFajrAngle != oldSettings.customFajrAngle ||
+        newSettings.customIshaAngle != oldSettings.customIshaAngle ||
+        newSettings.customIshaDelay != oldSettings.customIshaDelay
+    )) {
+        updatedSettings = updatedSettings.copy(areCustomAnglesAutoDetected = false)
+        Log.d("PrayerSettingsDialog", "🔄 Cleared auto-detection flag for custom angles")
+    }
+    
+    return updatedSettings
 }

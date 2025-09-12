@@ -2,6 +2,7 @@ package com.starception.submission.prayer.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.starception.submission.prayer.model.*
 import java.time.LocalDateTime
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -57,6 +58,8 @@ class PrayerSettingsRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object {
+        private const val TAG = "PrayerSettingsRepository"
+        
         // STORAGE CONFIGURATION - JSON-based persistence system
         private const val PREFS_NAME = "prayer_settings"  // SharedPreferences file name
         private const val KEY_CURRENT_SETTINGS_JSON = "current_settings_json"  // Current user settings as JSON
@@ -233,6 +236,13 @@ class PrayerSettingsRepository @Inject constructor(
         _settingsFlow.value = settings
         // Force trigger flow for UI updates
         _settingsFlow.tryEmit(settings)
+        
+        // ROBUST LOGGING: Track flow emission
+        Log.i(TAG, "🔄 FLOW EMISSION TRIGGERED:")
+        Log.i(TAG, "   - Settings flow updated with method: ${settings.calculationMethod.displayName}")
+        Log.i(TAG, "   - Flow has ${_settingsFlow.subscriptionCount.value} subscribers")
+        Log.i(TAG, "   - Current flow value: ${_settingsFlow.value?.calculationMethod?.displayName}")
+        Log.i(TAG, "   - Force commit: $forceCommit")
     }
     
     /**

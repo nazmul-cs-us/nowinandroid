@@ -21,6 +21,7 @@ import com.starception.submission.util.PrayerNotificationManager
 import com.starception.submission.util.AnrPreventionConfig
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.Duration
@@ -286,6 +287,9 @@ class PrayerNotificationService : Service() {
                     }
                 } ?: Log.w(TAG, "Notification manager initialization timed out, continuing")
                 
+                // Start observing settings changes for automatic recalculation
+                observeSettingsChanges()
+                
                 // Start simplified prayer time updates with timeout protection
                 withTimeoutOrNull(10000L) {
                     startPrayerTimeUpdateLoop()
@@ -293,6 +297,44 @@ class PrayerNotificationService : Service() {
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting prayer time updates - service continues", e)
+            }
+        }
+    }
+    
+    /**
+     * Observe settings changes and trigger prayer time recalculation
+     */
+    private fun observeSettingsChanges() {
+        serviceScope.launch {
+            try {
+                Log.d(TAG, "🔄 Starting to observe prayer settings changes...")
+                prayerSettingsRepository.settingsFlow
+                    .drop(1) // Skip initial value to avoid immediate recalculation
+                    .distinctUntilChanged() // Only react to actual changes
+                    .collect { newSettings ->
+                        Log.i(TAG, "🚨 PRAYER SERVICE: SETTINGS FLOW UPDATE RECEIVED!")
+                        Log.i(TAG, "   - Method: ${newSettings.calculationMethod.displayName}")
+                        Log.i(TAG, "   - Auto-detected: ${newSettings.isMethodAutoDetected}")
+                        Log.i(TAG, "   - Custom Fajr Angle: ${newSettings.customFajrAngle}")
+                        Log.i(TAG, "   - Custom Isha Angle: ${newSettings.customIshaAngle}")
+                        Log.i(TAG, "   - Time: ${java.time.LocalDateTime.now()}")
+                        
+                        // Trigger immediate prayer time update with new settings
+                        withContext(Dispatchers.IO) {
+                            try {
+                                Log.i(TAG, "📤 Starting prayer time recalculation...")
+                                val startTime = System.currentTimeMillis()
+                                updatePrayerNotificationWithRealData()
+                                val duration = System.currentTimeMillis() - startTime
+                                Log.i(TAG, "✅ Prayer times recalculated successfully in ${duration}ms")
+                                Log.i(TAG, "✅ Notification and UI should now show updated times")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "❌ Failed to recalculate prayer times after settings change", e)
+                            }
+                        }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error observing settings changes", e)
             }
         }
     }
