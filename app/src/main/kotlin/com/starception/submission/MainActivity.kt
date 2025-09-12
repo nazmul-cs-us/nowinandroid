@@ -53,8 +53,14 @@ import com.starception.submission.core.ui.LocalTimeZone
 import com.starception.submission.ui.NiaApp
 import com.starception.submission.ui.rememberNiaAppState
 import com.starception.submission.services.PrayerNotificationService
+import com.starception.submission.prayer.repository.PrayerSettingsRepository
+import com.starception.submission.prayer.service.CountryPrayerMethodService
+import com.starception.submission.prayer.model.CalculationMethod
+import android.location.Location as AndroidLocation
 import com.starception.submission.util.isSystemInDarkTheme
 import com.starception.submission.util.PermissionManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -254,11 +260,11 @@ class MainActivity : FragmentActivity() {
             }
         }
         
-        // SAFE: Start prayer service after longer delay to prevent ANR
+        // SAFE: Start prayer service after delay to prevent ANR
         lifecycleScope.launch {
-            delay(5000) // Wait 5 seconds for app to be fully stable
+            delay(3000) // Wait 3 seconds for app to be stable
             try {
-                Log.d("MainActivity", "Starting prayer service after delay")
+                Log.d("MainActivity", "App is ready, checking prayer service status")
                 startPrayerServiceIfNeeded()
             } catch (e: Exception) {
                 Log.e("MainActivity", "Failed to start prayer service, continuing without it", e)
@@ -293,13 +299,18 @@ class MainActivity : FragmentActivity() {
         
         lifecycleScope.launch {
             try {
-                // Check if service is already running
+                // Start auto-detection FIRST (independent of service and settings dialog)
+                startLocationBasedAutoDetection()
+                
+                // Then start prayer service
+                // Check if service is running and healthy
                 if (PrayerNotificationService.isServiceRunningInAnotherProcess(this@MainActivity)) {
-                    Log.d("MainActivity", "Prayer service already running")
+                    Log.d("MainActivity", "Prayer service already running - letting it continue")
                     return@launch
                 }
                 
-                // Start service
+                // Start service since none is running
+                Log.d("MainActivity", "No service running, starting new prayer service")
                 val intent = Intent(this@MainActivity, PrayerNotificationService::class.java)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     startForegroundService(intent)
@@ -310,6 +321,80 @@ class MainActivity : FragmentActivity() {
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error starting prayer service", e)
             }
+        }
+    }
+    
+    /**
+     * Start location-based auto-detection independent of Prayer Settings dialog
+     * This runs once at app startup to configure prayer methods automatically
+     */
+    private suspend fun startLocationBasedAutoDetection() {
+        try {
+            Log.d("MainActivity", "🌍 Starting location-based auto-detection")
+            
+            // Create temporary instances to avoid dependency on disabled ViewModel
+            val settingsRepository = PrayerSettingsRepository(this)
+            val countryService = CountryPrayerMethodService(this)
+            
+            // Check if user already has manual settings (don't override)
+            val currentSettings = settingsRepository.getSettings()
+            if (currentSettings.isMethodAutoDetected.not() && 
+                currentSettings.calculationMethod != CalculationMethod.MUSLIM_WORLD_LEAGUE) {
+                Log.d("MainActivity", "🔧 User has manual settings, skipping auto-detection")
+                return
+            }
+            
+            // Get current location from settings or location services
+            val location = currentSettings.location
+            if (location == null) {
+                Log.d("MainActivity", "📍 No location available for auto-detection")
+                return
+            }
+            
+            Log.d("MainActivity", "📍 Auto-detecting for location: ${location.getDisplayName()}")
+            
+            // Detect country and prayer method with timeout
+            withContext(Dispatchers.IO) {
+                kotlinx.coroutines.withTimeoutOrNull(5000L) {
+                    // Create Android Location from our Location model
+                    val androidLocation = AndroidLocation("").apply {
+                        latitude = location.latitude
+                        longitude = location.longitude
+                    }
+                    
+                    val detectionResult = countryService.getPrayerMethodForLocation(androidLocation)
+                    
+                    if (detectionResult.isAutoDetected) {
+                        Log.i("MainActivity", "🎯 Auto-detection successful: ${detectionResult.countryName}")
+                        Log.i("MainActivity", "🕌 Method: ${detectionResult.calculationMethod.name}")
+                        Log.i("MainActivity", "📿 Madhhab: ${detectionResult.madhhab.name}")
+                        
+                        // Apply auto-detected settings
+                        val autoDetectedSettings = currentSettings.copy(
+                            calculationMethod = detectionResult.calculationMethod,
+                            asrMadhhab = detectionResult.madhhab,
+                            customFajrAngle = detectionResult.customFajrAngle,
+                            customIshaAngle = detectionResult.customIshaAngle,
+                            // customIshaDelay = detectionResult.customIshaDelay, // Not available in this structure
+                            isMethodAutoDetected = true,
+                            isMadhhabAutoDetected = true,
+                            areCustomAnglesAutoDetected = true,
+                            autoDetectedCountryName = detectionResult.countryName,
+                            // originalAutoDetectedSettingsJson = detectionResult.originalJson // Add if available
+                        )
+                        
+                        settingsRepository.updateSettings(autoDetectedSettings, forceCommit = true)
+                        Log.i("MainActivity", "✅ Auto-detection applied successfully")
+                    } else {
+                        Log.d("MainActivity", "ℹ️ No auto-detection available for this location")
+                    }
+                } ?: run {
+                    Log.w("MainActivity", "⚠️ Auto-detection timed out")
+                }
+            }
+            
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Auto-detection failed: ${e.message}")
         }
     }
 }
