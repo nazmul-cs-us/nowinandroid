@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -265,21 +266,6 @@ private fun PrayerSettingsContent(
             )
         }
         
-        // Location Section
-        SettingsSection(title = "Location") {
-            LocationSection(
-                useGps = settings.useGpsLocation,
-                location = settings.location,
-                onUseGpsChanged = { useGps ->
-                    android.util.Log.d("PrayerSettingsScreen", "GPS toggle: ${settings.useGpsLocation} -> $useGps")
-                    val newSettings = settings.copy(useGpsLocation = useGps)
-                    android.util.Log.d("PrayerSettingsScreen", "New settings GPS value: ${newSettings.useGpsLocation}")
-                    android.util.Log.d("PrayerSettingsScreen", "Calling onSettingsChanged...")
-                    onSettingsChanged(newSettings)
-                    android.util.Log.d("PrayerSettingsScreen", "onSettingsChanged called successfully")
-                }
-            )
-        }
         
         // Restore button moved to top of screen for better visibility
     }
@@ -665,6 +651,13 @@ private fun LocationSection(
             Switch(
                 checked = useGps,
                 onCheckedChange = onUseGpsChanged
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Filled.LocationOn,
+                contentDescription = "Location",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text("Use GPS Location")
