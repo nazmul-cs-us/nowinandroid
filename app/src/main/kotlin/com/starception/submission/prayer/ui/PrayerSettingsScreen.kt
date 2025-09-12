@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoMode
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,32 +91,51 @@ fun PrayerSettingsScreen(
     }
     
     if (showAsDialog) {
-        // Dialog mode - no Scaffold, just content
-        PrayerSettingsContent(
-            settings = settings,
-            onSettingsChanged = onSettingsChanged,
-            onBackClick = onBackClick,
-            hasSettingsChanged = hasSettingsChanged,
-            onRestoreClick = onRestoreClick,
-            modifier = modifier,
-            showTopBar = true
-        )
+        // Dialog mode - no Scaffold, just content with Material 3 theme
+        Surface(
+            modifier = modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            PrayerSettingsContent(
+                settings = settings,
+                onSettingsChanged = onSettingsChanged,
+                onBackClick = onBackClick,
+                hasSettingsChanged = hasSettingsChanged,
+                onRestoreClick = onRestoreClick,
+                modifier = Modifier.fillMaxSize(),
+                showTopBar = true
+            )
+        }
     } else {
-        // Full screen mode - with Scaffold
+        // Full screen mode - with Scaffold and Material 3 theme
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Prayer Settings") },
+                    title = { 
+                        Text(
+                            "Prayer Settings",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ) 
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBackClick) {
                             Icon(
                                 imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Back"
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                    }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
             },
+            containerColor = MaterialTheme.colorScheme.background,
             modifier = modifier
         ) { paddingValues ->
             PrayerSettingsContent(
@@ -146,33 +166,43 @@ private fun PrayerSettingsContent(
 ) {
     Column(
         modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Top bar for dialog mode
+        // Top bar for dialog mode with Material 3 styling
         if (showTopBar) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                IconButton(onClick = onBackClick) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back"
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = "Prayer Settings",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp)
                     )
                 }
-                Text(
-                    text = "Prayer Settings",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
             }
-            Divider()
-            Spacer(modifier = Modifier.height(8.dp))
         }
         
         // Restore Auto-Detected Settings - Show at top when available
@@ -272,26 +302,38 @@ private fun SettingsSection(
     showAutoDetectedBadge: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    Column(modifier = modifier) {
-        Row(
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            
-            if (showAutoDetectedBadge) {
-                AutoDetectionBadge()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                if (showAutoDetectedBadge) {
+                    AutoDetectionBadge()
+                }
             }
+            content()
         }
-        content()
     }
 }
 
@@ -320,7 +362,13 @@ private fun CalculationMethodDropdown(
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .menuAnchor()
+                    .menuAnchor(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             )
         
             ExposedDropdownMenu(
@@ -367,13 +415,18 @@ private fun AsrMadhhabSelector(
             ) {
                 RadioButton(
                     selected = selectedMadhhab == madhhab,
-                    onClick = { onMadhhabSelected(madhhab) }
+                    onClick = { onMadhhabSelected(madhhab) },
+                    colors = RadioButtonDefaults.colors(
+                        selectedColor = MaterialTheme.colorScheme.primary,
+                        unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
                         text = madhhab.displayName,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = madhhab.description,
@@ -409,7 +462,13 @@ private fun HighLatitudeAdjustmentDropdown(
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor()
+                .menuAnchor(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         )
         
         ExposedDropdownMenu(
@@ -492,7 +551,15 @@ private fun CustomAnglesSection(
                 label = { Text("Fajr Angle (°)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.weight(1f),
-                isError = fajrAngleText.isNotEmpty() && fajrAngleText.toDoubleOrNull() == null
+                isError = fajrAngleText.isNotEmpty() && fajrAngleText.toDoubleOrNull() == null,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    errorBorderColor = MaterialTheme.colorScheme.error,
+                    errorLabelColor = MaterialTheme.colorScheme.error
+                )
             )
             
             OutlinedTextField(
@@ -508,7 +575,15 @@ private fun CustomAnglesSection(
                 label = { Text("Isha Angle (°)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.weight(1f),
-                isError = ishaAngleText.isNotEmpty() && ishaAngleText.toDoubleOrNull() == null
+                isError = ishaAngleText.isNotEmpty() && ishaAngleText.toDoubleOrNull() == null,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    errorBorderColor = MaterialTheme.colorScheme.error,
+                    errorLabelColor = MaterialTheme.colorScheme.error
+                )
             )
         }
         
@@ -525,7 +600,15 @@ private fun CustomAnglesSection(
             label = { Text("Isha Delay (minutes after Maghrib)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
-            isError = ishaDelayText.isNotEmpty() && ishaDelayText.toIntOrNull() == null
+            isError = ishaDelayText.isNotEmpty() && ishaDelayText.toIntOrNull() == null,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                errorBorderColor = MaterialTheme.colorScheme.error,
+                errorLabelColor = MaterialTheme.colorScheme.error
+            )
         )
         
     }
@@ -565,7 +648,13 @@ private fun TimeOffsetsSection(
                 },
                 label = { Text("$prayerName Offset") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             )
         }
     }
