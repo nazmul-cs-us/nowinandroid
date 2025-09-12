@@ -43,9 +43,17 @@ fun PrayerSettingsDialog(
     // Load settings in background without blocking main thread
     LaunchedEffect(Unit) {
         try {
+            Log.d("PrayerSettingsDialog", "🔄 Starting to load settings...")
             val repository = com.starception.submission.prayer.repository.PrayerSettingsRepository(context)
-            settings = repository.getSettings()
+            // Use getLoadedSettings() to ensure we get the same settings as other parts of the app
+            val loadedSettings = repository.getLoadedSettings()
+            Log.d("PrayerSettingsDialog", "📋 Loaded settings via getLoadedSettings():")
+            Log.d("PrayerSettingsDialog", "   - Method: ${loadedSettings.calculationMethod.displayName}")
+            Log.d("PrayerSettingsDialog", "   - Auto-detected: ${loadedSettings.isMethodAutoDetected}")
+            Log.d("PrayerSettingsDialog", "   - Country: ${loadedSettings.autoDetectedCountryName}")
+            settings = loadedSettings
             isLoading = false
+            Log.d("PrayerSettingsDialog", "✅ Settings applied to UI")
         } catch (e: Exception) {
             // Fallback to defaults if loading fails
             Log.w("PrayerSettingsDialog", "Failed to load settings", e)
