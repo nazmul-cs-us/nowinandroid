@@ -96,12 +96,23 @@ class PrayerTimesViewModel @Inject constructor(
         
         // Observe settings changes and recalculate prayer times when settings change (async to prevent ANR)
         viewModelScope.launch(Dispatchers.IO) {
-            settingsRepository.settingsFlow.collect { newSettings ->
-                android.util.Log.d("PrayerTimesViewModel", "Settings changed - Method: ${newSettings.calculationMethod.name}")
-                // Delay to prevent blocking during app startup
-                kotlinx.coroutines.delay(100) 
-                calculatePrayerTimes(showLoading = false, clearLoadingImmediately = true) // Background update, no loading state
-            }
+            settingsRepository.settingsFlow
+                .drop(1) // Skip initial value to avoid immediate recalculation
+                .collect { newSettings ->
+                    android.util.Log.i("PrayerTimesViewModel", "🚨 VIEWMODEL: SETTINGS FLOW UPDATE RECEIVED!")
+                    android.util.Log.i("PrayerTimesViewModel", "   - Method: ${newSettings.calculationMethod.displayName}")
+                    android.util.Log.i("PrayerTimesViewModel", "   - Auto-detected: ${newSettings.isMethodAutoDetected}")
+                    android.util.Log.i("PrayerTimesViewModel", "   - Custom Fajr Angle: ${newSettings.customFajrAngle}")
+                    android.util.Log.i("PrayerTimesViewModel", "   - Time: ${java.time.LocalDateTime.now()}")
+                    
+                    // Delay to prevent blocking during app startup
+                    kotlinx.coroutines.delay(100) 
+                    android.util.Log.i("PrayerTimesViewModel", "📤 Starting UI prayer time recalculation...")
+                    val startTime = System.currentTimeMillis()
+                    calculatePrayerTimes(showLoading = false, clearLoadingImmediately = true) // Background update, no loading state
+                    val duration = System.currentTimeMillis() - startTime
+                    android.util.Log.i("PrayerTimesViewModel", "✅ UI prayer times recalculated in ${duration}ms")
+                }
         }
         
         // Calculate fresh prayer times (will update cache if needed) - async to prevent ANR during startup
