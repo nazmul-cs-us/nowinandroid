@@ -106,38 +106,41 @@ class PrayerTimesViewModel @Inject constructor(
         
         // Calculate fresh prayer times (will update cache if needed) - async to prevent ANR during startup
         viewModelScope.launch(Dispatchers.IO) {
-            // Wait for settings to actually load from storage before running any initialization
-            val loadedSettings = settingsRepository.getLoadedSettings() // NEW: Wait for real settings
-            android.util.Log.w("PrayerTimesViewModel", "🔥 STARTING INITIALIZATION - Custom Isha: ${loadedSettings.customIshaAngle}")
+            // Use non-blocking settings access to prevent ANR during ViewModel initialization
+            val currentSettings = settingsRepository.getSettings() // NON-BLOCKING: Use current settings (may be defaults)
+            android.util.Log.w("PrayerTimesViewModel", "🔥 STARTING INITIALIZATION (NON-BLOCKING) - Custom Isha: ${currentSettings.customIshaAngle}")
+            
+            // TEMPORARILY DISABLED: All auto-detection during initialization to prevent ANR
+            android.util.Log.d("PrayerTimesViewModel", "⚠️ Auto-detection DISABLED during initialization to prevent ANR")
             
             // Try to auto-configure prayer method based on location during initial startup
-            tryInitialLocationBasedConfiguration()
+            // tryInitialLocationBasedConfiguration()
             
             // If no auto-detection happened, test with UAE location for demo purposes
-            kotlinx.coroutines.delay(2000) // Wait a bit for initial config
-            val currentSettings = settings.value
+            // kotlinx.coroutines.delay(2000) // Wait a bit for initial config
+            // val currentSettings = settings.value
             
             // Check if user has customizations before testing with UAE location
-            val hasCustomAngles = currentSettings.customFajrAngle != null ||
-                                currentSettings.customIshaAngle != null ||
-                                currentSettings.customIshaDelay != null
+            // val hasCustomAngles = currentSettings.customFajrAngle != null ||
+            //                     currentSettings.customIshaAngle != null ||
+            //                     currentSettings.customIshaDelay != null
             
             // Only skip if user has explicitly made changes AND we have backup data to distinguish from fresh install
-            val hasUserCustomizations = hasCustomAngles ||
-                                      // Skip if user previously had auto-detection but manually changed settings 
-                                      (currentSettings.originalAutoDetectedSettingsJson != null && 
-                                       (!currentSettings.isMethodAutoDetected || 
-                                        !currentSettings.isMadhhabAutoDetected || 
-                                        !currentSettings.areCustomAnglesAutoDetected))
+            // val hasUserCustomizations = hasCustomAngles ||
+            //                           // Skip if user previously had auto-detection but manually changed settings 
+            //                           (currentSettings.originalAutoDetectedSettingsJson != null && 
+            //                            (!currentSettings.isMethodAutoDetected || 
+            //                             !currentSettings.isMadhhabAutoDetected || 
+            //                             !currentSettings.areCustomAnglesAutoDetected))
             
-            if (!currentSettings.isMethodAutoDetected && 
-                currentSettings.calculationMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE &&
-                !hasUserCustomizations) {
-                android.util.Log.d("PrayerTimesViewModel", "No auto-detection occurred, testing with UAE location")
-                testAutoDetectionWithUAELocation()
-            } else if (hasUserCustomizations) {
-                android.util.Log.w("PrayerTimesViewModel", "🔥 Skipping UAE test - user has customizations")
-            }
+            // if (!currentSettings.isMethodAutoDetected && 
+            //     currentSettings.calculationMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE &&
+            //     !hasUserCustomizations) {
+            //     android.util.Log.d("PrayerTimesViewModel", "No auto-detection occurred, testing with UAE location")
+            //     testAutoDetectionWithUAELocation()
+            // } else if (hasUserCustomizations) {
+            //     android.util.Log.w("PrayerTimesViewModel", "🔥 Skipping UAE test - user has customizations")
+            // }
             
             calculatePrayerTimes()
         }
@@ -788,7 +791,8 @@ class PrayerTimesViewModel @Inject constructor(
             }
             
             android.util.Log.w("PrayerTimesViewModel", "🔥 FINAL: Saving angles - Fajr=${finalSettings.customFajrAngle}°, Isha=${finalSettings.customIshaAngle}°, IshaDelay=${finalSettings.customIshaDelay}min, autoDetected=${finalSettings.areCustomAnglesAutoDetected}")
-            updateSettings(finalSettings)
+            // Use non-blocking update during initialization to prevent ANR
+            settingsRepository.updateSettings(finalSettings, forceCommit = false) // Background initialization, use async apply()
             android.util.Log.w("PrayerTimesViewModel", "🔥 updateLocationWithAutoMethod COMPLETED")
             android.util.Log.w("PrayerTimesViewModel", "  Current Custom Isha AFTER: ${settings.value.customIshaAngle}")
             

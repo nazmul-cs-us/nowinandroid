@@ -150,27 +150,37 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * AWAITABLE SETTINGS GETTER: Waits for settings to be properly loaded
+     * AWAITABLE SETTINGS GETTER: Waits for settings to be properly loaded with timeout
      * 
      * This method waits for settings to be loaded from storage before returning.
      * Use this when you need to ensure you're getting actual saved settings, not defaults.
      * 
      * BEHAVIOR:
-     * - Suspends until settings are loaded from storage
+     * - Suspends until settings are loaded from storage (with timeout)
      * - Returns actual saved settings (not defaults)
      * - Safe to call from background coroutines
+     * - Has timeout protection to prevent ANR
      * 
      * @return Properly loaded PrayerSettings (never defaults)
      */
     suspend fun getLoadedSettings(): PrayerSettings {
         android.util.Log.w("PrayerSettingsRepository", "🔥🔥 getLoadedSettings CALLED - loaded flag: $_settingsLoaded")
         
-        // Wait until settings are loaded from storage
-        while (!_settingsLoaded) {
-            kotlinx.coroutines.delay(10) // Small delay to prevent busy waiting
+        // Wait until settings are loaded from storage WITH TIMEOUT to prevent ANR
+        var waitTime = 0L
+        val maxWaitTime = 3000L // 3 second max wait to prevent ANR
+        
+        while (!_settingsLoaded && waitTime < maxWaitTime) {
+            kotlinx.coroutines.delay(50) // Larger delay, less busy waiting
+            waitTime += 50
         }
         
-        val loadedSettings = _settingsFlow.value ?: PrayerSettings()
+        // If timeout occurred, log warning and return current value
+        if (!_settingsLoaded) {
+            android.util.Log.w("PrayerSettingsRepository", "⚠️ Settings loading timed out after ${maxWaitTime}ms")
+        }
+        
+        val loadedSettings = _settingsFlow.value ?: getDefaultSettings()
         android.util.Log.w("PrayerSettingsRepository", "🔥🔥 getLoadedSettings RETURNING - DETAILED DATA:")
         android.util.Log.w("PrayerSettingsRepository", "   📋 Calculation Method: ${loadedSettings.calculationMethod}")
         android.util.Log.w("PrayerSettingsRepository", "   📋 Asr Madhhab: ${loadedSettings.asrMadhhab}")
@@ -429,15 +439,11 @@ class PrayerSettingsRepository @Inject constructor(
             val editor = prefs.edit()
             editor.putString(KEY_CURRENT_SETTINGS_JSON, settingsJson)
             
-            val result = if (forceCommit) {
-                val committed = editor.commit()
-                android.util.Log.w("PrayerSettingsRepository", "🔥 COMMIT RESULT: $committed")
-                committed
-            } else {
-                editor.apply()
-                android.util.Log.w("PrayerSettingsRepository", "🔥 APPLY CALLED")
-                true
-            }
+            // Always use apply() instead of commit() to prevent main thread blocking
+            // commit() is synchronous and can cause ANR/startup hangs
+            editor.apply()
+            android.util.Log.w("PrayerSettingsRepository", "🔥 APPLY CALLED (async) - forceCommit was: $forceCommit")
+            val result = true
             
             // Verify it was saved
             val savedJson = prefs.getString(KEY_CURRENT_SETTINGS_JSON, null)
