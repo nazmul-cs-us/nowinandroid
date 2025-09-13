@@ -180,6 +180,40 @@ All cards in the app follow a consistent design pattern:
   - Optimized layout to prevent text cutoff while maintaining readability
   - Updated `SmartContentUtils.kt` with better content formatting for various tile sizes
 
+## Prayer Settings Auto-Detection System
+
+### Implementation Details
+The Prayer Settings Auto-Detection System automatically configures appropriate Islamic prayer calculation methods based on the user's location. The system follows a specific algorithm implemented in `PrayerSettingsRepository.kt`.
+
+#### Algorithm Flow
+1. **Initialization**: Detect cached country → Load auto-detected settings → Load cached settings → Populate UI
+2. **User Changes**: Update cached_prayer_settings → Recalculate times  
+3. **Restore Logic**: Compare cached vs auto-detected JSON → Show/hide restore option
+
+#### Core Components
+- **`getAutoDetectedSettingsForCountry(countryCode: String)`**: Loads country-specific prayer settings from JSON database
+- **`getCachedCountry()`**: Extracts country code from current location settings with comprehensive debugging
+- **`initializeSettings()`**: Implements the 3-step algorithm for settings initialization
+- **`shouldShowRestoreOption()`**: Compares settings to determine restore button visibility
+- **`restoreToAutoDetected()`**: Restores original auto-detected settings from backup
+
+#### Comprehensive Logging System
+The system includes emoji-based structured logging for debugging:
+- **🔍 CACHED COUNTRY DEBUG**: Detailed location data analysis
+- **🌍 COUNTRY AUTO-DETECTION**: Country lookup process
+- **📦 JSON LOADING**: Database loading performance (<1ms typical)
+- **📊 JSON PARSING**: Parsing performance and available countries list
+- **🔍 Country found/not found**: Lookup results with potential matches
+- **⚙️ CUSTOM ANGLES**: Detection of region-specific calculation parameters
+- **🔄 METHOD MAPPING**: Conversion from JSON names to enum values
+- **✅ AUTO-DETECTION COMPLETE**: Final results summary with timing
+
+#### Error Handling & Debugging
+- **Country Code Validation**: Lists all available countries when lookup fails
+- **Potential Match Detection**: Shows similar country codes for troubleshooting
+- **Performance Monitoring**: Tracks JSON loading and parsing times
+- **Backup System**: Maintains original auto-detected settings for restore functionality
+
 ## Country-Based Prayer Calculation Methods
 
 ### JSON Data Integration
@@ -218,17 +252,20 @@ All cards in the app follow a consistent design pattern:
 
 ### Development Commands
 ```bash
-# View all auto-detection logs
-adb logcat -s "CountryPrayerMethodService" "PrayerSettingsScreen"
+# View all auto-detection logs (updated service names)
+adb logcat -s "PrayerSettingsRepository" "PrayerSettingsDialog"
 
 # View only errors and warnings  
-adb logcat "*:W" -s "CountryPrayerMethodService"
+adb logcat "*:W" -s "PrayerSettingsRepository"
 
-# View location detection flow
-adb logcat -s "CountryPrayerMethodService" | grep "🌍\|🔍\|🏳️"
+# View location and country detection flow
+adb logcat -s "PrayerSettingsRepository" | grep "🌍\|🔍\|🏳️\|📦\|📊"
 
-# Monitor performance
-adb logcat -s "CountryPrayerMethodService" | grep "✅.*ms"
+# Monitor performance and results
+adb logcat -s "PrayerSettingsRepository" | grep "✅.*ms\|📊.*countries\|🔍.*Country found"
+
+# Debug country lookup issues
+adb logcat -s "PrayerSettingsRepository" | grep "CACHED COUNTRY\|Looking for country\|All available countries"
 ```
 
 ### Documentation

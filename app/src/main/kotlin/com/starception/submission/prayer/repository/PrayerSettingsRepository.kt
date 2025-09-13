@@ -23,6 +23,10 @@ import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 
@@ -410,19 +414,173 @@ class PrayerSettingsRepository @Inject constructor(
      */
     
     /**
-     * Get cached country from preferences
+     * Get cached country from current location settings
      */
     fun getCachedCountry(): String? {
-        return prefs.getString("cached_country", null)
+        val currentSettings = getCachedPrayerSettings()
+        val country = currentSettings?.location?.country
+        
+        Log.i(TAG, "🔍 CACHED COUNTRY DEBUG:")
+        Log.i(TAG, "   - Has cached settings: ${currentSettings != null}")
+        Log.i(TAG, "   - Has location: ${currentSettings?.location != null}")
+        if (currentSettings?.location != null) {
+            Log.i(TAG, "   - Location city: ${currentSettings.location?.city}")
+            Log.i(TAG, "   - Location country: ${currentSettings.location?.country}")
+            Log.i(TAG, "   - Location lat/lng: ${currentSettings.location?.latitude}, ${currentSettings.location?.longitude}")
+            Log.i(TAG, "   - Location timezone: ${currentSettings.location?.timeZoneOffset}")
+        }
+        Log.i(TAG, "   - Returning country: $country")
+        
+        return country
     }
     
     /**
      * Get auto-detected prayer settings for a country from JSON
      */
     fun getAutoDetectedSettingsForCountry(countryCode: String): PrayerSettings? {
-        // This would load from country_prayer_methods.json
-        // For now, return null as placeholder
-        return null
+        Log.i(TAG, "🌍 COUNTRY AUTO-DETECTION: Loading settings for country: $countryCode")
+        
+        return try {
+            val startTime = System.currentTimeMillis()
+            
+            // 1. Load JSON from assets
+            Log.i(TAG, "📦 Loading country_prayer_methods.json from assets...")
+            val jsonString = context.assets.open("country_prayer_methods.json").bufferedReader().use { it.readText() }
+            val loadTime = System.currentTimeMillis() - startTime
+            Log.i(TAG, "📦 JSON loaded successfully (${loadTime}ms, ${jsonString.length} chars)")
+            
+            // 2. Parse JSON
+            val parseStartTime = System.currentTimeMillis()
+            val jsonData = Json.parseToJsonElement(jsonString).jsonObject
+            val parseTime = System.currentTimeMillis() - parseStartTime
+            Log.i(TAG, "📊 JSON parsed successfully (${parseTime}ms, top-level keys: ${jsonData.keys.joinToString(", ")})")
+            
+            // 3. Extract countries object and find country entry
+            val countriesData = jsonData["countries"]?.jsonObject
+            if (countriesData == null) {
+                Log.e(TAG, "❌ No 'countries' key found in JSON structure")
+                return null
+            }
+            
+            Log.i(TAG, "📊 Countries data found (${countriesData.size} countries available)")
+            Log.i(TAG, "📊 All available countries: ${countriesData.keys.sorted().joinToString(", ")}")
+            Log.i(TAG, "📊 Looking for country code: '$countryCode'")
+            
+            val countryEntry = countriesData[countryCode]?.jsonObject
+            if (countryEntry == null) {
+                Log.w(TAG, "🏳️ Country not found in database: '$countryCode'")
+                Log.w(TAG, "   Exact matches check:")
+                countriesData.keys.forEach { key ->
+                    if (key.contains(countryCode, ignoreCase = true) || countryCode.contains(key, ignoreCase = true)) {
+                        Log.w(TAG, "     - Potential match: '$key'")
+                    }
+                }
+                return null
+            }
+            
+            Log.i(TAG, "🔍 Country found: $countryCode")
+            val countryName = countryEntry["name"]?.jsonPrimitive?.content ?: "Unknown"
+            val methodName = countryEntry["calculationMethod"]?.jsonPrimitive?.content
+            val madhhabName = countryEntry["madhhab"]?.jsonPrimitive?.content
+            
+            Log.i(TAG, "📋 Country details:")
+            Log.i(TAG, "   - Name: $countryName")
+            Log.i(TAG, "   - Calculation Method: $methodName")
+            Log.i(TAG, "   - Madhhab: $madhhabName")
+            
+            // 4. Map calculation method
+            val calculationMethod = when (methodName) {
+                "Muslim_World_League" -> CalculationMethod.MUSLIM_WORLD_LEAGUE
+                "Umm_al_Qura_University_Makkah" -> CalculationMethod.UMM_AL_QURA
+                "Egyptian_General_Authority_of_Survey" -> CalculationMethod.EGYPTIAN_AUTHORITY
+                "University_of_Islamic_Sciences_Karachi", "University_of_Karachi" -> CalculationMethod.UNIVERSITY_OF_ISLAMIC_SCIENCES
+                "Islamic_Society_of_North_America" -> CalculationMethod.ISNA
+                "Institute_of_Geophysics_University_of_Tehran" -> CalculationMethod.INSTITUTE_OF_GEOPHYSICS_TEHRAN
+                "Shia_Ithna_Ashari_Leva_Research_Institute_Qum" -> CalculationMethod.SHIA_ITHNA_ASHARI
+                "Majlis_Ugama_Islam_Singapura_Singapore" -> CalculationMethod.MUIS
+                "Europe", "South_Africa" -> CalculationMethod.MUSLIM_WORLD_LEAGUE // Common fallbacks
+                else -> {
+                    Log.w(TAG, "⚠️ Unknown calculation method: $methodName, using Muslim World League")
+                    CalculationMethod.MUSLIM_WORLD_LEAGUE
+                }
+            }
+            
+            // 5. Map madhhab
+            val asrMadhhab = when (madhhabName?.lowercase()) {
+                "hanafi" -> AsrMadhhab.HANAFI
+                "shafi", "shafii" -> AsrMadhhab.STANDARD
+                "maliki" -> AsrMadhhab.STANDARD
+                "hanbali" -> AsrMadhhab.STANDARD
+                "jafari" -> AsrMadhhab.STANDARD
+                "ibadi" -> AsrMadhhab.STANDARD
+                else -> {
+                    Log.w(TAG, "⚠️ Unknown madhhab: $madhhabName, using Standard")
+                    AsrMadhhab.STANDARD
+                }
+            }
+            
+            Log.i(TAG, "🔄 Method mapping complete:")
+            Log.i(TAG, "   - Mapped to: ${calculationMethod.displayName}")
+            Log.i(TAG, "   - Asr method: ${asrMadhhab.displayName}")
+            
+            // 6. Extract custom angles if available
+            val customFajrAngle = countryEntry["customFajrAngle"]?.jsonPrimitive?.doubleOrNull
+            val customIshaAngle = countryEntry["customIshaAngle"]?.jsonPrimitive?.doubleOrNull
+            val customIshaDelay = countryEntry["customIshaDelay"]?.jsonPrimitive?.intOrNull
+            
+            if (customFajrAngle != null || customIshaAngle != null || customIshaDelay != null) {
+                Log.i(TAG, "⚙️ Custom angles found:")
+                Log.i(TAG, "   - Custom Fajr angle: $customFajrAngle°")
+                Log.i(TAG, "   - Custom Isha angle: $customIshaAngle°")
+                Log.i(TAG, "   - Custom Isha delay: $customIshaDelay min")
+            }
+            
+            // 7. Create prayer settings with auto-detection info
+            val autoDetectedSettings = PrayerSettings(
+                calculationMethod = calculationMethod,
+                asrMadhhab = asrMadhhab,
+                customFajrAngle = customFajrAngle,
+                customIshaAngle = customIshaAngle,
+                customIshaDelay = customIshaDelay,
+                
+                // Auto-detection metadata
+                isMethodAutoDetected = true,
+                isMadhhabAutoDetected = true,
+                areCustomAnglesAutoDetected = customFajrAngle != null || customIshaAngle != null || customIshaDelay != null,
+                autoDetectedCountryName = countryName,
+                autoDetectedCountryCode = countryCode,
+                
+                // Store backup for restore functionality
+                originalAutoDetectedSettingsJson = json.encodeToString(PrayerSettings(
+                    calculationMethod = calculationMethod,
+                    asrMadhhab = asrMadhhab,
+                    customFajrAngle = customFajrAngle,
+                    customIshaAngle = customIshaAngle,
+                    customIshaDelay = customIshaDelay,
+                    isMethodAutoDetected = true,
+                    isMadhhabAutoDetected = true,
+                    areCustomAnglesAutoDetected = customFajrAngle != null || customIshaAngle != null || customIshaDelay != null,
+                    autoDetectedCountryName = countryName,
+                    autoDetectedCountryCode = countryCode
+                ))
+            )
+            
+            val totalTime = System.currentTimeMillis() - startTime
+            Log.i(TAG, "✅ AUTO-DETECTION COMPLETE (${totalTime}ms total)")
+            Log.i(TAG, "📊 Final auto-detected settings for $countryName:")
+            Log.i(TAG, "   - Method: ${autoDetectedSettings.calculationMethod.displayName}")
+            Log.i(TAG, "   - Asr: ${autoDetectedSettings.asrMadhhab.displayName}")
+            Log.i(TAG, "   - Auto-detected flags: method=${autoDetectedSettings.isMethodAutoDetected}, madhhab=${autoDetectedSettings.isMadhhabAutoDetected}, angles=${autoDetectedSettings.areCustomAnglesAutoDetected}")
+            Log.i(TAG, "   - Has backup JSON: ${autoDetectedSettings.originalAutoDetectedSettingsJson != null}")
+            
+            autoDetectedSettings
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to load auto-detected settings for $countryCode", e)
+            Log.e(TAG, "   - Error type: ${e.javaClass.simpleName}")
+            Log.e(TAG, "   - Error message: ${e.message}")
+            null
+        }
     }
     
     /**
