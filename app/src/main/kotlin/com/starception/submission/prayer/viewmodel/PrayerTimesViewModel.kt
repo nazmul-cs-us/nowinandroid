@@ -177,6 +177,16 @@ class PrayerTimesViewModel @Inject constructor(
                 val currentSettings = settings.value
                 val location = getCurrentLocation(currentSettings)
                 
+                // ROBUST LOGGING: Check what settings ViewModel is using for calculation
+                android.util.Log.i("PrayerTimesViewModel", "📋 VIEWMODEL SETTINGS FOR CALCULATION:")
+                android.util.Log.i("PrayerTimesViewModel", "   - Method: ${currentSettings.calculationMethod.displayName}")
+                android.util.Log.i("PrayerTimesViewModel", "   - Custom Fajr: ${currentSettings.customFajrAngle}")
+                android.util.Log.i("PrayerTimesViewModel", "   - Custom Isha: ${currentSettings.customIshaAngle}")
+                android.util.Log.i("PrayerTimesViewModel", "   - Fajr Offset: ${currentSettings.timeOffsets.fajr}")
+                android.util.Log.i("PrayerTimesViewModel", "   - Dhuhr Offset: ${currentSettings.timeOffsets.dhuhr}")
+                android.util.Log.i("PrayerTimesViewModel", "   - Asr Offset: ${currentSettings.timeOffsets.asr}")
+                android.util.Log.i("PrayerTimesViewModel", "   - Auto-detected: ${currentSettings.isMethodAutoDetected}")
+                
                 val prayerTimes = prayerCalculatorService.calculatePrayerTimes(date, location, currentSettings)
                 
                 prayerTimes?.let { times ->

@@ -520,6 +520,16 @@ class PrayerNotificationService : Service() {
                     return@withContext Triple("Prayer Time Tracker", "Loading...", "Initializing prayer data")
                 }
                 
+                // ROBUST LOGGING: Check what settings we're actually using for calculation
+                Log.i(TAG, "📋 SETTINGS BEING USED FOR PRAYER CALCULATION:")
+                Log.i(TAG, "   - Method: ${settings.calculationMethod.displayName}")
+                Log.i(TAG, "   - Custom Fajr: ${settings.customFajrAngle}")
+                Log.i(TAG, "   - Custom Isha: ${settings.customIshaAngle}")
+                Log.i(TAG, "   - Fajr Offset: ${settings.timeOffsets.fajr}")
+                Log.i(TAG, "   - Dhuhr Offset: ${settings.timeOffsets.dhuhr}")
+                Log.i(TAG, "   - Asr Offset: ${settings.timeOffsets.asr}")
+                Log.i(TAG, "   - Auto-detected: ${settings.isMethodAutoDetected}")
+                
                 val location = settings.location
                 if (location == null) {
                     Log.w(TAG, "No location available")
