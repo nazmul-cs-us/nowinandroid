@@ -1,6 +1,7 @@
 package com.starception.submission.prayer.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonIgnoreUnknownKeys
 
 /**
  * PRAYER SETTINGS MODEL: User preferences for personalized prayer time calculations
@@ -31,6 +32,7 @@ import kotlinx.serialization.Serializable
  * - Include reminder settings
  */
 @Serializable
+@JsonIgnoreUnknownKeys
 data class PrayerSettings(
     // CALCULATION METHOD SETTINGS - Core astronomical parameters
     val calculationMethod: CalculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,  // Primary calculation standard

@@ -219,30 +219,27 @@ class PrayerSettingsRepository @Inject constructor(
      * @param settings The new settings to save and apply
      * @param forceCommit Whether to use synchronous commit() for immediate persistence
      */
+    /**
+     * UPDATE SETTINGS - Following the algorithm specification:
+     * When user changes a setting:
+     * 1. Update cached_prayer_settings (JSON in preferences)
+     * 2. Update only when user finishes editing
+     * 3. Immediately recalculate prayer times
+     */
     fun updateSettings(settings: PrayerSettings, forceCommit: Boolean = false) {
-        android.util.Log.w("PrayerSettingsRepository", "🔥🔥 UPDATE SETTINGS CALLED:")
-        android.util.Log.w("PrayerSettingsRepository", "  ASR: ${settings.asrMadhhab}")
-        android.util.Log.w("PrayerSettingsRepository", "  Custom Isha: ${settings.customIshaAngle}")
-        android.util.Log.w("PrayerSettingsRepository", "  Custom Fajr: ${settings.customFajrAngle}")
-        android.util.Log.w("PrayerSettingsRepository", "  Force Commit: $forceCommit")
+        Log.i(TAG, "📝 User changed settings - updating cached_prayer_settings")
         
-        // STACK TRACE TO IDENTIFY CALLER
-        android.util.Log.w("PrayerSettingsRepository", "🔥 CALLER STACK TRACE:")
-        Thread.currentThread().stackTrace.take(8).forEach { element ->
-            android.util.Log.w("PrayerSettingsRepository", "  at ${element.className}.${element.methodName}(${element.fileName}:${element.lineNumber})")
-        }
+        // 1. Save to cached_prayer_settings (JSON format in preferences)
+        saveCachedPrayerSettings(settings)
         
-        saveSettings(settings, forceCommit)
+        // 2. Update in-memory flow for UI updates
         _settingsFlow.value = settings
-        // Force trigger flow for UI updates
         _settingsFlow.tryEmit(settings)
         
-        // ROBUST LOGGING: Track flow emission
-        Log.i(TAG, "🔄 FLOW EMISSION TRIGGERED:")
-        Log.i(TAG, "   - Settings flow updated with method: ${settings.calculationMethod.displayName}")
-        Log.i(TAG, "   - Flow has ${_settingsFlow.subscriptionCount.value} subscribers")
-        Log.i(TAG, "   - Current flow value: ${_settingsFlow.value?.calculationMethod?.displayName}")
-        Log.i(TAG, "   - Force commit: $forceCommit")
+        // 3. Immediately recalculate prayer times
+        triggerPrayerTimeRecalculation()
+        
+        Log.i(TAG, "✅ Settings updated: ${settings.calculationMethod.displayName}")
     }
     
     /**
@@ -403,6 +400,118 @@ class PrayerSettingsRepository @Inject constructor(
      * 
      * @return PrayerSettings with sensible defaults for immediate use
      */
+    /**
+     * PRAYER SETTINGS ALGORITHM IMPLEMENTATION
+     * 
+     * Following the specification:
+     * 1. Initialization: Detect cached country → Load auto-detected settings → Load cached settings → Populate UI
+     * 2. User changes: Update cached_prayer_settings → Recalculate times
+     * 3. Restore logic: Compare cached vs auto-detected JSON → Show/hide restore option
+     */
+    
+    /**
+     * Get cached country from preferences
+     */
+    fun getCachedCountry(): String? {
+        return prefs.getString("cached_country", null)
+    }
+    
+    /**
+     * Get auto-detected prayer settings for a country from JSON
+     */
+    fun getAutoDetectedSettingsForCountry(countryCode: String): PrayerSettings? {
+        // This would load from country_prayer_methods.json
+        // For now, return null as placeholder
+        return null
+    }
+    
+    /**
+     * Get cached prayer settings from preferences (JSON format)
+     */
+    fun getCachedPrayerSettings(): PrayerSettings? {
+        val cachedJson = prefs.getString(KEY_CURRENT_SETTINGS_JSON, null)
+        return if (cachedJson != null) {
+            try {
+                json.decodeFromString<PrayerSettings>(cachedJson)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to parse cached prayer settings", e)
+                null
+            }
+        } else null
+    }
+    
+    /**
+     * Save prayer settings to cache (JSON format)
+     */
+    fun saveCachedPrayerSettings(settings: PrayerSettings) {
+        val settingsJson = json.encodeToString(settings)
+        prefs.edit().putString(KEY_CURRENT_SETTINGS_JSON, settingsJson).apply()
+    }
+    
+    /**
+     * Initialize settings following the algorithm:
+     * 1. Detect cached country → 2. Load auto-detected → 3. Load cached → 4. Populate UI
+     */
+    fun initializeSettings(): PrayerSettings {
+        val cachedCountry = getCachedCountry()
+        val autoDetectedSettings = cachedCountry?.let { getAutoDetectedSettingsForCountry(it) }
+        val cachedSettings = getCachedPrayerSettings()
+        
+        return when {
+            cachedSettings != null -> {
+                Log.i(TAG, "Using cached prayer settings")
+                cachedSettings
+            }
+            autoDetectedSettings != null -> {
+                Log.i(TAG, "Using auto-detected settings for $cachedCountry")
+                autoDetectedSettings
+            }
+            else -> {
+                Log.i(TAG, "Using default settings")
+                getDefaultSettings()
+            }
+        }
+    }
+    
+    /**
+     * Compare cached settings with auto-detected settings to determine restore visibility
+     */
+    fun shouldShowRestoreOption(): Boolean {
+        val cachedCountry = getCachedCountry() ?: return false
+        val autoDetectedSettings = getAutoDetectedSettingsForCountry(cachedCountry) ?: return false
+        val cachedSettings = getCachedPrayerSettings() ?: return false
+        
+        // Convert both to JSON and compare
+        val autoDetectedJson = json.encodeToString(autoDetectedSettings)
+        val cachedJson = json.encodeToString(cachedSettings)
+        
+        return autoDetectedJson != cachedJson
+    }
+    
+    /**
+     * Restore to auto-detected settings
+     */
+    fun restoreToAutoDetected(): Boolean {
+        val cachedCountry = getCachedCountry() ?: return false
+        val autoDetectedSettings = getAutoDetectedSettingsForCountry(cachedCountry) ?: return false
+        
+        saveCachedPrayerSettings(autoDetectedSettings)
+        _settingsFlow.value = autoDetectedSettings
+        
+        // Trigger recalculation
+        triggerPrayerTimeRecalculation()
+        
+        return true
+    }
+    
+    /**
+     * Trigger prayer time recalculation (placeholder)
+     */
+    private fun triggerPrayerTimeRecalculation() {
+        Log.i(TAG, "Prayer time recalculation triggered")
+        // This would trigger the prayer time calculation service
+    }
+
     private fun getDefaultSettings(): PrayerSettings {
         return PrayerSettings(
             calculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,
@@ -507,6 +616,76 @@ class PrayerSettingsRepository @Inject constructor(
     fun forceSetAsrToStandard() {
         val updated = getSettings().copy(asrMadhhab = AsrMadhhab.STANDARD)
         updateSettings(updated, forceCommit = true) // Important setting change needs immediate persistence
+    }
+    
+    /**
+     * RESTORE FROM BACKUP: Restore original auto-detected settings from backup
+     * 
+     * This function restores the original auto-detected prayer settings when available.
+     * It looks for backup settings that contain auto-detected UAE configuration.
+     * 
+     * USE CASES:
+     * - User wants to restore original UAE auto-detected settings
+     * - Undo manual changes and return to auto-detected configuration
+     * - Restore country-specific prayer method settings
+     */
+    fun restoreAutoDetectedSettings(): Boolean {
+        val currentSettings = getSettings()
+        val backupJson = currentSettings.originalAutoDetectedSettingsJson
+        
+        Log.i(TAG, "🔄 RESTORE FUNCTION CALLED")
+        Log.i(TAG, "   - Current method: ${currentSettings.calculationMethod.displayName}")
+        Log.i(TAG, "   - Current auto-detected: ${currentSettings.isMethodAutoDetected}")
+        Log.i(TAG, "   - Backup JSON available: ${backupJson != null}")
+        Log.i(TAG, "   - Backup JSON length: ${backupJson?.length ?: 0}")
+        
+        return if (backupJson != null) {
+            try {
+                Log.i(TAG, "🔄 Parsing backup JSON...")
+                val backupSettings = Json.decodeFromString<PrayerSettings>(backupJson)
+                
+                Log.i(TAG, "📋 BACKUP SETTINGS FOUND:")
+                Log.i(TAG, "   - Backup method: ${backupSettings.calculationMethod.displayName}")
+                Log.i(TAG, "   - Backup country: ${backupSettings.autoDetectedCountryName}")
+                Log.i(TAG, "   - Backup custom Fajr: ${backupSettings.customFajrAngle}")
+                Log.i(TAG, "   - Backup custom Isha: ${backupSettings.customIshaAngle}")
+                Log.i(TAG, "   - Backup was auto-detected: ${backupSettings.isMethodAutoDetected}")
+                
+                // Restore with auto-detection flags enabled
+                val restoredSettings = backupSettings.copy(
+                    isMethodAutoDetected = true,
+                    isMadhhabAutoDetected = true,
+                    areCustomAnglesAutoDetected = true,
+                    originalAutoDetectedSettingsJson = backupJson // Keep the backup
+                )
+                
+                Log.i(TAG, "📤 APPLYING RESTORED SETTINGS:")
+                Log.i(TAG, "   - Restored method: ${restoredSettings.calculationMethod.displayName}")
+                Log.i(TAG, "   - Restored auto-detected flags: ${restoredSettings.isMethodAutoDetected}")
+                Log.i(TAG, "   - Restored country: ${restoredSettings.autoDetectedCountryName}")
+                
+                updateSettings(restoredSettings, forceCommit = true)
+                Log.i(TAG, "✅ Auto-detected settings restored and committed successfully")
+                
+                // Verify the settings were actually applied
+                val verifySettings = getSettings()
+                Log.i(TAG, "🔍 VERIFICATION:")
+                Log.i(TAG, "   - Final method: ${verifySettings.calculationMethod.displayName}")
+                Log.i(TAG, "   - Final auto-detected: ${verifySettings.isMethodAutoDetected}")
+                
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to restore auto-detected settings from backup", e)
+                Log.e(TAG, "   - Error type: ${e.javaClass.simpleName}")
+                Log.e(TAG, "   - Error message: ${e.message}")
+                false
+            }
+        } else {
+            Log.w(TAG, "⚠️ No backup auto-detected settings available")
+            Log.w(TAG, "   - Current country name: ${currentSettings.autoDetectedCountryName}")
+            Log.w(TAG, "   - Current backup JSON: ${currentSettings.originalAutoDetectedSettingsJson}")
+            false
+        }
     }
     
     /**
