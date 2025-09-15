@@ -80,13 +80,19 @@ data class Location(
      */
     fun getDisplayName(): String {
         return when {
-            // BEST CASE: Both city and country available
+            // BEST CASE: Both city, country, and country code available
+            city.isNotEmpty() && country.isNotEmpty() && countryCode.isNotEmpty() -> "$city, $country ($countryCode)"
+            
+            // GOOD CASE: City and country without country code
             city.isNotEmpty() && country.isNotEmpty() -> "$city, $country"
             
             // FALLBACK 1: City only
             city.isNotEmpty() -> city
             
-            // FALLBACK 2: Country only
+            // FALLBACK 2: Country with country code
+            country.isNotEmpty() && countryCode.isNotEmpty() -> "$country ($countryCode)"
+            
+            // FALLBACK 3: Country only
             country.isNotEmpty() -> country
             
             // FINAL FALLBACK: Show coordinates (4 decimal places = ~11 meter accuracy)
