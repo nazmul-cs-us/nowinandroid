@@ -939,7 +939,17 @@ class PrayerTimesViewModel @Inject constructor(
             return
         }
         
-        android.util.Log.w("PrayerTimesViewModel", "📋 FOUND BACKUP JSON (${backupJson.length} chars): ${backupJson.take(200)}...")
+        android.util.Log.w("PrayerTimesViewModel", "📋 FOUND BACKUP JSON (${backupJson.length} chars):")
+        try {
+            val prettyJson = kotlinx.serialization.json.Json { prettyPrint = true }.encodeToString(
+                kotlinx.serialization.json.Json.parseToJsonElement(backupJson)
+            )
+            prettyJson.lines().forEach { line ->
+                android.util.Log.w("PrayerTimesViewModel", line)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("PrayerTimesViewModel", backupJson)
+        }
         
         try {
             val backup = json.decodeFromString<AutoDetectedSettingsBackup>(backupJson)

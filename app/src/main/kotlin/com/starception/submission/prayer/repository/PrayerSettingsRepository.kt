@@ -201,7 +201,19 @@ class PrayerSettingsRepository @Inject constructor(
         android.util.Log.w("PrayerSettingsRepository", "   📋 Auto-Detected Country: ${loadedSettings.autoDetectedCountryName}")
         android.util.Log.w("PrayerSettingsRepository", "   📋 Has Backup JSON: ${loadedSettings.originalAutoDetectedSettingsJson != null}")
         if (loadedSettings.originalAutoDetectedSettingsJson != null) {
-            android.util.Log.w("PrayerSettingsRepository", "   📋 Backup JSON Preview: ${loadedSettings.originalAutoDetectedSettingsJson?.take(100)}...")
+            android.util.Log.w("PrayerSettingsRepository", "   📋 Backup JSON:")
+            loadedSettings.originalAutoDetectedSettingsJson?.let { backupJson ->
+                try {
+                    val prettyJson = Json { prettyPrint = true }.encodeToString(
+                        Json.parseToJsonElement(backupJson)
+                    )
+                    prettyJson.lines().forEach { line ->
+                        android.util.Log.w("PrayerSettingsRepository", "   $line")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("PrayerSettingsRepository", "   $backupJson")
+                }
+            }
         }
         return loadedSettings
     }
@@ -387,7 +399,20 @@ class PrayerSettingsRepository @Inject constructor(
             android.util.Log.w("PrayerSettingsRepository", "🔥 JSON FROM STORAGE: ${if (settingsJson != null) "EXISTS (${settingsJson.length} chars)" else "NULL"}")
             
             if (settingsJson != null) {
-                android.util.Log.w("PrayerSettingsRepository", "🔥 JSON CONTENT: ${settingsJson.take(200)}...")
+                android.util.Log.w("PrayerSettingsRepository", "Parsing cached JSON:")
+                android.util.Log.w("PrayerSettingsRepository", "🔥 JSON CONTENT:")
+                // Pretty-print the JSON for better readability
+                try {
+                    val prettyJson = Json { prettyPrint = true }.encodeToString(
+                        Json.parseToJsonElement(settingsJson)
+                    )
+                    prettyJson.lines().forEach { line ->
+                        android.util.Log.w("PrayerSettingsRepository", line)
+                    }
+                } catch (e: Exception) {
+                    // Fallback to original format if pretty-printing fails
+                    android.util.Log.w("PrayerSettingsRepository", settingsJson)
+                }
                 
                 val settings = json.decodeFromString<PrayerSettings>(settingsJson)
                 android.util.Log.w("PrayerSettingsRepository", "🔥 Settings loaded from JSON:")
@@ -546,7 +571,15 @@ class PrayerSettingsRepository @Inject constructor(
             Log.i(TAG, "   🌅 Raw Custom Fajr Angle: $customFajrAngleStr")
             Log.i(TAG, "   🌙 Raw Custom Isha Angle: $customIshaAngleStr") 
             Log.i(TAG, "   ⏰ Raw Custom Isha Delay: $customIshaDelayStr")
-            Log.i(TAG, "   📄 Full JSON Entry: ${countryEntry.toString().take(300)}...")
+            Log.i(TAG, "   📄 Full JSON Entry:")
+            try {
+                val prettyJson = Json { prettyPrint = true }.encodeToString(countryEntry)
+                prettyJson.lines().forEach { line ->
+                    Log.i(TAG, "   $line")
+                }
+            } catch (e: Exception) {
+                Log.i(TAG, "   ${countryEntry.toString()}")
+            }
             
             // 4. Map calculation method
             val calculationMethod = when (methodName) {
@@ -639,7 +672,19 @@ class PrayerSettingsRepository @Inject constructor(
             Log.i(TAG, "   ✅ Auto-Detection Flags: Method=${autoDetectedSettings.isMethodAutoDetected}, Madhhab=${autoDetectedSettings.isMadhhabAutoDetected}, Angles=${autoDetectedSettings.areCustomAnglesAutoDetected}")
             Log.i(TAG, "   🌍 Auto-Detected Country: ${autoDetectedSettings.autoDetectedCountryName} (${autoDetectedSettings.autoDetectedCountryCode})")
             Log.i(TAG, "   💾 Has Backup JSON: ${if (autoDetectedSettings.originalAutoDetectedSettingsJson != null) "YES (${autoDetectedSettings.originalAutoDetectedSettingsJson!!.length} chars)" else "NO"}")
-            Log.i(TAG, "   📄 Generated Settings JSON: ${json.encodeToString(autoDetectedSettings).take(300)}...")
+            Log.i(TAG, "   📄 Generated Settings JSON:")
+            Log.i(TAG, "   🔥 JSON CONTENT:")
+            // Pretty-print the JSON for better readability
+            try {
+                val prettyJson = Json { prettyPrint = true }.encodeToString(autoDetectedSettings)
+                prettyJson.lines().forEach { line ->
+                    Log.i(TAG, "   $line")
+                }
+            } catch (e: Exception) {
+                // Fallback to original format if pretty-printing fails
+                val fullJson = json.encodeToString(autoDetectedSettings)
+                Log.i(TAG, "   $fullJson")
+            }
             
             autoDetectedSettings
             
@@ -662,7 +707,17 @@ class PrayerSettingsRepository @Inject constructor(
         
         return if (cachedJson != null) {
             try {
-                Log.i(TAG, "📋 Parsing cached JSON: ${cachedJson.take(200)}...")
+                Log.i(TAG, "📋 Parsing cached JSON:")
+                try {
+                    val prettyJson = Json { prettyPrint = true }.encodeToString(
+                        Json.parseToJsonElement(cachedJson)
+                    )
+                    prettyJson.lines().forEach { line ->
+                        Log.i(TAG, line)
+                    }
+                } catch (e: Exception) {
+                    Log.i(TAG, cachedJson)
+                }
                 val cachedSettings = json.decodeFromString<PrayerSettings>(cachedJson)
                 
                 Log.i(TAG, "📋 CACHED SETTINGS RETRIEVED SUCCESSFULLY:")
@@ -683,7 +738,17 @@ class PrayerSettingsRepository @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "❌ CACHE PARSING FAILED: ${e.message}")
                 Log.e(TAG, "   Error details: ${e.javaClass.simpleName}")
-                Log.e(TAG, "   Problematic JSON: ${cachedJson.take(500)}")
+                Log.e(TAG, "   Problematic JSON:")
+                try {
+                    val prettyJson = Json { prettyPrint = true }.encodeToString(
+                        Json.parseToJsonElement(cachedJson)
+                    )
+                    prettyJson.lines().forEach { line ->
+                        Log.e(TAG, "   $line")
+                    }
+                } catch (ex: Exception) {
+                    Log.e(TAG, "   $cachedJson")
+                }
                 null
             }
         } else {
@@ -699,7 +764,17 @@ class PrayerSettingsRepository @Inject constructor(
         Log.i(TAG, "💾 CACHE SAVE: Saving prayer settings to cache")
         
         val settingsJson = json.encodeToString(settings)
-        Log.i(TAG, "💾 Generated JSON (${settingsJson.length} chars): ${settingsJson.take(300)}...")
+        Log.i(TAG, "💾 Generated JSON (${settingsJson.length} chars):")
+        try {
+            val prettyJson = Json { prettyPrint = true }.encodeToString(
+                Json.parseToJsonElement(settingsJson)
+            )
+            prettyJson.lines().forEach { line ->
+                Log.i(TAG, line)
+            }
+        } catch (e: Exception) {
+            Log.i(TAG, settingsJson)
+        }
         
         Log.i(TAG, "💾 SETTINGS BEING CACHED:")
         Log.i(TAG, "   🕌 Calculation Method: ${settings.calculationMethod.name} (${settings.calculationMethod.displayName})")
@@ -886,7 +961,17 @@ class PrayerSettingsRepository @Inject constructor(
         
         try {
             val settingsJson = json.encodeToString(settings)
-            android.util.Log.w("PrayerSettingsRepository", "🔥 JSON GENERATED: ${settingsJson.take(200)}...")
+            android.util.Log.w("PrayerSettingsRepository", "🔥 JSON GENERATED:")
+            try {
+                val prettyJson = Json { prettyPrint = true }.encodeToString(
+                    Json.parseToJsonElement(settingsJson)
+                )
+                prettyJson.lines().forEach { line ->
+                    android.util.Log.w("PrayerSettingsRepository", line)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("PrayerSettingsRepository", settingsJson)
+            }
             
             val editor = prefs.edit()
             editor.putString(KEY_CURRENT_SETTINGS_JSON, settingsJson)
