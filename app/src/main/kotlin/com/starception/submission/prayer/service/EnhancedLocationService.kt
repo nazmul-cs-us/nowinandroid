@@ -367,7 +367,8 @@ class EnhancedLocationService @Inject constructor(
                     addresses?.firstOrNull()?.let { address ->
                         baseLocation.copy(
                             city = address.locality ?: address.subAdminArea ?: "",
-                            country = address.countryName ?: ""
+                            country = address.countryName ?: "",
+                            countryCode = address.countryCode ?: ""
                         )
                     }
                 }
@@ -415,7 +416,8 @@ class EnhancedLocationService @Inject constructor(
                             longitude = address.longitude,
                             timeZoneOffset = getTimezoneOffset(address.latitude, address.longitude),
                             city = address.locality ?: address.subAdminArea ?: "",
-                            country = address.countryName ?: ""
+                            country = address.countryName ?: "",
+                            countryCode = address.countryCode ?: ""
                         )
                     } ?: emptyList()
                     

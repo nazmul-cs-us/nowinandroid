@@ -35,7 +35,8 @@ data class Location(
     
     // HUMAN-READABLE NAMES - For display in UI
     val city: String = "",       // City name (e.g., "Dubai", "New York")
-    val country: String = "",    // Country name (e.g., "UAE", "USA")
+    val country: String = "",    // Country name (e.g., "United Arab Emirates", "United States")
+    val countryCode: String = "",// ISO 3166-1 alpha-2 country code (e.g., "AE", "US")
     
     // OPTIONAL PRECISION DATA - For enhanced accuracy
     val altitude: Double = 0.0   // Meters above sea level (affects sunrise/sunset times)
