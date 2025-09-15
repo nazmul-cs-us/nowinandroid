@@ -24,6 +24,12 @@ import kotlin.coroutines.resume
 class LocationService @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    
+    init {
+        android.util.Log.i("LocationService", "🚀 LOCATION SERVICE INITIALIZING...")
+        android.util.Log.i("LocationService", "💡 Enhanced service available - recommend using EnhancedLocationService")
+        android.util.Log.i("LocationService", "✅ LOCATION SERVICE READY")
+    }
     private val locationManager: LocationManager by lazy {
         context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     }
@@ -156,27 +162,77 @@ class LocationService @Inject constructor(
      * Gets location details (city, country) from coordinates
      */
     suspend fun getLocationDetails(location: Location): Location = suspendCancellableCoroutine { continuation ->
+        android.util.Log.i("LocationService", "🔍 LEGACY GEOCODING DEBUG: Starting location enrichment")
+        android.util.Log.i("LocationService", "   📍 Input coordinates: ${location.latitude}, ${location.longitude}")
+        android.util.Log.i("LocationService", "   📍 Input location: ${location.getDisplayName()}")
+        
         geocoder?.let { geocoder ->
             try {
+                android.util.Log.i("LocationService", "   ✅ LEGACY GEOCODER AVAILABLE: Starting reverse geocoding...")
+                
                 @Suppress("DEPRECATION")
                 val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
                 
+                android.util.Log.i("LocationService", "   📋 LEGACY GEOCODING RESPONSE:")
+                android.util.Log.i("LocationService", "      📊 Addresses count: ${addresses?.size ?: 0}")
+                
                 if (!addresses.isNullOrEmpty()) {
                     val address = addresses[0]
+                    android.util.Log.i("LocationService", "      🏙️ City (locality): '${address.locality}'")
+                    android.util.Log.i("LocationService", "      🏙️ Sub admin area: '${address.subAdminArea}'")
+                    android.util.Log.i("LocationService", "      🌍 Country name: '${address.countryName}'")
+                    android.util.Log.i("LocationService", "      🏳️ Country code: '${address.countryCode}'")
+                    android.util.Log.i("LocationService", "      📍 Admin area: '${address.adminArea}'")
+                    android.util.Log.i("LocationService", "      📮 Postal code: '${address.postalCode}'")
+                    android.util.Log.i("LocationService", "      🏠 Address line: '${address.getAddressLine(0)}'")
+                    
+                    android.util.Log.i("LocationService", "      🔧 STARTING COUNTRY CODE RESOLUTION...")
+                    
+                    // Use CountryCodeMapper to ensure country code is populated
+                    val resolvedCountryCode = CountryCodeMapper.resolveCountryCode(
+                        address.countryCode, 
+                        address.countryName
+                    )
+                    
+                    android.util.Log.i("LocationService", "      ✅ COUNTRY CODE RESOLUTION COMPLETE:")
+                    android.util.Log.i("LocationService", "         📊 FINAL RESULT: '$resolvedCountryCode'")
+                    
+                    // Validate and log the result
+                    if (resolvedCountryCode.isNotEmpty()) {
+                        val isValid = CountryCodeMapper.validateCountryCode(resolvedCountryCode)
+                        if (isValid) {
+                            android.util.Log.i("LocationService", "         🎯 SUCCESS: Valid country code for prayer auto-detection")
+                        } else {
+                            android.util.Log.w("LocationService", "         ⚠️ WARNING: Country code not in prayer database")
+                        }
+                    } else {
+                        android.util.Log.e("LocationService", "         ❌ ERROR: No country code resolved - auto-detection may fail")
+                    }
+                    
                     val updatedLocation = location.copy(
                         city = address.locality ?: address.subAdminArea ?: "",
                         country = address.countryName ?: "",
-                        countryCode = address.countryCode ?: ""
+                        countryCode = resolvedCountryCode
                     )
+                    
+                    android.util.Log.i("LocationService", "   ✅ LEGACY ENRICHED LOCATION CREATED:")
+                    android.util.Log.i("LocationService", "      🏙️ Final city: '${updatedLocation.city}'")
+                    android.util.Log.i("LocationService", "      🌍 Final country: '${updatedLocation.country}'")
+                    android.util.Log.i("LocationService", "      🏳️ Final country code: '${updatedLocation.countryCode}'")
+                    android.util.Log.i("LocationService", "      📍 Display name: '${updatedLocation.getDisplayName()}'")
+                    
                     continuation.resume(updatedLocation)
                 } else {
+                    android.util.Log.w("LocationService", "   ⚠️ NO ADDRESS FOUND: addresses.isNullOrEmpty()")
                     continuation.resume(location)
                 }
             } catch (e: Exception) {
+                android.util.Log.e("LocationService", "   💥 LEGACY GEOCODING ERROR: ${e::class.simpleName}: ${e.message}")
                 // Return original location if geocoding fails
                 continuation.resume(location)
             }
         } ?: run {
+            android.util.Log.w("LocationService", "   ❌ LEGACY GEOCODER NOT AVAILABLE: Geocoder.isPresent() = ${Geocoder.isPresent()}")
             continuation.resume(location)
         }
     }
@@ -191,14 +247,27 @@ class LocationService @Inject constructor(
                 val addresses = geocoder.getFromLocationName(query, 5)
                 
                 if (!addresses.isNullOrEmpty()) {
-                    val locations = addresses.map { address ->
+                    val locations = addresses.mapIndexed { index, address ->
+                        android.util.Log.i("LocationService", "   📍 PROCESSING SEARCH RESULT #${index + 1}:")
+                        android.util.Log.i("LocationService", "      Location: ${address.latitude}, ${address.longitude}")
+                        android.util.Log.i("LocationService", "      City: '${address.locality}', Country: '${address.countryName}'")
+                        android.util.Log.i("LocationService", "      Geocoder Code: '${address.countryCode}'")
+                        
+                        // Use CountryCodeMapper for search results too
+                        val resolvedCountryCode = CountryCodeMapper.resolveCountryCode(
+                            address.countryCode,
+                            address.countryName
+                        )
+                        
+                        android.util.Log.i("LocationService", "      ✅ RESOLVED COUNTRY CODE: '$resolvedCountryCode'")
+                        
                         Location(
                             latitude = address.latitude,
                             longitude = address.longitude,
                             timeZoneOffset = getTimeZoneOffset(),
                             city = address.locality ?: address.subAdminArea ?: "",
                             country = address.countryName ?: "",
-                            countryCode = address.countryCode ?: "",
+                            countryCode = resolvedCountryCode,
                             altitude = 0.0
                         )
                     }

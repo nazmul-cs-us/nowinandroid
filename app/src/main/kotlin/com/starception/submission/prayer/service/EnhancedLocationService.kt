@@ -61,6 +61,12 @@ class EnhancedLocationService @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     
+    init {
+        android.util.Log.i("EnhancedLocationService", "🚀 ENHANCED LOCATION SERVICE INITIALIZING...")
+        CountryCodeMapper.logMappingStatistics()
+        android.util.Log.i("EnhancedLocationService", "✅ ENHANCED LOCATION SERVICE READY")
+    }
+    
     private val fusedLocationClient: FusedLocationProviderClient by lazy {
         LocationServices.getFusedLocationProviderClient(context)
     }
@@ -348,6 +354,9 @@ class EnhancedLocationService @Inject constructor(
      * @return Enhanced Location with city, country, and timezone
      */
     suspend fun getLocationDetails(androidLocation: android.location.Location): Location {
+        android.util.Log.i("EnhancedLocationService", "🔍 ENHANCED GEOCODING DEBUG: Starting location enrichment")
+        android.util.Log.i("EnhancedLocationService", "   📍 Input coordinates: ${androidLocation.latitude}, ${androidLocation.longitude}")
+        
         val baseLocation = Location(
             latitude = androidLocation.latitude,
             longitude = androidLocation.longitude,
@@ -355,8 +364,12 @@ class EnhancedLocationService @Inject constructor(
             altitude = androidLocation.altitude
         )
         
+        android.util.Log.i("EnhancedLocationService", "   📦 Base location: ${baseLocation.getDisplayName()}")
+        
         return try {
             geocoder?.let { gc ->
+                android.util.Log.i("EnhancedLocationService", "   ✅ ENHANCED GEOCODER AVAILABLE: Starting reverse geocoding...")
+                
                 withTimeoutOrNull(3000) { // 3 second timeout for geocoding to prevent delays
                     val addresses = gc.getFromLocation(
                         androidLocation.latitude,
@@ -364,16 +377,51 @@ class EnhancedLocationService @Inject constructor(
                         1
                     )
                     
+                    android.util.Log.i("EnhancedLocationService", "   📋 ENHANCED GEOCODING RESPONSE: ${addresses?.size ?: 0} addresses")
+                    
                     addresses?.firstOrNull()?.let { address ->
-                        baseLocation.copy(
+                        android.util.Log.i("EnhancedLocationService", "      🏙️ City: '${address.locality}', Sub-admin: '${address.subAdminArea}'")
+                        android.util.Log.i("EnhancedLocationService", "      🌍 Country: '${address.countryName}', Code: '${address.countryCode}'")
+                        
+                        android.util.Log.i("EnhancedLocationService", "      🔧 STARTING COUNTRY CODE RESOLUTION...")
+                        
+                        // Use CountryCodeMapper to ensure country code is populated
+                        val resolvedCountryCode = CountryCodeMapper.resolveCountryCode(
+                            address.countryCode, 
+                            address.countryName
+                        )
+                        
+                        android.util.Log.i("EnhancedLocationService", "      ✅ COUNTRY CODE RESOLUTION COMPLETE:")
+                        android.util.Log.i("EnhancedLocationService", "         📊 FINAL RESULT: '$resolvedCountryCode'")
+                        
+                        // Validate the result
+                        if (resolvedCountryCode.isNotEmpty()) {
+                            val isValid = CountryCodeMapper.validateCountryCode(resolvedCountryCode)
+                            if (isValid) {
+                                android.util.Log.i("EnhancedLocationService", "         🎯 SUCCESS: Valid country code for prayer auto-detection")
+                            } else {
+                                android.util.Log.w("EnhancedLocationService", "         ⚠️ WARNING: Country code not in prayer database")
+                            }
+                        } else {
+                            android.util.Log.e("EnhancedLocationService", "         ❌ ERROR: No country code resolved - auto-detection may fail")
+                        }
+                        
+                        val enrichedLocation = baseLocation.copy(
                             city = address.locality ?: address.subAdminArea ?: "",
                             country = address.countryName ?: "",
-                            countryCode = address.countryCode ?: ""
+                            countryCode = resolvedCountryCode
                         )
+                        
+                        android.util.Log.i("EnhancedLocationService", "   ✅ ENHANCED ENRICHED: ${enrichedLocation.getDisplayName()}")
+                        enrichedLocation
                     }
                 }
-            } ?: baseLocation
+            } ?: run {
+                android.util.Log.w("EnhancedLocationService", "   ❌ ENHANCED GEOCODER NOT AVAILABLE")
+                baseLocation
+            }
         } catch (e: Exception) {
+            android.util.Log.e("EnhancedLocationService", "   💥 ENHANCED GEOCODING ERROR: ${e.message}")
             // If geocoding fails, return location with coordinates only
             baseLocation
         }
@@ -410,14 +458,27 @@ class EnhancedLocationService @Inject constructor(
             geocoder?.let { gc ->
                 withTimeoutOrNull(5000) { // 5 seconds for search is reasonable
                     val addresses = gc.getFromLocationName(query, 5)
-                    val locations = addresses?.map { address ->
+                    val locations = addresses?.mapIndexed { index, address ->
+                        android.util.Log.i("EnhancedLocationService", "   📍 PROCESSING SEARCH RESULT #${index + 1}:")
+                        android.util.Log.i("EnhancedLocationService", "      Location: ${address.latitude}, ${address.longitude}")
+                        android.util.Log.i("EnhancedLocationService", "      City: '${address.locality}', Country: '${address.countryName}'")
+                        android.util.Log.i("EnhancedLocationService", "      Geocoder Code: '${address.countryCode}'")
+                        
+                        // Use CountryCodeMapper for search results too
+                        val resolvedCountryCode = CountryCodeMapper.resolveCountryCode(
+                            address.countryCode,
+                            address.countryName
+                        )
+                        
+                        android.util.Log.i("EnhancedLocationService", "      ✅ RESOLVED COUNTRY CODE: '$resolvedCountryCode'")
+                        
                         Location(
                             latitude = address.latitude,
                             longitude = address.longitude,
                             timeZoneOffset = getTimezoneOffset(address.latitude, address.longitude),
                             city = address.locality ?: address.subAdminArea ?: "",
                             country = address.countryName ?: "",
-                            countryCode = address.countryCode ?: ""
+                            countryCode = resolvedCountryCode
                         )
                     } ?: emptyList()
                     

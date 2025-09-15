@@ -398,8 +398,9 @@ class PrayerSettingsRepository @Inject constructor(
                 android.util.Log.w("PrayerSettingsRepository", "  Is Method Auto-Detected: ${settings.isMethodAutoDetected}")
                 settings
             } else {
-                android.util.Log.w("PrayerSettingsRepository", "🔥 No JSON settings found, using defaults")
-                getDefaultSettings()
+                android.util.Log.w("PrayerSettingsRepository", "🔥 No JSON settings found, running initialization algorithm")
+                android.util.Log.w("PrayerSettingsRepository", "🚀 TRIGGERING AUTO-DETECTION FOR FIRST-TIME SETUP")
+                initializeSettings()
             }
         } catch (e: Exception) {
             android.util.Log.e("PrayerSettingsRepository", "🔥 ERROR loading settings from JSON, using defaults", e)
@@ -446,16 +447,36 @@ class PrayerSettingsRepository @Inject constructor(
             Log.i(TAG, "   - Location city: ${currentSettings.location?.city}")
             Log.i(TAG, "   - Location country: ${currentSettings.location?.country}")
             Log.i(TAG, "   - Location country code: ${currentSettings.location?.countryCode}")
+            Log.i(TAG, "   - Location display: ${currentSettings.location?.getDisplayName()}")
             Log.i(TAG, "   - Location lat/lng: ${currentSettings.location?.latitude}, ${currentSettings.location?.longitude}")
             Log.i(TAG, "   - Location timezone: ${currentSettings.location?.timeZoneOffset}")
         }
         
-        // Prefer country code from geocoding API, fallback to country name if needed
+        // Prefer country code from geocoding API, fallback to country name mapping
         val result = if (!countryCode.isNullOrEmpty()) {
             Log.i(TAG, "   - Using country code from geocoding: $countryCode")
             countryCode
+        } else if (!countryName.isNullOrEmpty()) {
+            Log.i(TAG, "   - No country code available, trying to map country name: $countryName")
+            Log.i(TAG, "   🔧 USING COUNTRY CODE MAPPER FOR AUTO-DETECTION:")
+            
+            // Use CountryCodeMapper to resolve country name to ISO code
+            val mappedCode = com.starception.submission.prayer.service.CountryCodeMapper.resolveCountryCode(
+                null, // no geocoder code
+                countryName // use country name for mapping
+            )
+            
+            if (mappedCode.isNotEmpty()) {
+                Log.i(TAG, "   ✅ MAPPED COUNTRY NAME: '$countryName' → '$mappedCode'")
+                Log.i(TAG, "   🎯 SUCCESS: Auto-detection can proceed with country code '$mappedCode'")
+                mappedCode
+            } else {
+                Log.w(TAG, "   ❌ MAPPING FAILED: Country name '$countryName' not found in mapper")
+                Log.w(TAG, "   💡 Consider adding mapping for this country name")
+                null
+            }
         } else {
-            Log.i(TAG, "   - No country code available, returning null (country name: $countryName)")
+            Log.w(TAG, "   ❌ No country code or country name available")
             null
         }
         
