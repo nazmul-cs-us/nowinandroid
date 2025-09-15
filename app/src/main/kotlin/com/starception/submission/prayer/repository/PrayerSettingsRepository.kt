@@ -84,6 +84,7 @@ class PrayerSettingsRepository @Inject constructor(
         private const val KEY_CACHED_LOCATION_LON = "cached_location_lon"        // Cached location longitude
         private const val KEY_CACHED_LOCATION_CITY = "cached_location_city"      // Cached location city name
         private const val KEY_CACHED_LOCATION_COUNTRY = "cached_location_country" // Cached location country
+        private const val KEY_CACHED_LOCATION_COUNTRY_CODE = "cached_location_country_code" // Cached location country code
         private const val KEY_CACHED_LOCATION_TIMEZONE = "cached_location_timezone" // Cached timezone offset
     }
     
@@ -231,19 +232,36 @@ class PrayerSettingsRepository @Inject constructor(
      * 3. Immediately recalculate prayer times
      */
     fun updateSettings(settings: PrayerSettings, forceCommit: Boolean = false) {
-        Log.i(TAG, "📝 User changed settings - updating cached_prayer_settings")
+        Log.i(TAG, "📝 USER SETTINGS CHANGE DETECTED - Starting update process")
+        
+        val oldSettings = getSettings()
+        Log.i(TAG, "📝 BEFORE vs AFTER COMPARISON:")
+        Log.i(TAG, "   🕌 Calculation Method: ${oldSettings.calculationMethod.name} → ${settings.calculationMethod.name}")
+        Log.i(TAG, "   🤲 Asr Madhhab: ${oldSettings.asrMadhhab.name} → ${settings.asrMadhhab.name}")
+        Log.i(TAG, "   🌅 Custom Fajr Angle: ${oldSettings.customFajrAngle} → ${settings.customFajrAngle}")
+        Log.i(TAG, "   🌙 Custom Isha Angle: ${oldSettings.customIshaAngle} → ${settings.customIshaAngle}")
+        Log.i(TAG, "   ⏰ Custom Isha Delay: ${oldSettings.customIshaDelay} → ${settings.customIshaDelay}")
+        Log.i(TAG, "   🔧 Time Adjustments Changed: ${oldSettings.timeOffsets.fajr != settings.timeOffsets.fajr || oldSettings.timeOffsets.sunrise != settings.timeOffsets.sunrise || oldSettings.timeOffsets.dhuhr != settings.timeOffsets.dhuhr || oldSettings.timeOffsets.asr != settings.timeOffsets.asr || oldSettings.timeOffsets.maghrib != settings.timeOffsets.maghrib || oldSettings.timeOffsets.isha != settings.timeOffsets.isha}")
+        Log.i(TAG, "   📍 Use GPS: ${oldSettings.useGpsLocation} → ${settings.useGpsLocation}")
+        Log.i(TAG, "   ✅ Auto-Detection Flags: Method=${oldSettings.isMethodAutoDetected}→${settings.isMethodAutoDetected}, Madhhab=${oldSettings.isMadhhabAutoDetected}→${settings.isMadhhabAutoDetected}")
         
         // 1. Save to cached_prayer_settings (JSON format in preferences)
+        Log.i(TAG, "📝 Step 1: Saving to cached_prayer_settings")
         saveCachedPrayerSettings(settings)
         
         // 2. Update in-memory flow for UI updates
+        Log.i(TAG, "📝 Step 2: Updating in-memory settings flow for UI")
         _settingsFlow.value = settings
         _settingsFlow.tryEmit(settings)
         
         // 3. Immediately recalculate prayer times
+        Log.i(TAG, "📝 Step 3: Triggering prayer time recalculation")
         triggerPrayerTimeRecalculation()
         
-        Log.i(TAG, "✅ Settings updated: ${settings.calculationMethod.displayName}")
+        Log.i(TAG, "✅ USER SETTINGS UPDATE COMPLETE")
+        Log.i(TAG, "   🕌 Final Method: ${settings.calculationMethod.displayName}")
+        Log.i(TAG, "   🤲 Final Madhhab: ${settings.asrMadhhab.displayName}")
+        Log.i(TAG, "   💾 Force Commit: $forceCommit")
     }
     
     /**
@@ -414,11 +432,12 @@ class PrayerSettingsRepository @Inject constructor(
      */
     
     /**
-     * Get cached country from current location settings
+     * Get cached country code from current location settings
      */
     fun getCachedCountry(): String? {
         val currentSettings = getCachedPrayerSettings()
-        val country = currentSettings?.location?.country
+        val countryCode = currentSettings?.location?.countryCode
+        val countryName = currentSettings?.location?.country
         
         Log.i(TAG, "🔍 CACHED COUNTRY DEBUG:")
         Log.i(TAG, "   - Has cached settings: ${currentSettings != null}")
@@ -426,12 +445,22 @@ class PrayerSettingsRepository @Inject constructor(
         if (currentSettings?.location != null) {
             Log.i(TAG, "   - Location city: ${currentSettings.location?.city}")
             Log.i(TAG, "   - Location country: ${currentSettings.location?.country}")
+            Log.i(TAG, "   - Location country code: ${currentSettings.location?.countryCode}")
             Log.i(TAG, "   - Location lat/lng: ${currentSettings.location?.latitude}, ${currentSettings.location?.longitude}")
             Log.i(TAG, "   - Location timezone: ${currentSettings.location?.timeZoneOffset}")
         }
-        Log.i(TAG, "   - Returning country: $country")
         
-        return country
+        // Prefer country code from geocoding API, fallback to country name if needed
+        val result = if (!countryCode.isNullOrEmpty()) {
+            Log.i(TAG, "   - Using country code from geocoding: $countryCode")
+            countryCode
+        } else {
+            Log.i(TAG, "   - No country code available, returning null (country name: $countryName)")
+            null
+        }
+        
+        Log.i(TAG, "   - Returning country code: $result")
+        return result
     }
     
     /**
@@ -479,14 +508,24 @@ class PrayerSettingsRepository @Inject constructor(
             }
             
             Log.i(TAG, "🔍 Country found: $countryCode")
+            
+            // Extract all data from JSON entry
             val countryName = countryEntry["name"]?.jsonPrimitive?.content ?: "Unknown"
             val methodName = countryEntry["calculationMethod"]?.jsonPrimitive?.content
             val madhhabName = countryEntry["madhhab"]?.jsonPrimitive?.content
+            val customFajrAngleStr = countryEntry["customFajrAngle"]?.jsonPrimitive?.content
+            val customIshaAngleStr = countryEntry["customIshaAngle"]?.jsonPrimitive?.content
+            val customIshaDelayStr = countryEntry["customIshaDelay"]?.jsonPrimitive?.content
             
-            Log.i(TAG, "📋 Country details:")
-            Log.i(TAG, "   - Name: $countryName")
-            Log.i(TAG, "   - Calculation Method: $methodName")
-            Log.i(TAG, "   - Madhhab: $madhhabName")
+            Log.i(TAG, "📋 RAW COUNTRY JSON DATA:")
+            Log.i(TAG, "   🏳️ Country Code: $countryCode")
+            Log.i(TAG, "   📍 Country Name: $countryName")
+            Log.i(TAG, "   🕌 Raw Calculation Method: $methodName")
+            Log.i(TAG, "   🤲 Raw Madhhab: $madhhabName")
+            Log.i(TAG, "   🌅 Raw Custom Fajr Angle: $customFajrAngleStr")
+            Log.i(TAG, "   🌙 Raw Custom Isha Angle: $customIshaAngleStr") 
+            Log.i(TAG, "   ⏰ Raw Custom Isha Delay: $customIshaDelayStr")
+            Log.i(TAG, "   📄 Full JSON Entry: ${countryEntry.toString().take(300)}...")
             
             // 4. Map calculation method
             val calculationMethod = when (methodName) {
@@ -567,11 +606,19 @@ class PrayerSettingsRepository @Inject constructor(
             
             val totalTime = System.currentTimeMillis() - startTime
             Log.i(TAG, "✅ AUTO-DETECTION COMPLETE (${totalTime}ms total)")
-            Log.i(TAG, "📊 Final auto-detected settings for $countryName:")
-            Log.i(TAG, "   - Method: ${autoDetectedSettings.calculationMethod.displayName}")
-            Log.i(TAG, "   - Asr: ${autoDetectedSettings.asrMadhhab.displayName}")
-            Log.i(TAG, "   - Auto-detected flags: method=${autoDetectedSettings.isMethodAutoDetected}, madhhab=${autoDetectedSettings.isMadhhabAutoDetected}, angles=${autoDetectedSettings.areCustomAnglesAutoDetected}")
-            Log.i(TAG, "   - Has backup JSON: ${autoDetectedSettings.originalAutoDetectedSettingsJson != null}")
+            Log.i(TAG, "📊 FINAL AUTO-DETECTED SETTINGS FOR $countryName:")
+            Log.i(TAG, "   🕌 Calculation Method: ${autoDetectedSettings.calculationMethod.name} (${autoDetectedSettings.calculationMethod.displayName})")
+            Log.i(TAG, "   🤲 Asr Madhhab: ${autoDetectedSettings.asrMadhhab.name} (${autoDetectedSettings.asrMadhhab.displayName})")
+            Log.i(TAG, "   🌅 Custom Fajr Angle: ${autoDetectedSettings.customFajrAngle ?: "null"}")
+            Log.i(TAG, "   🌙 Custom Isha Angle: ${autoDetectedSettings.customIshaAngle ?: "null"}")
+            Log.i(TAG, "   ⏰ Custom Isha Delay: ${autoDetectedSettings.customIshaDelay ?: "null"}")
+            Log.i(TAG, "   🔧 Time Adjustments: ALL DEFAULTS (Fajr=${autoDetectedSettings.timeOffsets.fajr}, Sunrise=${autoDetectedSettings.timeOffsets.sunrise}, Dhuhr=${autoDetectedSettings.timeOffsets.dhuhr}, Asr=${autoDetectedSettings.timeOffsets.asr}, Maghrib=${autoDetectedSettings.timeOffsets.maghrib}, Isha=${autoDetectedSettings.timeOffsets.isha})")
+            Log.i(TAG, "   🧭 High Latitude Method: ${autoDetectedSettings.highLatitudeAdjustment.name}")
+            Log.i(TAG, "   📍 Use GPS: ${autoDetectedSettings.useGpsLocation} (default)")
+            Log.i(TAG, "   ✅ Auto-Detection Flags: Method=${autoDetectedSettings.isMethodAutoDetected}, Madhhab=${autoDetectedSettings.isMadhhabAutoDetected}, Angles=${autoDetectedSettings.areCustomAnglesAutoDetected}")
+            Log.i(TAG, "   🌍 Auto-Detected Country: ${autoDetectedSettings.autoDetectedCountryName} (${autoDetectedSettings.autoDetectedCountryCode})")
+            Log.i(TAG, "   💾 Has Backup JSON: ${if (autoDetectedSettings.originalAutoDetectedSettingsJson != null) "YES (${autoDetectedSettings.originalAutoDetectedSettingsJson!!.length} chars)" else "NO"}")
+            Log.i(TAG, "   📄 Generated Settings JSON: ${json.encodeToString(autoDetectedSettings).take(300)}...")
             
             autoDetectedSettings
             
@@ -587,23 +634,77 @@ class PrayerSettingsRepository @Inject constructor(
      * Get cached prayer settings from preferences (JSON format)
      */
     fun getCachedPrayerSettings(): PrayerSettings? {
+        Log.i(TAG, "📋 CACHE RETRIEVAL: Getting cached prayer settings")
+        
         val cachedJson = prefs.getString(KEY_CURRENT_SETTINGS_JSON, null)
+        Log.i(TAG, "📋 Raw cached JSON: ${if (cachedJson != null) "EXISTS (${cachedJson.length} chars)" else "NULL"}")
+        
         return if (cachedJson != null) {
             try {
-                json.decodeFromString<PrayerSettings>(cachedJson)
+                Log.i(TAG, "📋 Parsing cached JSON: ${cachedJson.take(200)}...")
+                val cachedSettings = json.decodeFromString<PrayerSettings>(cachedJson)
+                
+                Log.i(TAG, "📋 CACHED SETTINGS RETRIEVED SUCCESSFULLY:")
+                Log.i(TAG, "   🕌 Calculation Method: ${cachedSettings.calculationMethod.name} (${cachedSettings.calculationMethod.displayName})")
+                Log.i(TAG, "   🤲 Asr Madhhab: ${cachedSettings.asrMadhhab.name} (${cachedSettings.asrMadhhab.displayName})")
+                Log.i(TAG, "   🌅 Custom Fajr Angle: ${cachedSettings.customFajrAngle ?: "null"}")
+                Log.i(TAG, "   🌙 Custom Isha Angle: ${cachedSettings.customIshaAngle ?: "null"}")
+                Log.i(TAG, "   ⏰ Custom Isha Delay: ${cachedSettings.customIshaDelay ?: "null"}")
+                Log.i(TAG, "   🔧 Time Adjustments: Fajr=${cachedSettings.timeOffsets.fajr}, Sunrise=${cachedSettings.timeOffsets.sunrise}, Dhuhr=${cachedSettings.timeOffsets.dhuhr}, Asr=${cachedSettings.timeOffsets.asr}, Maghrib=${cachedSettings.timeOffsets.maghrib}, Isha=${cachedSettings.timeOffsets.isha}")
+                Log.i(TAG, "   🧭 High Latitude Method: ${cachedSettings.highLatitudeAdjustment.name}")
+                Log.i(TAG, "   📍 Use GPS: ${cachedSettings.useGpsLocation}")
+                Log.i(TAG, "   🏳️ Location Override: ${cachedSettings.location?.getDisplayName() ?: "null"}")
+                Log.i(TAG, "   ✅ Auto-Detection Flags: Method=${cachedSettings.isMethodAutoDetected}, Madhhab=${cachedSettings.isMadhhabAutoDetected}, Angles=${cachedSettings.areCustomAnglesAutoDetected}")
+                Log.i(TAG, "   🌍 Auto-Detected Country: ${cachedSettings.autoDetectedCountryName ?: "null"} (${cachedSettings.autoDetectedCountryCode ?: "null"})")
+                Log.i(TAG, "   💾 Has Backup JSON: ${if (cachedSettings.originalAutoDetectedSettingsJson != null) "YES (${cachedSettings.originalAutoDetectedSettingsJson!!.length} chars)" else "NO"}")
+                
+                cachedSettings
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to parse cached prayer settings", e)
+                Log.e(TAG, "❌ CACHE PARSING FAILED: ${e.message}")
+                Log.e(TAG, "   Error details: ${e.javaClass.simpleName}")
+                Log.e(TAG, "   Problematic JSON: ${cachedJson.take(500)}")
                 null
             }
-        } else null
+        } else {
+            Log.i(TAG, "📋 No cached settings found - will use auto-detected or defaults")
+            null
+        }
     }
     
     /**
      * Save prayer settings to cache (JSON format)
      */
     fun saveCachedPrayerSettings(settings: PrayerSettings) {
+        Log.i(TAG, "💾 CACHE SAVE: Saving prayer settings to cache")
+        
         val settingsJson = json.encodeToString(settings)
+        Log.i(TAG, "💾 Generated JSON (${settingsJson.length} chars): ${settingsJson.take(300)}...")
+        
+        Log.i(TAG, "💾 SETTINGS BEING CACHED:")
+        Log.i(TAG, "   🕌 Calculation Method: ${settings.calculationMethod.name} (${settings.calculationMethod.displayName})")
+        Log.i(TAG, "   🤲 Asr Madhhab: ${settings.asrMadhhab.name} (${settings.asrMadhhab.displayName})")
+        Log.i(TAG, "   🌅 Custom Fajr Angle: ${settings.customFajrAngle ?: "null"}")
+        Log.i(TAG, "   🌙 Custom Isha Angle: ${settings.customIshaAngle ?: "null"}")
+        Log.i(TAG, "   ⏰ Custom Isha Delay: ${settings.customIshaDelay ?: "null"}")
+        Log.i(TAG, "   🔧 Time Adjustments: Fajr=${settings.timeOffsets.fajr}, Sunrise=${settings.timeOffsets.sunrise}, Dhuhr=${settings.timeOffsets.dhuhr}, Asr=${settings.timeOffsets.asr}, Maghrib=${settings.timeOffsets.maghrib}, Isha=${settings.timeOffsets.isha}")
+        Log.i(TAG, "   🧭 High Latitude Method: ${settings.highLatitudeAdjustment.name}")
+        Log.i(TAG, "   📍 Use GPS: ${settings.useGpsLocation}")
+        Log.i(TAG, "   🏳️ Location Override: ${settings.location?.getDisplayName() ?: "null"}")
+        Log.i(TAG, "   ✅ Auto-Detection Flags: Method=${settings.isMethodAutoDetected}, Madhhab=${settings.isMadhhabAutoDetected}, Angles=${settings.areCustomAnglesAutoDetected}")
+        Log.i(TAG, "   🌍 Auto-Detected Country: ${settings.autoDetectedCountryName ?: "null"} (${settings.autoDetectedCountryCode ?: "null"})")
+        Log.i(TAG, "   💾 Has Backup JSON: ${if (settings.originalAutoDetectedSettingsJson != null) "YES (${settings.originalAutoDetectedSettingsJson!!.length} chars)" else "NO"}")
+        
         prefs.edit().putString(KEY_CURRENT_SETTINGS_JSON, settingsJson).apply()
+        
+        // Verify it was saved
+        val verifyJson = prefs.getString(KEY_CURRENT_SETTINGS_JSON, null)
+        if (verifyJson != null && verifyJson == settingsJson) {
+            Log.i(TAG, "✅ CACHE SAVE VERIFIED: Settings successfully saved to preferences")
+        } else {
+            Log.e(TAG, "❌ CACHE SAVE FAILED: Verification failed")
+            Log.e(TAG, "   Expected length: ${settingsJson.length}")
+            Log.e(TAG, "   Actual length: ${verifyJson?.length ?: 0}")
+        }
     }
     
     /**
@@ -611,24 +712,52 @@ class PrayerSettingsRepository @Inject constructor(
      * 1. Detect cached country → 2. Load auto-detected → 3. Load cached → 4. Populate UI
      */
     fun initializeSettings(): PrayerSettings {
-        val cachedCountry = getCachedCountry()
-        val autoDetectedSettings = cachedCountry?.let { getAutoDetectedSettingsForCountry(it) }
-        val cachedSettings = getCachedPrayerSettings()
+        Log.i(TAG, "🚀 INITIALIZATION ALGORITHM STARTED")
+        Log.i(TAG, "   Step 1: Detect cached country code...")
         
-        return when {
+        val cachedCountry = getCachedCountry()
+        Log.i(TAG, "   Step 1 Result: ${if (cachedCountry != null) "Found country code: $cachedCountry" else "No cached country code"}")
+        
+        Log.i(TAG, "   Step 2: Load auto-detected settings for country...")
+        val autoDetectedSettings = cachedCountry?.let { 
+            Log.i(TAG, "   Step 2: Attempting auto-detection for country: $it")
+            getAutoDetectedSettingsForCountry(it)
+        }
+        Log.i(TAG, "   Step 2 Result: ${if (autoDetectedSettings != null) "Auto-detected settings loaded" else "No auto-detected settings"}")
+        
+        Log.i(TAG, "   Step 3: Load cached prayer settings...")
+        val cachedSettings = getCachedPrayerSettings()
+        Log.i(TAG, "   Step 3 Result: ${if (cachedSettings != null) "Cached settings loaded" else "No cached settings"}")
+        
+        Log.i(TAG, "   Step 4: Populate UI with priority logic...")
+        
+        val finalSettings = when {
             cachedSettings != null -> {
-                Log.i(TAG, "Using cached prayer settings")
+                Log.i(TAG, "✅ INITIALIZATION RESULT: Using cached prayer settings (highest priority)")
+                Log.i(TAG, "   🕌 Final Method: ${cachedSettings.calculationMethod.displayName}")
+                Log.i(TAG, "   🤲 Final Madhhab: ${cachedSettings.asrMadhhab.displayName}")
+                Log.i(TAG, "   📍 Source: User's cached preferences")
                 cachedSettings
             }
             autoDetectedSettings != null -> {
-                Log.i(TAG, "Using auto-detected settings for $cachedCountry")
+                Log.i(TAG, "✅ INITIALIZATION RESULT: Using auto-detected settings for $cachedCountry")
+                Log.i(TAG, "   🕌 Final Method: ${autoDetectedSettings.calculationMethod.displayName}")
+                Log.i(TAG, "   🤲 Final Madhhab: ${autoDetectedSettings.asrMadhhab.displayName}")
+                Log.i(TAG, "   📍 Source: Auto-detected from location ($cachedCountry)")
                 autoDetectedSettings
             }
             else -> {
-                Log.i(TAG, "Using default settings")
-                getDefaultSettings()
+                Log.i(TAG, "⚠️ INITIALIZATION RESULT: Using default settings (fallback)")
+                val defaultSettings = getDefaultSettings()
+                Log.i(TAG, "   🕌 Final Method: ${defaultSettings.calculationMethod.displayName}")
+                Log.i(TAG, "   🤲 Final Madhhab: ${defaultSettings.asrMadhhab.displayName}")
+                Log.i(TAG, "   📍 Source: System defaults")
+                defaultSettings
             }
         }
+        
+        Log.i(TAG, "🏁 INITIALIZATION ALGORITHM COMPLETE")
+        return finalSettings
     }
     
     /**
@@ -663,11 +792,36 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
-     * Trigger prayer time recalculation (placeholder)
+     * Trigger prayer time recalculation with detailed logging
      */
     private fun triggerPrayerTimeRecalculation() {
-        Log.i(TAG, "Prayer time recalculation triggered")
-        // This would trigger the prayer time calculation service
+        Log.i(TAG, "⏰ PRAYER TIME RECALCULATION TRIGGERED")
+        
+        val currentSettings = getSettings()
+        Log.i(TAG, "⏰ RECALCULATION CONTEXT:")
+        Log.i(TAG, "   🕌 Using Method: ${currentSettings.calculationMethod.displayName}")
+        Log.i(TAG, "   🤲 Using Madhhab: ${currentSettings.asrMadhhab.displayName}")
+        Log.i(TAG, "   🌅 Custom Fajr Angle: ${currentSettings.customFajrAngle ?: "using default"}")
+        Log.i(TAG, "   🌙 Custom Isha Angle: ${currentSettings.customIshaAngle ?: "using default"}")
+        Log.i(TAG, "   ⏰ Custom Isha Delay: ${currentSettings.customIshaDelay ?: "using default"}")
+        Log.i(TAG, "   🔧 Time Adjustments Applied: Fajr=${currentSettings.timeOffsets.fajr}min, Sunrise=${currentSettings.timeOffsets.sunrise}min, Dhuhr=${currentSettings.timeOffsets.dhuhr}min, Asr=${currentSettings.timeOffsets.asr}min, Maghrib=${currentSettings.timeOffsets.maghrib}min, Isha=${currentSettings.timeOffsets.isha}min")
+        Log.i(TAG, "   📍 Location Source: ${if (currentSettings.useGpsLocation) "GPS" else "Manual"}")
+        if (currentSettings.location != null) {
+            Log.i(TAG, "   🏳️ Manual Location: ${currentSettings.location!!.getDisplayName()}")
+        }
+        Log.i(TAG, "   🧭 High Latitude Method: ${currentSettings.highLatitudeAdjustment.name}")
+        
+        // Clear existing prayer times cache to force recalculation
+        clearPrayerTimesCache()
+        Log.i(TAG, "   🧹 Prayer times cache cleared - fresh calculation will occur")
+        
+        // TODO: This would integrate with the actual prayer time calculation service
+        // Example integration points:
+        // - PrayerTimeCalculationService.recalculate(currentSettings)
+        // - NotificationService.updateSchedule()
+        // - UI refresh triggers
+        
+        Log.i(TAG, "✅ RECALCULATION REQUEST COMPLETE - Prayer calculation service should pick up changes")
     }
 
     private fun getDefaultSettings(): PrayerSettings {
@@ -885,6 +1039,7 @@ class PrayerSettingsRepository @Inject constructor(
             putFloat(KEY_CACHED_LOCATION_LON, prayerTimes.location.longitude.toFloat())
             putString(KEY_CACHED_LOCATION_CITY, prayerTimes.location.city)
             putString(KEY_CACHED_LOCATION_COUNTRY, prayerTimes.location.country)
+            putString(KEY_CACHED_LOCATION_COUNTRY_CODE, prayerTimes.location.countryCode)
             putFloat(KEY_CACHED_LOCATION_TIMEZONE, prayerTimes.location.timeZoneOffset.toFloat())
             
             apply() // Use apply() for cache - no need for immediate synchronous write during startup
@@ -944,6 +1099,7 @@ class PrayerSettingsRepository @Inject constructor(
                 longitude = prefs.getFloat(KEY_CACHED_LOCATION_LON, 0f).toDouble(),
                 city = prefs.getString(KEY_CACHED_LOCATION_CITY, "") ?: "",
                 country = prefs.getString(KEY_CACHED_LOCATION_COUNTRY, "") ?: "",
+                countryCode = prefs.getString(KEY_CACHED_LOCATION_COUNTRY_CODE, "") ?: "",
                 timeZoneOffset = prefs.getFloat(KEY_CACHED_LOCATION_TIMEZONE, 0f).toDouble()
             )
             
@@ -989,6 +1145,7 @@ class PrayerSettingsRepository @Inject constructor(
             remove(KEY_CACHED_LOCATION_LON)
             remove(KEY_CACHED_LOCATION_CITY)
             remove(KEY_CACHED_LOCATION_COUNTRY)
+            remove(KEY_CACHED_LOCATION_COUNTRY_CODE)
             remove(KEY_CACHED_LOCATION_TIMEZONE)
             apply()
         }

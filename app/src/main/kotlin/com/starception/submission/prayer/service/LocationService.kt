@@ -165,7 +165,8 @@ class LocationService @Inject constructor(
                     val address = addresses[0]
                     val updatedLocation = location.copy(
                         city = address.locality ?: address.subAdminArea ?: "",
-                        country = address.countryName ?: ""
+                        country = address.countryName ?: "",
+                        countryCode = address.countryCode ?: ""
                     )
                     continuation.resume(updatedLocation)
                 } else {
@@ -197,6 +198,7 @@ class LocationService @Inject constructor(
                             timeZoneOffset = getTimeZoneOffset(),
                             city = address.locality ?: address.subAdminArea ?: "",
                             country = address.countryName ?: "",
+                            countryCode = address.countryCode ?: "",
                             altitude = 0.0
                         )
                     }
