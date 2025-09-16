@@ -4,48 +4,23 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonIgnoreUnknownKeys
 
 /**
- * PRAYER SETTINGS MODEL: User preferences for personalized prayer time calculations
+ * CALCULATION METHOD SETTINGS: Core astronomical parameters for prayer time calculations
  * 
- * This stores all user customizations for prayer time calculations and notifications.
+ * This stores calculation-specific settings that determine how prayer times are computed.
  * 
- * CALCULATION SETTINGS:
+ * INCLUDED SETTINGS:
  * - Method selection (Muslim World League, ISNA, etc.)
- * - Madhab for Asr calculation (Standard vs Hanafi)
+ * - Madhab for Asr calculation (Standard vs Hanafi)  
  * - High latitude adjustments for polar regions
  * - Custom angle overrides for advanced users
- * 
- * LOCATION SETTINGS:
- * - Saved user location (overrides GPS)
- * - GPS preference toggle
- * 
- * NOTIFICATION SETTINGS:
- * - Enable/disable notifications
- * - Sound and vibration preferences
- * 
- * TIME ADJUSTMENTS:
  * - Per-prayer minute offsets for local customs
- * 
- * EDIT THIS TO:
- * - Add new calculation methods
- * - Include additional notification options
- * - Add prayer name customizations
- * - Include reminder settings
  */
 @Serializable
 @JsonIgnoreUnknownKeys
-data class PrayerSettings(
-    // CALCULATION METHOD SETTINGS - Core astronomical parameters
+data class PrayerCalculationSettings(
     val calculationMethod: CalculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,  // Primary calculation standard
     val asrMadhhab: AsrMadhhab = AsrMadhhab.STANDARD,                                   // Asr shadow calculation method
     val highLatitudeAdjustment: HighLatitudeAdjustment = HighLatitudeAdjustment.NONE,   // For polar regions
-    
-    // AUTO-DETECTION INFO - Shows if settings were automatically configured
-    val isMethodAutoDetected: Boolean = false,       // Whether calculation method was auto-detected from location
-    val isMadhhabAutoDetected: Boolean = false,      // Whether madhhab was auto-detected from location  
-    val autoDetectedCountryName: String? = null,     // Name of the auto-detected country
-    val autoDetectedCountryCode: String? = null,     // Code of the auto-detected country
-    val areCustomAnglesAutoDetected: Boolean = false, // Whether custom angles were auto-detected from JSON
-    val originalAutoDetectedSettingsJson: String? = null, // JSON backup of original auto-detected settings for restore
     
     // CUSTOM ANGLE OVERRIDES - Advanced user customizations
     val customFajrAngle: Double? = null,        // Override Fajr sun angle (degrees below horizon)
@@ -53,67 +28,133 @@ data class PrayerSettings(
     val customIshaDelay: Int? = null,           // Override Isha delay (minutes after Maghrib)
     
     // TIME ADJUSTMENTS - Local custom offsets
-    val timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),  // Per-prayer minute adjustments
-    
-    // LOCATION PREFERENCES - Where to calculate prayer times for
-    val location: Location? = null,             // User's saved location (overrides GPS)
-    val useGpsLocation: Boolean = true,         // Whether to use GPS when no saved location
-    
-    // NOTIFICATION PREFERENCES - How to alert user
-    val notificationsEnabled: Boolean = true,   // Master notification toggle
-    val notificationSound: String = "default",  // Notification sound selection
-    val vibrationEnabled: Boolean = true        // Vibration for notifications
+    val timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets()  // Per-prayer minute adjustments
 ) {
     /**
      * EFFECTIVE FAJR ANGLE: Gets the actual Fajr angle to use in calculations
-     * 
-     * This chooses between user's custom angle or the calculation method's default.
-     * 
-     * LOGIC:
-     * - Uses custom angle if user set one
-     * - Falls back to calculation method's standard angle
-     * 
-     * EDIT THIS TO:
-     * - Add angle validation
-     * - Include seasonal adjustments
-     * - Add location-based defaults
      */
     fun getEffectiveFajrAngle(): Double {
-        return customFajrAngle ?: calculationMethod.fajrAngle  // Custom overrides method default
+        return customFajrAngle ?: calculationMethod.fajrAngle
     }
     
     /**
      * EFFECTIVE ISHA ANGLE: Gets the actual Isha angle to use in calculations
-     * 
-     * This chooses between user's custom angle or the calculation method's default.
-     * 
-     * NOTE: Returns null if both custom and method angles are null (uses delay instead)
-     * 
-     * EDIT THIS TO:
-     * - Add angle validation
-     * - Handle conflicting angle/delay settings
-     * - Add seasonal adjustments
      */
     fun getEffectiveIshaAngle(): Double? {
-        return customIshaAngle ?: calculationMethod.ishaAngle  // Custom overrides method default
+        return customIshaAngle ?: calculationMethod.ishaAngle
     }
     
     /**
      * EFFECTIVE ISHA DELAY: Gets the actual Isha delay to use in calculations
-     * 
-     * This chooses between user's custom delay or the calculation method's default.
-     * 
-     * USAGE:
-     * - When Isha angle calculation isn't suitable
-     * - For regions where fixed delay after Maghrib is preferred
-     * 
-     * EDIT THIS TO:
-     * - Add delay validation (reasonable ranges)
-     * - Include seasonal delay adjustments
-     * - Handle angle vs delay conflicts
      */
     fun getEffectiveIshaDelay(): Int? {
-        return customIshaDelay ?: calculationMethod.ishaDelay  // Custom overrides method default
+        return customIshaDelay ?: calculationMethod.ishaDelay
+    }
+}
+
+/**
+ * LOCATION PREFERENCES: Where to calculate prayer times for
+ * 
+ * This stores location-specific settings for prayer time calculations.
+ */
+@Serializable
+@JsonIgnoreUnknownKeys
+data class PrayerLocationPreferences(
+    val location: Location? = null,             // User's saved location (overrides GPS)
+    val useGpsLocation: Boolean = true          // Whether to use GPS when no saved location
+)
+
+/**
+ * NOTIFICATION PREFERENCES: How to alert user for prayer times
+ * 
+ * This stores notification-specific settings for prayer alerts.
+ */
+@Serializable
+@JsonIgnoreUnknownKeys
+data class PrayerNotificationPreferences(
+    val notificationsEnabled: Boolean = true,   // Master notification toggle
+    val notificationSound: String = "default",  // Notification sound selection
+    val vibrationEnabled: Boolean = true        // Vibration for notifications
+)
+
+/**
+ * LEGACY PRAYER SETTINGS: Composite model for backward compatibility
+ * 
+ * @deprecated This composite model is being phased out in favor of separate preference classes.
+ * Use PrayerCalculationSettings, PrayerLocationPreferences, and PrayerNotificationPreferences instead.
+ */
+@Deprecated("Use separate preference classes instead", ReplaceWith("Use PrayerCalculationSettings, PrayerLocationPreferences, and PrayerNotificationPreferences"))
+@Serializable
+@JsonIgnoreUnknownKeys
+data class PrayerSettings(
+    // Calculation settings
+    val calculationMethod: CalculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,
+    val asrMadhhab: AsrMadhhab = AsrMadhhab.STANDARD,
+    val highLatitudeAdjustment: HighLatitudeAdjustment = HighLatitudeAdjustment.NONE,
+    val customFajrAngle: Double? = null,
+    val customIshaAngle: Double? = null,
+    val customIshaDelay: Int? = null,
+    val timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
+
+    // Location preferences  
+    val location: Location? = null,
+    val useGpsLocation: Boolean = true,
+    
+    // Notification preferences
+    val notificationsEnabled: Boolean = true,
+    val notificationSound: String = "default",
+    val vibrationEnabled: Boolean = true,
+    
+    // AUTO-DETECTION INFO - Kept for backward compatibility (deprecated)
+    @Deprecated("Auto-detection moved to separate system")
+    val isMethodAutoDetected: Boolean = false,
+    @Deprecated("Auto-detection moved to separate system")
+    val isMadhhabAutoDetected: Boolean = false,
+    @Deprecated("Auto-detection moved to separate system")
+    val autoDetectedCountryName: String? = null,
+    @Deprecated("Auto-detection moved to separate system")
+    val autoDetectedCountryCode: String? = null,
+    @Deprecated("Auto-detection moved to separate system")
+    val areCustomAnglesAutoDetected: Boolean = false,
+    @Deprecated("Auto-detection moved to separate system")
+    val originalAutoDetectedSettingsJson: String? = null
+) {
+    fun getEffectiveFajrAngle(): Double {
+        return customFajrAngle ?: calculationMethod.fajrAngle
+    }
+    
+    fun getEffectiveIshaAngle(): Double? {
+        return customIshaAngle ?: calculationMethod.ishaAngle
+    }
+    
+    fun getEffectiveIshaDelay(): Int? {
+        return customIshaDelay ?: calculationMethod.ishaDelay
+    }
+
+    /**
+     * Convert to separate preference classes
+     */
+    fun toSeparatePreferences(): Triple<PrayerCalculationSettings, PrayerLocationPreferences, PrayerNotificationPreferences> {
+        return Triple(
+            PrayerCalculationSettings(
+                calculationMethod = calculationMethod,
+                asrMadhhab = asrMadhhab,
+                highLatitudeAdjustment = highLatitudeAdjustment,
+                customFajrAngle = customFajrAngle,
+                customIshaAngle = customIshaAngle,
+                customIshaDelay = customIshaDelay,
+                timeOffsets = timeOffsets
+            ),
+            PrayerLocationPreferences(
+                location = location,
+                useGpsLocation = useGpsLocation
+            ),
+            PrayerNotificationPreferences(
+                notificationsEnabled = notificationsEnabled,
+                notificationSound = notificationSound,
+                vibrationEnabled = vibrationEnabled
+            )
+        )
     }
 }
 
@@ -174,8 +215,9 @@ data class PrayerTimeOffsets(
 /**
  * BACKUP DATA FOR RESTORE FUNCTIONALITY
  * 
- * Stores the original auto-detected settings for restore functionality.
- * This is serialized to JSON and stored in PrayerSettings.originalAutoDetectedSettingsJson
+ * Stores the original auto-detected calculation settings for restore functionality.
+ * Only stores calculation-related settings as location and notification preferences
+ * are not auto-detected.
  */
 @Serializable
 data class AutoDetectedSettingsBackup(

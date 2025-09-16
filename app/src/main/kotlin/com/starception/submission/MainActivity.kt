@@ -338,9 +338,8 @@ class MainActivity : FragmentActivity() {
             
             // Check if user already has manual settings (don't override)
             val currentSettings = settingsRepository.getSettings()
-            if (currentSettings.isMethodAutoDetected.not() && 
-                currentSettings.calculationMethod != CalculationMethod.MUSLIM_WORLD_LEAGUE) {
-                Log.d("MainActivity", "🔧 User has manual settings, skipping auto-detection")
+            if (currentSettings.calculationMethod != CalculationMethod.MUSLIM_WORLD_LEAGUE) {
+                Log.d("MainActivity", "🔧 User has custom settings, skipping auto-detection")
                 return
             }
             
@@ -374,13 +373,8 @@ class MainActivity : FragmentActivity() {
                             calculationMethod = detectionResult.calculationMethod,
                             asrMadhhab = detectionResult.madhhab,
                             customFajrAngle = detectionResult.customFajrAngle,
-                            customIshaAngle = detectionResult.customIshaAngle,
-                            // customIshaDelay = detectionResult.customIshaDelay, // Not available in this structure
-                            isMethodAutoDetected = true,
-                            isMadhhabAutoDetected = true,
-                            areCustomAnglesAutoDetected = true,
-                            autoDetectedCountryName = detectionResult.countryName,
-                            // originalAutoDetectedSettingsJson = detectionResult.originalJson // Add if available
+                            customIshaAngle = detectionResult.customIshaAngle
+                            // Auto-detection metadata removed in new architecture
                         )
                         
                         settingsRepository.updateSettings(autoDetectedSettings, forceCommit = true)
