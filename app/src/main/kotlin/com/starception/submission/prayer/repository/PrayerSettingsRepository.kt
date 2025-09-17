@@ -101,6 +101,32 @@ class PrayerSettingsRepository @Inject constructor(
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
     
+    // DEBUGGING HELPER FUNCTIONS - For explicit preference logging
+    private fun logPrefRead(key: String, value: Any?, defaultValue: Any? = null) {
+        Log.d(TAG, "🔍 PREF READ: key='$key' | value=$value | default=$defaultValue")
+    }
+    
+    private fun logPrefWrite(key: String, value: Any?) {
+        Log.d(TAG, "💾 PREF WRITE: key='$key' | value=$value")
+    }
+    
+    private fun logPrefReadJson(key: String, jsonContent: String?, description: String) {
+        val content = if (jsonContent.isNullOrEmpty() || jsonContent == "{}") {
+            "EMPTY/NULL"
+        } else {
+            "Length=${jsonContent.length} chars"
+        }
+        Log.d(TAG, "📄 JSON READ: key='$key' | content=$content | desc='$description'")
+        if (!jsonContent.isNullOrEmpty() && jsonContent != "{}") {
+            Log.d(TAG, "📄 JSON CONTENT: $jsonContent")
+        }
+    }
+    
+    private fun logPrefWriteJson(key: String, jsonContent: String, description: String) {
+        Log.d(TAG, "💾 JSON WRITE: key='$key' | length=${jsonContent.length} chars | desc='$description'")
+        Log.d(TAG, "💾 JSON CONTENT: $jsonContent")
+    }
+    
     // JSON SERIALIZATION CONFIGURATION - Handles serialization/deserialization
     private val json = Json {
         ignoreUnknownKeys = true    // For backward compatibility
@@ -521,6 +547,8 @@ class PrayerSettingsRepository @Inject constructor(
      * @param beforeMinutes How many minutes before prayer time to notify (default: 10)
      */
     fun updateNotificationSettings(enabled: Boolean, beforeMinutes: Int = 10) {
+        logPrefWrite(KEY_NOTIFICATIONS_ENABLED, enabled)
+        logPrefWrite(KEY_NOTIFY_BEFORE_MINUTES, beforeMinutes)
         prefs.edit()
             .putBoolean(KEY_NOTIFICATIONS_ENABLED, enabled)
             .putInt(KEY_NOTIFY_BEFORE_MINUTES, beforeMinutes)
@@ -535,8 +563,17 @@ class PrayerSettingsRepository @Inject constructor(
      * 
      * @return Current notification preferences
      */
-    fun isNotificationsEnabled(): Boolean = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)
-    fun getNotifyBeforeMinutes(): Int = prefs.getInt(KEY_NOTIFY_BEFORE_MINUTES, 10)
+    fun isNotificationsEnabled(): Boolean {
+        val value = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)
+        logPrefRead(KEY_NOTIFICATIONS_ENABLED, value, true)
+        return value
+    }
+    
+    fun getNotifyBeforeMinutes(): Int {
+        val value = prefs.getInt(KEY_NOTIFY_BEFORE_MINUTES, 10)
+        logPrefRead(KEY_NOTIFY_BEFORE_MINUTES, value, 10)
+        return value
+    }
     
     /**
      * SETTINGS LOADER: Loads user preferences from JSON storage
@@ -560,8 +597,7 @@ class PrayerSettingsRepository @Inject constructor(
         
         return try {
             val settingsJson = prefs.getString(KEY_CURRENT_SETTINGS_JSON, null)
-            android.util.Log.w("PrayerSettingsRepository", "📋 PREFERENCE READ: key='$KEY_CURRENT_SETTINGS_JSON' (legacy combined settings)")
-            android.util.Log.w("PrayerSettingsRepository", "🔥 JSON FROM STORAGE: ${if (settingsJson != null) "EXISTS (${settingsJson.length} chars)" else "NULL"}")
+            logPrefReadJson(KEY_CURRENT_SETTINGS_JSON, settingsJson, "legacy combined settings")
             
             if (settingsJson != null) {
                 android.util.Log.w("PrayerSettingsRepository", "Parsing cached JSON:")
@@ -934,12 +970,12 @@ class PrayerSettingsRepository @Inject constructor(
         Log.i(TAG, "   🤲 Madhhab: ${settings.asrMadhhab.displayName}")
         Log.i(TAG, "   📋 Settings saved successfully")
         
-        Log.i(TAG, "💾 PREFERENCE WRITE: key='$KEY_CURRENT_SETTINGS_JSON' (legacy combined settings)")
+        logPrefWriteJson(KEY_CURRENT_SETTINGS_JSON, settingsJson, "legacy combined settings")
         prefs.edit().putString(KEY_CURRENT_SETTINGS_JSON, settingsJson).apply()
         
         // Verify it was saved
-        Log.i(TAG, "🔍 PREFERENCE VERIFY READ: key='$KEY_CURRENT_SETTINGS_JSON' (legacy combined settings)")
         val verifyJson = prefs.getString(KEY_CURRENT_SETTINGS_JSON, null)
+        logPrefReadJson(KEY_CURRENT_SETTINGS_JSON, verifyJson, "verification after save")
         if (verifyJson != null && verifyJson == settingsJson) {
             Log.i(TAG, "✅ CACHE SAVE VERIFIED: Settings successfully saved to preferences")
         } else {
@@ -1516,29 +1552,45 @@ class PrayerSettingsRepository @Inject constructor(
     fun cachePrayerTimes(prayerTimes: DayPrayerTimes) {
         prefs.edit().apply {
             // Cache the date to ensure validity
-            Log.i(TAG, "💾 PREFERENCE WRITE: key='$KEY_CACHED_PRAYER_DATE' (cached prayer date)")
-            putString(KEY_CACHED_PRAYER_DATE, prayerTimes.date.toLocalDate().toString())
+            val dateStr = prayerTimes.date.toLocalDate().toString()
+            logPrefWrite(KEY_CACHED_PRAYER_DATE, dateStr)
+            putString(KEY_CACHED_PRAYER_DATE, dateStr)
             
             // Cache prayer times as minutes from midnight for precision
-            putInt(KEY_CACHED_FAJR, prayerTimes.fajr.toSecondOfDay() / 60)
-            putInt(KEY_CACHED_SUNRISE, prayerTimes.sunrise.toSecondOfDay() / 60)
-            putInt(KEY_CACHED_DHUHR, prayerTimes.dhuhr.toSecondOfDay() / 60)
-            putInt(KEY_CACHED_ASR, prayerTimes.asr.toSecondOfDay() / 60)
-            putInt(KEY_CACHED_MAGHRIB, prayerTimes.maghrib.toSecondOfDay() / 60)
-            putInt(KEY_CACHED_ISHA, prayerTimes.isha.toSecondOfDay() / 60)
+            val fajrMinutes = prayerTimes.fajr.toSecondOfDay() / 60
+            val sunriseMinutes = prayerTimes.sunrise.toSecondOfDay() / 60
+            val dhuhrMinutes = prayerTimes.dhuhr.toSecondOfDay() / 60
+            val asrMinutes = prayerTimes.asr.toSecondOfDay() / 60
+            val maghribMinutes = prayerTimes.maghrib.toSecondOfDay() / 60
+            val ishaMinutes = prayerTimes.isha.toSecondOfDay() / 60
+            
+            logPrefWrite(KEY_CACHED_FAJR, "$fajrMinutes (${prayerTimes.fajr})")
+            logPrefWrite(KEY_CACHED_SUNRISE, "$sunriseMinutes (${prayerTimes.sunrise})")
+            logPrefWrite(KEY_CACHED_DHUHR, "$dhuhrMinutes (${prayerTimes.dhuhr})")
+            logPrefWrite(KEY_CACHED_ASR, "$asrMinutes (${prayerTimes.asr})")
+            logPrefWrite(KEY_CACHED_MAGHRIB, "$maghribMinutes (${prayerTimes.maghrib})")
+            logPrefWrite(KEY_CACHED_ISHA, "$ishaMinutes (${prayerTimes.isha})")
+            
+            putInt(KEY_CACHED_FAJR, fajrMinutes)
+            putInt(KEY_CACHED_SUNRISE, sunriseMinutes)
+            putInt(KEY_CACHED_DHUHR, dhuhrMinutes)
+            putInt(KEY_CACHED_ASR, asrMinutes)
+            putInt(KEY_CACHED_MAGHRIB, maghribMinutes)
+            putInt(KEY_CACHED_ISHA, ishaMinutes)
             
             // Cache location information
-            Log.i(TAG, "💾 PREFERENCE WRITE: key='$KEY_CACHED_LOCATION_LAT' (cached location latitude)")
+            logPrefWrite(KEY_CACHED_LOCATION_LAT, prayerTimes.location.latitude)
+            logPrefWrite(KEY_CACHED_LOCATION_LON, prayerTimes.location.longitude)
+            logPrefWrite(KEY_CACHED_LOCATION_CITY, prayerTimes.location.city)
+            logPrefWrite(KEY_CACHED_LOCATION_COUNTRY, prayerTimes.location.country)
+            logPrefWrite(KEY_CACHED_LOCATION_COUNTRY_CODE, prayerTimes.location.countryCode)
+            logPrefWrite(KEY_CACHED_LOCATION_TIMEZONE, prayerTimes.location.timeZoneOffset)
+            
             putFloat(KEY_CACHED_LOCATION_LAT, prayerTimes.location.latitude.toFloat())
-            Log.i(TAG, "💾 PREFERENCE WRITE: key='$KEY_CACHED_LOCATION_LON' (cached location longitude)")
             putFloat(KEY_CACHED_LOCATION_LON, prayerTimes.location.longitude.toFloat())
-            Log.i(TAG, "💾 PREFERENCE WRITE: key='$KEY_CACHED_LOCATION_CITY' (cached location city)")
             putString(KEY_CACHED_LOCATION_CITY, prayerTimes.location.city)
-            Log.i(TAG, "💾 PREFERENCE WRITE: key='$KEY_CACHED_LOCATION_COUNTRY' (cached location country)")
             putString(KEY_CACHED_LOCATION_COUNTRY, prayerTimes.location.country)
-            Log.i(TAG, "💾 PREFERENCE WRITE: key='$KEY_CACHED_LOCATION_COUNTRY_CODE' (cached location country code)")
             putString(KEY_CACHED_LOCATION_COUNTRY_CODE, prayerTimes.location.countryCode)
-            Log.i(TAG, "💾 PREFERENCE WRITE: key='$KEY_CACHED_LOCATION_TIMEZONE' (cached location timezone)")
             putFloat(KEY_CACHED_LOCATION_TIMEZONE, prayerTimes.location.timeZoneOffset.toFloat())
             
             apply() // Use apply() for cache - no need for immediate synchronous write during startup
@@ -1567,8 +1619,9 @@ class PrayerSettingsRepository @Inject constructor(
      */
     fun getCachedPrayerTimes(): DayPrayerTimes? {
         return try {
-            Log.i(TAG, "📋 PREFERENCE READ: key='$KEY_CACHED_PRAYER_DATE' (cached prayer date)")
-            val cachedDateStr = prefs.getString(KEY_CACHED_PRAYER_DATE, null) ?: return null
+            val cachedDateStr = prefs.getString(KEY_CACHED_PRAYER_DATE, null)
+            logPrefRead(KEY_CACHED_PRAYER_DATE, cachedDateStr, "null")
+            if (cachedDateStr == null) return null
             val cachedDate = LocalDate.parse(cachedDateStr)
             
             // Only return cached data if it's for today
@@ -1588,28 +1641,44 @@ class PrayerSettingsRepository @Inject constructor(
             val maghribMinutes = prefs.getInt(KEY_CACHED_MAGHRIB, -1)
             val ishaMinutes = prefs.getInt(KEY_CACHED_ISHA, -1)
             
+            logPrefRead(KEY_CACHED_FAJR, "$fajrMinutes (${LocalTime.ofSecondOfDay((fajrMinutes * 60).toLong())})", -1)
+            logPrefRead(KEY_CACHED_SUNRISE, "$sunriseMinutes (${LocalTime.ofSecondOfDay((sunriseMinutes * 60).toLong())})", -1)
+            logPrefRead(KEY_CACHED_DHUHR, "$dhuhrMinutes (${LocalTime.ofSecondOfDay((dhuhrMinutes * 60).toLong())})", -1)
+            logPrefRead(KEY_CACHED_ASR, "$asrMinutes (${LocalTime.ofSecondOfDay((asrMinutes * 60).toLong())})", -1)
+            logPrefRead(KEY_CACHED_MAGHRIB, "$maghribMinutes (${LocalTime.ofSecondOfDay((maghribMinutes * 60).toLong())})", -1)
+            logPrefRead(KEY_CACHED_ISHA, "$ishaMinutes (${LocalTime.ofSecondOfDay((ishaMinutes * 60).toLong())})", -1)
+            
             // Validate all times are present
             if (fajrMinutes == -1 || sunriseMinutes == -1 || dhuhrMinutes == -1 ||
                 asrMinutes == -1 || maghribMinutes == -1 || ishaMinutes == -1) {
                 return null
             }
             
+            val latitude = prefs.getFloat(KEY_CACHED_LOCATION_LAT, 0f).toDouble()
+            val longitude = prefs.getFloat(KEY_CACHED_LOCATION_LON, 0f).toDouble()
+            val city = prefs.getString(KEY_CACHED_LOCATION_CITY, "") ?: ""
+            val country = prefs.getString(KEY_CACHED_LOCATION_COUNTRY, "") ?: ""
+            
+            logPrefRead(KEY_CACHED_LOCATION_LAT, latitude, 0f)
+            logPrefRead(KEY_CACHED_LOCATION_LON, longitude, 0f)
+            logPrefRead(KEY_CACHED_LOCATION_CITY, city, "")
+            logPrefRead(KEY_CACHED_LOCATION_COUNTRY, country, "")
+            
             val location = Location(
-                latitude = prefs.getFloat(KEY_CACHED_LOCATION_LAT, 0f).toDouble(),
-                longitude = prefs.getFloat(KEY_CACHED_LOCATION_LON, 0f).toDouble(),
-                city = run {
-                    Log.i(TAG, "📋 PREFERENCE READ: key='$KEY_CACHED_LOCATION_CITY' (cached location city)")
-                    prefs.getString(KEY_CACHED_LOCATION_CITY, "") ?: ""
-                },
-                country = run {
-                    Log.i(TAG, "📋 PREFERENCE READ: key='$KEY_CACHED_LOCATION_COUNTRY' (cached location country)")
-                    prefs.getString(KEY_CACHED_LOCATION_COUNTRY, "") ?: ""
-                },
+                latitude = latitude,
+                longitude = longitude,
+                city = city,
+                country = country,
                 countryCode = run {
-                    Log.i(TAG, "📋 PREFERENCE READ: key='$KEY_CACHED_LOCATION_COUNTRY_CODE' (cached location country code)")
-                    prefs.getString(KEY_CACHED_LOCATION_COUNTRY_CODE, "") ?: ""
+                    val countryCode = prefs.getString(KEY_CACHED_LOCATION_COUNTRY_CODE, "") ?: ""
+                    logPrefRead(KEY_CACHED_LOCATION_COUNTRY_CODE, countryCode, "")
+                    countryCode
                 },
-                timeZoneOffset = prefs.getFloat(KEY_CACHED_LOCATION_TIMEZONE, 0f).toDouble()
+                timeZoneOffset = run {
+                    val timezone = prefs.getFloat(KEY_CACHED_LOCATION_TIMEZONE, 0f).toDouble()
+                    logPrefRead(KEY_CACHED_LOCATION_TIMEZONE, timezone, 0f)
+                    timezone
+                }
             )
             
             DayPrayerTimes(
@@ -1754,14 +1823,11 @@ class PrayerSettingsRepository @Inject constructor(
      */
     private fun loadCalculationSettings(): PrayerCalculationSettings? {
         return try {
-            Log.i(TAG, "📋 PREFERENCE READ: key='$KEY_CALCULATION_SETTINGS_JSON' (prayer calculation settings)")
             val settingsJson = prefs.getString(KEY_CALCULATION_SETTINGS_JSON, null)
-            Log.i(TAG, "📋 PREFERENCE VALUE: ${if (settingsJson != null) "EXISTS (${settingsJson.length} chars)" else "NULL/EMPTY"}")
+            logPrefReadJson(KEY_CALCULATION_SETTINGS_JSON, settingsJson, "prayer calculation settings")
             if (settingsJson != null) {
-                Log.i(TAG, "📋 PREFERENCE CONTENT: $settingsJson")
                 json.decodeFromString<PrayerCalculationSettings>(settingsJson)
             } else {
-                Log.i(TAG, "📋 PREFERENCE RESULT: No calculation settings found - will use defaults")
                 null
             }
         } catch (e: Exception) {
@@ -1772,14 +1838,11 @@ class PrayerSettingsRepository @Inject constructor(
     
     private fun loadLocationPreferences(): PrayerLocationPreferences? {
         return try {
-            Log.i(TAG, "📋 PREFERENCE READ: key='$KEY_LOCATION_PREFERENCES_JSON' (location preferences)")
             val settingsJson = prefs.getString(KEY_LOCATION_PREFERENCES_JSON, null)
-            Log.i(TAG, "📋 PREFERENCE VALUE: ${if (settingsJson != null) "EXISTS (${settingsJson.length} chars)" else "NULL/EMPTY"}")
+            logPrefReadJson(KEY_LOCATION_PREFERENCES_JSON, settingsJson, "location preferences")
             if (settingsJson != null) {
-                Log.i(TAG, "📋 PREFERENCE CONTENT: $settingsJson")
                 json.decodeFromString<PrayerLocationPreferences>(settingsJson)
             } else {
-                Log.i(TAG, "📋 PREFERENCE RESULT: No location preferences found - will use defaults")
                 null
             }
         } catch (e: Exception) {
@@ -1790,14 +1853,11 @@ class PrayerSettingsRepository @Inject constructor(
     
     private fun loadNotificationPreferences(): PrayerNotificationPreferences? {
         return try {
-            Log.i(TAG, "📋 PREFERENCE READ: key='$KEY_NOTIFICATION_PREFERENCES_JSON' (notification preferences)")
             val settingsJson = prefs.getString(KEY_NOTIFICATION_PREFERENCES_JSON, null)
-            Log.i(TAG, "📋 PREFERENCE VALUE: ${if (settingsJson != null) "EXISTS (${settingsJson.length} chars)" else "NULL/EMPTY"}")
+            logPrefReadJson(KEY_NOTIFICATION_PREFERENCES_JSON, settingsJson, "notification preferences")
             if (settingsJson != null) {
-                Log.i(TAG, "📋 PREFERENCE CONTENT: $settingsJson")
                 json.decodeFromString<PrayerNotificationPreferences>(settingsJson)
             } else {
-                Log.i(TAG, "📋 PREFERENCE RESULT: No notification preferences found - will use defaults")
                 null
             }
         } catch (e: Exception) {
@@ -1808,14 +1868,11 @@ class PrayerSettingsRepository @Inject constructor(
     
     private fun loadLegacySettings(): PrayerSettings? {
         return try {
-            Log.i(TAG, "📋 PREFERENCE READ: key='$KEY_CURRENT_SETTINGS_JSON' (legacy settings)")
             val settingsJson = prefs.getString(KEY_CURRENT_SETTINGS_JSON, null)
-            Log.i(TAG, "📋 PREFERENCE VALUE: ${if (settingsJson != null) "EXISTS (${settingsJson.length} chars)" else "NULL/EMPTY"}")
+            logPrefReadJson(KEY_CURRENT_SETTINGS_JSON, settingsJson, "legacy settings")
             if (settingsJson != null) {
-                Log.i(TAG, "📋 PREFERENCE CONTENT (first 200 chars): ${settingsJson.take(200)}${if (settingsJson.length > 200) "..." else ""}")
                 json.decodeFromString<PrayerSettings>(settingsJson)
             } else {
-                Log.i(TAG, "📋 PREFERENCE RESULT: No legacy settings found")
                 null
             }
         } catch (e: Exception) {
@@ -1829,19 +1886,19 @@ class PrayerSettingsRepository @Inject constructor(
      */
     private fun saveCalculationSettings(settings: PrayerCalculationSettings) {
         val settingsJson = json.encodeToString(settings)
-        Log.i(TAG, "💾 PREFERENCE WRITE: key='$KEY_CALCULATION_SETTINGS_JSON' (prayer calculation settings)")
+        logPrefWriteJson(KEY_CALCULATION_SETTINGS_JSON, settingsJson, "prayer calculation settings")
         prefs.edit().putString(KEY_CALCULATION_SETTINGS_JSON, settingsJson).apply()
     }
     
     private fun saveLocationPreferences(preferences: PrayerLocationPreferences) {
         val settingsJson = json.encodeToString(preferences)
-        Log.i(TAG, "💾 PREFERENCE WRITE: key='$KEY_LOCATION_PREFERENCES_JSON' (location preferences)")
+        logPrefWriteJson(KEY_LOCATION_PREFERENCES_JSON, settingsJson, "location preferences")
         prefs.edit().putString(KEY_LOCATION_PREFERENCES_JSON, settingsJson).apply()
     }
     
     private fun saveNotificationPreferences(preferences: PrayerNotificationPreferences) {
         val settingsJson = json.encodeToString(preferences)
-        Log.i(TAG, "💾 PREFERENCE WRITE: key='$KEY_NOTIFICATION_PREFERENCES_JSON' (notification preferences)")
+        logPrefWriteJson(KEY_NOTIFICATION_PREFERENCES_JSON, settingsJson, "notification preferences")
         prefs.edit().putString(KEY_NOTIFICATION_PREFERENCES_JSON, settingsJson).apply()
     }
     

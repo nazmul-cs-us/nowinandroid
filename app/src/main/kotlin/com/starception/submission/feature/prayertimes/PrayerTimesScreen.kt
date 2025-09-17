@@ -82,6 +82,7 @@ import com.starception.submission.feature.prayertimes.SwipeableBigTiles
 import com.starception.submission.feature.prayertimes.SmartContentUtils
 import com.starception.submission.feature.prayertimes.PrayerTimeHelpers
 import com.starception.submission.feature.prayertimes.components.CompassPopupScreen
+import com.starception.submission.feature.prayertimes.getPrayerNameInLocalLanguage
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -91,6 +92,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.Duration
+
 
 /**
  * PRAYER TIMES SCREEN: Main UI for displaying Islamic prayer times with Material 3 design
@@ -661,16 +663,30 @@ fun PrayerTimesScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "Dhuhr",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = when (PrayerTimeHelpers.getPrayerStatus("Dhuhr", currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = FontWeight.Medium
-                            )
+                            Column(
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                Text(
+                                    text = "Dhuhr",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = when (PrayerTimeHelpers.getPrayerStatus("Dhuhr", currentTime, prayerTimes)) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = getPrayerNameInLocalLanguage("Dhuhr", prayerTimes?.location?.countryCode),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = when (PrayerTimeHelpers.getPrayerStatus("Dhuhr", currentTime, prayerTimes)) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    },
+                                    fontWeight = FontWeight.Normal
+                                )
+                            }
                             Text(
                                 text = PrayerTimeHelpers.getPrayerTimeDisplay("Dhuhr", prayerTimes),
                                 style = MaterialTheme.typography.headlineSmall,
@@ -707,16 +723,30 @@ fun PrayerTimesScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "Asr",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = when (PrayerTimeHelpers.getPrayerStatus("Asr", currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = FontWeight.Medium
-                            )
+                            Column(
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                Text(
+                                    text = "Asr",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = when (PrayerTimeHelpers.getPrayerStatus("Asr", currentTime, prayerTimes)) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = getPrayerNameInLocalLanguage("Asr", prayerTimes?.location?.countryCode),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = when (PrayerTimeHelpers.getPrayerStatus("Asr", currentTime, prayerTimes)) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    },
+                                    fontWeight = FontWeight.Normal
+                                )
+                            }
                             Text(
                                 text = PrayerTimeHelpers.getPrayerTimeDisplay("Asr", prayerTimes),
                                 style = MaterialTheme.typography.headlineSmall,
@@ -759,16 +789,30 @@ fun PrayerTimesScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "Maghrib",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = when (PrayerTimeHelpers.getPrayerStatus("Maghrib", currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = FontWeight.Medium
-                            )
+                            Column(
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                Text(
+                                    text = "Maghrib",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = when (PrayerTimeHelpers.getPrayerStatus("Maghrib", currentTime, prayerTimes)) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = getPrayerNameInLocalLanguage("Maghrib", prayerTimes?.location?.countryCode),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = when (PrayerTimeHelpers.getPrayerStatus("Maghrib", currentTime, prayerTimes)) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    },
+                                    fontWeight = FontWeight.Normal
+                                )
+                            }
                             Text(
                                 text = PrayerTimeHelpers.getPrayerTimeDisplay("Maghrib", prayerTimes),
                                 style = MaterialTheme.typography.headlineSmall,
@@ -805,16 +849,30 @@ fun PrayerTimesScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "Isha",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = when (PrayerTimeHelpers.getPrayerStatus("Isha", currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = FontWeight.Medium
-                            )
+                            Column(
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                Text(
+                                    text = "Isha",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = when (PrayerTimeHelpers.getPrayerStatus("Isha", currentTime, prayerTimes)) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = getPrayerNameInLocalLanguage("Isha", prayerTimes?.location?.countryCode),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = when (PrayerTimeHelpers.getPrayerStatus("Isha", currentTime, prayerTimes)) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    },
+                                    fontWeight = FontWeight.Normal
+                                )
+                            }
                             Text(
                                 text = PrayerTimeHelpers.getPrayerTimeDisplay("Isha", prayerTimes),
                                 style = MaterialTheme.typography.headlineSmall,
