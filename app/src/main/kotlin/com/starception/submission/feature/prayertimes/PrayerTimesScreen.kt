@@ -59,7 +59,10 @@ import androidx.compose.ui.unit.sp
 import android.util.Log
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.pager.HorizontalPager
@@ -82,6 +85,7 @@ import com.starception.submission.feature.prayertimes.SwipeableBigTiles
 import com.starception.submission.feature.prayertimes.SmartContentUtils
 import com.starception.submission.feature.prayertimes.PrayerTimeHelpers
 import com.starception.submission.feature.prayertimes.components.CompassPopupScreen
+import com.starception.submission.feature.prayertimes.components.InteractivePrayerTimeCard
 import com.starception.submission.feature.prayertimes.getPrayerNameInLocalLanguage
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
@@ -279,6 +283,10 @@ fun PrayerTimesScreen(
     // COMPASS POPUP STATE - Shows large compass with calibration guidance
     var showCompassPopup by remember { mutableStateOf(false) }
     
+    // INTERACTIVE DIAL STATE - Shows PNG file icon time adjustment dial
+    var showInteractiveDial by remember { mutableStateOf<String?>(null) } // Prayer name currently being adjusted
+    val hapticFeedback = LocalHapticFeedback.current
+    
     // LOCATION SERVICE - For Qibla compass functionality
     val locationService = remember {
         val entryPoint = EntryPointAccessors.fromApplication(
@@ -433,8 +441,81 @@ fun PrayerTimesScreen(
         }
     }
     
+    // INTERACTIVE PRAYER CARD HELPER - Creates prayer card with long-press dial functionality
+    @Composable
+    fun InteractivePrayerCard(
+        prayerName: String,
+        modifier: Modifier = Modifier
+    ) {
+        // Always show the regular small card with long-press detection
+        ElevatedCard(
+                modifier = modifier
+                    .pointerInput(prayerName) {
+                        detectTapGestures(
+                            onLongPress = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showInteractiveDial = prayerName
+                            }
+                        )
+                    },
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                        "Current" -> MaterialTheme.colorScheme.tertiaryContainer
+                        "Next" -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                ),
+                elevation = CardDefaults.elevatedCardElevation(
+                    defaultElevation = 4.dp
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        Text(
+                            text = prayerName,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                                "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            },
+                            fontWeight = FontWeight.Normal
+                        )
+                    }
+                    Text(
+                        text = PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                            "Current" -> MaterialTheme.colorScheme.tertiary
+                            "Next" -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
     // PRAYER TIMES CALCULATION ENGINE - Background calculation with 3-second location timeout
-    suspend fun calculatePrayerTimes() {
+    val calculatePrayerTimes: suspend () -> Unit = {
         try {
             // Run calculation on background thread to prevent UI blocking
             withContext(Dispatchers.Default) {
@@ -634,131 +715,27 @@ fun PrayerTimesScreen(
                     }
                 )
                 
-                // Other prayer times using Material 3 design
+                // Other prayer times using Material 3 design with long-press dial functionality
                 // First row: Dhuhr and Asr
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Dhuhr prayer
-                    ElevatedCard(
+                    // Dhuhr prayer with interactive dial
+                    InteractivePrayerCard(
+                        prayerName = "Dhuhr",
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = when (PrayerTimeHelpers.getPrayerStatus("Dhuhr", currentTime, prayerTimes)) {
-                                "Current" -> MaterialTheme.colorScheme.tertiaryContainer
-                                "Next" -> MaterialTheme.colorScheme.primaryContainer
-                                else -> MaterialTheme.colorScheme.surfaceVariant
-                            }
-                        ),
-                        elevation = CardDefaults.elevatedCardElevation(
-                            defaultElevation = 4.dp
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.Start
-                            ) {
-                                Text(
-                                    text = "Dhuhr",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = when (PrayerTimeHelpers.getPrayerStatus("Dhuhr", currentTime, prayerTimes)) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = getPrayerNameInLocalLanguage("Dhuhr", prayerTimes?.location?.countryCode),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = when (PrayerTimeHelpers.getPrayerStatus("Dhuhr", currentTime, prayerTimes)) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                    },
-                                    fontWeight = FontWeight.Normal
-                                )
-                            }
-                            Text(
-                                text = PrayerTimeHelpers.getPrayerTimeDisplay("Dhuhr", prayerTimes),
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = when (PrayerTimeHelpers.getPrayerStatus("Dhuhr", currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.tertiary
-                                    "Next" -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                            .height(120.dp)
+                    )
                     
-                    // Asr prayer
-                    ElevatedCard(
+                    // Asr prayer with interactive dial  
+                    InteractivePrayerCard(
+                        prayerName = "Asr",
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = when (PrayerTimeHelpers.getPrayerStatus("Asr", currentTime, prayerTimes)) {
-                                "Current" -> MaterialTheme.colorScheme.tertiaryContainer
-                                "Next" -> MaterialTheme.colorScheme.primaryContainer
-                                else -> MaterialTheme.colorScheme.surfaceVariant
-                            }
-                        ),
-                        elevation = CardDefaults.elevatedCardElevation(
-                            defaultElevation = 4.dp
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.Start
-                            ) {
-                                Text(
-                                    text = "Asr",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = when (PrayerTimeHelpers.getPrayerStatus("Asr", currentTime, prayerTimes)) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = getPrayerNameInLocalLanguage("Asr", prayerTimes?.location?.countryCode),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = when (PrayerTimeHelpers.getPrayerStatus("Asr", currentTime, prayerTimes)) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                    },
-                                    fontWeight = FontWeight.Normal
-                                )
-                            }
-                            Text(
-                                text = PrayerTimeHelpers.getPrayerTimeDisplay("Asr", prayerTimes),
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = when (PrayerTimeHelpers.getPrayerStatus("Asr", currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.tertiary
-                                    "Next" -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                            .height(120.dp)
+                    )
                 }
                 
                 // Second row: Maghrib and Isha
@@ -766,125 +743,21 @@ fun PrayerTimesScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Maghrib prayer
-                    ElevatedCard(
+                    // Maghrib prayer with interactive dial
+                    InteractivePrayerCard(
+                        prayerName = "Maghrib",
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = when (PrayerTimeHelpers.getPrayerStatus("Maghrib", currentTime, prayerTimes)) {
-                                "Current" -> MaterialTheme.colorScheme.tertiaryContainer
-                                "Next" -> MaterialTheme.colorScheme.primaryContainer
-                                else -> MaterialTheme.colorScheme.surfaceVariant
-                            }
-                        ),
-                        elevation = CardDefaults.elevatedCardElevation(
-                            defaultElevation = 4.dp
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.Start
-                            ) {
-                                Text(
-                                    text = "Maghrib",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = when (PrayerTimeHelpers.getPrayerStatus("Maghrib", currentTime, prayerTimes)) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = getPrayerNameInLocalLanguage("Maghrib", prayerTimes?.location?.countryCode),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = when (PrayerTimeHelpers.getPrayerStatus("Maghrib", currentTime, prayerTimes)) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                    },
-                                    fontWeight = FontWeight.Normal
-                                )
-                            }
-                            Text(
-                                text = PrayerTimeHelpers.getPrayerTimeDisplay("Maghrib", prayerTimes),
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = when (PrayerTimeHelpers.getPrayerStatus("Maghrib", currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.tertiary
-                                    "Next" -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                            .height(120.dp)
+                    )
                     
-                    // Isha prayer
-                    ElevatedCard(
+                    // Isha prayer with interactive dial
+                    InteractivePrayerCard(
+                        prayerName = "Isha",
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = when (PrayerTimeHelpers.getPrayerStatus("Isha", currentTime, prayerTimes)) {
-                                "Current" -> MaterialTheme.colorScheme.tertiaryContainer
-                                "Next" -> MaterialTheme.colorScheme.primaryContainer
-                                else -> MaterialTheme.colorScheme.surfaceVariant
-                            }
-                        ),
-                        elevation = CardDefaults.elevatedCardElevation(
-                            defaultElevation = 4.dp
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.Start
-                            ) {
-                                Text(
-                                    text = "Isha",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = when (PrayerTimeHelpers.getPrayerStatus("Isha", currentTime, prayerTimes)) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = getPrayerNameInLocalLanguage("Isha", prayerTimes?.location?.countryCode),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = when (PrayerTimeHelpers.getPrayerStatus("Isha", currentTime, prayerTimes)) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                    },
-                                    fontWeight = FontWeight.Normal
-                                )
-                            }
-                            Text(
-                                text = PrayerTimeHelpers.getPrayerTimeDisplay("Isha", prayerTimes),
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = when (PrayerTimeHelpers.getPrayerStatus("Isha", currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.tertiary
-                                    "Next" -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                            .height(120.dp)
+                    )
                 }
                 
                 // Location info using Material 3 design
@@ -1025,5 +898,33 @@ fun PrayerTimesScreen(
                 showCompassPopup = false 
             }
         )
+    }
+    
+    // INTERACTIVE DIAL POPUP - Shows PNG file style circular timer for prayer time adjustment
+    showInteractiveDial?.let { prayerName ->
+        val originalTime = when (prayerName) {
+            "Fajr" -> prayerTimes?.fajr
+            "Sunrise" -> prayerTimes?.sunrise
+            "Dhuhr" -> prayerTimes?.dhuhr
+            "Asr" -> prayerTimes?.asr
+            "Maghrib" -> prayerTimes?.maghrib
+            "Isha" -> prayerTimes?.isha
+            else -> null
+        }
+        
+        originalTime?.let { time ->
+            InteractivePrayerTimeCard(
+                prayerName = prayerName,
+                originalTime = time.toString(),
+                onTimeAdjustment = { prayer, adjustedTime ->
+                    // Handle the time adjustment here
+                    Log.d("PrayerTimes", "Adjusted $prayer time to $adjustedTime")
+                    showInteractiveDial = null // Close the dial
+                },
+                onCancel = {
+                    showInteractiveDial = null // Close the dial without saving
+                }
+            )
+        }
     }
 }
