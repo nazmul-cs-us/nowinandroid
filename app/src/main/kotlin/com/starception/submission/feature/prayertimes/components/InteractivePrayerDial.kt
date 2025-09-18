@@ -139,37 +139,18 @@ fun InteractivePrayerTimeCard(
                             .padding(vertical = 16.dp)
                     )
                     
-                    // Material 3 adjustment indicator
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (timeAdjustment != 0) {
-                            when {
-                                timeAdjustment > 0 -> colorScheme.tertiaryContainer
-                                else -> colorScheme.errorContainer
-                            }
-                        } else {
-                            colorScheme.surfaceVariant
-                        },
-                        modifier = Modifier.padding(top = 16.dp, bottom = 24.dp)
-                    ) {
+                    // Instruction text when no adjustment
+                    if (timeAdjustment == 0) {
                         Text(
-                            text = if (timeAdjustment != 0) {
-                                if (timeAdjustment > 0) "+${timeAdjustment} min" else "${timeAdjustment} min"
-                            } else {
-                                "Drag to adjust time"
-                            },
+                            text = "Drag to adjust time",
                             style = typography.titleMedium,
-                            color = if (timeAdjustment != 0) {
-                                when {
-                                    timeAdjustment > 0 -> colorScheme.onTertiaryContainer
-                                    else -> colorScheme.onErrorContainer
-                                }
-                            } else {
-                                colorScheme.onSurfaceVariant
-                            },
+                            color = colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            modifier = Modifier.padding(top = 16.dp, bottom = 24.dp)
                         )
+                    } else {
+                        // Spacer when adjustment is shown inside dial
+                        Spacer(modifier = Modifier.height(40.dp))
                     }
                     
                     // Spacer to push buttons to bottom
@@ -294,14 +275,34 @@ private fun InteractiveTimeDial(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxSize()
             ) {
-                Text(
-                    text = adjustTimeByMinutes(originalTime, adjustmentMinutes),
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.headlineSmall
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = convertTo12HourFormat(adjustTimeByMinutes(originalTime, adjustmentMinutes)),
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    
+                    // Show adjustment indicator inside the dial
+                    if (adjustmentMinutes != 0) {
+                        Text(
+                            text = if (adjustmentMinutes > 0) "+${adjustmentMinutes} min" else "${adjustmentMinutes} min",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (adjustmentMinutes > 0) {
+                                Color(0xFF00D4AA) // Teal for positive
+                            } else {
+                                Color(0xFFE74C3C) // Red for negative
+                            },
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
             }
         }
         
@@ -488,6 +489,28 @@ private fun adjustTimeByMinutes(timeString: String, minutesToAdd: Int): String {
         val adjustedMinutes = ((totalMinutes % 60) + 60) % 60 // Handle negative minutes
         
         String.format("%02d:%02d", adjustedHours, adjustedMinutes)
+    } catch (e: Exception) {
+        timeString // Return original time if parsing fails
+    }
+}
+
+/**
+ * Helper function to convert 24-hour format to 12-hour format
+ */
+private fun convertTo12HourFormat(timeString: String): String {
+    return try {
+        val parts = timeString.split(":")
+        val hours = parts[0].toInt()
+        val minutes = parts[1].toInt()
+        
+        val displayHours = when {
+            hours == 0 -> 12
+            hours > 12 -> hours - 12
+            else -> hours
+        }
+        
+        val amPm = if (hours < 12) "AM" else "PM"
+        String.format("%d:%02d %s", displayHours, minutes, amPm)
     } catch (e: Exception) {
         timeString // Return original time if parsing fails
     }
