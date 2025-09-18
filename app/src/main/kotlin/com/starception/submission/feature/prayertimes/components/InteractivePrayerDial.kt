@@ -352,23 +352,17 @@ private fun InteractiveTimeDial(
             val arcSize = Size(radius * 2, radius * 2)
             val arcTopLeft = Offset(center.x - radius, center.y - radius)
             
-            // Draw clean circular track background
+            // Draw clean circular track background with image colors
             drawCircle(
-                color = colorScheme.surfaceVariant,
+                color = Color(0xFFE8E8E8), // Light gray like in the image
                 radius = radius,
                 center = center,
                 style = Stroke(width = strokeWidth)
             )
             
-            // Draw progress arc based on adjustment
+            // Draw progress arc based on adjustment with image colors
             val progressAngle = (adjustmentMinutes + 60f) / 120f * 360f
-            val progressColor = when {
-                adjustmentMinutes > 20 -> colorScheme.tertiary
-                adjustmentMinutes > 0 -> colorScheme.primary  
-                adjustmentMinutes < -20 -> colorScheme.error
-                adjustmentMinutes < 0 -> colorScheme.secondary
-                else -> colorScheme.primary
-            }
+            val progressColor = Color(0xFF00D4AA) // Vibrant teal/aqua from the image
             
             if (adjustmentMinutes != 0) {
                 drawArc(
@@ -382,28 +376,51 @@ private fun InteractiveTimeDial(
                 )
             }
             
-            // Draw clean hour markers (12 positions)
-            for (i in 0 until 12) {
-                val tickAngle = (i * 30f) - 90f
-                val tickRadius = radius + 4.dp.toPx()
-                val tickPosition = center + Offset(
-                    x = tickRadius * cos(Math.toRadians(tickAngle.toDouble())).toFloat(),
-                    y = tickRadius * sin(Math.toRadians(tickAngle.toDouble())).toFloat()
+            // Draw segmented markers around the dial (like the image)
+            val segmentCount = 60 // More segments for smoother appearance
+            val segmentAngle = 360f / segmentCount
+            
+            for (i in 0 until segmentCount) {
+                val segmentAngleRad = (i * segmentAngle) - 90f
+                val segmentRadius = radius + 6.dp.toPx()
+                val segmentPosition = center + Offset(
+                    x = segmentRadius * cos(Math.toRadians(segmentAngleRad.toDouble())).toFloat(),
+                    y = segmentRadius * sin(Math.toRadians(segmentAngleRad.toDouble())).toFloat()
                 )
                 
-                // Draw tick marks as small rectangles
-                val tickLength = 6.dp.toPx()
-                val tickWidth = 2.dp.toPx()
-                val tickRect = androidx.compose.ui.geometry.Rect(
-                    center = tickPosition,
-                    radius = tickWidth / 2f
-                )
+                // Draw segmented markers as small rectangles
+                val segmentLength = if (i % 5 == 0) 8.dp.toPx() else 4.dp.toPx() // Longer markers every 5 segments
+                val segmentWidth = if (i % 5 == 0) 3.dp.toPx() else 2.dp.toPx() // Wider markers every 5 segments
                 
-                drawRect(
-                    color = colorScheme.outline.copy(alpha = 0.7f),
-                    topLeft = Offset(tickPosition.x - tickWidth/2, tickPosition.y - tickLength/2),
-                    size = androidx.compose.ui.geometry.Size(tickWidth, tickLength)
-                )
+                // Calculate rotation for the segment
+                val rotationAngle = segmentAngleRad + 90f
+                val cosRot = cos(Math.toRadians(rotationAngle.toDouble())).toFloat()
+                val sinRot = sin(Math.toRadians(rotationAngle.toDouble())).toFloat()
+                
+                // Draw the segment rectangle with image colors
+                val segmentColor = if (i < (adjustmentMinutes + 60) * segmentCount / 120) {
+                    Color(0xFF00D4AA) // Vibrant teal/aqua from the image
+                } else {
+                    Color(0xFFB8B8B8) // Light gray for inactive segments
+                }
+                
+                // Draw rotated rectangle for the segment
+                drawIntoCanvas { canvas ->
+                    canvas.save()
+                    canvas.translate(segmentPosition.x, segmentPosition.y)
+                    canvas.rotate(rotationAngle)
+                    canvas.drawRect(
+                        -segmentWidth / 2f,
+                        -segmentLength / 2f,
+                        segmentWidth / 2f,
+                        segmentLength / 2f,
+                        androidx.compose.ui.graphics.Paint().apply {
+                            color = segmentColor
+                            isAntiAlias = true
+                        }
+                    )
+                    canvas.restore()
+                }
             }
             
             // Calculate knob position based on current angle (not animated for smooth drag)
@@ -438,10 +455,25 @@ private fun InteractiveTimeDial(
                 style = Stroke(width = 1.5.dp.toPx())
             )
             
-            // Simple center dot indicator
+            // Draw indicator line pointing outward (like in the image)
+            val indicatorLength = knobRadius * 0.6f
+            val indicatorEnd = knobPosition + Offset(
+                x = indicatorLength * cos(knobAngleRad).toFloat(),
+                y = indicatorLength * sin(knobAngleRad).toFloat()
+            )
+            
+            drawLine(
+                color = Color(0xFF00D4AA), // Same teal color as segments
+                start = knobPosition,
+                end = indicatorEnd,
+                strokeWidth = 3.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+            
+            // Center dot
             drawCircle(
-                color = colorScheme.primary,
-                radius = 3.dp.toPx(),
+                color = Color(0xFF00D4AA), // Same teal color as segments
+                radius = 2.dp.toPx(),
                 center = knobPosition
             )
         }
