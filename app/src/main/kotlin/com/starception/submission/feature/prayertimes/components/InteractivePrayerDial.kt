@@ -36,7 +36,8 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.*
 
 /**
- * PNG File-style card with interactive dial for prayer time adjustment
+ * Material 3 expressive design card with interactive dial for prayer time adjustment
+ * Features asymmetrical shapes, layered backgrounds, and sophisticated styling
  */
 @Composable
 fun InteractivePrayerTimeCard(
@@ -49,52 +50,80 @@ fun InteractivePrayerTimeCard(
     var timeAdjustment by remember { mutableStateOf(0) } // Minutes adjustment
     val hapticFeedback = LocalHapticFeedback.current
     
-    // Professional, clean colors inspired by PNG file icons
-    val BackgroundWhite = Color(0xFFFFFFFF)
-    val ShadowGray = Color(0xFFE0E6ED)
-    val BorderGray = Color(0xFFD1D9E6)
-    val TextDark = Color(0xFF2C3E50)
-    val AccentBlue = Color(0xFF3498DB)
-    val ProgressGreen = Color(0xFF27AE60)
-    val WarningOrange = Color(0xFFE67E22)
-    val KnobSilver = Color(0xFFBDC3C7)
-    val KnobHighlight = Color(0xFFECF0F1)
+    // Material 3 theme colors for consistent design
+    val colorScheme = MaterialTheme.colorScheme
+    val typography = MaterialTheme.typography
     
-    // File icon style interface - clean white document design
+    // Material 3 expressive design with layered backgrounds
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA)) // Very light background
-            .padding(24.dp),
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        colorScheme.background,
+                        colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                )
+            )
+            .padding(20.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Document-style card with folded corner (like PNG/JPEG file icons)
+        // Main card with asymmetrical Material 3 shape
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .fillMaxHeight(0.85f),
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            shadowElevation = 8.dp
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(
+                topStart = 28.dp,
+                topEnd = 16.dp,
+                bottomStart = 16.dp,
+                bottomEnd = 28.dp
+            ),
+            color = colorScheme.surface,
+            shadowElevation = 12.dp,
+            tonalElevation = 2.dp
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                // Main content area
+                // Layered background with subtle gradient
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    colorScheme.primaryContainer.copy(alpha = 0.05f),
+                                    Color.Transparent
+                                ),
+                                center = Offset(0.3f, 0.3f),
+                                radius = 0.8f
+                            )
+                        )
+                )
+                
+                // Main content area with proper spacing
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 28.dp, vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Prayer name at top
-                    Text(
-                        text = prayerName,
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = Color(0xFF6B7280),
-                        fontWeight = FontWeight.Medium
-                    )
+                    // Prayer name with Material 3 typography and styling
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = colorScheme.primaryContainer,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Text(
+                            text = prayerName,
+                            style = typography.headlineMedium,
+                            color = colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        )
+                    }
                     
-                    // Clean, minimal dial
+                    // Material 3 styled interactive dial
                     InteractiveTimeDial(
                         originalTime = originalTime,
                         adjustmentMinutes = timeAdjustment,
@@ -104,83 +133,94 @@ fun InteractivePrayerTimeCard(
                                 timeAdjustment = adjustment
                             }
                         },
-                        backgroundWhite = BackgroundWhite,
-                        shadowGray = ShadowGray,
-                        borderGray = BorderGray,
-                        textDark = TextDark,
-                        accentBlue = AccentBlue,
-                        progressGreen = ProgressGreen,
-                        warningOrange = WarningOrange,
-                        knobSilver = KnobSilver,
-                        knobHighlight = KnobHighlight,
+                        colorScheme = colorScheme,
                         modifier = Modifier
                             .size(280.dp)
                             .padding(vertical = 16.dp)
                     )
                     
-                    // File-style adjustment text at bottom
-                    Text(
-                        text = if (timeAdjustment != 0) {
-                            if (timeAdjustment > 0) "+${timeAdjustment} min" else "${timeAdjustment} min"
+                    // Material 3 adjustment indicator
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (timeAdjustment != 0) {
+                            when {
+                                timeAdjustment > 0 -> colorScheme.tertiaryContainer
+                                else -> colorScheme.errorContainer
+                            }
                         } else {
-                            "Drag to adjust"
+                            colorScheme.surfaceVariant
                         },
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color(0xFF6B7280),
-                        fontWeight = FontWeight.Medium
-                    )
+                        modifier = Modifier.padding(top = 16.dp, bottom = 24.dp)
+                    ) {
+                        Text(
+                            text = if (timeAdjustment != 0) {
+                                if (timeAdjustment > 0) "+${timeAdjustment} min" else "${timeAdjustment} min"
+                            } else {
+                                "Drag to adjust time"
+                            },
+                            style = typography.titleMedium,
+                            color = if (timeAdjustment != 0) {
+                                when {
+                                    timeAdjustment > 0 -> colorScheme.onTertiaryContainer
+                                    else -> colorScheme.onErrorContainer
+                                }
+                            } else {
+                                colorScheme.onSurfaceVariant
+                            },
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                    
+                    // Spacer to push buttons to bottom
+                    Spacer(modifier = Modifier.weight(1f))
                 }
                 
-                // Folded corner effect (top-right)
-                Canvas(
+                // Material 3 decorative accent (top-right)
+                Surface(
+                    shape = RoundedCornerShape(0.dp, 16.dp, 0.dp, 20.dp),
+                    color = colorScheme.primary.copy(alpha = 0.1f),
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(60.dp)
                         .align(Alignment.TopEnd)
                 ) {
-                    val cornerSize = size.width * 0.8f
-                    drawPath(
-                        path = Path().apply {
-                            moveTo(size.width - cornerSize, 0f)
-                            lineTo(size.width, 0f)
-                            lineTo(size.width, cornerSize)
-                            close()
-                        },
-                        color = Color(0xFFE5E7EB), // Light gray for fold
-                    )
-                    drawPath(
-                        path = Path().apply {
-                            moveTo(size.width - cornerSize, 0f)
-                            lineTo(size.width - cornerSize * 0.3f, cornerSize * 0.3f)
-                            lineTo(size.width, cornerSize)
-                            close()
-                        },
-                        color = Color(0xFFD1D5DB), // Darker gray for shadow
-                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccessTime,
+                            contentDescription = null,
+                            tint = colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
                 
-                // Action buttons at bottom
+                // Material 3 action buttons at bottom - properly positioned
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .padding(24.dp)
+                        .padding(horizontal = 28.dp, vertical = 24.dp)
                 ) {
                     OutlinedButton(
                         onClick = { onCancel() },
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp),
-                        border = BorderStroke(1.dp, Color(0xFFD1D5DB)),
+                            .height(56.dp),
+                        border = BorderStroke(1.5.dp, colorScheme.outline),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF6B7280)
+                            contentColor = colorScheme.onSurface
                         ),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(16.dp)
                     ) {
                         Text(
                             "Cancel",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
+                            style = typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                     
@@ -191,17 +231,17 @@ fun InteractivePrayerTimeCard(
                         },
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp),
+                            .height(56.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF6B7280)
+                            containerColor = colorScheme.primary
                         ),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(16.dp)
                     ) {
                         Text(
                             "Apply",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White
+                            style = typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colorScheme.onPrimary
                         )
                     }
                 }
@@ -211,22 +251,14 @@ fun InteractivePrayerTimeCard(
 }
 
 /**
- * Beautiful circular timer for prayer time adjustment with smooth dragging
+ * Material 3 styled circular timer for prayer time adjustment with smooth dragging
  */
 @Composable
 private fun InteractiveTimeDial(
     originalTime: String,
     adjustmentMinutes: Int,
     onAdjustmentChange: (Int) -> Unit,
-    backgroundWhite: Color,
-    shadowGray: Color,
-    borderGray: Color,
-    textDark: Color,
-    accentBlue: Color,
-    progressGreen: Color,
-    warningOrange: Color,
-    knobSilver: Color,
-    knobHighlight: Color,
+    colorScheme: ColorScheme,
     modifier: Modifier = Modifier
 ) {
     val hapticFeedback = LocalHapticFeedback.current
@@ -250,12 +282,13 @@ private fun InteractiveTimeDial(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        // Professional time display in center with clean background
+        // Material 3 time display in center with elevated surface
         Surface(
             shape = CircleShape,
-            color = backgroundWhite,
-            shadowElevation = 4.dp,
-            modifier = Modifier.size(140.dp)
+            color = colorScheme.surface,
+            shadowElevation = 6.dp,
+            tonalElevation = 1.dp,
+            modifier = Modifier.size(150.dp)
         ) {
             Box(
                 contentAlignment = Alignment.Center,
@@ -263,10 +296,11 @@ private fun InteractiveTimeDial(
             ) {
                 Text(
                     text = adjustTimeByMinutes(originalTime, adjustmentMinutes),
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = textDark,
-                    textAlign = TextAlign.Center
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.headlineSmall
                 )
             }
         }
@@ -318,31 +352,9 @@ private fun InteractiveTimeDial(
             val arcSize = Size(radius * 2, radius * 2)
             val arcTopLeft = Offset(center.x - radius, center.y - radius)
             
-            // Draw professional outer ring with shadow effect
+            // Draw clean circular track background
             drawCircle(
-                color = shadowGray,
-                radius = radius + 8.dp.toPx(),
-                center = center + Offset(4.dp.toPx(), 4.dp.toPx())
-            )
-            
-            // Draw main track background 
-            drawCircle(
-                color = backgroundWhite,
-                radius = radius + 6.dp.toPx(),
-                center = center,
-                style = Stroke(width = strokeWidth + 12.dp.toPx())
-            )
-            
-            drawCircle(
-                color = borderGray,
-                radius = radius + 6.dp.toPx(),
-                center = center,
-                style = Stroke(width = 2.dp.toPx())
-            )
-            
-            // Draw progress track
-            drawCircle(
-                color = Color(0xFFF8F9FA),
+                color = colorScheme.surfaceVariant,
                 radius = radius,
                 center = center,
                 style = Stroke(width = strokeWidth)
@@ -351,11 +363,11 @@ private fun InteractiveTimeDial(
             // Draw progress arc based on adjustment
             val progressAngle = (adjustmentMinutes + 60f) / 120f * 360f
             val progressColor = when {
-                adjustmentMinutes > 20 -> warningOrange
-                adjustmentMinutes > 0 -> progressGreen  
-                adjustmentMinutes < -20 -> Color(0xFFE74C3C) // Red for significant negative
-                adjustmentMinutes < 0 -> warningOrange
-                else -> accentBlue
+                adjustmentMinutes > 20 -> colorScheme.tertiary
+                adjustmentMinutes > 0 -> colorScheme.primary  
+                adjustmentMinutes < -20 -> colorScheme.error
+                adjustmentMinutes < 0 -> colorScheme.secondary
+                else -> colorScheme.primary
             }
             
             if (adjustmentMinutes != 0) {
@@ -370,19 +382,27 @@ private fun InteractiveTimeDial(
                 )
             }
             
-            // Draw minimal hour markers  
+            // Draw clean hour markers (12 positions)
             for (i in 0 until 12) {
                 val tickAngle = (i * 30f) - 90f
-                val tickRadius = radius + 3.dp.toPx()
+                val tickRadius = radius + 4.dp.toPx()
                 val tickPosition = center + Offset(
                     x = tickRadius * cos(Math.toRadians(tickAngle.toDouble())).toFloat(),
                     y = tickRadius * sin(Math.toRadians(tickAngle.toDouble())).toFloat()
                 )
                 
-                drawCircle(
-                    color = borderGray,
-                    radius = 2.dp.toPx(),
-                    center = tickPosition
+                // Draw tick marks as small rectangles
+                val tickLength = 6.dp.toPx()
+                val tickWidth = 2.dp.toPx()
+                val tickRect = androidx.compose.ui.geometry.Rect(
+                    center = tickPosition,
+                    radius = tickWidth / 2f
+                )
+                
+                drawRect(
+                    color = colorScheme.outline.copy(alpha = 0.7f),
+                    topLeft = Offset(tickPosition.x - tickWidth/2, tickPosition.y - tickLength/2),
+                    size = androidx.compose.ui.geometry.Size(tickWidth, tickLength)
                 )
             }
             
@@ -395,49 +415,34 @@ private fun InteractiveTimeDial(
             )
             val knobRadius = 16.dp.toPx()
             
-            // Draw professional knob with proper shadow and highlight
+            // Draw clean knob with subtle shadow
             // Drop shadow
             drawCircle(
                 color = Color.Black.copy(alpha = 0.15f),
                 radius = knobRadius + 2.dp.toPx(),
-                center = knobPosition + Offset(3.dp.toPx(), 3.dp.toPx())
+                center = knobPosition + Offset(2.dp.toPx(), 2.dp.toPx())
             )
             
             // Main knob body
             drawCircle(
-                color = backgroundWhite,
+                color = colorScheme.surface,
                 radius = knobRadius,
                 center = knobPosition
             )
             
             // Knob border
             drawCircle(
-                color = borderGray,
+                color = colorScheme.outline,
                 radius = knobRadius,
                 center = knobPosition,
-                style = Stroke(width = 2.dp.toPx())
+                style = Stroke(width = 1.5.dp.toPx())
             )
             
-            // Inner circle with metallic appearance
+            // Simple center dot indicator
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        knobHighlight,
-                        knobSilver,
-                        borderGray
-                    ),
-                    center = knobPosition - Offset(knobRadius * 0.3f, knobRadius * 0.3f),
-                    radius = knobRadius * 0.7f
-                ),
-                radius = knobRadius * 0.6f,
+                color = colorScheme.primary,
+                radius = 3.dp.toPx(),
                 center = knobPosition
-            )
-            
-            // Top highlight for 3D effect
-            drawCircle(
-                color = Color.White.copy(alpha = 0.7f),
-                radius = knobRadius * 0.3f,
-                center = knobPosition - Offset(knobRadius * 0.25f, knobRadius * 0.25f)
             )
         }
     }
