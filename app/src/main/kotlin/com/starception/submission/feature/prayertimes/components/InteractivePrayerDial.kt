@@ -352,59 +352,45 @@ private fun InteractiveTimeDial(
             val arcSize = Size(radius * 2, radius * 2)
             val arcTopLeft = Offset(center.x - radius, center.y - radius)
             
-            // Draw clean circular track background with image colors
-            drawCircle(
-                color = Color(0xFFE8E8E8), // Light gray like in the image
-                radius = radius,
-                center = center,
-                style = Stroke(width = strokeWidth)
-            )
-            
-            // Draw progress arc based on adjustment with image colors
-            val progressAngle = (adjustmentMinutes + 60f) / 120f * 360f
-            val progressColor = Color(0xFF00D4AA) // Vibrant teal/aqua from the image
-            
-            if (adjustmentMinutes != 0) {
-                drawArc(
-                    color = progressColor,
-                    startAngle = -90f,
-                    sweepAngle = progressAngle - 180f,
-                    useCenter = false,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                    size = arcSize,
-                    topLeft = arcTopLeft
-                )
-            }
-            
-            // Draw segmented markers around the dial (like the image)
-            val segmentCount = 60 // More segments for smoother appearance
+            // Draw the segmented ring structure exactly like the reference
+            val outerRingRadius = radius + 20.dp.toPx()
+            val innerRingRadius = radius + 6.dp.toPx()
+            val segmentCount = 60
             val segmentAngle = 360f / segmentCount
             
+            // Draw the ring background first
+            drawCircle(
+                color = Color(0xFFE8E8E8), // Light gray ring background
+                radius = outerRingRadius,
+                center = center,
+                style = Stroke(width = 8.dp.toPx())
+            )
+            
+            // Draw individual rectangular segments around the ring
             for (i in 0 until segmentCount) {
                 val segmentAngleRad = (i * segmentAngle) - 90f
-                val segmentRadius = radius + 6.dp.toPx()
+                
+                // Calculate the segment color based on progress
+                val segmentColor = if (i < (adjustmentMinutes + 60) * segmentCount / 120) {
+                    Color(0xFF00D4AA) // Vibrant teal/aqua from the image
+                } else {
+                    Color(0xFFE8E8E8) // Light gray for inactive segments
+                }
+                
+                // Draw each segment as a small rectangle positioned on the ring
+                val segmentLength = if (i % 5 == 0) 8.dp.toPx() else 4.dp.toPx()
+                val segmentWidth = if (i % 5 == 0) 3.dp.toPx() else 2.dp.toPx()
+                
+                // Calculate segment position on the ring
+                val segmentRadius = outerRingRadius - 4.dp.toPx() // Position within the ring
                 val segmentPosition = center + Offset(
                     x = segmentRadius * cos(Math.toRadians(segmentAngleRad.toDouble())).toFloat(),
                     y = segmentRadius * sin(Math.toRadians(segmentAngleRad.toDouble())).toFloat()
                 )
                 
-                // Draw segmented markers as small rectangles
-                val segmentLength = if (i % 5 == 0) 8.dp.toPx() else 4.dp.toPx() // Longer markers every 5 segments
-                val segmentWidth = if (i % 5 == 0) 3.dp.toPx() else 2.dp.toPx() // Wider markers every 5 segments
-                
-                // Calculate rotation for the segment
+                // Draw the segment rectangle rotated to point outward
                 val rotationAngle = segmentAngleRad + 90f
-                val cosRot = cos(Math.toRadians(rotationAngle.toDouble())).toFloat()
-                val sinRot = sin(Math.toRadians(rotationAngle.toDouble())).toFloat()
                 
-                // Draw the segment rectangle with image colors
-                val segmentColor = if (i < (adjustmentMinutes + 60) * segmentCount / 120) {
-                    Color(0xFF00D4AA) // Vibrant teal/aqua from the image
-                } else {
-                    Color(0xFFB8B8B8) // Light gray for inactive segments
-                }
-                
-                // Draw rotated rectangle for the segment
                 drawIntoCanvas { canvas ->
                     canvas.save()
                     canvas.translate(segmentPosition.x, segmentPosition.y)
@@ -423,14 +409,22 @@ private fun InteractiveTimeDial(
                 }
             }
             
+            // Draw inner ring background for time display
+            drawCircle(
+                color = Color(0xFFF5F5F5), // Light background for time display
+                radius = innerRingRadius,
+                center = center,
+                style = Stroke(width = 2.dp.toPx())
+            )
+            
             // Calculate knob position based on current angle (not animated for smooth drag)
             val currentKnobAngle = if (isDragging) angle else animatedAngle
             val knobAngleRad = Math.toRadians(currentKnobAngle - 90.0)
             val knobPosition = Offset(
-                x = center.x + radius * cos(knobAngleRad).toFloat(),
-                y = center.y + radius * sin(knobAngleRad).toFloat()
+                x = center.x + innerRingRadius * cos(knobAngleRad).toFloat(),
+                y = center.y + innerRingRadius * sin(knobAngleRad).toFloat()
             )
-            val knobRadius = 16.dp.toPx()
+            val knobRadius = 10.dp.toPx() // Smaller knob like in the image
             
             // Draw clean knob with subtle shadow
             // Drop shadow
