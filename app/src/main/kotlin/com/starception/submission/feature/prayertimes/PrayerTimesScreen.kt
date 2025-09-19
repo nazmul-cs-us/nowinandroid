@@ -916,9 +916,43 @@ fun PrayerTimesScreen(
             InteractivePrayerTimeCard(
                 prayerName = prayerName,
                 originalTime = time.toString(),
-                onTimeAdjustment = { prayer, adjustedTime ->
-                    // Handle the time adjustment here
-                    Log.d("PrayerTimes", "Adjusted $prayer time to $adjustedTime")
+                onTimeAdjustment = { prayer, offsetMinutes ->
+                    android.util.Log.d("PrayerTimes", "🎯 CALLBACK TRIGGERED: $prayer offset=$offsetMinutes")
+                    try {
+                        // Get the repository to save the offset
+                        val entryPoint = EntryPointAccessors.fromApplication(
+                            context.applicationContext,
+                            PrayerTimeCalculatorEntryPoint::class.java
+                        )
+                        val repository = entryPoint.prayerSettingsRepository()
+                        
+                        // Get current offsets and update the specific prayer
+                        val currentSettings = repository.getCalculationSettings()
+                        val currentOffsets = currentSettings.timeOffsets
+                        
+                        val updatedOffsets = when (prayer.lowercase()) {
+                            "fajr" -> currentOffsets.copy(fajr = offsetMinutes)
+                            "sunrise" -> currentOffsets.copy(sunrise = offsetMinutes)
+                            "dhuhr" -> currentOffsets.copy(dhuhr = offsetMinutes)
+                            "asr" -> currentOffsets.copy(asr = offsetMinutes)
+                            "maghrib" -> currentOffsets.copy(maghrib = offsetMinutes)
+                            "isha" -> currentOffsets.copy(isha = offsetMinutes)
+                            else -> currentOffsets
+                        }
+                        
+                        // Save the updated offsets
+                        repository.updateTimeOffsets(updatedOffsets)
+                        
+                        // For now, just log the success - prayer times will refresh on next app launch
+                        // TODO: Implement real-time recalculation after offset changes
+                        
+                        Log.d("PrayerTimes", "✅ Saved offset for $prayer: ${if(offsetMinutes >= 0) "+" else ""}${offsetMinutes} minutes")
+                        android.util.Log.d("PrayerTimes", "🔧 Updated ${prayer} offset to ${offsetMinutes} minutes in repository")
+                    } catch (e: Exception) {
+                        Log.e("PrayerTimes", "❌ Error saving prayer time offset: ${e.message}")
+                        android.util.Log.e("PrayerTimes", "❌ Full error details", e)
+                    }
+                    
                     showInteractiveDial = null // Close the dial
                 },
                 onCancel = {
@@ -928,3 +962,4 @@ fun PrayerTimesScreen(
         }
     }
 }
+

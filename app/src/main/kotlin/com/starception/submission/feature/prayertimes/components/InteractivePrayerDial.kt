@@ -43,7 +43,7 @@ import kotlin.math.*
 fun InteractivePrayerTimeCard(
     prayerName: String,
     originalTime: String,
-    onTimeAdjustment: (String, String) -> Unit,
+    onTimeAdjustment: (String, Int) -> Unit, // prayer name, offset in minutes
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -147,8 +147,8 @@ fun InteractivePrayerTimeCard(
                         
                         Button(
                             onClick = { 
-                                val adjustedTime = adjustTimeByMinutes(originalTime, timeAdjustment)
-                                onTimeAdjustment(prayerName, adjustedTime)
+                                android.util.Log.d("PrayerTimes", "🔘 APPLY BUTTON CLICKED: $prayerName adjustment=$timeAdjustment")
+                                onTimeAdjustment(prayerName, timeAdjustment)
                             },
                             modifier = Modifier
                                 .weight(1f)

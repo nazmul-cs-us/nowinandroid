@@ -514,8 +514,16 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     fun updateTimeOffsets(offsets: PrayerTimeOffsets) {
-        val updated = getCalculationSettings().copy(timeOffsets = offsets)
+        Log.d("PrayerSettingsRepo", "📝 Updating time offsets: Fajr=${offsets.fajr}, Dhuhr=${offsets.dhuhr}, Asr=${offsets.asr}, Maghrib=${offsets.maghrib}, Isha=${offsets.isha}")
+        val current = getCalculationSettings()
+        Log.d("PrayerSettingsRepo", "📖 Current offsets before update: Fajr=${current.timeOffsets.fajr}, Dhuhr=${current.timeOffsets.dhuhr}")
+        val updated = current.copy(timeOffsets = offsets)
         updateCalculationSettings(updated, forceCommit = true)
+        Log.d("PrayerSettingsRepo", "✅ Time offsets updated successfully")
+        
+        // Verify the update
+        val verifyOffsets = getCalculationSettings().timeOffsets
+        Log.d("PrayerSettingsRepo", "🔍 Verification - New offsets: Fajr=${verifyOffsets.fajr}, Dhuhr=${verifyOffsets.dhuhr}")
     }
     
     fun updateLocationSettings(useGps: Boolean, location: Location? = null) {
