@@ -69,20 +69,15 @@ fun InteractivePrayerTimeCard(
             .padding(20.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Main card with asymmetrical Material 3 shape
+        // More compact card like PNG file icon
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.9f),
-            shape = RoundedCornerShape(
-                topStart = 28.dp,
-                topEnd = 16.dp,
-                bottomStart = 16.dp,
-                bottomEnd = 28.dp
-            ),
+                .fillMaxWidth(0.88f)
+                .fillMaxHeight(0.82f),
+            shape = RoundedCornerShape(16.dp),
             color = colorScheme.surface,
-            shadowElevation = 12.dp,
-            tonalElevation = 2.dp
+            shadowElevation = 8.dp,
+            tonalElevation = 1.dp
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // Layered background with subtle gradient
@@ -101,32 +96,19 @@ fun InteractivePrayerTimeCard(
                         )
                 )
                 
-                // Main content area with proper spacing
+                // Compact content area with dial taking most space
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 28.dp, vertical = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    // Prayer name with Material 3 typography and styling
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = colorScheme.primaryContainer,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    ) {
-                        Text(
-                            text = prayerName,
-                            style = typography.headlineMedium,
-                            color = colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
-                        )
-                    }
-                    
-                    // Material 3 styled interactive dial
+                    // Compact interactive dial (prayer name will be inside)
                     InteractiveTimeDial(
                         originalTime = originalTime,
                         adjustmentMinutes = timeAdjustment,
+                        prayerName = prayerName,
                         onAdjustmentChange = { adjustment ->
                             if (adjustment != timeAdjustment) {
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -136,22 +118,16 @@ fun InteractivePrayerTimeCard(
                         colorScheme = colorScheme,
                         modifier = Modifier
                             .size(280.dp)
-                            .padding(vertical = 16.dp)
+                            .weight(1f)
                     )
-                    
-                    // Spacer for consistent layout
-                    Spacer(modifier = Modifier.height(40.dp))
-                    
-                    // Spacer to push buttons to bottom
-                    Spacer(modifier = Modifier.weight(1f))
                 }
                 
-                // Material 3 decorative accent (top-right)
+                // Compact corner accent like PNG file icon
                 Surface(
-                    shape = RoundedCornerShape(0.dp, 16.dp, 0.dp, 20.dp),
-                    color = colorScheme.primary.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(0.dp, 16.dp, 0.dp, 16.dp),
+                    color = colorScheme.primary.copy(alpha = 0.08f),
                     modifier = Modifier
-                        .size(60.dp)
+                        .size(48.dp)
                         .align(Alignment.TopEnd)
                 ) {
                     Box(
@@ -161,36 +137,36 @@ fun InteractivePrayerTimeCard(
                         Icon(
                             imageVector = Icons.Default.AccessTime,
                             contentDescription = null,
-                            tint = colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
+                            tint = colorScheme.primary.copy(alpha = 0.6f),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
                 
-                // Material 3 action buttons at bottom - properly positioned
+                // Compact action buttons
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .padding(horizontal = 28.dp, vertical = 24.dp)
+                        .padding(horizontal = 24.dp, vertical = 20.dp)
                 ) {
                     OutlinedButton(
                         onClick = { onCancel() },
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp),
-                        border = BorderStroke(1.5.dp, colorScheme.outline),
+                            .height(48.dp),
+                        border = BorderStroke(1.dp, colorScheme.outline),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = colorScheme.onSurface
                         ),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             "Cancel",
-                            style = typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            style = typography.titleSmall,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                     
@@ -201,16 +177,16 @@ fun InteractivePrayerTimeCard(
                         },
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp),
+                            .height(48.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = colorScheme.primary
                         ),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             "Apply",
-                            style = typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            style = typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
                             color = colorScheme.onPrimary
                         )
                     }
@@ -227,6 +203,7 @@ fun InteractivePrayerTimeCard(
 private fun InteractiveTimeDial(
     originalTime: String,
     adjustmentMinutes: Int,
+    prayerName: String,
     onAdjustmentChange: (Int) -> Unit,
     colorScheme: ColorScheme,
     modifier: Modifier = Modifier
@@ -235,12 +212,11 @@ private fun InteractiveTimeDial(
     var lastHapticValue by remember { mutableIntStateOf(adjustmentMinutes) }
     var isDragging by remember { mutableStateOf(false) }
     
-    // Convert adjustment minutes to angle (0-360 degrees, unlimited range)
+    // Convert adjustment minutes to angle - unlimited rotation
     // Clockwise = positive adjustment, Counter-clockwise = negative adjustment
-    val maxAdjustmentMinutes = 120f // Increased range for better usability
     val angle = remember(adjustmentMinutes) {
-        // Reverse the angle calculation so clockwise increases time
-        ((maxAdjustmentMinutes - adjustmentMinutes) / (maxAdjustmentMinutes * 2)) * 360f
+        // Direct angle calculation: 6 degrees per minute (360°/60min = 6°/min)
+        -adjustmentMinutes * 6f // Negative for clockwise = positive time
     }
     
     // Only animate when not dragging for smooth interaction
@@ -254,13 +230,13 @@ private fun InteractiveTimeDial(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        // Material 3 time display in center with elevated surface
+        // Compact center display with prayer name and time
         Surface(
             shape = CircleShape,
             color = colorScheme.surface,
-            shadowElevation = 6.dp,
+            shadowElevation = 4.dp,
             tonalElevation = 1.dp,
-            modifier = Modifier.size(150.dp)
+            modifier = Modifier.size(180.dp)
         ) {
             Box(
                 contentAlignment = Alignment.Center,
@@ -268,27 +244,39 @@ private fun InteractiveTimeDial(
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(8.dp)
                 ) {
+                    // Prayer name at top - larger and theme-colored
+                    Text(
+                        text = prayerName,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
+                    
+                    // Time in center - much larger
                     Text(
                         text = convertTo12HourFormat(adjustTimeByMinutes(originalTime, adjustmentMinutes)),
-                        fontSize = 28.sp,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = colorScheme.onSurface,
                         textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.headlineSmall
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
                     
-                    // Show adjustment indicator inside the dial
+                    // Adjustment indicator at bottom - larger and theme-colored
                     if (adjustmentMinutes != 0) {
                         Text(
-                            text = if (adjustmentMinutes > 0) "+${adjustmentMinutes} min" else "${adjustmentMinutes} min",
+                            text = if (adjustmentMinutes > 0) "+${adjustmentMinutes}m" else "${adjustmentMinutes}m",
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
+                            fontWeight = FontWeight.SemiBold,
                             color = if (adjustmentMinutes > 0) {
-                                Color(0xFF00D4AA) // Teal for positive
+                                colorScheme.primary // Theme primary for positive
                             } else {
-                                Color(0xFFE74C3C) // Red for negative
+                                colorScheme.error // Theme error for negative
                             },
                             textAlign = TextAlign.Center
                         )
@@ -301,38 +289,60 @@ private fun InteractiveTimeDial(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
+                    var lastAngle = 0f
+                    var isDraggingLocal = false
+                    var initialAdjustment = 0
+                    var totalRotation = 0f
+                    
                     detectDragGestures(
                         onDragStart = { offset ->
                             isDragging = true
+                            isDraggingLocal = true
+                            initialAdjustment = adjustmentMinutes
+                            totalRotation = 0f
+                            
                             val center = Offset(size.width / 2f, size.height / 2f)
                             val dragVector = offset - center
-                            val touchAngle = (atan2(dragVector.y, dragVector.x) * (180f / PI.toFloat()) + 450f) % 360f
-                            
-                            // Convert angle back to adjustment minutes (clockwise = positive)
-                            val newAdjustmentMinutes = (maxAdjustmentMinutes - (touchAngle / 360f) * (maxAdjustmentMinutes * 2))
-                                .roundToInt()
-                            
-                            onAdjustmentChange(newAdjustmentMinutes)
+                            lastAngle = atan2(dragVector.y, dragVector.x) * (180f / PI.toFloat())
                         },
                         onDragEnd = { 
                             isDragging = false
-                        },
+                            isDraggingLocal = false
+                        }
                     ) { change, _ ->
+                        if (!isDraggingLocal) return@detectDragGestures
+                        
                         val center = Offset(size.width / 2f, size.height / 2f)
                         val dragVector = change.position - center
-                        val touchAngle = (atan2(dragVector.y, dragVector.x) * (180f / PI.toFloat()) + 450f) % 360f
+                        val currentAngle = atan2(dragVector.y, dragVector.x) * (180f / PI.toFloat())
                         
-                        // Convert angle back to adjustment minutes (clockwise = positive)
-                        val newAdjustmentMinutes = (maxAdjustmentMinutes - (touchAngle / 360f) * (maxAdjustmentMinutes * 2))
-                            .roundToInt()
+                        // Calculate angle difference
+                        var angleDiff = currentAngle - lastAngle
                         
-                        // Provide haptic feedback every 5 minutes for better UX
-                        if (abs(newAdjustmentMinutes - lastHapticValue) >= 5) {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            lastHapticValue = newAdjustmentMinutes
+                        // Handle wrap-around
+                        if (angleDiff > 180f) angleDiff -= 360f
+                        if (angleDiff < -180f) angleDiff += 360f
+                        
+                        // Accumulate total rotation
+                        totalRotation += angleDiff
+                        
+                        // Convert to minutes: 6 degrees = 1 minute
+                        // Negative because clockwise should increase time
+                        val minuteChange = (-totalRotation / 6f).roundToInt()
+                        val newAdjustment = initialAdjustment + minuteChange
+                        
+                        // Update the adjustment
+                        if (newAdjustment != adjustmentMinutes) {
+                            onAdjustmentChange(newAdjustment)
+                            
+                            // Haptic feedback
+                            if (abs(newAdjustment - lastHapticValue) >= 5) {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                lastHapticValue = newAdjustment
+                            }
                         }
                         
-                        onAdjustmentChange(newAdjustmentMinutes)
+                        lastAngle = currentAngle
                     }
                 }
         ) {
@@ -342,15 +352,15 @@ private fun InteractiveTimeDial(
             val arcSize = Size(radius * 2, radius * 2)
             val arcTopLeft = Offset(center.x - radius, center.y - radius)
             
-            // Draw the segmented ring structure exactly like the reference
-            val outerRingRadius = radius + 20.dp.toPx()
-            val innerRingRadius = radius + 6.dp.toPx()
+            // Draw the segmented ring structure closer to center
+            val outerRingRadius = radius - 10.dp.toPx()
+            val innerRingRadius = radius - 25.dp.toPx()
             val segmentCount = 60
             val segmentAngle = 360f / segmentCount
             
-            // Draw the ring background first
+            // Draw the ring background first - theme-aware
             drawCircle(
-                color = Color(0xFFE8E8E8), // Light gray ring background
+                color = colorScheme.outline.copy(alpha = 0.2f), // Theme-aware background
                 radius = outerRingRadius,
                 center = center,
                 style = Stroke(width = 8.dp.toPx())
@@ -360,19 +370,32 @@ private fun InteractiveTimeDial(
             for (i in 0 until segmentCount) {
                 val segmentAngleRad = (i * segmentAngle) - 90f
                 
-                // Calculate the segment color based on progress (unlimited range)
-                val segmentColor = if (i < (adjustmentMinutes + maxAdjustmentMinutes) * segmentCount / (maxAdjustmentMinutes * 2)) {
-                    Color(0xFF00D4AA) // Vibrant teal/aqua for active segments
+                // Calculate the segment color based on current progress (unlimited range)
+                val progressAngle = (-adjustmentMinutes * 6f + 90f) % 360f
+                val segmentAngleNormalized = (segmentAngleRad + 90f + 360f) % 360f
+                
+                val segmentColor = if (adjustmentMinutes >= 0) {
+                    // Positive adjustment - show progress clockwise from top
+                    if (segmentAngleNormalized <= progressAngle) {
+                        colorScheme.primary.copy(alpha = 0.8f) // More visible primary color
+                    } else {
+                        colorScheme.outline.copy(alpha = 0.4f) // More visible neutral color
+                    }
                 } else {
-                    Color(0xFFE8E8E8) // Light gray for inactive segments
+                    // Negative adjustment - show progress counter-clockwise from top
+                    if (segmentAngleNormalized >= progressAngle) {
+                        colorScheme.error.copy(alpha = 0.8f) // More visible error color
+                    } else {
+                        colorScheme.outline.copy(alpha = 0.4f) // More visible neutral color
+                    }
                 }
                 
                 // Draw each segment as a small rectangle positioned on the ring
                 val segmentLength = if (i % 5 == 0) 8.dp.toPx() else 4.dp.toPx()
                 val segmentWidth = if (i % 5 == 0) 3.dp.toPx() else 2.dp.toPx()
                 
-                // Calculate segment position on the ring
-                val segmentRadius = outerRingRadius - 4.dp.toPx() // Position within the ring
+                // Calculate segment position on the ring track  
+                val segmentRadius = (outerRingRadius + innerRingRadius) / 2f // Middle of the ring track
                 val segmentPosition = center + Offset(
                     x = segmentRadius * cos(Math.toRadians(segmentAngleRad.toDouble())).toFloat(),
                     y = segmentRadius * sin(Math.toRadians(segmentAngleRad.toDouble())).toFloat()
@@ -399,27 +422,28 @@ private fun InteractiveTimeDial(
                 }
             }
             
-            // Draw inner ring background for time display
+            // Draw inner ring background for time display - theme-aware
             drawCircle(
-                color = Color(0xFFF5F5F5), // Light background for time display
+                color = colorScheme.outline.copy(alpha = 0.1f), // Theme-aware light background
                 radius = innerRingRadius,
                 center = center,
                 style = Stroke(width = 2.dp.toPx())
             )
             
-            // Calculate knob position based on current angle (not animated for smooth drag)
-            val currentKnobAngle = if (isDragging) angle else animatedAngle
-            val knobAngleRad = Math.toRadians(currentKnobAngle - 90.0)
+            // Calculate knob position based on current adjustment value for accurate positioning
+            val knobAngle = -adjustmentMinutes * 6f // 6 degrees per minute, negative for clockwise
+            val knobAngleRad = Math.toRadians(knobAngle - 90.0) // -90 to start from top
+            val knobTrackRadius = (outerRingRadius + innerRingRadius) / 2f // Middle of the ring
             val knobPosition = Offset(
-                x = center.x + innerRingRadius * cos(knobAngleRad).toFloat(),
-                y = center.y + innerRingRadius * sin(knobAngleRad).toFloat()
+                x = center.x + knobTrackRadius * cos(knobAngleRad).toFloat(),
+                y = center.y + knobTrackRadius * sin(knobAngleRad).toFloat()
             )
-            val knobRadius = 10.dp.toPx() // Smaller knob like in the image
+            val knobRadius = 12.dp.toPx() // Slightly larger knob for better interaction
             
-            // Draw clean knob with subtle shadow
+            // Draw clean knob with subtle shadow - theme-aware
             // Drop shadow
             drawCircle(
-                color = Color.Black.copy(alpha = 0.15f),
+                color = Color.Black.copy(alpha = 0.2f),
                 radius = knobRadius + 2.dp.toPx(),
                 center = knobPosition + Offset(2.dp.toPx(), 2.dp.toPx())
             )
@@ -436,28 +460,28 @@ private fun InteractiveTimeDial(
                 color = colorScheme.outline,
                 radius = knobRadius,
                 center = knobPosition,
-                style = Stroke(width = 1.5.dp.toPx())
+                style = Stroke(width = 2.dp.toPx())
             )
             
-            // Draw indicator line pointing outward (like in the image)
-            val indicatorLength = knobRadius * 0.6f
+            // Draw indicator line pointing outward - theme-colored
+            val indicatorLength = knobRadius * 0.7f
             val indicatorEnd = knobPosition + Offset(
                 x = indicatorLength * cos(knobAngleRad).toFloat(),
                 y = indicatorLength * sin(knobAngleRad).toFloat()
             )
             
             drawLine(
-                color = Color(0xFF00D4AA), // Same teal color as segments
+                color = if (adjustmentMinutes >= 0) colorScheme.primary else colorScheme.error,
                 start = knobPosition,
                 end = indicatorEnd,
-                strokeWidth = 3.dp.toPx(),
+                strokeWidth = 4.dp.toPx(),
                 cap = StrokeCap.Round
             )
             
-            // Center dot
+            // Center dot - theme-colored with stronger visibility
             drawCircle(
-                color = Color(0xFF00D4AA), // Same teal color as segments
-                radius = 2.dp.toPx(),
+                color = if (adjustmentMinutes >= 0) colorScheme.primary else colorScheme.error,
+                radius = 3.dp.toPx(),
                 center = knobPosition
             )
         }
