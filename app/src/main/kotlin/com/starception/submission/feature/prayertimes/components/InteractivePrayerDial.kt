@@ -107,7 +107,7 @@ fun InteractivePrayerTimeCard(
                     // Compact interactive dial (prayer name will be inside)
                     InteractiveTimeDial(
                         originalTime = originalTime,
-                        adjustmentMinutes = timeAdjustment,
+                        timeAdjustment = timeAdjustment,
                         prayerName = prayerName,
                         onAdjustmentChange = { adjustment ->
                             if (adjustment != timeAdjustment) {
@@ -202,21 +202,21 @@ fun InteractivePrayerTimeCard(
 @Composable
 private fun InteractiveTimeDial(
     originalTime: String,
-    adjustmentMinutes: Int,
+    timeAdjustment: Int,
     prayerName: String,
     onAdjustmentChange: (Int) -> Unit,
     colorScheme: ColorScheme,
     modifier: Modifier = Modifier
 ) {
     val hapticFeedback = LocalHapticFeedback.current
-    var lastHapticValue by remember { mutableIntStateOf(adjustmentMinutes) }
+    var lastHapticValue by remember { mutableIntStateOf(timeAdjustment) }
     var isDragging by remember { mutableStateOf(false) }
     
     // Convert adjustment minutes to angle - unlimited rotation
     // Clockwise = positive adjustment, Counter-clockwise = negative adjustment
-    val angle = remember(adjustmentMinutes) {
+    val angle = remember(timeAdjustment) {
         // Direct angle calculation: 6 degrees per minute (360°/60min = 6°/min)
-        -adjustmentMinutes * 6f // Negative for clockwise = positive time
+        -timeAdjustment * 6f // Negative for clockwise = positive time
     }
     
     // Only animate when not dragging for smooth interaction
@@ -259,7 +259,7 @@ private fun InteractiveTimeDial(
                     
                     // Time in center - much larger
                     Text(
-                        text = convertTo12HourFormat(adjustTimeByMinutes(originalTime, adjustmentMinutes)),
+                        text = convertTo12HourFormat(adjustTimeByMinutes(originalTime, timeAdjustment)),
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = colorScheme.onSurface,
@@ -268,12 +268,12 @@ private fun InteractiveTimeDial(
                     )
                     
                     // Adjustment indicator at bottom - larger and theme-colored
-                    if (adjustmentMinutes != 0) {
+                    if (timeAdjustment != 0) {
                         Text(
-                            text = if (adjustmentMinutes > 0) "+${adjustmentMinutes}m" else "${adjustmentMinutes}m",
+                            text = if (timeAdjustment > 0) "+${timeAdjustment}m" else "${timeAdjustment}m",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (adjustmentMinutes > 0) {
+                            color = if (timeAdjustment > 0) {
                                 colorScheme.primary // Theme primary for positive
                             } else {
                                 colorScheme.error // Theme error for negative
@@ -298,7 +298,7 @@ private fun InteractiveTimeDial(
                         onDragStart = { offset ->
                             isDragging = true
                             isDraggingLocal = true
-                            initialAdjustment = adjustmentMinutes
+                            initialAdjustment = timeAdjustment
                             totalRotation = 0f
                             
                             val center = Offset(size.width / 2f, size.height / 2f)
@@ -332,7 +332,7 @@ private fun InteractiveTimeDial(
                         val newAdjustment = initialAdjustment + minuteChange
                         
                         // Update the adjustment
-                        if (newAdjustment != adjustmentMinutes) {
+                        if (newAdjustment != timeAdjustment) {
                             onAdjustmentChange(newAdjustment)
                             
                             // Haptic feedback
@@ -361,7 +361,7 @@ private fun InteractiveTimeDial(
             val segmentSpacing = 2.dp.toPx()
             
             // Calculate progress angle for highlighting segments
-            val progressAngle = (-adjustmentMinutes * 6f + 90f + 360f) % 360f
+            val progressAngle = (-timeAdjustment * 6f + 90f + 360f) % 360f
             
             // Draw individual rounded rectangular segments
             for (i in 0 until segmentCount) {
@@ -369,7 +369,7 @@ private fun InteractiveTimeDial(
                 val segmentAngleNormalized = (currentSegmentAngle + 90f + 360f) % 360f
                 
                 // Determine if this segment should be highlighted
-                val isHighlighted = if (adjustmentMinutes >= 0) {
+                val isHighlighted = if (timeAdjustment >= 0) {
                     // Positive: highlight clockwise from top
                     segmentAngleNormalized <= progressAngle
                 } else {
@@ -379,7 +379,7 @@ private fun InteractiveTimeDial(
                 
                 // Modern vibrant colors like the reference image
                 val segmentColor = if (isHighlighted) {
-                    if (adjustmentMinutes >= 0) {
+                    if (timeAdjustment >= 0) {
                         Color(0xFF4ECDC4) // Turquoise/teal for positive
                     } else {
                         Color(0xFFFF6B6B) // Coral red for negative
@@ -435,7 +435,7 @@ private fun InteractiveTimeDial(
             )
             
             // Calculate knob position - positioned outside the segments like reference image
-            val knobAngle = -adjustmentMinutes * 6f // 6 degrees per minute, negative for clockwise
+            val knobAngle = -timeAdjustment * 6f // 6 degrees per minute, negative for clockwise
             val knobAngleRad = Math.toRadians(knobAngle - 90.0) // -90 to start from top
             val knobTrackRadius = ringRadius + segmentHeight + 8.dp.toPx() // Outside the segments
             val knobPosition = Offset(
@@ -449,7 +449,7 @@ private fun InteractiveTimeDial(
             val knobHeight = 18.dp.toPx()
             
             // Choose knob color based on adjustment
-            val knobColor = if (adjustmentMinutes >= 0) {
+            val knobColor = if (timeAdjustment >= 0) {
                 Color(0xFF4ECDC4) // Same turquoise as positive segments
             } else {
                 Color(0xFFFF6B6B) // Same coral red as negative segments
@@ -474,6 +474,52 @@ private fun InteractiveTimeDial(
                     }
                 )
                 canvas.restore()
+            }
+        }
+        
+        // Text overlay using Compose Text components positioned absolutely in center
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Prayer name
+                Text(
+                    text = prayerName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                // Adjusted time
+                val adjustedTime = adjustTimeByMinutes(originalTime, timeAdjustment)
+                Text(
+                    text = adjustedTime,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 26.sp
+                )
+                
+                // Adjustment indicator
+                if (timeAdjustment != 0) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    val adjustmentText = if (timeAdjustment > 0) "+${timeAdjustment}m" else "${timeAdjustment}m"
+                    Text(
+                        text = adjustmentText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (timeAdjustment >= 0) Color(0xFF4ECDC4) else Color(0xFFFF6B6B),
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
+                    )
+                }
             }
         }
     }
