@@ -139,19 +139,8 @@ fun InteractivePrayerTimeCard(
                             .padding(vertical = 16.dp)
                     )
                     
-                    // Instruction text when no adjustment
-                    if (timeAdjustment == 0) {
-                        Text(
-                            text = "Drag to adjust time",
-                            style = typography.titleMedium,
-                            color = colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(top = 16.dp, bottom = 24.dp)
-                        )
-                    } else {
-                        // Spacer when adjustment is shown inside dial
-                        Spacer(modifier = Modifier.height(40.dp))
-                    }
+                    // Spacer for consistent layout
+                    Spacer(modifier = Modifier.height(40.dp))
                     
                     // Spacer to push buttons to bottom
                     Spacer(modifier = Modifier.weight(1f))
@@ -246,10 +235,12 @@ private fun InteractiveTimeDial(
     var lastHapticValue by remember { mutableIntStateOf(adjustmentMinutes) }
     var isDragging by remember { mutableStateOf(false) }
     
-    // Convert adjustment minutes to angle (0-360 degrees, max ±60 minutes for more intuitive range)
-    val maxAdjustmentMinutes = 60f
+    // Convert adjustment minutes to angle (0-360 degrees, unlimited range)
+    // Clockwise = positive adjustment, Counter-clockwise = negative adjustment
+    val maxAdjustmentMinutes = 120f // Increased range for better usability
     val angle = remember(adjustmentMinutes) {
-        ((adjustmentMinutes + maxAdjustmentMinutes) / (maxAdjustmentMinutes * 2)) * 360f
+        // Reverse the angle calculation so clockwise increases time
+        ((maxAdjustmentMinutes - adjustmentMinutes) / (maxAdjustmentMinutes * 2)) * 360f
     }
     
     // Only animate when not dragging for smooth interaction
@@ -317,10 +308,9 @@ private fun InteractiveTimeDial(
                             val dragVector = offset - center
                             val touchAngle = (atan2(dragVector.y, dragVector.x) * (180f / PI.toFloat()) + 450f) % 360f
                             
-                            // Convert angle back to adjustment minutes with more intuitive range
-                            val newAdjustmentMinutes = ((touchAngle / 360f) * (maxAdjustmentMinutes * 2) - maxAdjustmentMinutes)
+                            // Convert angle back to adjustment minutes (clockwise = positive)
+                            val newAdjustmentMinutes = (maxAdjustmentMinutes - (touchAngle / 360f) * (maxAdjustmentMinutes * 2))
                                 .roundToInt()
-                                .coerceIn(-60, 60)
                             
                             onAdjustmentChange(newAdjustmentMinutes)
                         },
@@ -332,10 +322,9 @@ private fun InteractiveTimeDial(
                         val dragVector = change.position - center
                         val touchAngle = (atan2(dragVector.y, dragVector.x) * (180f / PI.toFloat()) + 450f) % 360f
                         
-                        // Convert angle back to adjustment minutes with more intuitive range
-                        val newAdjustmentMinutes = ((touchAngle / 360f) * (maxAdjustmentMinutes * 2) - maxAdjustmentMinutes)
+                        // Convert angle back to adjustment minutes (clockwise = positive)
+                        val newAdjustmentMinutes = (maxAdjustmentMinutes - (touchAngle / 360f) * (maxAdjustmentMinutes * 2))
                             .roundToInt()
-                            .coerceIn(-60, 60)
                         
                         // Provide haptic feedback every 5 minutes for better UX
                         if (abs(newAdjustmentMinutes - lastHapticValue) >= 5) {
@@ -371,9 +360,9 @@ private fun InteractiveTimeDial(
             for (i in 0 until segmentCount) {
                 val segmentAngleRad = (i * segmentAngle) - 90f
                 
-                // Calculate the segment color based on progress
-                val segmentColor = if (i < (adjustmentMinutes + 60) * segmentCount / 120) {
-                    Color(0xFF00D4AA) // Vibrant teal/aqua from the image
+                // Calculate the segment color based on progress (unlimited range)
+                val segmentColor = if (i < (adjustmentMinutes + maxAdjustmentMinutes) * segmentCount / (maxAdjustmentMinutes * 2)) {
+                    Color(0xFF00D4AA) // Vibrant teal/aqua for active segments
                 } else {
                     Color(0xFFE8E8E8) // Light gray for inactive segments
                 }
