@@ -69,15 +69,15 @@ fun InteractivePrayerTimeCard(
             .padding(20.dp),
         contentAlignment = Alignment.Center
     ) {
-        // More compact card like PNG file icon
+        // More compact popup window with less empty space
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.88f)
-                .fillMaxHeight(0.82f),
-            shape = RoundedCornerShape(16.dp),
+                .fillMaxWidth(0.85f)
+                .fillMaxHeight(0.75f),
+            shape = RoundedCornerShape(20.dp),
             color = colorScheme.surface,
-            shadowElevation = 8.dp,
-            tonalElevation = 1.dp
+            shadowElevation = 12.dp,
+            tonalElevation = 2.dp
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // Layered background with subtle gradient
@@ -96,15 +96,15 @@ fun InteractivePrayerTimeCard(
                         )
                 )
                 
-                // Compact content area with dial taking most space
+                // Compact content area with less padding
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                        .padding(horizontal = 20.dp, vertical = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    // Compact interactive dial (prayer name will be inside)
+                    // Compact interactive dial
                     InteractiveTimeDial(
                         originalTime = originalTime,
                         timeAdjustment = timeAdjustment,
@@ -116,79 +116,55 @@ fun InteractivePrayerTimeCard(
                             }
                         },
                         colorScheme = colorScheme,
-                        modifier = Modifier
-                            .size(280.dp)
-                            .weight(1f)
+                        modifier = Modifier.size(260.dp)
                     )
-                }
-                
-                // Compact corner accent like PNG file icon
-                Surface(
-                    shape = RoundedCornerShape(0.dp, 16.dp, 0.dp, 16.dp),
-                    color = colorScheme.primary.copy(alpha = 0.08f),
-                    modifier = Modifier
-                        .size(48.dp)
-                        .align(Alignment.TopEnd)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AccessTime,
-                            contentDescription = null,
-                            tint = colorScheme.primary.copy(alpha = 0.6f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                
-                // Compact action buttons
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 24.dp, vertical = 20.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { onCancel() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        border = BorderStroke(1.dp, colorScheme.outline),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = colorScheme.onSurface
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            "Cancel",
-                            style = typography.titleSmall,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
                     
-                    Button(
-                        onClick = { 
-                            val adjustedTime = adjustTimeByMinutes(originalTime, timeAdjustment)
-                            onTimeAdjustment(prayerName, adjustedTime)
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = colorScheme.primary
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+                    Spacer(modifier = Modifier.height(20.dp))
+                    
+                    // Compact action buttons moved inside column
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            "Apply",
-                            style = typography.titleSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = colorScheme.onPrimary
-                        )
+                        OutlinedButton(
+                            onClick = { onCancel() },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            border = BorderStroke(1.dp, colorScheme.outline),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                "Cancel",
+                                style = typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        
+                        Button(
+                            onClick = { 
+                                val adjustedTime = adjustTimeByMinutes(originalTime, timeAdjustment)
+                                onTimeAdjustment(prayerName, adjustedTime)
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colorScheme.primary
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                "Apply",
+                                style = typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = colorScheme.onPrimary
+                            )
+                        }
                     }
                 }
             }
@@ -200,7 +176,7 @@ fun InteractivePrayerTimeCard(
  * Material 3 styled circular timer for prayer time adjustment with smooth dragging
  */
 @Composable
-private fun InteractiveTimeDial(
+fun InteractiveTimeDial(
     originalTime: String,
     timeAdjustment: Int,
     prayerName: String,
@@ -296,14 +272,23 @@ private fun InteractiveTimeDial(
                     
                     detectDragGestures(
                         onDragStart = { offset ->
-                            isDragging = true
-                            isDraggingLocal = true
-                            initialAdjustment = timeAdjustment
-                            totalRotation = 0f
-                            
                             val center = Offset(size.width / 2f, size.height / 2f)
                             val dragVector = offset - center
-                            lastAngle = atan2(dragVector.y, dragVector.x) * (180f / PI.toFloat())
+                            val distanceFromCenter = sqrt(dragVector.x * dragVector.x + dragVector.y * dragVector.y)
+                            
+                            // Allow dragging from anywhere in the dial area, not just the knob
+                            // This makes it more responsive when touching near the knob
+                            val dialRadius = (minOf(size.width, size.height) / 2.0f) * 0.85f
+                            val minRadius = dialRadius * 0.3f
+                            val maxRadius = dialRadius + 30.dp.toPx()
+                            
+                            if (distanceFromCenter >= minRadius && distanceFromCenter <= maxRadius) {
+                                isDragging = true
+                                isDraggingLocal = true
+                                initialAdjustment = timeAdjustment
+                                totalRotation = 0f
+                                lastAngle = atan2(dragVector.y, dragVector.x) * (180f / PI.toFloat())
+                            }
                         },
                         onDragEnd = { 
                             isDragging = false
@@ -323,7 +308,7 @@ private fun InteractiveTimeDial(
                         if (angleDiff > 180f) angleDiff -= 360f
                         if (angleDiff < -180f) angleDiff += 360f
                         
-                        // Accumulate total rotation
+                        // More responsive dragging - smaller angle accumulation threshold
                         totalRotation += angleDiff
                         
                         // Convert to minutes: 6 degrees = 1 minute
@@ -331,12 +316,12 @@ private fun InteractiveTimeDial(
                         val minuteChange = (-totalRotation / 6f).roundToInt()
                         val newAdjustment = initialAdjustment + minuteChange
                         
-                        // Update the adjustment
+                        // Update the adjustment more frequently for smoother interaction
                         if (newAdjustment != timeAdjustment) {
                             onAdjustmentChange(newAdjustment)
                             
                             // Haptic feedback
-                            if (abs(newAdjustment - lastHapticValue) >= 5) {
+                            if (abs(newAdjustment - lastHapticValue) >= 3) { // More frequent haptic feedback
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 lastHapticValue = newAdjustment
                             }
@@ -528,7 +513,7 @@ private fun InteractiveTimeDial(
 /**
  * Helper function to adjust time by minutes
  */
-private fun adjustTimeByMinutes(timeString: String, minutesToAdd: Int): String {
+fun adjustTimeByMinutes(timeString: String, minutesToAdd: Int): String {
     return try {
         val parts = timeString.split(":")
         val hours = parts[0].toInt()
@@ -547,7 +532,7 @@ private fun adjustTimeByMinutes(timeString: String, minutesToAdd: Int): String {
 /**
  * Helper function to convert 24-hour format to 12-hour format
  */
-private fun convertTo12HourFormat(timeString: String): String {
+fun convertTo12HourFormat(timeString: String): String {
     return try {
         val parts = timeString.split(":")
         val hours = parts[0].toInt()
