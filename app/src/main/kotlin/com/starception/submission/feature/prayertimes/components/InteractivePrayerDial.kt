@@ -352,67 +352,64 @@ private fun InteractiveTimeDial(
             val arcSize = Size(radius * 2, radius * 2)
             val arcTopLeft = Offset(center.x - radius, center.y - radius)
             
-            // Draw the segmented ring structure closer to center
-            val outerRingRadius = radius - 10.dp.toPx()
-            val innerRingRadius = radius - 25.dp.toPx()
+            // Modern segmented dial like the reference image
+            val ringRadius = radius - 15.dp.toPx()
             val segmentCount = 60
             val segmentAngle = 360f / segmentCount
+            val segmentWidth = 4.dp.toPx()
+            val segmentHeight = 16.dp.toPx()
+            val segmentSpacing = 2.dp.toPx()
             
-            // Draw the ring background first - theme-aware
-            drawCircle(
-                color = colorScheme.outline.copy(alpha = 0.2f), // Theme-aware background
-                radius = outerRingRadius,
-                center = center,
-                style = Stroke(width = 8.dp.toPx())
-            )
+            // Calculate progress angle for highlighting segments
+            val progressAngle = (-adjustmentMinutes * 6f + 90f + 360f) % 360f
             
-            // Draw individual rectangular segments around the ring
+            // Draw individual rounded rectangular segments
             for (i in 0 until segmentCount) {
-                val segmentAngleRad = (i * segmentAngle) - 90f
+                val currentSegmentAngle = (i * segmentAngle) - 90f // Start from top
+                val segmentAngleNormalized = (currentSegmentAngle + 90f + 360f) % 360f
                 
-                // Calculate the segment color based on current progress (unlimited range)
-                val progressAngle = (-adjustmentMinutes * 6f + 90f) % 360f
-                val segmentAngleNormalized = (segmentAngleRad + 90f + 360f) % 360f
-                
-                val segmentColor = if (adjustmentMinutes >= 0) {
-                    // Positive adjustment - show progress clockwise from top
-                    if (segmentAngleNormalized <= progressAngle) {
-                        colorScheme.primary.copy(alpha = 0.8f) // More visible primary color
-                    } else {
-                        colorScheme.outline.copy(alpha = 0.4f) // More visible neutral color
-                    }
+                // Determine if this segment should be highlighted
+                val isHighlighted = if (adjustmentMinutes >= 0) {
+                    // Positive: highlight clockwise from top
+                    segmentAngleNormalized <= progressAngle
                 } else {
-                    // Negative adjustment - show progress counter-clockwise from top
-                    if (segmentAngleNormalized >= progressAngle) {
-                        colorScheme.error.copy(alpha = 0.8f) // More visible error color
-                    } else {
-                        colorScheme.outline.copy(alpha = 0.4f) // More visible neutral color
-                    }
+                    // Negative: highlight counter-clockwise from top  
+                    segmentAngleNormalized >= progressAngle
                 }
                 
-                // Draw each segment as a small rectangle positioned on the ring
-                val segmentLength = if (i % 5 == 0) 8.dp.toPx() else 4.dp.toPx()
-                val segmentWidth = if (i % 5 == 0) 3.dp.toPx() else 2.dp.toPx()
+                // Modern vibrant colors like the reference image
+                val segmentColor = if (isHighlighted) {
+                    if (adjustmentMinutes >= 0) {
+                        Color(0xFF4ECDC4) // Turquoise/teal for positive
+                    } else {
+                        Color(0xFFFF6B6B) // Coral red for negative
+                    }
+                } else {
+                    Color(0xFFE8E8E8) // Light gray for inactive segments
+                }
                 
-                // Calculate segment position on the ring track  
-                val segmentRadius = (outerRingRadius + innerRingRadius) / 2f // Middle of the ring track
-                val segmentPosition = center + Offset(
-                    x = segmentRadius * cos(Math.toRadians(segmentAngleRad.toDouble())).toFloat(),
-                    y = segmentRadius * sin(Math.toRadians(segmentAngleRad.toDouble())).toFloat()
+                // Calculate segment position on the outer ring
+                val segmentCenterRadius = ringRadius + segmentHeight / 2f
+                val angleRad = Math.toRadians(currentSegmentAngle.toDouble())
+                val segmentCenter = center + Offset(
+                    x = segmentCenterRadius * cos(angleRad).toFloat(),
+                    y = segmentCenterRadius * sin(angleRad).toFloat()
                 )
                 
-                // Draw the segment rectangle rotated to point outward
-                val rotationAngle = segmentAngleRad + 90f
-                
+                // Draw rounded rectangular segment
                 drawIntoCanvas { canvas ->
                     canvas.save()
-                    canvas.translate(segmentPosition.x, segmentPosition.y)
-                    canvas.rotate(rotationAngle)
-                    canvas.drawRect(
+                    canvas.translate(segmentCenter.x, segmentCenter.y)
+                    canvas.rotate(currentSegmentAngle + 90f) // Rotate to point outward
+                    
+                    // Draw rounded rectangle segment
+                    canvas.drawRoundRect(
                         -segmentWidth / 2f,
-                        -segmentLength / 2f,
+                        -segmentHeight / 2f,
                         segmentWidth / 2f,
-                        segmentLength / 2f,
+                        segmentHeight / 2f,
+                        segmentWidth / 2f, // Corner radius for rounded ends
+                        segmentWidth / 2f,
                         androidx.compose.ui.graphics.Paint().apply {
                             color = segmentColor
                             isAntiAlias = true
@@ -422,68 +419,62 @@ private fun InteractiveTimeDial(
                 }
             }
             
-            // Draw inner ring background for time display - theme-aware
+            // Draw clean center circle background
             drawCircle(
-                color = colorScheme.outline.copy(alpha = 0.1f), // Theme-aware light background
-                radius = innerRingRadius,
-                center = center,
-                style = Stroke(width = 2.dp.toPx())
+                color = colorScheme.surface,
+                radius = ringRadius - 20.dp.toPx(),
+                center = center
             )
             
-            // Calculate knob position based on current adjustment value for accurate positioning
+            // Draw subtle inner border
+            drawCircle(
+                color = colorScheme.outline.copy(alpha = 0.1f),
+                radius = ringRadius - 20.dp.toPx(),
+                center = center,
+                style = Stroke(width = 1.dp.toPx())
+            )
+            
+            // Calculate knob position - positioned outside the segments like reference image
             val knobAngle = -adjustmentMinutes * 6f // 6 degrees per minute, negative for clockwise
             val knobAngleRad = Math.toRadians(knobAngle - 90.0) // -90 to start from top
-            val knobTrackRadius = (outerRingRadius + innerRingRadius) / 2f // Middle of the ring
+            val knobTrackRadius = ringRadius + segmentHeight + 8.dp.toPx() // Outside the segments
             val knobPosition = Offset(
                 x = center.x + knobTrackRadius * cos(knobAngleRad).toFloat(),
                 y = center.y + knobTrackRadius * sin(knobAngleRad).toFloat()
             )
-            val knobRadius = 12.dp.toPx() // Slightly larger knob for better interaction
+            val knobRadius = 6.dp.toPx() // Smaller, cleaner knob
             
-            // Draw clean knob with subtle shadow - theme-aware
-            // Drop shadow
-            drawCircle(
-                color = Color.Black.copy(alpha = 0.2f),
-                radius = knobRadius + 2.dp.toPx(),
-                center = knobPosition + Offset(2.dp.toPx(), 2.dp.toPx())
-            )
+            // Draw modern knob indicator like reference image - simple rounded rectangle
+            val knobWidth = 6.dp.toPx()
+            val knobHeight = 18.dp.toPx()
             
-            // Main knob body
-            drawCircle(
-                color = colorScheme.surface,
-                radius = knobRadius,
-                center = knobPosition
-            )
+            // Choose knob color based on adjustment
+            val knobColor = if (adjustmentMinutes >= 0) {
+                Color(0xFF4ECDC4) // Same turquoise as positive segments
+            } else {
+                Color(0xFFFF6B6B) // Same coral red as negative segments
+            }
             
-            // Knob border
-            drawCircle(
-                color = colorScheme.outline,
-                radius = knobRadius,
-                center = knobPosition,
-                style = Stroke(width = 2.dp.toPx())
-            )
-            
-            // Draw indicator line pointing outward - theme-colored
-            val indicatorLength = knobRadius * 0.7f
-            val indicatorEnd = knobPosition + Offset(
-                x = indicatorLength * cos(knobAngleRad).toFloat(),
-                y = indicatorLength * sin(knobAngleRad).toFloat()
-            )
-            
-            drawLine(
-                color = if (adjustmentMinutes >= 0) colorScheme.primary else colorScheme.error,
-                start = knobPosition,
-                end = indicatorEnd,
-                strokeWidth = 4.dp.toPx(),
-                cap = StrokeCap.Round
-            )
-            
-            // Center dot - theme-colored with stronger visibility
-            drawCircle(
-                color = if (adjustmentMinutes >= 0) colorScheme.primary else colorScheme.error,
-                radius = 3.dp.toPx(),
-                center = knobPosition
-            )
+            drawIntoCanvas { canvas ->
+                canvas.save()
+                canvas.translate(knobPosition.x, knobPosition.y)
+                canvas.rotate(knobAngle - 90f) // Align with dial direction
+                
+                // Draw rounded rectangular knob indicator
+                canvas.drawRoundRect(
+                    -knobWidth / 2f,
+                    -knobHeight / 2f,
+                    knobWidth / 2f,
+                    knobHeight / 2f,
+                    knobWidth / 2f, // Fully rounded ends
+                    knobWidth / 2f,
+                    androidx.compose.ui.graphics.Paint().apply {
+                        color = knobColor
+                        isAntiAlias = true
+                    }
+                )
+                canvas.restore()
+            }
         }
     }
 }
