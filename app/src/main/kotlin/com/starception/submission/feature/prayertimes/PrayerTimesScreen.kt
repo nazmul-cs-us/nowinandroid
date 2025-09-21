@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.geometry.Offset
 import android.util.Log
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -283,8 +284,6 @@ fun PrayerTimesScreen(
     // COMPASS POPUP STATE - Shows large compass with calibration guidance
     var showCompassPopup by remember { mutableStateOf(false) }
     
-    // INTERACTIVE DIAL STATE - Shows PNG file icon time adjustment dial
-    var showInteractiveDial by remember { mutableStateOf<String?>(null) } // Prayer name currently being adjusted
     val hapticFeedback = LocalHapticFeedback.current
     
     // LOCATION SERVICE - For Qibla compass functionality
@@ -447,14 +446,82 @@ fun PrayerTimesScreen(
         prayerName: String,
         modifier: Modifier = Modifier
     ) {
-        // Always show the regular small card with long-press detection
-        ElevatedCard(
+        // State to track if this specific card is in edit mode
+        var isInEditMode by remember { mutableStateOf(false) }
+        
+        if (isInEditMode) {
+            // Show ONLY the circular dial - complete transformation, no extra UI
+            var timeAdjustment by remember { mutableStateOf(0) }
+            
+            ElevatedCard(
+                modifier = modifier
+                    .pointerInput(prayerName) {
+                        detectTapGestures(
+                            onLongPress = {
+                                // Save adjustment and exit edit mode on long press
+                                try {
+                                    val entryPoint = EntryPointAccessors.fromApplication(
+                                        context.applicationContext,
+                                        com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                                    )
+                                    val repository = entryPoint.prayerSettingsRepository()
+                                    val currentSettings = repository.getCalculationSettings()
+                                    val currentOffsets = currentSettings.timeOffsets
+                                    
+                                    val updatedOffsets = when (prayerName.lowercase()) {
+                                        "dhuhr" -> currentOffsets.copy(dhuhr = timeAdjustment)
+                                        "asr" -> currentOffsets.copy(asr = timeAdjustment)
+                                        "maghrib" -> currentOffsets.copy(maghrib = timeAdjustment)
+                                        "isha" -> currentOffsets.copy(isha = timeAdjustment)
+                                        else -> currentOffsets
+                                    }
+                                    
+                                    repository.updateTimeOffsets(updatedOffsets)
+                                    android.util.Log.d("PrayerTimes", "✅ Saved $prayerName offset: $timeAdjustment minutes")
+                                } catch (e: Exception) {
+                                    android.util.Log.e("PrayerTimes", "❌ Error saving offset: ${e.message}")
+                                }
+                                
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                isInEditMode = false
+                            }
+                        )
+                    },
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.elevatedCardElevation(
+                    defaultElevation = 4.dp
+                )
+            ) {
+                // ONLY show the circular dial - complete transformation with no overlapping content
+                com.starception.submission.feature.prayertimes.components.InteractiveTimeDial(
+                    originalTime = when (prayerName) {
+                        "Dhuhr" -> prayerTimes?.dhuhr?.toString() ?: "12:00"
+                        "Asr" -> prayerTimes?.asr?.toString() ?: "15:46"
+                        "Maghrib" -> prayerTimes?.maghrib?.toString() ?: "18:25"
+                        "Isha" -> prayerTimes?.isha?.toString() ?: "19:55"
+                        else -> "12:00"
+                    },
+                    timeAdjustment = timeAdjustment,
+                    prayerName = prayerName,
+                    onAdjustmentChange = { adjustment ->
+                        timeAdjustment = adjustment
+                    },
+                    colorScheme = MaterialTheme.colorScheme,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        } else {
+            // Show regular small card with long-press detection
+            ElevatedCard(
                 modifier = modifier
                     .pointerInput(prayerName) {
                         detectTapGestures(
                             onLongPress = {
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                showInteractiveDial = prayerName
+                                isInEditMode = true
                             }
                         )
                     },
@@ -513,6 +580,7 @@ fun PrayerTimesScreen(
                 }
             }
         }
+    }
 
     // PRAYER TIMES CALCULATION ENGINE - Background calculation with 3-second location timeout
     val calculatePrayerTimes: suspend () -> Unit = {
@@ -898,68 +966,6 @@ fun PrayerTimesScreen(
                 showCompassPopup = false 
             }
         )
-    }
-    
-    // INTERACTIVE DIAL POPUP - Shows PNG file style circular timer for prayer time adjustment
-    showInteractiveDial?.let { prayerName ->
-        val originalTime = when (prayerName) {
-            "Fajr" -> prayerTimes?.fajr
-            "Sunrise" -> prayerTimes?.sunrise
-            "Dhuhr" -> prayerTimes?.dhuhr
-            "Asr" -> prayerTimes?.asr
-            "Maghrib" -> prayerTimes?.maghrib
-            "Isha" -> prayerTimes?.isha
-            else -> null
-        }
-        
-        originalTime?.let { time ->
-            InteractivePrayerTimeCard(
-                prayerName = prayerName,
-                originalTime = time.toString(),
-                onTimeAdjustment = { prayer, offsetMinutes ->
-                    android.util.Log.d("PrayerTimes", "🎯 CALLBACK TRIGGERED: $prayer offset=$offsetMinutes")
-                    try {
-                        // Get the repository to save the offset
-                        val entryPoint = EntryPointAccessors.fromApplication(
-                            context.applicationContext,
-                            PrayerTimeCalculatorEntryPoint::class.java
-                        )
-                        val repository = entryPoint.prayerSettingsRepository()
-                        
-                        // Get current offsets and update the specific prayer
-                        val currentSettings = repository.getCalculationSettings()
-                        val currentOffsets = currentSettings.timeOffsets
-                        
-                        val updatedOffsets = when (prayer.lowercase()) {
-                            "fajr" -> currentOffsets.copy(fajr = offsetMinutes)
-                            "sunrise" -> currentOffsets.copy(sunrise = offsetMinutes)
-                            "dhuhr" -> currentOffsets.copy(dhuhr = offsetMinutes)
-                            "asr" -> currentOffsets.copy(asr = offsetMinutes)
-                            "maghrib" -> currentOffsets.copy(maghrib = offsetMinutes)
-                            "isha" -> currentOffsets.copy(isha = offsetMinutes)
-                            else -> currentOffsets
-                        }
-                        
-                        // Save the updated offsets
-                        repository.updateTimeOffsets(updatedOffsets)
-                        
-                        // For now, just log the success - prayer times will refresh on next app launch
-                        // TODO: Implement real-time recalculation after offset changes
-                        
-                        Log.d("PrayerTimes", "✅ Saved offset for $prayer: ${if(offsetMinutes >= 0) "+" else ""}${offsetMinutes} minutes")
-                        android.util.Log.d("PrayerTimes", "🔧 Updated ${prayer} offset to ${offsetMinutes} minutes in repository")
-                    } catch (e: Exception) {
-                        Log.e("PrayerTimes", "❌ Error saving prayer time offset: ${e.message}")
-                        android.util.Log.e("PrayerTimes", "❌ Full error details", e)
-                    }
-                    
-                    showInteractiveDial = null // Close the dial
-                },
-                onCancel = {
-                    showInteractiveDial = null // Close the dial without saving
-                }
-            )
-        }
     }
 }
 
