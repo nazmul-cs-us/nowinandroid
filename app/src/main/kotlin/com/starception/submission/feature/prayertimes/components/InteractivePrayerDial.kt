@@ -292,12 +292,12 @@ fun InteractiveTimeDial(
             val arcSize = Size(radius * 2, radius * 2)
             val arcTopLeft = Offset(center.x - radius, center.y - radius)
             
-            // Modern segmented dial like the reference image
-            val ringRadius = radius - 15.dp.toPx()
+            // Modern segmented dial like the reference image - properly aligned
+            val ringRadius = radius - 8.dp.toPx() // Closer to the main dial circle
             val segmentCount = 60
             val segmentAngle = 360f / segmentCount
-            val segmentWidth = 4.dp.toPx()
-            val segmentHeight = 16.dp.toPx()
+            val segmentWidth = 3.dp.toPx() // Slightly thinner
+            val segmentHeight = 12.dp.toPx() // Shorter for better proportion
             val segmentSpacing = 2.dp.toPx()
             
             // Calculate progress angle for highlighting segments
@@ -328,8 +328,8 @@ fun InteractiveTimeDial(
                     Color(0xFFE8E8E8) // Light gray for inactive segments
                 }
                 
-                // Calculate segment position on the outer ring
-                val segmentCenterRadius = ringRadius + segmentHeight / 2f
+                // Calculate segment position - positioned ON the ring, not outside
+                val segmentCenterRadius = ringRadius // Position segments on the ring edge
                 val angleRad = Math.toRadians(currentSegmentAngle.toDouble())
                 val segmentCenter = center + Offset(
                     x = segmentCenterRadius * cos(angleRad).toFloat(),
@@ -359,34 +359,35 @@ fun InteractiveTimeDial(
                 }
             }
             
-            // Draw clean center circle background
+            // Draw clean center circle background - properly sized for text
+            val centerCircleRadius = ringRadius - segmentHeight - 8.dp.toPx()
             drawCircle(
                 color = colorScheme.surface,
-                radius = ringRadius - 20.dp.toPx(),
+                radius = centerCircleRadius,
                 center = center
             )
             
             // Draw subtle inner border
             drawCircle(
                 color = colorScheme.outline.copy(alpha = 0.1f),
-                radius = ringRadius - 20.dp.toPx(),
+                radius = centerCircleRadius,
                 center = center,
                 style = Stroke(width = 1.dp.toPx())
             )
             
-            // Calculate knob position - positioned outside the segments like reference image
+            // Calculate knob position - positioned slightly outside the segments for easy dragging
             val knobAngle = timeAdjustment * 6f // 6 degrees per minute, positive for clockwise
             val knobAngleRad = Math.toRadians(knobAngle - 90.0) // -90 to start from top
-            val knobTrackRadius = ringRadius + segmentHeight + 8.dp.toPx() // Outside the segments
+            val knobTrackRadius = ringRadius + segmentHeight + 4.dp.toPx() // Just outside segments
             val knobPosition = Offset(
                 x = center.x + knobTrackRadius * cos(knobAngleRad).toFloat(),
                 y = center.y + knobTrackRadius * sin(knobAngleRad).toFloat()
             )
-            val knobRadius = 6.dp.toPx() // Smaller, cleaner knob
+            val knobRadius = 5.dp.toPx() // Compact knob
             
-            // Draw modern knob indicator like reference image - simple rounded rectangle
-            val knobWidth = 6.dp.toPx()
-            val knobHeight = 18.dp.toPx()
+            // Draw modern knob indicator like reference image - compact and precise
+            val knobWidth = 5.dp.toPx()
+            val knobHeight = 14.dp.toPx() // Proportional to segment height
             
             // Choose knob color based on adjustment
             val knobColor = if (timeAdjustment >= 0) {
