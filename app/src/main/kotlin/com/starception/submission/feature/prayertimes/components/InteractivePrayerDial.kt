@@ -192,7 +192,7 @@ fun InteractiveTimeDial(
     // Clockwise = positive adjustment, Counter-clockwise = negative adjustment
     val angle = remember(timeAdjustment) {
         // Direct angle calculation: 6 degrees per minute (360°/60min = 6°/min)
-        -timeAdjustment * 6f // Negative for clockwise = positive time
+        timeAdjustment * 6f // Positive for clockwise = positive time
     }
     
     // Only animate when not dragging for smooth interaction
@@ -267,8 +267,8 @@ fun InteractiveTimeDial(
                         totalRotation += angleDiff
                         
                         // Convert to minutes: 6 degrees = 1 minute
-                        // Negative because clockwise should increase time
-                        val minuteChange = (-totalRotation / 6f).roundToInt()
+                        // Positive because clockwise should increase time
+                        val minuteChange = (totalRotation / 6f).roundToInt()
                         val newAdjustment = initialAdjustment + minuteChange
                         
                         // Update the adjustment more frequently for smoother interaction
@@ -301,7 +301,7 @@ fun InteractiveTimeDial(
             val segmentSpacing = 2.dp.toPx()
             
             // Calculate progress angle for highlighting segments
-            val progressAngle = (-timeAdjustment * 6f + 90f + 360f) % 360f
+            val progressAngle = (timeAdjustment * 6f + 90f + 360f) % 360f
             
             // Draw individual rounded rectangular segments
             for (i in 0 until segmentCount) {
@@ -375,7 +375,7 @@ fun InteractiveTimeDial(
             )
             
             // Calculate knob position - positioned outside the segments like reference image
-            val knobAngle = -timeAdjustment * 6f // 6 degrees per minute, negative for clockwise
+            val knobAngle = timeAdjustment * 6f // 6 degrees per minute, positive for clockwise
             val knobAngleRad = Math.toRadians(knobAngle - 90.0) // -90 to start from top
             val knobTrackRadius = ringRadius + segmentHeight + 8.dp.toPx() // Outside the segments
             val knobPosition = Offset(
@@ -432,19 +432,19 @@ fun InteractiveTimeDial(
                     style = MaterialTheme.typography.titleMedium,
                     color = colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp
+                    fontSize = 12.sp
                 )
                 
                 Spacer(modifier = Modifier.height(4.dp))
                 
-                // Adjusted time
-                val adjustedTime = adjustTimeByMinutes(originalTime, timeAdjustment)
+                // Adjusted time in 12-hour format
+                val adjustedTime = convertTo12HourFormat(adjustTimeByMinutes(originalTime, timeAdjustment))
                 Text(
                     text = adjustedTime,
                     style = MaterialTheme.typography.headlineMedium,
                     color = colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 26.sp
+                    fontSize = 14.sp
                 )
                 
                 // Adjustment indicator
@@ -457,7 +457,7 @@ fun InteractiveTimeDial(
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (timeAdjustment >= 0) Color(0xFF4ECDC4) else Color(0xFFFF6B6B),
                         fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp
+                        fontSize = 10.sp
                     )
                 }
             }
