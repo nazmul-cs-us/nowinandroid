@@ -206,59 +206,14 @@ fun InteractiveTimeDial(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        // Compact center display with prayer name and time
+        // Clean center background circle for text overlay
         Surface(
             shape = CircleShape,
-            color = colorScheme.surface,
-            shadowElevation = 4.dp,
-            tonalElevation = 1.dp,
-            modifier = Modifier.size(180.dp)
+            color = colorScheme.surface.copy(alpha = 0.95f),
+            shadowElevation = 2.dp,
+            modifier = Modifier.size(140.dp)
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(8.dp)
-                ) {
-                    // Prayer name at top - larger and theme-colored
-                    Text(
-                        text = prayerName,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colorScheme.primary,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1
-                    )
-                    
-                    // Time in center - much larger
-                    Text(
-                        text = convertTo12HourFormat(adjustTimeByMinutes(originalTime, timeAdjustment)),
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-                    
-                    // Adjustment indicator at bottom - larger and theme-colored
-                    if (timeAdjustment != 0) {
-                        Text(
-                            text = if (timeAdjustment > 0) "+${timeAdjustment}m" else "${timeAdjustment}m",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (timeAdjustment > 0) {
-                                colorScheme.primary // Theme primary for positive
-                            } else {
-                                colorScheme.error // Theme error for negative
-                            },
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            }
+            // Empty content - just provides background for text overlay
         }
         
         Canvas(
