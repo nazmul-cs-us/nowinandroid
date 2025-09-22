@@ -367,12 +367,21 @@ fun InteractiveTimeDial(
                 center = center
             )
             
-            // Draw subtle inner border
+            // Draw subtle inner border around center
             drawCircle(
                 color = colorScheme.outline.copy(alpha = 0.1f),
                 radius = centerCircleRadius,
                 center = center,
                 style = Stroke(width = 1.dp.toPx())
+            )
+            
+            // Draw outer border circle that properly encompasses the tick markers
+            val outerBorderRadius = ringRadius + segmentHeight + 1.dp.toPx()
+            drawCircle(
+                color = colorScheme.outline.copy(alpha = 0.3f),
+                radius = outerBorderRadius,
+                center = center,
+                style = Stroke(width = 1.5.dp.toPx())
             )
             
             // Calculate knob position - positioned slightly outside the segments for easy dragging

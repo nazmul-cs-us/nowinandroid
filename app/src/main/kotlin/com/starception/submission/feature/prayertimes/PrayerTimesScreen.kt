@@ -454,7 +454,9 @@ fun PrayerTimesScreen(
             var timeAdjustment by remember { mutableStateOf(0) }
             
             ElevatedCard(
+                shape = CircleShape, // Make the card circular for the dial
                 modifier = modifier
+                    .aspectRatio(1f) // Force square aspect ratio for perfect circle
                     .pointerInput(prayerName) {
                         detectTapGestures(
                             onLongPress = {
@@ -487,7 +489,6 @@ fun PrayerTimesScreen(
                             }
                         )
                     },
-                shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.elevatedCardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
