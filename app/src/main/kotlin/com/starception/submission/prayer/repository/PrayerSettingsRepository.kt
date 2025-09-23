@@ -513,17 +513,118 @@ class PrayerSettingsRepository @Inject constructor(
         updateCalculationSettings(updated, forceCommit = true)
     }
     
-    fun updateTimeOffsets(offsets: PrayerTimeOffsets) {
-        Log.d("PrayerSettingsRepo", "📝 Updating time offsets: Fajr=${offsets.fajr}, Dhuhr=${offsets.dhuhr}, Asr=${offsets.asr}, Maghrib=${offsets.maghrib}, Isha=${offsets.isha}")
-        val current = getCalculationSettings()
-        Log.d("PrayerSettingsRepo", "📖 Current offsets before update: Fajr=${current.timeOffsets.fajr}, Dhuhr=${current.timeOffsets.dhuhr}")
+    suspend fun updateTimeOffsets(offsets: PrayerTimeOffsets) {
+        Log.d(TAG, "")
+        Log.d(TAG, "⏰ PRAYER TIME OFFSETS UPDATE")
+        Log.d(TAG, "=".repeat(50))
+        Log.d(TAG, "📝 REQUEST: Updating time offsets")
+        Log.d(TAG, "   🌅 Fajr: ${offsets.fajr} minutes")
+        Log.d(TAG, "   🌄 Sunrise: ${offsets.sunrise} minutes")
+        Log.d(TAG, "   🌞 Dhuhr: ${offsets.dhuhr} minutes")
+        Log.d(TAG, "   🌇 Asr: ${offsets.asr} minutes")
+        Log.d(TAG, "   🌆 Maghrib: ${offsets.maghrib} minutes")
+        Log.d(TAG, "   🌙 Isha: ${offsets.isha} minutes")
+        
+        val current = getLoadedCalculationSettings()
+        Log.d(TAG, "📖 CURRENT OFFSETS (before update):")
+        Log.d(TAG, "   🌅 Fajr: ${current.timeOffsets.fajr} → ${offsets.fajr}")
+        Log.d(TAG, "   🌄 Sunrise: ${current.timeOffsets.sunrise} → ${offsets.sunrise}")
+        Log.d(TAG, "   🌞 Dhuhr: ${current.timeOffsets.dhuhr} → ${offsets.dhuhr}")
+        Log.d(TAG, "   🌇 Asr: ${current.timeOffsets.asr} → ${offsets.asr}")
+        Log.d(TAG, "   🌆 Maghrib: ${current.timeOffsets.maghrib} → ${offsets.maghrib}")
+        Log.d(TAG, "   🌙 Isha: ${current.timeOffsets.isha} → ${offsets.isha}")
+        
         val updated = current.copy(timeOffsets = offsets)
+        Log.d(TAG, "💾 SAVING: Calling updateCalculationSettings with forceCommit=true")
         updateCalculationSettings(updated, forceCommit = true)
-        Log.d("PrayerSettingsRepo", "✅ Time offsets updated successfully")
+        Log.d(TAG, "✅ SAVE COMPLETE: Time offsets updated successfully")
         
         // Verify the update
         val verifyOffsets = getCalculationSettings().timeOffsets
-        Log.d("PrayerSettingsRepo", "🔍 Verification - New offsets: Fajr=${verifyOffsets.fajr}, Dhuhr=${verifyOffsets.dhuhr}")
+        Log.d(TAG, "🔍 VERIFICATION: Reading back saved offsets")
+        Log.d(TAG, "   🌅 Fajr: ${verifyOffsets.fajr} (expected: ${offsets.fajr})")
+        Log.d(TAG, "   🌄 Sunrise: ${verifyOffsets.sunrise} (expected: ${offsets.sunrise})")
+        Log.d(TAG, "   🌞 Dhuhr: ${verifyOffsets.dhuhr} (expected: ${offsets.dhuhr})")
+        Log.d(TAG, "   🌇 Asr: ${verifyOffsets.asr} (expected: ${offsets.asr})")
+        Log.d(TAG, "   🌆 Maghrib: ${verifyOffsets.maghrib} (expected: ${offsets.maghrib})")
+        Log.d(TAG, "   🌙 Isha: ${verifyOffsets.isha} (expected: ${offsets.isha})")
+        
+        val allMatch = verifyOffsets.fajr == offsets.fajr &&
+                      verifyOffsets.sunrise == offsets.sunrise &&
+                      verifyOffsets.dhuhr == offsets.dhuhr &&
+                      verifyOffsets.asr == offsets.asr &&
+                      verifyOffsets.maghrib == offsets.maghrib &&
+                      verifyOffsets.isha == offsets.isha
+        
+        if (allMatch) {
+            Log.i(TAG, "✅ VERIFICATION SUCCESS: All offsets saved correctly")
+        } else {
+            Log.e(TAG, "❌ VERIFICATION FAILED: Some offsets not saved correctly")
+        }
+        Log.d(TAG, "=".repeat(50))
+    }
+    
+    /**
+     * Update offset for a single prayer (used by Interactive Prayer Dial)
+     */
+    suspend fun updateSinglePrayerOffset(prayerName: String, offsetMinutes: Int) {
+        Log.d(TAG, "")
+        Log.d(TAG, "🎯 SINGLE PRAYER OFFSET UPDATE")
+        Log.d(TAG, "=".repeat(50))
+        Log.d(TAG, "📝 INTERACTIVE DIAL REQUEST:")
+        Log.d(TAG, "   🔤 Prayer Name: $prayerName")
+        Log.d(TAG, "   ⏱️ Offset: $offsetMinutes minutes")
+        
+        val current = getLoadedCalculationSettings()
+        val currentOffsets = current.timeOffsets
+        
+        Log.d(TAG, "📖 CURRENT OFFSETS (before update):")
+        Log.d(TAG, "   🌅 Fajr: ${currentOffsets.fajr}")
+        Log.d(TAG, "   🌄 Sunrise: ${currentOffsets.sunrise}")
+        Log.d(TAG, "   🌞 Dhuhr: ${currentOffsets.dhuhr}")
+        Log.d(TAG, "   🌇 Asr: ${currentOffsets.asr}")
+        Log.d(TAG, "   🌆 Maghrib: ${currentOffsets.maghrib}")
+        Log.d(TAG, "   🌙 Isha: ${currentOffsets.isha}")
+        
+        val newOffsets = when (prayerName.lowercase()) {
+            "fajr" -> {
+                Log.d(TAG, "🌅 UPDATING Fajr: ${currentOffsets.fajr} → $offsetMinutes")
+                currentOffsets.copy(fajr = offsetMinutes)
+            }
+            "sunrise" -> {
+                Log.d(TAG, "🌄 UPDATING Sunrise: ${currentOffsets.sunrise} → $offsetMinutes")
+                currentOffsets.copy(sunrise = offsetMinutes)
+            }
+            "dhuhr" -> {
+                Log.d(TAG, "🌞 UPDATING Dhuhr: ${currentOffsets.dhuhr} → $offsetMinutes")
+                currentOffsets.copy(dhuhr = offsetMinutes)
+            }
+            "asr" -> {
+                Log.d(TAG, "🌇 UPDATING Asr: ${currentOffsets.asr} → $offsetMinutes")
+                currentOffsets.copy(asr = offsetMinutes)
+            }
+            "maghrib" -> {
+                Log.d(TAG, "🌆 UPDATING Maghrib: ${currentOffsets.maghrib} → $offsetMinutes")
+                currentOffsets.copy(maghrib = offsetMinutes)
+            }
+            "isha" -> {
+                Log.d(TAG, "🌙 UPDATING Isha: ${currentOffsets.isha} → $offsetMinutes")
+                currentOffsets.copy(isha = offsetMinutes)
+            }
+            else -> {
+                Log.w(TAG, "⚠️ UNKNOWN PRAYER NAME: $prayerName - no update performed")
+                currentOffsets
+            }
+        }
+        
+        if (newOffsets != currentOffsets) {
+            Log.d(TAG, "💾 SAVING: Updated offsets via updateTimeOffsets()")
+            updateTimeOffsets(newOffsets)
+            Log.i(TAG, "✅ SINGLE PRAYER OFFSET UPDATE COMPLETE: $prayerName = $offsetMinutes minutes")
+        } else {
+            Log.w(TAG, "⚠️ NO CHANGES: Prayer name '$prayerName' not recognized")
+        }
+        Log.d(TAG, "=".repeat(50))
     }
     
     fun updateLocationSettings(useGps: Boolean, location: Location? = null) {
@@ -1833,13 +1934,35 @@ class PrayerSettingsRepository @Inject constructor(
         return try {
             val settingsJson = prefs.getString(KEY_CALCULATION_SETTINGS_JSON, null)
             logPrefReadJson(KEY_CALCULATION_SETTINGS_JSON, settingsJson, "prayer calculation settings")
+            
             if (settingsJson != null) {
-                json.decodeFromString<PrayerCalculationSettings>(settingsJson)
+                val settings = json.decodeFromString<PrayerCalculationSettings>(settingsJson)
+                
+                // ENHANCED LOADING LOGGING
+                Log.i(TAG, "")
+                Log.i(TAG, "📥 DETAILED LOADING OPERATION")
+                Log.i(TAG, "=".repeat(60))
+                Log.i(TAG, "🗂️ STORAGE KEY: '$KEY_CALCULATION_SETTINGS_JSON'")
+                Log.i(TAG, "📦 RAW JSON FROM STORAGE:")
+                Log.i(TAG, "   $settingsJson")
+                Log.i(TAG, "🔍 PARSED PRAYER OFFSETS:")
+                Log.i(TAG, "   🌅 Fajr: ${settings.timeOffsets.fajr} minutes")
+                Log.i(TAG, "   🌄 Sunrise: ${settings.timeOffsets.sunrise} minutes") 
+                Log.i(TAG, "   🌞 Dhuhr: ${settings.timeOffsets.dhuhr} minutes")
+                Log.i(TAG, "   🌇 Asr: ${settings.timeOffsets.asr} minutes")
+                Log.i(TAG, "   🌆 Maghrib: ${settings.timeOffsets.maghrib} minutes")
+                Log.i(TAG, "   🌙 Isha: ${settings.timeOffsets.isha} minutes")
+                Log.i(TAG, "📊 TOTAL NON-ZERO OFFSETS: ${listOf(settings.timeOffsets.fajr, settings.timeOffsets.sunrise, settings.timeOffsets.dhuhr, settings.timeOffsets.asr, settings.timeOffsets.maghrib, settings.timeOffsets.isha).count { it != 0 }}")
+                Log.i(TAG, "=".repeat(60))
+                Log.i(TAG, "")
+                
+                settings
             } else {
+                Log.i(TAG, "📭 NO DATA FOUND: '$KEY_CALCULATION_SETTINGS_JSON' is empty - will use defaults")
                 null
             }
         } catch (e: Exception) {
-            android.util.Log.e("PrayerSettingsRepository", "Error loading calculation settings", e)
+            Log.e(TAG, "❌ ERROR LOADING: Failed to parse '$KEY_CALCULATION_SETTINGS_JSON'", e)
             null
         }
     }
@@ -1895,7 +2018,28 @@ class PrayerSettingsRepository @Inject constructor(
     private fun saveCalculationSettings(settings: PrayerCalculationSettings) {
         val settingsJson = json.encodeToString(settings)
         logPrefWriteJson(KEY_CALCULATION_SETTINGS_JSON, settingsJson, "prayer calculation settings")
+        
+        // ENHANCED STORAGE LOGGING
+        Log.i(TAG, "")
+        Log.i(TAG, "💾 DETAILED STORAGE OPERATION")
+        Log.i(TAG, "=".repeat(60))
+        Log.i(TAG, "🗂️ STORAGE KEY: '$KEY_CALCULATION_SETTINGS_JSON'")
+        Log.i(TAG, "📦 COMPLETE JSON BEING STORED:")
+        Log.i(TAG, "   $settingsJson")
+        Log.i(TAG, "🔍 PRAYER OFFSETS IN STORAGE:")
+        Log.i(TAG, "   🌅 Fajr: ${settings.timeOffsets.fajr} minutes")
+        Log.i(TAG, "   🌄 Sunrise: ${settings.timeOffsets.sunrise} minutes") 
+        Log.i(TAG, "   🌞 Dhuhr: ${settings.timeOffsets.dhuhr} minutes")
+        Log.i(TAG, "   🌇 Asr: ${settings.timeOffsets.asr} minutes")
+        Log.i(TAG, "   🌆 Maghrib: ${settings.timeOffsets.maghrib} minutes")
+        Log.i(TAG, "   🌙 Isha: ${settings.timeOffsets.isha} minutes")
+        Log.i(TAG, "📊 TOTAL NON-ZERO OFFSETS: ${listOf(settings.timeOffsets.fajr, settings.timeOffsets.sunrise, settings.timeOffsets.dhuhr, settings.timeOffsets.asr, settings.timeOffsets.maghrib, settings.timeOffsets.isha).count { it != 0 }}")
+        Log.i(TAG, "=".repeat(60))
+        
         prefs.edit().putString(KEY_CALCULATION_SETTINGS_JSON, settingsJson).apply()
+        
+        Log.i(TAG, "✅ STORAGE COMPLETE: Data written to SharedPreferences")
+        Log.i(TAG, "")
     }
     
     private fun saveLocationPreferences(preferences: PrayerLocationPreferences) {

@@ -57,6 +57,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.animation.core.*
+import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.IntSize
 import android.util.Log
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -93,6 +97,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -180,6 +186,12 @@ fun PrayerTimesScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    
+    // SHARED STATE - Only one tile can be in edit mode at a time
+    var currentEditingTile by remember { mutableStateOf<String?>(null) }
+    
+    // TODO: Load actual prayer settings - for now use defaults to test functionality
+    val prayerSettings = null
     
     // UI STATE MANAGEMENT - These control what the user sees
     // Try to load cached data immediately, with Dubai fallback for instant startup
@@ -285,6 +297,60 @@ fun PrayerTimesScreen(
     var showCompassPopup by remember { mutableStateOf(false) }
     
     val hapticFeedback = LocalHapticFeedback.current
+    
+    // LOAD STORED PRAYER OFFSETS
+    var storedOffsets by remember { mutableStateOf(com.starception.submission.prayer.model.PrayerTimeOffsets()) }
+    var offsetRefreshTrigger by remember { mutableStateOf(0) }
+    
+    // Function to refresh offsets from storage
+    suspend fun refreshStoredOffsets() {
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+            )
+            val repository = entryPoint.prayerSettingsRepository()
+            val currentSettings = repository.getLoadedCalculationSettings()
+            storedOffsets = currentSettings.timeOffsets
+            android.util.Log.d("PrayerTimesScreen", "🔄 REFRESHED STORED OFFSETS:")
+            android.util.Log.d("PrayerTimesScreen", "   🌞 Dhuhr: ${storedOffsets.dhuhr}")
+            android.util.Log.d("PrayerTimesScreen", "   🌇 Asr: ${storedOffsets.asr}")
+            android.util.Log.d("PrayerTimesScreen", "   🌆 Maghrib: ${storedOffsets.maghrib}")
+            android.util.Log.d("PrayerTimesScreen", "   🌙 Isha: ${storedOffsets.isha}")
+        } catch (e: Exception) {
+            android.util.Log.e("PrayerTimesScreen", "❌ Failed to refresh stored offsets", e)
+        }
+    }
+    
+    // Also refresh when screen is resumed in case offsets were changed in Prayer Settings
+    LaunchedEffect(Unit) {
+        refreshStoredOffsets()
+    }
+    
+    // Load offsets once when screen initializes and when refresh trigger changes
+    LaunchedEffect(offsetRefreshTrigger) {
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+            )
+            val repository = entryPoint.prayerSettingsRepository()
+            val currentSettings = repository.getLoadedCalculationSettings()
+            storedOffsets = currentSettings.timeOffsets
+            android.util.Log.d("PrayerTimesScreen", "📥 LOADED STORED OFFSETS:")
+            android.util.Log.d("PrayerTimesScreen", "   📄 Repository Source: ${repository.javaClass.simpleName}")
+            android.util.Log.d("PrayerTimesScreen", "   🔍 Raw Offsets Object: $storedOffsets")
+            android.util.Log.d("PrayerTimesScreen", "   🌅 Fajr: ${storedOffsets.fajr}")
+            android.util.Log.d("PrayerTimesScreen", "   🌄 Sunrise: ${storedOffsets.sunrise}")
+            android.util.Log.d("PrayerTimesScreen", "   🌞 Dhuhr: ${storedOffsets.dhuhr}")
+            android.util.Log.d("PrayerTimesScreen", "   🌇 Asr: ${storedOffsets.asr}")
+            android.util.Log.d("PrayerTimesScreen", "   🌆 Maghrib: ${storedOffsets.maghrib}")
+            android.util.Log.d("PrayerTimesScreen", "   🌙 Isha: ${storedOffsets.isha}")
+            android.util.Log.d("PrayerTimesScreen", "   📊 Total non-zero offsets: ${listOf(storedOffsets.fajr, storedOffsets.sunrise, storedOffsets.dhuhr, storedOffsets.asr, storedOffsets.maghrib, storedOffsets.isha).count { it != 0 }}")
+        } catch (e: Exception) {
+            android.util.Log.e("PrayerTimesScreen", "❌ Failed to load stored offsets", e)
+        }
+    }
     
     // LOCATION SERVICE - For Qibla compass functionality
     val locationService = remember {
@@ -444,60 +510,105 @@ fun PrayerTimesScreen(
     @Composable
     fun InteractivePrayerCard(
         prayerName: String,
+        currentEditingTile: String?,
+        onEditingTileChange: (String?) -> Unit,
+        currentOffset: Int = 0,
         modifier: Modifier = Modifier
     ) {
-        // State to track if this specific card is in edit mode
-        var isInEditMode by remember { mutableStateOf(false) }
+        // Check if this specific card is in edit mode
+        val isInEditMode = currentEditingTile == prayerName
+        val isAnotherTileInEditMode = currentEditingTile != null && currentEditingTile != prayerName
+        
+        // Animation states
+        val animationSpec = tween<Float>(
+            durationMillis = 300,
+            easing = FastOutSlowInEasing
+        )
+        
+        val sizeAnimationSpec = tween<IntSize>(
+            durationMillis = 300,
+            easing = FastOutSlowInEasing
+        )
+        
+        // Scale animation: shrink other tiles when one is in edit mode
+        val scale by animateFloatAsState(
+            targetValue = when {
+                isInEditMode -> 1f // Keep normal size when this tile is in edit mode
+                isAnotherTileInEditMode -> 0.85f // Shrink when another tile is in edit mode
+                else -> 1f // Normal size when no tile is in edit mode
+            },
+            animationSpec = animationSpec,
+            label = "TileScale"
+        )
+        
+        // Transform animation for tile to dial transition
+        val alpha by animateFloatAsState(
+            targetValue = 1f,
+            animationSpec = animationSpec,
+            label = "TileAlpha"
+        )
+        
+        // No rotation animation - keep tiles stationary during transformation
+        
+        // Pop effect animation - slight scale up then down for transformation
+        val transformScale by animateFloatAsState(
+            targetValue = if (isInEditMode) 1.05f else 1f, // Slight scale up when transforming
+            animationSpec = tween(
+                durationMillis = 250,
+                easing = FastOutSlowInEasing
+            ),
+            label = "TransformScale"
+        )
+        
+        // Debug logging
+        android.util.Log.d("PrayerCard", "🔄 Rendering InteractivePrayerCard for $prayerName, isInEditMode=$isInEditMode, scale=$scale")
         
         if (isInEditMode) {
             // Show ONLY the circular dial - complete transformation, no extra UI
-            var timeAdjustment by remember { mutableStateOf(0) }
+            var timeAdjustment by remember { mutableStateOf(currentOffset) }
             
-            ElevatedCard(
-                shape = CircleShape, // Make the card circular for the dial
+            // Use Box to constrain the circular dial to the original tile space
+            Box(
                 modifier = modifier
-                    .aspectRatio(1f) // Force square aspect ratio for perfect circle
+                    .aspectRatio(1f) // Force square container for perfect circle
+                    .graphicsLayer(
+                        scaleX = scale * transformScale,
+                        scaleY = scale * transformScale,
+                        alpha = alpha
+                    )
+                    .animateContentSize(animationSpec = sizeAnimationSpec),
+                contentAlignment = Alignment.Center
+            ) {
+                ElevatedCard(
+                    shape = CircleShape, // Make the card circular for the dial
+                    elevation = CardDefaults.elevatedCardElevation(
+                        defaultElevation = 12.dp, // Enhanced elevation for professional depth
+                        pressedElevation = 16.dp,
+                        focusedElevation = 14.dp
+                    ),
+                    modifier = Modifier
+                        .fillMaxSize() // Fill the square container for perfect circle
                     .pointerInput(prayerName) {
                         detectTapGestures(
                             onLongPress = {
-                                // Save adjustment and exit edit mode on long press
-                                try {
-                                    val entryPoint = EntryPointAccessors.fromApplication(
-                                        context.applicationContext,
-                                        com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
-                                    )
-                                    val repository = entryPoint.prayerSettingsRepository()
-                                    val currentSettings = repository.getCalculationSettings()
-                                    val currentOffsets = currentSettings.timeOffsets
-                                    
-                                    val updatedOffsets = when (prayerName.lowercase()) {
-                                        "dhuhr" -> currentOffsets.copy(dhuhr = timeAdjustment)
-                                        "asr" -> currentOffsets.copy(asr = timeAdjustment)
-                                        "maghrib" -> currentOffsets.copy(maghrib = timeAdjustment)
-                                        "isha" -> currentOffsets.copy(isha = timeAdjustment)
-                                        else -> currentOffsets
-                                    }
-                                    
-                                    repository.updateTimeOffsets(updatedOffsets)
-                                    android.util.Log.d("PrayerTimes", "✅ Saved $prayerName offset: $timeAdjustment minutes")
-                                } catch (e: Exception) {
-                                    android.util.Log.e("PrayerTimes", "❌ Error saving offset: ${e.message}")
-                                }
-                                
+                                // Exit edit mode on long press without saving
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                isInEditMode = false
+                                // Exit edit mode by clearing the current editing tile
+                                onEditingTileChange(null)
+                                android.util.Log.d("PrayerTimes", "🚪 Exited edit mode via long press without saving")
                             }
                         )
                     },
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.elevatedCardElevation(
-                    defaultElevation = 4.dp
+                    containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                        "Current" -> MaterialTheme.colorScheme.tertiaryContainer
+                        "Next" -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
                 )
             ) {
                 // ONLY show the circular dial - complete transformation with no overlapping content
-                com.starception.submission.feature.prayertimes.components.InteractiveTimeDial(
+                com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
                     originalTime = when (prayerName) {
                         "Dhuhr" -> prayerTimes?.dhuhr?.toString() ?: "12:00"
                         "Asr" -> prayerTimes?.asr?.toString() ?: "15:46"
@@ -510,19 +621,63 @@ fun PrayerTimesScreen(
                     onAdjustmentChange = { adjustment ->
                         timeAdjustment = adjustment
                     },
-                    colorScheme = MaterialTheme.colorScheme,
+                    onSave = { finalAdjustment ->
+                        android.util.Log.d("PrayerTimesScreen", "🎯 INTERACTIVE DIAL SAVE:")
+                        android.util.Log.d("PrayerTimesScreen", "   📝 Prayer: $prayerName")
+                        android.util.Log.d("PrayerTimesScreen", "   ⏱️ Final Adjustment: $finalAdjustment minutes")
+                        android.util.Log.d("PrayerTimesScreen", "   💾 Saving to prayer settings...")
+                        
+                        // Save the adjustment to Prayer settings using repository
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                val repository = com.starception.submission.prayer.repository.PrayerSettingsRepository(context)
+                                repository.updateSinglePrayerOffset(prayerName, finalAdjustment)
+                                android.util.Log.i("PrayerTimesScreen", "✅ SAVE SUCCESS: $prayerName offset saved as $finalAdjustment minutes")
+                                
+                                // Update UI on main thread
+                                withContext(Dispatchers.Main) {
+                                    // Trigger refresh to reload stored offsets from storage
+                                    offsetRefreshTrigger++
+                                    android.util.Log.d("PrayerTimesScreen", "🔄 TRIGGERING OFFSET REFRESH: trigger=$offsetRefreshTrigger")
+                                    
+                                    // Exit edit mode after successful saving
+                                    onEditingTileChange(null)
+                                    android.util.Log.d("PrayerTimesScreen", "🚪 Exited edit mode - returning to tile view")
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("PrayerTimesScreen", "❌ SAVE FAILED: Error saving $prayerName offset", e)
+                                // Still exit edit mode even if save failed
+                                withContext(Dispatchers.Main) {
+                                    onEditingTileChange(null)
+                                }
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
+            }
             }
         } else {
             // Show regular small card with long-press detection
             ElevatedCard(
                 modifier = modifier
+                    .graphicsLayer(
+                        scaleX = scale * transformScale,
+                        scaleY = scale * transformScale,
+                        alpha = alpha
+                    )
+                    .animateContentSize(animationSpec = sizeAnimationSpec)
                     .pointerInput(prayerName) {
                         detectTapGestures(
                             onLongPress = {
+                                android.util.Log.d("PrayerCard", "🔥 LONG PRESS detected on $prayerName card!")
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                isInEditMode = true
+                                // Set this tile as the current editing tile (others will automatically become false)
+                                onEditingTileChange(prayerName)
+                                android.util.Log.d("PrayerCard", "✅ Set $prayerName as current editing tile")
+                            },
+                            onTap = {
+                                android.util.Log.d("PrayerCard", "👆 Regular tap detected on $prayerName card")
                             }
                         )
                     },
@@ -568,16 +723,34 @@ fun PrayerTimesScreen(
                             fontWeight = FontWeight.Normal
                         )
                     }
-                    Text(
-                        text = PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                            "Current" -> MaterialTheme.colorScheme.tertiary
-                            "Next" -> MaterialTheme.colorScheme.primary
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes),
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                "Current" -> MaterialTheme.colorScheme.tertiary
+                                "Next" -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        // Show adjustment offset if any
+                        if (currentOffset != 0) {
+                            Text(
+                                text = if (currentOffset > 0) "+${currentOffset}m" else "${currentOffset}m",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                    "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f)
+                                    "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                },
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -793,6 +966,9 @@ fun PrayerTimesScreen(
                     // Dhuhr prayer with interactive dial
                     InteractivePrayerCard(
                         prayerName = "Dhuhr",
+                        currentEditingTile = currentEditingTile,
+                        onEditingTileChange = { currentEditingTile = it },
+                        currentOffset = storedOffsets.dhuhr,
                         modifier = Modifier
                             .weight(1f)
                             .height(120.dp)
@@ -801,6 +977,9 @@ fun PrayerTimesScreen(
                     // Asr prayer with interactive dial  
                     InteractivePrayerCard(
                         prayerName = "Asr",
+                        currentEditingTile = currentEditingTile,
+                        onEditingTileChange = { currentEditingTile = it },
+                        currentOffset = storedOffsets.asr,
                         modifier = Modifier
                             .weight(1f)
                             .height(120.dp)
@@ -815,6 +994,9 @@ fun PrayerTimesScreen(
                     // Maghrib prayer with interactive dial
                     InteractivePrayerCard(
                         prayerName = "Maghrib",
+                        currentEditingTile = currentEditingTile,
+                        onEditingTileChange = { currentEditingTile = it },
+                        currentOffset = storedOffsets.maghrib,
                         modifier = Modifier
                             .weight(1f)
                             .height(120.dp)
@@ -823,6 +1005,9 @@ fun PrayerTimesScreen(
                     // Isha prayer with interactive dial
                     InteractivePrayerCard(
                         prayerName = "Isha",
+                        currentEditingTile = currentEditingTile,
+                        onEditingTileChange = { currentEditingTile = it },
+                        currentOffset = storedOffsets.isha,
                         modifier = Modifier
                             .weight(1f)
                             .height(120.dp)

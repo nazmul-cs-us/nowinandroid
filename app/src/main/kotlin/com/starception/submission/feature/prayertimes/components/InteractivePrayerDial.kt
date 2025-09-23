@@ -7,6 +7,14 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -105,7 +113,7 @@ fun InteractivePrayerTimeCard(
                     verticalArrangement = Arrangement.Center
                 ) {
                     // Compact interactive dial
-                    InteractiveTimeDial(
+                    InteractivePrayerDial(
                         originalTime = originalTime,
                         timeAdjustment = timeAdjustment,
                         prayerName = prayerName,
@@ -115,7 +123,6 @@ fun InteractivePrayerTimeCard(
                                 timeAdjustment = adjustment
                             }
                         },
-                        colorScheme = colorScheme,
                         modifier = Modifier.size(260.dp)
                     )
                     
@@ -147,7 +154,11 @@ fun InteractivePrayerTimeCard(
                         
                         Button(
                             onClick = { 
-                                android.util.Log.d("PrayerTimes", "🔘 APPLY BUTTON CLICKED: $prayerName adjustment=$timeAdjustment")
+                                android.util.Log.d("InteractivePrayerDial", "🔘 APPLY BUTTON CLICKED:")
+                                android.util.Log.d("InteractivePrayerDial", "   📝 Prayer: $prayerName")
+                                android.util.Log.d("InteractivePrayerDial", "   ⏰ Original Time: $originalTime")
+                                android.util.Log.d("InteractivePrayerDial", "   ⏱️ Adjustment: $timeAdjustment minutes")
+                                android.util.Log.d("InteractivePrayerDial", "   🎯 Calling onTimeAdjustment callback...")
                                 onTimeAdjustment(prayerName, timeAdjustment)
                             },
                             modifier = Modifier
@@ -176,31 +187,36 @@ fun InteractivePrayerTimeCard(
  * Material 3 styled circular timer for prayer time adjustment with smooth dragging
  */
 @Composable
-fun InteractiveTimeDial(
+fun InteractivePrayerDial(
     originalTime: String,
     timeAdjustment: Int,
     prayerName: String,
     onAdjustmentChange: (Int) -> Unit,
-    colorScheme: ColorScheme,
+    onSave: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     var lastHapticValue by remember { mutableIntStateOf(timeAdjustment) }
     var isDragging by remember { mutableStateOf(false) }
     
+    // Track current adjustment locally for save operations
+    var currentAdjustment by remember { mutableIntStateOf(timeAdjustment) }
+    
+    // Update local adjustment when external timeAdjustment changes
+    LaunchedEffect(timeAdjustment) {
+        currentAdjustment = timeAdjustment
+        android.util.Log.v("InteractivePrayerDial", "📥 EXTERNAL UPDATE: $prayerName adjustment updated to $timeAdjustment")
+    }
+    
     // Convert adjustment minutes to angle - unlimited rotation
     // Clockwise = positive adjustment, Counter-clockwise = negative adjustment
     val angle = remember(timeAdjustment) {
-        // Direct angle calculation: 6 degrees per minute (360°/60min = 6°/min)
+        // Direct angle calculation: 6 degrees per minute (standard timer)
         timeAdjustment * 6f // Positive for clockwise = positive time
     }
     
-    // Only animate when not dragging for smooth interaction
-    val animatedAngle by animateFloatAsState(
-        targetValue = if (isDragging) angle else angle,
-        animationSpec = if (isDragging) snap() else tween(durationMillis = 200),
-        label = "angleAnimation"
-    )
+    // Live feedback during dragging - no animation when dragging for immediate response
+    val displayAngle = if (isDragging) angle else angle // Always show current angle for live feedback
     
     Box(
         modifier = modifier,
@@ -209,7 +225,7 @@ fun InteractiveTimeDial(
         // Clean center background circle for text overlay
         Surface(
             shape = CircleShape,
-            color = colorScheme.surface.copy(alpha = 0.95f),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
             shadowElevation = 2.dp,
             modifier = Modifier.size(140.dp)
         ) {
@@ -220,6 +236,22 @@ fun InteractiveTimeDial(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
+                    // Long press detection for saving  
+                    detectTapGestures(
+                        onLongPress = {
+                            android.util.Log.d("InteractivePrayerDial", "👆 LONG PRESS SAVE:")
+                            android.util.Log.d("InteractivePrayerDial", "   📝 Prayer: $prayerName")
+                            android.util.Log.d("InteractivePrayerDial", "   ⏱️ Current Local Adjustment: $currentAdjustment minutes")
+                            android.util.Log.d("InteractivePrayerDial", "   📊 Parameter Adjustment: $timeAdjustment minutes")
+                            android.util.Log.d("InteractivePrayerDial", "   💾 Calling onSave callback with: $currentAdjustment")
+                            onSave?.let { 
+                                it(currentAdjustment)
+                                android.util.Log.d("InteractivePrayerDial", "   ✅ onSave callback completed")
+                            } ?: android.util.Log.w("InteractivePrayerDial", "   ⚠️ onSave callback is null - save not performed")
+                        }
+                    )
+                }
+                .pointerInput(Unit) {
                     var lastAngle = 0f
                     var isDraggingLocal = false
                     var initialAdjustment = 0
@@ -227,58 +259,47 @@ fun InteractiveTimeDial(
                     
                     detectDragGestures(
                         onDragStart = { offset ->
+                            isDraggingLocal = true
+                            initialAdjustment = currentAdjustment
+                            totalRotation = 0f
                             val center = Offset(size.width / 2f, size.height / 2f)
-                            val dragVector = offset - center
-                            val distanceFromCenter = sqrt(dragVector.x * dragVector.x + dragVector.y * dragVector.y)
-                            
-                            // Allow dragging from anywhere in the dial area, not just the knob
-                            // This makes it more responsive when touching near the knob
-                            val dialRadius = (minOf(size.width, size.height) / 2.0f) * 0.85f
-                            val minRadius = dialRadius * 0.3f
-                            val maxRadius = dialRadius + 30.dp.toPx()
-                            
-                            if (distanceFromCenter >= minRadius && distanceFromCenter <= maxRadius) {
-                                isDragging = true
-                                isDraggingLocal = true
-                                initialAdjustment = timeAdjustment
-                                totalRotation = 0f
-                                lastAngle = atan2(dragVector.y, dragVector.x) * (180f / PI.toFloat())
-                            }
+                            lastAngle = kotlin.math.atan2(
+                                offset.y - center.y,
+                                offset.x - center.x
+                            ) * 180f / kotlin.math.PI.toFloat()
+                            android.util.Log.d("InteractivePrayerDial", "🎯 DRAG START: $prayerName, initial adjustment: $initialAdjustment")
                         },
                         onDragEnd = { 
-                            isDragging = false
                             isDraggingLocal = false
                         }
                     ) { change, _ ->
                         if (!isDraggingLocal) return@detectDragGestures
                         
                         val center = Offset(size.width / 2f, size.height / 2f)
-                        val dragVector = change.position - center
-                        val currentAngle = atan2(dragVector.y, dragVector.x) * (180f / PI.toFloat())
+                        val currentAngle = kotlin.math.atan2(
+                            change.position.y - center.y,
+                            change.position.x - center.x
+                        ) * 180f / kotlin.math.PI.toFloat()
                         
-                        // Calculate angle difference
-                        var angleDiff = currentAngle - lastAngle
+                        var deltaAngle = currentAngle - lastAngle
+                        if (deltaAngle > 180f) deltaAngle -= 360f
+                        if (deltaAngle < -180f) deltaAngle += 360f
                         
-                        // Handle wrap-around
-                        if (angleDiff > 180f) angleDiff -= 360f
-                        if (angleDiff < -180f) angleDiff += 360f
+                        totalRotation += deltaAngle
                         
-                        // More responsive dragging - smaller angle accumulation threshold
-                        totalRotation += angleDiff
-                        
-                        // Convert to minutes: 6 degrees = 1 minute
-                        // Positive because clockwise should increase time
-                        val minuteChange = (totalRotation / 6f).roundToInt()
+                        // Convert rotation to minute adjustment (6 degrees per minute)
+                        val minuteChange = (totalRotation / 6f).toInt()
                         val newAdjustment = initialAdjustment + minuteChange
                         
-                        // Update the adjustment more frequently for smoother interaction
-                        if (newAdjustment != timeAdjustment) {
-                            onAdjustmentChange(newAdjustment)
+                        if (newAdjustment != currentAdjustment) {
+                            android.util.Log.v("InteractivePrayerDial", "🔄 DRAGGING: $prayerName adjustment changed from $currentAdjustment to $newAdjustment minutes")
+                            currentAdjustment = newAdjustment  // Update local state
+                            onAdjustmentChange(newAdjustment)   // Notify parent
                             
-                            // Haptic feedback
-                            if (abs(newAdjustment - lastHapticValue) >= 3) { // More frequent haptic feedback
+                            if (kotlin.math.abs(newAdjustment - lastHapticValue) >= 3) {
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 lastHapticValue = newAdjustment
+                                android.util.Log.v("InteractivePrayerDial", "📳 HAPTIC FEEDBACK: $prayerName at $newAdjustment minutes")
                             }
                         }
                         
@@ -292,142 +313,171 @@ fun InteractiveTimeDial(
             val arcSize = Size(radius * 2, radius * 2)
             val arcTopLeft = Offset(center.x - radius, center.y - radius)
             
-            // Modern segmented dial like the reference image - properly aligned
-            val ringRadius = radius - 8.dp.toPx() // Closer to the main dial circle
-            val segmentCount = 60
-            val segmentAngle = 360f / segmentCount
-            val segmentWidth = 3.dp.toPx() // Slightly thinner
-            val segmentHeight = 12.dp.toPx() // Shorter for better proportion
-            val segmentSpacing = 2.dp.toPx()
+            // PNG File Icon Aesthetic - Document style with folded corner
+            val outerRadius = radius * 0.95f
+            val trackRadius = outerRadius * 0.85f
             
-            // Calculate progress angle for highlighting segments
-            val progressAngle = (timeAdjustment * 6f + 90f + 360f) % 360f
-            
-            // Draw individual rounded rectangular segments
-            for (i in 0 until segmentCount) {
-                val currentSegmentAngle = (i * segmentAngle) - 90f // Start from top
-                val segmentAngleNormalized = (currentSegmentAngle + 90f + 360f) % 360f
-                
-                // Determine if this segment should be highlighted
-                val isHighlighted = if (timeAdjustment >= 0) {
-                    // Positive: highlight clockwise from top
-                    segmentAngleNormalized <= progressAngle
-                } else {
-                    // Negative: highlight counter-clockwise from top  
-                    segmentAngleNormalized >= progressAngle
-                }
-                
-                // Modern vibrant colors like the reference image
-                val segmentColor = if (isHighlighted) {
-                    if (timeAdjustment >= 0) {
-                        Color(0xFF4ECDC4) // Turquoise/teal for positive
-                    } else {
-                        Color(0xFFFF6B6B) // Coral red for negative
-                    }
-                } else {
-                    Color(0xFFE8E8E8) // Light gray for inactive segments
-                }
-                
-                // Calculate segment position - positioned ON the ring, not outside
-                val segmentCenterRadius = ringRadius // Position segments on the ring edge
-                val angleRad = Math.toRadians(currentSegmentAngle.toDouble())
-                val segmentCenter = center + Offset(
-                    x = segmentCenterRadius * cos(angleRad).toFloat(),
-                    y = segmentCenterRadius * sin(angleRad).toFloat()
-                )
-                
-                // Draw rounded rectangular segment
-                drawIntoCanvas { canvas ->
-                    canvas.save()
-                    canvas.translate(segmentCenter.x, segmentCenter.y)
-                    canvas.rotate(currentSegmentAngle + 90f) // Rotate to point outward
-                    
-                    // Draw rounded rectangle segment
-                    canvas.drawRoundRect(
-                        -segmentWidth / 2f,
-                        -segmentHeight / 2f,
-                        segmentWidth / 2f,
-                        segmentHeight / 2f,
-                        segmentWidth / 2f, // Corner radius for rounded ends
-                        segmentWidth / 2f,
-                        androidx.compose.ui.graphics.Paint().apply {
-                            color = segmentColor
-                            isAntiAlias = true
-                        }
-                    )
-                    canvas.restore()
-                }
-            }
-            
-            // Draw clean center circle background - properly sized for text
-            val centerCircleRadius = ringRadius - segmentHeight - 8.dp.toPx()
+            // Drop shadow like PNG file icon
             drawCircle(
-                color = colorScheme.surface,
-                radius = centerCircleRadius,
+                color = Color.Black.copy(alpha = 0.12f),
+                radius = outerRadius + 3.dp.toPx(),
+                center = center + Offset(2.dp.toPx(), 3.dp.toPx())
+            )
+            
+            // Main document background - clean white like PNG icon
+            drawCircle(
+                color = Color.White,
+                radius = outerRadius,
                 center = center
             )
             
-            // Draw subtle inner border around center
+            // Subtle document border for definition
             drawCircle(
-                color = colorScheme.outline.copy(alpha = 0.1f),
-                radius = centerCircleRadius,
+                color = Color(0xFFE8E8E8),
+                radius = outerRadius,
                 center = center,
-                style = Stroke(width = 1.dp.toPx())
+                style = Stroke(width = 0.5.dp.toPx())
             )
             
-            // Draw outer border circle that properly encompasses the tick markers
-            val outerBorderRadius = ringRadius + segmentHeight + 1.dp.toPx()
+            // Folded corner effect (top-right quadrant)
+            val foldSize = outerRadius * 0.2f
+            val foldCenter = center + Offset(outerRadius * 0.7f, -outerRadius * 0.7f)
+            
+            // Folded corner shadow
             drawCircle(
-                color = colorScheme.outline.copy(alpha = 0.3f),
-                radius = outerBorderRadius,
-                center = center,
-                style = Stroke(width = 1.5.dp.toPx())
+                color = Color.Black.copy(alpha = 0.06f),
+                radius = foldSize,
+                center = foldCenter + Offset(1.dp.toPx(), 1.dp.toPx())
             )
             
-            // Calculate knob position - positioned slightly outside the segments for easy dragging
-            val knobAngle = timeAdjustment * 6f // 6 degrees per minute, positive for clockwise
-            val knobAngleRad = Math.toRadians(knobAngle - 90.0) // -90 to start from top
-            val knobTrackRadius = ringRadius + segmentHeight + 4.dp.toPx() // Just outside segments
-            val knobPosition = Offset(
-                x = center.x + knobTrackRadius * cos(knobAngleRad).toFloat(),
-                y = center.y + knobTrackRadius * sin(knobAngleRad).toFloat()
+            // Folded corner highlight
+            drawCircle(
+                color = Color(0xFFF5F5F5),
+                radius = foldSize,
+                center = foldCenter
             )
-            val knobRadius = 5.dp.toPx() // Compact knob
             
-            // Draw modern knob indicator like reference image - compact and precise
-            val knobWidth = 5.dp.toPx()
-            val knobHeight = 14.dp.toPx() // Proportional to segment height
+            // Properly aligned tick marks - 60 evenly spaced
+            val tickCount = 60
+            val tickAngle = 360f / tickCount
+            val tickTrackRadius = trackRadius - 2.dp.toPx() // Align with progress track
             
-            // Choose knob color based on adjustment
-            val knobColor = if (timeAdjustment >= 0) {
-                Color(0xFF4ECDC4) // Same turquoise as positive segments
-            } else {
-                Color(0xFFFF6B6B) // Same coral red as negative segments
-            }
-            
-            drawIntoCanvas { canvas ->
-                canvas.save()
-                canvas.translate(knobPosition.x, knobPosition.y)
-                canvas.rotate(knobAngle - 90f) // Align with dial direction
+            for (i in 0 until tickCount) {
+                val currentTickAngle = (i * tickAngle) - 90f // Start from top (12 o'clock)
+                val angleRad = Math.toRadians(currentTickAngle.toDouble())
                 
-                // Draw rounded rectangular knob indicator
-                canvas.drawRoundRect(
-                    -knobWidth / 2f,
-                    -knobHeight / 2f,
-                    knobWidth / 2f,
-                    knobHeight / 2f,
-                    knobWidth / 2f, // Fully rounded ends
-                    knobWidth / 2f,
-                    androidx.compose.ui.graphics.Paint().apply {
-                        color = knobColor
-                        isAntiAlias = true
-                    }
+                // Different sizes for major/minor ticks
+                val isMajorTick = i % 5 == 0
+                val tickLength = if (isMajorTick) 10.dp.toPx() else 6.dp.toPx()
+                val tickWidth = if (isMajorTick) 2.dp.toPx() else 1.dp.toPx()
+                
+                // Align ticks properly with the progress track
+                val tickInnerRadius = tickTrackRadius - tickLength / 2f
+                val tickOuterRadius = tickTrackRadius + tickLength / 2f
+                
+                val tickStart = center + Offset(
+                    x = tickInnerRadius * cos(angleRad).toFloat(),
+                    y = tickInnerRadius * sin(angleRad).toFloat()
                 )
-                canvas.restore()
+                val tickEnd = center + Offset(
+                    x = tickOuterRadius * cos(angleRad).toFloat(),
+                    y = tickOuterRadius * sin(angleRad).toFloat()
+                )
+                
+                // Clean aligned tick marks
+                drawLine(
+                    color = Color(0xFFD1D5DB),
+                    start = tickStart,
+                    end = tickEnd,
+                    strokeWidth = tickWidth,
+                    cap = StrokeCap.Round
+                )
             }
+            
+            // Live progress arc with immediate feedback during dragging
+            if (timeAdjustment != 0) {
+                val progressAngle = abs(displayAngle) // Use live display angle for immediate feedback
+                val startAngle = -90f // Start from top (12 o'clock)
+                val progressRadius = tickTrackRadius // Same radius as tick marks for perfect alignment
+                
+                // Outer glow effect - updates live during drag
+                drawArc(
+                    color = Color(0xFF10B981).copy(alpha = 0.25f), // Slightly more visible during drag
+                    startAngle = startAngle,
+                    sweepAngle = if (timeAdjustment > 0) progressAngle else -progressAngle,
+                    useCenter = false,
+                    topLeft = Offset(center.x - progressRadius, center.y - progressRadius),
+                    size = Size(progressRadius * 2, progressRadius * 2),
+                    style = Stroke(width = 10.dp.toPx(), cap = StrokeCap.Round)
+                )
+                
+                // Main progress arc - live feedback
+                drawArc(
+                    color = Color(0xFF10B981), // Professional teal-green
+                    startAngle = startAngle,
+                    sweepAngle = if (timeAdjustment > 0) progressAngle else -progressAngle,
+                    useCenter = false,
+                    topLeft = Offset(center.x - progressRadius, center.y - progressRadius),
+                    size = Size(progressRadius * 2, progressRadius * 2),
+                    style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+                )
+                
+                // Live knob positioning - follows drag immediately
+                val knobAngle = displayAngle
+                val knobAngleRad = Math.toRadians(knobAngle - 90.0) // Start from top
+                val knobPosition = Offset(
+                    x = center.x + progressRadius * cos(knobAngleRad).toFloat(),
+                    y = center.y + progressRadius * sin(knobAngleRad).toFloat()
+                )
+                
+                // Enhanced knob for better visibility during drag
+                drawCircle(
+                    color = Color.Black.copy(alpha = if (isDragging) 0.15f else 0.1f),
+                    radius = if (isDragging) 8.dp.toPx() else 7.dp.toPx(),
+                    center = knobPosition + Offset(0.5.dp.toPx(), 1.dp.toPx())
+                )
+                
+                drawCircle(
+                    color = Color(0xFF10B981),
+                    radius = if (isDragging) 7.dp.toPx() else 6.dp.toPx(), // Slightly larger when dragging
+                    center = knobPosition
+                )
+                
+                // Inner highlight on knob
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.4f),
+                    radius = if (isDragging) 4.dp.toPx() else 3.dp.toPx(),
+                    center = knobPosition - Offset(1.dp.toPx(), 1.dp.toPx())
+                )
+            }
+            
+            // Large professional center circle
+            val centerRadius = trackRadius * 0.65f
+            
+            // Center shadow
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.04f),
+                radius = centerRadius + 1.dp.toPx(),
+                center = center + Offset(0.5.dp.toPx(), 1.dp.toPx())
+            )
+            
+            // Clean white center
+            drawCircle(
+                color = Color.White,
+                radius = centerRadius,
+                center = center
+            )
+            
+            // Professional border
+            drawCircle(
+                color = Color(0xFFE5E7EB),
+                radius = centerRadius,
+                center = center,
+                style = Stroke(width = 0.5.dp.toPx())
+            )
         }
         
-        // Text overlay using Compose Text components positioned absolutely in center
+        // Prayer name and offset display in center
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -440,34 +490,34 @@ fun InteractiveTimeDial(
                 Text(
                     text = prayerName,
                     style = MaterialTheme.typography.titleMedium,
-                    color = colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 12.sp
+                    color = Color(0xFF666666), // Medium gray
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
                 )
                 
                 Spacer(modifier = Modifier.height(4.dp))
                 
-                // Adjusted time in 12-hour format
+                // Adjusted time display
                 val adjustedTime = convertTo12HourFormat(adjustTimeByMinutes(originalTime, timeAdjustment))
                 Text(
                     text = adjustedTime,
                     style = MaterialTheme.typography.headlineMedium,
-                    color = colorScheme.onSurface,
+                    color = Color(0xFF333333), // Dark gray like reference
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
+                    fontSize = 20.sp, // Slightly smaller to fit with prayer name
+                    letterSpacing = (-0.5).sp,
+                    textAlign = TextAlign.Center
                 )
                 
-                // Adjustment indicator
+                // Offset display
                 if (timeAdjustment != 0) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    val adjustmentText = if (timeAdjustment > 0) "+${timeAdjustment}m" else "${timeAdjustment}m"
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = adjustmentText,
+                        text = if (timeAdjustment > 0) "+${timeAdjustment}m" else "${timeAdjustment}m",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (timeAdjustment >= 0) Color(0xFF4ECDC4) else Color(0xFFFF6B6B),
+                        color = Color(0xFF10B981), // Teal color matching the progress arc
                         fontWeight = FontWeight.Medium,
-                        fontSize = 10.sp
+                        textAlign = TextAlign.Center
                     )
                 }
             }
