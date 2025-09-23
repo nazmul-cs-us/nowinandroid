@@ -54,6 +54,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
@@ -696,11 +700,12 @@ fun PrayerTimesScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Column(
-                        horizontalAlignment = Alignment.Start
+                        horizontalAlignment = Alignment.Start,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
                             text = prayerName,
@@ -710,7 +715,9 @@ fun PrayerTimesScreen(
                                 "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             },
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1
                         )
                         Text(
                             text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
@@ -720,36 +727,43 @@ fun PrayerTimesScreen(
                                 "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                             },
-                            fontWeight = FontWeight.Normal
+                            fontWeight = FontWeight.Normal,
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1
                         )
                     }
                     Column(
                         horizontalAlignment = Alignment.End
                     ) {
                         Text(
-                            text = PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes),
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                "Current" -> MaterialTheme.colorScheme.tertiary
-                                "Next" -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            text = buildAnnotatedString {
+                                val baseColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                    "Current" -> MaterialTheme.colorScheme.tertiary
+                                    "Next" -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                                
+                                // Main prayer time in bold
+                                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = baseColor)) {
+                                    append(PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes))
+                                }
+                                
+                                // Offset indicator in smaller, lighter style
+                                if (currentOffset != 0) {
+                                    append(" ")
+                                    withStyle(style = SpanStyle(
+                                        fontWeight = FontWeight.Medium,
+                                        color = baseColor.copy(alpha = 0.7f),
+                                        fontSize = MaterialTheme.typography.bodySmall.fontSize
+                                    )) {
+                                        append(if (currentOffset > 0) "+${currentOffset}m" else "${currentOffset}m")
+                                    }
+                                }
                             },
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.headlineSmall,
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1
                         )
-                        
-                        // Show adjustment offset if any
-                        if (currentOffset != 0) {
-                            Text(
-                                text = if (currentOffset > 0) "+${currentOffset}m" else "${currentOffset}m",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f)
-                                    "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                },
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
                     }
                 }
             }
@@ -971,7 +985,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.dhuhr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp)
+                            .height(110.dp)
                     )
                     
                     // Asr prayer with interactive dial  
@@ -982,7 +996,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.asr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp)
+                            .height(110.dp)
                     )
                 }
                 
@@ -999,7 +1013,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.maghrib,
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp)
+                            .height(110.dp)
                     )
                     
                     // Isha prayer with interactive dial
@@ -1010,18 +1024,19 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.isha,
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp)
+                            .height(110.dp)
                     )
                 }
                 
                 // Location info using Material 3 design
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
                     Row(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1033,11 +1048,16 @@ fun PrayerTimesScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = location,
+                            text = if (location.isBlank()) "Loading location..." else location,
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            textAlign = TextAlign.Center
-                        )
+                            textAlign = TextAlign.Center,
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1,
+                            fontWeight = FontWeight.Bold
+                        ).also {
+                            android.util.Log.d("LocationText", "📍 LOCATION DISPLAY: '$location' (length=${location.length})")
+                        }
                     }
                 }
             }
