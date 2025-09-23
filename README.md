@@ -73,6 +73,18 @@ Each prayer follows specific astronomical criteria:
 - **Pull-to-refresh**: Manual refresh with smooth animations
 - **Notification Support**: Prayer time alerts and reminders
 
+### Interactive Prayer Time Adjustment (September 2025)
+- **PNG File Icon Aesthetic Circular Timer**: Professional document-style circular dials for precise prayer time adjustments
+- **Long-Press Activation**: Transform any prayer tile (Dhuhr, Asr, Maghrib, Isha) into interactive circular dial
+- **Live Dragging Feedback**: Real-time progress arc and knob movement following finger during adjustments
+- **Prayer Information Display**: Shows prayer name, adjusted time (12-hour format), and current offset in dial center
+- **Visual Feedback**: Beautiful teal progress arc with glowing effects and 120 precision tick marks
+- **Long-Press Save**: Clean interaction - long press dial again to save adjustment and return to tile view
+- **Persistent Offset Display**: Small tiles show current stored adjustments (e.g., "+5m", "-3m")
+- **Exclusive Editing**: Only one tile in edit mode at a time with smooth scaling animations for others
+- **±180 Minute Range**: Full 6-hour adjustment range with 6-degree-per-minute precision
+- **Haptic Feedback**: Tactile response during drag interactions for enhanced user experience
+
 ### Technical Features
 - **Offline-first Architecture**: Works without internet connection
 - **Background Services**: Automatic prayer time updates and notifications

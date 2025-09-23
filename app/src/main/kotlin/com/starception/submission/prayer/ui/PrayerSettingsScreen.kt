@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.activity.compose.BackHandler
@@ -602,34 +603,88 @@ private fun TimeOffsetsSection(
         offsets.asr, offsets.maghrib, offsets.isha
     )
     
+    // Local state for text input to handle negative values properly
+    val offsetTexts = remember {
+        mutableStateListOf<String>().apply {
+            addAll(currentOffsets.map { it.toString() })
+        }
+    }
+    
+    // Update text fields when offsets change from external sources
+    LaunchedEffect(offsets) {
+        android.util.Log.d("PrayerSettingsScreen", "📥 OFFSETS RELOAD DETECTED:")
+        android.util.Log.d("PrayerSettingsScreen", "   🌅 Fajr: ${offsets.fajr}")
+        android.util.Log.d("PrayerSettingsScreen", "   🌄 Sunrise: ${offsets.sunrise}")
+        android.util.Log.d("PrayerSettingsScreen", "   🌞 Dhuhr: ${offsets.dhuhr}")
+        android.util.Log.d("PrayerSettingsScreen", "   🌇 Asr: ${offsets.asr}")
+        android.util.Log.d("PrayerSettingsScreen", "   🌆 Maghrib: ${offsets.maghrib}")
+        android.util.Log.d("PrayerSettingsScreen", "   🌙 Isha: ${offsets.isha}")
+        
+        currentOffsets.forEachIndexed { index, offset ->
+            val currentTextValue = offsetTexts[index].toIntOrNull()
+            if (currentTextValue != offset) {
+                android.util.Log.d("PrayerSettingsScreen", "📝 UPDATING UI field ${prayerNames[index]}: ${offsetTexts[index]} → ${offset}")
+                offsetTexts[index] = offset.toString()
+            }
+        }
+        android.util.Log.d("PrayerSettingsScreen", "✅ UI FIELDS UPDATED with stored offsets")
+    }
+    
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         prayerNames.forEachIndexed { index, prayerName ->
             OutlinedTextField(
-                value = currentOffsets[index].toString(),
+                value = offsetTexts[index],
                 onValueChange = { value ->
-                    val offset = value.toIntOrNull() ?: 0
-                    val newOffsets = when (index) {
-                        0 -> offsets.copy(fajr = offset)
-                        1 -> offsets.copy(sunrise = offset)
-                        2 -> offsets.copy(dhuhr = offset)
-                        3 -> offsets.copy(asr = offset)
-                        4 -> offsets.copy(maghrib = offset)
-                        5 -> offsets.copy(isha = offset)
-                        else -> offsets
+                    android.util.Log.v("PrayerSettingsScreen", "⌨️ USER INPUT: ${prayerName} field changed to '$value'")
+                    
+                    // Filter input to only allow digits and minus sign at the beginning
+                    val filteredValue = when {
+                        value.isEmpty() -> value
+                        value == "-" -> value
+                        value.matches(Regex("^-?\\d+$")) -> value // Only signed integers
+                        else -> {
+                            android.util.Log.v("PrayerSettingsScreen", "⚠️ INVALID INPUT: '$value' rejected, keeping '${offsetTexts[index]}'")
+                            offsetTexts[index] // Keep previous valid value
+                        }
                     }
-                    onOffsetsChanged(newOffsets)
+                    
+                    offsetTexts[index] = filteredValue
+                    
+                    // Only update settings when value is valid or empty
+                    val offset = if (filteredValue.isEmpty()) 0 else filteredValue.toIntOrNull()
+                    if (filteredValue.isEmpty() || offset != null) {
+                        val actualOffset = offset ?: 0
+                        android.util.Log.d("PrayerSettingsScreen", "📝 UPDATING $prayerName offset: '$filteredValue' → $actualOffset minutes")
+                        
+                        val newOffsets = when (index) {
+                            0 -> offsets.copy(fajr = actualOffset)
+                            1 -> offsets.copy(sunrise = actualOffset)
+                            2 -> offsets.copy(dhuhr = actualOffset)
+                            3 -> offsets.copy(asr = actualOffset)
+                            4 -> offsets.copy(maghrib = actualOffset)
+                            5 -> offsets.copy(isha = actualOffset)
+                            else -> offsets
+                        }
+                        
+                        android.util.Log.d("PrayerSettingsScreen", "💾 CALLING onOffsetsChanged with $prayerName = $actualOffset")
+                        onOffsetsChanged(newOffsets)
+                        android.util.Log.v("PrayerSettingsScreen", "✅ $prayerName offset update complete")
+                    }
                 },
                 label = { Text("$prayerName Offset") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
+                isError = offsetTexts[index].isNotEmpty() && offsetTexts[index].toIntOrNull() == null,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                     focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    errorBorderColor = MaterialTheme.colorScheme.error,
+                    errorLabelColor = MaterialTheme.colorScheme.error
                 )
             )
         }

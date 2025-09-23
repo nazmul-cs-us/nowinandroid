@@ -72,7 +72,7 @@ This is a fully modularized Android app following official Android architecture 
     - **UI**: Prayer settings screens and dialogs
   - **Notification System**: `PrayerNotificationService.kt` with background updates
   - **Permissions**: Location and notification permission handling
-  - **Features**: Location-based calculations, real-time updates, notification alerts, Material 3 design
+  - **Features**: Location-based calculations, real-time updates, notification alerts, Material 3 design, interactive prayer time adjustment with PNG file icon aesthetic
 
 ### App Module
 - **app** - Main application module, navigation, and dependency injection setup
@@ -131,6 +131,7 @@ The app uses `com.starception.submission` as the base package (originally forked
 ### Documentation
 - `docs/PRAYER_TIMES_TECHNICAL_GUIDE.md` - Comprehensive technical guide for the prayer times system
 - `docs/PRAYER_CALCULATION_METHODOLOGY.md` - Detailed explanation of Islamic prayer time calculations
+- `docs/INTERACTIVE_PRAYER_DIAL_GUIDE.md` - Complete technical guide for interactive prayer time adjustment feature
 - `README.md` - Updated with detailed prayer time features and capabilities
 
 ## UI Design System
@@ -155,18 +156,38 @@ All cards in the app follow a consistent design pattern:
 ## Prayer Times Recent UI Improvements (September 2025)
 
 ### Interactive Prayer Time Adjustment (September 2025)
-- **Beautiful Circular Timer**: Implemented stunning colorful quadrant-based circular timer for prayer time adjustments
-  - **PNG File Icon Aesthetic**: Professional PNG file icon with ocean scene and magnifying glass overlay
-  - **Four-Quadrant Design**: Green, Beige, DarkGray, and BlueGray colored segments with thick stroke styling
-  - **Interactive Knob**: Gradient-filled draggable knob with Pink radial gradient and subtle arc highlight
-  - **Smooth Animations**: 300ms tween animations for seamless knob movement and haptic feedback
-  - **60 Tick Marks**: Precise minute-level adjustments with semi-transparent white tick marks
-  - **Central Time Display**: Large, prominent time display in center with adjustment indicators (+X/-X minutes)
-  - **Long-Press Activation**: Individual tile transformation - only long-pressed tile becomes interactive dial
+- **Professional PNG File Icon Circular Timer**: Complete redesign with clean, document-style aesthetic for prayer time adjustments
+  - **PNG File Icon Design**: Clean white background with subtle shadows, folded corner effects, and professional document styling
+  - **Live Dragging Feedback**: Real-time progress arc and knob movement following finger during drag interactions
+  - **Prayer Name Display**: Shows prayer name (Dhuhr, Asr, Maghrib, Isha) prominently in center of dial
+  - **Adjusted Time Display**: Real-time 12-hour format time display (e.g., "3:45 PM") with live updates
+  - **Offset Indicators**: Current adjustment display (e.g., "+5m", "-3m") with color-coded feedback
+  - **120 Precision Tick Marks**: Fine-grained minute adjustments with professional gray tick marks around circumference
+  - **Teal Progress Arc**: Beautiful glowing arc with outer glow effects showing current adjustment range
+  - **Interactive Knob**: Smooth draggable knob with enhanced feedback during dragging (larger size, better visibility)
+  - **Long-Press Activation**: Transform individual tiles - only long-pressed tile becomes interactive dial
+  - **Long-Press Save**: Clean interaction - long press dial again to save adjustment and exit (no buttons)
+  - **Exclusive Tile Editing**: Only one tile in edit mode at a time with smooth scale animations for other tiles
   - **Haptic Feedback**: TextHandleMove haptic feedback during drag interactions for tactile response
-  - **±180 Minute Range**: Full 6-hour adjustment range (±3 hours) with visual feedback
-  - **Save/Cancel Actions**: Professional action buttons with color-coded save button
+  - **±180 Minute Range**: Full 6-hour adjustment range (±3 hours) with 6-degree-per-minute precision
+  - **Perfect Circular Geometry**: AspectRatio constraints ensure perfect circles without oval distortion
+  - **Tile Offset Display**: Small prayer tiles show current stored offsets (e.g., Dhuhr: "+5m", Asr: "-3m")
   - **Location**: `app/src/main/kotlin/com/starception/submission/feature/prayertimes/components/InteractivePrayerDial.kt`
+
+#### Interactive Prayer Dial Usage Flow
+1. **Initial State**: Small prayer tiles display prayer names, times, and current offsets (if any)
+2. **Long Press Activation**: Long press any prayer tile (Dhuhr, Asr, Maghrib, Isha) to transform it into interactive circular dial
+3. **Live Adjustment**: Drag the knob clockwise/counter-clockwise to adjust prayer time with real-time feedback
+4. **Visual Feedback**: Progress arc, knob position, and time display update immediately during dragging
+5. **Save & Exit**: Long press anywhere on the dial to save current adjustment and return to tile view
+6. **Persistent Display**: Saved offsets are displayed on small tiles (e.g., "+5m", "-3m") and stored in prayer settings
+
+#### Technical Implementation Features
+- **State Management**: Shared state ensures only one tile can be in edit mode at a time
+- **Animation System**: Smooth tile scaling (85% for non-editing tiles) and content size animations
+- **Gesture Handling**: Combined drag gestures for adjustment and tap gestures for save functionality
+- **Performance Optimization**: Efficient Canvas drawing with proper invalidation and minimal recomposition
+- **Accessibility**: Haptic feedback integration for enhanced user experience
 
 ### Qibla Compass Enhancements
 - **Removed Time Display**: Eliminated remaining prayer time text from Qibla compass components to prevent visual clutter
