@@ -20,6 +20,111 @@ class PrayerTimeCalculatorService @Inject constructor(
     }
     
     /**
+     * ENHANCED PRAYER CALCULATION LOGGING SYSTEM
+     * Provides comprehensive visibility into all prayer time calculations
+     */
+    
+    private fun logCalculationPhase(phase: String, details: String, data: Map<String, Any> = emptyMap()) {
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        
+        Log.i(TAG, "")
+        Log.i(TAG, "🔆 CALCULATION PHASE: $phase")
+        Log.i(TAG, "⏰ Timestamp: $timestamp")
+        Log.i(TAG, "📝 Details: $details")
+        
+        data.forEach { (key, value) ->
+            Log.i(TAG, "📊 $key: $value")
+        }
+        Log.i(TAG, "")
+    }
+    
+    private fun logPrayerTimeResult(prayerName: String, time: LocalTime?, offset: Int, method: String = "") {
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        
+        Log.i(TAG, "")
+        Log.i(TAG, "🕌 PRAYER TIME RESULT: $prayerName")
+        Log.i(TAG, "⏰ Timestamp: $timestamp")
+        
+        if (time != null) {
+            Log.i(TAG, "✅ Calculated Time: $time")
+            Log.i(TAG, "⏱️ User Offset: ${if (offset != 0) "$offset minutes" else "none"}")
+            if (method.isNotEmpty()) {
+                Log.i(TAG, "🔬 Method: $method")
+            }
+        } else {
+            Log.e(TAG, "❌ Calculation Failed: Returned null")
+            Log.e(TAG, "🔍 Likely Cause: High latitude or extreme calculation parameters")
+        }
+        Log.i(TAG, "")
+    }
+    
+    private fun validateCalculationInputs(date: LocalDate, location: Location, settings: PrayerSettings): Boolean {
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+            .format(java.util.Date())
+            
+        Log.i(TAG, "")
+        Log.i(TAG, "🔍 INPUT VALIDATION")
+        Log.i(TAG, "⏰ Timestamp: $timestamp")
+        
+        var isValid = true
+        
+        // Validate date
+        val today = LocalDate.now()
+        val daysDiff = java.time.temporal.ChronoUnit.DAYS.between(today, date)
+        if (Math.abs(daysDiff) > 365) {
+            Log.w(TAG, "⚠️ Date warning: $date is ${Math.abs(daysDiff)} days from today")
+        }
+        Log.i(TAG, "📅 Date: $date (${daysDiff} days from today)")
+        
+        // Validate location
+        if (!location.isValid()) {
+            Log.e(TAG, "❌ Invalid location coordinates")
+            Log.e(TAG, "📍 Latitude: ${location.latitude} (must be -90° to +90°)")
+            Log.e(TAG, "📍 Longitude: ${location.longitude} (must be -180° to +180°)")
+            isValid = false
+        } else {
+            Log.i(TAG, "✅ Location: ${location.getDisplayName()}")
+            Log.i(TAG, "📍 Coordinates: ${location.latitude}°, ${location.longitude}°")
+            Log.i(TAG, "🌍 Timezone: UTC${if (location.timeZoneOffset >= 0) "+" else ""}${location.timeZoneOffset}")
+        }
+        
+        // Validate settings
+        Log.i(TAG, "⚙️ Settings validation:")
+        Log.i(TAG, "  🕌 Calculation Method: ${settings.calculationMethod.displayName}")
+        Log.i(TAG, "  🤲 ASR Madhhab: ${settings.asrMadhhab.displayName} (shadow factor: ${settings.asrMadhhab.shadowFactor})")
+        Log.i(TAG, "  🏔️ High Latitude: ${settings.highLatitudeAdjustment.name}")
+        
+        val customAngles = mutableListOf<String>()
+        settings.customFajrAngle?.let { customAngles.add("Fajr: ${it}°") }
+        settings.customIshaAngle?.let { customAngles.add("Isha: ${it}°") }
+        if (customAngles.isNotEmpty()) {
+            Log.i(TAG, "  🌅 Custom Angles: ${customAngles.joinToString(", ")}")
+        }
+        
+        val nonZeroOffsets = listOf(
+            "Fajr" to settings.timeOffsets.fajr,
+            "Sunrise" to settings.timeOffsets.sunrise,
+            "Dhuhr" to settings.timeOffsets.dhuhr,
+            "Asr" to settings.timeOffsets.asr,
+            "Maghrib" to settings.timeOffsets.maghrib,
+            "Isha" to settings.timeOffsets.isha
+        ).filter { it.second != 0 }
+        
+        if (nonZeroOffsets.isNotEmpty()) {
+            Log.i(TAG, "  ⏱️ User Offsets: ${nonZeroOffsets.joinToString(", ") { "${it.first}: ${it.second}m" }}")
+        } else {
+            Log.i(TAG, "  ⏱️ User Offsets: None")
+        }
+        
+        Log.i(TAG, if (isValid) "✅ All inputs valid" else "❌ Input validation failed")
+        Log.i(TAG, "")
+        
+        return isValid
+    }
+    
+    /**
      * MAIN PRAYER TIMES CALCULATION FLOW
      * 
      * This is the core method that orchestrates the complete Islamic prayer time calculation process.
@@ -42,59 +147,124 @@ class PrayerTimeCalculatorService @Inject constructor(
         location: Location,
         settings: PrayerSettings
     ): DayPrayerTimes? {
-        Log.d(TAG, "=== STARTING PRAYER TIMES CALCULATION ===")
-        Log.d(TAG, "Location: ${location.getDisplayName()}")
-        Log.d(TAG, "Coordinates: lat=${location.latitude}, lng=${location.longitude}, tz=${location.timeZoneOffset}")
-        Log.d(TAG, "Date: $date")
-        Log.d(TAG, "Calculation Method: ${settings.calculationMethod}")
+        val calculationStart = System.currentTimeMillis()
+        
+        Log.i(TAG, "")
+        Log.i(TAG, "🌅 ISLAMIC PRAYER TIMES CALCULATION")
+        Log.i(TAG, "=".repeat(80))
+        Log.i(TAG, "🔆 Starting comprehensive prayer time calculation")
+        Log.i(TAG, "")
         
         // STEP 1: INPUT VALIDATION
-        // Verify that the provided coordinates are within valid geographic ranges
-        // Latitude: -90° to +90°, Longitude: -180° to +180°
-        if (!location.isValid()) {
-            Log.e(TAG, "❌ VALIDATION FAILED: Invalid location coordinates")
+        logCalculationPhase(
+            "INPUT_VALIDATION",
+            "Validating calculation inputs for safety and accuracy",
+            mapOf(
+                "date" to date,
+                "location" to location.getDisplayName(),
+                "method" to settings.calculationMethod.displayName
+            )
+        )
+        
+        if (!validateCalculationInputs(date, location, settings)) {
+            Log.e(TAG, "❌ CALCULATION ABORTED: Invalid inputs detected")
+            Log.e(TAG, "")
             return null
         }
         
         // STEP 2: ASTRONOMICAL FOUNDATION
-        // Convert the Gregorian date to Julian Day Number for precise astronomical calculations
-        // Julian Day provides a continuous count of days since the beginning of the Julian Period
+        logCalculationPhase(
+            "ASTRONOMICAL_FOUNDATION",
+            "Converting Gregorian date to Julian Day for astronomical precision",
+            mapOf("inputDate" to date)
+        )
+        
         val julianDay = astronomicalCalculator.calculateJulianDay(date)
-        Log.d(TAG, "✓ Julian day calculated: $julianDay")
+        
+        if (julianDay.isNaN()) {
+            Log.e(TAG, "❌ JULIAN DAY CALCULATION FAILED")
+            Log.e(TAG, "")
+            return null
+        }
+        
+        Log.i(TAG, "✅ ASTRONOMICAL FOUNDATION: Julian Day calculated successfully")
+        Log.i(TAG, "📊 Julian Day: $julianDay")
+        Log.i(TAG, "🗓️ Corresponds to: $date")
+        Log.i(TAG, "")
         
         // STEP 3: FUNDAMENTAL SOLAR CALCULATIONS
-        // Calculate the three key solar positions that form the foundation for all prayer times:
-        // - Solar Noon: When the sun reaches its highest point (Dhuhr prayer time)
-        // - Sunrise: Dawn transition, used for Fajr calculations and as Sunrise prayer time
-        // - Sunset: Dusk transition, immediate Maghrib time and basis for Isha calculations
+        logCalculationPhase(
+            "FUNDAMENTAL_SOLAR_CALCULATIONS",
+            "Calculating core solar positions for prayer time foundation",
+            mapOf(
+                "location" to location.getDisplayName(),
+                "julianDay" to julianDay
+            )
+        )
+        
         val solarNoon = astronomicalCalculator.calculateSolarNoon(location, julianDay)
         val sunrise = astronomicalCalculator.calculateSunrise(location, julianDay)
         val sunset = astronomicalCalculator.calculateSunset(location, julianDay)
         
-        Log.d(TAG, "✓ Solar positions calculated:")
-        Log.d(TAG, "  Solar Noon: $solarNoon (Dhuhr base time)")
-        Log.d(TAG, "  Sunrise: $sunrise (Dawn transition)")
-        Log.d(TAG, "  Sunset: $sunset (Maghrib time)")
+        // Verify fundamental calculations succeeded
+        if (solarNoon.isNaN() || sunrise.isNaN() || sunset.isNaN()) {
+            Log.e(TAG, "❌ FUNDAMENTAL SOLAR CALCULATIONS FAILED")
+            Log.e(TAG, "  Solar Noon: ${if (solarNoon.isNaN()) "FAILED" else "OK"}")
+            Log.e(TAG, "  Sunrise: ${if (sunrise.isNaN()) "FAILED" else "OK"}")
+            Log.e(TAG, "  Sunset: ${if (sunset.isNaN()) "FAILED" else "OK"}")
+            Log.e(TAG, "")
+            return null
+        }
+        
+        val solarNoonTime = astronomicalCalculator.decimalHourToLocalTime(solarNoon)
+        val sunriseTime = astronomicalCalculator.decimalHourToLocalTime(sunrise)
+        val sunsetTime = astronomicalCalculator.decimalHourToLocalTime(sunset)
+        
+        Log.i(TAG, "✅ FUNDAMENTAL SOLAR CALCULATIONS: All positions calculated successfully")
+        Log.i(TAG, "☀️ Solar Noon: $solarNoonTime (${solarNoon} decimal hours)")
+        Log.i(TAG, "🌅 Sunrise: $sunriseTime (${sunrise} decimal hours)")
+        Log.i(TAG, "🌆 Sunset: $sunsetTime (${sunset} decimal hours)")
+        Log.i(TAG, "📊 Day Length: ${String.format("%.2f", sunset - sunrise)} hours")
+        Log.i(TAG, "")
         
         // STEP 4: ISLAMIC PRAYER-SPECIFIC CALCULATIONS
-        // Apply Islamic astronomical rules for the three prayers that require complex calculations:
-        // - Fajr: Pre-dawn prayer based on sun's angle below horizon (typically -15° to -19.5°)
-        // - Asr: Afternoon prayer based on shadow length relative to object height
-        // - Isha: Night prayer based on sun's angle below horizon or fixed time after sunset
+        logCalculationPhase(
+            "ISLAMIC_PRAYER_CALCULATIONS",
+            "Applying Islamic astronomical rules for complex prayer calculations",
+            mapOf(
+                "method" to settings.calculationMethod.displayName,
+                "madhhab" to settings.asrMadhhab.displayName,
+                "highLatitudeMethod" to settings.highLatitudeAdjustment.name
+            )
+        )
+        
         val fajrTime = calculateFajrWithAdjustments(location, julianDay, settings)
         val asrTime = calculateAsrWithAdjustments(location, julianDay, settings)
         val ishaTime = calculateIshaWithAdjustments(location, julianDay, settings, sunset)
         
-        Log.d(TAG, "✓ Islamic prayer calculations completed:")
-        Log.d(TAG, "  Fajr (Pre-dawn): $fajrTime")
-        Log.d(TAG, "  Asr (Afternoon): $asrTime") 
-        Log.d(TAG, "  Isha (Night): $ishaTime")
+        // Log individual prayer calculation results
+        logPrayerTimeResult("FAJR", fajrTime, settings.timeOffsets.fajr, "${settings.getEffectiveFajrAngle()}° depression angle")
+        logPrayerTimeResult("ASR", asrTime, settings.timeOffsets.asr, "${settings.asrMadhhab.displayName} (${settings.asrMadhhab.shadowFactor}x shadow)")
+        logPrayerTimeResult("ISHA", ishaTime, settings.timeOffsets.isha, 
+            if (settings.getEffectiveIshaAngle() != null) "${settings.getEffectiveIshaAngle()}° depression angle" 
+            else "${settings.getEffectiveIshaDelay()} minutes after sunset")
+        
+        Log.i(TAG, "✅ ISLAMIC PRAYER CALCULATIONS: All prayers calculated")
+        Log.i(TAG, "")
         
         // STEP 5: USER CUSTOMIZATION APPLICATION
-        // Apply user-defined time adjustments to accommodate local customs,
-        // mosque schedules, or personal preferences
+        logCalculationPhase(
+            "USER_CUSTOMIZATION",
+            "Applying user-defined time adjustments and preferences",
+            mapOf(
+                "totalNonZeroOffsets" to settings.timeOffsets.run {
+                    listOf(fajr, sunrise, dhuhr, asr, maghrib, isha).count { it != 0 }
+                },
+                "offsetsJson" to settings.timeOffsets.toString()
+            )
+        )
+        
         val offsets = settings.timeOffsets
-        Log.d(TAG, "✓ Applying user time offsets: $offsets")
         
         // STEP 6: FINAL PRAYER TIME ASSEMBLY
         // Apply individual user time offsets to each prayer time.
@@ -134,25 +304,58 @@ class PrayerTimeCalculatorService @Inject constructor(
         // ISHA: Apply user offset to the calculated night time
         val isha = addMinutesToTime(ishaTime, offsets.isha)
         
-        Log.d(TAG, "✓ STEP 6: Final prayer times after all adjustments:")
-        Log.d(TAG, "  Fajr: $fajr (offset: ${offsets.fajr}min)")
-        Log.d(TAG, "  Sunrise: $sunriseAdjusted (offset: ${offsets.sunrise}min)") 
-        Log.d(TAG, "  Dhuhr: $dhuhr (offset: ${offsets.dhuhr}min)")
-        Log.d(TAG, "  Asr: $asr (offset: ${offsets.asr}min)")
-        Log.d(TAG, "  Maghrib: $maghrib (method: ${settings.calculationMethod.maghribOffset}min + user: ${offsets.maghrib}min)")
-        Log.d(TAG, "  Isha: $isha (offset: ${offsets.isha}min)")
+        // STEP 6: FINAL VERIFICATION AND LOGGING
+        logCalculationPhase(
+            "FINAL_VERIFICATION",
+            "Verifying all prayer times are valid and applying final adjustments"
+        )
+        
+        Log.i(TAG, "🕰️ FINAL PRAYER TIMES (after all adjustments):")
+        Log.i(TAG, "  🌄 Fajr: $fajr" + if (offsets.fajr != 0) " (${offsets.fajr}m)" else "")
+        Log.i(TAG, "  🌅 Sunrise: $sunriseAdjusted" + if (offsets.sunrise != 0) " (${offsets.sunrise}m)" else "")
+        Log.i(TAG, "  ☀️ Dhuhr: $dhuhr" + if (offsets.dhuhr != 0) " (${offsets.dhuhr}m)" else "")
+        Log.i(TAG, "  🌇 Asr: $asr" + if (offsets.asr != 0) " (${offsets.asr}m)" else "")
+        Log.i(TAG, "  🌆 Maghrib: $maghrib (method: ${settings.calculationMethod.maghribOffset}m)")
+        Log.i(TAG, "  🌙 Isha: $isha" + if (offsets.isha != 0) " (${offsets.isha}m)" else "")
+        Log.i(TAG, "")
         
         // STEP 7: FINAL VALIDATION
-        // Ensure all prayer times were successfully calculated before returning results
-        // If any calculation failed (returned null), the entire calculation is considered failed
         if (fajr == null || sunriseAdjusted == null || dhuhr == null || 
             asr == null || maghrib == null || isha == null) {
-            Log.e(TAG, "❌ CALCULATION FAILED: Some prayer times are null")
-            Log.e(TAG, "Failed times: fajr=${fajr == null}, sunrise=${sunriseAdjusted == null}, dhuhr=${dhuhr == null}, asr=${asr == null}, maghrib=${maghrib == null}, isha=${isha == null}")
+            
+            val failedPrayers = mutableListOf<String>()
+            if (fajr == null) failedPrayers.add("Fajr")
+            if (sunriseAdjusted == null) failedPrayers.add("Sunrise")
+            if (dhuhr == null) failedPrayers.add("Dhuhr")
+            if (asr == null) failedPrayers.add("Asr")
+            if (maghrib == null) failedPrayers.add("Maghrib")
+            if (isha == null) failedPrayers.add("Isha")
+            
+            Log.e(TAG, "")
+            Log.e(TAG, "❌ CALCULATION FAILURE DETECTED")
+            Log.e(TAG, "📊 Failed Calculations: ${failedPrayers.joinToString(", ")}")
+            Log.e(TAG, "🔍 Likely Causes:")
+            Log.e(TAG, "  - High latitude location (polar regions)")
+            Log.e(TAG, "  - Extreme calculation parameters")
+            Log.e(TAG, "  - Invalid astronomical conditions")
+            Log.e(TAG, "🛠️ Recommended Actions:")
+            Log.e(TAG, "  - Check high latitude adjustment method")
+            Log.e(TAG, "  - Verify calculation method compatibility")
+            Log.e(TAG, "  - Consider using different calculation parameters")
+            Log.e(TAG, "")
             return null
         }
         
-        Log.d(TAG, "✅ PRAYER TIMES CALCULATION COMPLETED SUCCESSFULLY")
+        val calculationEnd = System.currentTimeMillis()
+        val totalDuration = calculationEnd - calculationStart
+        
+        Log.i(TAG, "✅ PRAYER TIMES CALCULATION COMPLETED SUCCESSFULLY")
+        Log.i(TAG, "⚡ Total Calculation Time: ${totalDuration}ms")
+        Log.i(TAG, "🌍 Location: ${location.getDisplayName()}")
+        Log.i(TAG, "📅 Date: $date")
+        Log.i(TAG, "🕌 Method: ${settings.calculationMethod.displayName}")
+        Log.i(TAG, "=".repeat(80))
+        Log.i(TAG, "")
         
         // STEP 8: RETURN COMPLETE PRAYER SCHEDULE
         // Package all calculated times into a comprehensive day's prayer schedule
@@ -197,28 +400,46 @@ class PrayerTimeCalculatorService @Inject constructor(
         settings: PrayerSettings
     ): LocalTime? {
         // Get the depression angle for Fajr based on user's selected calculation method
-        // Common angles: -15° (Egypt), -18° (Makkah), -19.5° (Karachi), etc.
         val fajrAngle = settings.getEffectiveFajrAngle()
-        Log.d(TAG, "⏰ FAJR CALCULATION: Using depression angle: $fajrAngle°")
-        Log.d(TAG, "  Method: ${settings.calculationMethod}")
+        
+        logCalculationPhase(
+            "FAJR_CALCULATION",
+            "Calculating pre-dawn prayer time using astronomical depression angle",
+            mapOf(
+                "depressionAngle" to "$fajrAngle°",
+                "calculationMethod" to settings.calculationMethod.displayName,
+                "customAngle" to (settings.customFajrAngle?.let { "Yes (${it}°)" } ?: "No")
+            )
+        )
         
         // Attempt standard astronomical calculation
-        // This calculates when the sun reaches the specified angle below the horizon
+        val fajrStart = System.currentTimeMillis()
         val fajrDecimal = astronomicalCalculator.calculateFajr(location, julianDay, fajrAngle)
-        Log.d(TAG, "  Astronomical result: $fajrDecimal (decimal hour)")
+        val fajrDuration = System.currentTimeMillis() - fajrStart
+        
+        Log.i(TAG, "🔬 FAJR ASTRONOMICAL CALCULATION")
+        Log.i(TAG, "  📊 Depression Angle: $fajrAngle° (sun below horizon)")
+        Log.i(TAG, "  ⚡ Calculation Time: ${fajrDuration}ms")
+        Log.i(TAG, "  📊 Raw Result: $fajrDecimal decimal hours")
         
         // Check if standard calculation succeeded
         if (!fajrDecimal.isNaN()) {
             val fajrTime = astronomicalCalculator.decimalHourToLocalTime(fajrDecimal)
-            Log.d(TAG, "✅ FAJR TIME: $fajrTime (standard calculation)")
+            Log.i(TAG, "  ✅ FAJR SUCCESS: $fajrTime (standard astronomical calculation)")
+            Log.i(TAG, "  🌅 Method: ${settings.calculationMethod.displayName} depression angle")
+            Log.i(TAG, "")
             return fajrTime
         }
         
-        // Standard calculation failed - likely due to high latitude location
-        // Apply special adjustment methods for extreme latitudes
-        Log.w(TAG, "⚠️ FAJR: Standard calculation failed (NaN result)")
-        Log.w(TAG, "  Applying high latitude adjustment for lat=${location.latitude}")
-        Log.w(TAG, "  Adjustment method: ${settings.highLatitudeAdjustment}")
+        // Standard calculation failed - apply high latitude adjustments
+        Log.w(TAG, "")
+        Log.w(TAG, "⚠️ FAJR CALCULATION FAILED - HIGH LATITUDE DETECTED")
+        Log.w(TAG, "📊 Location: ${location.getDisplayName()} (${location.latitude}° N)")
+        Log.w(TAG, "🔍 Analysis: Sun never reaches $fajrAngle° below horizon")
+        Log.w(TAG, "🌅 Common in: Polar regions, extreme northern/southern locations")
+        Log.w(TAG, "🛠️ Solution: Applying high latitude adjustment method")
+        Log.w(TAG, "⚙️ Method: ${settings.highLatitudeAdjustment.name}")
+        Log.w(TAG, "")
         
         return applyHighLatitudeAdjustment(
             location, julianDay, settings, "fajr", fajrAngle
@@ -259,22 +480,39 @@ class PrayerTimeCalculatorService @Inject constructor(
         julianDay: Double,
         settings: PrayerSettings
     ): LocalTime? {
-        // Get shadow factor based on user's selected madhhab (school of thought)
-        // Hanafi: 2.0 (later time), Shafi/Maliki/Hanbali: 1.0 (earlier time)
         val shadowFactor = settings.asrMadhhab.shadowFactor
-        Log.d(TAG, "⏰ ASR CALCULATION: Using shadow factor: $shadowFactor")
-        Log.d(TAG, "  Madhhab: ${settings.asrMadhhab} (${if (shadowFactor == 2) "later" else "earlier"} Asr)")
         
-        // Calculate when object's shadow equals (shadowFactor × object height + original noon shadow)
-        // This involves complex trigonometry with sun's position and geographic location
+        logCalculationPhase(
+            "ASR_CALCULATION",
+            "Calculating afternoon prayer time using shadow-based methodology",
+            mapOf(
+                "madhhab" to settings.asrMadhhab.displayName,
+                "shadowFactor" to shadowFactor,
+                "timing" to if (shadowFactor == 2) "Later (Hanafi)" else "Earlier (Shafi/Maliki/Hanbali)"
+            )
+        )
+        
+        val asrStart = System.currentTimeMillis()
         val asrDecimal = astronomicalCalculator.calculateAsr(location, julianDay, shadowFactor)
-        Log.d(TAG, "  Astronomical result: $asrDecimal (decimal hour)")
+        val asrDuration = System.currentTimeMillis() - asrStart
         
-        // Convert decimal hour to clock time
-        val asrTime = astronomicalCalculator.decimalHourToLocalTime(asrDecimal)
-        Log.d(TAG, "✅ ASR TIME: $asrTime (shadow-based calculation)")
+        Log.i(TAG, "🔬 ASR SHADOW-BASED CALCULATION")
+        Log.i(TAG, "  🌇 Shadow Method: ${settings.asrMadhhab.displayName}")
+        Log.i(TAG, "  📏 Shadow Factor: ${shadowFactor}x object height")
+        Log.i(TAG, "  ⚡ Calculation Time: ${asrDuration}ms")
+        Log.i(TAG, "  📊 Raw Result: $asrDecimal decimal hours")
         
-        return asrTime
+        if (!asrDecimal.isNaN()) {
+            val asrTime = astronomicalCalculator.decimalHourToLocalTime(asrDecimal)
+            Log.i(TAG, "  ✅ ASR SUCCESS: $asrTime (shadow-based calculation)")
+            Log.i(TAG, "  📈 Interpretation: When shadow = ${shadowFactor} × object height")
+            Log.i(TAG, "")
+            return asrTime
+        } else {
+            Log.e(TAG, "  ❌ ASR CALCULATION FAILED: Extreme latitude or astronomical conditions")
+            Log.e(TAG, "")
+            return null
+        }
     }
     
     /**
@@ -316,31 +554,54 @@ class PrayerTimeCalculatorService @Inject constructor(
         sunset: Double
     ): LocalTime? {
         // Get the calculation parameters based on user's selected method
-        val ishaAngle = settings.getEffectiveIshaAngle()        // Depression angle (if angle-based)
-        val ishaDelay = settings.getEffectiveIshaDelay()        // Fixed minutes after sunset (if time-based)
+        val ishaAngle = settings.getEffectiveIshaAngle()
+        val ishaDelay = settings.getEffectiveIshaDelay()
+        val isAngleBased = ishaAngle != null
         
-        Log.d(TAG, "⏰ ISHA CALCULATION: Method: ${settings.calculationMethod}")
-        Log.d(TAG, "  Angle: $ishaAngle° (null = time-based method)")
-        Log.d(TAG, "  Fixed delay: $ishaDelay minutes (null = angle-based method)")
+        logCalculationPhase(
+            "ISHA_CALCULATION",
+            "Calculating night prayer time using ${if (isAngleBased) "angle-based" else "time-based"} method",
+            mapOf(
+                "calculationMethod" to settings.calculationMethod.displayName,
+                "approach" to if (isAngleBased) "Depression angle" else "Fixed delay after sunset",
+                "parameter" to if (isAngleBased) "$ishaAngle°" else "$ishaDelay minutes"
+            )
+        )
         
-        // Attempt calculation using the method-specific approach
-        // The calculator will automatically choose angle-based or time-based calculation
+        val ishaStart = System.currentTimeMillis()
         val ishaDecimal = astronomicalCalculator.calculateIsha(location, julianDay, ishaAngle, ishaDelay)
-        Log.d(TAG, "  Astronomical result: $ishaDecimal (decimal hour)")
+        val ishaDuration = System.currentTimeMillis() - ishaStart
         
-        // Check if standard calculation succeeded
+        Log.i(TAG, "🔬 ISHA NIGHT PRAYER CALCULATION")
+        Log.i(TAG, "  🌙 Method: ${settings.calculationMethod.displayName}")
+        if (isAngleBased) {
+            Log.i(TAG, "  📊 Angle-Based: $ishaAngle° depression angle (sun below horizon)")
+        } else {
+            Log.i(TAG, "  ⏰ Time-Based: $ishaDelay minutes after sunset")
+        }
+        Log.i(TAG, "  ⚡ Calculation Time: ${ishaDuration}ms")
+        Log.i(TAG, "  📊 Raw Result: $ishaDecimal decimal hours")
+        
         if (!ishaDecimal.isNaN()) {
             val ishaTime = astronomicalCalculator.decimalHourToLocalTime(ishaDecimal)
-            Log.d(TAG, "✅ ISHA TIME: $ishaTime (${if (ishaAngle != null) "angle" else "time"}-based calculation)")
+            Log.i(TAG, "  ✅ ISHA SUCCESS: $ishaTime (${if (isAngleBased) "angle" else "time"}-based calculation)")
+            Log.i(TAG, "")
             return ishaTime
         }
         
         // Standard calculation failed - apply high latitude adjustments
-        // This is more common for Isha than other prayers due to "white nights"
-        Log.w(TAG, "⚠️ ISHA: Standard calculation failed (NaN result)")
-        Log.w(TAG, "  Likely cause: High latitude location with insufficient darkness")
-        Log.w(TAG, "  Applying high latitude adjustment for lat=${location.latitude}")
-        Log.w(TAG, "  Adjustment method: ${settings.highLatitudeAdjustment}")
+        Log.w(TAG, "")
+        Log.w(TAG, "⚠️ ISHA CALCULATION FAILED - WHITE NIGHTS DETECTED")
+        Log.w(TAG, "📊 Location: ${location.getDisplayName()} (${location.latitude}° N)")
+        if (isAngleBased) {
+            Log.w(TAG, "🔍 Analysis: Sun never reaches $ishaAngle° below horizon")
+        } else {
+            Log.w(TAG, "🔍 Analysis: Time-based calculation failed")
+        }
+        Log.w(TAG, "🌅 Common in: Polar regions during summer months ('white nights')")
+        Log.w(TAG, "🛠️ Solution: Applying high latitude adjustment method")
+        Log.w(TAG, "⚙️ Method: ${settings.highLatitudeAdjustment.name}")
+        Log.w(TAG, "")
         
         return applyHighLatitudeAdjustment(
             location, julianDay, settings, "isha", ishaAngle ?: 0.0

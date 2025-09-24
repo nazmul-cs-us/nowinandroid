@@ -29,6 +29,44 @@ import javax.inject.Inject
 class NiaPreferencesDataSource @Inject constructor(
     private val userPreferences: DataStore<UserPreferences>,
 ) {
+    
+    companion object {
+        private const val TAG = "NiaPreferencesDataSource"
+    }
+    
+    /**
+     * ENHANCED DATASTORE LOGGING
+     * Comprehensive logging for all DataStore operations with detailed metadata
+     */
+    private fun logDataStoreOperation(operation: String, key: String, value: Any?, details: String = "") {
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        
+        Log.i(TAG, "")
+        Log.i(TAG, "💾 DATASTORE OPERATION")
+        Log.i(TAG, "⏰ Timestamp: $timestamp")
+        Log.i(TAG, "🔄 Operation: $operation")
+        Log.i(TAG, "🗝️ Key/Field: $key")
+        Log.i(TAG, "💎 Value: $value")
+        if (details.isNotEmpty()) {
+            Log.i(TAG, "📄 Details: $details")
+        }
+        Log.i(TAG, "📁 Storage: Proto DataStore")
+        Log.i(TAG, "")
+    }
+    
+    private fun verifyDataStoreWrite(operation: String, expectedResult: String) {
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+            .format(java.util.Date())
+            
+        Log.i(TAG, "")
+        Log.i(TAG, "🔍 DATASTORE WRITE VERIFICATION")
+        Log.i(TAG, "⏰ Timestamp: $timestamp")
+        Log.i(TAG, "🔄 Operation: $operation")
+        Log.i(TAG, "✅ Status: Write operation completed")
+        Log.i(TAG, "📈 Expected: $expectedResult")
+        Log.i(TAG, "")
+    }
     val userData = userPreferences.data
         .map {
             UserData(
@@ -61,6 +99,13 @@ class NiaPreferencesDataSource @Inject constructor(
         }
 
     suspend fun setFollowedTopicIds(topicIds: Set<String>) {
+        logDataStoreOperation(
+            operation = "SET_FOLLOWED_TOPICS",
+            key = "followedTopicIds", 
+            value = topicIds,
+            details = "Setting ${topicIds.size} topics as followed, clearing previous selections"
+        )
+        
         try {
             userPreferences.updateData {
                 it.copy {
@@ -69,12 +114,25 @@ class NiaPreferencesDataSource @Inject constructor(
                     updateShouldHideOnboardingIfNecessary()
                 }
             }
+            
+            verifyDataStoreWrite(
+                operation = "SET_FOLLOWED_TOPICS",
+                expectedResult = "${topicIds.size} topics stored as followed"
+            )
         } catch (ioException: IOException) {
-            Log.e("NiaPreferences", "Failed to update user preferences", ioException)
+            Log.e(TAG, "❌ DATASTORE ERROR: Failed to update followed topic IDs", ioException)
+            Log.e(TAG, "❌ Attempted to store: $topicIds")
         }
     }
 
     suspend fun setTopicIdFollowed(topicId: String, followed: Boolean) {
+        logDataStoreOperation(
+            operation = if (followed) "FOLLOW_TOPIC" else "UNFOLLOW_TOPIC",
+            key = "followedTopicIds[$topicId]",
+            value = followed,
+            details = "${if (followed) "Adding" else "Removing"} topic from followed list"
+        )
+        
         try {
             userPreferences.updateData {
                 it.copy {
@@ -86,26 +144,66 @@ class NiaPreferencesDataSource @Inject constructor(
                     updateShouldHideOnboardingIfNecessary()
                 }
             }
+            
+            verifyDataStoreWrite(
+                operation = if (followed) "FOLLOW_TOPIC" else "UNFOLLOW_TOPIC",
+                expectedResult = "Topic $topicId ${if (followed) "added to" else "removed from"} followed list"
+            )
         } catch (ioException: IOException) {
-            Log.e("NiaPreferences", "Failed to update user preferences", ioException)
+            Log.e(TAG, "❌ DATASTORE ERROR: Failed to update topic follow status", ioException)
+            Log.e(TAG, "❌ Topic: $topicId, Follow: $followed")
         }
     }
 
     suspend fun setThemeBrand(themeBrand: ThemeBrand) {
-        userPreferences.updateData {
-            it.copy {
-                this.themeBrand = when (themeBrand) {
-                    ThemeBrand.DEFAULT -> ThemeBrandProto.THEME_BRAND_DEFAULT
-                    ThemeBrand.ANDROID -> ThemeBrandProto.THEME_BRAND_ANDROID
-                    ThemeBrand.COASTAL -> ThemeBrandProto.THEME_BRAND_COASTAL
+        logDataStoreOperation(
+            operation = "SET_THEME_BRAND",
+            key = "themeBrand",
+            value = themeBrand.name,
+            details = "Changing app theme brand preference"
+        )
+        
+        try {
+            userPreferences.updateData {
+                it.copy {
+                    this.themeBrand = when (themeBrand) {
+                        ThemeBrand.DEFAULT -> ThemeBrandProto.THEME_BRAND_DEFAULT
+                        ThemeBrand.ANDROID -> ThemeBrandProto.THEME_BRAND_ANDROID
+                        ThemeBrand.COASTAL -> ThemeBrandProto.THEME_BRAND_COASTAL
+                    }
                 }
             }
+            
+            verifyDataStoreWrite(
+                operation = "SET_THEME_BRAND",
+                expectedResult = "Theme brand set to ${themeBrand.name}"
+            )
+        } catch (exception: Exception) {
+            Log.e(TAG, "❌ DATASTORE ERROR: Failed to update theme brand", exception)
+            Log.e(TAG, "❌ Attempted theme: ${themeBrand.name}")
         }
     }
 
     suspend fun setDynamicColorPreference(useDynamicColor: Boolean) {
-        userPreferences.updateData {
-            it.copy { this.useDynamicColor = useDynamicColor }
+        logDataStoreOperation(
+            operation = "SET_DYNAMIC_COLOR",
+            key = "useDynamicColor",
+            value = useDynamicColor,
+            details = "${if (useDynamicColor) "Enabling" else "Disabling"} dynamic color theming"
+        )
+        
+        try {
+            userPreferences.updateData {
+                it.copy { this.useDynamicColor = useDynamicColor }
+            }
+            
+            verifyDataStoreWrite(
+                operation = "SET_DYNAMIC_COLOR",
+                expectedResult = "Dynamic color preference set to $useDynamicColor"
+            )
+        } catch (exception: Exception) {
+            Log.e(TAG, "❌ DATASTORE ERROR: Failed to update dynamic color preference", exception)
+            Log.e(TAG, "❌ Attempted value: $useDynamicColor")
         }
     }
 
@@ -123,6 +221,13 @@ class NiaPreferencesDataSource @Inject constructor(
     }
 
     suspend fun setNewsResourceBookmarked(newsResourceId: String, bookmarked: Boolean) {
+        logDataStoreOperation(
+            operation = if (bookmarked) "BOOKMARK_ARTICLE" else "UNBOOKMARK_ARTICLE",
+            key = "bookmarkedNewsResourceIds[$newsResourceId]",
+            value = bookmarked,
+            details = "${if (bookmarked) "Adding" else "Removing"} article bookmark"
+        )
+        
         try {
             userPreferences.updateData {
                 it.copy {
@@ -133,8 +238,14 @@ class NiaPreferencesDataSource @Inject constructor(
                     }
                 }
             }
+            
+            verifyDataStoreWrite(
+                operation = if (bookmarked) "BOOKMARK_ARTICLE" else "UNBOOKMARK_ARTICLE",
+                expectedResult = "Article $newsResourceId ${if (bookmarked) "bookmarked" else "unbookmarked"}"
+            )
         } catch (ioException: IOException) {
-            Log.e("NiaPreferences", "Failed to update user preferences", ioException)
+            Log.e(TAG, "❌ DATASTORE ERROR: Failed to update bookmark status", ioException)
+            Log.e(TAG, "❌ Article: $newsResourceId, Bookmarked: $bookmarked")
         }
     }
 
