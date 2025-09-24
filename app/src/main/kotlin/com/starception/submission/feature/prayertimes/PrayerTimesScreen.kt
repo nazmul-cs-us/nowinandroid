@@ -696,13 +696,14 @@ fun PrayerTimesScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp),
+                        .wrapContentHeight()
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Column(
                         horizontalAlignment = Alignment.Start,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Text(
                             text = prayerName,
@@ -986,7 +987,6 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.dhuhr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(130.dp)
                     )
                     
                     // Asr prayer with interactive dial  
@@ -997,7 +997,6 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.asr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(130.dp)
                     )
                 }
                 
@@ -1014,7 +1013,6 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.maghrib,
                         modifier = Modifier
                             .weight(1f)
-                            .height(130.dp)
                     )
                     
                     // Isha prayer with interactive dial
@@ -1025,37 +1023,36 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.isha,
                         modifier = Modifier
                             .weight(1f)
-                            .height(130.dp)
                     )
                 }
                 
                 // Location info using Material 3 design
                 Surface(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
+                        .fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Filled.LocationOn,
                             contentDescription = "Location",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp)
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (location.isBlank()) "Loading location..." else location,
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
                             textAlign = TextAlign.Center,
-                            maxLines = 2,
-                            fontWeight = FontWeight.ExtraBold
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1,
+                            fontWeight = FontWeight.Bold
                         ).also {
                             android.util.Log.d("LocationText", "📍 LOCATION DISPLAY: '$location' (length=${location.length})")
                         }
