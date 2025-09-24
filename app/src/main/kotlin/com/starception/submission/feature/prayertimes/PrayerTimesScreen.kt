@@ -97,6 +97,7 @@ import com.starception.submission.feature.prayertimes.components.CompassPopupScr
 import com.starception.submission.feature.prayertimes.components.InteractivePrayerTimeCard
 import com.starception.submission.feature.prayertimes.getPrayerNameInLocalLanguage
 import dagger.hilt.android.EntryPointAccessors
+import com.starception.submission.prayer.service.CountryCodeMapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -1050,7 +1051,7 @@ fun PrayerTimesScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (location.isBlank()) "Loading location..." else location,
+                            text = getLocationWithCountryCode(location, prayerTimes?.location),
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             textAlign = TextAlign.Center,
@@ -1175,5 +1176,41 @@ fun PrayerTimesScreen(
             }
         )
     }
+}
+
+/**
+ * Helper function to get location text with country code
+ * Uses CountryCodeMapper to add country code to location display
+ */
+private fun getLocationWithCountryCode(
+    locationString: String,
+    locationData: com.starception.submission.prayer.model.Location?
+): String {
+    if (locationString.isBlank()) {
+        return "Loading location..."
+    }
+    
+    // If we have location data with country information, try to get country code
+    if (locationData != null) {
+        val countryCode = when {
+            // Use existing country code if available
+            locationData.countryCode.isNotEmpty() -> locationData.countryCode
+            
+            // Try to map country name to code using CountryCodeMapper
+            locationData.country.isNotEmpty() -> {
+                CountryCodeMapper.getCountryCode(locationData.country) ?: ""
+            }
+            
+            else -> ""
+        }
+        
+        // Return location with country code if we found one
+        if (countryCode.isNotEmpty()) {
+            return "$locationString ($countryCode)"
+        }
+    }
+    
+    // Fallback to original location string
+    return locationString
 }
 
