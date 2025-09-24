@@ -110,9 +110,168 @@ import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
 import com.starception.submission.prayer.service.EnhancedLocationService
 import java.time.LocalTime
+import kotlin.math.PI
+import androidx.compose.ui.graphics.StrokeCap
 
 
 
+
+@Composable
+fun Modifier.geminiGradientEdge(
+    borderWidth: Dp = 2.0.dp,
+    topStart: Dp = 16.dp,
+    topEnd: Dp = 16.dp,
+    bottomStart: Dp = 16.dp,
+    bottomEnd: Dp = 16.dp
+): Modifier {
+    val infiniteTransition = rememberInfiniteTransition(label = "geminiGradient")
+    
+    // Create a traveling shine animation around the perimeter
+    val shinePosition by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = androidx.compose.animation.core.LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shinePosition"
+    )
+    
+    return this.drawWithContent {
+        // Draw the content first
+        drawContent()
+        
+        // Calculate corner radii in pixels
+        val topStartPx = topStart.toPx()
+        val topEndPx = topEnd.toPx()
+        val bottomStartPx = bottomStart.toPx()
+        val bottomEndPx = bottomEnd.toPx()
+        val borderWidthPx = borderWidth.toPx()
+        
+        // Use the average corner radius for simplicity
+        val avgCornerRadius = (topStartPx + topEndPx + bottomStartPx + bottomEndPx) / 4f
+        
+        // Calculate traveling shine position
+        val perimeter = 2 * (size.width + size.height)
+        val shineProgress = shinePosition * perimeter
+        val shineSize = 50f // Size of the traveling shine
+        
+        // Calculate the shine position coordinates around the perimeter
+        val shineX: Float
+        val shineY: Float
+        
+        when {
+            shineProgress <= size.width -> {
+                // Top edge (left to right)
+                shineX = shineProgress
+                shineY = 0f
+            }
+            shineProgress <= size.width + size.height -> {
+                // Right edge (top to bottom)
+                shineX = size.width
+                shineY = shineProgress - size.width
+            }
+            shineProgress <= 2 * size.width + size.height -> {
+                // Bottom edge (right to left)
+                shineX = size.width - (shineProgress - size.width - size.height)
+                shineY = size.height
+            }
+            else -> {
+                // Left edge (bottom to top)
+                shineX = 0f
+                shineY = size.height - (shineProgress - 2 * size.width - size.height)
+            }
+        }
+        
+        // Determine which edge the shine is currently on and draw only that edge
+        when {
+            shineProgress <= size.width -> {
+                // Top edge (left to right) - draw horizontal shine on top
+                val topShineBrush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color(0xFF4CAF50).copy(alpha = 0.8f), // Green
+                        Color(0xFFFFEB3B).copy(alpha = 1.0f), // Yellow
+                        Color(0xFFFF9800).copy(alpha = 0.8f), // Orange
+                        Color.Transparent
+                    ),
+                    start = Offset(shineX - shineSize, 0f),
+                    end = Offset(shineX + shineSize, 0f)
+                )
+                drawLine(
+                    brush = topShineBrush,
+                    start = Offset(shineX - shineSize, 0f),
+                    end = Offset(shineX + shineSize, 0f),
+                    strokeWidth = borderWidthPx,
+                    cap = StrokeCap.Round
+                )
+            }
+            shineProgress <= size.width + size.height -> {
+                // Right edge (top to bottom) - draw vertical shine on right
+                val rightShineBrush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.8f),
+                        Color.White.copy(alpha = 1.0f),
+                        Color.White.copy(alpha = 0.8f),
+                        Color.Transparent
+                    ),
+                    start = Offset(size.width, shineY - shineSize),
+                    end = Offset(size.width, shineY + shineSize)
+                )
+                drawLine(
+                    brush = rightShineBrush,
+                    start = Offset(size.width, shineY - shineSize),
+                    end = Offset(size.width, shineY + shineSize),
+                    strokeWidth = borderWidthPx,
+                    cap = StrokeCap.Round
+                )
+            }
+            shineProgress <= 2 * size.width + size.height -> {
+                // Bottom edge (right to left) - draw horizontal shine on bottom
+                val bottomShineBrush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.8f),
+                        Color.White.copy(alpha = 1.0f),
+                        Color.White.copy(alpha = 0.8f),
+                        Color.Transparent
+                    ),
+                    start = Offset(shineX - shineSize, size.height),
+                    end = Offset(shineX + shineSize, size.height)
+                )
+                drawLine(
+                    brush = bottomShineBrush,
+                    start = Offset(shineX - shineSize, size.height),
+                    end = Offset(shineX + shineSize, size.height),
+                    strokeWidth = borderWidthPx,
+                    cap = StrokeCap.Round
+                )
+            }
+            else -> {
+                // Left edge (bottom to top) - draw vertical shine on left
+                val leftShineBrush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.8f),
+                        Color.White.copy(alpha = 1.0f),
+                        Color.White.copy(alpha = 0.8f),
+                        Color.Transparent
+                    ),
+                    start = Offset(0f, shineY - shineSize),
+                    end = Offset(0f, shineY + shineSize)
+                )
+                drawLine(
+                    brush = leftShineBrush,
+                    start = Offset(0f, shineY - shineSize),
+                    end = Offset(0f, shineY + shineSize),
+                    strokeWidth = borderWidthPx,
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun Modifier.sunshineAura(
@@ -624,18 +783,14 @@ private fun NextPrayerTile(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .sunshineAura(
-                    topStart = 40.dp,
-                    topEnd = 20.dp,
-                    bottomStart = 20.dp,
-                    bottomEnd = 40.dp
+                .geminiGradientEdge(
+                    borderWidth = 1.5.dp,
+                    topStart = 32.dp,
+                    topEnd = 32.dp,
+                    bottomStart = 32.dp,
+                    bottomEnd = 32.dp
                 ),
-            shape = RoundedCornerShape(
-                topStart = 40.dp,
-                topEnd = 20.dp,
-                bottomStart = 20.dp,
-                bottomEnd = 40.dp
-            ),
+            shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
             shadowElevation = 2.dp
         ) {
@@ -776,12 +931,7 @@ private fun NextPrayerTile(
         // Fallback if no prayer data - Beautiful loading state
         Surface(
             modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(
-                topStart = 40.dp,
-                topEnd = 20.dp,
-                bottomStart = 20.dp,
-                bottomEnd = 40.dp
-            ),
+            shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.surface
         ) {
             Column(
@@ -826,18 +976,14 @@ private fun SmartInfoTile(
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .sunshineAura(
-                topStart = 20.dp,
-                topEnd = 40.dp,
-                bottomStart = 40.dp,
-                bottomEnd = 20.dp
+            .geminiGradientEdge(
+                borderWidth = 1.5.dp,
+                topStart = 32.dp,
+                topEnd = 32.dp,
+                bottomStart = 32.dp,
+                bottomEnd = 32.dp
             ),
-        shape = RoundedCornerShape(
-            topStart = 20.dp,
-            topEnd = 40.dp,
-            bottomStart = 40.dp,
-            bottomEnd = 20.dp
-        ),
+        shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
         shadowElevation = 2.dp
     ) {
@@ -919,18 +1065,14 @@ private fun DailyStatsTile(
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .sunshineAura(
+            .geminiGradientEdge(
+                borderWidth = 1.5.dp,
                 topStart = 32.dp,
-                topEnd = 16.dp,
-                bottomStart = 16.dp,
+                topEnd = 32.dp,
+                bottomStart = 32.dp,
                 bottomEnd = 32.dp
             ),
-        shape = RoundedCornerShape(
-            topStart = 32.dp,
-            topEnd = 16.dp,
-            bottomStart = 16.dp,
-            bottomEnd = 32.dp
-        ),
+        shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.tertiaryContainer,
         shadowElevation = 2.dp
     ) {
