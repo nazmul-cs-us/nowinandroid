@@ -698,7 +698,8 @@ fun PrayerTimesScreen(
                     modifier = Modifier
                         .wrapContentHeight()
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                        .padding(horizontal = 14.dp)
+                        .padding(top = 8.dp, bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Column(
@@ -1029,7 +1030,8 @@ fun PrayerTimesScreen(
                 // Location info using Material 3 design
                 Surface(
                     modifier = Modifier
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, bottom = 20.dp),
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
