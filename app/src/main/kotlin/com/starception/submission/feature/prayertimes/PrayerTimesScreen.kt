@@ -662,8 +662,8 @@ fun PrayerTimesScreen(
             }
             }
         } else {
-            // Show regular small card with long-press detection
-            ElevatedCard(
+            // Show regular small card with long-press detection - NO SHADOW
+            Card(
                 modifier = modifier
                     .graphicsLayer(
                         scaleX = scale * transformScale,
@@ -686,15 +686,12 @@ fun PrayerTimesScreen(
                         )
                     },
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.elevatedCardColors(
+                colors = CardDefaults.cardColors(
                     containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                         "Current" -> MaterialTheme.colorScheme.tertiaryContainer
                         "Next" -> MaterialTheme.colorScheme.primaryContainer
                         else -> MaterialTheme.colorScheme.surfaceVariant
                     }
-                ),
-                elevation = CardDefaults.elevatedCardElevation(
-                    defaultElevation = 4.dp
                 )
             ) {
                 Column(
@@ -829,10 +826,14 @@ fun PrayerTimesScreen(
                 }
             } else {
                 android.util.Log.d("PrayerScreen", "No cached data found - this is first time use")
+                // Set fallback location immediately so it's visible
+                location = "Dubai (Default)"
                 isLoading = true  // Only show loading for brand new users
             }
         } catch (e: Exception) {
             android.util.Log.w("PrayerScreen", "Failed to load cached data: ${e.message}")
+            // Set fallback location immediately so it's visible
+            location = "Dubai (Default)"
             isLoading = true  // Show loading if cache access fails
         }
         
@@ -936,7 +937,7 @@ fun PrayerTimesScreen(
                         bottom = 24.dp // Increased from 16.dp to accommodate swipe hint
                     )
                     .offset(y = (animatedPullOffset * 0.2f).dp), // Reduced content movement to prevent overlap
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
 
 
@@ -985,7 +986,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.dhuhr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(110.dp)
+                            .height(130.dp)
                     )
                     
                     // Asr prayer with interactive dial  
@@ -996,7 +997,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.asr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(110.dp)
+                            .height(130.dp)
                     )
                 }
                 
@@ -1013,7 +1014,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.maghrib,
                         modifier = Modifier
                             .weight(1f)
-                            .height(110.dp)
+                            .height(130.dp)
                     )
                     
                     // Isha prayer with interactive dial
@@ -1024,37 +1025,37 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.isha,
                         modifier = Modifier
                             .weight(1f)
-                            .height(110.dp)
+                            .height(130.dp)
                     )
                 }
                 
                 // Location info using Material 3 design
                 Surface(
                     modifier = Modifier
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer
+                    color = MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Filled.LocationOn,
                             contentDescription = "Location",
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(20.dp)
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (location.isBlank()) "Loading location..." else location,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.primary,
                             textAlign = TextAlign.Center,
-                            overflow = TextOverflow.Ellipsis,
-                            maxLines = 1,
-                            fontWeight = FontWeight.Bold
+                            maxLines = 2,
+                            fontWeight = FontWeight.ExtraBold
                         ).also {
                             android.util.Log.d("LocationText", "📍 LOCATION DISPLAY: '$location' (length=${location.length})")
                         }

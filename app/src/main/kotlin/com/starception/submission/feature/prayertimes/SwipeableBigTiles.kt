@@ -510,7 +510,7 @@ fun SwipeableBigTiles(
     )
     
     Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         HorizontalPager(
             state = pagerState,
@@ -551,7 +551,7 @@ fun SwipeableBigTiles(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp),
+                .padding(top = 1.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -578,7 +578,7 @@ fun SwipeableBigTiles(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp),
+                .padding(top = 0.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
