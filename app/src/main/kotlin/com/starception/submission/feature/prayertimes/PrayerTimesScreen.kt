@@ -1031,7 +1031,7 @@ fun PrayerTimesScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp, bottom = 20.dp),
+                        .padding(top = 16.dp, bottom = 16.dp),
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
@@ -1044,12 +1044,14 @@ fun PrayerTimesScreen(
                             imageVector = Icons.Filled.LocationOn,
                             contentDescription = "Location",
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier
+                                .size(24.dp)
+                                .offset(y = (0).dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (location.isBlank()) "Loading location..." else location,
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             textAlign = TextAlign.Center,
                             overflow = TextOverflow.Ellipsis,
