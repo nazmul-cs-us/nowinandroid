@@ -68,6 +68,10 @@ interface PrayerTimeCalculatorEntryPoint {
  */
 class PrayerTimesCalculator(private val context: Context) {
     
+    companion object {
+        private const val TAG = "PrayerTimesCalculator"
+    }
+    
     /**
      * MAIN CALCULATION METHOD: Calculate prayer times with smart caching and fallbacks
      * 
@@ -99,11 +103,16 @@ class PrayerTimesCalculator(private val context: Context) {
      */
     suspend fun calculateDefaultPrayerTimes(): Pair<DayPrayerTimes?, String> {
         val startTime = System.currentTimeMillis()
-        android.util.Log.d("PrayerCalculation", "=== STARTING PRAYER TIMES CALCULATION ===")
+        android.util.Log.i(TAG, "")
+        android.util.Log.i(TAG, "🌅 COMPREHENSIVE PRAYER TIMES CALCULATION")
+        android.util.Log.i(TAG, "=".repeat(90))
+        android.util.Log.i(TAG, "🔆 Starting multi-stage prayer calculation with intelligent fallbacks")
+        android.util.Log.i(TAG, "")
         
         return try {
             // STEP 1: Get all required services
-            android.util.Log.d("PrayerCalculation", "STEP 1: Getting required services")
+            android.util.Log.i(TAG, "🔄 STEP 1: SERVICE INITIALIZATION")
+            android.util.Log.i(TAG, "Obtaining required services via Hilt dependency injection")
             val entryPoint = EntryPointAccessors.fromApplication(
                 context.applicationContext,
                 PrayerTimeCalculatorEntryPoint::class.java
@@ -112,25 +121,31 @@ class PrayerTimesCalculator(private val context: Context) {
             val locationService = entryPoint.enhancedLocationService()
             val settingsRepository = entryPoint.prayerSettingsRepository()
             val cache = entryPoint.locationCache()
-            android.util.Log.d("PrayerCalculation", "✓ All services obtained successfully")
+            android.util.Log.i(TAG, "✅ All required services obtained successfully")
+            android.util.Log.i(TAG, "")
             
             // STEP 2: Check cache first for instant results
-            android.util.Log.d("PrayerCalculation", "STEP 2: Checking cached prayer times")
+            android.util.Log.i(TAG, "🔄 STEP 2: CACHE VALIDATION")
+            android.util.Log.i(TAG, "Checking for cached prayer times to enable instant results")
             val cachedData = cache.getCachedPrayerTimes()
             if (cachedData != null) {
                 val (cachedPrayerTimes, cachedDate, cachedLocationName) = cachedData
                 android.util.Log.d("PrayerCalculation", "Found cached data: date=$cachedDate, location=$cachedLocationName")
                 if (cachedPrayerTimes != null && cachedLocationName != null) {
-                    android.util.Log.d("PrayerCalculation", "✓ Using cached prayer times - INSTANT RETURN")
+                    android.util.Log.i(TAG, "🚀 CACHE HIT - INSTANT RETURN")
+                    android.util.Log.i(TAG, "📅 Cached Date: $cachedDate")
+                    android.util.Log.i(TAG, "🌍 Cached Location: $cachedLocationName")
                     android.util.Log.d("PrayerCalculation", "Cached times: Fajr=${cachedPrayerTimes.fajr}, Dhuhr=${cachedPrayerTimes.dhuhr}, Asr=${cachedPrayerTimes.asr}, Maghrib=${cachedPrayerTimes.maghrib}, Isha=${cachedPrayerTimes.isha}")
                     // Return cached data immediately - no waiting!
                     return Pair(cachedPrayerTimes, cachedLocationName)
                 }
             }
-            android.util.Log.d("PrayerCalculation", "No valid cached data found, proceeding with fresh calculation")
+            android.util.Log.i(TAG, "💾 CACHE MISS - Proceeding with fresh calculation")
+            android.util.Log.i(TAG, "")
             
             // STEP 3: Get user prayer settings (wait for proper loading)
-            android.util.Log.d("PrayerCalculation", "STEP 3: Loading user prayer settings (waiting for proper load)")
+            android.util.Log.i(TAG, "🔄 STEP 3: USER SETTINGS LOADING")
+            android.util.Log.i(TAG, "Loading user prayer calculation preferences and configuration")
             val userSettings = try {
                 val settings = settingsRepository.getLoadedSettings() // NEW: Wait for actual loaded settings
                 android.util.Log.w("PrayerCalculation", "✓ LOADED User settings (not defaults):")
@@ -147,7 +162,8 @@ class PrayerTimesCalculator(private val context: Context) {
             }
             
             // STEP 4: SMART LOCATION DETERMINATION - Multi-level fallback system
-            android.util.Log.d("PrayerCalculation", "STEP 4: Determining location using priority fallback system")
+            android.util.Log.i(TAG, "🔄 STEP 4: INTELLIGENT LOCATION DETERMINATION")
+            android.util.Log.i(TAG, "Applying intelligent multi-tier location resolution strategy")
             android.util.Log.d("PrayerCalculation", "=== LOCATION PERMISSION DEBUG ===")
             android.util.Log.d("PrayerCalculation", "Location permission granted: ${locationService.hasLocationPermission()}")
             android.util.Log.d("PrayerCalculation", "User saved location exists: ${userSettings.location != null}")
@@ -277,7 +293,8 @@ class PrayerTimesCalculator(private val context: Context) {
             }
             
             // STEP 5: CALCULATE PRAYER TIMES using astronomical formulas
-            android.util.Log.d("PrayerCalculation", "STEP 5: Calculating prayer times using astronomical formulas")
+            android.util.Log.i(TAG, "🔄 STEP 5: ASTRONOMICAL CALCULATION")
+            android.util.Log.i(TAG, "Executing comprehensive Islamic prayer time calculations")
             val today = LocalDate.now()
             android.util.Log.d("PrayerCalculation", "Calculation date: $today")
             android.util.Log.d("PrayerCalculation", "Final location: ${location.getDisplayName()}")
@@ -336,14 +353,19 @@ class PrayerTimesCalculator(private val context: Context) {
             }
             
             val totalTime = System.currentTimeMillis() - startTime
-            android.util.Log.d("PrayerCalculation", "=== CALCULATION COMPLETE ===")
+            android.util.Log.i(TAG, "")
+            android.util.Log.i(TAG, "✅ PRAYER CALCULATION ORCHESTRATION COMPLETE")
+            android.util.Log.i(TAG, "=".repeat(90))
             android.util.Log.d("PrayerCalculation", "Total calculation time: ${totalTime}ms")
             android.util.Log.d("PrayerCalculation", "Result: ${if (calculatedTimes != null) "SUCCESS" else "FAILED"}")
             
             Pair(calculatedTimes, locationName)
         } catch (e: Exception) {
             val totalTime = System.currentTimeMillis() - startTime
-            android.util.Log.e("PrayerCalculation", "=== CALCULATION FAILED AFTER ${totalTime}ms ===")
+            android.util.Log.e(TAG, "")
+            android.util.Log.e(TAG, "❌ CRITICAL CALCULATION FAILURE")
+            android.util.Log.e(TAG, "=".repeat(90))
+            android.util.Log.e(TAG, "⚡ Failure Time: ${totalTime}ms")
             android.util.Log.e("PrayerCalculation", "Error during prayer times calculation: ${e.message}", e)
             
             // ERROR RECOVERY: Try cached data as emergency fallback

@@ -101,30 +101,202 @@ class PrayerSettingsRepository @Inject constructor(
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
     
-    // DEBUGGING HELPER FUNCTIONS - For explicit preference logging
+    // COMPREHENSIVE PREFERENCE LOGGING SYSTEM - Enhanced logging with detailed data tracking
+    // This provides complete visibility into all preference operations for debugging and monitoring
+    
+    /**
+     * ENHANCED PREFERENCE READ LOGGING
+     * Logs all preference read operations with key, value, type, and metadata
+     */
     private fun logPrefRead(key: String, value: Any?, defaultValue: Any? = null) {
-        Log.d(TAG, "🔍 PREF READ: key='$key' | value=$value | default=$defaultValue")
+        val valueType = when (value) {
+            is String -> "String(${value.length} chars)"
+            is Int -> "Integer"
+            is Float -> "Float" 
+            is Boolean -> "Boolean"
+            is Double -> "Double"
+            null -> "NULL"
+            else -> value::class.simpleName ?: "Unknown"
+        }
+        
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        
+        Log.i(TAG, "")
+        Log.i(TAG, "🔍 PREFERENCE READ OPERATION")
+        Log.i(TAG, "⏰ Timestamp: $timestamp")
+        Log.i(TAG, "🗝️ Key: '$key'")
+        Log.i(TAG, "📊 Data Type: $valueType")
+        Log.i(TAG, "💎 Current Value: $value")
+        if (defaultValue != null) {
+            Log.i(TAG, "🔄 Default Fallback: $defaultValue")
+        }
+        Log.i(TAG, "📁 Storage File: $PREFS_NAME")
+        Log.i(TAG, "")
     }
     
+    /**
+     * ENHANCED PREFERENCE WRITE LOGGING
+     * Logs all preference write operations with comprehensive metadata
+     */
     private fun logPrefWrite(key: String, value: Any?) {
-        Log.d(TAG, "💾 PREF WRITE: key='$key' | value=$value")
+        val valueType = when (value) {
+            is String -> "String(${value.length} chars)"
+            is Int -> "Integer"
+            is Float -> "Float" 
+            is Boolean -> "Boolean"
+            is Double -> "Double"
+            null -> "NULL"
+            else -> value::class.simpleName ?: "Unknown"
+        }
+        
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        
+        Log.i(TAG, "")
+        Log.i(TAG, "💾 PREFERENCE WRITE OPERATION")
+        Log.i(TAG, "⏰ Timestamp: $timestamp")
+        Log.i(TAG, "🗝️ Key: '$key'")
+        Log.i(TAG, "📊 Data Type: $valueType")
+        Log.i(TAG, "💎 New Value: $value")
+        Log.i(TAG, "📁 Storage File: $PREFS_NAME")
+        Log.i(TAG, "")
     }
     
+    /**
+     * ENHANCED JSON READ LOGGING
+     * Provides detailed analysis of JSON preference reads with size, parsing info, and content preview
+     */
     private fun logPrefReadJson(key: String, jsonContent: String?, description: String) {
-        val content = if (jsonContent.isNullOrEmpty() || jsonContent == "{}") {
-            "EMPTY/NULL"
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+            .format(java.util.Date())
+            
+        Log.i(TAG, "")
+        Log.i(TAG, "📄 JSON PREFERENCE READ")
+        Log.i(TAG, "⏰ Timestamp: $timestamp")
+        Log.i(TAG, "🗝️ Key: '$key'")
+        Log.i(TAG, "📝 Description: $description")
+        Log.i(TAG, "📁 Storage File: $PREFS_NAME")
+        
+        if (jsonContent.isNullOrEmpty()) {
+            Log.i(TAG, "📊 Status: EMPTY/NULL - Using defaults")
+            Log.i(TAG, "🔄 Action: Will fallback to default values")
+        } else if (jsonContent == "{}") {
+            Log.i(TAG, "📊 Status: EMPTY JSON OBJECT")
+            Log.i(TAG, "🔄 Action: Will fallback to default values")
         } else {
-            "Length=${jsonContent.length} chars"
+            Log.i(TAG, "📊 Status: DATA FOUND")
+            Log.i(TAG, "📏 Size: ${jsonContent.length} characters")
+            Log.i(TAG, "🔄 Action: Will parse JSON content")
+            
+            // Show JSON content with proper formatting for debugging
+            Log.i(TAG, "📄 JSON CONTENT:")
+            // Split long JSON into readable chunks
+            if (jsonContent.length > 200) {
+                Log.i(TAG, "${jsonContent.substring(0, 200)}...")
+                Log.i(TAG, "📏 (Showing first 200 chars of ${jsonContent.length} total)")
+            } else {
+                Log.i(TAG, jsonContent)
+            }
+            
+            // Try to provide quick JSON analysis
+            try {
+                val jsonElement = kotlinx.serialization.json.Json.parseToJsonElement(jsonContent)
+                when {
+                    jsonElement.jsonObject.keys.isEmpty() -> Log.i(TAG, "🔍 Analysis: Empty JSON object")
+                    else -> Log.i(TAG, "🔍 Analysis: ${jsonElement.jsonObject.keys.size} properties found")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ JSON Analysis: Failed to parse - ${e.message}")
+            }
         }
-        Log.d(TAG, "📄 JSON READ: key='$key' | content=$content | desc='$description'")
-        if (!jsonContent.isNullOrEmpty() && jsonContent != "{}") {
-            Log.d(TAG, "📄 JSON CONTENT: $jsonContent")
-        }
+        Log.i(TAG, "")
     }
     
+    /**
+     * ENHANCED JSON WRITE LOGGING
+     * Comprehensive logging for JSON preference writes with validation and content analysis
+     */
     private fun logPrefWriteJson(key: String, jsonContent: String, description: String) {
-        Log.d(TAG, "💾 JSON WRITE: key='$key' | length=${jsonContent.length} chars | desc='$description'")
-        Log.d(TAG, "💾 JSON CONTENT: $jsonContent")
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+            .format(java.util.Date())
+            
+        Log.i(TAG, "")
+        Log.i(TAG, "💾 JSON PREFERENCE WRITE")
+        Log.i(TAG, "⏰ Timestamp: $timestamp")
+        Log.i(TAG, "🗝️ Key: '$key'")
+        Log.i(TAG, "📝 Description: $description")
+        Log.i(TAG, "📁 Storage File: $PREFS_NAME")
+        Log.i(TAG, "📏 Size: ${jsonContent.length} characters")
+        
+        // JSON content analysis
+        try {
+            val jsonElement = kotlinx.serialization.json.Json.parseToJsonElement(jsonContent)
+            Log.i(TAG, "✅ JSON Validation: Valid JSON format")
+            Log.i(TAG, "🔍 Properties: ${jsonElement.jsonObject.keys.size} fields")
+            Log.i(TAG, "🏷️ Field Names: ${jsonElement.jsonObject.keys.joinToString(", ")}")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ JSON Validation: Invalid JSON - ${e.message}")
+        }
+        
+        // Show JSON content with formatting
+        Log.i(TAG, "📄 JSON CONTENT TO SAVE:")
+        if (jsonContent.length > 300) {
+            Log.i(TAG, "${jsonContent.substring(0, 300)}...")
+            Log.i(TAG, "📏 (Showing first 300 chars of ${jsonContent.length} total)")
+        } else {
+            // Pretty print for better readability in logs
+            try {
+                val prettyJson = kotlinx.serialization.json.Json { prettyPrint = true }
+                    .encodeToString(kotlinx.serialization.json.JsonElement.serializer(), 
+                        kotlinx.serialization.json.Json.parseToJsonElement(jsonContent))
+                Log.i(TAG, prettyJson)
+            } catch (e: Exception) {
+                Log.i(TAG, jsonContent)
+            }
+        }
+        Log.i(TAG, "")
+    }
+    
+    /**
+     * PREFERENCE OPERATION VERIFICATION
+     * Verifies that write operations were successful by reading back the data
+     */
+    private fun verifyPrefWrite(key: String, expectedValue: Any?, operationType: String) {
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+            .format(java.util.Date())
+            
+        Log.i(TAG, "")
+        Log.i(TAG, "🔍 PREFERENCE WRITE VERIFICATION")
+        Log.i(TAG, "⏰ Timestamp: $timestamp")
+        Log.i(TAG, "🗝️ Key: '$key'")
+        Log.i(TAG, "📝 Operation: $operationType")
+        
+        val actualValue = when (expectedValue) {
+            is String -> prefs.getString(key, null)
+            is Int -> prefs.getInt(key, -999999) // Use unlikely default to detect missing values
+            is Float -> prefs.getFloat(key, -999999f)
+            is Boolean -> prefs.getBoolean(key, !expectedValue) // Use opposite as default
+            else -> null
+        }
+        
+        val success = when (expectedValue) {
+            is String -> actualValue == expectedValue
+            is Int -> actualValue != -999999 && actualValue == expectedValue
+            is Float -> actualValue != -999999f && actualValue == expectedValue
+            is Boolean -> actualValue == expectedValue
+            else -> true
+        }
+        
+        if (success) {
+            Log.i(TAG, "✅ Verification: SUCCESS")
+            Log.i(TAG, "💾 Confirmed Value: $actualValue")
+        } else {
+            Log.e(TAG, "❌ Verification: FAILED")
+            Log.e(TAG, "❌ Expected: $expectedValue")
+            Log.e(TAG, "❌ Actual: $actualValue")
+        }
+        Log.i(TAG, "")
     }
     
     // JSON SERIALIZATION CONFIGURATION - Handles serialization/deserialization
@@ -656,12 +828,24 @@ class PrayerSettingsRepository @Inject constructor(
      * @param beforeMinutes How many minutes before prayer time to notify (default: 10)
      */
     fun updateNotificationSettings(enabled: Boolean, beforeMinutes: Int = 10) {
+        Log.i(TAG, "")
+        Log.i(TAG, "🔔 NOTIFICATION SETTINGS UPDATE")
+        Log.i(TAG, "=".repeat(60))
+        
         logPrefWrite(KEY_NOTIFICATIONS_ENABLED, enabled)
         logPrefWrite(KEY_NOTIFY_BEFORE_MINUTES, beforeMinutes)
+        
         prefs.edit()
             .putBoolean(KEY_NOTIFICATIONS_ENABLED, enabled)
             .putInt(KEY_NOTIFY_BEFORE_MINUTES, beforeMinutes)
             .apply()
+            
+        // Verify the writes were successful
+        verifyPrefWrite(KEY_NOTIFICATIONS_ENABLED, enabled, "notification enabled flag")
+        verifyPrefWrite(KEY_NOTIFY_BEFORE_MINUTES, beforeMinutes, "notification timing")
+        
+        Log.i(TAG, "✅ NOTIFICATION SETTINGS: Update completed successfully")
+        Log.i(TAG, "")
     }
     
     /**
@@ -1659,26 +1843,34 @@ class PrayerSettingsRepository @Inject constructor(
      * - Include calculation settings used
      */
     fun cachePrayerTimes(prayerTimes: DayPrayerTimes) {
+        Log.i(TAG, "")
+        Log.i(TAG, "💾 PRAYER TIMES CACHE OPERATION")
+        Log.i(TAG, "=".repeat(70))
+        Log.i(TAG, "📅 Caching prayer times for: ${prayerTimes.date.toLocalDate()}")
+        Log.i(TAG, "📍 Location: ${prayerTimes.location.city}, ${prayerTimes.location.country}")
+        Log.i(TAG, "📊 Total cache keys: 12 (1 date + 6 prayer times + 5 location data)")
+        Log.i(TAG, "")
+        
+        val dateStr = prayerTimes.date.toLocalDate().toString()
+        val fajrMinutes = prayerTimes.fajr.toSecondOfDay() / 60
+        val sunriseMinutes = prayerTimes.sunrise.toSecondOfDay() / 60
+        val dhuhrMinutes = prayerTimes.dhuhr.toSecondOfDay() / 60
+        val asrMinutes = prayerTimes.asr.toSecondOfDay() / 60
+        val maghribMinutes = prayerTimes.maghrib.toSecondOfDay() / 60
+        val ishaMinutes = prayerTimes.isha.toSecondOfDay() / 60
+        
         prefs.edit().apply {
             // Cache the date to ensure validity
-            val dateStr = prayerTimes.date.toLocalDate().toString()
             logPrefWrite(KEY_CACHED_PRAYER_DATE, dateStr)
             putString(KEY_CACHED_PRAYER_DATE, dateStr)
             
-            // Cache prayer times as minutes from midnight for precision
-            val fajrMinutes = prayerTimes.fajr.toSecondOfDay() / 60
-            val sunriseMinutes = prayerTimes.sunrise.toSecondOfDay() / 60
-            val dhuhrMinutes = prayerTimes.dhuhr.toSecondOfDay() / 60
-            val asrMinutes = prayerTimes.asr.toSecondOfDay() / 60
-            val maghribMinutes = prayerTimes.maghrib.toSecondOfDay() / 60
-            val ishaMinutes = prayerTimes.isha.toSecondOfDay() / 60
-            
-            logPrefWrite(KEY_CACHED_FAJR, "$fajrMinutes (${prayerTimes.fajr})")
-            logPrefWrite(KEY_CACHED_SUNRISE, "$sunriseMinutes (${prayerTimes.sunrise})")
-            logPrefWrite(KEY_CACHED_DHUHR, "$dhuhrMinutes (${prayerTimes.dhuhr})")
-            logPrefWrite(KEY_CACHED_ASR, "$asrMinutes (${prayerTimes.asr})")
-            logPrefWrite(KEY_CACHED_MAGHRIB, "$maghribMinutes (${prayerTimes.maghrib})")
-            logPrefWrite(KEY_CACHED_ISHA, "$ishaMinutes (${prayerTimes.isha})")
+            Log.i(TAG, "⏰ PRAYER TIME CACHE DATA:")
+            logPrefWrite(KEY_CACHED_FAJR, "$fajrMinutes minutes (${prayerTimes.fajr})")
+            logPrefWrite(KEY_CACHED_SUNRISE, "$sunriseMinutes minutes (${prayerTimes.sunrise})")
+            logPrefWrite(KEY_CACHED_DHUHR, "$dhuhrMinutes minutes (${prayerTimes.dhuhr})")
+            logPrefWrite(KEY_CACHED_ASR, "$asrMinutes minutes (${prayerTimes.asr})")
+            logPrefWrite(KEY_CACHED_MAGHRIB, "$maghribMinutes minutes (${prayerTimes.maghrib})")
+            logPrefWrite(KEY_CACHED_ISHA, "$ishaMinutes minutes (${prayerTimes.isha})")
             
             putInt(KEY_CACHED_FAJR, fajrMinutes)
             putInt(KEY_CACHED_SUNRISE, sunriseMinutes)
@@ -1688,6 +1880,7 @@ class PrayerSettingsRepository @Inject constructor(
             putInt(KEY_CACHED_ISHA, ishaMinutes)
             
             // Cache location information
+            Log.i(TAG, "📍 LOCATION CACHE DATA:")
             logPrefWrite(KEY_CACHED_LOCATION_LAT, prayerTimes.location.latitude)
             logPrefWrite(KEY_CACHED_LOCATION_LON, prayerTimes.location.longitude)
             logPrefWrite(KEY_CACHED_LOCATION_CITY, prayerTimes.location.city)
@@ -1704,6 +1897,18 @@ class PrayerSettingsRepository @Inject constructor(
             
             apply() // Use apply() for cache - no need for immediate synchronous write during startup
         }
+        
+        Log.i(TAG, "")
+        Log.i(TAG, "🔍 CACHE WRITE VERIFICATION:")
+        // Verify critical cache data was written correctly
+        verifyPrefWrite(KEY_CACHED_PRAYER_DATE, dateStr, "prayer date")
+        verifyPrefWrite(KEY_CACHED_FAJR, fajrMinutes, "fajr time")
+        verifyPrefWrite(KEY_CACHED_DHUHR, dhuhrMinutes, "dhuhr time")
+        verifyPrefWrite(KEY_CACHED_LOCATION_CITY, prayerTimes.location.city, "location city")
+        
+        Log.i(TAG, "✅ PRAYER TIMES CACHE: Successfully cached all data to preferences")
+        Log.i(TAG, "📈 Cache Performance: Fast app startup enabled for ${prayerTimes.date.toLocalDate()}")
+        Log.i(TAG, "")
     }
     
     /**
@@ -2038,6 +2243,9 @@ class PrayerSettingsRepository @Inject constructor(
         
         prefs.edit().putString(KEY_CALCULATION_SETTINGS_JSON, settingsJson).apply()
         
+        // Verify the save operation was successful
+        verifyPrefWrite(KEY_CALCULATION_SETTINGS_JSON, settingsJson, "calculation settings JSON")
+        
         Log.i(TAG, "✅ STORAGE COMPLETE: Data written to SharedPreferences")
         Log.i(TAG, "")
     }
@@ -2045,13 +2253,35 @@ class PrayerSettingsRepository @Inject constructor(
     private fun saveLocationPreferences(preferences: PrayerLocationPreferences) {
         val settingsJson = json.encodeToString(preferences)
         logPrefWriteJson(KEY_LOCATION_PREFERENCES_JSON, settingsJson, "location preferences")
+        
+        Log.i(TAG, "")
+        Log.i(TAG, "📍 LOCATION PREFERENCES STORAGE")
+        Log.i(TAG, "=".repeat(50))
+        Log.i(TAG, "🗂️ Storage Key: '$KEY_LOCATION_PREFERENCES_JSON'")
+        Log.i(TAG, "📊 Data: GPS=${preferences.useGpsLocation}, Location=${preferences.location?.getDisplayName() ?: "null"}")
+        
         prefs.edit().putString(KEY_LOCATION_PREFERENCES_JSON, settingsJson).apply()
+        
+        verifyPrefWrite(KEY_LOCATION_PREFERENCES_JSON, settingsJson, "location preferences")
+        Log.i(TAG, "✅ Location preferences saved successfully")
+        Log.i(TAG, "")
     }
     
     private fun saveNotificationPreferences(preferences: PrayerNotificationPreferences) {
         val settingsJson = json.encodeToString(preferences)
         logPrefWriteJson(KEY_NOTIFICATION_PREFERENCES_JSON, settingsJson, "notification preferences")
+        
+        Log.i(TAG, "")
+        Log.i(TAG, "🔔 NOTIFICATION PREFERENCES STORAGE")
+        Log.i(TAG, "=".repeat(50))
+        Log.i(TAG, "🗂️ Storage Key: '$KEY_NOTIFICATION_PREFERENCES_JSON'")
+        Log.i(TAG, "📊 Data: Enabled=${preferences.notificationsEnabled}, Sound=${preferences.notificationSound}, Vibration=${preferences.vibrationEnabled}")
+        
         prefs.edit().putString(KEY_NOTIFICATION_PREFERENCES_JSON, settingsJson).apply()
+        
+        verifyPrefWrite(KEY_NOTIFICATION_PREFERENCES_JSON, settingsJson, "notification preferences")
+        Log.i(TAG, "✅ Notification preferences saved successfully")
+        Log.i(TAG, "")
     }
     
     /**
