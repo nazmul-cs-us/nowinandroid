@@ -1032,6 +1032,7 @@ fun PrayerTimesScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .offset(y = 16.dp) // Move the entire surface down by 4dp
                         .padding(top = 16.dp, bottom = 16.dp),
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer
@@ -1057,7 +1058,7 @@ fun PrayerTimesScreen(
                             textAlign = TextAlign.Center,
                             overflow = TextOverflow.Ellipsis,
                             maxLines = 1,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Normal
                         ).also {
                             android.util.Log.d("LocationText", "📍 LOCATION DISPLAY: '$location' (length=${location.length})")
                         }
