@@ -32,6 +32,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -69,6 +70,7 @@ import android.util.Log
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -94,7 +96,6 @@ import com.starception.submission.feature.prayertimes.SwipeableBigTiles
 import com.starception.submission.feature.prayertimes.SmartContentUtils
 import com.starception.submission.feature.prayertimes.PrayerTimeHelpers
 import com.starception.submission.feature.prayertimes.components.CompassPopupScreen
-import com.starception.submission.feature.prayertimes.components.InteractivePrayerTimeCard
 import com.starception.submission.feature.prayertimes.getPrayerNameInLocalLanguage
 import dagger.hilt.android.EntryPointAccessors
 import com.starception.submission.prayer.service.CountryCodeMapper
@@ -300,6 +301,10 @@ fun PrayerTimesScreen(
     
     // COMPASS POPUP STATE - Shows large compass with calibration guidance
     var showCompassPopup by remember { mutableStateOf(false) }
+    
+    // INTERACTIVE PRAYER DIAL POPUP STATE
+    var showPrayerDialPopup by remember { mutableStateOf(false) }
+    var popupPrayerName by remember { mutableStateOf<String?>(null) }
     
     val hapticFeedback = LocalHapticFeedback.current
     
@@ -518,7 +523,8 @@ fun PrayerTimesScreen(
         currentEditingTile: String?,
         onEditingTileChange: (String?) -> Unit,
         currentOffset: Int = 0,
-        modifier: Modifier = Modifier
+        modifier: Modifier = Modifier,
+        onShowPopup: (String) -> Unit = {}
     ) {
         // Check if this specific card is in edit mode
         val isInEditMode = currentEditingTile == prayerName
@@ -614,19 +620,19 @@ fun PrayerTimesScreen(
             ) {
                 // ONLY show the circular dial - complete transformation with no overlapping content
                 com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
+                    prayerName = prayerName,
                     originalTime = when (prayerName) {
-                        "Dhuhr" -> prayerTimes?.dhuhr?.toString() ?: "12:00"
-                        "Asr" -> prayerTimes?.asr?.toString() ?: "15:46"
-                        "Maghrib" -> prayerTimes?.maghrib?.toString() ?: "18:25"
-                        "Isha" -> prayerTimes?.isha?.toString() ?: "19:55"
-                        else -> "12:00"
+                        "Dhuhr" -> prayerTimes?.dhuhr ?: LocalTime.of(12, 0)
+                        "Asr" -> prayerTimes?.asr ?: LocalTime.of(15, 46)
+                        "Maghrib" -> prayerTimes?.maghrib ?: LocalTime.of(18, 25)
+                        "Isha" -> prayerTimes?.isha ?: LocalTime.of(19, 55)
+                        else -> LocalTime.of(12, 0)
                     },
                     timeAdjustment = timeAdjustment,
-                    prayerName = prayerName,
-                    onAdjustmentChange = { adjustment ->
+                    onTimeAdjusted = { adjustment ->
                         timeAdjustment = adjustment
                     },
-                    onSave = { finalAdjustment ->
+                    onSaveAdjustment = { prayerName, finalAdjustment ->
                         android.util.Log.d("PrayerTimesScreen", "🎯 INTERACTIVE DIAL SAVE:")
                         android.util.Log.d("PrayerTimesScreen", "   📝 Prayer: $prayerName")
                         android.util.Log.d("PrayerTimesScreen", "   ⏱️ Final Adjustment: $finalAdjustment minutes")
@@ -658,6 +664,10 @@ fun PrayerTimesScreen(
                             }
                         }
                     },
+                    onResetAdjustment = {
+                        android.util.Log.d("PrayerTimesScreen", "🔄 INTERACTIVE DIAL RESET for $prayerName")
+                        timeAdjustment = 0
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -677,9 +687,9 @@ fun PrayerTimesScreen(
                             onLongPress = {
                                 android.util.Log.d("PrayerCard", "🔥 LONG PRESS detected on $prayerName card!")
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                // Set this tile as the current editing tile (others will automatically become false)
-                                onEditingTileChange(prayerName)
-                                android.util.Log.d("PrayerCard", "✅ Set $prayerName as current editing tile")
+                                // Show popup instead of in-place editing
+                                onShowPopup(prayerName)
+                                android.util.Log.d("PrayerCard", "✅ Showing popup for $prayerName")
                             },
                             onTap = {
                                 android.util.Log.d("PrayerCard", "👆 Regular tap detected on $prayerName card")
@@ -987,8 +997,11 @@ fun PrayerTimesScreen(
                         currentEditingTile = currentEditingTile,
                         onEditingTileChange = { currentEditingTile = it },
                         currentOffset = storedOffsets.dhuhr,
-                        modifier = Modifier
-                            .weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onShowPopup = { prayerName ->
+                            popupPrayerName = prayerName
+                            showPrayerDialPopup = true
+                        }
                     )
                     
                     // Asr prayer with interactive dial  
@@ -997,8 +1010,11 @@ fun PrayerTimesScreen(
                         currentEditingTile = currentEditingTile,
                         onEditingTileChange = { currentEditingTile = it },
                         currentOffset = storedOffsets.asr,
-                        modifier = Modifier
-                            .weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onShowPopup = { prayerName ->
+                            popupPrayerName = prayerName
+                            showPrayerDialPopup = true
+                        }
                     )
                 }
                 
@@ -1013,8 +1029,11 @@ fun PrayerTimesScreen(
                         currentEditingTile = currentEditingTile,
                         onEditingTileChange = { currentEditingTile = it },
                         currentOffset = storedOffsets.maghrib,
-                        modifier = Modifier
-                            .weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onShowPopup = { prayerName ->
+                            popupPrayerName = prayerName
+                            showPrayerDialPopup = true
+                        }
                     )
                     
                     // Isha prayer with interactive dial
@@ -1023,8 +1042,11 @@ fun PrayerTimesScreen(
                         currentEditingTile = currentEditingTile,
                         onEditingTileChange = { currentEditingTile = it },
                         currentOffset = storedOffsets.isha,
-                        modifier = Modifier
-                            .weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onShowPopup = { prayerName ->
+                            popupPrayerName = prayerName
+                            showPrayerDialPopup = true
+                        }
                     )
                 }
                 
@@ -1176,6 +1198,73 @@ fun PrayerTimesScreen(
                 showCompassPopup = false 
             }
         )
+    }
+    
+    // INTERACTIVE PRAYER DIAL POPUP - Shows circular dial overlay
+    if (showPrayerDialPopup && popupPrayerName != null) {
+        Log.d("PrayerTimes", "showPrayerDialPopup is true, rendering InteractivePrayerDial overlay for $popupPrayerName")
+        
+        // Full screen overlay with dark background
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.8f)),
+            contentAlignment = Alignment.Center
+        ) {
+            // State for adjustment in popup
+            var timeAdjustment by remember { mutableStateOf(
+                when (popupPrayerName) {
+                    "Dhuhr" -> storedOffsets.dhuhr
+                    "Asr" -> storedOffsets.asr
+                    "Maghrib" -> storedOffsets.maghrib
+                    "Isha" -> storedOffsets.isha
+                    else -> 0
+                }
+            ) }
+            
+            // Circular dial overlay - no rectangular constraints
+            Box(
+                modifier = Modifier
+                    .size(350.dp) // Larger size for better interaction
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = {
+                                Log.d("PrayerTimes", "Long press on dial overlay, closing")
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showPrayerDialPopup = false
+                                popupPrayerName = null
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
+                    prayerName = popupPrayerName!!,
+                    originalTime = when (popupPrayerName) {
+                        "Dhuhr" -> prayerTimes?.dhuhr ?: LocalTime.of(12, 0)
+                        "Asr" -> prayerTimes?.asr ?: LocalTime.of(15, 46)
+                        "Maghrib" -> prayerTimes?.maghrib ?: LocalTime.of(18, 25)
+                        "Isha" -> prayerTimes?.isha ?: LocalTime.of(19, 55)
+                        else -> LocalTime.of(12, 0)
+                    },
+                    timeAdjustment = timeAdjustment,
+                    onTimeAdjusted = { adjustment ->
+                        timeAdjustment = adjustment
+                    },
+                    onSaveAdjustment = { prayerName, finalAdjustment ->
+                        Log.d("PrayerTimes", "🎯 POPUP DIAL SAVE: $prayerName = $finalAdjustment minutes")
+                        // Save the adjustment and close popup
+                        showPrayerDialPopup = false
+                        popupPrayerName = null
+                    },
+                    onResetAdjustment = {
+                        Log.d("PrayerTimes", "🔄 POPUP DIAL RESET for $popupPrayerName")
+                        timeAdjustment = 0
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
     }
 }
 
