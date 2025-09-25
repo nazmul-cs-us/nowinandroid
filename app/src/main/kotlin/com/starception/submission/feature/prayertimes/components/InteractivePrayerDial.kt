@@ -2,9 +2,13 @@ package com.starception.submission.feature.prayertimes.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -134,17 +138,59 @@ fun InteractivePrayerDial(
             drawTealIndicator(center, radius * 0.95f, timeAdjustment)
         }
 
-        // Simple time display
-        val adjustedTime = adjustTimeByMinutes(originalTime, timeAdjustment)
-        Text(
-            text = adjustedTime,
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 32.sp
-            ),
-            color = Color.Black,
-            textAlign = TextAlign.Center
-        )
+        // Prayer name and adjustment display in center
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Prayer name
+            Text(
+                text = prayerName,
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp
+                ),
+                color = Color.Black,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            // Adjusted time display
+            val adjustedTime = adjustTimeByMinutes(originalTime, timeAdjustment)
+            Text(
+                text = adjustedTime,
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 28.sp
+                ),
+                color = Color.Black,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(2.dp))
+            
+            // Adjustment amount with +/- indicator
+            val adjustmentText = when {
+                timeAdjustment > 0 -> "+${timeAdjustment}m"
+                timeAdjustment < 0 -> "${timeAdjustment}m"
+                else -> "0m"
+            }
+            
+            Text(
+                text = adjustmentText,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 18.sp
+                ),
+                color = when {
+                    timeAdjustment > 0 -> Color(0xFF4CAF50) // Green for positive
+                    timeAdjustment < 0 -> Color(0xFFF44336) // Red for negative  
+                    else -> Color.Gray // Gray for zero
+                },
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -175,8 +221,11 @@ private fun adjustTimeByMinutes(originalTime: LocalTime, minutes: Int): String {
         originalTime
     ).plusMinutes(minutes.toLong())
 
-    val adjustedHours = adjustedDateTime.hour
-    val adjustedMinutes = adjustedDateTime.minute
+    val adjustedTime = adjustedDateTime.toLocalTime()
+    val hour12 = if (adjustedTime.hour == 0) 12 
+                else if (adjustedTime.hour > 12) adjustedTime.hour - 12 
+                else adjustedTime.hour
+    val amPm = if (adjustedTime.hour < 12) "AM" else "PM"
 
-    return String.format("%02d:%02d", adjustedHours, adjustedMinutes)
+    return String.format("%d:%02d %s", hour12, adjustedTime.minute, amPm)
 }

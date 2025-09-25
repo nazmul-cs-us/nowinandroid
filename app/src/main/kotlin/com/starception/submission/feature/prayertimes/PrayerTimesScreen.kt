@@ -1204,11 +1204,20 @@ fun PrayerTimesScreen(
     if (showPrayerDialPopup && popupPrayerName != null) {
         Log.d("PrayerTimes", "showPrayerDialPopup is true, rendering InteractivePrayerDial overlay for $popupPrayerName")
         
-        // Full screen overlay with dark background
+        // Full screen overlay with dark background - tap outside to dismiss
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.8f)),
+                .background(Color.Black.copy(alpha = 0.8f))
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            Log.d("PrayerTimes", "Tap outside dial, closing popup")
+                            showPrayerDialPopup = false
+                            popupPrayerName = null
+                        }
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
             // State for adjustment in popup
@@ -1233,6 +1242,9 @@ fun PrayerTimesScreen(
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                 showPrayerDialPopup = false
                                 popupPrayerName = null
+                            },
+                            onTap = {
+                                // Consume tap events on dial to prevent background dismissal
                             }
                         )
                     },
