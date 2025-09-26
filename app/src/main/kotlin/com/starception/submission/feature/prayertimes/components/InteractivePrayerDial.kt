@@ -85,7 +85,7 @@ fun InteractivePrayerDial(
                                 (offset.y - center.y) * (offset.y - center.y)
                             )
                             
-                            // Allow dragging if touch is anywhere within the outer radius
+                            // Allow dragging if touch is anywhere within the circular dial
                             val outerRadius = kotlin.math.min(size.width, size.height) * 0.5f
                             if (distanceFromCenter <= outerRadius) {
                                 isDragging = true
@@ -165,17 +165,12 @@ fun InteractivePrayerDial(
             drawCleanCircularTimer(center, radius, timeAdjustment, originalTime, isDragging, currentDragAngle)
         }
 
-        // Central text container with dark background to match design
+        // Central text container with clean background like reference
         Box(
             modifier = Modifier
                 .size(180.dp)
                 .background(
-                    color = Color(0xFF2A2A2A).copy(alpha = 0.95f), // Dark background
-                    shape = CircleShape
-                )
-                .border(
-                    width = 2.dp,
-                    color = Color(0xFF00BCD4), // Teal border
+                    color = Color.Transparent, // Transparent to blend with dial background
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -191,21 +186,21 @@ fun InteractivePrayerDial(
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp
                     ),
-                    color = Color.White, // White text on dark background
+                    color = Color(0xFF333333), // Dark text on light background
                     textAlign = TextAlign.Center
                 )
                 
                 Spacer(modifier = Modifier.height(6.dp))
                 
-                // Adjusted time display
+                // Adjusted time display - using the format from reference (00:00)
                 val adjustedTime = adjustTimeByMinutes(originalTime, timeAdjustment)
                 Text(
                     text = adjustedTime,
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 36.sp
+                        fontSize = 32.sp // Slightly smaller like reference
                     ),
-                    color = Color(0xFF00BCD4), // Teal color to match design
+                    color = Color(0xFF2C2C2C), // Dark gray like reference
                     textAlign = TextAlign.Center
                 )
                 
@@ -221,13 +216,13 @@ fun InteractivePrayerDial(
                 Text(
                     text = adjustmentText,
                     style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
                     ),
                     color = when {
-                        timeAdjustment > 0 -> Color(0xFF4CAF50) // Brighter green for dark background
-                        timeAdjustment < 0 -> Color(0xFFFF5252) // Brighter red for dark background
-                        else -> Color(0xFFCCCCCC) // Light gray for zero
+                        timeAdjustment > 0 -> Color(0xFF4DD0E1) // Teal for positive adjustment
+                        timeAdjustment < 0 -> Color(0xFFE57373) // Light red for negative
+                        else -> Color(0xFF757575) // Medium gray for zero
                     },
                     textAlign = TextAlign.Center
                 )
@@ -237,37 +232,46 @@ fun InteractivePrayerDial(
 }
 
 private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, timeAdjustment: Int, originalTime: LocalTime, isDragging: Boolean, currentDragAngle: Float) {
-    // Dark background shadow
+    // Clean circular design matching the reference image
+    val timerRadius = radius
+    
+    // Outer shadow for depth (like the reference)
     drawCircle(
-        color = Color.Black.copy(alpha = 0.8f),
-        radius = radius + 20f,
-        center = Offset(center.x + 4f, center.y + 6f)
+        color = Color.Black.copy(alpha = 0.08f),
+        radius = timerRadius + 6f,
+        center = Offset(center.x + 1f, center.y + 2f)
     )
     
-    // Main metallic circle with radial gradient effect
-    val gradientColors = listOf(
-        Color(0xFFE8E8E8), // Light metallic
-        Color(0xFFC0C0C0), // Mid metallic  
-        Color(0xFF808080), // Dark metallic
-        Color(0xFF404040)  // Very dark metallic
+    // Main light gray circle background (like the reference)
+    drawCircle(
+        color = Color(0xFFF5F5F5), // Very light gray background
+        radius = timerRadius,
+        center = center
+    )
+    
+    // Subtle inner gradient for depth
+    val innerGradientColors = listOf(
+        Color(0xFFFFFFFF).copy(alpha = 0.8f), // White highlight at top
+        Color(0xFFF0F0F0), // Light gray
+        Color(0xFFE8E8E8)  // Slightly darker gray at bottom
     )
     
     drawCircle(
         brush = Brush.radialGradient(
-            colors = gradientColors,
-            center = center,
-            radius = radius
+            colors = innerGradientColors,
+            center = Offset(center.x, center.y - radius * 0.3f), // Offset upward for lighting effect
+            radius = timerRadius * 0.9f
         ),
-        radius = radius,
+        radius = timerRadius,
         center = center
     )
     
-    // Teal border around the circle
+    // Subtle border like the reference
     drawCircle(
-        color = Color(0xFF00BCD4),
-        radius = radius,
+        color = Color(0xFFDDDDDD), // Light gray border
+        radius = timerRadius,
         center = center,
-        style = Stroke(width = 4f)
+        style = Stroke(width = 1.5f)
     )
     
     // Calculate actual prayer time (adjusted)
@@ -302,8 +306,8 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         } else false
         
         // Extremely subtle marks - almost invisible like PNG document guidelines
-        val tickStartRadius = radius + 10f
-        val tickEndRadius = radius + 18f
+        val tickStartRadius = timerRadius + 8f
+        val tickEndRadius = timerRadius + 16f
         
         val tickStart = Offset(
             center.x + tickStartRadius * cos(angle).toFloat(),
@@ -316,9 +320,9 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         
         drawLine(
             color = if (shouldLightUp && isDragging) {
-                Color(0xFF00BCD4) // Teal when lit
+                Color(0xFF4DD0E1) // Lighter teal like the reference image
             } else {
-                Color(0xFFE8E8E8).copy(alpha = 0.08f) // Almost invisible when not lit - like PNG document guidelines
+                Color(0xFFE0E0E0).copy(alpha = 0.3f) // Subtle gray tick marks
             },
             start = tickStart,
             end = tickEnd,
@@ -375,10 +379,10 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         close()
     }
     
-    // Draw the pill indicator with rounded corners
+    // Draw the pill indicator with rounded corners - teal color like reference
     drawPath(
         path = pillPath,
-        color = Color(0xFF00BCD4)
+        color = Color(0xFF4DD0E1)
     )
     
     // Add rounded end caps to make it more pill-like
@@ -390,7 +394,7 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         indicatorCenter.y - halfHeight * sin(indicatorAngle.toFloat()).toFloat()
     )
     drawCircle(
-        color = Color(0xFF00BCD4),
+        color = Color(0xFF4DD0E1),
         radius = capRadius,
         center = leftCapCenter
     )
@@ -401,7 +405,7 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         indicatorCenter.y + halfHeight * sin(indicatorAngle.toFloat()).toFloat()
     )
     drawCircle(
-        color = Color(0xFF00BCD4),
+        color = Color(0xFF4DD0E1),
         radius = capRadius,
         center = rightCapCenter
     )
