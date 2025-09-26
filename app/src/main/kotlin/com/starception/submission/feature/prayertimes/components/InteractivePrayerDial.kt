@@ -232,8 +232,8 @@ fun InteractivePrayerDial(
 }
 
 private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, timeAdjustment: Int, originalTime: LocalTime, isDragging: Boolean, currentDragAngle: Float) {
-    // Clean circular design matching the reference image
-    val timerRadius = radius
+    // Clean circular design matching the reference image - no document background
+    val timerRadius = radius // Use full radius for pure circular design
     
     // Outer shadow for depth (like the reference)
     drawCircle(
@@ -274,6 +274,43 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         style = Stroke(width = 1.5f)
     )
     
+    // Draw outer circle with markers around the circumference
+    val outerRadius = timerRadius + 25f
+    
+    // Outer circle border
+    drawCircle(
+        color = Color(0xFFE8E8E8), // Very light gray outer circle
+        radius = outerRadius,
+        center = center,
+        style = Stroke(width = 2f)
+    )
+    
+    // Draw markers around the outer circle (like hour markers on a clock)
+    for (i in 0 until 12) {
+        val markerAngle = i * 30.0 * PI / 180.0 // 12 markers, 30 degrees apart
+        
+        // Marker positions
+        val markerOuterRadius = outerRadius - 3f
+        val markerInnerRadius = outerRadius - 12f
+        
+        val markerStart = Offset(
+            center.x + markerInnerRadius * cos(markerAngle.toFloat()).toFloat(),
+            center.y + markerInnerRadius * sin(markerAngle.toFloat()).toFloat()
+        )
+        val markerEnd = Offset(
+            center.x + markerOuterRadius * cos(markerAngle.toFloat()).toFloat(),
+            center.y + markerOuterRadius * sin(markerAngle.toFloat()).toFloat()
+        )
+        
+        drawLine(
+            color = Color(0xFFBBBBBB), // Medium gray markers
+            start = markerStart,
+            end = markerEnd,
+            strokeWidth = 2f,
+            cap = StrokeCap.Round
+        )
+    }
+    
     // Calculate actual prayer time (adjusted)
     val adjustedDateTime = LocalDateTime.of(LocalDate.now(), originalTime).plusMinutes(timeAdjustment.toLong())
     val adjustedTime = adjustedDateTime.toLocalTime()
@@ -305,9 +342,9 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
             }
         } else false
         
-        // Extremely subtle marks - almost invisible like PNG document guidelines
-        val tickStartRadius = timerRadius + 8f
-        val tickEndRadius = timerRadius + 16f
+        // Subtle tick marks positioned inside the dial like PNG reference
+        val tickStartRadius = timerRadius - 25f
+        val tickEndRadius = timerRadius - 10f
         
         val tickStart = Offset(
             center.x + tickStartRadius * cos(angle).toFloat(),
@@ -331,10 +368,10 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         )
     }
     
-    // Draw rounded pill-shaped indicator
+    // Draw rounded pill-shaped indicator - positioned in the outer ring
     val displayAngle = if (isDragging) currentDragAngle else timeAngle
     val indicatorAngle = displayAngle * PI / 180f
-    val indicatorRadius = radius + 12f
+    val indicatorRadius = outerRadius - 15f // Position in the outer ring area
     
     val indicatorCenter = Offset(
         center.x + indicatorRadius * cos(indicatorAngle.toFloat()).toFloat(),
@@ -408,6 +445,97 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         color = Color(0xFF4DD0E1),
         radius = capRadius,
         center = rightCapCenter
+    )
+}
+
+private fun DrawScope.drawPNGDocumentBackground(center: Offset, radius: Float) {
+    val documentSize = radius * 1.8f // Document size larger than the circular dial
+    val cornerSize = radius * 0.4f // Size of the folded corner
+    
+    // Main document shadow for depth
+    drawRect(
+        color = Color.Black.copy(alpha = 0.15f),
+        topLeft = Offset(
+            center.x - documentSize/2 + 3f,
+            center.y - documentSize/2 + 4f
+        ),
+        size = Size(documentSize, documentSize)
+    )
+    
+    // Main document body (light gray like PNG file)
+    val documentPath = Path().apply {
+        // Start from top-left, create document shape with folded corner
+        moveTo(center.x - documentSize/2, center.y - documentSize/2 + 16f)
+        
+        // Top edge up to fold
+        lineTo(center.x + documentSize/2 - cornerSize, center.y - documentSize/2)
+        
+        // Folded corner diagonal
+        lineTo(center.x + documentSize/2, center.y - documentSize/2 + cornerSize)
+        
+        // Right edge
+        lineTo(center.x + documentSize/2, center.y + documentSize/2 - 16f)
+        
+        // Bottom-right corner (rounded)
+        quadraticTo(
+            center.x + documentSize/2, center.y + documentSize/2,
+            center.x + documentSize/2 - 16f, center.y + documentSize/2
+        )
+        
+        // Bottom edge
+        lineTo(center.x - documentSize/2 + 16f, center.y + documentSize/2)
+        
+        // Bottom-left corner (rounded)
+        quadraticTo(
+            center.x - documentSize/2, center.y + documentSize/2,
+            center.x - documentSize/2, center.y + documentSize/2 - 16f
+        )
+        
+        // Left edge
+        lineTo(center.x - documentSize/2, center.y - documentSize/2 + 16f)
+        
+        close()
+    }
+    
+    // Draw main document with light gray gradient
+    drawPath(
+        path = documentPath,
+        brush = Brush.linearGradient(
+            colors = listOf(
+                Color(0xFFF8F8F8), // Very light gray at top
+                Color(0xFFF0F0F0), // Light gray at bottom
+            ),
+            start = Offset(center.x, center.y - documentSize/2),
+            end = Offset(center.x, center.y + documentSize/2)
+        )
+    )
+    
+    // Draw the folded corner triangle (slightly darker for depth)
+    val foldPath = Path().apply {
+        moveTo(center.x + documentSize/2 - cornerSize, center.y - documentSize/2)
+        lineTo(center.x + documentSize/2 - cornerSize, center.y - documentSize/2 + cornerSize)
+        lineTo(center.x + documentSize/2, center.y - documentSize/2 + cornerSize)
+        close()
+    }
+    
+    drawPath(
+        path = foldPath,
+        color = Color(0xFFE0E0E0) // Slightly darker for the fold
+    )
+    
+    // Document border
+    drawPath(
+        path = documentPath,
+        color = Color(0xFFD0D0D0),
+        style = Stroke(width = 1.5f)
+    )
+    
+    // Fold line
+    drawLine(
+        color = Color(0xFFD0D0D0),
+        start = Offset(center.x + documentSize/2 - cornerSize, center.y - documentSize/2),
+        end = Offset(center.x + documentSize/2, center.y - documentSize/2 + cornerSize),
+        strokeWidth = 1f
     )
 }
 
