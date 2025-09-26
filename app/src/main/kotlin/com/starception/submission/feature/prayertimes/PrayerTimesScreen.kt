@@ -1211,10 +1211,21 @@ fun PrayerTimesScreen(
                 .background(Color.Black.copy(alpha = 0.8f))
                 .pointerInput(Unit) {
                     detectTapGestures(
-                        onTap = {
-                            Log.d("PrayerTimes", "Tap outside dial, closing popup")
-                            showPrayerDialPopup = false
-                            popupPrayerName = null
+                        onTap = { offset ->
+                            // Calculate if tap is outside the dial area (350.dp diameter)
+                            val centerX = size.width / 2f
+                            val centerY = size.height / 2f
+                            val dialRadius = 175.dp.toPx() // 350.dp / 2
+                            val distance = kotlin.math.sqrt(
+                                (offset.x - centerX) * (offset.x - centerX) + 
+                                (offset.y - centerY) * (offset.y - centerY)
+                            )
+                            
+                            if (distance > dialRadius) {
+                                Log.d("PrayerTimes", "Tap outside dial area, closing popup")
+                                showPrayerDialPopup = false
+                                popupPrayerName = null
+                            }
                         }
                     )
                 },
@@ -1231,23 +1242,10 @@ fun PrayerTimesScreen(
                 }
             ) }
             
-            // Circular dial overlay - no rectangular constraints
+            // Circular dial container - NO gesture interference
             Box(
                 modifier = Modifier
-                    .size(350.dp) // Larger size for better interaction
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onLongPress = {
-                                Log.d("PrayerTimes", "Long press on dial overlay, closing")
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                showPrayerDialPopup = false
-                                popupPrayerName = null
-                            },
-                            onTap = {
-                                // Consume tap events on dial to prevent background dismissal
-                            }
-                        )
-                    },
+                    .size(350.dp), // Larger size for better interaction
                 contentAlignment = Alignment.Center
             ) {
                 com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
