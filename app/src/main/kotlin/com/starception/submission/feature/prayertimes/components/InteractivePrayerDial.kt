@@ -275,8 +275,8 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
     )
     
     // Draw outer border with individual tick marks like the reference
-    val outerRadius = timerRadius + 25f
-    val tickCount = 60 // More tick marks for finer detail like reference
+    val outerRadius = timerRadius + 15f // Closer to main circle
+    val tickCount = 120 // Much denser tick marks like reference
     
     // Calculate actual prayer time (adjusted) for angle calculation
     val adjustedDateTime = LocalDateTime.of(LocalDate.now(), originalTime).plusMinutes(timeAdjustment.toLong())
@@ -298,9 +298,9 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         // Check if this tick is within the progress arc (from 0 to current position)
         val isHighlighted = normalizedTickAngle <= normalizedCurrentAngle
         
-        // Tick positions
-        val tickOuterRadius = outerRadius + 8f
-        val tickInnerRadius = outerRadius - 2f
+        // Tick positions - longer and more elegant like reference
+        val tickOuterRadius = outerRadius + 12f  // Much longer extending outward
+        val tickInnerRadius = outerRadius - 3f   // Slightly inward for better connection
         
         val tickStart = Offset(
             center.x + tickInnerRadius * cos(markerAngle.toFloat()).toFloat(),
@@ -311,12 +311,12 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
             center.y + tickOuterRadius * sin(markerAngle.toFloat()).toFloat()
         )
         
-        // Draw tick mark with appropriate color
+        // Draw tick mark with appropriate color - much thinner and longer like reference
         drawLine(
             color = if (isHighlighted) Color(0xFF4DD0E1) else Color(0xFFE0E0E0), // Teal for highlighted, light gray for others
             start = tickStart,
             end = tickEnd,
-            strokeWidth = 3f,
+            strokeWidth = 0.8f, // Much thinner strokes like reference
             cap = StrokeCap.Round
         )
     }
@@ -333,9 +333,9 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         center.y + indicatorRadius * sin(indicatorAngle.toFloat()).toFloat()
     )
     
-    // Draw teal pill-shaped indicator (rounded rectangle like your reference)
-    val pillWidth = 16f
-    val pillHeight = 6f
+    // Draw teal pill-shaped indicator (2x bigger for maximum user visibility)
+    val pillWidth = 40f  // 2x bigger width - impossible to miss
+    val pillHeight = 16f // 2x bigger height - very prominent
     
     // Calculate pill orientation (perpendicular to radius)
     val perpAngle = indicatorAngle + PI / 2
