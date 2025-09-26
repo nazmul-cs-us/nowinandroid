@@ -165,17 +165,17 @@ fun InteractivePrayerDial(
             drawCleanCircularTimer(center, radius, timeAdjustment, originalTime, isDragging, currentDragAngle)
         }
 
-        // Central text container with background for better visibility
+        // Central text container with dark background to match design
         Box(
             modifier = Modifier
                 .size(180.dp)
                 .background(
-                    color = Color.White.copy(alpha = 0.95f),
+                    color = Color(0xFF2A2A2A).copy(alpha = 0.95f), // Dark background
                     shape = CircleShape
                 )
                 .border(
                     width = 2.dp,
-                    color = Color(0xFFE0E0E0),
+                    color = Color(0xFF00BCD4), // Teal border
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -191,7 +191,7 @@ fun InteractivePrayerDial(
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp
                     ),
-                    color = Color(0xFF2E2E2E), // Dark gray for high contrast
+                    color = Color.White, // White text on dark background
                     textAlign = TextAlign.Center
                 )
                 
@@ -205,7 +205,7 @@ fun InteractivePrayerDial(
                         fontWeight = FontWeight.Bold,
                         fontSize = 36.sp
                     ),
-                    color = Color(0xFF1A1A1A), // Very dark for maximum contrast
+                    color = Color(0xFF00BCD4), // Teal color to match design
                     textAlign = TextAlign.Center
                 )
                 
@@ -225,9 +225,9 @@ fun InteractivePrayerDial(
                         fontSize = 16.sp
                     ),
                     color = when {
-                        timeAdjustment > 0 -> Color(0xFF2E7D32) // Darker green for better visibility
-                        timeAdjustment < 0 -> Color(0xFFC62828) // Darker red for better visibility
-                        else -> Color(0xFF616161) // Darker gray for zero
+                        timeAdjustment > 0 -> Color(0xFF4CAF50) // Brighter green for dark background
+                        timeAdjustment < 0 -> Color(0xFFFF5252) // Brighter red for dark background
+                        else -> Color(0xFFCCCCCC) // Light gray for zero
                     },
                     textAlign = TextAlign.Center
                 )
@@ -237,12 +237,37 @@ fun InteractivePrayerDial(
 }
 
 private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, timeAdjustment: Int, originalTime: LocalTime, isDragging: Boolean, currentDragAngle: Float) {
-    // Background circle (light gray track)
+    // Dark background shadow
     drawCircle(
-        color = Color(0xFFE5E5E5),
+        color = Color.Black.copy(alpha = 0.8f),
+        radius = radius + 20f,
+        center = Offset(center.x + 4f, center.y + 6f)
+    )
+    
+    // Main metallic circle with radial gradient effect
+    val gradientColors = listOf(
+        Color(0xFFE8E8E8), // Light metallic
+        Color(0xFFC0C0C0), // Mid metallic  
+        Color(0xFF808080), // Dark metallic
+        Color(0xFF404040)  // Very dark metallic
+    )
+    
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = gradientColors,
+            center = center,
+            radius = radius
+        ),
+        radius = radius,
+        center = center
+    )
+    
+    // Teal border around the circle
+    drawCircle(
+        color = Color(0xFF00BCD4),
         radius = radius,
         center = center,
-        style = Stroke(width = 12f)
+        style = Stroke(width = 4f)
     )
     
     // Calculate actual prayer time (adjusted)
@@ -253,111 +278,80 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
     val hourIn12Format = if (adjustedTime.hour % 12 == 0) 12 else adjustedTime.hour % 12
     val timeAngle = ((hourIn12Format * 60 + adjustedTime.minute) / (12 * 60f)) * 360f - 90f // Start from 12 o'clock (top)
     
-    // Draw subtle arc showing time position
-    drawArc(
-        color = Color(0xFF00BCD4).copy(alpha = 0.3f), // Light teal background arc
-        startAngle = -90f,
-        sweepAngle = 360f,
-        useCenter = false,
-        topLeft = Offset(center.x - radius, center.y - radius),
-        size = Size(radius * 2f, radius * 2f),
-        style = Stroke(width = 6f)
-    )
-    
-    // Draw hour markers (12, 3, 6, 9) for clock reference
-    for (hour in arrayOf(12, 3, 6, 9)) {
-        val hourAngle = ((hour % 12) * 30f - 90f) * PI / 180f // 30 degrees per hour, starting from 12 o'clock
-        val tickStartRadius = radius + 20f
-        val tickEndRadius = radius + 35f
+    // Draw teal tick marks around the circle (like volume knob)
+    for (i in 0 until 60) { // 60 tick marks around the circle
+        val angle = (i * 6f - 90f) * PI / 180f // Every 6 degrees
+        val isMajorTick = i % 5 == 0 // Every 5th tick is major
+        
+        val tickStartRadius = radius + 15f
+        val tickEndRadius = if (isMajorTick) radius + 30f else radius + 22f
+        val tickWidth = if (isMajorTick) 3f else 2f
         
         val tickStart = Offset(
-            center.x + tickStartRadius * cos(hourAngle).toFloat(),
-            center.y + tickStartRadius * sin(hourAngle).toFloat()
+            center.x + tickStartRadius * cos(angle).toFloat(),
+            center.y + tickStartRadius * sin(angle).toFloat()
         )
         val tickEnd = Offset(
-            center.x + tickEndRadius * cos(hourAngle).toFloat(),
-            center.y + tickEndRadius * sin(hourAngle).toFloat()
+            center.x + tickEndRadius * cos(angle).toFloat(),
+            center.y + tickEndRadius * sin(angle).toFloat()
         )
         
         drawLine(
-            color = Color(0xFF444444),
+            color = Color(0xFF00BCD4), // Teal color like the design
             start = tickStart,
             end = tickEnd,
-            strokeWidth = 4f,
+            strokeWidth = tickWidth,
             cap = StrokeCap.Round
         )
     }
     
-    // Draw minute tick marks (subtle)
-    for (i in 0 until 12) { // 12 tick marks for hours
-        val angle = (i * 30f - 90f) * PI / 180f // Every 30 degrees (hour positions)
-        val isMainHour = i % 3 == 0 // 12, 3, 6, 9 already drawn above
+    // Draw triangular indicator like volume knob design
+    val displayAngle = if (isDragging) currentDragAngle else timeAngle
+    val indicatorAngle = displayAngle * PI / 180f
+    val indicatorRadius = radius + 8f
+    val indicatorSize = 12f
+    
+    val indicatorCenter = Offset(
+        center.x + indicatorRadius * cos(indicatorAngle.toFloat()).toFloat(),
+        center.y + indicatorRadius * sin(indicatorAngle.toFloat()).toFloat()
+    )
+    
+    // Create triangle path pointing inward toward center
+    val trianglePath = Path().apply {
+        val triangleHeight = indicatorSize
+        val triangleWidth = indicatorSize * 0.8f
         
-        if (!isMainHour) {
-            val tickStartRadius = radius + 15f
-            val tickEndRadius = radius + 25f
-            
-            val tickStart = Offset(
-                center.x + tickStartRadius * cos(angle).toFloat(),
-                center.y + tickStartRadius * sin(angle).toFloat()
-            )
-            val tickEnd = Offset(
-                center.x + tickEndRadius * cos(angle).toFloat(),
-                center.y + tickEndRadius * sin(angle).toFloat()
-            )
-            
-            drawLine(
-                color = Color(0xFFCCCCCC),
-                start = tickStart,
-                end = tickEnd,
-                strokeWidth = 2f,
-                cap = StrokeCap.Round
-            )
-        }
+        // Calculate triangle points relative to indicator position
+        val perpAngle = indicatorAngle + PI / 2 // Perpendicular to radius
+        
+        // Top point (pointing toward center)
+        val topPoint = Offset(
+            indicatorCenter.x - (triangleHeight * 0.7f) * cos(indicatorAngle.toFloat()).toFloat(),
+            indicatorCenter.y - (triangleHeight * 0.7f) * sin(indicatorAngle.toFloat()).toFloat()
+        )
+        
+        // Bottom left point
+        val leftPoint = Offset(
+            indicatorCenter.x + (triangleWidth / 2) * cos(perpAngle.toFloat()).toFloat(),
+            indicatorCenter.y + (triangleWidth / 2) * sin(perpAngle.toFloat()).toFloat()
+        )
+        
+        // Bottom right point
+        val rightPoint = Offset(
+            indicatorCenter.x - (triangleWidth / 2) * cos(perpAngle.toFloat()).toFloat(),
+            indicatorCenter.y - (triangleWidth / 2) * sin(perpAngle.toFloat()).toFloat()
+        )
+        
+        moveTo(topPoint.x, topPoint.y)
+        lineTo(leftPoint.x, leftPoint.y)
+        lineTo(rightPoint.x, rightPoint.y)
+        close()
     }
     
-    // Draw draggable knob - use drag angle when dragging, otherwise prayer time angle
-    val displayAngle = if (isDragging) currentDragAngle else timeAngle
-    val knobAngle = displayAngle * PI / 180f
-    val knobRadius = 20f // Larger knob
-    val knobCenter = Offset(
-        center.x + radius * cos(knobAngle.toFloat()).toFloat(),
-        center.y + radius * sin(knobAngle.toFloat()).toFloat()
-    )
-    
-    // Large knob shadow for visibility
-    drawCircle(
-        color = Color.Black.copy(alpha = 0.3f),
-        radius = knobRadius + 4f,
-        center = Offset(knobCenter.x + 2f, knobCenter.y + 3f)
-    )
-    
-    // Bright colored outer ring for high visibility
-    drawCircle(
-        color = Color(0xFF00BCD4),
-        radius = knobRadius + 2f,
-        center = knobCenter
-    )
-    
-    // Main knob circle (bright white)
-    drawCircle(
-        color = Color.White,
-        radius = knobRadius,
-        center = knobCenter
-    )
-    
-    // Inner teal circle for contrast
-    drawCircle(
-        color = Color(0xFF00BCD4),
-        radius = knobRadius * 0.6f,
-        center = knobCenter
-    )
-    
-    // Center white dot
-    drawCircle(
-        color = Color.White,
-        radius = 4f,
-        center = knobCenter
+    // Draw triangle indicator in teal
+    drawPath(
+        path = trianglePath,
+        color = Color(0xFF00BCD4)
     )
 }
 
