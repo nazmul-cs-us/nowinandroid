@@ -278,14 +278,32 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
     val hourIn12Format = if (adjustedTime.hour % 12 == 0) 12 else adjustedTime.hour % 12
     val timeAngle = ((hourIn12Format * 60 + adjustedTime.minute) / (12 * 60f)) * 360f - 90f // Start from 12 o'clock (top)
     
-    // Draw teal tick marks around the circle (like volume knob)
-    for (i in 0 until 60) { // 60 tick marks around the circle
-        val angle = (i * 6f - 90f) * PI / 180f // Every 6 degrees
-        val isMajorTick = i % 5 == 0 // Every 5th tick is major
+    // Draw minimal PNG file-style tick marks - extremely subtle like document guidelines
+    val currentIndicatorAngle = if (isDragging) currentDragAngle else timeAngle
+    val normalizedIndicatorAngle = ((currentIndicatorAngle + 90f) % 360f + 360f) % 360f // Normalize to 0-360
+    
+    // Only draw major hour marks (12 total) - very minimal like PNG document
+    for (i in 0 until 12) { // Only 12 major marks (every 30 degrees)
+        val tickAngleDegrees = i * 30f // Every 30 degrees (hour positions)
+        val angle = (tickAngleDegrees - 90f) * PI / 180f // Convert to radians
         
-        val tickStartRadius = radius + 15f
-        val tickEndRadius = if (isMajorTick) radius + 30f else radius + 22f
-        val tickWidth = if (isMajorTick) 3f else 2f
+        // Calculate if this tick should be lit up
+        val shouldLightUp = if (isDragging) {
+            val tickNormalizedAngle = tickAngleDegrees
+            val indicatorNormalizedAngle = normalizedIndicatorAngle
+            
+            // Check if tick is between 0 and indicator position
+            if (indicatorNormalizedAngle >= tickNormalizedAngle) {
+                tickNormalizedAngle <= indicatorNormalizedAngle
+            } else {
+                // Handle wrap around
+                tickNormalizedAngle <= indicatorNormalizedAngle || tickNormalizedAngle >= indicatorNormalizedAngle + 360f - 360f
+            }
+        } else false
+        
+        // Extremely subtle marks - almost invisible like PNG document guidelines
+        val tickStartRadius = radius + 10f
+        val tickEndRadius = radius + 18f
         
         val tickStart = Offset(
             center.x + tickStartRadius * cos(angle).toFloat(),
@@ -297,61 +315,95 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         )
         
         drawLine(
-            color = Color(0xFF00BCD4), // Teal color like the design
+            color = if (shouldLightUp && isDragging) {
+                Color(0xFF00BCD4) // Teal when lit
+            } else {
+                Color(0xFFE8E8E8).copy(alpha = 0.08f) // Almost invisible when not lit - like PNG document guidelines
+            },
             start = tickStart,
             end = tickEnd,
-            strokeWidth = tickWidth,
-            cap = StrokeCap.Round
+            strokeWidth = 0.8f, // Very thin
+            cap = StrokeCap.Square
         )
     }
     
-    // Draw triangular indicator like volume knob design
+    // Draw rounded pill-shaped indicator
     val displayAngle = if (isDragging) currentDragAngle else timeAngle
     val indicatorAngle = displayAngle * PI / 180f
-    val indicatorRadius = radius + 8f
-    val indicatorSize = 12f
+    val indicatorRadius = radius + 12f
     
     val indicatorCenter = Offset(
         center.x + indicatorRadius * cos(indicatorAngle.toFloat()).toFloat(),
         center.y + indicatorRadius * sin(indicatorAngle.toFloat()).toFloat()
     )
     
-    // Create triangle path pointing inward toward center
-    val trianglePath = Path().apply {
-        val triangleHeight = indicatorSize
-        val triangleWidth = indicatorSize * 0.8f
-        
-        // Calculate triangle points relative to indicator position
-        val perpAngle = indicatorAngle + PI / 2 // Perpendicular to radius
-        
-        // Top point (pointing toward center)
-        val topPoint = Offset(
-            indicatorCenter.x - (triangleHeight * 0.7f) * cos(indicatorAngle.toFloat()).toFloat(),
-            indicatorCenter.y - (triangleHeight * 0.7f) * sin(indicatorAngle.toFloat()).toFloat()
-        )
-        
-        // Bottom left point
-        val leftPoint = Offset(
-            indicatorCenter.x + (triangleWidth / 2) * cos(perpAngle.toFloat()).toFloat(),
-            indicatorCenter.y + (triangleWidth / 2) * sin(perpAngle.toFloat()).toFloat()
-        )
-        
-        // Bottom right point
-        val rightPoint = Offset(
-            indicatorCenter.x - (triangleWidth / 2) * cos(perpAngle.toFloat()).toFloat(),
-            indicatorCenter.y - (triangleWidth / 2) * sin(perpAngle.toFloat()).toFloat()
-        )
-        
-        moveTo(topPoint.x, topPoint.y)
-        lineTo(leftPoint.x, leftPoint.y)
-        lineTo(rightPoint.x, rightPoint.y)
+    // Draw rounded pill-shaped indicator (like a rounded rectangle)
+    val pillWidth = 20f
+    val pillHeight = 8f
+    
+    // Calculate the pill rectangle aligned with the radius
+    val perpAngle = indicatorAngle + PI / 2 // Perpendicular to radius for width direction
+    
+    // Calculate pill corner positions
+    val halfWidth = pillWidth / 2f
+    val halfHeight = pillHeight / 2f
+    
+    // Four corners of the pill rectangle
+    val corner1 = Offset(
+        indicatorCenter.x - halfHeight * cos(indicatorAngle.toFloat()).toFloat() - halfWidth * cos(perpAngle.toFloat()).toFloat(),
+        indicatorCenter.y - halfHeight * sin(indicatorAngle.toFloat()).toFloat() - halfWidth * sin(perpAngle.toFloat()).toFloat()
+    )
+    val corner2 = Offset(
+        indicatorCenter.x - halfHeight * cos(indicatorAngle.toFloat()).toFloat() + halfWidth * cos(perpAngle.toFloat()).toFloat(),
+        indicatorCenter.y - halfHeight * sin(indicatorAngle.toFloat()).toFloat() + halfWidth * sin(perpAngle.toFloat()).toFloat()
+    )
+    val corner3 = Offset(
+        indicatorCenter.x + halfHeight * cos(indicatorAngle.toFloat()).toFloat() + halfWidth * cos(perpAngle.toFloat()).toFloat(),
+        indicatorCenter.y + halfHeight * sin(indicatorAngle.toFloat()).toFloat() + halfWidth * sin(perpAngle.toFloat()).toFloat()
+    )
+    val corner4 = Offset(
+        indicatorCenter.x + halfHeight * cos(indicatorAngle.toFloat()).toFloat() - halfWidth * cos(perpAngle.toFloat()).toFloat(),
+        indicatorCenter.y + halfHeight * sin(indicatorAngle.toFloat()).toFloat() - halfWidth * sin(perpAngle.toFloat()).toFloat()
+    )
+    
+    // Create rounded rectangle path
+    val pillPath = Path().apply {
+        moveTo(corner1.x, corner1.y)
+        lineTo(corner2.x, corner2.y)
+        lineTo(corner3.x, corner3.y)
+        lineTo(corner4.x, corner4.y)
         close()
     }
     
-    // Draw triangle indicator in teal
+    // Draw the pill indicator with rounded corners
     drawPath(
-        path = trianglePath,
+        path = pillPath,
         color = Color(0xFF00BCD4)
+    )
+    
+    // Add rounded end caps to make it more pill-like
+    val capRadius = pillHeight / 2f
+    
+    // Left cap
+    val leftCapCenter = Offset(
+        indicatorCenter.x - halfHeight * cos(indicatorAngle.toFloat()).toFloat(),
+        indicatorCenter.y - halfHeight * sin(indicatorAngle.toFloat()).toFloat()
+    )
+    drawCircle(
+        color = Color(0xFF00BCD4),
+        radius = capRadius,
+        center = leftCapCenter
+    )
+    
+    // Right cap
+    val rightCapCenter = Offset(
+        indicatorCenter.x + halfHeight * cos(indicatorAngle.toFloat()).toFloat(),
+        indicatorCenter.y + halfHeight * sin(indicatorAngle.toFloat()).toFloat()
+    )
+    drawCircle(
+        color = Color(0xFF00BCD4),
+        radius = capRadius,
+        center = rightCapCenter
     )
 }
 
