@@ -193,8 +193,26 @@ fun PrayerTimesScreen(
 ) {
     val context = LocalContext.current
     
+    // COMPREHENSIVE UI LOGGING SYSTEM
+    LaunchedEffect(Unit) {
+        android.util.Log.i("PrayerTimesScreen", "")
+        android.util.Log.i("PrayerTimesScreen", "🖼️ PRAYER TIMES SCREEN COMPOSITION")
+        android.util.Log.i("PrayerTimesScreen", "=".repeat(60))
+        android.util.Log.i("PrayerTimesScreen", "🚀 Screen initialization started")
+        android.util.Log.i("PrayerTimesScreen", "⏰ Timestamp: ${LocalDateTime.now()}")
+        android.util.Log.i("PrayerTimesScreen", "📱 Context: ${context.javaClass.simpleName}")
+        android.util.Log.i("PrayerTimesScreen", "")
+    }
+    
     // SHARED STATE - Only one tile can be in edit mode at a time
     var currentEditingTile by remember { mutableStateOf<String?>(null) }
+    
+    // Track tile editing state changes
+    LaunchedEffect(currentEditingTile) {
+        android.util.Log.i("PrayerTimesScreen", "🔄 TILE EDITING STATE CHANGED")
+        android.util.Log.i("PrayerTimesScreen", "  📝 Currently editing: ${currentEditingTile ?: "None"}")
+        android.util.Log.i("PrayerTimesScreen", "  🔒 Other tiles locked: ${currentEditingTile != null}")
+    }
     
     // TODO: Load actual prayer settings - for now use defaults to test functionality
     val prayerSettings = null
@@ -287,13 +305,57 @@ fun PrayerTimesScreen(
     var isLoading by remember { mutableStateOf(initialLoading) }     // Start with no loading if we have cached data
     var location by remember { mutableStateOf(initialLocation) }  // Location display text
     
+    // COMPREHENSIVE DATA STATE LOGGING
+    LaunchedEffect(prayerTimes) {
+        android.util.Log.i("PrayerTimesScreen", "🕌 PRAYER TIMES DATA STATE CHANGED")
+        if (prayerTimes != null) {
+            android.util.Log.i("PrayerTimesScreen", "  ✅ Prayer times available")
+            android.util.Log.i("PrayerTimesScreen", "  📅 Date: ${prayerTimes!!.date.toLocalDate()}")
+            android.util.Log.i("PrayerTimesScreen", "  📍 Location: ${prayerTimes!!.location.getDisplayName()}")
+            android.util.Log.i("PrayerTimesScreen", "  🌄 Fajr: ${prayerTimes!!.fajr}")
+            android.util.Log.i("PrayerTimesScreen", "  🌅 Sunrise: ${prayerTimes!!.sunrise}")
+            android.util.Log.i("PrayerTimesScreen", "  ☀️ Dhuhr: ${prayerTimes!!.dhuhr}")
+            android.util.Log.i("PrayerTimesScreen", "  🌇 Asr: ${prayerTimes!!.asr}")
+            android.util.Log.i("PrayerTimesScreen", "  🌆 Maghrib: ${prayerTimes!!.maghrib}")
+            android.util.Log.i("PrayerTimesScreen", "  🌙 Isha: ${prayerTimes!!.isha}")
+        } else {
+            android.util.Log.w("PrayerTimesScreen", "  ❌ No prayer times available")
+        }
+    }
+    
+    LaunchedEffect(isLoading) {
+        android.util.Log.i("PrayerTimesScreen", "⏳ LOADING STATE CHANGED: ${if (isLoading) "LOADING" else "IDLE"}")
+    }
+    
+    LaunchedEffect(location) {
+        android.util.Log.i("PrayerTimesScreen", "📍 LOCATION DISPLAY CHANGED: $location")
+    }
+    
     // REAL-TIME CLOCK STATE - Updates every minute for live prayer status
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
+    
+    // Track current time updates for prayer status calculations
+    LaunchedEffect(currentTime) {
+        android.util.Log.d("PrayerTimesScreen", "⏰ CURRENT TIME UPDATED: $currentTime")
+        prayerTimes?.let { times ->
+            val nextPrayer = times.getNextPrayer()
+            android.util.Log.d("PrayerTimesScreen", "  🔔 Next prayer: ${nextPrayer?.name ?: "None today"}")
+            android.util.Log.d("PrayerTimesScreen", "  ⏱️ Time until next: ${nextPrayer?.let { 
+                val duration = Duration.between(currentTime, it.time)
+                "${duration.toHours()}h ${duration.toMinutes() % 60}m"
+            } ?: "N/A"}")
+        }
+    }
     
     // PULL-TO-REFRESH STATE - Simple implementation
     var isRefreshing by remember { mutableStateOf(false) }
     var pullOffset by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
+    
+    // Track refresh state changes
+    LaunchedEffect(isRefreshing) {
+        android.util.Log.i("PrayerTimesScreen", "🔄 REFRESH STATE CHANGED: ${if (isRefreshing) "REFRESHING" else "IDLE"}")
+    }
     
     // LOCATION SERVICE PROMPT STATE
     var showLocationServiceDialog by remember { mutableStateOf(false) }
@@ -488,6 +550,39 @@ fun PrayerTimesScreen(
     val locationPermissionState = rememberPermissionState(
         permission = Manifest.permission.ACCESS_FINE_LOCATION
     )
+    
+    // COMPREHENSIVE PERMISSION STATE LOGGING
+    LaunchedEffect(notificationPermissionState.status) {
+        android.util.Log.i("PrayerTimesScreen", "🔔 NOTIFICATION PERMISSION STATE CHANGED")
+        when (notificationPermissionState.status) {
+            is com.google.accompanist.permissions.PermissionStatus.Granted -> {
+                android.util.Log.i("PrayerTimesScreen", "  ✅ Notification permission: GRANTED")
+                android.util.Log.i("PrayerTimesScreen", "  🔔 Prayer alerts will be shown")
+            }
+            is com.google.accompanist.permissions.PermissionStatus.Denied -> {
+                val denied = notificationPermissionState.status as com.google.accompanist.permissions.PermissionStatus.Denied
+                android.util.Log.w("PrayerTimesScreen", "  ❌ Notification permission: DENIED")
+                android.util.Log.w("PrayerTimesScreen", "  🚫 Should show rationale: ${denied.shouldShowRationale}")
+                android.util.Log.w("PrayerTimesScreen", "  📵 Prayer alerts will not be shown")
+            }
+        }
+    }
+    
+    LaunchedEffect(locationPermissionState.status) {
+        android.util.Log.i("PrayerTimesScreen", "📍 LOCATION PERMISSION STATE CHANGED")
+        when (locationPermissionState.status) {
+            is com.google.accompanist.permissions.PermissionStatus.Granted -> {
+                android.util.Log.i("PrayerTimesScreen", "  ✅ Location permission: GRANTED")
+                android.util.Log.i("PrayerTimesScreen", "  🎯 Precise prayer times available")
+            }
+            is com.google.accompanist.permissions.PermissionStatus.Denied -> {
+                val denied = locationPermissionState.status as com.google.accompanist.permissions.PermissionStatus.Denied
+                android.util.Log.w("PrayerTimesScreen", "  ❌ Location permission: DENIED")
+                android.util.Log.w("PrayerTimesScreen", "  🚫 Should show rationale: ${denied.shouldShowRationale}")
+                android.util.Log.w("PrayerTimesScreen", "  🏠 Will use default/cached location")
+            }
+        }
+    }
     
     // PERMISSION REQUEST STRATEGY - Request permissions politely on first screen load
     LaunchedEffect(Unit) {

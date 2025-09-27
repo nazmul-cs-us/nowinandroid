@@ -198,7 +198,7 @@ fun InteractivePrayerDial(
                     text = adjustedTime,
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 32.sp // Slightly smaller like reference
+                        fontSize = 38.sp // Larger for better visibility
                     ),
                     color = Color(0xFF2C2C2C), // Dark gray like reference
                     textAlign = TextAlign.Center
@@ -220,7 +220,7 @@ fun InteractivePrayerDial(
                         fontSize = 14.sp
                     ),
                     color = when {
-                        timeAdjustment > 0 -> Color(0xFF4DD0E1) // Teal for positive adjustment
+                        timeAdjustment > 0 -> Color(0xFF10B981) // Compass green for positive adjustment
                         timeAdjustment < 0 -> Color(0xFFE57373) // Light red for negative
                         else -> Color(0xFF757575) // Medium gray for zero
                     },
@@ -313,7 +313,7 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         
         // Draw tick mark with appropriate color - much thinner and longer like reference
         drawLine(
-            color = if (isHighlighted) Color(0xFF4DD0E1) else Color(0xFFE0E0E0), // Teal for highlighted, light gray for others
+            color = if (isHighlighted) Color(0xFF10B981) else Color(0xFFE0E0E0), // Compass green for highlighted, light gray for others
             start = tickStart,
             end = tickEnd,
             strokeWidth = 0.8f, // Much thinner strokes like reference
@@ -371,10 +371,10 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         close()
     }
     
-    // Draw the teal pill indicator
+    // Draw the compass green pill indicator
     drawPath(
         path = pillPath,
-        color = Color(0xFF4DD0E1)
+        color = Color(0xFF10B981)
     )
     
     // Add rounded end caps to make it pill-like
@@ -386,7 +386,7 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         indicatorCenter.y - halfWidth * sin(perpAngle.toFloat())
     )
     drawCircle(
-        color = Color(0xFF4DD0E1),
+        color = Color(0xFF10B981),
         radius = capRadius,
         center = leftCapCenter
     )
@@ -397,7 +397,7 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         indicatorCenter.y + halfWidth * sin(perpAngle.toFloat())
     )
     drawCircle(
-        color = Color(0xFF4DD0E1),
+        color = Color(0xFF10B981),
         radius = capRadius,
         center = rightCapCenter
     )
