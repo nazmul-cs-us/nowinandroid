@@ -1052,9 +1052,9 @@ fun PrayerTimesScreen(
                     .padding(horizontal = 24.dp)
                     .padding(
                         top = 8.dp, // Further reduced for closer gap to Home header
-                        bottom = 24.dp
+                        bottom = 8.dp
                     ),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Top)
             ) {
 
 
@@ -1135,7 +1135,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 6.dp), // Match big tiles padding for consistency
+                        .padding(horizontal = 10.dp, vertical = 8.dp), // Reduced vertical padding for tighter layout
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Dhuhr prayer with interactive dial
@@ -1173,7 +1173,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 6.dp), // Match big tiles padding for consistency
+                        .padding(horizontal = 10.dp, vertical = 8.dp), // Reduced vertical padding for tighter layout
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Maghrib prayer with interactive dial
@@ -1261,7 +1261,7 @@ fun PrayerTimesScreen(
             },
             text = {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = "Prayer Times needs location access to calculate accurate prayer times for your area.",
