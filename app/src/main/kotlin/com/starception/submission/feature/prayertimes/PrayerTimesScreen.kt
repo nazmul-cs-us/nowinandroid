@@ -812,8 +812,8 @@ fun PrayerTimesScreen(
                         modifier = Modifier
                             .wrapContentHeight()
                             .fillMaxWidth()
-                            .padding(horizontal = 11.dp)
-                            .padding(top = 7.dp, bottom = 7.dp),
+                            .padding(horizontal = 12.dp)
+                            .padding(top = 8.dp, bottom = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                     Column(
@@ -845,6 +845,10 @@ fun PrayerTimesScreen(
                             maxLines = 1
                         )
                     }
+                    
+                    // 2dp gap between Arabic prayer name and time
+                    Spacer(modifier = Modifier.height(2.dp))
+                    
                     Column(
                         horizontalAlignment = Alignment.End
                     ) {
@@ -1052,9 +1056,9 @@ fun PrayerTimesScreen(
                     .padding(horizontal = 24.dp)
                     .padding(
                         top = 8.dp, // Further reduced for closer gap to Home header
-                        bottom = 8.dp
+                        bottom = 0.dp
                     ),
-                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Top)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
 
 
@@ -1146,7 +1150,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.dhuhr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(105.dp),
+                            .height(107.dp),
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1161,7 +1165,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.asr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(105.dp),
+                            .height(107.dp),
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1184,7 +1188,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.maghrib,
                         modifier = Modifier
                             .weight(1f)
-                            .height(105.dp),
+                            .height(107.dp),
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1199,7 +1203,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.isha,
                         modifier = Modifier
                             .weight(1f)
-                            .height(105.dp),
+                            .height(107.dp),
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1207,11 +1211,14 @@ fun PrayerTimesScreen(
                     )
                 }
                 
+                // Flexible spacer to push location to bottom when tiles are larger
+                Spacer(modifier = Modifier.weight(1f))
+                
                 // Location info using Material 3 design
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 16.dp),
+                        .padding(vertical = 12.dp),
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
@@ -1224,19 +1231,17 @@ fun PrayerTimesScreen(
                             imageVector = Icons.Filled.LocationOn,
                             contentDescription = "Location",
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .offset(y = (0).dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = getLocationWithCountryCode(location, prayerTimes?.location),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             textAlign = TextAlign.Center,
                             overflow = TextOverflow.Ellipsis,
                             maxLines = 1,
-                            fontWeight = FontWeight.Normal
+                            fontWeight = FontWeight.Medium
                         ).also {
                             android.util.Log.d("LocationText", "📍 LOCATION DISPLAY: '$location' (length=${location.length})")
                         }
