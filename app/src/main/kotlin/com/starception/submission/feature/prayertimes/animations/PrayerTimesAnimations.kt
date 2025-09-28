@@ -228,8 +228,8 @@ fun FlowingArrowsAnimation(
                     Spacer(modifier = Modifier.width(12.dp))
                 }
                 
-                // Text content - centered within available space
-                Column(
+                // Text content - temporarily hidden
+                /*Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -258,7 +258,7 @@ fun FlowingArrowsAnimation(
                             textAlign = TextAlign.Center
                         )
                     }
-                }
+                }*/
             }
         }
     }
@@ -419,8 +419,8 @@ fun RefreshIndicator(
                     
                     Spacer(modifier = Modifier.width(16.dp))
                     
-                    // Enhanced text with better typography and status indication
-                    Column(
+                    // Enhanced text - temporarily hidden
+                    /*Column(
                         horizontalAlignment = Alignment.Start
                     ) {
                         Text(
@@ -438,7 +438,6 @@ fun RefreshIndicator(
                             } else {
                                 MaterialTheme.colorScheme.onSurface
                             }
-                        )
                         
                         if (isRefreshing) {
                             Text(
@@ -453,7 +452,7 @@ fun RefreshIndicator(
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                             )
                         }
-                    }
+                    }*/
                 }
                 
                 // Professional progress bar
