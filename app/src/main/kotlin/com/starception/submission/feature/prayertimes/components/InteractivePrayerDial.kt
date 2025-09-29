@@ -179,51 +179,85 @@ fun InteractivePrayerDial(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Prayer name
+                // Prayer name - improved typography
                 Text(
                     text = prayerName,
                     style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 20.sp,
+                        letterSpacing = 0.15.sp
                     ),
-                    color = Color(0xFF333333), // Dark text on light background
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Adjusted time display - enhanced with better typography
+                val adjustedTime = adjustTimeByMinutes(originalTime, timeAdjustment)
+                Text(
+                    text = adjustedTime,
+                    style = MaterialTheme.typography.displaySmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 36.sp,
+                        letterSpacing = (-0.5).sp // Tighter spacing for time display
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center
                 )
                 
                 Spacer(modifier = Modifier.height(6.dp))
                 
-                // Adjusted time display - using the format from reference (00:00)
-                val adjustedTime = adjustTimeByMinutes(originalTime, timeAdjustment)
-                Text(
-                    text = adjustedTime,
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 38.sp // Larger for better visibility
-                    ),
-                    color = Color(0xFF2C2C2C), // Dark gray like reference
-                    textAlign = TextAlign.Center
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                // Adjustment amount with +/- indicator
+                // Adjustment amount with improved styling (hours and minutes format)
                 val adjustmentText = when {
-                    timeAdjustment > 0 -> "+${timeAdjustment}m"
-                    timeAdjustment < 0 -> "${timeAdjustment}m"
-                    else -> "0m"
+                    timeAdjustment > 0 -> {
+                        val hours = timeAdjustment / 60
+                        val minutes = timeAdjustment % 60
+                        when {
+                            hours > 0 && minutes > 0 -> "+${hours}h ${minutes}m"
+                            hours > 0 -> "+${hours}h"
+                            else -> "+${minutes}m"
+                        }
+                    }
+                    timeAdjustment < 0 -> {
+                        val totalMinutes = kotlin.math.abs(timeAdjustment)
+                        val hours = totalMinutes / 60
+                        val minutes = totalMinutes % 60
+                        when {
+                            hours > 0 && minutes > 0 -> "-${hours}h ${minutes}m"
+                            hours > 0 -> "-${hours}h"
+                            else -> "${timeAdjustment}m" // Keep negative sign
+                        }
+                    }
+                    else -> "±0m"
                 }
                 
                 Text(
                     text = adjustmentText,
-                    style = MaterialTheme.typography.bodyLarge.copy(
+                    style = MaterialTheme.typography.labelLarge.copy(
                         fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp
+                        fontSize = 13.sp,
+                        letterSpacing = 0.1.sp
                     ),
                     color = when {
-                        timeAdjustment > 0 -> Color(0xFF10B981) // Compass green for positive adjustment
-                        timeAdjustment < 0 -> Color(0xFFE57373) // Light red for negative
-                        else -> Color(0xFF757575) // Medium gray for zero
+                        timeAdjustment > 0 -> MaterialTheme.colorScheme.primary
+                        timeAdjustment < 0 -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.outline
                     },
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                // Professional guidance hint - refined
+                Text(
+                    text = "Drag to adjust",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Normal,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.0.sp
+                    ),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center
                 )
             }
