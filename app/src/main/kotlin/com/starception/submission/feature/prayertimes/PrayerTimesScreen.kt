@@ -1146,32 +1146,6 @@ fun PrayerTimesScreen(
                 // Expandable prayer layout - smart default view with expand option
                 var showAllPrayers by remember { mutableStateOf(false) }
                 
-                // Show/Hide toggle button - placed at top for better visibility
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    TextButton(
-                        onClick = { showAllPrayers = !showAllPrayers },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = if (showAllPrayers) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (showAllPrayers) "Show Less" else "Show All Prayers",
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                    }
-                }
-                
                 // Always show current and next 3 prayers (4 total) by default
                 val defaultPrayers = listOf("Dhuhr", "Asr", "Maghrib", "Isha")
                 val additionalPrayers = listOf("Fajr", "Sunrise")
@@ -1218,7 +1192,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 0.dp, bottom = 8.dp),
+                        .padding(start = 10.dp, end = 10.dp, top = 0.dp, bottom = 0.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Maghrib
@@ -1252,7 +1226,7 @@ fun PrayerTimesScreen(
                     )
                 }
                 
-                // Expandable section for additional prayers (Fajr & Sunrise)
+                // Expandable section for additional prayers (Fajr & Sunrise) - appears above toggle button
                 AnimatedVisibility(
                     visible = showAllPrayers,
                     enter = expandVertically() + fadeIn(),
@@ -1261,7 +1235,7 @@ fun PrayerTimesScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 10.dp, end = 10.dp, top = 0.dp, bottom = 8.dp),
+                            .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 0.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         // Fajr
@@ -1289,6 +1263,32 @@ fun PrayerTimesScreen(
                                 .weight(1f)
                                 .height(95.dp),
                             onShowPopup = { } // Sunrise doesn't have popup
+                        )
+                    }
+                }
+                
+                // Show/Hide toggle button - placed after all prayer tiles for perfect flow
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    TextButton(
+                        onClick = { showAllPrayers = !showAllPrayers },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (showAllPrayers) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (showAllPrayers) "Show Less" else "Show All Prayers",
+                            style = MaterialTheme.typography.labelMedium
                         )
                     }
                 }
