@@ -112,7 +112,6 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.Duration
 
-
 /**
  * PRAYER TIMES SCREEN: Main UI for displaying Islamic prayer times with Material 3 design
  * 
@@ -694,8 +693,15 @@ fun PrayerTimesScreen(
                         pressedElevation = 4.dp,
                         focusedElevation = 4.dp
                     ),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                            "Current" -> MaterialTheme.colorScheme.tertiaryContainer
+                            "Next" -> MaterialTheme.colorScheme.primaryContainer
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
+                    ),
                     modifier = Modifier
-                        .fillMaxSize() // Fill the square container for perfect circle
+                        .fillMaxSize() // Fill container space
                     .pointerInput(prayerName) {
                         detectTapGestures(
                             onLongPress = {
@@ -706,14 +712,7 @@ fun PrayerTimesScreen(
                                 android.util.Log.d("PrayerTimes", "🚪 Exited edit mode via long press without saving")
                             }
                         )
-                    },
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                        "Current" -> MaterialTheme.colorScheme.tertiaryContainer
-                        "Next" -> MaterialTheme.colorScheme.primaryContainer
-                        else -> MaterialTheme.colorScheme.surfaceVariant
                     }
-                )
             ) {
                 // ONLY show the circular dial - complete transformation with no overlapping content
                 com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
@@ -770,8 +769,21 @@ fun PrayerTimesScreen(
             }
             }
         } else {
-            // Show regular small card with long-press detection - NO SHADOW
-            Card(
+            // Show regular small card with long-press detection
+            ElevatedCard(
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.elevatedCardElevation(
+                    defaultElevation = 2.dp,
+                    pressedElevation = 4.dp,
+                    focusedElevation = 3.dp
+                ),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                        "Current" -> MaterialTheme.colorScheme.tertiaryContainer
+                        "Next" -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.surface
+                    }
+                ),
                 modifier = modifier
                     .graphicsLayer(
                         scaleX = scale * transformScale,
@@ -792,20 +804,7 @@ fun PrayerTimesScreen(
                                 android.util.Log.d("PrayerCard", "👆 Regular tap detected on $prayerName card")
                             }
                         )
-                    },
-                shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.elevatedCardElevation(
-                    defaultElevation = 2.dp,
-                    pressedElevation = 4.dp,
-                    focusedElevation = 3.dp
-                ),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                        "Current" -> MaterialTheme.colorScheme.tertiaryContainer
-                        "Next" -> MaterialTheme.colorScheme.primaryContainer
-                        else -> MaterialTheme.colorScheme.surface
                     }
-                )
             ) {
                 Box {
                     Column(
@@ -1056,7 +1055,7 @@ fun PrayerTimesScreen(
                     .padding(horizontal = 24.dp)
                     .padding(
                         top = 8.dp, // Further reduced for closer gap to Home header
-                        bottom = 0.dp
+                        bottom = 24.dp // Provide room for elevation shadows near screen bottom
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -1139,7 +1138,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 8.dp), // Reduced vertical padding for tighter layout
+                        .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Dhuhr prayer with interactive dial
@@ -1150,7 +1149,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.dhuhr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(107.dp),
+                            .height(128.dp),
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1165,7 +1164,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.asr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(107.dp),
+                            .height(128.dp),
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1177,7 +1176,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 8.dp), // Reduced vertical padding for tighter layout
+                        .padding(start = 10.dp, end = 10.dp, top = 0.dp, bottom = 0.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Maghrib prayer with interactive dial
@@ -1188,7 +1187,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.maghrib,
                         modifier = Modifier
                             .weight(1f)
-                            .height(107.dp),
+                            .height(128.dp),
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1203,7 +1202,7 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.isha,
                         modifier = Modifier
                             .weight(1f)
-                            .height(107.dp),
+                            .height(128.dp),
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1218,7 +1217,7 @@ fun PrayerTimesScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 0.dp),
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
