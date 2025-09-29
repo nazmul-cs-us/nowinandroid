@@ -89,6 +89,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 
 
@@ -1059,6 +1061,7 @@ fun PrayerTimesScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp)
                     .padding(
                         top = 8.dp, // Further reduced for closer gap to Home header
@@ -1142,6 +1145,32 @@ fun PrayerTimesScreen(
                 
                 // Expandable prayer layout - smart default view with expand option
                 var showAllPrayers by remember { mutableStateOf(false) }
+                
+                // Show/Hide toggle button - placed at top for better visibility
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    TextButton(
+                        onClick = { showAllPrayers = !showAllPrayers },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (showAllPrayers) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (showAllPrayers) "Show Less" else "Show All Prayers",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
                 
                 // Always show current and next 3 prayers (4 total) by default
                 val defaultPrayers = listOf("Dhuhr", "Asr", "Maghrib", "Isha")
@@ -1264,34 +1293,9 @@ fun PrayerTimesScreen(
                     }
                 }
                 
-                // Show/Hide toggle button
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    TextButton(
-                        onClick = { showAllPrayers = !showAllPrayers },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = if (showAllPrayers) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (showAllPrayers) "Show Less" else "Show All Prayers",
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                    }
-                }
                 
-                // Flexible spacer to push location to bottom when tiles are larger
-                Spacer(modifier = Modifier.weight(1f))
+                // Fixed spacer to provide consistent spacing
+                Spacer(modifier = Modifier.height(16.dp))
                 
                 // Location info using Material 3 design
                 Surface(
