@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +68,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.animation.core.*
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntSize
 import android.util.Log
@@ -812,12 +819,12 @@ fun PrayerTimesScreen(
                             .wrapContentHeight()
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
-                            .padding(top = 8.dp, bottom = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                            .padding(top = 8.dp, bottom = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
                     ) {
                     Column(
                         horizontalAlignment = Alignment.Start,
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         Text(
                             text = prayerName,
@@ -845,8 +852,8 @@ fun PrayerTimesScreen(
                         )
                     }
                     
-                    // 2dp gap between Arabic prayer name and time
-                    Spacer(modifier = Modifier.height(2.dp))
+                    // Minimal gap between Arabic prayer name and time
+                    Spacer(modifier = Modifier.height(0.dp))
                     
                     Column(
                         horizontalAlignment = Alignment.End
@@ -1133,115 +1140,152 @@ fun PrayerTimesScreen(
                     }
                 }
                 
-                // Dynamic prayer times - showing next 4 upcoming prayers
-                val next4Prayers = remember(currentTime, prayerTimes) {
-                    PrayerTimeHelpers.getNext4Prayers(currentTime, prayerTimes)
+                // Expandable prayer layout - smart default view with expand option
+                var showAllPrayers by remember { mutableStateOf(false) }
+                
+                // Always show current and next 3 prayers (4 total) by default
+                val defaultPrayers = listOf("Dhuhr", "Asr", "Maghrib", "Isha")
+                val additionalPrayers = listOf("Fajr", "Sunrise")
+                
+                // First row: Most relevant prayers (default view)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Dhuhr
+                    InteractivePrayerCard(
+                        prayerName = "Dhuhr",
+                        currentEditingTile = currentEditingTile,
+                        onEditingTileChange = { currentEditingTile = it },
+                        currentOffset = storedOffsets.dhuhr,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(95.dp),
+                        onShowPopup = { prayerName ->
+                            popupPrayerName = prayerName
+                            showPrayerDialPopup = true
+                        }
+                    )
+                    
+                    // Asr
+                    InteractivePrayerCard(
+                        prayerName = "Asr",
+                        currentEditingTile = currentEditingTile,
+                        onEditingTileChange = { currentEditingTile = it },
+                        currentOffset = storedOffsets.asr,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(95.dp),
+                        onShowPopup = { prayerName ->
+                            popupPrayerName = prayerName
+                            showPrayerDialPopup = true
+                        }
+                    )
                 }
                 
-                // First row: First 2 upcoming prayers
-                if (next4Prayers.size >= 2) {
+                // Second row: Remaining main prayers
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 10.dp, end = 10.dp, top = 0.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Maghrib
+                    InteractivePrayerCard(
+                        prayerName = "Maghrib",
+                        currentEditingTile = currentEditingTile,
+                        onEditingTileChange = { currentEditingTile = it },
+                        currentOffset = storedOffsets.maghrib,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(95.dp),
+                        onShowPopup = { prayerName ->
+                            popupPrayerName = prayerName
+                            showPrayerDialPopup = true
+                        }
+                    )
+                    
+                    // Isha
+                    InteractivePrayerCard(
+                        prayerName = "Isha",
+                        currentEditingTile = currentEditingTile,
+                        onEditingTileChange = { currentEditingTile = it },
+                        currentOffset = storedOffsets.isha,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(95.dp),
+                        onShowPopup = { prayerName ->
+                            popupPrayerName = prayerName
+                            showPrayerDialPopup = true
+                        }
+                    )
+                }
+                
+                // Expandable section for additional prayers (Fajr & Sunrise)
+                AnimatedVisibility(
+                    visible = showAllPrayers,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 16.dp),
+                            .padding(start = 10.dp, end = 10.dp, top = 0.dp, bottom = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // First upcoming prayer
+                        // Fajr
                         InteractivePrayerCard(
-                            prayerName = next4Prayers[0].first,
+                            prayerName = "Fajr",
                             currentEditingTile = currentEditingTile,
                             onEditingTileChange = { currentEditingTile = it },
-                            currentOffset = when (next4Prayers[0].first) {
-                                "Fajr" -> storedOffsets.fajr
-                                "Dhuhr" -> storedOffsets.dhuhr
-                                "Asr" -> storedOffsets.asr
-                                "Maghrib" -> storedOffsets.maghrib
-                                "Isha" -> storedOffsets.isha
-                                else -> 0
-                            },
+                            currentOffset = storedOffsets.fajr,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(128.dp),
+                                .height(95.dp),
                             onShowPopup = { prayerName ->
                                 popupPrayerName = prayerName
                                 showPrayerDialPopup = true
                             }
                         )
                         
-                        // Second upcoming prayer  
+                        // Sunrise
                         InteractivePrayerCard(
-                            prayerName = next4Prayers[1].first,
+                            prayerName = "Sunrise",
                             currentEditingTile = currentEditingTile,
                             onEditingTileChange = { currentEditingTile = it },
-                            currentOffset = when (next4Prayers[1].first) {
-                                "Fajr" -> storedOffsets.fajr
-                                "Dhuhr" -> storedOffsets.dhuhr
-                                "Asr" -> storedOffsets.asr
-                                "Maghrib" -> storedOffsets.maghrib
-                                "Isha" -> storedOffsets.isha
-                                else -> 0
-                            },
+                            currentOffset = 0, // Sunrise doesn't have adjustments
                             modifier = Modifier
                                 .weight(1f)
-                                .height(128.dp),
-                            onShowPopup = { prayerName ->
-                                popupPrayerName = prayerName
-                                showPrayerDialPopup = true
-                            }
+                                .height(95.dp),
+                            onShowPopup = { } // Sunrise doesn't have popup
                         )
                     }
                 }
                 
-                // Second row: Next 2 upcoming prayers
-                if (next4Prayers.size >= 4) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 10.dp, end = 10.dp, top = 0.dp, bottom = 0.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        // Third upcoming prayer
-                        InteractivePrayerCard(
-                            prayerName = next4Prayers[2].first,
-                            currentEditingTile = currentEditingTile,
-                            onEditingTileChange = { currentEditingTile = it },
-                            currentOffset = when (next4Prayers[2].first) {
-                                "Fajr" -> storedOffsets.fajr
-                                "Dhuhr" -> storedOffsets.dhuhr
-                                "Asr" -> storedOffsets.asr
-                                "Maghrib" -> storedOffsets.maghrib
-                                "Isha" -> storedOffsets.isha
-                                else -> 0
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(128.dp),
-                            onShowPopup = { prayerName ->
-                                popupPrayerName = prayerName
-                                showPrayerDialPopup = true
-                            }
+                // Show/Hide toggle button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    TextButton(
+                        onClick = { showAllPrayers = !showAllPrayers },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
                         )
-                        
-                        // Fourth upcoming prayer
-                        InteractivePrayerCard(
-                            prayerName = next4Prayers[3].first,
-                            currentEditingTile = currentEditingTile,
-                            onEditingTileChange = { currentEditingTile = it },
-                            currentOffset = when (next4Prayers[3].first) {
-                                "Fajr" -> storedOffsets.fajr
-                                "Dhuhr" -> storedOffsets.dhuhr
-                                "Asr" -> storedOffsets.asr
-                                "Maghrib" -> storedOffsets.maghrib
-                                "Isha" -> storedOffsets.isha
-                                else -> 0
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(128.dp),
-                            onShowPopup = { prayerName ->
-                                popupPrayerName = prayerName
-                                showPrayerDialPopup = true
-                            }
+                    ) {
+                        Icon(
+                            imageVector = if (showAllPrayers) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (showAllPrayers) "Show Less" else "Show All Prayers",
+                            style = MaterialTheme.typography.labelMedium
                         )
                     }
                 }

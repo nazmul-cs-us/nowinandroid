@@ -71,6 +71,7 @@ object PrayerTimeHelpers {
         
         val time = when (prayerName) {
             "Fajr" -> times.fajr
+            "Sunrise" -> times.sunrise
             "Dhuhr" -> times.dhuhr
             "Asr" -> times.asr
             "Maghrib" -> times.maghrib
@@ -87,6 +88,7 @@ object PrayerTimeHelpers {
         
         val prayerTime = when (prayerName) {
             "Fajr" -> times.fajr
+            "Sunrise" -> times.sunrise
             "Dhuhr" -> times.dhuhr
             "Asr" -> times.asr
             "Maghrib" -> times.maghrib
@@ -96,6 +98,7 @@ object PrayerTimeHelpers {
         
         val allPrayerTimes = listOf(
             "Fajr" to times.fajr,
+            "Sunrise" to times.sunrise,
             "Dhuhr" to times.dhuhr,
             "Asr" to times.asr,
             "Maghrib" to times.maghrib,
@@ -125,6 +128,7 @@ object PrayerTimeHelpers {
         
         val allPrayerTimes = listOf(
             "Fajr" to times.fajr,
+            "Sunrise" to times.sunrise,
             "Dhuhr" to times.dhuhr,
             "Asr" to times.asr,
             "Maghrib" to times.maghrib,
@@ -140,6 +144,7 @@ object PrayerTimeHelpers {
         
         val allPrayerTimes = listOf(
             "Fajr" to times.fajr,
+            "Sunrise" to times.sunrise,
             "Dhuhr" to times.dhuhr,
             "Asr" to times.asr,
             "Maghrib" to times.maghrib,
@@ -175,6 +180,7 @@ object PrayerTimeHelpers {
         
         val allPrayerTimes = listOf(
             "Fajr" to times.fajr,
+            "Sunrise" to times.sunrise,
             "Dhuhr" to times.dhuhr,
             "Asr" to times.asr,
             "Maghrib" to times.maghrib,
@@ -195,6 +201,7 @@ object PrayerTimeHelpers {
         // Add tomorrow's prayers starting from Fajr until we have 4 total
         val tomorrowPrayers = listOf(
             "Fajr" to times.fajr.plusHours(24), // Tomorrow's Fajr
+            "Sunrise" to times.sunrise.plusHours(24), // Tomorrow's Sunrise
             "Dhuhr" to times.dhuhr.plusHours(24), // Tomorrow's Dhuhr
             "Asr" to times.asr.plusHours(24), // Tomorrow's Asr
             "Maghrib" to times.maghrib.plusHours(24), // Tomorrow's Maghrib
