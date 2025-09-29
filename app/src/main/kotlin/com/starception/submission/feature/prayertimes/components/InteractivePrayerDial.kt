@@ -116,7 +116,7 @@ fun InteractivePrayerDial(
                         }
                     ) { change, _ ->
                         if (isDragging) {
-                            val center = Offset(size.width / 2f, size.height / 2f)
+                        val center = Offset(size.width / 2f, size.height / 2f)
                             val fingerAngle = kotlin.math.atan2(
                                 change.position.y - center.y,
                                 change.position.x - center.x
@@ -236,14 +236,14 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
     val timerRadius = radius // Use full radius for pure circular design
     
     // Outer shadow for depth (like the reference)
-    drawCircle(
+            drawCircle(
         color = Color.Black.copy(alpha = 0.08f),
         radius = timerRadius + 6f,
         center = Offset(center.x + 1f, center.y + 2f)
     )
     
     // Main light gray circle background (like the reference)
-    drawCircle(
+            drawCircle(
         color = Color(0xFFF5F5F5), // Very light gray background
         radius = timerRadius,
         center = center
@@ -256,8 +256,8 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         Color(0xFFE8E8E8)  // Slightly darker gray at bottom
     )
     
-    drawCircle(
-        brush = Brush.radialGradient(
+            drawCircle(
+                brush = Brush.radialGradient(
             colors = innerGradientColors,
             center = Offset(center.x, center.y - radius * 0.3f), // Offset upward for lighting effect
             radius = timerRadius * 0.9f
@@ -267,7 +267,7 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
     )
     
     // Subtle border like the reference
-    drawCircle(
+            drawCircle(
         color = Color(0xFFDDDDDD), // Light gray border
         radius = timerRadius,
         center = center,
