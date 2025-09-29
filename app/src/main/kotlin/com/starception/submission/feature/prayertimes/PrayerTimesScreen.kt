@@ -1294,8 +1294,7 @@ fun PrayerTimesScreen(
                 }
                 
                 
-                // Fixed spacer to provide consistent spacing
-                Spacer(modifier = Modifier.height(16.dp))
+                // Removed spacer to eliminate excessive gap
                 
                 // Location info using Material 3 design
                 Surface(
@@ -1314,17 +1313,17 @@ fun PrayerTimesScreen(
                             imageVector = Icons.Filled.LocationOn,
                             contentDescription = "Location",
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(26.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = getLocationWithCountryCode(location, prayerTimes?.location),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.headlineMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             textAlign = TextAlign.Center,
                             overflow = TextOverflow.Ellipsis,
                             maxLines = 1,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.SemiBold
                         ).also {
                             android.util.Log.d("LocationText", "📍 LOCATION DISPLAY: '$location' (length=${location.length})")
                         }
