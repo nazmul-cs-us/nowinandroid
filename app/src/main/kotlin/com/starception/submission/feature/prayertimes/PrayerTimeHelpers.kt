@@ -168,4 +168,47 @@ object PrayerTimeHelpers {
             "${minutes}m"
         }
     }
+    
+    // Get next 4 prayers dynamically (handles day transitions)
+    fun getNext4Prayers(currentTime: LocalTime, prayerTimes: DayPrayerTimes?): List<Pair<String, LocalTime>> {
+        val times = prayerTimes ?: return emptyList()
+        
+        val allPrayerTimes = listOf(
+            "Fajr" to times.fajr,
+            "Dhuhr" to times.dhuhr,
+            "Asr" to times.asr,
+            "Maghrib" to times.maghrib,
+            "Isha" to times.isha
+        )
+        
+        // Find upcoming prayers for today
+        val upcomingToday = allPrayerTimes.filter { it.second.isAfter(currentTime) }
+        
+        // If we have 4 or more prayers left today, return the next 4
+        if (upcomingToday.size >= 4) {
+            return upcomingToday.take(4)
+        }
+        
+        // If less than 4 prayers left today, include tomorrow's prayers
+        val result = upcomingToday.toMutableList()
+        
+        // Add tomorrow's prayers starting from Fajr until we have 4 total
+        val tomorrowPrayers = listOf(
+            "Fajr" to times.fajr.plusHours(24), // Tomorrow's Fajr
+            "Dhuhr" to times.dhuhr.plusHours(24), // Tomorrow's Dhuhr
+            "Asr" to times.asr.plusHours(24), // Tomorrow's Asr
+            "Maghrib" to times.maghrib.plusHours(24), // Tomorrow's Maghrib
+            "Isha" to times.isha.plusHours(24) // Tomorrow's Isha
+        )
+        
+        for (prayer in tomorrowPrayers) {
+            if (result.size < 4) {
+                result.add(prayer)
+            } else {
+                break
+            }
+        }
+        
+        return result.take(4)
+    }
 }
