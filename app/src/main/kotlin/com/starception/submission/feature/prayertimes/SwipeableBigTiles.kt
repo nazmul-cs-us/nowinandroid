@@ -155,9 +155,9 @@ fun Modifier.geminiGradientEdge(
         val shineProgress = shinePosition * perimeter
         val shineSize = 80f // Size of the traveling shine
         
-        // Create the Gemini gradient colors
+        // Create the gradient colors using Material 3 theme
         val geminiColors = listOf(
-            Color(0xFF4CAF50), // Green
+            Color(0xFF4CAF50), // Green - keeping for now, will be passed as parameter
             Color(0xFF2196F3), // Blue
             Color(0xFFE91E63), // Red
             Color(0xFFFFEB3B)  // Yellow
@@ -359,7 +359,7 @@ fun Modifier.sunshineAura(
         val bottomStartPx = bottomStart.toPx()
         val bottomEndPx = bottomEnd.toPx()
         
-        // Divine golden aura with enhanced layers (slightly more prominent)
+        // Divine golden aura with enhanced layers (temporarily keeping hardcoded)
         val auralayers = listOf(
             Triple(16.dp.toPx(), primaryGlow * 1.1f, Color(0xFFFFD700)),      // Inner gold
             Triple(26.dp.toPx(), primaryGlow * 0.9f, Color(0xFFFFE55C)),      // Mid gold  

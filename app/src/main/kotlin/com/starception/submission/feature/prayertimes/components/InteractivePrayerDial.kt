@@ -57,6 +57,11 @@ fun InteractivePrayerDial(
     var baseAdjustment by remember { mutableStateOf(timeAdjustment) }
     var currentDragAngle by remember { mutableStateOf(0f) }
     
+    // Get Material 3 theme colors for dark/light mode support
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val outlineColor = MaterialTheme.colorScheme.outline
+    
     // Reset base when timeAdjustment changes externally
     LaunchedEffect(timeAdjustment) {
         if (!isDragging) {
@@ -161,8 +166,20 @@ fun InteractivePrayerDial(
             val center = this.center
             val radius = kotlin.math.min(size.width, size.height) * 0.4f
             
-            // Draw clean circular timer design
-            drawCleanCircularTimer(center, radius, timeAdjustment, originalTime, isDragging, currentDragAngle)
+            // Use Material 3 theme colors passed from Composable
+            
+            // Draw clean circular timer design with theme colors
+            drawCleanCircularTimer(
+                center = center, 
+                radius = radius, 
+                timeAdjustment = timeAdjustment, 
+                originalTime = originalTime, 
+                isDragging = isDragging, 
+                currentDragAngle = currentDragAngle,
+                surfaceColor = surfaceColor,
+                onSurfaceColor = onSurfaceColor,
+                outlineColor = outlineColor
+            )
         }
 
         // Central text container with clean background like reference
@@ -265,29 +282,43 @@ fun InteractivePrayerDial(
     }
 }
 
-private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, timeAdjustment: Int, originalTime: LocalTime, isDragging: Boolean, currentDragAngle: Float) {
+private fun DrawScope.drawCleanCircularTimer(
+    center: Offset, 
+    radius: Float, 
+    timeAdjustment: Int, 
+    originalTime: LocalTime, 
+    isDragging: Boolean, 
+    currentDragAngle: Float,
+    surfaceColor: Color,
+    onSurfaceColor: Color,
+    outlineColor: Color
+) {
     // Clean circular design matching the reference image - no document background
     val timerRadius = radius // Use full radius for pure circular design
     
+    // Theme-aware colors for dark/light mode support
+    val shadowColor = onSurfaceColor.copy(alpha = 0.08f)
+    val borderColor = outlineColor
+    
     // Outer shadow for depth (like the reference)
-            drawCircle(
-        color = Color.Black.copy(alpha = 0.08f),
+    drawCircle(
+        color = shadowColor,
         radius = timerRadius + 6f,
         center = Offset(center.x + 1f, center.y + 2f)
     )
     
-    // Main light gray circle background (like the reference)
-            drawCircle(
-        color = Color(0xFFF5F5F5), // Very light gray background
+    // Main circle background (theme-aware)
+    drawCircle(
+        color = surfaceColor,
         radius = timerRadius,
         center = center
     )
     
-    // Subtle inner gradient for depth
+    // Subtle inner gradient for depth - using theme-aware colors
     val innerGradientColors = listOf(
-        Color(0xFFFFFFFF).copy(alpha = 0.8f), // White highlight at top
-        Color(0xFFF0F0F0), // Light gray
-        Color(0xFFE8E8E8)  // Slightly darker gray at bottom
+        surfaceColor.copy(alpha = 1f), // Surface color at top
+        surfaceColor.copy(alpha = 0.9f), // Slightly darker surface
+        surfaceColor.copy(alpha = 0.8f)  // Even darker surface at bottom
     )
     
             drawCircle(
@@ -301,8 +332,8 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
     )
     
     // Subtle border like the reference
-            drawCircle(
-        color = Color(0xFFDDDDDD), // Light gray border
+    drawCircle(
+        color = borderColor,
         radius = timerRadius,
         center = center,
         style = Stroke(width = 1.5f)
@@ -347,7 +378,7 @@ private fun DrawScope.drawCleanCircularTimer(center: Offset, radius: Float, time
         
         // Draw tick mark with appropriate color - much thinner and longer like reference
         drawLine(
-            color = if (isHighlighted) Color(0xFF10B981) else Color(0xFFE0E0E0), // Compass green for highlighted, light gray for others
+            color = if (isHighlighted) Color(0xFF10B981) else outlineColor.copy(alpha = 0.6f), // Compass green for highlighted, theme outline for others
             start = tickStart,
             end = tickEnd,
             strokeWidth = 0.8f, // Much thinner strokes like reference

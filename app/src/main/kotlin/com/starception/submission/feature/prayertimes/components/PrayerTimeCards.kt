@@ -55,8 +55,8 @@ fun PrayerTimesHeaderCard(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFFF8F9FA),
-                            Color(0xFFE9ECEF)
+                            MaterialTheme.colorScheme.surface,
+                            MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
                 )
@@ -74,8 +74,8 @@ fun PrayerTimesHeaderCard(
                         .background(
                             Brush.horizontalGradient(
                                 colors = listOf(
-                                    Color(0xFF4A90E2),
-                                    Color(0xFF5BA4F2)
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.primaryContainer
                                 )
                             )
                         )
@@ -100,13 +100,13 @@ fun PrayerTimesHeaderCard(
                     Text(
                         text = "📍 $location",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color(0xFF495057),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = "📅 $date",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color(0xFF6C757D)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
