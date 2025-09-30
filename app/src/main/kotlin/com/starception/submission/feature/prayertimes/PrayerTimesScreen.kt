@@ -196,6 +196,21 @@ import java.time.Duration
  * - Verify currentTime updates every minute
  * - Track calculation timeouts and error handling
  */
+/**
+ * Converts English numerals to Arabic-Indic numerals
+ * Example: "12:19 PM" -> "١٢:١٩ PM"
+ */
+private fun convertToArabicNumerals(text: String): String {
+    val arabicNumerals = mapOf(
+        '0' to '٠', '1' to '١', '2' to '٢', '3' to '٣', '4' to '٤',
+        '5' to '٥', '6' to '٦', '7' to '٧', '8' to '٨', '9' to '٩'
+    )
+    
+    return text.map { char ->
+        arabicNumerals[char] ?: char
+    }.joinToString("")
+}
+
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun PrayerTimesScreen(
@@ -858,9 +873,29 @@ fun PrayerTimesScreen(
                     // Minimal gap between Arabic prayer name and time
                     Spacer(modifier = Modifier.height(0.dp))
                     
-                    Column(
-                        horizontalAlignment = Alignment.End
+                    Box(
+                        modifier = Modifier.fillMaxSize()
                     ) {
+                        // Arabic numerals time (top left, matching Arabic prayer name alignment)
+                        val arabicTime = PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes)?.let { time ->
+                            convertToArabicNumerals(time)
+                        } ?: ""
+                        
+                        Text(
+                            text = arabicTime,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                                "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            },
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.align(Alignment.TopEnd),
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1
+                        )
+                        
+                        // English time (bottom right) - main time display
                         Text(
                             text = buildAnnotatedString {
                                 val baseColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
@@ -887,6 +922,7 @@ fun PrayerTimesScreen(
                                 }
                             },
                             style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.align(Alignment.BottomEnd),
                             overflow = TextOverflow.Ellipsis,
                             maxLines = 1
                         )
@@ -1069,7 +1105,7 @@ fun PrayerTimesScreen(
                         bottom = 0.dp // Eliminate all unused space
                     )
                     .background(Color.Blue.copy(alpha = 0.2f)), // DEBUG: Blue background for main column
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.Top
             ) {
 
 
@@ -1149,6 +1185,9 @@ fun PrayerTimesScreen(
                 // Expandable prayer layout - smart default view with expand option
                 var showAllPrayers by remember { mutableStateOf(false) }
                 
+                // Dynamic tile height based on number of rows shown  
+                val tileHeight = if (showAllPrayers) 120.dp else 145.dp // Properly sized tiles for 2 rows to prevent text cutoff, smaller when 3 rows
+                
                 // Always show current and next 3 prayers (4 total) by default
                 val defaultPrayers = listOf("Dhuhr", "Asr", "Maghrib", "Isha")
                 val additionalPrayers = listOf("Fajr", "Sunrise")
@@ -1157,7 +1196,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
+                        .padding(horizontal = 6.dp)
                         .background(Color.Red.copy(alpha = 0.2f)), // DEBUG: Red background for first row
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -1169,8 +1208,8 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.dhuhr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp)
-                            .padding(6.dp), // Add margin around tile for elevation shadows
+                            .height(tileHeight)
+                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 12.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1185,8 +1224,8 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.asr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp)
-                            .padding(6.dp), // Add margin around tile for elevation shadows
+                            .height(tileHeight)
+                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 12.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1198,7 +1237,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
+                        .padding(horizontal = 6.dp)
                         .background(Color.Green.copy(alpha = 0.2f)), // DEBUG: Green background for second row
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -1210,8 +1249,8 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.maghrib,
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp)
-                            .padding(6.dp), // Add margin around tile for elevation shadows
+                            .height(tileHeight)
+                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 12.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1226,8 +1265,8 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.isha,
                         modifier = Modifier
                             .weight(1f)
-                            .height(120.dp)
-                            .padding(6.dp), // Add margin around tile for elevation shadows
+                            .height(tileHeight)
+                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 12.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1244,7 +1283,7 @@ fun PrayerTimesScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
+                            .padding(horizontal = 6.dp)
                             .background(Color(0xFF9C27B0).copy(alpha = 0.2f)), // DEBUG: Purple background for expandable row
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -1256,7 +1295,7 @@ fun PrayerTimesScreen(
                             currentOffset = storedOffsets.fajr,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(120.dp)
+                                .height(tileHeight)
                                 .padding(6.dp), // Add margin around tile for elevation shadows
                             onShowPopup = { prayerName ->
                                 popupPrayerName = prayerName
@@ -1272,7 +1311,7 @@ fun PrayerTimesScreen(
                             currentOffset = 0, // Sunrise doesn't have adjustments
                             modifier = Modifier
                                 .weight(1f)
-                                .height(120.dp)
+                                .height(tileHeight)
                                 .padding(6.dp), // Add margin around tile for elevation shadows
                             onShowPopup = { } // Sunrise doesn't have popup
                         )
