@@ -1154,7 +1154,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 8.dp),
+                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Dhuhr
@@ -1192,7 +1192,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 0.dp, bottom = 0.dp),
+                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Maghrib
@@ -1235,7 +1235,7 @@ fun PrayerTimesScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 0.dp),
+                            .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         // Fajr
@@ -1271,7 +1271,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
+                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
                     horizontalArrangement = Arrangement.Center
                 ) {
                     TextButton(
@@ -1313,17 +1313,15 @@ fun PrayerTimesScreen(
                             imageVector = Icons.Filled.LocationOn,
                             contentDescription = "Location",
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
+
                         Text(
                             text = getLocationWithCountryCode(location, prayerTimes?.location),
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            textAlign = TextAlign.Center,
-                            overflow = TextOverflow.Ellipsis,
-                            maxLines = 1,
-                            fontWeight = FontWeight.Normal
+                            textAlign = TextAlign.Center
                         ).also {
                             android.util.Log.d("LocationText", "📍 LOCATION DISPLAY: '$location' (length=${location.length})")
                         }
