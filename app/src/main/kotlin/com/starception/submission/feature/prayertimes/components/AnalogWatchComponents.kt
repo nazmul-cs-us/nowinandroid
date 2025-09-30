@@ -67,9 +67,9 @@ fun PremiumHourMarkers(watchSize: Dp) {
                     .background(
                         Brush.radialGradient(
                             colors = listOf(
-                                Color(0xFF1E293B).copy(alpha = 0.95f),
-                                Color(0xFF334155).copy(alpha = 0.8f),
-                                Color(0xFF475569).copy(alpha = 0.6f)
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
                             ),
                             radius = if (isCardinal) 60f else 48f
                         )
@@ -84,7 +84,7 @@ fun PremiumHourMarkers(watchSize: Dp) {
                     .background(
                         Brush.radialGradient(
                             colors = listOf(
-                                Color(0xFFFFD700).copy(alpha = 0.3f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
                                 Color.Transparent
                             )
                         )
@@ -95,7 +95,7 @@ fun PremiumHourMarkers(watchSize: Dp) {
             Text(
                 text = direction,
                 style = MaterialTheme.typography.labelLarge,
-                color = if (isCardinal) Color(0xFFFFD700) else Color(0xFF60A5FA),
+                color = if (isCardinal) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
                 fontWeight = FontWeight.Bold,
                 fontSize = if (isCardinal) 20.sp else 16.sp
             )

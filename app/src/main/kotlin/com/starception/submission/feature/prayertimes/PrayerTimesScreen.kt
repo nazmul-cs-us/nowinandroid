@@ -1296,11 +1296,11 @@ fun PrayerTimesScreen(
                 
                 // Removed spacer to eliminate excessive gap
                 
-                // Location info using Material 3 design
+                // Location info using Material 3 design - aligned with big tiles
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 0.dp),
+                        .padding(horizontal = 8.dp),
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
@@ -1323,7 +1323,7 @@ fun PrayerTimesScreen(
                             textAlign = TextAlign.Center,
                             overflow = TextOverflow.Ellipsis,
                             maxLines = 1,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Normal
                         ).also {
                             android.util.Log.d("LocationText", "📍 LOCATION DISPLAY: '$location' (length=${location.length})")
                         }
