@@ -790,7 +790,7 @@ fun PrayerTimesScreen(
                     containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                         "Current" -> MaterialTheme.colorScheme.tertiaryContainer
                         "Next" -> MaterialTheme.colorScheme.primaryContainer
-                        else -> MaterialTheme.colorScheme.surface
+                        else -> MaterialTheme.colorScheme.surfaceVariant
                     }
                 ),
                 modifier = modifier
@@ -815,14 +815,15 @@ fun PrayerTimesScreen(
                         )
                     }
             ) {
-                Box {
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                ) {
                     Column(
                         modifier = Modifier
-                            .wrapContentHeight()
-                            .fillMaxWidth()
+                            .fillMaxSize()
                             .padding(horizontal = 12.dp)
-                            .padding(top = 8.dp, bottom = 6.dp),
-                        verticalArrangement = Arrangement.spacedBy(1.dp)
+                            .padding(vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                     Column(
                         horizontalAlignment = Alignment.Start,
@@ -1065,9 +1066,10 @@ fun PrayerTimesScreen(
                     .padding(horizontal = 24.dp)
                     .padding(
                         top = 8.dp, // Further reduced for closer gap to Home header
-                        bottom = 24.dp // Provide room for elevation shadows near screen bottom
-                    ),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                        bottom = 0.dp // Eliminate all unused space
+                    )
+                    .background(Color.Blue.copy(alpha = 0.2f)), // DEBUG: Blue background for main column
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
 
 
@@ -1106,7 +1108,8 @@ fun PrayerTimesScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp), // Match big tiles horizontal constraint
+                        .padding(horizontal = 10.dp) // Match big tiles horizontal constraint
+                        .background(Color(0xFFFF9800).copy(alpha = 0.3f)), // DEBUG: Orange background for instruction banner
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
                     ),
@@ -1154,8 +1157,9 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
+                        .background(Color.Red.copy(alpha = 0.2f)), // DEBUG: Red background for first row
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Dhuhr
                     InteractivePrayerCard(
@@ -1165,7 +1169,8 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.dhuhr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(95.dp),
+                            .height(120.dp)
+                            .padding(6.dp), // Add margin around tile for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1180,7 +1185,8 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.asr,
                         modifier = Modifier
                             .weight(1f)
-                            .height(95.dp),
+                            .height(120.dp)
+                            .padding(6.dp), // Add margin around tile for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1192,8 +1198,9 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
+                        .background(Color.Green.copy(alpha = 0.2f)), // DEBUG: Green background for second row
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Maghrib
                     InteractivePrayerCard(
@@ -1203,7 +1210,8 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.maghrib,
                         modifier = Modifier
                             .weight(1f)
-                            .height(95.dp),
+                            .height(120.dp)
+                            .padding(6.dp), // Add margin around tile for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1218,7 +1226,8 @@ fun PrayerTimesScreen(
                         currentOffset = storedOffsets.isha,
                         modifier = Modifier
                             .weight(1f)
-                            .height(95.dp),
+                            .height(120.dp)
+                            .padding(6.dp), // Add margin around tile for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1235,8 +1244,9 @@ fun PrayerTimesScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
+                            .background(Color(0xFF9C27B0).copy(alpha = 0.2f)), // DEBUG: Purple background for expandable row
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // Fajr
                         InteractivePrayerCard(
@@ -1246,7 +1256,8 @@ fun PrayerTimesScreen(
                             currentOffset = storedOffsets.fajr,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(95.dp),
+                                .height(120.dp)
+                                .padding(6.dp), // Add margin around tile for elevation shadows
                             onShowPopup = { prayerName ->
                                 popupPrayerName = prayerName
                                 showPrayerDialPopup = true
@@ -1261,7 +1272,8 @@ fun PrayerTimesScreen(
                             currentOffset = 0, // Sunrise doesn't have adjustments
                             modifier = Modifier
                                 .weight(1f)
-                                .height(95.dp),
+                                .height(120.dp)
+                                .padding(6.dp), // Add margin around tile for elevation shadows
                             onShowPopup = { } // Sunrise doesn't have popup
                         )
                     }
@@ -1271,7 +1283,8 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp)
+                        .background(Color.Yellow.copy(alpha = 0.2f)), // DEBUG: Yellow background for toggle button
                     horizontalArrangement = Arrangement.Center
                 ) {
                     TextButton(
