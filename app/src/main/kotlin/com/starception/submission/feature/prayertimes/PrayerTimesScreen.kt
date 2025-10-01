@@ -767,7 +767,25 @@ fun PrayerTimesScreen(
                                 
                                 // Update UI on main thread
                                 withContext(Dispatchers.Main) {
-                                    // Trigger refresh to reload stored offsets from storage
+                                    // Force immediate refresh using both methods to ensure UI updates
+                                    try {
+                                        // Method 1: Direct repository reload
+                                        val currentSettings = repository.getLoadedCalculationSettings()
+                                        storedOffsets = currentSettings.timeOffsets
+                                        android.util.Log.d("PrayerTimesScreen", "🔄 IMMEDIATE OFFSET RELOAD (Method 1):")
+                                        android.util.Log.d("PrayerTimesScreen", "   🌞 Dhuhr: ${storedOffsets.dhuhr}")
+                                        android.util.Log.d("PrayerTimesScreen", "   🌇 Asr: ${storedOffsets.asr}")
+                                        android.util.Log.d("PrayerTimesScreen", "   🌆 Maghrib: ${storedOffsets.maghrib}")
+                                        android.util.Log.d("PrayerTimesScreen", "   🌙 Isha: ${storedOffsets.isha}")
+                                        
+                                        // Method 2: Use the refresh function for consistency
+                                        refreshStoredOffsets()
+                                        android.util.Log.d("PrayerTimesScreen", "🔄 REFRESH FUNCTION CALLED (Method 2)")
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("PrayerTimesScreen", "❌ Failed immediate offset reload", e)
+                                    }
+                                    
+                                    // Also trigger the standard refresh mechanism as backup
                                     offsetRefreshTrigger++
                                     android.util.Log.d("PrayerTimesScreen", "🔄 TRIGGERING OFFSET REFRESH: trigger=$offsetRefreshTrigger")
                                     
