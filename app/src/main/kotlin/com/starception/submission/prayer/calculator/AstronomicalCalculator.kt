@@ -438,52 +438,212 @@ class AstronomicalCalculator @Inject constructor() {
     }
     
     /**
-     * Calculates sunrise time
+     * SUNRISE CALCULATOR: Determines exact sunrise time with atmospheric refraction
+     * 
+     * CALCULATION METHOD:
+     * - Uses geometric horizon (-0.833°) with refraction correction
+     * - Applies altitude-based atmospheric refraction
+     * - Calculates hour angle for sunrise elevation
+     * - Returns solar noon minus morning hour angle
+     * 
+     * REFRACTION FORMULA:
+     * - Base refraction: -0.833° (standard atmospheric refraction at sea level)
+     * - Altitude correction: -0.0347 * √(altitude_meters)
+     * - Combined: More negative angles for higher elevations
      */
     fun calculateSunrise(location: Location, julianDay: Double): Double {
-        val declination = calculateSolarDeclination(julianDay)
-        val solarNoon = calculateSolarNoon(location, julianDay)
+        if (!logInputValidation("SUNRISE", location.latitude, location.longitude, julianDay)) {
+            return Double.NaN
+        }
         
-        // Geometric horizon with atmospheric refraction correction
-        val sunriseAltitude = -0.833 - 0.0347 * sqrt(maxOf(location.altitude, 0.0))
-        val hourAngle = calculateHourAngle(location.latitude, declination, sunriseAltitude)
-        
-        if (hourAngle.isNaN()) return Double.NaN
-        
-        return solarNoon - Math.toDegrees(hourAngle) / 15.0
+        return benchmarkCalculation("SUNRISE_CALCULATION") {
+            val declination = calculateSolarDeclination(julianDay)
+            val solarNoon = calculateSolarNoon(location, julianDay)
+            
+            // ATMOSPHERIC REFRACTION CALCULATION
+            // Standard refraction (-0.833°) plus altitude-dependent correction
+            val baseRefraction = -0.833
+            val altitudeCorrection = -0.0347 * sqrt(maxOf(location.altitude, 0.0))
+            val sunriseAltitude = baseRefraction + altitudeCorrection
+            
+            val hourAngle = calculateHourAngle(location.latitude, declination, sunriseAltitude)
+            
+            val inputs = mapOf(
+                "location" to location.getDisplayName(),
+                "julianDay" to julianDay,
+                "declination" to "${Math.toDegrees(declination)}°",
+                "solarNoon" to "${solarNoon}h",
+                "altitude" to "${location.altitude}m",
+                "baseRefraction" to "${baseRefraction}°",
+                "altitudeCorrection" to "${altitudeCorrection}°",
+                "totalSunriseAltitude" to "${sunriseAltitude}°",
+                "hourAngle" to "${Math.toDegrees(hourAngle)}°"
+            )
+            
+            if (hourAngle.isNaN()) {
+                Log.w(TAG, "")
+                Log.w(TAG, "⚠️ SUNRISE CALCULATION FAILED")
+                Log.w(TAG, "🔍 Cause: Sun never rises at this latitude/date combination")
+                Log.w(TAG, "🌍 Common in: Polar regions during winter months")
+                Log.w(TAG, "")
+                
+                logCalculation("SUNRISE_CALCULATION", inputs, "NaN (no sunrise)")
+                return@benchmarkCalculation Double.NaN
+            }
+            
+            val result = solarNoon - Math.toDegrees(hourAngle) / 15.0
+            
+            logCalculation("SUNRISE_CALCULATION", inputs, "${result}h")
+            
+            // Sunrise should be between midnight and noon
+            verifyTimeResult("SUNRISE", result, Pair(0.0, 12.0))
+            
+            result
+        }
     }
     
     /**
-     * Calculates sunset time
+     * SUNSET CALCULATOR: Determines exact sunset time with atmospheric refraction
+     * 
+     * CALCULATION METHOD:
+     * - Uses identical geometric horizon to sunrise (-0.833°)
+     * - Applies same altitude-based atmospheric refraction
+     * - Calculates hour angle for sunset elevation
+     * - Returns solar noon plus evening hour angle
+     * 
+     * SYMMETRY:
+     * - Sunset uses same refraction calculation as sunrise
+     * - Hour angle is added instead of subtracted from solar noon
+     * - Ensures symmetric sunrise/sunset around solar noon
      */
     fun calculateSunset(location: Location, julianDay: Double): Double {
-        val declination = calculateSolarDeclination(julianDay)
-        val solarNoon = calculateSolarNoon(location, julianDay)
+        if (!logInputValidation("SUNSET", location.latitude, location.longitude, julianDay)) {
+            return Double.NaN
+        }
         
-        // Geometric horizon with atmospheric refraction correction
-        val sunsetAltitude = -0.833 - 0.0347 * sqrt(maxOf(location.altitude, 0.0))
-        val hourAngle = calculateHourAngle(location.latitude, declination, sunsetAltitude)
-        
-        if (hourAngle.isNaN()) return Double.NaN
-        
-        return solarNoon + Math.toDegrees(hourAngle) / 15.0
+        return benchmarkCalculation("SUNSET_CALCULATION") {
+            val declination = calculateSolarDeclination(julianDay)
+            val solarNoon = calculateSolarNoon(location, julianDay)
+            
+            // ATMOSPHERIC REFRACTION CALCULATION (identical to sunrise)
+            val baseRefraction = -0.833
+            val altitudeCorrection = -0.0347 * sqrt(maxOf(location.altitude, 0.0))
+            val sunsetAltitude = baseRefraction + altitudeCorrection
+            
+            val hourAngle = calculateHourAngle(location.latitude, declination, sunsetAltitude)
+            
+            val inputs = mapOf(
+                "location" to location.getDisplayName(),
+                "julianDay" to julianDay,
+                "declination" to "${Math.toDegrees(declination)}°",
+                "solarNoon" to "${solarNoon}h",
+                "altitude" to "${location.altitude}m",
+                "baseRefraction" to "${baseRefraction}°",
+                "altitudeCorrection" to "${altitudeCorrection}°",
+                "totalSunsetAltitude" to "${sunsetAltitude}°",
+                "hourAngle" to "${Math.toDegrees(hourAngle)}°"
+            )
+            
+            if (hourAngle.isNaN()) {
+                Log.w(TAG, "")
+                Log.w(TAG, "⚠️ SUNSET CALCULATION FAILED")
+                Log.w(TAG, "🔍 Cause: Sun never sets at this latitude/date combination")
+                Log.w(TAG, "🌍 Common in: Polar regions during summer months")
+                Log.w(TAG, "")
+                
+                logCalculation("SUNSET_CALCULATION", inputs, "NaN (no sunset)")
+                return@benchmarkCalculation Double.NaN
+            }
+            
+            val result = solarNoon + Math.toDegrees(hourAngle) / 15.0
+            
+            logCalculation("SUNSET_CALCULATION", inputs, "${result}h")
+            
+            // Sunset should be between noon and midnight
+            verifyTimeResult("SUNSET", result, Pair(12.0, 24.0))
+            
+            result
+        }
     }
     
     /**
-     * Calculates Fajr time based on depression angle
+     * FAJR CALCULATOR: Dawn prayer time based on solar depression angle
+     * 
+     * ISLAMIC ASTRONOMY:
+     * - Fajr occurs when sun is at specific angle below horizon (dawn)
+     * - Common angles: 15°, 18°, 19.5° depending on calculation method
+     * - Uses negative altitude (sun below horizon)
+     * - Calculated as solar noon minus dawn hour angle
+     * 
+     * METHODOLOGY DIFFERENCES:
+     * - Hanafi: Often uses 18° depression angle
+     * - Shafi/Maliki: May use 15° or 19.5° depending on region
+     * - Regional variations account for atmospheric conditions
      */
     fun calculateFajr(location: Location, julianDay: Double, fajrAngle: Double): Double {
-        val declination = calculateSolarDeclination(julianDay)
-        val solarNoon = calculateSolarNoon(location, julianDay)
-        val hourAngle = calculateHourAngle(location.latitude, declination, -fajrAngle)
+        if (!logInputValidation("FAJR", location.latitude, location.longitude, julianDay, fajrAngle)) {
+            return Double.NaN
+        }
         
-        if (hourAngle.isNaN()) return Double.NaN
-        
-        return solarNoon - Math.toDegrees(hourAngle) / 15.0
+        return benchmarkCalculation("FAJR_CALCULATION") {
+            val declination = calculateSolarDeclination(julianDay)
+            val solarNoon = calculateSolarNoon(location, julianDay)
+            
+            // Fajr uses negative altitude (sun below horizon)
+            val fajrAltitude = -fajrAngle
+            val hourAngle = calculateHourAngle(location.latitude, declination, fajrAltitude)
+            
+            val inputs = mapOf(
+                "location" to location.getDisplayName(),
+                "julianDay" to julianDay,
+                "fajrAngle" to "${fajrAngle}°",
+                "fajrAltitude" to "${fajrAltitude}° (below horizon)",
+                "declination" to "${Math.toDegrees(declination)}°",
+                "solarNoon" to "${solarNoon}h",
+                "hourAngle" to "${Math.toDegrees(hourAngle)}°"
+            )
+            
+            if (hourAngle.isNaN()) {
+                Log.w(TAG, "")
+                Log.w(TAG, "⚠️ FAJR CALCULATION FAILED")
+                Log.w(TAG, "🔍 Cause: Sun never reaches ${fajrAngle}° below horizon")
+                Log.w(TAG, "🌍 Common in: High latitude locations during summer")
+                Log.w(TAG, "📐 Solution: Use different calculation method or apply midnight rule")
+                Log.w(TAG, "")
+                
+                logCalculation("FAJR_CALCULATION", inputs, "NaN (no dawn)")
+                return@benchmarkCalculation Double.NaN
+            }
+            
+            val result = solarNoon - Math.toDegrees(hourAngle) / 15.0
+            
+            logCalculation("FAJR_CALCULATION", inputs, "${result}h")
+            
+            // Fajr should be between midnight and sunrise (roughly 0-8 AM)
+            verifyTimeResult("FAJR", result, Pair(0.0, 8.0))
+            
+            result
+        }
     }
     
     /**
-     * Calculates Isha time based on depression angle or delay
+     * ISHA CALCULATOR: Night prayer time using depression angle or delay after Maghrib
+     * 
+     * DUAL CALCULATION METHODS:
+     * 1. DEPRESSION ANGLE: Sun at specific angle below horizon (astronomical dusk)
+     *    - Common angles: 15°, 17°, 18° depending on calculation method
+     *    - Uses same principles as Fajr but for evening
+     *    - Calculated as solar noon plus dusk hour angle
+     * 
+     * 2. DELAY AFTER MAGHRIB: Fixed time interval after sunset
+     *    - Common delays: 60, 90, 120 minutes
+     *    - Used in regions where astronomical calculation fails
+     *    - Simple addition to sunset time
+     * 
+     * REGIONAL PREFERENCES:
+     * - Urban areas: Often use depression angle for consistency
+     * - High latitudes: Use delay method when astronomical fails
+     * - Traditional communities: May prefer fixed delay approach
      */
     fun calculateIsha(
         location: Location, 
@@ -491,74 +651,305 @@ class AstronomicalCalculator @Inject constructor() {
         ishaAngle: Double? = null,
         ishaDelay: Int? = null
     ): Double {
+        if (!logInputValidation("ISHA", location.latitude, location.longitude, julianDay)) {
+            return Double.NaN
+        }
+        
         return if (ishaAngle != null) {
-            // Calculate based on depression angle
-            val declination = calculateSolarDeclination(julianDay)
-            val solarNoon = calculateSolarNoon(location, julianDay)
-            val hourAngle = calculateHourAngle(location.latitude, declination, -ishaAngle)
-            
-            if (hourAngle.isNaN()) return Double.NaN
-            
-            solarNoon + Math.toDegrees(hourAngle) / 15.0
+            // METHOD 1: DEPRESSION ANGLE CALCULATION
+            benchmarkCalculation("ISHA_ANGLE_CALCULATION") {
+                val declination = calculateSolarDeclination(julianDay)
+                val solarNoon = calculateSolarNoon(location, julianDay)
+                
+                // Isha uses negative altitude (sun below horizon)
+                val ishaAltitude = -ishaAngle
+                val hourAngle = calculateHourAngle(location.latitude, declination, ishaAltitude)
+                
+                val inputs = mapOf(
+                    "location" to location.getDisplayName(),
+                    "julianDay" to julianDay,
+                    "method" to "Depression Angle",
+                    "ishaAngle" to "${ishaAngle}°",
+                    "ishaAltitude" to "${ishaAltitude}° (below horizon)",
+                    "declination" to "${Math.toDegrees(declination)}°",
+                    "solarNoon" to "${solarNoon}h",
+                    "hourAngle" to "${Math.toDegrees(hourAngle)}°"
+                )
+                
+                if (hourAngle.isNaN()) {
+                    Log.w(TAG, "")
+                    Log.w(TAG, "⚠️ ISHA ANGLE CALCULATION FAILED")
+                    Log.w(TAG, "🔍 Cause: Sun never reaches ${ishaAngle}° below horizon")
+                    Log.w(TAG, "🌍 Common in: High latitude locations during summer")
+                    Log.w(TAG, "📐 Solution: Use delay method or different angle")
+                    Log.w(TAG, "")
+                    
+                    logCalculation("ISHA_ANGLE_CALCULATION", inputs, "NaN (no dusk)")
+                    return@benchmarkCalculation Double.NaN
+                }
+                
+                val result = solarNoon + Math.toDegrees(hourAngle) / 15.0
+                
+                logCalculation("ISHA_ANGLE_CALCULATION", inputs, "${result}h")
+                
+                // Isha should be between sunset and midnight (roughly 18-24)
+                verifyTimeResult("ISHA_ANGLE", result, Pair(18.0, 24.0))
+                
+                result
+            }
         } else if (ishaDelay != null) {
-            // Calculate based on delay after Maghrib
-            val sunset = calculateSunset(location, julianDay)
-            if (sunset.isNaN()) return Double.NaN
-            
-            sunset + ishaDelay / 60.0
+            // METHOD 2: DELAY AFTER MAGHRIB CALCULATION
+            benchmarkCalculation("ISHA_DELAY_CALCULATION") {
+                val sunset = calculateSunset(location, julianDay)
+                
+                val inputs = mapOf(
+                    "location" to location.getDisplayName(),
+                    "julianDay" to julianDay,
+                    "method" to "Delay after Maghrib",
+                    "sunset" to "${sunset}h",
+                    "delayMinutes" to "${ishaDelay}min",
+                    "delayHours" to "${ishaDelay / 60.0}h"
+                )
+                
+                if (sunset.isNaN()) {
+                    Log.w(TAG, "")
+                    Log.w(TAG, "⚠️ ISHA DELAY CALCULATION FAILED")
+                    Log.w(TAG, "🔍 Cause: Cannot calculate sunset time")
+                    Log.w(TAG, "🌍 Common in: Polar regions during extreme seasons")
+                    Log.w(TAG, "")
+                    
+                    logCalculation("ISHA_DELAY_CALCULATION", inputs, "NaN (no sunset)")
+                    return@benchmarkCalculation Double.NaN
+                }
+                
+                val result = sunset + ishaDelay / 60.0
+                
+                logCalculation("ISHA_DELAY_CALCULATION", inputs, "${result}h")
+                
+                // Isha with delay should be between sunset and midnight+3 hours
+                verifyTimeResult("ISHA_DELAY", result, Pair(sunset, 27.0))
+                
+                result
+            }
         } else {
+            Log.e(TAG, "")
+            Log.e(TAG, "❌ ISHA CALCULATION ERROR")
+            Log.e(TAG, "🔍 Cause: Neither angle nor delay specified")
+            Log.e(TAG, "📐 Solution: Provide either ishaAngle or ishaDelay parameter")
+            Log.e(TAG, "")
+            
             Double.NaN
         }
     }
     
     /**
-     * Calculates Asr time based on shadow factor
+     * ASR CALCULATOR: Afternoon prayer time based on shadow length methodology
+     * 
+     * ISLAMIC SHADOW CALCULATION:
+     * - Asr occurs when object's shadow length equals shadowFactor × object height
+     * - Shadow factor varies by Islamic school of jurisprudence (madhhab)
+     * - Uses trigonometric relationship between sun altitude and shadow length
+     * - Calculated as solar noon plus afternoon hour angle
+     * 
+     * MADHHAB DIFFERENCES:
+     * - HANAFI: shadowFactor = 2 (shadow = 2 × object height + noon shadow)
+     * - SHAFI/MALIKI/HANBALI: shadowFactor = 1 (shadow = 1 × object height + noon shadow)
+     * - Some regions use intermediate values or regional variations
+     * 
+     * MATHEMATICAL FORMULA:
+     * 1. Calculate cotangent of Asr altitude = shadowFactor + tan(|latitude - declination|)
+     * 2. Asr altitude = arctan(1 / cotangent)
+     * 3. Find hour angle for this altitude
+     * 4. Asr time = solar noon + hour angle in hours
      */
     fun calculateAsr(
         location: Location, 
         julianDay: Double, 
         shadowFactor: Int = 1
     ): Double {
-        val declination = calculateSolarDeclination(julianDay)
-        val solarNoon = calculateSolarNoon(location, julianDay)
+        if (!logInputValidation("ASR", location.latitude, location.longitude, julianDay)) {
+            return Double.NaN
+        }
         
-        val latRad = Math.toRadians(location.latitude)
-        
-        // Calculate Asr altitude angle
-        val cotanAsrAltitude = shadowFactor + tan(abs(latRad - declination))
-        val asrAltitude = atan(1.0 / cotanAsrAltitude)
-        val asrAltitudeDegrees = Math.toDegrees(asrAltitude)
-        
-        val hourAngle = calculateHourAngle(location.latitude, declination, asrAltitudeDegrees)
-        
-        if (hourAngle.isNaN()) return Double.NaN
-        
-        return solarNoon + Math.toDegrees(hourAngle) / 15.0
+        return benchmarkCalculation("ASR_CALCULATION") {
+            val declination = calculateSolarDeclination(julianDay)
+            val solarNoon = calculateSolarNoon(location, julianDay)
+            
+            val latRad = Math.toRadians(location.latitude)
+            val decDegrees = Math.toDegrees(declination)
+            
+            // SHADOW CALCULATION: Core Islamic astronomical formula
+            // cotangent(Asr altitude) = shadowFactor + tan(|latitude - declination|)
+            val latDecDiff = abs(latRad - declination)
+            val latDecDiffDegrees = Math.toDegrees(latDecDiff)
+            val tanLatDecDiff = tan(latDecDiff)
+            val cotanAsrAltitude = shadowFactor + tanLatDecDiff
+            val asrAltitude = atan(1.0 / cotanAsrAltitude)
+            val asrAltitudeDegrees = Math.toDegrees(asrAltitude)
+            
+            val hourAngle = calculateHourAngle(location.latitude, declination, asrAltitudeDegrees)
+            
+            val madhhabName = when (shadowFactor) {
+                1 -> "Shafi/Maliki/Hanbali"
+                2 -> "Hanafi"
+                else -> "Custom ($shadowFactor)"
+            }
+            
+            val inputs = mapOf(
+                "location" to location.getDisplayName(),
+                "julianDay" to julianDay,
+                "madhhab" to madhhabName,
+                "shadowFactor" to shadowFactor,
+                "latitude" to "${location.latitude}°",
+                "declination" to "${decDegrees}°",
+                "latitudeDeclinationDiff" to "${latDecDiffDegrees}°",
+                "tanLatDecDiff" to tanLatDecDiff,
+                "cotanAsrAltitude" to cotanAsrAltitude,
+                "asrAltitude" to "${asrAltitudeDegrees}°",
+                "solarNoon" to "${solarNoon}h",
+                "hourAngle" to "${Math.toDegrees(hourAngle)}°"
+            )
+            
+            if (hourAngle.isNaN()) {
+                Log.w(TAG, "")
+                Log.w(TAG, "⚠️ ASR CALCULATION FAILED")
+                Log.w(TAG, "🔍 Cause: Sun never reaches calculated Asr altitude")
+                Log.w(TAG, "📐 Asr altitude required: ${asrAltitudeDegrees}°")
+                Log.w(TAG, "🌍 Common in: Extreme latitudes or unusual date/location combinations")
+                Log.w(TAG, "📚 Madhhab: $madhhabName (shadow factor: $shadowFactor)")
+                Log.w(TAG, "")
+                
+                logCalculation("ASR_CALCULATION", inputs, "NaN (invalid geometry)")
+                return@benchmarkCalculation Double.NaN
+            }
+            
+            val result = solarNoon + Math.toDegrees(hourAngle) / 15.0
+            
+            logCalculation("ASR_CALCULATION", inputs, "${result}h")
+            
+            // Asr should be between noon and sunset (roughly 12-18)
+            verifyTimeResult("ASR", result, Pair(12.0, 18.0))
+            
+            result
+        }
     }
     
     /**
-     * Converts decimal hour to LocalTime
+     * TIME CONVERTER: Transforms decimal hours to LocalTime format
+     * 
+     * CONVERSION PROCESS:
+     * - Extracts whole hours from decimal value
+     * - Calculates minutes from fractional part (× 60)
+     * - Calculates seconds from remaining fraction (× 60)
+     * - Creates LocalTime object with hour:minute:second format
+     * 
+     * VALIDATION:
+     * - Rejects NaN values (calculation failures)
+     * - Ensures time is within 24-hour range (0.0 to 23.999...)
+     * - Handles precision issues in floating-point arithmetic
+     * 
+     * PRECISION:
+     * - Seconds precision for accurate prayer time display
+     * - Proper rounding to avoid display inconsistencies
      */
     fun decimalHourToLocalTime(decimalHour: Double): LocalTime? {
-        Log.d(TAG, "Converting decimal hour to LocalTime: $decimalHour")
-        
-        if (decimalHour.isNaN()) {
-            Log.w(TAG, "Decimal hour is NaN")
-            return null
+        return benchmarkCalculation("TIME_CONVERSION") {
+            val inputs = mapOf(
+                "decimalHour" to decimalHour,
+                "isNaN" to decimalHour.isNaN(),
+                "isInfinite" to decimalHour.isInfinite()
+            )
+            
+            // VALIDATION: Check for invalid input values
+            when {
+                decimalHour.isNaN() -> {
+                    Log.w(TAG, "")
+                    Log.w(TAG, "⚠️ TIME CONVERSION FAILED")
+                    Log.w(TAG, "🔍 Cause: Decimal hour is NaN (calculation failed)")
+                    Log.w(TAG, "📐 Source: Prayer time calculation returned invalid result")
+                    Log.w(TAG, "")
+                    
+                    logCalculation("TIME_CONVERSION", inputs, "null (NaN input)")
+                    return@benchmarkCalculation null
+                }
+                
+                decimalHour.isInfinite() -> {
+                    Log.w(TAG, "")
+                    Log.w(TAG, "⚠️ TIME CONVERSION FAILED")
+                    Log.w(TAG, "🔍 Cause: Decimal hour is infinite (mathematical overflow)")
+                    Log.w(TAG, "📐 Source: Extreme calculation conditions")
+                    Log.w(TAG, "")
+                    
+                    logCalculation("TIME_CONVERSION", inputs, "null (infinite input)")
+                    return@benchmarkCalculation null
+                }
+                
+                decimalHour < 0 || decimalHour >= 24 -> {
+                    Log.w(TAG, "")
+                    Log.w(TAG, "⚠️ TIME CONVERSION WARNING")
+                    Log.w(TAG, "🔍 Cause: Decimal hour outside 24-hour range: $decimalHour")
+                    Log.w(TAG, "📐 Normalizing to valid range...")
+                    Log.w(TAG, "")
+                    
+                    // Normalize to 24-hour range
+                    var normalizedHour = decimalHour % 24.0
+                    if (normalizedHour < 0) normalizedHour += 24.0
+                    
+                    Log.i(TAG, "🔄 Normalized time: $decimalHour → $normalizedHour")
+                    
+                    val normalizedInputs = inputs + mapOf("normalizedHour" to normalizedHour)
+                    
+                    // PRECISION CALCULATION with normalized value
+                    val hours = floor(normalizedHour).toInt()
+                    val minutesFraction = (normalizedHour - hours) * 60.0
+                    val minutes = floor(minutesFraction).toInt()
+                    val secondsFraction = (minutesFraction - minutes) * 60.0
+                    val seconds = floor(secondsFraction).toInt()
+                    
+                    val result = LocalTime.of(hours, minutes, seconds)
+                    
+                    val conversionData = normalizedInputs + mapOf(
+                        "extractedHours" to hours,
+                        "extractedMinutes" to minutes,
+                        "extractedSeconds" to seconds,
+                        "minutesFraction" to minutesFraction,
+                        "secondsFraction" to secondsFraction
+                    )
+                    
+                    logCalculation("TIME_CONVERSION", conversionData, "$result (normalized)")
+                    return@benchmarkCalculation result
+                }
+                
+                else -> {
+                    // STANDARD CONVERSION for valid input
+                    val hours = floor(decimalHour).toInt()
+                    val minutesFraction = (decimalHour - hours) * 60.0
+                    val minutes = floor(minutesFraction).toInt()
+                    val secondsFraction = (minutesFraction - minutes) * 60.0
+                    val seconds = floor(secondsFraction).toInt()
+                    
+                    val result = LocalTime.of(hours, minutes, seconds)
+                    
+                    val conversionData = inputs + mapOf(
+                        "extractedHours" to hours,
+                        "extractedMinutes" to minutes,
+                        "extractedSeconds" to seconds,
+                        "minutesFraction" to minutesFraction,
+                        "secondsFraction" to secondsFraction
+                    )
+                    
+                    logCalculation("TIME_CONVERSION", conversionData, result)
+                    
+                    // Verify reasonable time values
+                    if (hours in 0..23 && minutes in 0..59 && seconds in 0..59) {
+                        Log.d(TAG, "✅ Time conversion successful: ${decimalHour}h → $result")
+                    } else {
+                        Log.w(TAG, "⚠️ Unusual time components: H:$hours M:$minutes S:$seconds")
+                    }
+                    
+                    return@benchmarkCalculation result
+                }
+            }
         }
-        
-        if (decimalHour < 0 || decimalHour >= 24) {
-            Log.w(TAG, "Decimal hour out of range: $decimalHour")
-            return null
-        }
-        
-        val hours = floor(decimalHour).toInt()
-        val minutes = ((decimalHour - hours) * 60).toInt()
-        val seconds = (((decimalHour - hours) * 60 - minutes) * 60).toInt()
-        
-        val localTime = LocalTime.of(hours, minutes, seconds)
-        Log.d(TAG, "Converted to LocalTime: $localTime")
-        
-        return localTime
     }
 }
