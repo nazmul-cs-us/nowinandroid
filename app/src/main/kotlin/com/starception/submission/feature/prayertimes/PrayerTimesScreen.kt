@@ -837,96 +837,116 @@ fun PrayerTimesScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 12.dp)
-                            .padding(vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                            .padding(vertical = 1.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                    Column(
-                        horizontalAlignment = Alignment.Start,
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        Text(
-                            text = prayerName,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            fontWeight = FontWeight.Medium,
-                            overflow = TextOverflow.Ellipsis,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                                "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                            },
-                            fontWeight = FontWeight.Normal,
-                            overflow = TextOverflow.Ellipsis,
-                            maxLines = 1
-                        )
-                    }
-                    
-                    // Minimal gap between Arabic prayer name and time
-                    Spacer(modifier = Modifier.height(0.dp))
-                    
-                    Box(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        // Arabic numerals time (top left, matching Arabic prayer name alignment)
-                        val arabicTime = PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes)?.let { time ->
-                            convertToArabicNumerals(time)
-                        } ?: ""
-                        
-                        Text(
-                            text = arabicTime,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
-                                "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            },
-                            fontWeight = FontWeight.Normal,
-                            modifier = Modifier.align(Alignment.TopEnd),
-                            overflow = TextOverflow.Ellipsis,
-                            maxLines = 1
-                        )
-                        
-                        // English time (bottom right) - main time display
-                        Text(
-                            text = buildAnnotatedString {
-                                val baseColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.tertiary
-                                    "Next" -> MaterialTheme.colorScheme.primary
+                        // Top section: Prayer names
+                        Column(
+                            horizontalAlignment = Alignment.Start,
+                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                        ) {
+                            Text(
+                                text = prayerName,
+                                style = MaterialTheme.typography.titleLarge,
+                                color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
                                     else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                                
-                                // Main prayer time in bold
-                                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = baseColor)) {
-                                    append(PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes))
-                                }
-                                
-                                // Offset indicator in smaller, lighter style
-                                if (currentOffset != 0) {
-                                    append(" ")
-                                    withStyle(style = SpanStyle(
-                                        fontWeight = FontWeight.Medium,
-                                        color = baseColor.copy(alpha = 0.7f),
-                                        fontSize = MaterialTheme.typography.bodySmall.fontSize
-                                    )) {
-                                        append(if (currentOffset > 0) "+${currentOffset}m" else "${currentOffset}m")
+                                },
+                                fontWeight = FontWeight.Medium,
+                                overflow = TextOverflow.Ellipsis,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                },
+                                fontWeight = FontWeight.Normal,
+                                overflow = TextOverflow.Ellipsis,
+                                maxLines = 1
+                            )
+                        }
+                        
+                        // Bottom section: Times with proper spacing and bottom padding
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            verticalArrangement = Arrangement.spacedBy(-2.dp)
+                        ) {
+                            // Arabic numerals time (smaller, at top) - show adjusted time
+                            val originalTime = when (prayerName) {
+                                "Fajr" -> prayerTimes?.fajr
+                                "Sunrise" -> prayerTimes?.sunrise
+                                "Dhuhr" -> prayerTimes?.dhuhr
+                                "Asr" -> prayerTimes?.asr
+                                "Maghrib" -> prayerTimes?.maghrib
+                                "Isha" -> prayerTimes?.isha
+                                else -> null
+                            }
+                            val adjustedTime = originalTime?.let { time ->
+                                val adjustedDateTime = java.time.LocalDateTime.of(java.time.LocalDate.now(), time).plusMinutes(currentOffset.toLong())
+                                val adjusted = adjustedDateTime.toLocalTime()
+                                val hour12 = if (adjusted.hour == 0) 12 
+                                            else if (adjusted.hour > 12) adjusted.hour - 12 
+                                            else adjusted.hour
+                                val amPm = if (adjusted.hour < 12) "AM" else "PM"
+                                val result = String.format("%d:%02d %s", hour12, adjusted.minute, amPm)
+                                android.util.Log.d("PrayerCard", "🕐 TIME CALCULATION for $prayerName:")
+                                android.util.Log.d("PrayerCard", "   📅 Original time: $time")
+                                android.util.Log.d("PrayerCard", "   ⏱️ Current offset: $currentOffset minutes")
+                                android.util.Log.d("PrayerCard", "   🔄 Adjusted time: $result")
+                                result
+                            } ?: ""
+                            val arabicTime = convertToArabicNumerals(adjustedTime)
+                            
+                            Text(
+                                text = arabicTime,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                    "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                                    "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                },
+                                fontWeight = FontWeight.Normal,
+                                overflow = TextOverflow.Ellipsis,
+                                maxLines = 1
+                            )
+                            
+                            // English time (main display) with bottom padding - show adjusted time
+                            Text(
+                                text = buildAnnotatedString {
+                                    val baseColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                        "Current" -> MaterialTheme.colorScheme.tertiary
+                                        "Next" -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
                                     }
-                                }
-                            },
-                            style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.align(Alignment.BottomEnd),
-                            overflow = TextOverflow.Ellipsis,
-                            maxLines = 1
-                        )
-                    }
+                                    
+                                    // Main prayer time in bold - show adjusted time
+                                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = baseColor)) {
+                                        append(adjustedTime)
+                                    }
+                                    
+                                    // Offset indicator in smaller, lighter style (show adjustment amount)
+                                    if (currentOffset != 0) {
+                                        append(" ")
+                                        withStyle(style = SpanStyle(
+                                            fontWeight = FontWeight.Medium,
+                                            color = baseColor.copy(alpha = 0.7f),
+                                            fontSize = MaterialTheme.typography.bodySmall.fontSize
+                                        )) {
+                                            append(if (currentOffset > 0) "+${currentOffset}m" else "${currentOffset}m")
+                                        }
+                                    }
+                                },
+                                style = MaterialTheme.typography.headlineSmall,
+                                overflow = TextOverflow.Ellipsis,
+                                maxLines = 1,
+                                modifier = Modifier.padding(bottom = 8.dp) // Add specific bottom padding after English prayer time
+                            )
+                        }
                 }
                 
             }
@@ -1209,7 +1229,7 @@ fun PrayerTimesScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(tileHeight)
-                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 12.dp), // Extra bottom space for elevation shadows
+                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 16.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1225,7 +1245,7 @@ fun PrayerTimesScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(tileHeight)
-                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 12.dp), // Extra bottom space for elevation shadows
+                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 16.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1250,7 +1270,7 @@ fun PrayerTimesScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(tileHeight)
-                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 12.dp), // Extra bottom space for elevation shadows
+                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 16.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1266,7 +1286,7 @@ fun PrayerTimesScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(tileHeight)
-                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 12.dp), // Extra bottom space for elevation shadows
+                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 16.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
                             popupPrayerName = prayerName
                             showPrayerDialPopup = true
@@ -1296,7 +1316,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(6.dp), // Add margin around tile for elevation shadows
+                                .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 16.dp), // Extra bottom space for elevation shadows
                             onShowPopup = { prayerName ->
                                 popupPrayerName = prayerName
                                 showPrayerDialPopup = true
@@ -1312,7 +1332,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(6.dp), // Add margin around tile for elevation shadows
+                                .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 16.dp), // Extra bottom space for elevation shadows
                             onShowPopup = { } // Sunrise doesn't have popup
                         )
                     }
@@ -1572,38 +1592,112 @@ fun PrayerTimesScreen(
 }
 
 /**
- * Helper function to get location text with country code
- * Uses CountryCodeMapper to add country code to location display
+ * Helper function to get location text with country information
+ * Uses CountryCodeMapper to add country code or full country name based on available space
  */
 private fun getLocationWithCountryCode(
     locationString: String,
     locationData: com.starception.submission.prayer.model.Location?
 ): String {
+    android.util.Log.d("LocationDisplay", "🏷️ FORMATTING LOCATION DISPLAY:")
+    android.util.Log.d("LocationDisplay", "   Input: '$locationString'")
+    android.util.Log.d("LocationDisplay", "   Location Data: ${locationData?.let { "${it.city}, ${it.country} (${it.countryCode})" } ?: "null"}")
+    
     if (locationString.isBlank()) {
+        android.util.Log.d("LocationDisplay", "   ❌ Location string is blank - returning loading message")
         return "Loading location..."
     }
     
-    // If we have location data with country information, try to get country code
+    // Clean up the location string by removing redundant country information
+    val cleanLocationString = locationString
+        .replace(Regex(",\\s*(UAE|United Arab Emirates)"), "") // Remove existing country references
+        .replace(Regex("\\s+"), " ") // Normalize whitespace
+        .trim()
+    
+    android.util.Log.d("LocationDisplay", "   🧹 Cleaned location: '$cleanLocationString'")
+    
+    // If we have location data with country information, enhance the display
     if (locationData != null) {
         val countryCode = when {
             // Use existing country code if available
-            locationData.countryCode.isNotEmpty() -> locationData.countryCode
+            locationData.countryCode.isNotEmpty() -> {
+                android.util.Log.d("LocationDisplay", "   ✅ Using existing country code: ${locationData.countryCode}")
+                locationData.countryCode
+            }
             
             // Try to map country name to code using CountryCodeMapper
             locationData.country.isNotEmpty() -> {
+                android.util.Log.d("LocationDisplay", "   🔍 Mapping country name '${locationData.country}' to code")
                 CountryCodeMapper.getCountryCode(locationData.country) ?: ""
             }
             
-            else -> ""
+            else -> {
+                android.util.Log.d("LocationDisplay", "   ⚠️ No country information available")
+                ""
+            }
         }
         
-        // Return location with country code if we found one
         if (countryCode.isNotEmpty()) {
-            return "$locationString ($countryCode)"
+            // Get full country name from country code
+            val fullCountryName = CountryCodeMapper.getFullCountryName(countryCode)
+            
+            android.util.Log.d("LocationDisplay", "   🌍 COUNTRY INFO:")
+            android.util.Log.d("LocationDisplay", "      Country Code: '$countryCode'")
+            android.util.Log.d("LocationDisplay", "      Full Country Name: '$fullCountryName'")
+            
+            if (fullCountryName != null) {
+                // Calculate available space for the format: "City, Full Country Name (CODE)"
+                val baseLocationLength = cleanLocationString.length
+                val totalAvailableSpace = 45 // Increased estimate for location display
+                val fullFormatLength = baseLocationLength + 2 + fullCountryName.length + 3 + countryCode.length + 1 // " , " + name + " (" + code + ")"
+                val codeOnlyFormatLength = baseLocationLength + 3 + countryCode.length + 1 // " (" + code + ")"
+                
+                android.util.Log.d("LocationDisplay", "   📏 SPACE CALCULATION:")
+                android.util.Log.d("LocationDisplay", "      Base location length: $baseLocationLength")
+                android.util.Log.d("LocationDisplay", "      Total available space: $totalAvailableSpace")
+                android.util.Log.d("LocationDisplay", "      Full format length: $fullFormatLength")
+                android.util.Log.d("LocationDisplay", "      Code only format length: $codeOnlyFormatLength")
+                
+                val finalResult = when {
+                    // Format: "Dubai, United Arab Emirates (AE)" - preferred format when space allows
+                    fullFormatLength <= totalAvailableSpace -> {
+                        val result = "$cleanLocationString, $fullCountryName ($countryCode)"
+                        android.util.Log.i("LocationDisplay", "   ✅ Using full format: '$result' (${result.length} chars)")
+                        result
+                    }
+                    
+                    // Format: "Dubai (AE)" - fallback when full name doesn't fit
+                    codeOnlyFormatLength <= totalAvailableSpace -> {
+                        val result = "$cleanLocationString ($countryCode)"
+                        android.util.Log.i("LocationDisplay", "   ✅ Using code only format: '$result' (${result.length} chars)")
+                        result
+                    }
+                    
+                    // Format: "Dubai" - fallback when even code doesn't fit
+                    else -> {
+                        android.util.Log.w("LocationDisplay", "   ⚠️ No space for country info - showing location only: '$cleanLocationString'")
+                        cleanLocationString
+                    }
+                }
+                
+                android.util.Log.i("LocationDisplay", "   🎯 FINAL RESULT: '$finalResult' (${finalResult.length} chars)")
+                return finalResult
+            } else {
+                // Fallback to code only if we can't get full country name
+                val baseLocationLength = cleanLocationString.length
+                val codeOnlyFormatLength = baseLocationLength + 3 + countryCode.length + 1 // " (" + code + ")"
+                
+                if (codeOnlyFormatLength <= 45) {
+                    val result = "$cleanLocationString ($countryCode)"
+                    android.util.Log.i("LocationDisplay", "   ✅ Using code fallback: '$result' (${result.length} chars)")
+                    return result
+                }
+            }
         }
     }
     
-    // Fallback to original location string
-    return locationString
+    // Fallback to cleaned location string
+    android.util.Log.d("LocationDisplay", "   📋 Using fallback: cleaned location string")
+    return cleanLocationString
 }
 

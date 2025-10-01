@@ -107,6 +107,8 @@ class PrayerSettingsRepository @Inject constructor(
     /**
      * ENHANCED PREFERENCE READ LOGGING
      * Logs all preference read operations with key, value, type, and metadata
+     * 
+     * Specific Tag: "PrayerSettings_PREF_READ" for filtered logging
      */
     private fun logPrefRead(key: String, value: Any?, defaultValue: Any? = null) {
         val valueType = when (value) {
@@ -122,6 +124,7 @@ class PrayerSettingsRepository @Inject constructor(
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
             .format(java.util.Date())
         
+        // Primary logging with main tag
         Log.i(TAG, "")
         Log.i(TAG, "🔍 PREFERENCE READ OPERATION")
         Log.i(TAG, "⏰ Timestamp: $timestamp")
@@ -133,11 +136,19 @@ class PrayerSettingsRepository @Inject constructor(
         }
         Log.i(TAG, "📁 Storage File: $PREFS_NAME")
         Log.i(TAG, "")
+        
+        // Dedicated preference operation logging with specific tag
+        Log.i("PrayerSettings_PREF_READ", "🔍 READ | $timestamp | key='$key' | type=$valueType | value=$value | file=$PREFS_NAME")
+        if (defaultValue != null) {
+            Log.i("PrayerSettings_PREF_READ", "🔄 DEFAULT | key='$key' | fallback=$defaultValue")
+        }
     }
     
     /**
      * ENHANCED PREFERENCE WRITE LOGGING
      * Logs all preference write operations with comprehensive metadata
+     * 
+     * Specific Tag: "PrayerSettings_PREF_WRITE" for filtered logging
      */
     private fun logPrefWrite(key: String, value: Any?) {
         val valueType = when (value) {
@@ -153,6 +164,7 @@ class PrayerSettingsRepository @Inject constructor(
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
             .format(java.util.Date())
         
+        // Primary logging with main tag
         Log.i(TAG, "")
         Log.i(TAG, "💾 PREFERENCE WRITE OPERATION")
         Log.i(TAG, "⏰ Timestamp: $timestamp")
@@ -161,16 +173,22 @@ class PrayerSettingsRepository @Inject constructor(
         Log.i(TAG, "💎 New Value: $value")
         Log.i(TAG, "📁 Storage File: $PREFS_NAME")
         Log.i(TAG, "")
+        
+        // Dedicated preference operation logging with specific tag
+        Log.i("PrayerSettings_PREF_WRITE", "💾 WRITE | $timestamp | key='$key' | type=$valueType | value=$value | file=$PREFS_NAME")
     }
     
     /**
      * ENHANCED JSON READ LOGGING
      * Provides detailed analysis of JSON preference reads with size, parsing info, and content preview
+     * 
+     * Specific Tag: "PrayerSettings_JSON_READ" for filtered logging
      */
     private fun logPrefReadJson(key: String, jsonContent: String?, description: String) {
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
             .format(java.util.Date())
             
+        // Primary logging with main tag
         Log.i(TAG, "")
         Log.i(TAG, "📄 JSON PREFERENCE READ")
         Log.i(TAG, "⏰ Timestamp: $timestamp")
@@ -178,13 +196,20 @@ class PrayerSettingsRepository @Inject constructor(
         Log.i(TAG, "📝 Description: $description")
         Log.i(TAG, "📁 Storage File: $PREFS_NAME")
         
+        // Status and content analysis
+        val status: String
+        val size = jsonContent?.length ?: 0
+        
         if (jsonContent.isNullOrEmpty()) {
+            status = "EMPTY/NULL"
             Log.i(TAG, "📊 Status: EMPTY/NULL - Using defaults")
             Log.i(TAG, "🔄 Action: Will fallback to default values")
         } else if (jsonContent == "{}") {
+            status = "EMPTY_OBJECT"
             Log.i(TAG, "📊 Status: EMPTY JSON OBJECT")
             Log.i(TAG, "🔄 Action: Will fallback to default values")
         } else {
+            status = "DATA_FOUND"
             Log.i(TAG, "📊 Status: DATA FOUND")
             Log.i(TAG, "📏 Size: ${jsonContent.length} characters")
             Log.i(TAG, "🔄 Action: Will parse JSON content")
@@ -211,16 +236,31 @@ class PrayerSettingsRepository @Inject constructor(
             }
         }
         Log.i(TAG, "")
+        
+        // Dedicated JSON operation logging with specific tag
+        Log.i("PrayerSettings_JSON_READ", "📄 JSON_READ | $timestamp | key='$key' | desc='$description' | status=$status | size=${size}ch | file=$PREFS_NAME")
+        if (status == "DATA_FOUND" && jsonContent != null) {
+            // Log first 100 chars of JSON for compact view
+            val preview = if (jsonContent.length > 100) {
+                "${jsonContent.substring(0, 100)}..."
+            } else {
+                jsonContent
+            }
+            Log.i("PrayerSettings_JSON_READ", "📄 CONTENT | key='$key' | preview=$preview")
+        }
     }
     
     /**
      * ENHANCED JSON WRITE LOGGING
      * Comprehensive logging for JSON preference writes with validation and content analysis
+     * 
+     * Specific Tag: "PrayerSettings_JSON_WRITE" for filtered logging
      */
     private fun logPrefWriteJson(key: String, jsonContent: String, description: String) {
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
             .format(java.util.Date())
             
+        // Primary logging with main tag
         Log.i(TAG, "")
         Log.i(TAG, "💾 JSON PREFERENCE WRITE")
         Log.i(TAG, "⏰ Timestamp: $timestamp")
@@ -230,11 +270,19 @@ class PrayerSettingsRepository @Inject constructor(
         Log.i(TAG, "📏 Size: ${jsonContent.length} characters")
         
         // JSON content analysis
+        var isValid = false
+        var fieldCount = 0
+        var fieldNames = ""
+        
         try {
             val jsonElement = kotlinx.serialization.json.Json.parseToJsonElement(jsonContent)
+            isValid = true
+            fieldCount = jsonElement.jsonObject.keys.size
+            fieldNames = jsonElement.jsonObject.keys.joinToString(", ")
+            
             Log.i(TAG, "✅ JSON Validation: Valid JSON format")
-            Log.i(TAG, "🔍 Properties: ${jsonElement.jsonObject.keys.size} fields")
-            Log.i(TAG, "🏷️ Field Names: ${jsonElement.jsonObject.keys.joinToString(", ")}")
+            Log.i(TAG, "🔍 Properties: $fieldCount fields")
+            Log.i(TAG, "🏷️ Field Names: $fieldNames")
         } catch (e: Exception) {
             Log.e(TAG, "❌ JSON Validation: Invalid JSON - ${e.message}")
         }
@@ -256,16 +304,34 @@ class PrayerSettingsRepository @Inject constructor(
             }
         }
         Log.i(TAG, "")
+        
+        // Dedicated JSON operation logging with specific tag
+        val status = if (isValid) "VALID" else "INVALID"
+        Log.i("PrayerSettings_JSON_WRITE", "💾 JSON_WRITE | $timestamp | key='$key' | desc='$description' | status=$status | size=${jsonContent.length}ch | fields=$fieldCount | file=$PREFS_NAME")
+        if (isValid && fieldNames.isNotEmpty()) {
+            Log.i("PrayerSettings_JSON_WRITE", "🏷️ FIELDS | key='$key' | names=[$fieldNames]")
+        }
+        
+        // Log content preview for compact view
+        val preview = if (jsonContent.length > 100) {
+            "${jsonContent.substring(0, 100)}..."
+        } else {
+            jsonContent
+        }
+        Log.i("PrayerSettings_JSON_WRITE", "📄 CONTENT | key='$key' | preview=$preview")
     }
     
     /**
      * PREFERENCE OPERATION VERIFICATION
      * Verifies that write operations were successful by reading back the data
+     * 
+     * Specific Tag: "PrayerSettings_PREF_VERIFY" for filtered logging
      */
     private fun verifyPrefWrite(key: String, expectedValue: Any?, operationType: String) {
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
             .format(java.util.Date())
             
+        // Primary logging with main tag
         Log.i(TAG, "")
         Log.i(TAG, "🔍 PREFERENCE WRITE VERIFICATION")
         Log.i(TAG, "⏰ Timestamp: $timestamp")
@@ -297,6 +363,16 @@ class PrayerSettingsRepository @Inject constructor(
             Log.e(TAG, "❌ Actual: $actualValue")
         }
         Log.i(TAG, "")
+        
+        // Dedicated verification logging with specific tag
+        val status = if (success) "SUCCESS" else "FAILED"
+        val resultLevel = if (success) "i" else "e"
+        
+        Log.i("PrayerSettings_PREF_VERIFY", "🔍 VERIFY | $timestamp | key='$key' | op='$operationType' | status=$status | expected=$expectedValue | actual=$actualValue")
+        
+        if (!success) {
+            Log.e("PrayerSettings_PREF_VERIFY", "❌ FAILED | key='$key' | expected_type=${expectedValue?.javaClass?.simpleName} | actual_type=${actualValue?.javaClass?.simpleName}")
+        }
     }
     
     // JSON SERIALIZATION CONFIGURATION - Handles serialization/deserialization
