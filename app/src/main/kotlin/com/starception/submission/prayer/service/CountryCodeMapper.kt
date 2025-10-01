@@ -1015,6 +1015,106 @@ object CountryCodeMapper {
     }
     
     /**
+     * GET FULL COUNTRY NAME FROM CODE
+     * 
+     * Returns the full official country name for a given ISO country code.
+     * Uses the first (most common/official) name mapping for each country.
+     * 
+     * ALGORITHM:
+     * 1. Find all names mapped to the given country code
+     * 2. Filter for official names (longer, more formal)
+     * 3. Return the most appropriate full name
+     * 4. Fallback to any available name if no official name found
+     * 
+     * USAGE EXAMPLES:
+     * - "AE" → "United Arab Emirates"
+     * - "US" → "United States of America"  
+     * - "GB" → "United Kingdom"
+     * - "SA" → "Saudi Arabia"
+     * 
+     * @param countryCode ISO 3166-1 alpha-2 country code
+     * @return Full country name or null if code not found
+     */
+    fun getFullCountryName(countryCode: String?): String? {
+        android.util.Log.d("CountryCodeMapper", "🏳️ GETTING FULL COUNTRY NAME:")
+        android.util.Log.d("CountryCodeMapper", "   Input Code: '$countryCode'")
+        
+        if (countryCode.isNullOrBlank()) {
+            android.util.Log.d("CountryCodeMapper", "   ❌ Country code is null or blank")
+            return null
+        }
+        
+        // Find all names mapped to this country code
+        val namesForCode = countryNameToCodeMap.entries
+            .filter { it.value.equals(countryCode, ignoreCase = true) }
+            .map { it.key }
+        
+        if (namesForCode.isEmpty()) {
+            android.util.Log.w("CountryCodeMapper", "   ❌ No names found for country code '$countryCode'")
+            return null
+        }
+        
+        android.util.Log.d("CountryCodeMapper", "   🔍 Found ${namesForCode.size} name(s) for '$countryCode'")
+        
+        // Priority list: Look for official/formal names first
+        val officialNamePatterns = listOf(
+            "republic of", "kingdom of", "state of", "federation of", 
+            "commonwealth of", "principality of", "sultanate of", 
+            "emirates", "arab republic", "democratic republic"
+        )
+        
+        // 1. Look for official names (containing formal terms)
+        val officialNames = namesForCode.filter { name ->
+            officialNamePatterns.any { pattern -> name.contains(pattern) }
+        }
+        
+        // 2. Look for full country names (longer names, avoiding abbreviations)
+        val fullNames = namesForCode.filter { name ->
+            name.length > 3 && !name.matches(Regex("[A-Z]{2,4}")) // Not abbreviations like UAE, USA
+        }
+        
+        // 3. Select the best name using priority order
+        val selectedName = when {
+            // Priority 1: Official names that are reasonably long
+            officialNames.isNotEmpty() -> {
+                val bestOfficial = officialNames.maxByOrNull { it.length }
+                android.util.Log.i("CountryCodeMapper", "   ✅ Using official name: '$bestOfficial'")
+                bestOfficial
+            }
+            
+            // Priority 2: Longest non-abbreviation name
+            fullNames.isNotEmpty() -> {
+                val longestFull = fullNames.maxByOrNull { it.length }
+                android.util.Log.i("CountryCodeMapper", "   ✅ Using full name: '$longestFull'")
+                longestFull
+            }
+            
+            // Priority 3: Any available name (fallback)
+            else -> {
+                val fallback = namesForCode.first()
+                android.util.Log.i("CountryCodeMapper", "   ⚠️ Using fallback name: '$fallback'")
+                fallback
+            }
+        }
+        
+        // Capitalize properly for display
+        val capitalizedName = selectedName?.split(" ")
+            ?.joinToString(" ") { word ->
+                if (word.lowercase() in listOf("of", "the", "and", "or")) {
+                    word.lowercase()
+                } else {
+                    word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                }
+            }
+            ?.replace(" Of ", " of ")
+            ?.replace(" The ", " the ")
+            ?.replace(" And ", " and ")
+        
+        android.util.Log.i("CountryCodeMapper", "   🎯 FINAL RESULT: '$capitalizedName'")
+        return capitalizedName
+    }
+
+    /**
      * VALIDATE COUNTRY CODE
      * 
      * Validates if a country code is supported and logs the result.

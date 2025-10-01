@@ -38,7 +38,15 @@
       "Read(/Users/smarterai/Documents/GitHub/Compass-main/app/src/main/java/com/akarsh/compassapp/**)",
       "Read(/Users/smarterai/Documents/GitHub/Compass-main/app/src/main/res/layout/**)",
       "Read(/Users/smarterai/Documents/GitHub/Compass-main/app/src/main/**)",
-      "Read(/Users/smarterai/Documents/GitHub/Compass-main/app/src/main/res/drawable/**)"
+      "Read(/Users/smarterai/Documents/GitHub/Compass-main/app/src/main/res/drawable/**)",
+      "Read(/tmp/**)",
+      "Read(/tmp/**)",
+      "Read(/tmp/**)",
+      "Read(/tmp/**)",
+      "Read(/tmp/**)",
+      "Read(/tmp/**)",
+      "Read(/tmp/**)",
+      "Read(/tmp/**)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

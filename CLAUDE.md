@@ -307,3 +307,82 @@ adb logcat -s "PrayerSettingsRepository" | grep "CACHED COUNTRY\|Looking for cou
 - `docs/AUTO_DETECTION_LOGGING_GUIDE.md` - Complete logging guide with debugging examples
 - Structured log format enables integration with crash reporting and analytics
 - Performance benchmarks for database loading (<50ms optimal) and geocoding (<2s normal)
+
+## Enhanced Preference Logging System
+
+### Detailed Preference Operation Tracking
+- **Comprehensive Logging**: All preference read/write operations are logged with detailed metadata
+- **Specific Tags**: Dedicated log tags for easy filtering and monitoring:
+  - `PrayerSettings_PREF_READ` - All preference read operations
+  - `PrayerSettings_PREF_WRITE` - All preference write operations  
+  - `PrayerSettings_JSON_READ` - JSON preference read operations with content analysis
+  - `PrayerSettings_JSON_WRITE` - JSON preference write operations with validation
+  - `PrayerSettings_PREF_VERIFY` - Write operation verification and validation
+
+### Log Format Features
+- **Timestamp Precision**: Millisecond-level timestamps for performance analysis
+- **Type Detection**: Automatic data type identification (String, Int, Float, Boolean, etc.)
+- **Content Analysis**: JSON validation, field counting, and structure analysis
+- **Size Tracking**: Character count for JSON content and performance monitoring
+- **Preview Content**: Truncated content preview for large JSON objects
+- **Verification Status**: Success/failure status for all write operations
+
+### Development Commands for Preference Debugging
+
+```bash
+# View all preference operations (all types)
+adb logcat -s "PrayerSettings_PREF_READ" "PrayerSettings_PREF_WRITE" "PrayerSettings_JSON_READ" "PrayerSettings_JSON_WRITE" "PrayerSettings_PREF_VERIFY"
+
+# Monitor only preference reads
+adb logcat -s "PrayerSettings_PREF_READ"
+
+# Monitor only preference writes  
+adb logcat -s "PrayerSettings_PREF_WRITE"
+
+# Monitor JSON operations with content analysis
+adb logcat -s "PrayerSettings_JSON_READ" "PrayerSettings_JSON_WRITE"
+
+# Monitor write verification and validation
+adb logcat -s "PrayerSettings_PREF_VERIFY"
+
+# Monitor specific preference key (example: prayer time offsets)
+adb logcat -s "PrayerSettings_PREF_READ" "PrayerSettings_PREF_WRITE" | grep "cached_prayer_settings"
+
+# Monitor JSON validation and parsing issues
+adb logcat -s "PrayerSettings_JSON_READ" "PrayerSettings_JSON_WRITE" | grep "INVALID\|FAILED\|ERROR"
+
+# Performance monitoring for preference operations
+adb logcat -s "PrayerSettings_PREF_READ" "PrayerSettings_PREF_WRITE" "PrayerSettings_JSON_READ" "PrayerSettings_JSON_WRITE" | grep -E "[0-9]+ch|[0-9]+ms"
+
+# Real-time preference monitoring during app usage
+adb logcat -s "PrayerSettings_PREF_READ" "PrayerSettings_PREF_WRITE" -v time
+```
+
+### Log Analysis Examples
+
+#### Successful Preference Write:
+```
+PrayerSettings_PREF_WRITE: 💾 WRITE | 14:32:15.123 | key='notifications_enabled' | type=Boolean | value=true | file=prayer_settings
+PrayerSettings_PREF_VERIFY: 🔍 VERIFY | 14:32:15.125 | key='notifications_enabled' | op='notification settings' | status=SUCCESS | expected=true | actual=true
+```
+
+#### JSON Content Analysis:
+```
+PrayerSettings_JSON_WRITE: 💾 JSON_WRITE | 14:32:20.456 | key='calculation_settings_json' | desc='prayer calculation settings' | status=VALID | size=324ch | fields=6 | file=prayer_settings
+PrayerSettings_JSON_WRITE: 🏷️ FIELDS | key='calculation_settings_json' | names=[calculationMethod, madhab, timeOffsets, location, manualAdjustments, lastUpdated]
+PrayerSettings_JSON_WRITE: 📄 CONTENT | key='calculation_settings_json' | preview={"calculationMethod":"ISNA","madhab":"HANAFI","timeOffsets":{"fajr":0,"sunrise":0...}
+```
+
+#### Failed Operation Detection:
+```
+PrayerSettings_PREF_VERIFY: 🔍 VERIFY | 14:32:25.789 | key='invalid_key' | op='test operation' | status=FAILED | expected=test_value | actual=null
+PrayerSettings_PREF_VERIFY: ❌ FAILED | key='invalid_key' | expected_type=String | actual_type=null
+```
+
+### Use Cases for Enhanced Logging
+- **Performance Analysis**: Track preference operation timing and JSON size optimization
+- **Debug Data Corruption**: Identify when preference values don't match expectations
+- **Content Validation**: Monitor JSON structure changes and parsing issues
+- **User Behavior Tracking**: Understand which settings are modified most frequently
+- **Integration Testing**: Verify preference operations in automated testing scenarios
+- **Production Monitoring**: Track preference operation success rates and performance
