@@ -1204,7 +1204,7 @@ fun PrayerTimesScreen(
                 var showAllPrayers by remember { mutableStateOf(false) }
                 
                 // Dynamic tile height based on number of rows shown  
-                val tileHeight = if (showAllPrayers) 122.dp else 145.dp // Optimized height: prevents text cutoff while maintaining layout balance
+                val tileHeight = if (showAllPrayers) 120.dp else 145.dp // Optimized height: prevents text cutoff while maintaining layout balance
                 
                 // Always show current and next 3 prayers (4 total) by default
                 val defaultPrayers = listOf("Dhuhr", "Asr", "Maghrib", "Isha")
@@ -1214,7 +1214,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 6.dp)
+                        .padding(horizontal = 4.dp)
                         //.background(Color.Red.copy(alpha = 0.2f)), // DEBUG: Red background for first row
                     ,horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -1255,7 +1255,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 6.dp),
+                        .padding(horizontal = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Maghrib
@@ -1300,7 +1300,7 @@ fun PrayerTimesScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 6.dp),
+                            .padding(horizontal = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // Fajr
