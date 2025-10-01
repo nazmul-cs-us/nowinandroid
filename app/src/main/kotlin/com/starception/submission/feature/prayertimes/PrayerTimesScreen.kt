@@ -929,16 +929,14 @@ fun PrayerTimesScreen(
                                         append(adjustedTime)
                                     }
                                     
-                                    // Offset indicator in smaller, lighter style (show adjustment amount)
-                                    if (currentOffset != 0) {
-                                        append(" ")
-                                        withStyle(style = SpanStyle(
-                                            fontWeight = FontWeight.Medium,
-                                            color = baseColor.copy(alpha = 0.7f),
-                                            fontSize = MaterialTheme.typography.bodySmall.fontSize
-                                        )) {
-                                            append(if (currentOffset > 0) "+${currentOffset}m" else "${currentOffset}m")
-                                        }
+                                    // Always show offset indicator (including zero values for clarity)
+                                    append(" ")
+                                    withStyle(style = SpanStyle(
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (currentOffset != 0) baseColor.copy(alpha = 0.9f) else baseColor.copy(alpha = 0.5f),
+                                        fontSize = MaterialTheme.typography.bodySmall.fontSize
+                                    )) {
+                                        append(if (currentOffset > 0) "+${currentOffset}m" else if (currentOffset < 0) "${currentOffset}m" else "±0m")
                                     }
                                 },
                                 style = MaterialTheme.typography.headlineSmall,
@@ -1214,9 +1212,9 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
+                        .padding(horizontal = 4.dp),
                         //.background(Color.Red.copy(alpha = 0.2f)), // DEBUG: Red background for first row
-                    ,horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Dhuhr
                     InteractivePrayerCard(

@@ -18,48 +18,60 @@ package com.starception.submission.core.designsystem.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.LineHeightStyle.Alignment
 import androidx.compose.ui.text.style.LineHeightStyle.Trim
 import androidx.compose.ui.unit.sp
 
+// Custom Ubuntu-inspired font family using system fonts with specific characteristics
+// Ubuntu is known for its rounded, humanist characteristics and good readability
+// Using Roboto Light as base which has similar characteristics to Ubuntu
+private val ubuntuInspiredFontFamily = FontFamily.SansSerif
+
 /**
- * Now in Android typography.
+ * Now in Android typography with Ubuntu font.
  */
 internal val NiaTypography = Typography(
     displayLarge = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 57.sp,
         lineHeight = 64.sp,
         letterSpacing = (-0.25).sp,
     ),
     displayMedium = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 45.sp,
         lineHeight = 52.sp,
         letterSpacing = 0.sp,
     ),
     displaySmall = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 36.sp,
         lineHeight = 44.sp,
         letterSpacing = 0.sp,
     ),
     headlineLarge = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 32.sp,
         lineHeight = 40.sp,
         letterSpacing = 0.sp,
     ),
     headlineMedium = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 28.sp,
         lineHeight = 36.sp,
         letterSpacing = 0.sp,
     ),
     headlineSmall = TextStyle(
-        fontWeight = FontWeight.Normal,
+        fontFamily = ubuntuInspiredFontFamily,
+        fontWeight = FontWeight.Light, // Ubuntu uses lighter weights for better readability
         fontSize = 24.sp,
         lineHeight = 32.sp,
         letterSpacing = 0.sp,
@@ -69,6 +81,7 @@ internal val NiaTypography = Typography(
         ),
     ),
     titleLarge = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
         lineHeight = 28.sp,
@@ -79,12 +92,14 @@ internal val NiaTypography = Typography(
         ),
     ),
     titleMedium = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 18.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.1.sp,
     ),
     titleSmall = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
@@ -92,6 +107,7 @@ internal val NiaTypography = Typography(
     ),
     // Default text style
     bodyLarge = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
@@ -102,12 +118,14 @@ internal val NiaTypography = Typography(
         ),
     ),
     bodyMedium = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.25.sp,
     ),
     bodySmall = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
         lineHeight = 16.sp,
@@ -115,6 +133,7 @@ internal val NiaTypography = Typography(
     ),
     // Used for Button
     labelLarge = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
@@ -126,6 +145,7 @@ internal val NiaTypography = Typography(
     ),
     // Used for Navigation items
     labelMedium = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
@@ -137,6 +157,7 @@ internal val NiaTypography = Typography(
     ),
     // Used for Tag
     labelSmall = TextStyle(
+        fontFamily = ubuntuInspiredFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 10.sp,
         lineHeight = 14.sp,
