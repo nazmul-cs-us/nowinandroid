@@ -46,6 +46,7 @@
       "Read(/tmp/**)",
       "Read(/tmp/**)",
       "Read(/tmp/**)",
+      "Read(/tmp/**)",
       "Read(/tmp/**)"
     ],
     "deny": [],
