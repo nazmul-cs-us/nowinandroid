@@ -34,6 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -53,11 +55,13 @@ fun InteractivePrayerDial(
     onSaveAdjustment: (String, Int) -> Unit,
     onResetAdjustment: () -> Unit
 ) {
+    val hapticFeedback = LocalHapticFeedback.current
     var lastAngle by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
     var accumulatedAngle by remember { mutableStateOf(0f) }
     var baseAdjustment by remember { mutableStateOf(timeAdjustment) }
     var currentDragAngle by remember { mutableStateOf(0f) }
+    var lastHapticAdjustment by remember { mutableStateOf(timeAdjustment) }
     
     // Material 3 expressive animations for enhanced feedback
     val dialScale by animateFloatAsState(
@@ -97,6 +101,7 @@ fun InteractivePrayerDial(
         if (!isDragging) {
             baseAdjustment = timeAdjustment
             accumulatedAngle = 0f
+            lastHapticAdjustment = timeAdjustment
         }
     }
 
@@ -184,6 +189,14 @@ fun InteractivePrayerDial(
                             
                             if (newAdjustment != timeAdjustment) {
                                 Log.d("InteractiveDial", "✅ ADJUSTMENT APPLIED - Old: ${timeAdjustment}m → New: ${newAdjustment}m")
+                                
+                                // Strong haptic feedback for every minute change
+                                if (newAdjustment != lastHapticAdjustment) {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    lastHapticAdjustment = newAdjustment
+                                    Log.d("InteractiveDial", "💥 STRONG HAPTIC FEEDBACK - Adjustment: ${newAdjustment}m")
+                                }
+                                
                                 onTimeAdjusted(newAdjustment)
                             } else {
                                 Log.d("InteractiveDial", "📍 Same adjustment value: ${newAdjustment}m")
