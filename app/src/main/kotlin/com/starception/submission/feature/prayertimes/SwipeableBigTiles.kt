@@ -984,18 +984,15 @@ private fun NextPrayerTile(
                                 scaleX = compassScale
                                 scaleY = compassScale
                             }
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) { 
-                                onCompassClick() 
-                            }
                             .pointerInput(Unit) {
                                 detectTapGestures(
                                     onPress = { 
                                         isPressed = true
                                         tryAwaitRelease()
                                         isPressed = false
+                                    },
+                                    onTap = {
+                                        onCompassClick()
                                     }
                                 )
                             }

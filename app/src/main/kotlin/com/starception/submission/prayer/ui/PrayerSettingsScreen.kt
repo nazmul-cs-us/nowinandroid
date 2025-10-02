@@ -22,6 +22,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.prayer.model.*
 
@@ -324,22 +335,79 @@ private fun CalculationMethodDropdown(
     autoDetectedCountry: String? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val hapticFeedback = LocalHapticFeedback.current
+    
+    // Material 3 expressive animation for dropdown expansion
+    val dropdownScale by animateFloatAsState(
+        targetValue = if (expanded) 1.02f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
+        ),
+        label = "dropdown_scale"
+    )
+    
+    val textFieldElevation by animateFloatAsState(
+        targetValue = if (expanded) 4f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "textfield_elevation"
+    )
     
     Column(modifier = modifier) {
         ExposedDropdownMenuBox(
             expanded = expanded,
-            onExpandedChange = { expanded = it },
-            modifier = Modifier.fillMaxWidth()
+            onExpandedChange = { 
+                if (it != expanded) {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+                expanded = it 
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    scaleX = dropdownScale
+                    scaleY = dropdownScale
+                }
         ) {
             OutlinedTextField(
                 value = selectedMethod.displayName,
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("Method") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                label = { 
+                    Text(
+                        "Method",
+                        modifier = Modifier.graphicsLayer {
+                            alpha = if (expanded) 0.8f else 1f
+                        }
+                    ) 
+                },
+                trailingIcon = { 
+                    val iconRotation by animateFloatAsState(
+                        targetValue = if (expanded) 180f else 0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessHigh
+                        ),
+                        label = "icon_rotation"
+                    )
+                    
+                    Box(
+                        modifier = Modifier.graphicsLayer {
+                            rotationZ = iconRotation
+                        }
+                    ) {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .menuAnchor(),
+                    .menuAnchor()
+                    .graphicsLayer {
+                        shadowElevation = textFieldElevation
+                    },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline,
@@ -348,27 +416,114 @@ private fun CalculationMethodDropdown(
                 )
             )
         
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                CalculationMethod.values().forEach { method ->
-                    DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(method.displayName)
-                                Text(
-                                    text = method.description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        },
-                        onClick = {
-                            onMethodSelected(method)
-                            expanded = false
-                        }
+            // Enhanced dropdown menu with Material 3 expressive animations
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(
+                    animationSpec = tween(
+                        durationMillis = 200,
+                        easing = FastOutSlowInEasing
                     )
+                ) + expandVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    )
+                ) + scaleIn(
+                    initialScale = 0.92f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessHigh
+                    )
+                ),
+                exit = fadeOut(
+                    animationSpec = tween(
+                        durationMillis = 150,
+                        easing = FastOutLinearInEasing
+                    )
+                ) + shrinkVertically(
+                    animationSpec = tween(
+                        durationMillis = 200,
+                        easing = FastOutLinearInEasing
+                    )
+                ) + scaleOut(
+                    targetScale = 0.95f,
+                    animationSpec = tween(
+                        durationMillis = 150,
+                        easing = FastOutLinearInEasing
+                    )
+                )
+            ) {
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.graphicsLayer {
+                        // Subtle entrance glow effect
+                        shadowElevation = 8f
+                    }
+                ) {
+                    CalculationMethod.values().forEachIndexed { index, method ->
+                        // Staggered animation for each menu item
+                        var itemVisible by remember { mutableStateOf(false) }
+                        
+                        LaunchedEffect(expanded) {
+                            if (expanded) {
+                                kotlinx.coroutines.delay(index * 30L) // 30ms stagger
+                                itemVisible = true
+                            } else {
+                                itemVisible = false
+                            }
+                        }
+                        
+                        AnimatedVisibility(
+                            visible = itemVisible,
+                            enter = fadeIn(
+                                animationSpec = tween(
+                                    durationMillis = 200,
+                                    easing = FastOutSlowInEasing
+                                )
+                            ) + scaleIn(
+                                initialScale = 0.9f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessHigh
+                                )
+                            )
+                        ) {
+                            var itemPressed by remember { mutableStateOf(false) }
+                            
+                            val itemScale by animateFloatAsState(
+                                targetValue = if (itemPressed) 0.95f else 1f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessHigh
+                                ),
+                                label = "item_scale"
+                            )
+                            
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(method.displayName)
+                                        Text(
+                                            text = method.description,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onMethodSelected(method)
+                                    expanded = false
+                                },
+                                modifier = Modifier.graphicsLayer {
+                                    scaleX = itemScale
+                                    scaleY = itemScale
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -729,29 +884,92 @@ private fun LocationSection(
 private fun AutoDetectionBadge(
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-        shape = MaterialTheme.shapes.small,
-        tonalElevation = 0.dp
+    // Material 3 expressive entrance animation
+    var isVisible by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(300) // Delay for staggered appearance
+        isVisible = true
+    }
+    
+    // Pulsing animation for the icon
+    val iconPulse by rememberInfiniteTransition(label = "icon_pulse").animateFloat(
+        initialValue = 1f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 1500,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "icon_pulse"
+    )
+    
+    // Subtle glow animation
+    val glowAlpha by rememberInfiniteTransition(label = "glow_alpha").animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 2000,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow_alpha"
+    )
+    
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = fadeIn(
+            animationSpec = tween(
+                durationMillis = 400,
+                easing = FastOutSlowInEasing
+            )
+        ) + scaleIn(
+            initialScale = 0.8f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessHigh
+            )
+        ),
+        modifier = modifier
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        Surface(
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = glowAlpha),
+            shape = MaterialTheme.shapes.small,
+            tonalElevation = 0.dp,
+            modifier = Modifier.graphicsLayer {
+                // Subtle breathing effect
+                scaleX = 1f + (glowAlpha - 0.45f) * 0.1f
+                scaleY = 1f + (glowAlpha - 0.45f) * 0.1f
+            }
         ) {
-            Icon(
-                imageVector = Icons.Default.AutoMode,
-                contentDescription = "Auto-detected",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(12.dp)
-            )
-            Text(
-                text = "Auto-detected",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Medium
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoMode,
+                    contentDescription = "Auto-detected",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .size(12.dp)
+                        .graphicsLayer {
+                            scaleX = iconPulse
+                            scaleY = iconPulse
+                            rotationZ = (iconPulse - 1f) * 20f // Subtle rotation
+                        }
+                )
+                Text(
+                    text = "Auto-detected",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
@@ -766,8 +984,40 @@ private fun RestoreAutoSettingsButton(
     onRestoreClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val hapticFeedback = LocalHapticFeedback.current
+    var buttonPressed by remember { mutableStateOf(false) }
+    
+    // Material 3 expressive animation for button press
+    val buttonScale by animateFloatAsState(
+        targetValue = if (buttonPressed) 0.96f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
+        ),
+        label = "button_scale"
+    )
+    
+    val cardElevation by animateFloatAsState(
+        targetValue = if (buttonPressed) 1f else 4f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "card_elevation"
+    )
+    
     Card(
-        modifier = modifier.fillMaxWidth(),
+        onClick = {
+            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+            onRestoreClick()
+        },
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = buttonScale
+                scaleY = buttonScale
+                shadowElevation = cardElevation
+            },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
         ),
