@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material3.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.*
@@ -25,6 +27,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -232,7 +236,7 @@ fun CompassProgressIndicator(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
-        // Perfect circle background with accuracy indication
+        // Clean original background with subtle directional guidance
         Canvas(
             modifier = Modifier.size(size)
         ) {
@@ -264,19 +268,110 @@ fun CompassProgressIndicator(
             
         }
         
-        // QIBLA DIRECTION INDICATOR - Color changes based on sensor accuracy
+        // Calculate if user is facing Qibla (within ±15 degrees)
+        val qiblaAngle = animatedCompassDegree
+        val normalizedAngle = ((qiblaAngle % 360f) + 360f) % 360f
+        
+        // FIXED: Calculate if within ±15 degrees of 0° (Qibla direction)
+        // This means: 0° to 15° OR 345° to 360°
+        val isNearQibla = normalizedAngle <= 15f || normalizedAngle >= 345f
+        
+        // Determine rotation direction needed
+        val needsClockwise = when {
+            normalizedAngle > 180f -> true  // Turn clockwise to get to 0°
+            normalizedAngle <= 180f && normalizedAngle > 15f -> false // Turn counter-clockwise
+            else -> false // Already near Qibla
+        }
+        
+        // Original elegant Qibla direction indicator with enhanced feedback
         CircularProgressIndicator(
-            progress = { 0.1f }, // 10% progress pointing to Qibla
+            progress = { 0.1f }, // Original 10% progress
             modifier = Modifier
                 .size(size - 16.dp)
                 .rotate(animatedCompassDegree),
-            color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981), // Red when unreliable, green when accurate
-            strokeWidth = 8.dp,
+            color = if (needsCalibration) {
+                Color(0xFFFF4444)
+            } else if (isNearQibla) {
+                Color(0xFF00C853) // Brighter green when aligned
+            } else {
+                Color(0xFF10B981) // Original green
+            },
+            strokeWidth = if (isNearQibla) 10.dp else 8.dp, // Slightly thicker when aligned
             trackColor = Color.Black.copy(alpha = 0.1f),
             strokeCap = StrokeCap.Round,
         )
         
-        // MAIN CONTENT - Time and direction info
+        // Animated rotation guidance - only when not near Qibla and not calibrating
+        if (size >= 120.dp && !isNearQibla && !needsCalibration) {
+            // Animated rotation indicator
+            val infiniteTransition = rememberInfiniteTransition(label = "rotation_guide")
+            val rotationIndicatorAlpha by infiniteTransition.animateFloat(
+                initialValue = 0.3f,
+                targetValue = 0.8f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "rotation_alpha"
+            )
+            
+            val rotationIndicatorScale by infiniteTransition.animateFloat(
+                initialValue = 0.9f,
+                targetValue = 1.1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "rotation_scale"
+            )
+            
+            // Draw animated arc showing rotation direction
+            Canvas(
+                modifier = Modifier
+                    .size(size - 8.dp)
+                    .graphicsLayer {
+                        alpha = rotationIndicatorAlpha
+                        scaleX = rotationIndicatorScale
+                        scaleY = rotationIndicatorScale
+                    }
+            ) {
+                val center = Offset(this.size.width / 2, this.size.height / 2)
+                val radius = (this.size.minDimension / 2) - 4.dp.toPx()
+                
+                if (needsClockwise) {
+                    // Clockwise rotation arc
+                    drawArc(
+                        color = Color(0xFF2196F3).copy(alpha = 0.6f),
+                        startAngle = -45f,
+                        sweepAngle = 90f,
+                        useCenter = false,
+                        style = Stroke(
+                            width = 3.dp.toPx(),
+                            cap = StrokeCap.Round
+                        ),
+                        topLeft = Offset(center.x - radius, center.y - radius),
+                        size = Size(radius * 2, radius * 2)
+                    )
+                } else {
+                    // Counter-clockwise rotation arc
+                    drawArc(
+                        color = Color(0xFF2196F3).copy(alpha = 0.6f),
+                        startAngle = 45f,
+                        sweepAngle = -90f,
+                        useCenter = false,
+                        style = Stroke(
+                            width = 3.dp.toPx(),
+                            cap = StrokeCap.Round
+                        ),
+                        topLeft = Offset(center.x - radius, center.y - radius),
+                        size = Size(radius * 2, radius * 2)
+                    )
+                }
+            }
+        }
+        
+        
+        // Enhanced center content with integrated facing status
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -287,24 +382,47 @@ fun CompassProgressIndicator(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Qibla direction with Kaaba emoji and sensor status
+                // Qibla direction with better status for different sizes
+                val displayText = if (needsCalibration) {
+                    "🕋 Qibla"
+                } else if (isNearQibla) {
+                    if (size >= 140.dp) "🕋 Facing Qibla" else "🕋 Aligned" // Shorter text for big tiles
+                } else {
+                    "🕋 Qibla"
+                }
+                
+                
                 Text(
-                    text = "🕋 Qibla",
+                    text = displayText,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981),
+                    color = if (needsCalibration) {
+                        Color(0xFFFF4444)
+                    } else if (isNearQibla) {
+                        Color(0xFF00C853) // Bright green when facing Qibla
+                    } else {
+                        Color(0xFF10B981) // Original green
+                    },
                     textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = if (size >= 280.dp) 16.sp else 12.sp, // Larger in popup
+                    fontWeight = if (isNearQibla && !needsCalibration) FontWeight.Bold else FontWeight.SemiBold,
+                    fontSize = if (size >= 280.dp) 16.sp else 12.sp,
                 )
                 
-                // Guidance text for popup - only show when compass is large enough
+                // Guidance text for popup - dynamic based on status
                 if (size >= 260.dp) {
                     Text(
-                        text = "Turn until green arc\npoints up ↑",
+                        text = if (isNearQibla && !needsCalibration) {
+                            "✓ Aligned correctly"
+                        } else {
+                            "Turn until green arc\npoints up ↑"
+                        },
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.Black.copy(alpha = 0.6f),
+                        color = if (isNearQibla && !needsCalibration) {
+                            Color(0xFF00C853)
+                        } else {
+                            Color.Black.copy(alpha = 0.6f)
+                        },
                         textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = if (isNearQibla && !needsCalibration) FontWeight.Medium else FontWeight.Medium,
                         fontSize = 13.sp,
                         lineHeight = 15.sp,
                         modifier = Modifier.padding(top = 6.dp)

@@ -7,16 +7,23 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -176,88 +183,234 @@ fun QiblaCompass(
     val accuracyColor = if (isInitializing) Color(0xFF10B981) else getAccuracyColor(sensorAccuracy)
     val needsCalibration = !isInitializing && sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
     
-    // UI
+    // Enhanced UI with better novice user guidance
     Box(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
-        // Background circle with accuracy indication
+        // Enhanced compass background with directional labels
         Canvas(
             modifier = Modifier.size(size)
         ) {
             val center = Offset(this.size.width / 2, this.size.height / 2)
             val backgroundRadius = (this.size.minDimension / 2) - 2.dp.toPx()
+            val labelRadius = backgroundRadius + 15.dp.toPx()
             
-            // Perfect circle background
+            // Gradient background for better depth
             drawCircle(
-                color = Color.White,
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color.White,
+                        Color(0xFFF8F9FA)
+                    ),
+                    radius = backgroundRadius
+                ),
                 radius = backgroundRadius,
                 center = center
             )
             
-            // Accuracy indication border
+            // Accuracy indication border with enhanced styling
             drawCircle(
-                color = accuracyColor.copy(alpha = 0.6f),
+                color = accuracyColor.copy(alpha = 0.8f),
                 radius = backgroundRadius,
                 center = center,
-                style = Stroke(width = 3.dp.toPx())
+                style = Stroke(width = 4.dp.toPx())
             )
             
-            // Inner border for definition
+            // Inner definition border
             drawCircle(
-                color = Color.Black.copy(alpha = 0.1f),
-                radius = backgroundRadius - 2.dp.toPx(),
+                color = Color.Black.copy(alpha = 0.15f),
+                radius = backgroundRadius - 3.dp.toPx(),
                 center = center,
                 style = Stroke(width = 1.dp.toPx())
             )
+            
+            // Cardinal direction markers and labels
+            val directions = listOf(
+                "N" to 0f,    // North (top)
+                "E" to 90f,   // East (right)
+                "S" to 180f,  // South (bottom)
+                "W" to 270f   // West (left)
+            )
+            
+            directions.forEach { (label, angle) ->
+                val angleRad = Math.toRadians(angle.toDouble())
+                
+                // Direction marker lines
+                val markerStart = Offset(
+                    x = center.x + cos(angleRad).toFloat() * (backgroundRadius - 10.dp.toPx()),
+                    y = center.y + sin(angleRad).toFloat() * (backgroundRadius - 10.dp.toPx())
+                )
+                val markerEnd = Offset(
+                    x = center.x + cos(angleRad).toFloat() * backgroundRadius,
+                    y = center.y + sin(angleRad).toFloat() * backgroundRadius
+                )
+                
+                drawLine(
+                    color = Color.Black.copy(alpha = 0.4f),
+                    start = markerStart,
+                    end = markerEnd,
+                    strokeWidth = 3.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            }
         }
         
-        // Qibla direction indicator
-        CircularProgressIndicator(
-            progress = { 0.1f }, // 10% progress pointing to Qibla
+        // Directional labels positioned outside the compass
+        if (size >= 120.dp) {
+            val directions = listOf(
+                "N" to Offset(0f, -1f),    // North (top)
+                "E" to Offset(1f, 0f),     // East (right)  
+                "S" to Offset(0f, 1f),     // South (bottom)
+                "W" to Offset(-1f, 0f)     // West (left)
+            )
+            
+            directions.forEach { (label, offset) ->
+                Box(
+                    modifier = Modifier
+                        .offset(
+                            x = (offset.x * (size.value / 2 + 20)).dp,
+                            y = (offset.y * (size.value / 2 + 20)).dp
+                        )
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+        
+        // Enhanced Qibla direction indicator with arrow
+        Box(
             modifier = Modifier
                 .size(size - 16.dp)
                 .rotate(animatedCompassDegree),
-            color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981),
-            strokeWidth = 8.dp,
-            trackColor = Color.Black.copy(alpha = 0.1f),
-            strokeCap = StrokeCap.Round,
-        )
+            contentAlignment = Alignment.Center
+        ) {
+            // Qibla direction arc
+            CircularProgressIndicator(
+                progress = { 0.15f }, // 15% progress pointing to Qibla (more visible)
+                modifier = Modifier.fillMaxSize(),
+                color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981),
+                strokeWidth = 10.dp,
+                trackColor = Color.Black.copy(alpha = 0.05f),
+                strokeCap = StrokeCap.Round,
+            )
+            
+            // Qibla arrow indicator at top of compass
+            Box(
+                modifier = Modifier
+                    .offset(y = -(size.value / 2 - 25).dp)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Navigation,
+                    contentDescription = "Qibla Direction",
+                    modifier = Modifier
+                        .size(16.dp)
+                        .rotate(-90f), // Point upward
+                    tint = Color.White
+                )
+            }
+        }
         
-        // Content display
+        // Enhanced center content with better instructions
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(12.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Qibla direction with Kaaba emoji
-                Text(
-                    text = "🕋 Qibla",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981),
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = if (size >= 280.dp) 16.sp else 12.sp
-                )
-                
-                // Guidance text for larger compasses
-                if (size >= 260.dp) {
+                // Kaaba icon with enhanced styling
+                Box(
+                    modifier = Modifier
+                        .size(if (size >= 140.dp) 32.dp else 24.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (needsCalibration) Color(0xFFFF4444).copy(alpha = 0.1f) 
+                            else Color(0xFF10B981).copy(alpha = 0.1f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        text = "Turn until green arc\npoints up ↑",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Black.copy(alpha = 0.6f),
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 13.sp,
-                        lineHeight = 15.sp,
-                        modifier = Modifier.padding(top = 6.dp)
+                        text = "🕋",
+                        fontSize = if (size >= 140.dp) 20.sp else 16.sp
                     )
                 }
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                // Status text
+                Text(
+                    text = if (needsCalibration) "Qibla" else "Qibla",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981),
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (size >= 140.dp) 14.sp else 11.sp
+                )
+                
+                // Calibration status or guidance
+                if (needsCalibration) {
+                    Text(
+                        text = "Calibrate",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFFF4444),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = if (size >= 140.dp) 11.sp else 9.sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                } else if (size >= 140.dp) {
+                    Text(
+                        text = "Turn phone until\narrow points up ↑",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Black.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 10.sp,
+                        lineHeight = 12.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        }
+        
+        // Calibration guidance overlay for larger compasses
+        if (needsCalibration && size >= 160.dp) {
+            Box(
+                modifier = Modifier
+                    .offset(y = (size.value / 2 + 35).dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFFF4444).copy(alpha = 0.9f))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "Move phone in figure-8 pattern",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 11.sp
+                )
             }
         }
     }
