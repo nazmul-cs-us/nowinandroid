@@ -73,6 +73,10 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntSize
 import android.util.Log
@@ -84,7 +88,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -650,45 +661,55 @@ fun PrayerTimesScreen(
         val isInEditMode = currentEditingTile == prayerName
         val isAnotherTileInEditMode = currentEditingTile != null && currentEditingTile != prayerName
         
-        // Animation states
-        val animationSpec = tween<Float>(
-            durationMillis = 300,
-            easing = FastOutSlowInEasing
+        // Material 3 expressive animation states with spring physics
+        val expressiveAnimationSpec = spring<Float>(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium,
+            visibilityThreshold = 0.01f
         )
         
-        val sizeAnimationSpec = tween<IntSize>(
-            durationMillis = 300,
-            easing = FastOutSlowInEasing
+        val sizeAnimationSpec = spring<IntSize>(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
         )
         
-        // Scale animation: shrink other tiles when one is in edit mode
+        // Material 3 expressive scale animation: shrink other tiles when one is in edit mode
         val scale by animateFloatAsState(
             targetValue = when {
                 isInEditMode -> 1f // Keep normal size when this tile is in edit mode
-                isAnotherTileInEditMode -> 0.85f // Shrink when another tile is in edit mode
+                isAnotherTileInEditMode -> 0.82f // More pronounced shrink with spring bounce
                 else -> 1f // Normal size when no tile is in edit mode
             },
-            animationSpec = animationSpec,
-            label = "TileScale"
+            animationSpec = expressiveAnimationSpec,
+            label = "expressiveTileScale"
         )
         
-        // Transform animation for tile to dial transition
+        // Material 3 expressive transformation with enhanced visual feedback
         val alpha by animateFloatAsState(
             targetValue = 1f,
-            animationSpec = animationSpec,
-            label = "TileAlpha"
+            animationSpec = expressiveAnimationSpec,
+            label = "expressiveTileAlpha"
         )
         
-        // No rotation animation - keep tiles stationary during transformation
-        
-        // Pop effect animation - slight scale up then down for transformation
+        // Enhanced pop effect with overshoot for more expressive feedback
         val transformScale by animateFloatAsState(
-            targetValue = if (isInEditMode) 1.05f else 1f, // Slight scale up when transforming
-            animationSpec = tween(
-                durationMillis = 250,
-                easing = FastOutSlowInEasing
+            targetValue = if (isInEditMode) 1.08f else 1f, // More pronounced scale for edit mode
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessHigh, // Higher stiffness for snappy response
+                visibilityThreshold = 0.005f
             ),
-            label = "TransformScale"
+            label = "expressiveTransformScale"
+        )
+        
+        // Subtle rotation for transformation feedback (Material 3 playful motion)
+        val transformRotation by animateFloatAsState(
+            targetValue = if (isInEditMode) 2f else 0f, // Slight rotation for visual emphasis
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            ),
+            label = "expressiveTransformRotation"
         )
         
         // Debug logging
@@ -705,7 +726,8 @@ fun PrayerTimesScreen(
                     .graphicsLayer(
                         scaleX = scale * transformScale,
                         scaleY = scale * transformScale,
-                        alpha = alpha
+                        alpha = alpha,
+                        rotationZ = transformRotation
                     )
                     .animateContentSize(animationSpec = sizeAnimationSpec),
                 contentAlignment = Alignment.Center
@@ -830,7 +852,8 @@ fun PrayerTimesScreen(
                     .graphicsLayer(
                         scaleX = scale * transformScale,
                         scaleY = scale * transformScale,
-                        alpha = alpha
+                        alpha = alpha,
+                        rotationZ = transformRotation
                     )
                     .animateContentSize(animationSpec = sizeAnimationSpec)
                     .pointerInput(prayerName) {
@@ -1171,6 +1194,7 @@ fun PrayerTimesScreen(
                     },
                     onCompassClick = { 
                         Log.d("PrayerTimes", "Compass clicked, showing popup")
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         showCompassPopup = true 
                     }
                 )
@@ -1219,8 +1243,44 @@ fun PrayerTimesScreen(
                 // Expandable prayer layout - smart default view with expand option
                 var showAllPrayers by remember { mutableStateOf(false) }
                 
-                // Dynamic tile height based on number of rows shown  
-                val tileHeight = if (showAllPrayers) 120.dp else 145.dp // Optimized height: prevents text cutoff while maintaining layout balance
+                // Material 3 expressive tile height animation with spring physics
+                val tileHeight by animateDpAsState(
+                    targetValue = if (showAllPrayers) 120.dp else 145.dp,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow,
+                        visibilityThreshold = 0.1.dp
+                    ),
+                    label = "expressiveTileHeight"
+                )
+                
+                // Staggered animation progress for choreographed card entrances
+                val fajrAnimProgress by animateFloatAsState(
+                    targetValue = if (showAllPrayers) 1f else 0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                        visibilityThreshold = 0.01f
+                    ),
+                    label = "fajrCardAnimation"
+                )
+                
+                val sunriseAnimProgress by animateFloatAsState(
+                    targetValue = if (showAllPrayers) 1f else 0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                        visibilityThreshold = 0.01f
+                    ).let { spec ->
+                        // Add stagger delay for sunrise card
+                        tween(
+                            durationMillis = (spec as? SpringSpec)?.let { 600 } ?: 400,
+                            delayMillis = 80,
+                            easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
+                        )
+                    },
+                    label = "sunriseCardAnimation"
+                )
                 
                 // Always show current and next 3 prayers (4 total) by default
                 val defaultPrayers = listOf("Dhuhr", "Asr", "Maghrib", "Isha")
@@ -1307,19 +1367,50 @@ fun PrayerTimesScreen(
                     )
                 }
                 
-                // Expandable section for additional prayers (Fajr & Sunrise) - appears above toggle button
+                // Material 3 expressive expandable section with spring-based animations
                 AnimatedVisibility(
                     visible = showAllPrayers,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = expandVertically(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMediumLow,
+                            visibilityThreshold = IntSize.VisibilityThreshold
+                        ),
+                        expandFrom = Alignment.Top
+                    ) + fadeIn(
+                        animationSpec = tween(
+                            durationMillis = 400,
+                            delayMillis = 50,
+                            easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f) // Material motion emphasis
+                        )
+                    ),
+                    exit = shrinkVertically(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        shrinkTowards = Alignment.Top
+                    ) + fadeOut(
+                        animationSpec = tween(
+                            durationMillis = 250,
+                            easing = CubicBezierEasing(0.4f, 0.0f, 1.0f, 1.0f) // Material motion standard
+                        )
+                    )
                 ) {
+                    // Material 3 expressive choreographed card entrance
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp),
+                            .padding(horizontal = 4.dp)
+                            .animateContentSize(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            ),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Fajr
+                        // Fajr with staggered entrance animation
                         InteractivePrayerCard(
                             prayerName = "Fajr",
                             currentEditingTile = currentEditingTile,
@@ -1328,14 +1419,21 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), // Extra bottom space for elevation shadows
+                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
+                                .graphicsLayer {
+                                    // Material 3 expressive card entrance with bounce and scale
+                                    translationY = (1f - fajrAnimProgress) * 24f
+                                    scaleX = 0.85f + (fajrAnimProgress * 0.15f)
+                                    scaleY = 0.85f + (fajrAnimProgress * 0.15f)
+                                    alpha = fajrAnimProgress
+                                },
                             onShowPopup = { prayerName ->
                                 popupPrayerName = prayerName
                                 showPrayerDialPopup = true
                             }
                         )
                         
-                        // Sunrise
+                        // Sunrise with staggered entrance animation
                         InteractivePrayerCard(
                             prayerName = "Sunrise",
                             currentEditingTile = currentEditingTile,
@@ -1344,29 +1442,71 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), // Extra bottom space for elevation shadows
+                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
+                                .graphicsLayer {
+                                    // Material 3 expressive card entrance with staggered timing
+                                    translationY = (1f - sunriseAnimProgress) * 32f
+                                    scaleX = 0.82f + (sunriseAnimProgress * 0.18f)
+                                    scaleY = 0.82f + (sunriseAnimProgress * 0.18f)
+                                    alpha = sunriseAnimProgress
+                                },
                             onShowPopup = { } // Sunrise doesn't have popup
                         )
                     }
                 }
                 
-                // Show/Hide toggle button - placed after all prayer tiles for perfect flow
+                // Material 3 expressive toggle button with smooth icon rotation and scale
+                val buttonIconRotation by animateFloatAsState(
+                    targetValue = if (showAllPrayers) 180f else 0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "iconRotation"
+                )
+                
+                val buttonContentScale by animateFloatAsState(
+                    targetValue = if (showAllPrayers) 1.05f else 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessHigh
+                    ),
+                    label = "buttonScale"
+                )
+                
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp)
+                        .animateContentSize(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            )
+                        ),
                     horizontalArrangement = Arrangement.Center
                 ) {
                     TextButton(
-                        onClick = { showAllPrayers = !showAllPrayers },
+                        onClick = { 
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showAllPrayers = !showAllPrayers 
+                        },
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.primary
-                        )
+                        ),
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = buttonContentScale
+                            scaleY = buttonContentScale
+                        }
                     ) {
                         Icon(
-                            imageVector = if (showAllPrayers) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            imageVector = Icons.Default.ExpandMore, // Always use ExpandMore, rotation handles the direction
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier
+                                .size(18.dp)
+                                .graphicsLayer {
+                                    rotationZ = buttonIconRotation
+                                }
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
@@ -1414,8 +1554,34 @@ fun PrayerTimesScreen(
         }
     }
     
-    // NATIVE-STYLE LOCATION SERVICE DIALOG
-    if (showLocationServiceDialog) {
+    // MATERIAL 3 EXPRESSIVE LOCATION SERVICE DIALOG
+    AnimatedVisibility(
+        visible = showLocationServiceDialog,
+        enter = fadeIn(
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        ) + scaleIn(
+            initialScale = 0.9f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        ),
+        exit = fadeOut(
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessHigh
+            )
+        ) + scaleOut(
+            targetScale = 0.95f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessHigh
+            )
+        )
+    ) {
         AlertDialog(
             onDismissRequest = { showLocationServiceDialog = false },
             title = {
@@ -1459,6 +1625,7 @@ fun PrayerTimesScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         showLocationServiceDialog = false
                         // Open device location settings
                         val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
@@ -1479,6 +1646,7 @@ fun PrayerTimesScreen(
             dismissButton = {
                 TextButton(
                     onClick = { 
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         showLocationServiceDialog = false
                         // Continue with cached/default location
                     },
@@ -1499,8 +1667,46 @@ fun PrayerTimesScreen(
         )
     }
     
-    // COMPASS POPUP - Shows large compass with calibration guidance
-    if (showCompassPopup) {
+    // MATERIAL 3 EXPRESSIVE COMPASS POPUP - Enhanced entrance with slide and scale
+    AnimatedVisibility(
+        visible = showCompassPopup,
+        enter = slideInVertically(
+            initialOffsetY = { fullHeight -> fullHeight / 3 },
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        ) + fadeIn(
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        ) + scaleIn(
+            initialScale = 0.85f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        ),
+        exit = slideOutVertically(
+            targetOffsetY = { fullHeight -> fullHeight / 4 },
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessHigh
+            )
+        ) + fadeOut(
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessHigh
+            )
+        ) + scaleOut(
+            targetScale = 0.9f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessHigh
+            )
+        )
+    ) {
         Log.d("PrayerTimes", "showCompassPopup is true, rendering CompassPopupScreen")
         CompassPopupScreen(
             progress = prayerTimes?.let { times ->
@@ -1524,11 +1730,42 @@ fun PrayerTimesScreen(
         )
     }
     
-    // INTERACTIVE PRAYER DIAL POPUP - Shows circular dial overlay
-    if (showPrayerDialPopup && popupPrayerName != null) {
-        Log.d("PrayerTimes", "showPrayerDialPopup is true, rendering InteractivePrayerDial overlay for $popupPrayerName")
+    // INTERACTIVE PRAYER DIAL POPUP - Material 3 expressive overlay with entrance animation
+    // Store current prayer name to prevent null access during exit animation
+    val currentPopupPrayerName = remember(popupPrayerName) { popupPrayerName }
+    
+    AnimatedVisibility(
+        visible = showPrayerDialPopup && popupPrayerName != null,
+        enter = fadeIn(
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        ) + scaleIn(
+            initialScale = 0.8f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        ),
+        exit = fadeOut(
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessHigh
+            )
+        ) + scaleOut(
+            targetScale = 0.85f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessHigh
+            )
+        )
+    ) {
+        // Use safe prayer name that won't be null during exit animation
+        val safePrayerName = currentPopupPrayerName ?: "Dhuhr"
+        Log.d("PrayerTimes", "showPrayerDialPopup is true, rendering InteractivePrayerDial overlay for $safePrayerName")
         
-        // Full screen overlay with dark background - tap outside to dismiss
+        // Full screen overlay with Material 3 expressive backdrop
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -1573,8 +1810,8 @@ fun PrayerTimesScreen(
                 contentAlignment = Alignment.Center
             ) {
                 com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
-                    prayerName = popupPrayerName!!,
-                    originalTime = when (popupPrayerName) {
+                    prayerName = safePrayerName,
+                    originalTime = when (safePrayerName) {
                         "Dhuhr" -> prayerTimes?.dhuhr ?: LocalTime.of(12, 0)
                         "Asr" -> prayerTimes?.asr ?: LocalTime.of(15, 46)
                         "Maghrib" -> prayerTimes?.maghrib ?: LocalTime.of(18, 25)
@@ -1592,7 +1829,7 @@ fun PrayerTimesScreen(
                         popupPrayerName = null
                     },
                     onResetAdjustment = {
-                        Log.d("PrayerTimes", "🔄 POPUP DIAL RESET for $popupPrayerName")
+                        Log.d("PrayerTimes", "🔄 POPUP DIAL RESET for $safePrayerName")
                         timeAdjustment = 0
                     },
                     modifier = Modifier.fillMaxSize()

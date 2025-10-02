@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.animation.core.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -57,6 +59,34 @@ fun InteractivePrayerDial(
     var baseAdjustment by remember { mutableStateOf(timeAdjustment) }
     var currentDragAngle by remember { mutableStateOf(0f) }
     
+    // Material 3 expressive animations for enhanced feedback
+    val dialScale by animateFloatAsState(
+        targetValue = if (isDragging) 1.05f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
+        ),
+        label = "dialScale"
+    )
+    
+    val knobScale by animateFloatAsState(
+        targetValue = if (isDragging) 1.2f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "knobScale"
+    )
+    
+    val progressArcGlow by animateFloatAsState(
+        targetValue = if (isDragging) 1.5f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "progressArcGlow"
+    )
+    
     // Get Material 3 theme colors for dark/light mode support
     val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
@@ -73,7 +103,11 @@ fun InteractivePrayerDial(
     Box(
         modifier = modifier
             .aspectRatio(1f) // Perfect circle
-            .fillMaxSize(),
+            .fillMaxSize()
+            .graphicsLayer {
+                scaleX = dialScale
+                scaleY = dialScale
+            },
         contentAlignment = Alignment.Center
     ) {
         Canvas(
@@ -178,7 +212,9 @@ fun InteractivePrayerDial(
                 currentDragAngle = currentDragAngle,
                 surfaceColor = surfaceColor,
                 onSurfaceColor = onSurfaceColor,
-                outlineColor = outlineColor
+                outlineColor = outlineColor,
+                knobScale = knobScale,
+                progressArcGlow = progressArcGlow
             )
         }
 
@@ -291,7 +327,9 @@ private fun DrawScope.drawCleanCircularTimer(
     currentDragAngle: Float,
     surfaceColor: Color,
     onSurfaceColor: Color,
-    outlineColor: Color
+    outlineColor: Color,
+    knobScale: Float = 1f,
+    progressArcGlow: Float = 1f
 ) {
     // Clean circular design matching the reference image - no document background
     val timerRadius = radius // Use full radius for pure circular design
@@ -378,10 +416,19 @@ private fun DrawScope.drawCleanCircularTimer(
         
         // Draw tick mark with appropriate color - much thinner and longer like reference
         drawLine(
-            color = if (isHighlighted) Color(0xFF10B981) else outlineColor.copy(alpha = 0.6f), // Compass green for highlighted, theme outline for others
+            color = if (isHighlighted) {
+                // Material 3 expressive glow effect on progress ticks
+                Color(0xFF10B981).copy(alpha = 0.7f + (progressArcGlow * 0.3f))
+            } else {
+                outlineColor.copy(alpha = 0.6f)
+            },
             start = tickStart,
             end = tickEnd,
-            strokeWidth = 0.8f, // Much thinner strokes like reference
+            strokeWidth = if (isHighlighted && progressArcGlow > 1f) {
+                0.8f * progressArcGlow // Thicker strokes during interaction
+            } else {
+                0.8f
+            },
             cap = StrokeCap.Round
         )
     }
@@ -398,9 +445,11 @@ private fun DrawScope.drawCleanCircularTimer(
         center.y + indicatorRadius * sin(indicatorAngle.toFloat()).toFloat()
     )
     
-    // Draw teal pill-shaped indicator (2x bigger for maximum user visibility)
-    val pillWidth = 40f  // 2x bigger width - impossible to miss
-    val pillHeight = 16f // 2x bigger height - very prominent
+    // Material 3 expressive pill-shaped indicator with dynamic scaling
+    val basePillWidth = 40f  
+    val basePillHeight = 16f 
+    val pillWidth = basePillWidth * knobScale  // Animated width for touch feedback
+    val pillHeight = basePillHeight * knobScale // Animated height for touch feedback
     
     // Calculate pill orientation (perpendicular to radius)
     val perpAngle = indicatorAngle + PI / 2
@@ -436,10 +485,14 @@ private fun DrawScope.drawCleanCircularTimer(
         close()
     }
     
-    // Draw the compass green pill indicator
+    // Draw the Material 3 expressive pill indicator with glow
+    val knobColor = Color(0xFF10B981).copy(
+        alpha = 0.9f + (progressArcGlow * 0.1f) // Enhanced visibility during interaction
+    )
+    
     drawPath(
         path = pillPath,
-        color = Color(0xFF10B981)
+        color = knobColor
     )
     
     // Add rounded end caps to make it pill-like
@@ -451,18 +504,18 @@ private fun DrawScope.drawCleanCircularTimer(
         indicatorCenter.y - halfWidth * sin(perpAngle.toFloat())
     )
     drawCircle(
-        color = Color(0xFF10B981),
+        color = knobColor,
         radius = capRadius,
         center = leftCapCenter
     )
     
-    // Right cap
+    // Right cap with enhanced Material 3 styling
     val rightCapCenter = Offset(
         indicatorCenter.x + halfWidth * cos(perpAngle.toFloat()),
         indicatorCenter.y + halfWidth * sin(perpAngle.toFloat())
     )
     drawCircle(
-        color = Color(0xFF10B981),
+        color = knobColor,
         radius = capRadius,
         center = rightCapCenter
     )

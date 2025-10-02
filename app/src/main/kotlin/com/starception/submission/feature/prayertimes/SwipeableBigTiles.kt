@@ -61,6 +61,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -106,6 +109,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.graphicsLayer
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
 import com.starception.submission.prayer.service.EnhancedLocationService
@@ -951,11 +956,49 @@ private fun NextPrayerTile(
                         }
                     }
                     
-                    // Countdown timer with integrated Qibla compass
+                    // Material 3 expressive compass with enhanced interaction feedback
+                    var isPressed by remember { mutableStateOf(false) }
+                    
+                    val compassScale by animateFloatAsState(
+                        targetValue = if (isPressed) 0.95f else 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessHigh
+                        ),
+                        label = "compassPressScale"
+                    )
+                    
+                    val compassElevation by animateDpAsState(
+                        targetValue = if (isPressed) 2.dp else 6.dp,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "compassElevation"
+                    )
+                    
                     Box(
                         modifier = Modifier
                             .size(120.dp) // Constrain the compass size to fit within tile padding
-                            .clickable { onCompassClick() }
+                            .graphicsLayer {
+                                scaleX = compassScale
+                                scaleY = compassScale
+                            }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { 
+                                onCompassClick() 
+                            }
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onPress = { 
+                                        isPressed = true
+                                        tryAwaitRelease()
+                                        isPressed = false
+                                    }
+                                )
+                            }
                     ) {
                         CompassProgressIndicator(
                             progress = 0.7f,
