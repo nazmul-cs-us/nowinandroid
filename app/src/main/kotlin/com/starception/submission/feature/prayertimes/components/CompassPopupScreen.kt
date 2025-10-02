@@ -30,6 +30,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -39,8 +40,12 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import kotlin.math.*
 import com.starception.submission.prayer.service.EnhancedLocationService
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Full-screen compass popup with calibration guidance
@@ -69,11 +74,48 @@ fun CompassPopupScreen(
     onDismiss: () -> Unit
 ) {
     val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
     var dragState by remember { mutableFloatStateOf(0f) }
     val dragThreshold = with(density) { 60.dp.toPx() } // Reduced threshold for easier closing
     
+    // Material 3 expressive entrance animations
+    var isVisible by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+    
+    val backgroundAlpha by animateFloatAsState(
+        targetValue = if (isVisible) 0.95f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "backgroundAlpha"
+    )
+    
     // Visual feedback for drag gesture
     val dragProgress = (dragState / dragThreshold).coerceIn(0f, 1f)
+    
+    val contentScale by animateFloatAsState(
+        targetValue = if (isVisible) (1f - dragProgress * 0.1f) else 0.8f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "contentScale"
+    )
+    
+    val contentAlpha by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium,
+            visibilityThreshold = 0.01f
+        ),
+        label = "contentAlpha"
+    )
+    
     val handleScale by animateFloatAsState(
         targetValue = 1f + (dragProgress * 0.2f), // Slightly grow handle during drag
         animationSpec = spring(stiffness = Spring.StiffnessHigh),
@@ -94,25 +136,70 @@ fun CompassPopupScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = backgroundAlpha))
                 .windowInsetsPadding(WindowInsets.systemBars) // Handle camera cutouts and system bars
+                .graphicsLayer {
+                    scaleX = contentScale
+                    scaleY = contentScale
+                    alpha = contentAlpha
+                }
         ) {
-            // Close button - minimal styling to match settings icon exactly
+            // Material 3 expressive close button with enhanced feedback
+            var isCloseButtonPressed by remember { mutableStateOf(false) }
+            
+            val closeButtonScale by animateFloatAsState(
+                targetValue = if (isCloseButtonPressed) 0.9f else 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessHigh
+                ),
+                label = "closeButtonScale"
+            )
+            
+            val closeButtonAlpha by animateFloatAsState(
+                targetValue = if (isVisible) 1f else 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium,
+                    visibilityThreshold = 0.01f
+                ),
+                label = "closeButtonAlpha"
+            )
+            
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 16.dp, end = 16.dp)
                     .zIndex(100f)
+                    .graphicsLayer {
+                        scaleX = closeButtonScale
+                        scaleY = closeButtonScale
+                        alpha = closeButtonAlpha
+                    }
             ) {
                 IconButton(
                     onClick = { 
                         Log.d("CompassPopup", "Close button clicked!")
-                        onDismiss()
-                        Log.d("CompassPopup", "onDismiss() called")
+                        isVisible = false // Trigger exit animation
+                        // Delay actual dismiss to allow exit animation
+                        coroutineScope.launch {
+                            delay(200) // Match animation duration
+                            onDismiss()
+                        }
+                        Log.d("CompassPopup", "Exit animation started")
                     },
                     modifier = Modifier
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = { 
+                                    isCloseButtonPressed = true
+                                    tryAwaitRelease()
+                                    isCloseButtonPressed = false
+                                }
+                            )
+                        }
                 ) {
                     Icon(
                         imageVector = Icons.Default.Clear,
@@ -148,10 +235,15 @@ fun CompassPopupScreen(
                                 .pointerInput(Unit) {
                                     detectVerticalDragGestures(
                                         onDragEnd = {
-                                            // If user dragged down far enough, close the popup
+                                            // If user dragged down far enough, close with animation
                                             if (dragState > dragThreshold) {
                                                 Log.d("CompassPopup", "Pull-down gesture detected (${dragState}px > ${dragThreshold}px), closing popup")
-                                                onDismiss()
+                                                isVisible = false // Trigger exit animation
+                                                // Delay actual dismiss to allow exit animation
+                                                coroutineScope.launch {
+                                                    delay(200) // Match animation duration
+                                                    onDismiss()
+                                                }
                                             }
                                             // Reset drag state
                                             dragState = 0f
@@ -209,13 +301,40 @@ fun CompassPopupScreen(
                     }
                 }
 
-                // Large compass
-                CompassProgressIndicator(
-                    progress = progress,
-                    size = 260.dp,
-                    locationService = locationService,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                // Material 3 expressive large compass with enhanced entrance
+                val compassRotation by animateFloatAsState(
+                    targetValue = if (isVisible) 0f else -15f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "compassRotation"
                 )
+                
+                val compassScale by animateFloatAsState(
+                    targetValue = if (isVisible) 1f else 0.7f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "compassScale"
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            scaleX = compassScale
+                            scaleY = compassScale
+                            rotationZ = compassRotation
+                        }
+                ) {
+                    CompassProgressIndicator(
+                        progress = progress,
+                        size = 260.dp,
+                        locationService = locationService,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                }
 
                 // Calibration guidance card
                 Card(
