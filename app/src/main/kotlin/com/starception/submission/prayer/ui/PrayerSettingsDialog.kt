@@ -1,21 +1,33 @@
 package com.starception.submission.prayer.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.prayer.viewmodel.PrayerTimesViewModel
@@ -35,11 +47,23 @@ fun PrayerSettingsDialog(
 ) {
     // Get context outside of coroutines
     val context = LocalContext.current
+    val hapticFeedback = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Animation states - start visible to prevent white flash
+    var isVisible by remember { mutableStateOf(true) }
+    var animateContent by remember { mutableStateOf(false) }
     
     // ALGORITHM IMPLEMENTATION: Initialization 
     var settings by remember { mutableStateOf(PrayerSettings()) }
     var isLoading by remember { mutableStateOf(true) }
     val repository = remember { com.starception.submission.prayer.repository.PrayerSettingsRepository(context) }
+    
+    // Staggered content animation trigger
+    LaunchedEffect(Unit) {
+        delay(100) // Shorter delay for faster content appearance
+        animateContent = true
+    }
     
     // Initialization: Load settings following the algorithm
     LaunchedEffect(Unit) {
@@ -94,79 +118,154 @@ fun PrayerSettingsDialog(
         }
     }
     
-    // Full screen modal dialog
+    // Animated entrance scale and fade
+    val surfaceScale by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0.92f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "surface_scale"
+    )
+    
+    val surfaceAlpha by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = 400,
+            easing = FastOutSlowInEasing
+        ),
+        label = "surface_alpha"
+    )
+    
+    // Direct background coverage to completely prevent white flash
     Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                scaleX = surfaceScale
+                scaleY = surfaceScale
+                alpha = surfaceAlpha
+            },
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
     ) {
-        if (isLoading) {
-            // Simple loading state
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+        // Content container with animations
+            // Content animation wrapper
+            AnimatedVisibility(
+                visible = animateContent,
+                enter = fadeIn(
+                    animationSpec = tween(
+                        durationMillis = 200, // Faster content fade
+                        delayMillis = 50, // Shorter delay
+                        easing = FastOutSlowInEasing
+                    )
+                ) + scaleIn(
+                    initialScale = 0.97f, // Less dramatic scale
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessHigh
+                    )
+                )
             ) {
-                androidx.compose.material3.CircularProgressIndicator()
-            }
-        } else {
-            PrayerSettingsScreen(
-                settings = settings,
-                onSettingsChanged = { newSettings ->
-                    Log.i("PrayerSettingsDialog", "📝 ALGORITHM: User changed settings")
-                    
-                    // ALGORITHM: Update cached_prayer_settings and recalculate
-                    GlobalScope.launch(Dispatchers.IO) {
-                        try {
-                            // The repository.updateSettings follows the algorithm:
-                            // 1. Update cached_prayer_settings (JSON in preferences)
-                            // 2. Immediately recalculate prayer times
-                            repository.updateSettings(newSettings)
-                            
-                            // Update local UI state
-                            withContext(Dispatchers.Main) {
-                                settings = newSettings
-                                Log.i("PrayerSettingsDialog", "✅ Local UI updated")
-                            }
-                        } catch (e: Exception) {
-                            Log.e("PrayerSettingsDialog", "❌ Failed to update settings", e)
-                        }
+                if (isLoading) {
+                    // Enhanced loading state with animation
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val loadingRotation by rememberInfiniteTransition(label = "loading_rotation").animateFloat(
+                            initialValue = 0f,
+                            targetValue = 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(
+                                    durationMillis = 1000,
+                                    easing = LinearEasing
+                                )
+                            ),
+                            label = "loading_rotation"
+                        )
+                        
+                        CircularProgressIndicator(
+                            modifier = Modifier.graphicsLayer {
+                                rotationZ = loadingRotation
+                            },
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 3.dp
+                        )
                     }
-                },
-                onBackClick = {
-                    Log.i("PrayerSettingsDialog", "🔙 Prayer Settings Dialog CLOSED - changes should now take effect")
-                    onDismiss()
-                },
+                } else {
+                    PrayerSettingsScreen(
+                        settings = settings,
+                        onSettingsChanged = { newSettings ->
+                            Log.i("PrayerSettingsDialog", "📝 ALGORITHM: User changed settings")
+                            
+                            // Haptic feedback for settings change
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            
+                            // ALGORITHM: Update cached_prayer_settings and recalculate
+                            GlobalScope.launch(Dispatchers.IO) {
+                                try {
+                                    // The repository.updateSettings follows the algorithm:
+                                    // 1. Update cached_prayer_settings (JSON in preferences)
+                                    // 2. Immediately recalculate prayer times
+                                    repository.updateSettings(newSettings)
+                                    
+                                    // Update local UI state
+                                    withContext(Dispatchers.Main) {
+                                        settings = newSettings
+                                        Log.i("PrayerSettingsDialog", "✅ Local UI updated")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("PrayerSettingsDialog", "❌ Failed to update settings", e)
+                                }
+                            }
+                        },
+                        onBackClick = {
+                            Log.i("PrayerSettingsDialog", "🔙 Prayer Settings Dialog CLOSED - changes should now take effect")
+                            
+                            // Haptic feedback for dismissal
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            
+                            // Direct dismissal for instant response
+                            onDismiss()
+                        },
                 showAsDialog = false,
                 hasSettingsChanged = hasSettingsChanged,
-                onRestoreClick = {
-                    Log.i("PrayerSettingsDialog", "🔄 ALGORITHM: Restore to auto-detected clicked")
-                    
-                    // ALGORITHM: Use repository's restore method
-                    GlobalScope.launch(Dispatchers.IO) {
-                        try {
-                            val success = repository.restoreToAutoDetected()
+                        onRestoreClick = {
+                            Log.i("PrayerSettingsDialog", "🔄 ALGORITHM: Restore to auto-detected clicked")
                             
-                            if (success) {
-                                // Get the restored settings and update UI
-                                val restoredSettings = repository.getCachedPrayerSettings()
-                                if (restoredSettings != null) {
-                                    withContext(Dispatchers.Main) {
-                                        settings = restoredSettings
-                                        Log.i("PrayerSettingsDialog", "✅ Restored to auto-detected settings")
+                            // Enhanced haptic feedback for restore action
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            
+                            // ALGORITHM: Use repository's restore method
+                            GlobalScope.launch(Dispatchers.IO) {
+                                try {
+                                    val success = repository.restoreToAutoDetected()
+                                    
+                                    if (success) {
+                                        // Get the restored settings and update UI
+                                        val restoredSettings = repository.getCachedPrayerSettings()
+                                        if (restoredSettings != null) {
+                                            withContext(Dispatchers.Main) {
+                                                // Additional haptic feedback for successful restore
+                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                settings = restoredSettings
+                                                Log.i("PrayerSettingsDialog", "✅ Restored to auto-detected settings")
+                                            }
+                                        }
+                                    } else {
+                                        Log.w("PrayerSettingsDialog", "⚠️ Restore failed - no auto-detected settings available")
                                     }
+                                } catch (e: Exception) {
+                                    Log.e("PrayerSettingsDialog", "❌ Failed to restore settings", e)
                                 }
-                            } else {
-                                Log.w("PrayerSettingsDialog", "⚠️ Restore failed - no auto-detected settings available")
                             }
-                        } catch (e: Exception) {
-                            Log.e("PrayerSettingsDialog", "❌ Failed to restore settings", e)
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
         }
     }
-}
 
 // ALGORITHM IMPLEMENTATION COMPLETE
 // The Prayer Settings now follow the specified algorithm:

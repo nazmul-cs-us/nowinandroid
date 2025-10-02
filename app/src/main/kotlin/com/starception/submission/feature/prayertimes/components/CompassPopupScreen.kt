@@ -87,10 +87,19 @@ fun CompassPopupScreen(
     
     val backgroundAlpha by animateFloatAsState(
         targetValue = if (isVisible) 0.95f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
+        animationSpec = if (isVisible) {
+            // Entrance: Smooth and bouncy
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        } else {
+            // Exit: Fast and smooth
+            tween(
+                durationMillis = 250,
+                easing = FastOutLinearInEasing
+            )
+        },
         label = "backgroundAlpha"
     )
     
@@ -98,21 +107,39 @@ fun CompassPopupScreen(
     val dragProgress = (dragState / dragThreshold).coerceIn(0f, 1f)
     
     val contentScale by animateFloatAsState(
-        targetValue = if (isVisible) (1f - dragProgress * 0.1f) else 0.8f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        targetValue = if (isVisible) (1f - dragProgress * 0.1f) else 0.85f,
+        animationSpec = if (isVisible) {
+            // Entrance: Bouncy spring
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMediumLow
+            )
+        } else {
+            // Exit: Quick scale down with slight overshoot
+            spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessHigh
+            )
+        },
         label = "contentScale"
     )
     
     val contentAlpha by animateFloatAsState(
         targetValue = if (isVisible) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
-            visibilityThreshold = 0.01f
-        ),
+        animationSpec = if (isVisible) {
+            // Entrance: Smooth fade in
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium,
+                visibilityThreshold = 0.01f
+            )
+        } else {
+            // Exit: Quick fade out
+            tween(
+                durationMillis = 200,
+                easing = FastOutLinearInEasing
+            )
+        },
         label = "contentAlpha"
     )
     
@@ -158,11 +185,20 @@ fun CompassPopupScreen(
             
             val closeButtonAlpha by animateFloatAsState(
                 targetValue = if (isVisible) 1f else 0f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium,
-                    visibilityThreshold = 0.01f
-                ),
+                animationSpec = if (isVisible) {
+                    // Entrance: Delayed smooth appearance
+                    spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                        visibilityThreshold = 0.01f
+                    )
+                } else {
+                    // Exit: Immediate fade
+                    tween(
+                        durationMillis = 150,
+                        easing = FastOutLinearInEasing
+                    )
+                },
                 label = "closeButtonAlpha"
             )
             
@@ -183,7 +219,7 @@ fun CompassPopupScreen(
                         isVisible = false // Trigger exit animation
                         // Delay actual dismiss to allow exit animation
                         coroutineScope.launch {
-                            delay(200) // Match animation duration
+                            delay(250) // Match background fade duration
                             onDismiss()
                         }
                         Log.d("CompassPopup", "Exit animation started")
@@ -241,7 +277,7 @@ fun CompassPopupScreen(
                                                 isVisible = false // Trigger exit animation
                                                 // Delay actual dismiss to allow exit animation
                                                 coroutineScope.launch {
-                                                    delay(200) // Match animation duration
+                                                    delay(250) // Match background fade duration
                                                     onDismiss()
                                                 }
                                             }
