@@ -131,13 +131,10 @@ class PrayerNotificationService : Service() {
                     Log.d(TAG, "Background initialization starting...")
                     delay(100) // Small delay to ensure service startup completes
                     
-                    // Start prayer updates with timeout protection
-                    withTimeoutOrNull(5000L) { // 5 second timeout
-                        startRealPrayerTimeUpdates()
-                        Log.d(TAG, "✓ Prayer updates started successfully")
-                    } ?: run {
-                        Log.w(TAG, "⚠️ Prayer updates startup timed out")
-                    }
+                    // Start prayer updates with extended timeout protection
+                    // Start prayer updates without timeout restriction
+                    startRealPrayerTimeUpdates()
+                    Log.d(TAG, "✓ Prayer updates started successfully")
                     
                 } catch (e: Exception) {
                     Log.e(TAG, "Background initialization failed: ${e.message}")
@@ -275,8 +272,8 @@ class PrayerNotificationService : Service() {
                     return@withContext
                 }
                 
-                // Initialize notification manager with timeout
-                withTimeoutOrNull(5000L) {
+                // Initialize notification manager with extended timeout
+                withTimeoutOrNull(10000L) { // Increased from 5s to 10s
                     // Check if device supports Live Updates
                     if (PrayerNotificationManager.supportsLiveUpdates()) {
                         Log.d(TAG, "Device supports Live Updates")
@@ -290,10 +287,8 @@ class PrayerNotificationService : Service() {
                 // Start observing settings changes for automatic recalculation
                 observeSettingsChanges()
                 
-                // Start simplified prayer time updates with timeout protection
-                withTimeoutOrNull(10000L) {
-                    startPrayerTimeUpdateLoop()
-                } ?: Log.w(TAG, "Prayer update loop initialization timed out")
+                // Start simplified prayer time updates (no timeout - runs continuously)
+                startPrayerTimeUpdateLoop() // Remove timeout wrapper to allow continuous updates
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting prayer time updates - service continues", e)
@@ -361,7 +356,7 @@ class PrayerNotificationService : Service() {
         
         // CONFIGURABLE LIMITS - Edit these values to change service behavior
         val maxServiceTime = 24 * 60 * 60 * 1000L // 24 hours max - prevents battery drain
-        val maxUpdates = 60 // Max 60 updates - prevents excessive notifications
+        val maxUpdates = 1440 // Max 1440 updates (24 hours * 60 minutes) - allows continuous updates
         var updateCount = 0
         
         Log.d(TAG, "Service limits configured: maxTime=${maxServiceTime/1000}s, maxUpdates=$maxUpdates")
@@ -417,12 +412,18 @@ class PrayerNotificationService : Service() {
                 delay(updateInterval)
             }
             
-            // Auto-stop service after max updates or time limit
+            // Auto-restart service after max updates or time limit
             val runtimeSeconds = (System.currentTimeMillis() - startTime) / 1000
-            Log.d(TAG, "Service stopping automatically - updates: $updateCount, runtime: ${runtimeSeconds}s")
+            Log.d(TAG, "Service restarting automatically - updates: $updateCount, runtime: ${runtimeSeconds}s")
+            
+            // Restart the service instead of stopping it
             isServiceRunning = false
-            stopForeground(true)
-            stopSelf()
+            delay(2000) // Wait 2 seconds before restart
+            isServiceRunning = true
+            
+            // Restart the update loop
+            Log.d(TAG, "🔄 Restarting prayer notification update loop...")
+            startPrayerTimeUpdateLoop()
             
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected error in prayer update loop", e)
