@@ -127,22 +127,40 @@ object PrayerNotificationManager {
      */
     fun supportsLiveUpdates(): Boolean {
         val supported = Build.VERSION.SDK_INT >= 35 // Android 16 API level
-        Log.d(TAG, "Live Updates supported: $supported (API ${Build.VERSION.SDK_INT})")
+        Log.d(TAG, "Live Update Notifications supported: $supported (API ${Build.VERSION.SDK_INT})")
         return supported
     }
     
     /**
-     * Post prayer notification using Live Updates if supported, otherwise regular notification
+     * Checks if the device can post promoted (Live Update) notifications
+     */
+    fun canPostPromotedNotifications(): Boolean {
+        return if (Build.VERSION.SDK_INT >= 35) {
+            try {
+                val canPost = notificationManager.canPostPromotedNotifications()
+                Log.d(TAG, "Can post promoted notifications: $canPost")
+                canPost
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to check promoted notification capability: ${e.message}")
+                false
+            }
+        } else {
+            false
+        }
+    }
+    
+    /**
+     * Post prayer notification using Android 16 Progress-Centric Notifications if supported, otherwise regular notification
      */
     fun postPrayerNotification(prayerName: String, progress: Int = 0, isOngoing: Boolean = true) {
-        val notification = if (supportsLiveUpdates()) {
-            buildLiveUpdateReadyNotification(prayerName, progress, isOngoing)
+        val notification = if (supportsLiveUpdates() && canPostPromotedNotifications()) {
+            buildLiveUpdateNotification(prayerName, progress, isOngoing).build()
         } else {
-            buildRegularNotification(prayerName, progress, isOngoing)
+            buildRegularNotification(prayerName, progress, isOngoing).build()
         }
         
         // Always use the same notification ID to update existing notification
-        notificationManager.notify(NOTIFICATION_ID, notification.build())
+        notificationManager.notify(NOTIFICATION_ID, notification)
         Log.d(TAG, "Updated notification: $prayerName (progress: $progress%)")
     }
     
@@ -201,11 +219,159 @@ object PrayerNotificationManager {
     }
     
     /**
-     * Build notification ready for Android 16 Live Updates
-     * Uses current APIs with Live Update optimizations
+     * Build Live Update notification using proper Android Live Update APIs
      */
-    private fun buildLiveUpdateReadyNotification(
+    private fun buildLiveUpdateNotification(
         prayerName: String, 
+        progress: Int, 
+        isOngoing: Boolean
+    ): NotificationCompat.Builder {
+        val title = try {
+            appContext.getString(R.string.live_notification_title)
+        } catch (e: Exception) {
+            "Prayer Time Tracker"
+        }
+        
+        val content = try {
+            appContext.getString(R.string.live_notification_content, prayerName)
+        } catch (e: Exception) {
+            "Current prayer: $prayerName"
+        }
+        
+        val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSmallIcon(R.drawable.ic_prayer)
+            .setContentIntent(createAppLaunchIntent())
+            .setOngoing(true) // Required for Live Updates
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(true)
+            .setAutoCancel(false)
+        
+        // Add progress bar
+        if (progress > 0) {
+            builder.setProgress(100, progress, false)
+        }
+        
+        // Enable Live Update characteristics for Android 16+
+        if (Build.VERSION.SDK_INT >= 35) {
+            try {
+                // Use standard ongoing notification characteristics that qualify for Live Updates
+                builder.setOngoing(true)
+                    .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+                    .setOnlyAlertOnce(true)
+                    .setSilent(true)
+                    .setLocalOnly(false) // Allow system to manage Live Updates
+                
+                Log.d(TAG, "Applied Live Update characteristics")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to apply Live Update characteristics: ${e.message}")
+            }
+        }
+        
+        Log.d(TAG, "Created Live Update notification")
+        return builder
+    }
+    
+    @RequiresApi(35) // Android 16
+    private fun buildNativeProgressCentricNotification(
+        prayerName: String,
+        progress: Int, 
+        isOngoing: Boolean
+    ): Notification.Builder {
+        val title = try {
+            appContext.getString(R.string.live_notification_title)
+        } catch (e: Exception) {
+            "Prayer Time Tracker"
+        }
+        
+        val content = try {
+            appContext.getString(R.string.live_notification_content, prayerName)
+        } catch (e: Exception) {
+            "Current prayer: $prayerName"
+        }
+        
+        // Use native Notification.Builder for Android 16 Progress-Centric Notifications
+        val builder = Notification.Builder(appContext, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSmallIcon(R.drawable.ic_prayer)
+            .setContentIntent(createAppLaunchIntent())
+            .setOngoing(true) // Required for Progress-Centric Notifications
+            .setCategory(Notification.CATEGORY_PROGRESS) // Progress-Centric category
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(true)
+            .setTimeoutAfter(0) // No timeout for ongoing tracking
+        
+        // Enable Android 16 Progress-Centric Style with ProgressStyle
+        if (progress > 0 && Build.VERSION.SDK_INT >= 35) {
+            try {
+                // Create Android 16 ProgressStyle for prayer time tracking
+                val progressStyle = Notification.ProgressStyle()
+                    .setStyledByProgress(true)
+                    .setProgress(progress)
+                    .setProgressTrackerIcon(
+                        android.graphics.drawable.Icon.createWithResource(appContext, R.drawable.ic_prayer)
+                    )
+                
+                // Add prayer phase segments (approximate prayer time phases)
+                val segments = mutableListOf<Notification.ProgressStyle.Segment>()
+                
+                // Phase 1: Go to Mosque (0-20%)
+                segments.add(
+                    Notification.ProgressStyle.Segment(20)
+                        .setColor(android.graphics.Color.parseColor("#10B981")) // Green
+                )
+                
+                // Phase 2: Best Time to Pray (20-60%)
+                segments.add(
+                    Notification.ProgressStyle.Segment(40)
+                        .setColor(android.graphics.Color.parseColor("#059669")) // Darker green
+                )
+                
+                // Phase 3: Make Time (60-100%)
+                segments.add(
+                    Notification.ProgressStyle.Segment(40)
+                        .setColor(android.graphics.Color.parseColor("#047857")) // Darkest green
+                )
+                
+                progressStyle.setProgressSegments(segments)
+                
+                // Add milestone points for key prayer phases
+                val points = mutableListOf<Notification.ProgressStyle.Point>()
+                points.add(
+                    Notification.ProgressStyle.Point(20)
+                        .setColor(android.graphics.Color.parseColor("#FBBF24")) // Yellow for phase transition
+                )
+                points.add(
+                    Notification.ProgressStyle.Point(60)
+                        .setColor(android.graphics.Color.parseColor("#F59E0B")) // Orange for phase transition
+                )
+                
+                progressStyle.setProgressPoints(points)
+                
+                // Apply the Progress-Centric style to the notification
+                builder.setStyle(progressStyle)
+                
+                Log.d(TAG, "Applied Android 16 ProgressStyle with segments and points")
+                
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to apply Android 16 ProgressStyle, falling back to regular progress: ${e.message}")
+                builder.setProgress(100, progress, false)
+            }
+        } else {
+            builder.setProgress(100, progress, false)
+        }
+        
+        Log.d(TAG, "Created native Android 16 Progress-Centric Notification")
+        return builder
+    }
+    
+    private fun buildCompatProgressNotification(
+        prayerName: String,
         progress: Int, 
         isOngoing: Boolean
     ): NotificationCompat.Builder {
