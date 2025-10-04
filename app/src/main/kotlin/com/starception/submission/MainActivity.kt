@@ -81,6 +81,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.starception.submission.util.GoogleSampleNotificationManager
+import android.app.NotificationManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 /**
  * MAIN ACTIVITY: Entry point for the Islamic prayer times app
@@ -167,6 +172,20 @@ class MainActivity : FragmentActivity() {
 
         // Initialize ViewModel for theme handling (but without splash screen blocking)
         val viewModel: MainActivityViewModel by viewModels()
+        
+        // GOOGLE SAMPLE LIVE UPDATE - Initialize for prayer notifications
+        if (Build.VERSION.SDK_INT >= 35) { // Android 16+ (BAKLAVA = 35)
+            lifecycleScope.launch {
+                delay(2000) // Wait 2 seconds after app start
+                try {
+                    val notificationManager = getSystemService(NotificationManager::class.java)
+                    GoogleSampleNotificationManager.initialize(this@MainActivity, notificationManager)
+                    Log.d("MainActivity", "🧪 GOOGLE SAMPLE: Initialized for prayer notifications")
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Failed to initialize Google sample notification manager: ${e.message}")
+                }
+            }
+        }
         
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()

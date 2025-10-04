@@ -41,7 +41,7 @@ object PrayerNotificationManager {
     // NOTIFICATION CONFIGURATION - Edit these to change notification behavior
     private const val CHANNEL_ID = "prayer_live_update_channel"
     private const val CHANNEL_NAME = "Prayer Notifications" 
-    private const val NOTIFICATION_ID = 1001  // Same ID = updates replace previous notifications
+    private const val NOTIFICATION_ID = 1002  // Live Update notification ID (separate from foreground service)
     
     fun initialize(context: Context) {
         Log.d(TAG, "=== INITIALIZING PRAYER NOTIFICATION MANAGER ===")
@@ -198,13 +198,13 @@ object PrayerNotificationManager {
         if (Build.VERSION.SDK_INT >= 35 && canPostPromoted) {
             // Use Android 16 Live Update notification
             try {
-                val notification = buildLiveUpdateNotification(
+                val notification = buildDetailedLiveUpdateNotification(
                     title = title,
                     content = content,
                     detailedMessage = detailedMessage,
                     progress = progress,
                     isOngoing = isOngoing,
-                    prayerName = prayerName // Pass the prayer name to the style builder
+                    prayerName = prayerName
                 )
                 
                 // Update existing notification instead of creating new one
@@ -254,38 +254,108 @@ object PrayerNotificationManager {
             .setShowWhen(true)
             .setAutoCancel(false)
         
-        // Add progress bar
-        if (progress > 0) {
-            builder.setProgress(100, progress, false)
-        }
-        
-        // Apply Live Update characteristics following platform sample
+        // Apply enhanced notification characteristics for Android 16+
         if (Build.VERSION.SDK_INT >= 35) {
             try {
-                // Progressive notification characteristics (like platform sample order tracking)
+                // Enhanced Live Update features (using available APIs)
                 builder.setOngoing(true)
                     .setCategory(NotificationCompat.CATEGORY_PROGRESS)
                     .setOnlyAlertOnce(true)
                     .setSilent(true)
                     .setLocalOnly(false)
                     .setTimeoutAfter(0) // No timeout for ongoing tracking
+                    .setPriority(NotificationCompat.PRIORITY_HIGH) // High priority for visibility
                 
-                // Add colored progress style inspired by platform sample
+                // Enhanced progress bar with color for Android 16+
                 if (progress > 0) {
-                    // val progressStyle = createPrayerProgressStyle(progress, prayerName)
-                    // if (progressStyle != null) {
-                    //     builder.setStyle(progressStyle)
-                    //     Log.d(TAG, "Applied colored progress style for prayer phase")
-                    // }
+                    builder.setProgress(100, progress, false)
+                    // Add color based on prayer phase
+                    val phaseColor = getPrayerPhaseColor(progress)
+                    builder.setColor(phaseColor)
+                    builder.setColorized(true)
+                    Log.d(TAG, "Applied enhanced progress bar with phase color for progress: $progress%")
                 }
                 
-                Log.d(TAG, "Applied Live Update characteristics with progress style")
+                Log.d(TAG, "Applied enhanced Live Update characteristics for Android 16+")
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to apply Live Update characteristics: ${e.message}")
+                Log.w(TAG, "Failed to apply enhanced characteristics: ${e.message}")
+                // Fallback to regular progress bar
+                if (progress > 0) {
+                    builder.setProgress(100, progress, false)
+                }
+            }
+        } else {
+            // Fallback for pre-Android 16
+            if (progress > 0) {
+                builder.setProgress(100, progress, false)
             }
         }
         
         Log.d(TAG, "Created Live Update notification")
+        return builder
+    }
+    
+    /**
+     * Build detailed Live Update notification with enhanced Android 16+ features
+     */
+    @RequiresApi(35)
+    private fun buildDetailedLiveUpdateNotification(
+        title: String,
+        content: String,
+        detailedMessage: String,
+        progress: Int,
+        isOngoing: Boolean,
+        prayerName: String
+    ): NotificationCompat.Builder {
+        Log.d(TAG, "Building detailed Live Update notification: $title")
+        
+        val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSmallIcon(R.drawable.ic_prayer)
+            .setContentIntent(createAppLaunchIntent())
+            .setOngoing(isOngoing)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(true)
+            .setAutoCancel(false)
+            .setSilent(true)
+            .setLocalOnly(false)
+            .setTimeoutAfter(0)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+        
+        // Enhanced notification features for Android 16+
+        if (progress > 0) {
+            try {
+                // Enhanced progress bar with phase-based coloring
+                builder.setProgress(100, progress, false)
+                val phaseColor = getPrayerPhaseColor(progress)
+                builder.setColor(phaseColor)
+                builder.setColorized(true)
+                
+                // Add detailed message as expanded content
+                if (detailedMessage.isNotBlank()) {
+                    val expandedContent = "$content\n\n$detailedMessage"
+                    builder.setStyle(NotificationCompat.BigTextStyle().bigText(expandedContent))
+                }
+                
+                Log.d(TAG, "Applied enhanced Live Update features for progress: $progress%")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to apply enhanced features, using fallback: ${e.message}")
+                builder.setProgress(100, progress, false)
+                if (detailedMessage.isNotBlank()) {
+                    builder.setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
+                }
+            }
+        } else {
+            // No progress, just show detailed message
+            if (detailedMessage.isNotBlank()) {
+                builder.setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
+            }
+        }
+        
+        Log.d(TAG, "Created detailed Live Update notification with enhanced features")
         return builder
     }
     
@@ -746,9 +816,11 @@ object PrayerNotificationManager {
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            // Lock screen visibility is controlled by channel settings and notification visibility
             .setLocalOnly(false)
             .setAutoCancel(false)
             .setOnlyAlertOnce(false) // Allow alerts for phase transitions
+            .setFullScreenIntent(createAppLaunchIntent(), false) // Add full screen intent for lock screen prominence
         
         // Set alert behavior based on phase transition
         if (withAlert) {
@@ -758,8 +830,8 @@ object PrayerNotificationManager {
                 .setSilent(false)
                 .setVibrate(longArrayOf(0, 250, 100, 250)) // Short vibration pattern
         } else {
-            // Silent update - no popup, no sound
-            builder.setPriority(NotificationCompat.PRIORITY_LOW)
+            // Silent update - no popup, no sound, but still visible on lock screen
+            builder.setPriority(NotificationCompat.PRIORITY_DEFAULT) // Changed from LOW to DEFAULT for lock screen visibility
                 .setDefaults(0) // No sound, vibration, or lights
                 .setSilent(true)
                 .setVibrate(null)
@@ -782,13 +854,28 @@ object PrayerNotificationManager {
                     
                     Log.d(TAG, "🔍 DEBUG: Segment sizes - Blue: $blueSegmentSize%, Green: $greenSegmentSize%, Yellow: $yellowSegmentSize%")
                     
-                    // Use enhanced progress bar for Android 15+
+                    // Use enhanced progress bar for Android 15+ with prayer phase colors
                     builder.setProgress(100, progress, false)
                     
-                    // Enable live update features
-                    builder.setOngoing(true)
+                    // Apply prayer phase color based on progress
+                    val phaseColor = getPrayerPhaseColor(progress)
+                    builder.setColor(phaseColor)
+                    builder.setColorized(true)
                     
-                    Log.d(TAG, "🔍 DEBUG: Added enhanced progress bar with progress: $progress%")
+                    // Enable live update features with Android 16+ APIs
+                    builder.setOngoing(true)
+                        .setRequestPromotedOngoing(true) // CRITICAL: This enables true Live Updates!
+                    
+                    // Add Live Update ProgressStyle like Google's sample
+                    try {
+                        val progressStyle = createPrayerProgressStyle(progress)
+                        builder.setStyle(progressStyle)
+                        Log.d(TAG, "🎨 Applied Live Update ProgressStyle with prayer phase segments")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "ProgressStyle not available yet, using basic progress: ${e.message}")
+                    }
+                    
+                    Log.d(TAG, "🔍 DEBUG: Added enhanced progress bar with progress: $progress% and phase color: ${String.format("#%06X", 0xFFFFFF and phaseColor)}")
                     
                     // Android 15+ Live Update features enabled
                     
@@ -806,14 +893,26 @@ object PrayerNotificationManager {
                     Log.w(TAG, "Failed to apply Live Update progress style, falling back to basic: ${e.message}")
                     builder.setProgress(100, progress, false)
                     
+                    // Apply prayer phase color even in fallback
+                    val phaseColor = getPrayerPhaseColor(progress)
+                    builder.setColor(phaseColor)
+                    builder.setColorized(true)
+                    
                     // Add detailed message as BigTextStyle for fallback
                     if (!detailedMessage.isNullOrBlank()) {
                         builder.setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
                     }
                 }
             } else {
-                // Basic progress bar for older Android versions
+                // Basic progress bar for older Android versions with prayer phase colors
                 builder.setProgress(100, progress, false)
+                
+                // Apply prayer phase color for all Android versions
+                val phaseColor = getPrayerPhaseColor(progress)
+                builder.setColor(phaseColor)
+                builder.setColorized(true)
+                
+                Log.d(TAG, "🔍 DEBUG: Applied prayer phase color for older Android: ${String.format("#%06X", 0xFFFFFF and phaseColor)}")
                 
                 // Add detailed message as BigTextStyle for older Android
                 if (!detailedMessage.isNullOrBlank()) {
@@ -974,6 +1073,69 @@ object PrayerNotificationManager {
         
         Log.i(TAG, status)
         return status
+    }
+    
+    /**
+     * Get prayer phase color based on progress percentage
+     * This provides visual feedback for different prayer phases
+     */
+    private fun getPrayerPhaseColor(progress: Int): Int {
+        return when {
+            progress <= 20 -> Color.parseColor("#4169E1")    // Blue for Go to Mosque (0-20%)
+            progress <= 60 -> Color.parseColor("#10B981")    // Green for Best Time (20-60%)
+            else -> Color.parseColor("#FBBF24")              // Yellow for Make Time (60-100%)
+        }
+    }
+    
+    /**
+     * Create Prayer Progress Style using Android 16+ ProgressStyle API
+     * Based on Google's platform sample: live-updates/SnackbarNotificationManager.kt
+     */
+    @RequiresApi(35)
+    private fun createPrayerProgressStyle(progress: Int): NotificationCompat.ProgressStyle {
+        Log.d(TAG, "Creating Live Update ProgressStyle for prayer progress: $progress%")
+        
+        // Prayer phase colors (converted to Color.valueOf format like Google sample)
+        val goToMosqueColor = Color.valueOf(65f / 255f, 105f / 255f, 225f / 255f, 1f).toArgb() // Blue for Go to Mosque (0-20%)
+        val bestTimeColor = Color.valueOf(16f / 255f, 185f / 255f, 129f / 255f, 1f).toArgb()   // Green for Best Time (20-60%)
+        val makeTimeColor = Color.valueOf(251f / 255f, 191f / 255f, 36f / 255f, 1f).toArgb()   // Yellow for Make Time (60-100%)
+        
+        // Milestone point color (when phases change)
+        val pointColor = Color.valueOf(139f / 255f, 65f / 255f, 143f / 255f, 1f).toArgb()      // Purple for milestones
+        
+        val progressStyle = NotificationCompat.ProgressStyle()
+            .setProgressSegments(
+                listOf(
+                    // Phase 1: Go to Mosque (0-20%) - Blue
+                    NotificationCompat.ProgressStyle.Segment(20).setColor(goToMosqueColor),
+                    // Phase 2: Best Time (20-60%) - Green  
+                    NotificationCompat.ProgressStyle.Segment(40).setColor(bestTimeColor),
+                    // Phase 3: Make Time (60-100%) - Yellow
+                    NotificationCompat.ProgressStyle.Segment(40).setColor(makeTimeColor)
+                )
+            )
+            .setProgressPoints(
+                listOf(
+                    // Milestone at 20% (Go to Mosque -> Best Time)
+                    NotificationCompat.ProgressStyle.Point(20).setColor(pointColor),
+                    // Milestone at 60% (Best Time -> Make Time)
+                    NotificationCompat.ProgressStyle.Point(60).setColor(pointColor)
+                )
+            )
+            .setProgress(progress)
+        
+        // Add prayer icon as progress tracker (like Google's sample)
+        try {
+            progressStyle.setProgressTrackerIcon(
+                IconCompat.createWithResource(appContext, R.drawable.ic_prayer)
+            )
+            Log.d(TAG, "Added prayer icon as progress tracker")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not set progress tracker icon: ${e.message}")
+        }
+        
+        Log.d(TAG, "Created Live Update ProgressStyle with 3 segments (Blue: 0-20%, Green: 20-60%, Yellow: 60-100%) and 2 milestone points")
+        return progressStyle
     }
     
     /**
