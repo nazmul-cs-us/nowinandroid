@@ -12,12 +12,15 @@ import android.os.Vibrator
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.IconCompat
+import androidx.annotation.RequiresApi
 import com.starception.submission.R
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTime
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.util.PrayerNotificationManager
+import com.starception.submission.util.GoogleSampleNotificationManager
 import com.starception.submission.util.AnrPreventionConfig
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
@@ -46,12 +49,16 @@ class PrayerNotificationService : Service() {
     private var isInitializing = false
     private var previousPrayerPhase: String? = null // Track previous phase for smart notifications
     
+    // Live Update notification manager (separate from foreground service)
+    private lateinit var notificationManager: NotificationManager
+    
     companion object {
         private const val TAG = "PrayerNotificationService"
         
         // NOTIFICATION CONFIGURATION - Edit these to change notification behavior
         private const val NOTIFICATION_CHANNEL_ID = "prayer_live_update_channel"
-        private const val NOTIFICATION_ID = 1001  // Single ID ensures updates replace previous notifications
+        private const val NOTIFICATION_ID = 1001  // Foreground service notification ID
+        private const val LIVE_UPDATE_NOTIFICATION_ID = 1002 // Separate Live Update notification ID
         
         // Check if service is running in another process (NON-BLOCKING with timeout)
         fun isServiceRunningInAnotherProcess(context: android.content.Context): Boolean {
@@ -103,6 +110,11 @@ class PrayerNotificationService : Service() {
         try {
             createNotificationChannel()
             PrayerNotificationManager.initialize(this)
+            
+            // Initialize notification manager for separate Live Update notifications
+            notificationManager = getSystemService(NotificationManager::class.java)
+            Log.d(TAG, "✓ Live Update notification manager initialized separately from foreground service")
+            
             Log.d(TAG, "✓ Service onCreate completed successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error in onCreate: ${e.message}")
@@ -163,18 +175,20 @@ class PrayerNotificationService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
-                "Prayer Notifications",
-                NotificationManager.IMPORTANCE_HIGH
+                "Prayer Live Updates",
+                NotificationManager.IMPORTANCE_HIGH // High importance for lock screen visibility
             ).apply {
-                description = "Prayer time notifications and live updates"
+                description = "Prayer time notifications and live updates - shows on lock screen"
                 enableVibration(true) // Enable vibration for prayer notifications
                 setShowBadge(true)
                 enableLights(true)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC // Explicitly enable lock screen visibility
+                setBypassDnd(false) // Respect Do Not Disturb for silent updates
             }
             
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(channel)
-            Log.d(TAG, "Notification channel created")
+            Log.d(TAG, "Prayer Live Updates notification channel created with lock screen visibility")
         }
     }
     
@@ -214,33 +228,144 @@ class PrayerNotificationService : Service() {
     }
     
     private fun createEmergencyNotification(): Notification {
+        // Emergency simple foreground service notification - ONLY for keeping service alive
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Prayer Service")
-            .setContentText("Active")
+            .setContentText("Emergency mode")
             .setSmallIcon(android.R.drawable.ic_dialog_info) // Use system icon as fallback
             .setOngoing(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET) // Hide this simple notification
+            .setPriority(NotificationCompat.PRIORITY_MIN) // Minimal priority
+            .setSilent(true)
             .build()
     }
     
     private fun createInitialNotification(): Notification {
-        val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("Prayer Time Tracker")
-            .setContentText("Initializing...")
+        // Simple foreground service notification - ONLY for keeping service alive
+        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("Prayer Service")
+            .setContentText("Background service running")
             .setSmallIcon(R.drawable.ic_prayer)
             .setOngoing(true)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setColor(Color.parseColor("#8B418F"))
-            .setColorized(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET) // Hide this simple notification
+            .setPriority(NotificationCompat.PRIORITY_MIN) // Minimal priority
+            .setShowWhen(false)
+            .setSilent(true)
             .build()
+    }
+    
+    /**
+     * Create Live Update notification directly (separate from foreground service)
+     * This ensures PROMOTED_ONGOING flag without FOREGROUND_SERVICE flag
+     */
+    @RequiresApi(35)
+    private fun createLiveUpdateNotification(
+        title: String,
+        content: String,
+        detailedMessage: String = "",
+        progress: Int = 0
+    ): Notification {
+        Log.d(TAG, "🎯 Creating direct Live Update notification: $title")
         
-        // Force refresh to ensure Live Updates are activated on Android 16
-        if (PrayerNotificationManager.supportsLiveUpdates()) {
-            PrayerNotificationManager.forceRefreshNotification()
+        val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSmallIcon(R.drawable.ic_prayer)
+            .setOngoing(true)
+            .setRequestPromotedOngoing(true) // CRITICAL: This enables Live Updates!
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(true)
+            .setAutoCancel(false)
+            .setSilent(true)
+            .setLocalOnly(false)
+            .setTimeoutAfter(0)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+        
+        // Add prayer phase color based on progress
+        if (progress > 0) {
+            val phaseColor = when {
+                progress <= 20 -> Color.parseColor("#4169E1")    // Blue for Go to Mosque
+                progress <= 60 -> Color.parseColor("#10B981")    // Green for Best Time
+                else -> Color.parseColor("#FBBF24")              // Yellow for Make Time
+            }
+            builder.setColor(phaseColor)
+            builder.setColorized(true)
+            
+            // Add Live Update ProgressStyle
+            try {
+                val progressStyle = createLiveUpdateProgressStyle(progress)
+                builder.setStyle(progressStyle)
+                Log.d(TAG, "✨ Applied Live Update ProgressStyle with segments")
+            } catch (e: Exception) {
+                Log.w(TAG, "ProgressStyle not available, using basic progress: ${e.message}")
+                builder.setProgress(100, progress, false)
+            }
         }
         
+        // Add detailed message if provided
+        if (detailedMessage.isNotBlank()) {
+            if (progress == 0) {
+                builder.setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
+            }
+        }
+        
+        val notification = builder.build()
+        Log.d(TAG, "🚀 Live Update notification created with setRequestPromotedOngoing(true)")
         return notification
+    }
+    
+    /**
+     * Create Live Update ProgressStyle (matching Google sample structure)
+     */
+    @RequiresApi(35)
+    private fun createLiveUpdateProgressStyle(progress: Int): NotificationCompat.ProgressStyle {
+        // Colors matching Google sample format
+        val pointColor = Color.valueOf(236f / 255f, 183f / 255f, 255f / 255f, 1f).toArgb()
+        
+        return NotificationCompat.ProgressStyle()
+            .setProgressSegments(
+                listOf(
+                    NotificationCompat.ProgressStyle.Segment(20).setColor(Color.parseColor("#4169E1")), // Blue
+                    NotificationCompat.ProgressStyle.Segment(40).setColor(Color.parseColor("#10B981")), // Green
+                    NotificationCompat.ProgressStyle.Segment(40).setColor(Color.parseColor("#FBBF24"))  // Yellow
+                )
+            )
+            .setProgressPoints(
+                listOf(
+                    NotificationCompat.ProgressStyle.Point(20).setColor(pointColor),
+                    NotificationCompat.ProgressStyle.Point(60).setColor(pointColor)
+                )
+            )
+            .setProgress(progress)
+            .setProgressTrackerIcon(
+                IconCompat.createWithResource(this, R.drawable.ic_prayer)
+            )
+    }
+    
+    /**
+     * Post Live Update notification directly (bypassing PrayerNotificationManager)
+     */
+    private fun postLiveUpdateNotification(
+        title: String,
+        content: String,
+        detailedMessage: String = "",
+        progress: Int = 0
+    ) {
+        if (Build.VERSION.SDK_INT >= 35) {
+            try {
+                val notification = createLiveUpdateNotification(title, content, detailedMessage, progress)
+                notificationManager.notify(LIVE_UPDATE_NOTIFICATION_ID, notification)
+                Log.d(TAG, "📱 Posted Live Update notification (ID: $LIVE_UPDATE_NOTIFICATION_ID) - should have PROMOTED_ONGOING flag")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to post Live Update notification: ${e.message}")
+            }
+        } else {
+            Log.w(TAG, "Live Updates not supported on API level ${Build.VERSION.SDK_INT}")
+        }
     }
     
     /**
@@ -272,17 +397,28 @@ class PrayerNotificationService : Service() {
                     return@withContext
                 }
                 
-                // Initialize notification manager with extended timeout
+                // Initialize separate Live Update notification (not tied to foreground service)
                 withTimeoutOrNull(10000L) { // Increased from 5s to 10s
                     // Check if device supports Live Updates
                     if (PrayerNotificationManager.supportsLiveUpdates()) {
-                        Log.d(TAG, "Device supports Live Updates")
+                        Log.d(TAG, "🚀 Device supports Live Updates - using separate notification")
                         Log.d(TAG, "Has promotable characteristics: ${PrayerNotificationManager.hasPromotableCharacteristics()}")
                         
-                        // Post initial notification
-                        PrayerNotificationManager.postPrayerNotification("Prayer Time Tracker Active", 0, true)
+                        // Post initial Live Update notification using PrayerNotificationManager
+                        if (PrayerNotificationManager.isInitialized()) {
+                            PrayerNotificationManager.updatePrayerProgressSmart(
+                                prayerName = "Prayer",
+                                progress = 0,
+                                title = "Prayer Time Tracker",
+                                content = "Live Updates Active",
+                                detailedMessage = "Real-time prayer time tracking enabled"
+                            )
+                            Log.d(TAG, "🎯 Posted separate Live Update notification via manager")
+                        }
+                    } else {
+                        Log.w(TAG, "Device does not support Live Updates, using standard notifications")
                     }
-                } ?: Log.w(TAG, "Notification manager initialization timed out, continuing")
+                } ?: Log.w(TAG, "Live Update notification initialization timed out, continuing")
                 
                 // Start observing settings changes for automatic recalculation
                 observeSettingsChanges()
@@ -387,9 +523,20 @@ class PrayerNotificationService : Service() {
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error updating prayer notification", e)
-                    // Fallback notification on error
-                    if (PrayerNotificationManager.isInitialized()) {
-                        PrayerNotificationManager.postPrayerNotification("Prayer tracker active", 0, true)
+                    // Fallback Live Update notification on error using PrayerNotificationManager
+                    try {
+                        if (PrayerNotificationManager.isInitialized()) {
+                            PrayerNotificationManager.updatePrayerProgressSmart(
+                                prayerName = "Prayer",
+                                progress = 0,
+                                title = "Prayer Tracker",
+                                content = "Service Active",
+                                detailedMessage = "Error occurred, using fallback mode"
+                            )
+                            Log.d(TAG, "🔄 Posted fallback Live Update notification via manager")
+                        }
+                    } catch (fallbackError: Exception) {
+                        Log.e(TAG, "Live Update fallback failed: ${fallbackError.message}")
                     }
                 }
                 
@@ -462,44 +609,101 @@ class PrayerNotificationService : Service() {
                     val progress = calculateNotificationProgress(prayerData)
                     val currentPhase = getCurrentPrayerPhase(progress)
                     
-                    // Update notification
-                    PrayerNotificationManager.updatePrayerProgressSmart(
-                        prayerName = if (content.contains(" since ")) {
-                            content.split(" since ").lastOrNull()?.split(" • ")?.firstOrNull() ?: "Prayer"
-                        } else {
-                            "Prayer"
-                        },
-                        progress = progress,
-                        previousPhase = previousPrayerPhase,
-                        title = title,
-                        content = content,
-                        detailedMessage = detailedMessage
-                    )
+                    // Update notification using Google's proven Live Update system
+                    if (Build.VERSION.SDK_INT >= 35) {
+                        try {
+                            GoogleSampleNotificationManager.postPrayerNotification(
+                                title = title,
+                                content = content,
+                                detailedMessage = detailedMessage,
+                                progress = progress
+                            )
+                            Log.d(TAG, "🧪 Posted prayer notification via Google Live Update system")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to post via Google system, falling back: ${e.message}")
+                            // Fallback to PrayerNotificationManager
+                            PrayerNotificationManager.updatePrayerProgressSmart(
+                                prayerName = if (content.contains(" since ")) {
+                                    content.split(" since ").lastOrNull()?.split(" • ")?.firstOrNull() ?: "Prayer"
+                                } else {
+                                    "Prayer"
+                                },
+                                progress = progress,
+                                previousPhase = previousPrayerPhase,
+                                title = title,
+                                content = content,
+                                detailedMessage = detailedMessage
+                            )
+                        }
+                    } else {
+                        // For older Android versions, use PrayerNotificationManager
+                        PrayerNotificationManager.updatePrayerProgressSmart(
+                            prayerName = if (content.contains(" since ")) {
+                                content.split(" since ").lastOrNull()?.split(" • ")?.firstOrNull() ?: "Prayer"
+                            } else {
+                                "Prayer"
+                            },
+                            progress = progress,
+                            previousPhase = previousPrayerPhase,
+                            title = title,
+                            content = content,
+                            detailedMessage = detailedMessage
+                        )
+                    }
                     
                     previousPrayerPhase = currentPhase
                     
                     val totalDuration = System.currentTimeMillis() - updateStartTime
                     Log.d(TAG, "✓ Notification updated successfully in ${totalDuration}ms")
                 } else {
-                    // Quick fallback
-                    PrayerNotificationManager.postPrayerNotification("Prayer tracker active", 50, true)
-                    Log.d(TAG, "Using fallback notification")
+                    // Quick Live Update fallback using PrayerNotificationManager
+                    if (PrayerNotificationManager.isInitialized()) {
+                        PrayerNotificationManager.updatePrayerProgressSmart(
+                            prayerName = "Prayer",
+                            progress = 50,
+                            title = "Prayer Tracker",
+                            content = "Quick Update",
+                            detailedMessage = "Using fallback mode"
+                        )
+                        Log.d(TAG, "📱 Using Live Update fallback notification via manager")
+                    }
                 }
                 
             } ?: run {
-                // Timeout occurred - use emergency fallback
-                Log.w(TAG, "⚠️ Update timed out after 5s - using emergency fallback")
-                if (PrayerNotificationManager.isInitialized()) {
-                    PrayerNotificationManager.postPrayerNotification("Prayer tracker running", 0, true)
+                // Timeout occurred - use emergency Live Update fallback (separate from foreground service)
+                Log.w(TAG, "⚠️ Update timed out after 5s - using emergency Live Update fallback")
+                try {
+                    if (PrayerNotificationManager.isInitialized()) {
+                        PrayerNotificationManager.updatePrayerProgressSmart(
+                            prayerName = "Prayer",
+                            progress = 0,
+                            title = "Prayer Tracker",
+                            content = "Service Running",
+                            detailedMessage = "Update timed out, using emergency mode"
+                        )
+                        Log.d(TAG, "🚨 Posted emergency Live Update notification via manager")
+                    }
+                } catch (emergencyError: Exception) {
+                    Log.e(TAG, "Emergency Live Update notification failed: ${emergencyError.message}")
                 }
             }
             
         } catch (e: Exception) {
             Log.e(TAG, "Error in update: ${e.message}")
             try {
-                PrayerNotificationManager.postPrayerNotification("Prayer service active", 0, true)
+                // Final fallback Live Update notification using PrayerNotificationManager
+                if (PrayerNotificationManager.isInitialized()) {
+                    PrayerNotificationManager.updatePrayerProgressSmart(
+                        prayerName = "Prayer",
+                        progress = 0,
+                        title = "Prayer Service",
+                        content = "Active",
+                        detailedMessage = "Service encountered error but remains active"
+                    )
+                    Log.d(TAG, "💾 Posted final fallback Live Update notification via manager")
+                }
             } catch (fallbackError: Exception) {
-                Log.e(TAG, "Fallback notification also failed: ${fallbackError.message}")
+                Log.e(TAG, "Final Live Update fallback also failed: ${fallbackError.message}")
             }
         }
     }
