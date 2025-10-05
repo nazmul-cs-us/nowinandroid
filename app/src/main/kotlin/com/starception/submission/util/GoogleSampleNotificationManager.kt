@@ -327,10 +327,12 @@ object GoogleSampleNotificationManager {
         // Update tracked phase
         currentPhase = newPhase
         
-        // Android 16 Progress-Centric: Define meaningful colors that reflect prayer journey states
-        val activeSegmentColor = Color.valueOf(0f / 255f, 150f / 255f, 136f / 255f, 1f).toArgb()     // Teal - Active phase
-        val completedSegmentColor = Color.valueOf(76f / 255f, 175f / 255f, 80f / 255f, 1f).toArgb()  // Green - Completed phase
-        val pendingSegmentColor = Color.valueOf(189f / 255f, 189f / 255f, 189f / 255f, 1f).toArgb()  // Gray - Pending phase
+        // Android 16 Progress-Centric: Define segment colors for prayer urgency progression
+        // Green (Go to Mosque) → Yellow (Best Time) → Red (Make Time)
+        val greenSegmentColor = Color.valueOf(76f / 255f, 175f / 255f, 80f / 255f, 1f).toArgb()     // Green - Go to Mosque
+        val yellowSegmentColor = Color.valueOf(255f / 255f, 193f / 255f, 7f / 255f, 1f).toArgb()    // Yellow - Best Time
+        val redSegmentColor = Color.valueOf(244f / 255f, 67f / 255f, 54f / 255f, 1f).toArgb()       // Red - Make Time
+        val graySegmentColor = Color.valueOf(189f / 255f, 189f / 255f, 189f / 255f, 1f).toArgb()    // Gray - Pending/Inactive
         
         // Define distinct milestone colors for clear visual hierarchy
         val mosquePhaseColor = Color.valueOf(46f / 255f, 125f / 255f, 50f / 255f, 1f).toArgb()    // Green for Go to Mosque
@@ -344,24 +346,13 @@ object GoogleSampleNotificationManager {
             else -> IconCompat.createWithResource(appContext, R.drawable.ic_clock_milestone)                 // Make Time for Prayer
         }
         
-        // Android 16 Progress-Centric: Dynamic segment coloring based on current progress
-        val segments = when {
-            progress <= 20 -> listOf(
-                ProgressStyle.Segment(20).setColor(activeSegmentColor),    // Active: Go to Mosque
-                ProgressStyle.Segment(40).setColor(pendingSegmentColor),   // Pending: Best Time
-                ProgressStyle.Segment(40).setColor(pendingSegmentColor)    // Pending: Make Time
-            )
-            progress <= 60 -> listOf(
-                ProgressStyle.Segment(20).setColor(completedSegmentColor), // Completed: Go to Mosque
-                ProgressStyle.Segment(40).setColor(activeSegmentColor),    // Active: Best Time
-                ProgressStyle.Segment(40).setColor(pendingSegmentColor)    // Pending: Make Time
-            )
-            else -> listOf(
-                ProgressStyle.Segment(20).setColor(completedSegmentColor), // Completed: Go to Mosque
-                ProgressStyle.Segment(40).setColor(completedSegmentColor), // Completed: Best Time
-                ProgressStyle.Segment(40).setColor(activeSegmentColor)     // Active: Make Time
-            )
-        }
+        // Android 16 Progress-Centric: Fixed segment colors for prayer urgency progression
+        // Each segment always has its designated color: Green → Yellow → Red
+        val segments = listOf(
+            ProgressStyle.Segment(20).setColor(greenSegmentColor),    // Segment 1: Go to Mosque (Green)
+            ProgressStyle.Segment(40).setColor(yellowSegmentColor),   // Segment 2: Best Time (Yellow)
+            ProgressStyle.Segment(40).setColor(redSegmentColor)       // Segment 3: Make Time (Red)
+        )
         
         // Android 16 Progress-Centric: Create meaningful progress points with proper milestone colors
         val progressStyle = NotificationCompat.ProgressStyle()
@@ -386,6 +377,8 @@ object GoogleSampleNotificationManager {
             "📊 Progress Details: ${progress}% | Phase: ${newPhase} ($phaseName) | Prayer Phase: '$prayerPhase' | Segments: ${segments.size}")
         android.util.Log.d("GoogleSampleNotificationManager", 
             "📊 Expected Position: At ${progress}% on progress bar | Tracker in segment ${newPhase + 1} ($phaseName)")
+        android.util.Log.d("GoogleSampleNotificationManager", 
+            "🎨 Segment Colors: Green (Go to Mosque) → Yellow (Best Time) → Red (Make Time)")
         
         // Android 16 Progress-Centric: Create concise, clear status text for status chip
         val shortCriticalText = when {
