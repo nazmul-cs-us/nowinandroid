@@ -65,6 +65,7 @@
       "Read(/tmp/**)",
       "Read(/tmp/**)",
       "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/live-updates/src/main/java/com/example/platform/ui/live_updates/**)",
+      "Read(/tmp/**)",
       "Read(/tmp/**)"
     ],
     "deny": [],

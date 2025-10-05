@@ -281,13 +281,25 @@ object GoogleSampleNotificationManager {
             1f,
         ).toArgb()
         
-        // 3-segment prayer phases: Go to Mosque (20%), Best Time (40%), Make Time (40%)
+        // Define distinct colors for each prayer phase milestone
+        val mosquePhaseColor = Color.valueOf(46f / 255f, 125f / 255f, 50f / 255f, 1f).toArgb()    // Green for Go to Mosque
+        val bestTimeColor = Color.valueOf(255f / 255f, 193f / 255f, 7f / 255f, 1f).toArgb()        // Amber for Best Time
+        val makeTimeColor = Color.valueOf(244f / 255f, 67f / 255f, 54f / 255f, 1f).toArgb()        // Red for Make Time
+        
+        // Choose appropriate tracker icon based on current progress phase
+        val trackerIcon = when {
+            progress <= 20 -> IconCompat.createWithResource(appContext, R.drawable.ic_mosque_milestone)      // Go to Mosque
+            progress <= 60 -> IconCompat.createWithResource(appContext, R.drawable.ic_prayer_mat_milestone)  // Best Time to Pray
+            else -> IconCompat.createWithResource(appContext, R.drawable.ic_clock_milestone)                 // Make Time for Prayer
+        }
+        
+        // 3-segment prayer phases with colored milestone points and meaningful tracker icon
         val progressStyle = NotificationCompat.ProgressStyle()
             .setProgressPoints(
                 listOf(
-                    ProgressStyle.Point(20).setColor(pointColor),  // End of "Go to Mosque" phase
-                    ProgressStyle.Point(60).setColor(pointColor),  // End of "Best Time" phase  
-                    ProgressStyle.Point(100).setColor(pointColor)  // End of "Make Time" phase
+                    ProgressStyle.Point(20).setColor(mosquePhaseColor),   // Go to Mosque - Green milestone
+                    ProgressStyle.Point(60).setColor(bestTimeColor),     // Best Time - Amber milestone  
+                    ProgressStyle.Point(100).setColor(makeTimeColor)     // Make Time - Red milestone
                 )
             ).setProgressSegments(
                 listOf(
@@ -295,9 +307,8 @@ object GoogleSampleNotificationManager {
                     ProgressStyle.Segment(40).setColor(segmentColor),  // Best Time to Pray (20-60%)
                     ProgressStyle.Segment(40).setColor(segmentColor)   // Make Time for Prayer (60-100%)
                 )
-            ).setProgressTrackerIcon(
-                IconCompat.createWithResource(appContext, R.drawable.ic_prayer)
-            ).setProgress(progress)
+            ).setProgressTrackerIcon(trackerIcon)  // Dynamic tracker icon that moves along the progress bar
+            .setProgress(progress)
         
         // Combine content and detailed message for complete prayer information
         val fullContent = if (detailedMessage.isNotEmpty()) {
@@ -313,9 +324,6 @@ object GoogleSampleNotificationManager {
             .setStyle(progressStyle) // Keep progress style for Live Updates
             .setOngoing(true)
             .setRequestPromotedOngoing(true) // CRITICAL: This enables Live Updates!
-            .setLargeIcon(
-                IconCompat.createWithResource(appContext, R.drawable.ic_prayer).toIcon(appContext)
-            )
             .build()
         
         notificationManager.notify(NOTIFICATION_ID, notification)
