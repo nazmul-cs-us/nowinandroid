@@ -407,17 +407,16 @@ object GoogleSampleNotificationManager {
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)  // Appropriate category
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)  // Public visibility for lock screen
         
-        // Apply alert behavior based on phase change detection
+        // Apply intelligent alert behavior: Only alert on phase changes, silent for progress updates
         if (shouldAlert) {
-            // Phase change: Allow normal alert behavior
-            android.util.Log.d("GoogleSampleNotificationManager", "🔔 Phase change - will allow normal alerts")
+            // Phase change or first notification: Allow normal alert behavior (sound/vibration)
+            android.util.Log.d("GoogleSampleNotificationManager", "🔔 Phase change detected - allowing alerts (sound/vibration)")
+            // Don't set silent - let the notification use normal channel settings for alerts
         } else {
-            // Silent update: Log but don't modify notification for now (to debug snoozing issue)
-            android.util.Log.d("GoogleSampleNotificationManager", "🔕 Progress update - temporarily allowing alerts to debug snoozing")
+            // Progress update within same phase: Make completely silent
+            android.util.Log.d("GoogleSampleNotificationManager", "🔕 Progress update - setting notification as SILENT (no sound/vibration)")
+            notificationBuilder.setSilent(true)  // Suppress sound and vibration for progress updates
         }
-        
-        // TEMPORARY: Disable .setSilent() to debug auto-snoozing issue
-        // We'll re-enable intelligent alerts once the notification stays visible
         
         val notification = notificationBuilder.build()
         
