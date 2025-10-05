@@ -688,7 +688,74 @@ class PrayerNotificationService : Service() {
                 val nextPrayer = prayerTimes.getNextPrayer()
                 
                 if (currentPrayer == null) {
-                    // No current prayer, show next prayer info
+                    // No current prayer - check if we're in cross-day period (Isha → Fajr)
+                    Log.d(TAG, "🌙 No current prayer detected - checking for cross-day Isha→Fajr period")
+                    
+                    if (nextPrayer?.name == "Fajr") {
+                        // We're likely in the overnight period between today's Isha and tomorrow's Fajr
+                        val todayIsha = prayerTimes.isha
+                        val now = LocalTime.now()
+                        
+                        Log.d(TAG, "📊 Cross-day scenario detected:")
+                        Log.d(TAG, "   Today's Isha: $todayIsha")
+                        Log.d(TAG, "   Tomorrow's Fajr: ${nextPrayer.time}")
+                        Log.d(TAG, "   Current time: $now")
+                        
+                        // Calculate cross-day progress from today's Isha to tomorrow's Fajr
+                        val timeUntilFajr = Duration.between(now, LocalTime.MAX) + Duration.between(LocalTime.MIN, nextPrayer.time)
+                        val totalIshaToFajr = Duration.between(todayIsha, LocalTime.MAX) + Duration.between(LocalTime.MIN, nextPrayer.time)
+                        val elapsedSinceIsha = Duration.between(todayIsha, now)
+                        
+                        if (totalIshaToFajr.toMinutes() > 0) {
+                            val progressPercentage = (elapsedSinceIsha.toMinutes().toFloat() / totalIshaToFajr.toMinutes().toFloat() * 100f).coerceIn(0f, 100f)
+                            
+                            Log.d(TAG, "✅ Cross-day progress calculation:")
+                            Log.d(TAG, "   Time until Fajr: ${timeUntilFajr.toMinutes()} minutes")
+                            Log.d(TAG, "   Total Isha→Fajr: ${totalIshaToFajr.toMinutes()} minutes")
+                            Log.d(TAG, "   Elapsed since Isha: ${elapsedSinceIsha.toMinutes()} minutes")
+                            Log.d(TAG, "   Progress: ${progressPercentage}%")
+                            
+                            // Create a virtual Isha prayer object to represent the current prayer period
+                            val virtualIshaPrayer = PrayerTime("Isha", todayIsha, isNext = false, isCurrently = true)
+                            
+                            // Determine the prayer phase based on progress
+                            val prayerPhase = when {
+                                progressPercentage <= 20 -> PrayerPhase.GO_TO_MOSQUE
+                                progressPercentage <= 60 -> PrayerPhase.BEST_TIME
+                                else -> PrayerPhase.MAKE_TIME
+                            }
+                            
+                            // Format title based on prayer phase (same logic as regular prayers)
+                            val title = when (prayerPhase) {
+                                PrayerPhase.GO_TO_MOSQUE -> "Go to Mosque for Isha"
+                                PrayerPhase.BEST_TIME -> "Best Time to Pray Isha"
+                                PrayerPhase.MAKE_TIME -> "Make Time for Isha"
+                            }
+                            
+                            // Show time elapsed since Isha (not countdown to Fajr)
+                            val elapsedText = formatElapsedTime(elapsedSinceIsha.toMinutes())
+                            val content = "$elapsedText since Isha"
+                            
+                            // Detailed message can still show next prayer info
+                            val detailedMessage = buildNextPrayerMessage(prayerTimes, nextPrayer)
+                            
+                            // Map prayer phase to string for GoogleSampleNotificationManager
+                            val phaseString = when (prayerPhase) {
+                                PrayerPhase.GO_TO_MOSQUE -> "GO_TO_MOSQUE"
+                                PrayerPhase.BEST_TIME -> "BEST_TIME"
+                                PrayerPhase.MAKE_TIME -> "MAKE_TIME"
+                            }
+                            
+                            Log.d(TAG, "🕌 Cross-day Isha prayer notification:")
+                            Log.d(TAG, "   Title: $title")
+                            Log.d(TAG, "   Content: $content") 
+                            Log.d(TAG, "   Phase: $phaseString (${progressPercentage}%)")
+                            
+                            return@withContext Quintuple(title, content, detailedMessage, phaseString, progressPercentage.toInt())
+                        }
+                    }
+                    
+                    // Fallback: Regular next prayer info with static progress
                     val title = "⏰ Next Prayer: ${nextPrayer?.name ?: "Unknown"}"
                     val content = nextPrayer?.let { "Next prayer in ${formatTimeRemaining(it.time)}" } ?: "Prayer times calculated"
                     val detailedMessage = buildNextPrayerMessage(prayerTimes, nextPrayer)
@@ -758,31 +825,57 @@ class PrayerNotificationService : Service() {
             Log.d(TAG, "Prayer time has passed 2-hour threshold, calculating progress towards next prayer")
             // Prayer time has passed, calculate progress towards next prayer
             if (nextPrayer != null) {
-                val timeUntilNext = Duration.between(now, nextPrayer.time)
-                Log.d(TAG, "Time until next prayer: ${timeUntilNext.toMinutes()} minutes")
                 
-                if (timeUntilNext.isNegative.not()) {
-                    // Calculate progress based on time since last prayer
-                    val totalTime = Duration.between(prayerStart, nextPrayer.time)
-                    val elapsedTime = Duration.between(prayerStart, now)
+                // CROSS-DAY CALCULATION FIX: Handle Isha → Fajr overnight period
+                val timeUntilNext: Duration
+                val totalTime: Duration
+                val elapsedTime: Duration
+                
+                if (nextPrayer.time.isBefore(now)) {
+                    // Next prayer is tomorrow (cross-day case: Isha → Fajr)
+                    Log.d(TAG, "🌙 CROSS-DAY DETECTED: Current prayer is today's ${currentPrayer.name}, next prayer is tomorrow's ${nextPrayer.name}")
                     
-                    Log.d(TAG, "Total time between prayers: ${totalTime.toMinutes()} minutes")
-                    Log.d(TAG, "Elapsed time since current prayer: ${elapsedTime.toMinutes()} minutes")
+                    // Time until tomorrow's Fajr = time until midnight + time from midnight to Fajr
+                    timeUntilNext = Duration.between(now, LocalTime.MAX) + Duration.between(LocalTime.MIN, nextPrayer.time)
                     
-                    if (totalTime.toMinutes() > 0) {
-                        val progressPercentage = (elapsedTime.toMinutes().toFloat() / totalTime.toMinutes().toFloat() * 100f).coerceIn(0f, 100f)
-                        Log.d(TAG, "Calculated progress: ${progressPercentage}% (MAKE_TIME phase)")
-                        
-                        val prayerProgress = PrayerProgress(
-                            elapsedMinutes = elapsedTime.toMinutes(),
-                            remainingMinutes = timeUntilNext.toMinutes(),
-                            totalDuration = totalTime.toMinutes(),
-                            progressPercentage = progressPercentage,
-                            phase = PrayerPhase.MAKE_TIME // Since prayer time has passed
-                        )
-                        Log.d(TAG, "✓ Returning prayer progress: $prayerProgress")
-                        return prayerProgress
-                    }
+                    // Total time from today's Isha to tomorrow's Fajr = time until midnight + time from midnight to Fajr
+                    totalTime = Duration.between(prayerStart, LocalTime.MAX) + Duration.between(LocalTime.MIN, nextPrayer.time)
+                    
+                    // Elapsed time since today's Isha
+                    elapsedTime = Duration.between(prayerStart, now)
+                    
+                    Log.d(TAG, "⏰ Cross-day calculation:")
+                    Log.d(TAG, "   Time until tomorrow's ${nextPrayer.name}: ${timeUntilNext.toMinutes()} minutes")
+                    Log.d(TAG, "   Total Isha→Fajr duration: ${totalTime.toMinutes()} minutes") 
+                    Log.d(TAG, "   Elapsed since today's ${currentPrayer.name}: ${elapsedTime.toMinutes()} minutes")
+                    
+                } else {
+                    // Next prayer is today (normal case)
+                    timeUntilNext = Duration.between(now, nextPrayer.time)
+                    totalTime = Duration.between(prayerStart, nextPrayer.time)
+                    elapsedTime = Duration.between(prayerStart, now)
+                    
+                    Log.d(TAG, "📅 Same-day calculation:")
+                    Log.d(TAG, "   Time until next prayer: ${timeUntilNext.toMinutes()} minutes")
+                    Log.d(TAG, "   Total time between prayers: ${totalTime.toMinutes()} minutes")
+                    Log.d(TAG, "   Elapsed time since current prayer: ${elapsedTime.toMinutes()} minutes")
+                }
+                
+                if (totalTime.toMinutes() > 0) {
+                    val progressPercentage = (elapsedTime.toMinutes().toFloat() / totalTime.toMinutes().toFloat() * 100f).coerceIn(0f, 100f)
+                    Log.d(TAG, "🎯 Calculated progress: ${progressPercentage}% (MAKE_TIME phase)")
+                    
+                    val prayerProgress = PrayerProgress(
+                        elapsedMinutes = elapsedTime.toMinutes(),
+                        remainingMinutes = timeUntilNext.toMinutes(),
+                        totalDuration = totalTime.toMinutes(),
+                        progressPercentage = progressPercentage,
+                        phase = PrayerPhase.MAKE_TIME // Since prayer time has passed
+                    )
+                    Log.d(TAG, "✅ Returning cross-day prayer progress: $prayerProgress")
+                    return prayerProgress
+                } else {
+                    Log.w(TAG, "⚠️ Invalid total time calculation: ${totalTime.toMinutes()} minutes")
                 }
             }
             
