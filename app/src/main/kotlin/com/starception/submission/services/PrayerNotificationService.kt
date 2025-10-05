@@ -404,17 +404,8 @@ class PrayerNotificationService : Service() {
                         Log.d(TAG, "🚀 Device supports Live Updates - using separate notification")
                         Log.d(TAG, "Has promotable characteristics: ${PrayerNotificationManager.hasPromotableCharacteristics()}")
                         
-                        // Post initial Live Update notification using PrayerNotificationManager
-                        if (PrayerNotificationManager.isInitialized()) {
-                            PrayerNotificationManager.updatePrayerProgressSmart(
-                                prayerName = "Prayer",
-                                progress = 0,
-                                title = "Prayer Time Tracker",
-                                content = "Live Updates Active",
-                                detailedMessage = "Real-time prayer time tracking enabled"
-                            )
-                            Log.d(TAG, "🎯 Posted separate Live Update notification via manager")
-                        }
+                        // Don't post initial notification - Google system will handle it
+                        Log.d(TAG, "🎯 Initial notification will be posted by Google Live Update system")
                     } else {
                         Log.w(TAG, "Device does not support Live Updates, using standard notifications")
                     }
@@ -523,21 +514,8 @@ class PrayerNotificationService : Service() {
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error updating prayer notification", e)
-                    // Fallback Live Update notification on error using PrayerNotificationManager
-                    try {
-                        if (PrayerNotificationManager.isInitialized()) {
-                            PrayerNotificationManager.updatePrayerProgressSmart(
-                                prayerName = "Prayer",
-                                progress = 0,
-                                title = "Prayer Tracker",
-                                content = "Service Active",
-                                detailedMessage = "Error occurred, using fallback mode"
-                            )
-                            Log.d(TAG, "🔄 Posted fallback Live Update notification via manager")
-                        }
-                    } catch (fallbackError: Exception) {
-                        Log.e(TAG, "Live Update fallback failed: ${fallbackError.message}")
-                    }
+                    // Don't create fallback notifications - user wants only single AOD notification
+                    Log.d(TAG, "⚠️ Error occurred but not creating fallback notification to avoid duplicates")
                 }
                 
                 // SMART UPDATE STRATEGY - Edit this logic to change update timing
@@ -603,52 +581,33 @@ class PrayerNotificationService : Service() {
                 Log.d(TAG, "✓ Prayer data retrieved in ${prayerDataDuration}ms")
                 
                 if (prayerData != null) {
-                    val (title, content, detailedMessage) = prayerData
+                    val (title, content, detailedMessage, prayerPhase, realProgress) = prayerData
                     
-                    // Quick progress calculation
-                    val progress = calculateNotificationProgress(prayerData)
+                    // Use the REAL progress percentage from prayer calculation, not the fake hour-based one
+                    val progress = realProgress
                     val currentPhase = getCurrentPrayerPhase(progress)
                     
-                    // Update notification using Google's proven Live Update system
+                    Log.d(TAG, "🎯 Using REAL prayer progress: ${progress}% (phase: $prayerPhase)")
+                    
+                    // ONLY use Google's proven Live Update system for Android 16+
                     if (Build.VERSION.SDK_INT >= 35) {
                         try {
                             GoogleSampleNotificationManager.postPrayerNotification(
                                 title = title,
                                 content = content,
                                 detailedMessage = detailedMessage,
-                                progress = progress
-                            )
-                            Log.d(TAG, "🧪 Posted prayer notification via Google Live Update system")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to post via Google system, falling back: ${e.message}")
-                            // Fallback to PrayerNotificationManager
-                            PrayerNotificationManager.updatePrayerProgressSmart(
-                                prayerName = if (content.contains(" since ")) {
-                                    content.split(" since ").lastOrNull()?.split(" • ")?.firstOrNull() ?: "Prayer"
-                                } else {
-                                    "Prayer"
-                                },
                                 progress = progress,
-                                previousPhase = previousPrayerPhase,
-                                title = title,
-                                content = content,
-                                detailedMessage = detailedMessage
+                                prayerPhase = prayerPhase
                             )
+                            Log.d(TAG, "🧪 Posted SINGLE prayer notification via Google Live Update system with phase: $prayerPhase, real progress: ${progress}%")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Google Live Update failed: ${e.message}")
+                            // Don't create fallback notifications - better to have no notification than duplicates
                         }
                     } else {
-                        // For older Android versions, use PrayerNotificationManager
-                        PrayerNotificationManager.updatePrayerProgressSmart(
-                            prayerName = if (content.contains(" since ")) {
-                                content.split(" since ").lastOrNull()?.split(" • ")?.firstOrNull() ?: "Prayer"
-                            } else {
-                                "Prayer"
-                            },
-                            progress = progress,
-                            previousPhase = previousPrayerPhase,
-                            title = title,
-                            content = content,
-                            detailedMessage = detailedMessage
-                        )
+                        Log.d(TAG, "⚠️ Android 16+ required for Live Update notifications")
+                        // For older Android versions, don't create any notification
+                        // The user specifically wants Android 16 Live Update functionality
                     }
                     
                     previousPrayerPhase = currentPhase
@@ -656,62 +615,28 @@ class PrayerNotificationService : Service() {
                     val totalDuration = System.currentTimeMillis() - updateStartTime
                     Log.d(TAG, "✓ Notification updated successfully in ${totalDuration}ms")
                 } else {
-                    // Quick Live Update fallback using PrayerNotificationManager
-                    if (PrayerNotificationManager.isInitialized()) {
-                        PrayerNotificationManager.updatePrayerProgressSmart(
-                            prayerName = "Prayer",
-                            progress = 50,
-                            title = "Prayer Tracker",
-                            content = "Quick Update",
-                            detailedMessage = "Using fallback mode"
-                        )
-                        Log.d(TAG, "📱 Using Live Update fallback notification via manager")
-                    }
+                    // Don't create quick fallback - user wants only single AOD notification
+                    Log.d(TAG, "📱 Skipping quick fallback to avoid duplicate notifications")
                 }
                 
             } ?: run {
                 // Timeout occurred - use emergency Live Update fallback (separate from foreground service)
                 Log.w(TAG, "⚠️ Update timed out after 5s - using emergency Live Update fallback")
-                try {
-                    if (PrayerNotificationManager.isInitialized()) {
-                        PrayerNotificationManager.updatePrayerProgressSmart(
-                            prayerName = "Prayer",
-                            progress = 0,
-                            title = "Prayer Tracker",
-                            content = "Service Running",
-                            detailedMessage = "Update timed out, using emergency mode"
-                        )
-                        Log.d(TAG, "🚨 Posted emergency Live Update notification via manager")
-                    }
-                } catch (emergencyError: Exception) {
-                    Log.e(TAG, "Emergency Live Update notification failed: ${emergencyError.message}")
-                }
+                // Don't create emergency fallback - user wants only single AOD notification
+                Log.d(TAG, "🚨 Update timed out but not creating emergency notification to avoid duplicates")
             }
             
         } catch (e: Exception) {
             Log.e(TAG, "Error in update: ${e.message}")
-            try {
-                // Final fallback Live Update notification using PrayerNotificationManager
-                if (PrayerNotificationManager.isInitialized()) {
-                    PrayerNotificationManager.updatePrayerProgressSmart(
-                        prayerName = "Prayer",
-                        progress = 0,
-                        title = "Prayer Service",
-                        content = "Active",
-                        detailedMessage = "Service encountered error but remains active"
-                    )
-                    Log.d(TAG, "💾 Posted final fallback Live Update notification via manager")
-                }
-            } catch (fallbackError: Exception) {
-                Log.e(TAG, "Final Live Update fallback also failed: ${fallbackError.message}")
-            }
+            // Don't create final fallback - user wants only single AOD notification
+            Log.d(TAG, "💾 Service error but not creating final fallback to avoid duplicates")
         }
     }
     
     /**
      * Get current prayer data for notification with ANR prevention
      */
-    private suspend fun getCurrentPrayerData(): Triple<String, String, String>? {
+    private suspend fun getCurrentPrayerData(): Quintuple<String, String, String, String, Int>? {
         return withContext(Dispatchers.IO) { // Ensure background thread
             try {
                 Log.d(TAG, "=== GETTING PRAYER DATA (BACKGROUND THREAD) ===")
@@ -722,7 +647,7 @@ class PrayerNotificationService : Service() {
                 }
                 if (settings == null) {
                     Log.w(TAG, "Settings unavailable, using fallback")
-                    return@withContext Triple("Prayer Time Tracker", "Loading...", "Initializing prayer data")
+                    return@withContext Quintuple("Prayer Time Tracker", "Loading...", "Initializing prayer data", "MAKE_TIME", 25)
                 }
                 
                 // ROBUST LOGGING: Check what settings we're actually using for calculation
@@ -738,7 +663,7 @@ class PrayerNotificationService : Service() {
                 val location = settings.location
                 if (location == null) {
                     Log.w(TAG, "No location available")
-                    return@withContext Triple("Prayer Time Tracker", "Location needed", "Grant location permission to see prayer times")
+                    return@withContext Quintuple("Prayer Time Tracker", "Location needed", "Grant location permission to see prayer times", "MAKE_TIME", 30)
                 }
                 
                 Log.d(TAG, "Location: ${location.getDisplayName()}")
@@ -753,7 +678,7 @@ class PrayerNotificationService : Service() {
                 
                 if (prayerTimes == null) {
                     Log.w(TAG, "Prayer calculation timed out after ${calculationTime}ms")
-                    return@withContext Triple("Prayer Time Tracker", "Calculating...", "Prayer times being calculated")
+                    return@withContext Quintuple("Prayer Time Tracker", "Calculating...", "Prayer times being calculated", "MAKE_TIME", 40)
                 }
                 
                 Log.d(TAG, "✓ Prayer times calculated in ${calculationTime}ms")
@@ -767,7 +692,7 @@ class PrayerNotificationService : Service() {
                     val title = "⏰ Next Prayer: ${nextPrayer?.name ?: "Unknown"}"
                     val content = nextPrayer?.let { "Next prayer in ${formatTimeRemaining(it.time)}" } ?: "Prayer times calculated"
                     val detailedMessage = buildNextPrayerMessage(prayerTimes, nextPrayer)
-                    return@withContext Triple(title, content, detailedMessage)
+                    return@withContext Quintuple(title, content, detailedMessage, "MAKE_TIME", 10)
                 }
                 
                 // Calculate prayer time progress
@@ -782,11 +707,19 @@ class PrayerNotificationService : Service() {
                 val content = buildPrayerProgressContent(prayerProgress, currentPrayer)
                 val detailedMessage = buildDetailedPrayerProgressMessage(prayerTimes, currentPrayer, nextPrayer, prayerProgress)
                 
-                Triple(title, content, detailedMessage)
+                // Include prayer phase for accurate notification display
+                val phaseString = when (prayerProgress.phase) {
+                    PrayerPhase.GO_TO_MOSQUE -> "GO_TO_MOSQUE"
+                    PrayerPhase.BEST_TIME -> "BEST_TIME"
+                    PrayerPhase.MAKE_TIME -> "MAKE_TIME"
+                }
+                
+                // Return tuple with phase and real progress information for GoogleSampleNotificationManager
+                Quintuple(title, content, detailedMessage, phaseString, prayerProgress.progressPercentage.toInt())
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting prayer data: ${e.message}")
-                Triple("Prayer Time Tracker", "Service active", "Prayer time updates running")
+                Quintuple("Prayer Time Tracker", "Service active", "Prayer time updates running", "MAKE_TIME", 50)
             }
         }
     }
@@ -942,6 +875,12 @@ class PrayerNotificationService : Service() {
     )
     
     /**
+     * Data class to hold notification content with prayer phase information
+     */
+    private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+    private data class Quintuple<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)
+    
+    /**
      * PRAYER PHASES: The three stages of prayer time
      * 
      * These phases determine the notification message and color.
@@ -1010,27 +949,11 @@ class PrayerNotificationService : Service() {
     }
     
     /**
-     * Calculate progress with lightweight fallback - no heavy operations
+     * Extract real progress from prayer data - no longer needed since we get it directly
      */
-    private fun calculateNotificationProgress(prayerData: Triple<String, String, String>): Int {
-        return try {
-            // Simple time-based progress fallback to avoid any blocking operations
-            val now = LocalTime.now()
-            val currentHour = now.hour
-            val currentMinute = now.minute
-            
-            // Simple hour-based progress (0-100%) to avoid any database/calculation delays
-            // This provides a basic progress indication without any blocking operations
-            val hourProgress = ((currentHour % 12) * 8) + (currentMinute / 8) // 0-100 range based on 12-hour cycle
-            val safeProgress = hourProgress.coerceIn(0, 100)
-            
-            Log.d(TAG, "Using lightweight progress calculation: ${safeProgress}% (hour=${currentHour}, min=${currentMinute})")
-            safeProgress
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in lightweight progress calculation: ${e.message}")
-            50 // Default middle progress
-        }
+    private fun calculateNotificationProgress(prayerData: Quintuple<String, String, String, String, Int>): Int {
+        // Return the real progress percentage that was calculated by the prayer system
+        return prayerData.fifth
     }
     
 

@@ -38,6 +38,9 @@ object GoogleSampleNotificationManager {
     const val CHANNEL_ID = "google_live_updates_channel_id"
     private const val CHANNEL_NAME = "Google Live Updates Test"
     private const val NOTIFICATION_ID = 9999
+    
+    // Track current prayer phase to detect phase changes
+    private var currentPhase: Int = -1 // -1 = not set, 0 = Go to Mosque, 1 = Best Time, 2 = Make Time
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun initialize(context: Context, notifManager: NotificationManager) {
@@ -265,23 +268,71 @@ object GoogleSampleNotificationManager {
     }
     
     @RequiresApi(35) // Android 16+ (BAKLAVA = 35)
-    fun postPrayerNotification(title: String, content: String, detailedMessage: String = "", progress: Int) {
-        android.util.Log.d("GoogleSampleNotificationManager", "Posting prayer notification with Google's Live Update system...")
+    fun postPrayerNotification(title: String, content: String, detailedMessage: String = "", progress: Int, prayerPhase: String = "") {
+        android.util.Log.d("GoogleSampleNotificationManager", "Posting Progress-Centric prayer notification...")
         
-        val pointColor = Color.valueOf(
-            236f / 255f, // Normalize red value to be between 0.0 and 1.0
-            183f / 255f, // Normalize green value to be between 0.0 and 1.0
-            255f / 255f, // Normalize blue value to be between 0.0 and 1.0
-            1f,
-        ).toArgb()
-        val segmentColor = Color.valueOf(
-            134f / 255f, // Normalize red value to be between 0.0 and 1.0
-            247f / 255f, // Normalize green value to be between 0.0 and 1.0
-            250f / 255f, // Normalize blue value to be between 0.0 and 1.0
-            1f,
-        ).toArgb()
+        // Determine current prayer phase - use actual phase from prayer service if provided
+        val newPhase = if (prayerPhase.isNotEmpty()) {
+            when (prayerPhase) {
+                "GO_TO_MOSQUE" -> 0
+                "BEST_TIME" -> 1 
+                "MAKE_TIME" -> 2
+                else -> when {
+                    progress <= 20 -> 0  // Fallback to progress-based if unknown phase
+                    progress <= 60 -> 1
+                    else -> 2
+                }
+            }
+        } else {
+            // Fallback to old logic if no phase provided
+            when {
+                progress <= 20 -> 0  // Go to Mosque (0-20%)
+                progress <= 60 -> 1  // Best Time to Pray (20-60%)
+                else -> 2            // Make Time for Prayer (60-100%)
+            }
+        }
         
-        // Define distinct colors for each prayer phase milestone
+        // Check if this is a new prayer cycle (progress jumped backwards significantly)
+        // This happens when we move from one prayer to the next
+        val isNewPrayerCycle = currentPhase != -1 && newPhase < currentPhase
+        if (isNewPrayerCycle) {
+            android.util.Log.d("GoogleSampleNotificationManager", 
+                "🔄 NEW PRAYER CYCLE: Phase reset from ${currentPhase} to ${newPhase}")
+            currentPhase = -1  // Reset to allow first phase to alert
+        }
+        
+        // Check if this is a phase change (should alert) or silent update
+        val isPhaseChange = currentPhase != -1 && currentPhase != newPhase
+        val isFirstNotification = currentPhase == -1
+        val shouldAlert = isPhaseChange || isFirstNotification
+        
+        // Log phase change detection
+        when {
+            isFirstNotification -> {
+                val phaseNames = arrayOf("Go to Mosque", "Best Time", "Make Time")
+                android.util.Log.d("GoogleSampleNotificationManager", 
+                    "🔔 FIRST NOTIFICATION: Starting with ${phaseNames[newPhase]} phase (will alert)")
+            }
+            isPhaseChange -> {
+                val phaseNames = arrayOf("Go to Mosque", "Best Time", "Make Time")
+                android.util.Log.d("GoogleSampleNotificationManager", 
+                    "🔔 PHASE CHANGE DETECTED: ${phaseNames[currentPhase]} → ${phaseNames[newPhase]} (will alert)")
+            }
+            else -> {
+                android.util.Log.d("GoogleSampleNotificationManager", 
+                    "🔕 Silent update: Phase ${newPhase}, Progress ${progress}% (no alert)")
+            }
+        }
+        
+        // Update tracked phase
+        currentPhase = newPhase
+        
+        // Android 16 Progress-Centric: Define meaningful colors that reflect prayer journey states
+        val activeSegmentColor = Color.valueOf(0f / 255f, 150f / 255f, 136f / 255f, 1f).toArgb()     // Teal - Active phase
+        val completedSegmentColor = Color.valueOf(76f / 255f, 175f / 255f, 80f / 255f, 1f).toArgb()  // Green - Completed phase
+        val pendingSegmentColor = Color.valueOf(189f / 255f, 189f / 255f, 189f / 255f, 1f).toArgb()  // Gray - Pending phase
+        
+        // Define distinct milestone colors for clear visual hierarchy
         val mosquePhaseColor = Color.valueOf(46f / 255f, 125f / 255f, 50f / 255f, 1f).toArgb()    // Green for Go to Mosque
         val bestTimeColor = Color.valueOf(255f / 255f, 193f / 255f, 7f / 255f, 1f).toArgb()        // Amber for Best Time
         val makeTimeColor = Color.valueOf(244f / 255f, 67f / 255f, 54f / 255f, 1f).toArgb()        // Red for Make Time
@@ -293,40 +344,91 @@ object GoogleSampleNotificationManager {
             else -> IconCompat.createWithResource(appContext, R.drawable.ic_clock_milestone)                 // Make Time for Prayer
         }
         
-        // 3-segment prayer phases with colored milestone points and meaningful tracker icon
+        // Android 16 Progress-Centric: Dynamic segment coloring based on current progress
+        val segments = when {
+            progress <= 20 -> listOf(
+                ProgressStyle.Segment(20).setColor(activeSegmentColor),    // Active: Go to Mosque
+                ProgressStyle.Segment(40).setColor(pendingSegmentColor),   // Pending: Best Time
+                ProgressStyle.Segment(40).setColor(pendingSegmentColor)    // Pending: Make Time
+            )
+            progress <= 60 -> listOf(
+                ProgressStyle.Segment(20).setColor(completedSegmentColor), // Completed: Go to Mosque
+                ProgressStyle.Segment(40).setColor(activeSegmentColor),    // Active: Best Time
+                ProgressStyle.Segment(40).setColor(pendingSegmentColor)    // Pending: Make Time
+            )
+            else -> listOf(
+                ProgressStyle.Segment(20).setColor(completedSegmentColor), // Completed: Go to Mosque
+                ProgressStyle.Segment(40).setColor(completedSegmentColor), // Completed: Best Time
+                ProgressStyle.Segment(40).setColor(activeSegmentColor)     // Active: Make Time
+            )
+        }
+        
+        // Android 16 Progress-Centric: Create meaningful progress points with proper milestone colors
         val progressStyle = NotificationCompat.ProgressStyle()
             .setProgressPoints(
                 listOf(
-                    ProgressStyle.Point(20).setColor(mosquePhaseColor),   // Go to Mosque - Green milestone
-                    ProgressStyle.Point(60).setColor(bestTimeColor),     // Best Time - Amber milestone  
-                    ProgressStyle.Point(100).setColor(makeTimeColor)     // Make Time - Red milestone
+                    ProgressStyle.Point(20).setColor(mosquePhaseColor),   // Go to Mosque milestone (0-20%)
+                    ProgressStyle.Point(60).setColor(bestTimeColor),     // Best Time milestone (20-60%) 
+                    ProgressStyle.Point(100).setColor(makeTimeColor)     // Make Time milestone (60-100%)
                 )
-            ).setProgressSegments(
-                listOf(
-                    ProgressStyle.Segment(20).setColor(segmentColor),  // Go to Mosque (0-20%)
-                    ProgressStyle.Segment(40).setColor(segmentColor),  // Best Time to Pray (20-60%)
-                    ProgressStyle.Segment(40).setColor(segmentColor)   // Make Time for Prayer (60-100%)
-                )
-            ).setProgressTrackerIcon(trackerIcon)  // Dynamic tracker icon that moves along the progress bar
-            .setProgress(progress)
+            )
+            .setProgressSegments(segments)  // Dynamic segment coloring
+            .setProgressTrackerIcon(trackerIcon)  // Phase-appropriate tracker icon
+            .setProgress(progress)  // This positions the tracker at the exact progress percentage
         
-        // Combine content and detailed message for complete prayer information
+        val phaseName = when (newPhase) {
+            0 -> "Go to Mosque"
+            1 -> "Best Time"
+            2 -> "Make Time"
+            else -> "Unknown"
+        }
+        android.util.Log.d("GoogleSampleNotificationManager", 
+            "📊 Progress Details: ${progress}% | Phase: ${newPhase} ($phaseName) | Prayer Phase: '$prayerPhase' | Segments: ${segments.size}")
+        android.util.Log.d("GoogleSampleNotificationManager", 
+            "📊 Expected Position: At ${progress}% on progress bar | Tracker in segment ${newPhase + 1} ($phaseName)")
+        
+        // Android 16 Progress-Centric: Create concise, clear status text for status chip
+        val shortCriticalText = when {
+            progress <= 20 -> "🕌 Go to Mosque"
+            progress <= 60 -> "🧎 Best Time"
+            else -> "⏰ Make Time"
+        }
+        
+        // Android 16 Progress-Centric: Combine content for clear journey communication
         val fullContent = if (detailedMessage.isNotEmpty()) {
             "$content\n$detailedMessage"
         } else {
             content
         }
         
-        val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
+        // Android 16 Progress-Centric: Build notification with recommended practices
+        val notificationBuilder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_prayer)
-            .setContentTitle(title)
-            .setContentText(fullContent)
-            .setStyle(progressStyle) // Keep progress style for Live Updates
+            .setContentTitle(title)  // Clear state of journey
+            .setContentText(fullContent)  // Time information and next step
+            .setStyle(progressStyle)  // Progress-centric style
             .setOngoing(true)
-            .setRequestPromotedOngoing(true) // CRITICAL: This enables Live Updates!
-            .build()
+            .setRequestPromotedOngoing(true)  // Enable Live Updates
+            .setShortCriticalText(shortCriticalText)  // Status chip text for status bar
+            .setUsesChronometer(false)  // Don't use chronometer for prayer tracking
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)  // Appropriate category
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)  // Public visibility for lock screen
+        
+        // Apply alert behavior based on phase change detection
+        if (shouldAlert) {
+            // Phase change: Allow normal alert behavior
+            android.util.Log.d("GoogleSampleNotificationManager", "🔔 Phase change - will allow normal alerts")
+        } else {
+            // Silent update: Log but don't modify notification for now (to debug snoozing issue)
+            android.util.Log.d("GoogleSampleNotificationManager", "🔕 Progress update - temporarily allowing alerts to debug snoozing")
+        }
+        
+        // TEMPORARY: Disable .setSilent() to debug auto-snoozing issue
+        // We'll re-enable intelligent alerts once the notification stays visible
+        
+        val notification = notificationBuilder.build()
         
         notificationManager.notify(NOTIFICATION_ID, notification)
-        android.util.Log.d("GoogleSampleNotificationManager", "Posted prayer notification: $title - $fullContent ($progress%)")
+        android.util.Log.d("GoogleSampleNotificationManager", "Posted Progress-Centric prayer notification: $title - $shortCriticalText ($progress%)")
     }
 }
