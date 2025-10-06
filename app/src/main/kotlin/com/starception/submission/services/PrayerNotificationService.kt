@@ -997,7 +997,37 @@ class PrayerNotificationService : Service() {
             else -> PrayerPhase.MAKE_TIME    // Halfway to end: Make time
         }
         
-        val progressPercentage = (elapsedMinutes.toFloat() / totalDuration.toFloat() * 100).coerceIn(0f, 100f)
+        // 3-SEGMENT PROGRESS CALCULATION to match notification segments
+        // Segment 1 (Go to Mosque): 0-20% = First 20 minutes
+        // Segment 2 (Best Time): 20-60% = 20min to halfway point  
+        // Segment 3 (Make Time): 60-100% = Halfway to end
+        val progressPercentage = when (progressPhase) {
+            PrayerPhase.GO_TO_MOSQUE -> {
+                // First 20 minutes maps to 0-20% progress
+                val segmentProgress = (elapsedMinutes.toFloat() / 20f).coerceIn(0f, 1f)
+                (segmentProgress * 20f).coerceIn(0f, 20f)
+            }
+            PrayerPhase.BEST_TIME -> {
+                // From 20 minutes to halfway point maps to 20-60% progress
+                val halfway = totalDuration / 2
+                val segmentElapsed = (elapsedMinutes - 20).coerceAtLeast(0)
+                val segmentDuration = (halfway - 20).coerceAtLeast(1) // Avoid division by zero
+                val segmentProgress = (segmentElapsed.toFloat() / segmentDuration.toFloat()).coerceIn(0f, 1f)
+                (20f + segmentProgress * 40f).coerceIn(20f, 60f)
+            }
+            PrayerPhase.MAKE_TIME -> {
+                // From halfway to end maps to 60-100% progress
+                val halfway = totalDuration / 2
+                val segmentElapsed = (elapsedMinutes - halfway).coerceAtLeast(0)
+                val segmentDuration = (totalDuration - halfway).coerceAtLeast(1) // Avoid division by zero
+                val segmentProgress = (segmentElapsed.toFloat() / segmentDuration.toFloat()).coerceIn(0f, 1f)
+                (60f + segmentProgress * 40f).coerceIn(60f, 100f)
+            }
+        }
+        
+        Log.d(TAG, "🎯 3-SEGMENT PROGRESS CALCULATION:")
+        Log.d(TAG, "   Elapsed: ${elapsedMinutes}m, Total: ${totalDuration}m, Phase: $progressPhase")
+        Log.d(TAG, "   Progress: ${progressPercentage.toInt()}% (${progressPhase.name})")
         
         return PrayerProgress(
             elapsedMinutes = elapsedMinutes,
