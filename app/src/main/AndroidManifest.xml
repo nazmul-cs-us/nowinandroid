@@ -75,6 +75,15 @@
             android:foregroundServiceType="dataSync"
             android:stopWithTask="false" />
             <!-- Using dataSync type instead of specialUse to avoid restrictions -->
+            
+        <!-- Prayer Action Receiver for notification actions like "Mark as Prayed" -->
+        <receiver
+            android:name=".util.PrayerActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.starception.submission.MARK_AS_PRAYED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Disable Firebase analytics by default. This setting is overwritten for the `prod`
         flavor -->

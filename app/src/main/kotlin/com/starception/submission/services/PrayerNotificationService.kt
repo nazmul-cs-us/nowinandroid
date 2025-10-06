@@ -581,7 +581,8 @@ class PrayerNotificationService : Service() {
                 Log.d(TAG, "✓ Prayer data retrieved in ${prayerDataDuration}ms")
                 
                 if (prayerData != null) {
-                    val (title, content, detailedMessage, prayerPhase, realProgress) = prayerData
+                    val (title, content, detailedMessage, prayerPhase, realProgress, prayerInfo) = prayerData
+                    val (prayerName, prayerTime) = prayerInfo
                     
                     // Use the REAL progress percentage from prayer calculation, not the fake hour-based one
                     val progress = realProgress
@@ -597,7 +598,9 @@ class PrayerNotificationService : Service() {
                                 content = content,
                                 detailedMessage = detailedMessage,
                                 progress = progress,
-                                prayerPhase = prayerPhase
+                                prayerPhase = prayerPhase,
+                                prayerName = prayerName,
+                                prayerTime = prayerTime
                             )
                             Log.d(TAG, "🧪 Posted SINGLE prayer notification via Google Live Update system with phase: $prayerPhase, real progress: ${progress}%")
                         } catch (e: Exception) {
@@ -636,7 +639,7 @@ class PrayerNotificationService : Service() {
     /**
      * Get current prayer data for notification with ANR prevention
      */
-    private suspend fun getCurrentPrayerData(): Quintuple<String, String, String, String, Int>? {
+    private suspend fun getCurrentPrayerData(): Sextuple<String, String, String, String, Int, Pair<String, String>>? {
         return withContext(Dispatchers.IO) { // Ensure background thread
             try {
                 Log.d(TAG, "=== GETTING PRAYER DATA (BACKGROUND THREAD) ===")
@@ -647,7 +650,7 @@ class PrayerNotificationService : Service() {
                 }
                 if (settings == null) {
                     Log.w(TAG, "Settings unavailable, using fallback")
-                    return@withContext Quintuple("Prayer Time Tracker", "Loading...", "Initializing prayer data", "MAKE_TIME", 25)
+                    return@withContext Sextuple("Prayer Time Tracker", "Loading...", "Initializing prayer data", "MAKE_TIME", 25, Pair("Current Prayer", LocalTime.now().toString()))
                 }
                 
                 // ROBUST LOGGING: Check what settings we're actually using for calculation
@@ -663,7 +666,7 @@ class PrayerNotificationService : Service() {
                 val location = settings.location
                 if (location == null) {
                     Log.w(TAG, "No location available")
-                    return@withContext Quintuple("Prayer Time Tracker", "Location needed", "Grant location permission to see prayer times", "MAKE_TIME", 30)
+                    return@withContext Sextuple("Prayer Time Tracker", "Location needed", "Grant location permission to see prayer times", "MAKE_TIME", 30, Pair("Current Prayer", LocalTime.now().toString()))
                 }
                 
                 Log.d(TAG, "Location: ${location.getDisplayName()}")
@@ -678,7 +681,7 @@ class PrayerNotificationService : Service() {
                 
                 if (prayerTimes == null) {
                     Log.w(TAG, "Prayer calculation timed out after ${calculationTime}ms")
-                    return@withContext Quintuple("Prayer Time Tracker", "Calculating...", "Prayer times being calculated", "MAKE_TIME", 40)
+                    return@withContext Sextuple("Prayer Time Tracker", "Calculating...", "Prayer times being calculated", "MAKE_TIME", 40, Pair("Current Prayer", LocalTime.now().toString()))
                 }
                 
                 Log.d(TAG, "✓ Prayer times calculated in ${calculationTime}ms")
@@ -815,7 +818,7 @@ class PrayerNotificationService : Service() {
                             Log.d(TAG, "   Content: $content") 
                             Log.d(TAG, "   Phase: $phaseString (${progressPercentage}%)")
                             
-                            return@withContext Quintuple(title, content, detailedMessage, phaseString, progressPercentage.toInt())
+                            return@withContext Sextuple(title, content, detailedMessage, phaseString, progressPercentage.toInt(), Pair(currentPrayer?.name ?: "Current Prayer", currentPrayer?.time?.toString() ?: LocalTime.now().toString()))
                         }
                     }
                     
@@ -823,7 +826,7 @@ class PrayerNotificationService : Service() {
                     val title = "⏰ Next Prayer: ${nextPrayer?.name ?: "Unknown"}"
                     val content = nextPrayer?.let { "Next prayer in ${formatTimeRemaining(it.time)}" } ?: "Prayer times calculated"
                     val detailedMessage = buildNextPrayerMessage(prayerTimes, nextPrayer)
-                    return@withContext Quintuple(title, content, detailedMessage, "MAKE_TIME", 10)
+                    return@withContext Sextuple(title, content, detailedMessage, "MAKE_TIME", 10, Pair(currentPrayer?.name ?: "Current Prayer", currentPrayer?.time?.toString() ?: LocalTime.now().toString()))
                 }
                 
                 // Calculate prayer time progress
@@ -846,11 +849,11 @@ class PrayerNotificationService : Service() {
                 }
                 
                 // Return tuple with phase and real progress information for GoogleSampleNotificationManager
-                Quintuple(title, content, detailedMessage, phaseString, prayerProgress.progressPercentage.toInt())
+                Sextuple(title, content, detailedMessage, phaseString, prayerProgress.progressPercentage.toInt(), Pair(currentPrayer?.name ?: "Current Prayer", currentPrayer?.time?.toString() ?: LocalTime.now().toString()))
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting prayer data: ${e.message}")
-                Quintuple("Prayer Time Tracker", "Service active", "Prayer time updates running", "MAKE_TIME", 50)
+                Sextuple("Prayer Time Tracker", "Service active", "Prayer time updates running", "MAKE_TIME", 50, Pair("Current Prayer", LocalTime.now().toString()))
             }
         }
     }
@@ -1063,6 +1066,7 @@ class PrayerNotificationService : Service() {
      */
     private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
     private data class Quintuple<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)
+    private data class Sextuple<A, B, C, D, E, F>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E, val sixth: F)
     
     /**
      * PRAYER PHASES: The three stages of prayer time
@@ -1107,7 +1111,7 @@ class PrayerNotificationService : Service() {
      */
     private fun formatElapsedTime(elapsedMinutes: Long): String {
         return when {
-            elapsedMinutes == 0L -> "just started"
+            elapsedMinutes == 0L -> "Just started"
             elapsedMinutes == 1L -> "1 minute"
             elapsedMinutes < 60 -> "${elapsedMinutes} minutes"
             else -> {
@@ -1135,7 +1139,7 @@ class PrayerNotificationService : Service() {
     /**
      * Extract real progress from prayer data - no longer needed since we get it directly
      */
-    private fun calculateNotificationProgress(prayerData: Quintuple<String, String, String, String, Int>): Int {
+    private fun calculateNotificationProgress(prayerData: Sextuple<String, String, String, String, Int, Pair<String, String>>): Int {
         // Return the real progress percentage that was calculated by the prayer system
         return prayerData.fifth
     }

@@ -19,7 +19,9 @@ package com.starception.submission.util
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.NotificationManager.IMPORTANCE_DEFAULT
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import androidx.core.app.NotificationCompat.ProgressStyle
 import android.graphics.Color
 import android.os.Build
@@ -29,6 +31,8 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.starception.submission.R
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.util.logging.Level
 import java.util.logging.Logger
 
@@ -41,6 +45,10 @@ object GoogleSampleNotificationManager {
     
     // Track current prayer phase to detect phase changes
     private var currentPhase: Int = -1 // -1 = not set, 0 = Go to Mosque, 1 = Best Time, 2 = Make Time
+    
+    // Track current prayer information for action buttons
+    private var currentPrayerName: String = ""
+    private var currentPrayerTime: String = ""
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun initialize(context: Context, notifManager: NotificationManager) {
@@ -268,8 +276,16 @@ object GoogleSampleNotificationManager {
     }
     
     @RequiresApi(35) // Android 16+ (BAKLAVA = 35)
-    fun postPrayerNotification(title: String, content: String, detailedMessage: String = "", progress: Int, prayerPhase: String = "") {
+    fun postPrayerNotification(title: String, content: String, detailedMessage: String = "", progress: Int, prayerPhase: String = "", prayerName: String = "", prayerTime: String = "") {
         android.util.Log.d("GoogleSampleNotificationManager", "Posting Progress-Centric prayer notification...")
+        
+        // Store current prayer information for action buttons
+        if (prayerName.isNotEmpty()) {
+            currentPrayerName = prayerName
+        }
+        if (prayerTime.isNotEmpty()) {
+            currentPrayerTime = prayerTime
+        }
         
         // Determine current prayer phase - use actual phase from prayer service if provided
         val newPhase = if (prayerPhase.isNotEmpty()) {
@@ -394,6 +410,9 @@ object GoogleSampleNotificationManager {
             content
         }
         
+        // Create "Mark as Prayed" action button
+        val markAsPrayedAction = createMarkAsPrayedAction()
+        
         // Android 16 Progress-Centric: Build notification with recommended practices
         val notificationBuilder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_prayer)
@@ -406,6 +425,7 @@ object GoogleSampleNotificationManager {
             .setUsesChronometer(false)  // Don't use chronometer for prayer tracking
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)  // Appropriate category
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)  // Public visibility for lock screen
+            .addAction(markAsPrayedAction)  // Add "Mark as Prayed" action button
         
         // Apply intelligent alert behavior: Only alert on phase changes, silent for progress updates
         if (shouldAlert) {
@@ -422,5 +442,78 @@ object GoogleSampleNotificationManager {
         
         notificationManager.notify(NOTIFICATION_ID, notification)
         android.util.Log.d("GoogleSampleNotificationManager", "Posted Progress-Centric prayer notification: $title - $shortCriticalText ($progress%)")
+    }
+    
+    /**
+     * Creates the "Mark as Prayed" action button for the notification
+     * 
+     * @return NotificationCompat.Action configured for prayer marking
+     */
+    private fun createMarkAsPrayedAction(): NotificationCompat.Action {
+        // Create intent for the PrayerActionReceiver
+        val markAsPrayedIntent = Intent(appContext, PrayerActionReceiver::class.java).apply {
+            action = PrayerActionReceiver.ACTION_MARK_AS_PRAYED
+            // Pass current prayer information to the receiver
+            putExtra(PrayerActionReceiver.EXTRA_PRAYER_NAME, currentPrayerName)
+            putExtra(PrayerActionReceiver.EXTRA_PRAYER_TIME, currentPrayerTime)
+            putExtra(PrayerActionReceiver.EXTRA_TIMESTAMP, System.currentTimeMillis())
+        }
+        
+        // Create PendingIntent with unique request code to avoid conflicts
+        val pendingIntent = PendingIntent.getBroadcast(
+            appContext,
+            NOTIFICATION_ID, // Use notification ID as request code for uniqueness
+            markAsPrayedIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        // Create the action with prayer icon and appropriate text
+        val action = NotificationCompat.Action.Builder(
+            R.drawable.ic_prayer, // Use prayer icon for the action
+            "Mark as Prayed", // Action button text
+            pendingIntent
+        ).build()
+        
+        android.util.Log.d("GoogleSampleNotificationManager", 
+            "📿 Created 'Mark as Prayed' action for prayer: $currentPrayerName at $currentPrayerTime")
+        
+        return action
+    }
+    
+    /**
+     * Updates notification to reflect prayer completion (optional feature)
+     * You can call this from PrayerActionReceiver to update the notification after marking prayer as completed
+     */
+    @RequiresApi(35)
+    fun updateNotificationForCompletedPrayer(prayerName: String) {
+        // 🚧 TODO: CUSTOMIZE THIS FOR YOUR NEEDS 🚧
+        
+        android.util.Log.d("GoogleSampleNotificationManager", "🕌 Updating notification for completed prayer: $prayerName")
+        
+        // Option 1: Dismiss the notification entirely
+        // dismissNotification()
+        
+        // Option 2: Update notification to show completion status
+        val completionNotification = NotificationCompat.Builder(appContext, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_prayer)
+            .setContentTitle("Prayer Completed ✅")
+            .setContentText("$prayerName has been marked as completed")
+            .setAutoCancel(true) // Allow user to dismiss by tapping
+            .setOngoing(false) // Not ongoing anymore
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+            
+        notificationManager.notify(NOTIFICATION_ID, completionNotification)
+        
+        android.util.Log.d("GoogleSampleNotificationManager", "✅ Notification updated for completed prayer: $prayerName")
+    }
+    
+    /**
+     * Dismisses the current prayer notification
+     * You can call this from PrayerActionReceiver to remove the notification after prayer completion
+     */
+    fun dismissNotification() {
+        notificationManager.cancel(NOTIFICATION_ID)
+        android.util.Log.d("GoogleSampleNotificationManager", "🗑️ Prayer notification dismissed")
     }
 }
