@@ -684,8 +684,46 @@ class PrayerNotificationService : Service() {
                 Log.d(TAG, "✓ Prayer times calculated in ${calculationTime}ms")
                 
                 // Get current and next prayer
-                val currentPrayer = prayerTimes.getActualPrayers().find { it.isCurrently }
+                val allPrayers = prayerTimes.getActualPrayers()
+                val rawCurrentPrayer = allPrayers.find { it.isCurrently }
                 val nextPrayer = prayerTimes.getNextPrayer()
+                
+                // OVERRIDE DETECTION: Fix incorrect prayer detection for overnight period
+                val now = LocalTime.now()
+                val ishaTime = prayerTimes.isha
+                val fajrTime = prayerTimes.fajr
+                
+                val currentPrayer = if (rawCurrentPrayer?.name == "Fajr" && now.isBefore(fajrTime)) {
+                    Log.w(TAG, "🚨 INCORRECT DETECTION: System thinks Fajr is current at $now but Fajr is at $fajrTime")
+                    Log.w(TAG, "🔧 FIXING: Checking if we're in overnight Isha→Fajr period")
+                    
+                    // Check if we're in the overnight period between yesterday's Isha and today's Fajr
+                    val isInOvernightPeriod = if (now.isAfter(ishaTime)) {
+                        // Same day: after Isha, before midnight
+                        Log.d(TAG, "   Same day scenario: $now is after Isha ($ishaTime)")
+                        true
+                    } else if (now.isBefore(fajrTime)) {
+                        // Next day: after midnight, before Fajr
+                        Log.d(TAG, "   Cross-day scenario: $now is before Fajr ($fajrTime)")
+                        true
+                    } else {
+                        false
+                    }
+                    
+                    if (isInOvernightPeriod) {
+                        Log.i(TAG, "✅ OVERRIDE: Treating this as Isha period, not Fajr")
+                        // Create a virtual Isha prayer object representing the current period
+                        PrayerTime("Isha", ishaTime, isNext = false, isCurrently = true)
+                    } else {
+                        rawCurrentPrayer
+                    }
+                } else {
+                    rawCurrentPrayer
+                }
+                
+                Log.d(TAG, "🔍 FINAL PRAYER DETECTION:")
+                Log.d(TAG, "   Current Prayer: ${currentPrayer?.name ?: "None"}")
+                Log.d(TAG, "   Next Prayer: ${nextPrayer?.name ?: "None"}")
                 
                 if (currentPrayer == null) {
                     // No current prayer - check if we're in cross-day period (Isha → Fajr)
@@ -704,15 +742,41 @@ class PrayerNotificationService : Service() {
                         // Calculate cross-day progress from today's Isha to tomorrow's Fajr
                         val timeUntilFajr = Duration.between(now, LocalTime.MAX) + Duration.between(LocalTime.MIN, nextPrayer.time)
                         val totalIshaToFajr = Duration.between(todayIsha, LocalTime.MAX) + Duration.between(LocalTime.MIN, nextPrayer.time)
-                        val elapsedSinceIsha = Duration.between(todayIsha, now)
+                        
+                        // FIXED: Handle elapsed time calculation properly for cross-day scenario
+                        val elapsedSinceIsha = if (now.isAfter(todayIsha)) {
+                            // Same day scenario: Current time is after Isha time today (e.g., Isha at 8 PM, now 11:30 PM)
+                            Duration.between(todayIsha, now)
+                        } else {
+                            // Cross-midnight scenario: We've crossed midnight, so calculate elapsed time across day boundary
+                            // Time from Isha to midnight + time from midnight to now
+                            Duration.between(todayIsha, LocalTime.MAX) + Duration.between(LocalTime.MIN, now)
+                        }
                         
                         if (totalIshaToFajr.toMinutes() > 0) {
-                            val progressPercentage = (elapsedSinceIsha.toMinutes().toFloat() / totalIshaToFajr.toMinutes().toFloat() * 100f).coerceIn(0f, 100f)
+                            // SAFETY CHECK: Ensure elapsed time is never negative
+                            val elapsedMinutes = elapsedSinceIsha.toMinutes()
+                            val (safeElapsedMinutes, progressPercentage) = if (elapsedMinutes < 0) {
+                                Log.e(TAG, "🚨 NEGATIVE ELAPSED TIME DETECTED!")
+                                Log.e(TAG, "   Today's Isha: $todayIsha")
+                                Log.e(TAG, "   Current time: $now")
+                                Log.e(TAG, "   Elapsed calculation: Duration.between($todayIsha, $now) = ${elapsedMinutes}m")
+                                Log.e(TAG, "   now.isAfter(todayIsha): ${now.isAfter(todayIsha)}")
+                                // Use 0 instead of negative value to prevent "-111m since Isha"
+                                val safe = 0L
+                                val progress = (safe.toFloat() / totalIshaToFajr.toMinutes().toFloat() * 100f).coerceIn(0f, 100f)
+                                Log.w(TAG, "   Using safe elapsed time: ${safe}m (${progress}%)")
+                                Pair(safe, progress)
+                            } else {
+                                val progress = (elapsedMinutes.toFloat() / totalIshaToFajr.toMinutes().toFloat() * 100f).coerceIn(0f, 100f)
+                                Pair(elapsedMinutes, progress)
+                            }
                             
                             Log.d(TAG, "✅ Cross-day progress calculation:")
                             Log.d(TAG, "   Time until Fajr: ${timeUntilFajr.toMinutes()} minutes")
                             Log.d(TAG, "   Total Isha→Fajr: ${totalIshaToFajr.toMinutes()} minutes")
-                            Log.d(TAG, "   Elapsed since Isha: ${elapsedSinceIsha.toMinutes()} minutes")
+                            Log.d(TAG, "   Elapsed since Isha: ${safeElapsedMinutes} minutes")
+                            Log.d(TAG, "   Same day (now.isAfter(todayIsha)): ${now.isAfter(todayIsha)}")
                             Log.d(TAG, "   Progress: ${progressPercentage}%")
                             
                             // Create a virtual Isha prayer object to represent the current prayer period
@@ -733,7 +797,7 @@ class PrayerNotificationService : Service() {
                             }
                             
                             // Show time elapsed since Isha (not countdown to Fajr)
-                            val elapsedText = formatElapsedTime(elapsedSinceIsha.toMinutes())
+                            val elapsedText = formatElapsedTime(safeElapsedMinutes)
                             val content = "$elapsedText since Isha"
                             
                             // Detailed message can still show next prayer info
@@ -880,8 +944,22 @@ class PrayerNotificationService : Service() {
             }
             
             // Fallback: prayer time has passed, no progress to show
+            val elapsedMinutes = Duration.between(prayerStart, now).toMinutes()
+            
+            // SAFETY CHECK: Ensure elapsed time is never negative
+            val safeElapsedMinutes = if (elapsedMinutes < 0) {
+                Log.e(TAG, "🚨 NEGATIVE ELAPSED TIME IN FALLBACK!")
+                Log.e(TAG, "   Prayer start: $prayerStart")
+                Log.e(TAG, "   Current time: $now")
+                Log.e(TAG, "   Elapsed calculation: Duration.between($prayerStart, $now) = ${elapsedMinutes}m")
+                Log.w(TAG, "   Using safe elapsed time: 0m instead of ${elapsedMinutes}m")
+                0L
+            } else {
+                elapsedMinutes
+            }
+            
             return PrayerProgress(
-                elapsedMinutes = Duration.between(prayerStart, now).toMinutes(),
+                elapsedMinutes = safeElapsedMinutes,
                 remainingMinutes = 0,
                 totalDuration = 0,
                 progressPercentage = 0f,
@@ -892,7 +970,20 @@ class PrayerNotificationService : Service() {
         // Prayer time is still active, calculate normal progress
         val prayerEnd = nextPrayer?.time ?: prayerStart.plusHours(1) // Default 1 hour if no next prayer
         
-        val elapsedMinutes = Duration.between(prayerStart, now).toMinutes()
+        val rawElapsedMinutes = Duration.between(prayerStart, now).toMinutes()
+        
+        // SAFETY CHECK: Ensure elapsed time is never negative (for active prayer period)
+        val elapsedMinutes = if (rawElapsedMinutes < 0) {
+            Log.e(TAG, "🚨 NEGATIVE ELAPSED TIME IN ACTIVE PRAYER!")
+            Log.e(TAG, "   Prayer start: $prayerStart")
+            Log.e(TAG, "   Current time: $now")
+            Log.e(TAG, "   Elapsed calculation: Duration.between($prayerStart, $now) = ${rawElapsedMinutes}m")
+            Log.w(TAG, "   Using safe elapsed time: 0m instead of ${rawElapsedMinutes}m")
+            0L
+        } else {
+            rawElapsedMinutes
+        }
+        
         val totalDuration = Duration.between(prayerStart, prayerEnd).toMinutes()
         val remainingMinutes = Duration.between(now, prayerEnd).toMinutes()
         
