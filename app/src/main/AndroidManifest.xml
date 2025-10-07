@@ -29,6 +29,14 @@
     
     <!-- Compass functionality - from original Compass-main app -->
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
+    
+    <!-- Android Auto permissions -->
+    <uses-feature
+        android:name="android.hardware.type.automotive"
+        android:required="false" />
+    <uses-feature
+        android:name="android.software.car.templates_host"
+        android:required="false" />
 
     <!--
     Firebase automatically adds these AD_ID and ADSERVICES permissions, even though we don'''t use them.
@@ -84,6 +92,21 @@
                 <action android:name="com.starception.submission.MARK_AS_PRAYED" />
             </intent-filter>
         </receiver>
+        
+        <!-- Android Auto Car App Service -->
+        <service
+            android:name=".automotive.PrayerTimesCarAppService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.IOT" />
+            </intent-filter>
+        </service>
+
+        <!-- Android Auto app metadata -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
 
         <!-- Disable Firebase analytics by default. This setting is overwritten for the `prod`
         flavor -->
