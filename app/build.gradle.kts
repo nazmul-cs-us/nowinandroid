@@ -105,6 +105,9 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.play.services.location)
     implementation(libs.accompanist.permissions)
+    
+    // Android Auto support
+    implementation(libs.androidx.car.app)
 
     ksp(libs.hilt.compiler)
 

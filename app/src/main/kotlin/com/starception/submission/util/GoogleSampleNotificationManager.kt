@@ -355,12 +355,8 @@ object GoogleSampleNotificationManager {
         val bestTimeColor = Color.valueOf(255f / 255f, 193f / 255f, 7f / 255f, 1f).toArgb()        // Amber for Best Time
         val makeTimeColor = Color.valueOf(244f / 255f, 67f / 255f, 54f / 255f, 1f).toArgb()        // Red for Make Time
         
-        // Choose appropriate tracker icon based on current progress phase
-        val trackerIcon = when {
-            progress <= 20 -> IconCompat.createWithResource(appContext, R.drawable.ic_mosque_milestone)      // Go to Mosque
-            progress <= 60 -> IconCompat.createWithResource(appContext, R.drawable.ic_prayer_mat_milestone)  // Best Time to Pray
-            else -> IconCompat.createWithResource(appContext, R.drawable.ic_clock_milestone)                 // Make Time for Prayer
-        }
+        // Use Go to mosque icon for tracker across all phases
+        val trackerIcon = IconCompat.createWithResource(appContext, R.drawable.ic_go_to_mosque_pin)
         
         // Android 16 Progress-Centric: Fixed segment colors for prayer urgency progression
         // Each segment always has its designated color: Green → Yellow → Red
@@ -371,6 +367,7 @@ object GoogleSampleNotificationManager {
         )
         
         // Android 16 Progress-Centric: Create meaningful progress points with proper milestone colors
+        // Tracker icon will automatically position at the exact progress point
         val progressStyle = NotificationCompat.ProgressStyle()
             .setProgressPoints(
                 listOf(
@@ -380,8 +377,8 @@ object GoogleSampleNotificationManager {
                 )
             )
             .setProgressSegments(segments)  // Dynamic segment coloring
-            .setProgressTrackerIcon(trackerIcon)  // Phase-appropriate tracker icon
-            .setProgress(progress)  // This positions the tracker at the exact progress percentage
+            .setProgressTrackerIcon(trackerIcon)  // Go to mosque location pin icon
+            .setProgress(progress)  // Tracker positioned at exact progress point
         
         val phaseName = when (newPhase) {
             0 -> "Go to Mosque"
@@ -390,9 +387,9 @@ object GoogleSampleNotificationManager {
             else -> "Unknown"
         }
         android.util.Log.d("GoogleSampleNotificationManager", 
-            "📊 Progress Details: ${progress}% | Phase: ${newPhase} ($phaseName) | Prayer Phase: '$prayerPhase' | Segments: ${segments.size}")
+            "📊 Progress Details: ${progress}% actual | Phase: ${newPhase} ($phaseName) | Prayer Phase: '$prayerPhase'")
         android.util.Log.d("GoogleSampleNotificationManager", 
-            "📊 Expected Position: At ${progress}% on progress bar | Tracker in segment ${newPhase + 1} ($phaseName)")
+            "🎯 Tracker Position: Positioned at exact progress point (${progress}%)")
         android.util.Log.d("GoogleSampleNotificationManager", 
             "🎨 Segment Colors: Green (Go to Mosque) → Yellow (Best Time) → Red (Make Time)")
         
