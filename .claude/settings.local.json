@@ -72,7 +72,15 @@
       "Read(/tmp/**)",
       "Read(/tmp/**)",
       "Read(/tmp/**)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/haptics/src/main/java/com/example/platform/ui/haptics/wobble/**)",
+      "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/haptics/src/main/java/com/example/platform/ui/haptics/wobble/**)",
+      "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/haptics/src/main/java/com/example/platform/ui/haptics/wobble/**)",
+      "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/haptics/src/main/java/com/example/platform/ui/haptics/wobble/**)",
+      "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/haptics/**)",
+      "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/haptics/src/main/java/com/example/platform/ui/haptics/shapes/**)",
+      "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/haptics/src/main/java/com/example/platform/ui/haptics/wobble/**)",
+      "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/haptics/src/main/java/com/example/platform/ui/haptics/wobble/**)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
