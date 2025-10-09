@@ -3,29 +3,20 @@ package com.starception.submission.automotive
 import android.content.Intent
 import androidx.car.app.Screen
 import androidx.car.app.Session
-import androidx.lifecycle.lifecycleScope
-import com.starception.submission.automotive.screens.PrayerTimesMainScreen
-import com.starception.submission.automotive.screens.PrayerTimesGridScreen
-import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.launch
 
 /**
- * Car Session for Prayer Times Android Auto app
+ * Simple Car Session for Prayer Times Android Auto app
  * 
- * Manages the session lifecycle and navigation between screens
- * in the Android Auto environment.
+ * No dependency injection - basic session management
  */
-@AndroidEntryPoint
 class PrayerTimesCarSession : Session() {
 
     override fun onCreateScreen(intent: Intent): Screen {
-        // Start with the grid view for a more visual experience
-        return PrayerTimesGridScreen(carContext)
+        return PrayerTimesMainScreen(carContext)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Handle any new intents if needed
-        screenManager.push(PrayerTimesGridScreen(carContext))
+        // Handle new intent if needed
     }
 }

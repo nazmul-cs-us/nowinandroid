@@ -1,4 +1,4 @@
-package com.starception.submission.automotive.screens
+package com.starception.submission.automotive
 
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
@@ -10,12 +10,8 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
-import androidx.car.app.model.CarText
-import androidx.car.app.model.ForegroundCarColorSpan
 import androidx.lifecycle.lifecycleScope
 import com.starception.submission.R
-import com.starception.submission.prayer.model.Location
-import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,13 +19,16 @@ import kotlinx.coroutines.launch
 import kotlin.math.*
 
 /**
- * Android Auto Qibla compass screen
- * 
- * Provides Qibla direction information in a car-safe interface
- * with clear directional guidance for prayers.
+ * Simple Android Auto Qibla compass screen
  */
-@AndroidEntryPoint
-class QiblaCompassCarScreen(carContext: CarContext) : Screen(carContext) {
+class QiblaCompassScreen(carContext: CarContext) : Screen(carContext) {
+
+    data class QiblaInfo(
+        val direction: Double,
+        val distance: Double,
+        val compassDirection: String,
+        val locationName: String
+    )
 
     private val _qiblaDirection = MutableStateFlow<QiblaInfo?>(null)
     private val qiblaDirection: StateFlow<QiblaInfo?> = _qiblaDirection.asStateFlow()
@@ -41,15 +40,7 @@ class QiblaCompassCarScreen(carContext: CarContext) : Screen(carContext) {
     private val kaabaLatitude = 21.4225
     private val kaabaLongitude = 39.8262
 
-    data class QiblaInfo(
-        val direction: Double,       // Degrees from North
-        val distance: Double,        // Distance in KM
-        val compassDirection: String, // N, NE, E, SE, S, SW, W, NW
-        val locationName: String
-    )
-
     init {
-        lifecycle.addObserver(this)
         calculateQiblaDirection()
     }
 
@@ -59,35 +50,25 @@ class QiblaCompassCarScreen(carContext: CarContext) : Screen(carContext) {
         if (isLoading.value) {
             itemListBuilder.addItem(
                 Row.Builder()
-                    .setTitle(createStyledText("🧭 Calculating Qibla Direction...", CarColor.PRIMARY))
-                    .addText(createStyledText("Determining direction to Makkah", CarColor.SECONDARY))
-                    .setImage(CarIcon.Builder(R.drawable.ic_prayer).setTint(CarColor.PRIMARY).build())
+                    .setTitle("🧭 Calculating Qibla Direction...")
+                    .addText("Determining direction to Holy Kaaba in Makkah")
                     .build()
             )
         } else {
             qiblaDirection.value?.let { qibla ->
-                // Main Qibla direction info
+                // Main Qibla direction
                 itemListBuilder.addItem(
                     Row.Builder()
-                        .setTitle(createStyledText("🕋 Qibla Direction", CarColor.PRIMARY))
-                        .addText(createStyledText("${qibla.compassDirection} (${qibla.direction.toInt()}°)", CarColor.GREEN))
-                        .setImage(CarIcon.Builder(R.drawable.ic_prayer).setTint(CarColor.PRIMARY).build())
+                        .setTitle("🕋 Qibla Direction")
+                        .addText("${qibla.compassDirection} (${qibla.direction.toInt()}°)")
                         .build()
                 )
 
                 // Distance to Makkah
                 itemListBuilder.addItem(
                     Row.Builder()
-                        .setTitle(createStyledText("📏 Distance to Makkah", CarColor.BLUE))
-                        .addText(createStyledText("${String.format("%.0f", qibla.distance)} km", CarColor.BLUE))
-                        .setImage(CarIcon.Builder(R.drawable.ic_prayer).setTint(CarColor.BLUE).build())
-                        .build()
-                )
-
-                // Separator
-                itemListBuilder.addItem(
-                    Row.Builder()
-                        .setTitle("─────────────────────")
+                        .setTitle("📏 Distance to Makkah")
+                        .addText("${String.format("%.0f", qibla.distance)} km")
                         .build()
                 )
 
@@ -95,42 +76,32 @@ class QiblaCompassCarScreen(carContext: CarContext) : Screen(carContext) {
                 val guidance = getDirectionalGuidance(qibla.direction)
                 itemListBuilder.addItem(
                     Row.Builder()
-                        .setTitle(createStyledText("🧭 Compass Guidance", CarColor.SECONDARY))
-                        .addText(createStyledText(guidance, CarColor.PRIMARY))
-                        .setImage(CarIcon.Builder(R.drawable.ic_prayer).setTint(CarColor.SECONDARY).build())
+                        .setTitle("🧭 Turn Direction")
+                        .addText(guidance)
                         .build()
                 )
 
                 // Prayer reminder
                 itemListBuilder.addItem(
                     Row.Builder()
-                        .setTitle(createStyledText("🤲 Prayer Direction", CarColor.GREEN))
-                        .addText(createStyledText("Face this direction during Salah", CarColor.GREEN))
-                        .setImage(CarIcon.Builder(R.drawable.ic_prayer).setTint(CarColor.GREEN).build())
+                        .setTitle("🤲 For Prayer")
+                        .addText("Face this direction during Salah")
                         .build()
                 )
 
                 // Location info
                 itemListBuilder.addItem(
                     Row.Builder()
-                        .setTitle("─────────────────────")
-                        .build()
-                )
-
-                itemListBuilder.addItem(
-                    Row.Builder()
-                        .setTitle(createStyledText("📍 Your Location", CarColor.SECONDARY))
-                        .addText(createStyledText(qibla.locationName, CarColor.SECONDARY))
-                        .setImage(CarIcon.Builder(R.drawable.ic_prayer).setTint(CarColor.SECONDARY).build())
+                        .setTitle("📍 Your Location")
+                        .addText(qibla.locationName)
                         .build()
                 )
 
             } ?: run {
                 itemListBuilder.addItem(
                     Row.Builder()
-                        .setTitle(createStyledText("⚠️ Qibla Direction Unavailable", CarColor.RED))
-                        .addText(createStyledText("Unable to calculate direction", CarColor.SECONDARY))
-                        .setImage(CarIcon.Builder(R.drawable.ic_prayer).setTint(CarColor.RED).build())
+                        .setTitle("⚠️ Qibla Direction Unavailable")
+                        .addText("Unable to calculate direction to Makkah")
                         .build()
                 )
             }
@@ -138,7 +109,7 @@ class QiblaCompassCarScreen(carContext: CarContext) : Screen(carContext) {
 
         return ListTemplate.Builder()
             .setSingleList(itemListBuilder.build())
-            .setTitle(createStyledText("🧭 Qibla Compass", CarColor.PRIMARY))
+            .setTitle("🧭 Qibla Compass")
             .setHeaderAction(Action.BACK)
             .setActionStrip(
                 ActionStrip.Builder()
@@ -148,14 +119,6 @@ class QiblaCompassCarScreen(carContext: CarContext) : Screen(carContext) {
                             .setOnClickListener { calculateQiblaDirection() }
                             .build()
                     )
-                    .addAction(
-                        Action.Builder()
-                            .setTitle("🏠 Prayer Times")
-                            .setOnClickListener { 
-                                screenManager.pop()
-                            }
-                            .build()
-                    )
                     .build()
             )
             .build()
@@ -163,40 +126,35 @@ class QiblaCompassCarScreen(carContext: CarContext) : Screen(carContext) {
 
     private fun calculateQiblaDirection() {
         lifecycleScope.launch {
-            try {
-                _isLoading.value = true
+            _isLoading.value = true
+            
+            kotlinx.coroutines.delay(500) // Simulate calculation
+            
+            // Use sample location (New York)
+            val userLatitude = 40.7128
+            val userLongitude = -74.0060
 
-                // Use default location (can be enhanced with actual location)
-                val userLatitude = 40.7128  // New York
-                val userLongitude = -74.0060
+            val direction = calculateBearing(
+                userLatitude, userLongitude,
+                kaabaLatitude, kaabaLongitude
+            )
 
-                val direction = calculateBearing(
-                    userLatitude, userLongitude,
-                    kaabaLatitude, kaabaLongitude
-                )
+            val distance = calculateDistance(
+                userLatitude, userLongitude,
+                kaabaLatitude, kaabaLongitude
+            )
 
-                val distance = calculateDistance(
-                    userLatitude, userLongitude,
-                    kaabaLatitude, kaabaLongitude
-                )
+            val compassDirection = getCompassDirection(direction)
 
-                val compassDirection = getCompassDirection(direction)
+            _qiblaDirection.value = QiblaInfo(
+                direction = direction,
+                distance = distance,
+                compassDirection = compassDirection,
+                locationName = "New York, USA"
+            )
 
-                _qiblaDirection.value = QiblaInfo(
-                    direction = direction,
-                    distance = distance,
-                    compassDirection = compassDirection,
-                    locationName = "New York, USA"
-                )
-
-                _isLoading.value = false
-                invalidate()
-
-            } catch (e: Exception) {
-                android.util.Log.e("QiblaCompassCarScreen", "Error calculating Qibla", e)
-                _isLoading.value = false
-                invalidate()
-            }
+            _isLoading.value = false
+            invalidate()
         }
     }
 
@@ -259,9 +217,5 @@ class QiblaCompassCarScreen(carContext: CarContext) : Screen(carContext) {
         }
     }
 
-    private fun createStyledText(text: String, color: CarColor): CarText {
-        return CarText.Builder(text)
-            .addSpan(ForegroundCarColorSpan.create(color), 0, text.length)
-            .build()
-    }
+    // Removed styled text for simplicity
 }

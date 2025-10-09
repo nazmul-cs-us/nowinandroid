@@ -382,6 +382,8 @@ class EnhancedLocationService @Inject constructor(
                     addresses?.firstOrNull()?.let { address ->
                         android.util.Log.i("EnhancedLocationService", "      🏙️ City: '${address.locality}', Sub-admin: '${address.subAdminArea}'")
                         android.util.Log.i("EnhancedLocationService", "      🌍 Country: '${address.countryName}', Code: '${address.countryCode}'")
+                        android.util.Log.i("EnhancedLocationService", "      📍 Area Details: SubLocality='${address.subLocality}', Thoroughfare='${address.thoroughfare}'")
+                        android.util.Log.i("EnhancedLocationService", "      🏛️ Admin Area: '${address.adminArea}', Features: '${address.featureName}'")
                         
                         android.util.Log.i("EnhancedLocationService", "      🔧 STARTING COUNTRY CODE RESOLUTION...")
                         
@@ -406,10 +408,26 @@ class EnhancedLocationService @Inject constructor(
                             android.util.Log.e("EnhancedLocationService", "         ❌ ERROR: No country code resolved - auto-detection may fail")
                         }
                         
+                        // Extract detailed area information from address components
+                        val area = address.subLocality ?: address.featureName ?: ""
+                        val subLocality = address.subLocality ?: ""
+                        val thoroughfare = address.thoroughfare ?: ""
+                        val administrativeArea = address.adminArea ?: ""
+                        
+                        android.util.Log.i("EnhancedLocationService", "      🔍 EXTRACTED AREA INFO:")
+                        android.util.Log.i("EnhancedLocationService", "         📌 Area: '$area'")
+                        android.util.Log.i("EnhancedLocationService", "         🏘️ SubLocality: '$subLocality'")
+                        android.util.Log.i("EnhancedLocationService", "         🛣️ Thoroughfare: '$thoroughfare'")
+                        android.util.Log.i("EnhancedLocationService", "         🏛️ Administrative Area: '$administrativeArea'")
+                        
                         val enrichedLocation = baseLocation.copy(
                             city = address.locality ?: address.subAdminArea ?: "",
                             country = address.countryName ?: "",
-                            countryCode = resolvedCountryCode
+                            countryCode = resolvedCountryCode,
+                            area = area,
+                            subLocality = subLocality,
+                            thoroughfare = thoroughfare,
+                            administrativeArea = administrativeArea
                         )
                         
                         android.util.Log.i("EnhancedLocationService", "   ✅ ENHANCED ENRICHED: ${enrichedLocation.getDisplayName()}")
@@ -463,6 +481,8 @@ class EnhancedLocationService @Inject constructor(
                         android.util.Log.i("EnhancedLocationService", "      Location: ${address.latitude}, ${address.longitude}")
                         android.util.Log.i("EnhancedLocationService", "      City: '${address.locality}', Country: '${address.countryName}'")
                         android.util.Log.i("EnhancedLocationService", "      Geocoder Code: '${address.countryCode}'")
+                        android.util.Log.i("EnhancedLocationService", "      📍 Area Details: SubLocality='${address.subLocality}', Thoroughfare='${address.thoroughfare}'")
+                        android.util.Log.i("EnhancedLocationService", "      🏛️ Admin Area: '${address.adminArea}', Features: '${address.featureName}'")
                         
                         // Use CountryCodeMapper for search results too
                         val resolvedCountryCode = CountryCodeMapper.resolveCountryCode(
@@ -472,13 +492,23 @@ class EnhancedLocationService @Inject constructor(
                         
                         android.util.Log.i("EnhancedLocationService", "      ✅ RESOLVED COUNTRY CODE: '$resolvedCountryCode'")
                         
+                        // Extract detailed area information from address components
+                        val area = address.subLocality ?: address.featureName ?: ""
+                        val subLocality = address.subLocality ?: ""
+                        val thoroughfare = address.thoroughfare ?: ""
+                        val administrativeArea = address.adminArea ?: ""
+                        
                         Location(
                             latitude = address.latitude,
                             longitude = address.longitude,
                             timeZoneOffset = getTimezoneOffset(address.latitude, address.longitude),
                             city = address.locality ?: address.subAdminArea ?: "",
                             country = address.countryName ?: "",
-                            countryCode = resolvedCountryCode
+                            countryCode = resolvedCountryCode,
+                            area = area,
+                            subLocality = subLocality,
+                            thoroughfare = thoroughfare,
+                            administrativeArea = administrativeArea
                         )
                     } ?: emptyList()
                     
