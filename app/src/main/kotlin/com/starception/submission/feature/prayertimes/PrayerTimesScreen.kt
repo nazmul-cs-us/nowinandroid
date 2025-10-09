@@ -1167,12 +1167,20 @@ fun PrayerTimesScreen(
             }
         }
         
-        // Wobble shape
-        WobbleShape(
-            wobbleShapeHeight = 120.dp,
-            elasticTopPercent = dragDistanceAnimated / maxDragDistance,
-            isRefreshing = isRefreshing
-        )
+        // Wobble shape at top for pull-to-refresh
+        if (dragDistanceAnimated > 0f || isRefreshing) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = (-60).dp + (dragDistanceAnimated * 0.3f).dp)
+            ) {
+                WobbleShape(
+                    wobbleShapeHeight = 120.dp,
+                    elasticTopPercent = dragDistanceAnimated / maxDragDistance,
+                    isRefreshing = isRefreshing
+                )
+            }
+        }
         
         if (isLoading) {
             // Loading state with Material 3 design
@@ -1997,8 +2005,10 @@ private fun getLocationWithCountryCode(
 @Composable
 private fun WobbleShape(wobbleShapeHeight: androidx.compose.ui.unit.Dp, elasticTopPercent: Float, isRefreshing: Boolean) {
     Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Bottom
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(wobbleShapeHeight),
+        verticalArrangement = Arrangement.Top
     ) {
         val halfOfTotalWobbleShapeHeight = wobbleShapeHeight.div(2)
         
