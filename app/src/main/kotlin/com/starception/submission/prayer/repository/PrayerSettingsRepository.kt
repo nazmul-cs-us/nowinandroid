@@ -93,6 +93,10 @@ class PrayerSettingsRepository @Inject constructor(
         private const val KEY_CACHED_LOCATION_COUNTRY = "cached_location_country" // Cached location country
         private const val KEY_CACHED_LOCATION_COUNTRY_CODE = "cached_location_country_code" // Cached location country code
         private const val KEY_CACHED_LOCATION_TIMEZONE = "cached_location_timezone" // Cached timezone offset
+        private const val KEY_CACHED_LOCATION_AREA = "cached_location_area"      // Cached location area/neighborhood
+        private const val KEY_CACHED_LOCATION_SUB_LOCALITY = "cached_location_sub_locality" // Cached location sub-locality
+        private const val KEY_CACHED_LOCATION_THOROUGHFARE = "cached_location_thoroughfare" // Cached location thoroughfare/street
+        private const val KEY_CACHED_LOCATION_ADMIN_AREA = "cached_location_admin_area" // Cached location administrative area
     }
     
     // LAZY INITIALIZATION - Prevents main thread blocking during repository creation
@@ -1963,6 +1967,10 @@ class PrayerSettingsRepository @Inject constructor(
             logPrefWrite(KEY_CACHED_LOCATION_COUNTRY, prayerTimes.location.country)
             logPrefWrite(KEY_CACHED_LOCATION_COUNTRY_CODE, prayerTimes.location.countryCode)
             logPrefWrite(KEY_CACHED_LOCATION_TIMEZONE, prayerTimes.location.timeZoneOffset)
+            logPrefWrite(KEY_CACHED_LOCATION_AREA, prayerTimes.location.area)
+            logPrefWrite(KEY_CACHED_LOCATION_SUB_LOCALITY, prayerTimes.location.subLocality)
+            logPrefWrite(KEY_CACHED_LOCATION_THOROUGHFARE, prayerTimes.location.thoroughfare)
+            logPrefWrite(KEY_CACHED_LOCATION_ADMIN_AREA, prayerTimes.location.administrativeArea)
             
             putFloat(KEY_CACHED_LOCATION_LAT, prayerTimes.location.latitude.toFloat())
             putFloat(KEY_CACHED_LOCATION_LON, prayerTimes.location.longitude.toFloat())
@@ -1970,6 +1978,10 @@ class PrayerSettingsRepository @Inject constructor(
             putString(KEY_CACHED_LOCATION_COUNTRY, prayerTimes.location.country)
             putString(KEY_CACHED_LOCATION_COUNTRY_CODE, prayerTimes.location.countryCode)
             putFloat(KEY_CACHED_LOCATION_TIMEZONE, prayerTimes.location.timeZoneOffset.toFloat())
+            putString(KEY_CACHED_LOCATION_AREA, prayerTimes.location.area)
+            putString(KEY_CACHED_LOCATION_SUB_LOCALITY, prayerTimes.location.subLocality)
+            putString(KEY_CACHED_LOCATION_THOROUGHFARE, prayerTimes.location.thoroughfare)
+            putString(KEY_CACHED_LOCATION_ADMIN_AREA, prayerTimes.location.administrativeArea)
             
             apply() // Use apply() for cache - no need for immediate synchronous write during startup
         }
@@ -1981,6 +1993,8 @@ class PrayerSettingsRepository @Inject constructor(
         verifyPrefWrite(KEY_CACHED_FAJR, fajrMinutes, "fajr time")
         verifyPrefWrite(KEY_CACHED_DHUHR, dhuhrMinutes, "dhuhr time")
         verifyPrefWrite(KEY_CACHED_LOCATION_CITY, prayerTimes.location.city, "location city")
+        verifyPrefWrite(KEY_CACHED_LOCATION_AREA, prayerTimes.location.area, "location area")
+        verifyPrefWrite(KEY_CACHED_LOCATION_SUB_LOCALITY, prayerTimes.location.subLocality, "location sub-locality")
         
         Log.i(TAG, "✅ PRAYER TIMES CACHE: Successfully cached all data to preferences")
         Log.i(TAG, "📈 Cache Performance: Fast app startup enabled for ${prayerTimes.date.toLocalDate()}")
@@ -2048,11 +2062,19 @@ class PrayerSettingsRepository @Inject constructor(
             val longitude = prefs.getFloat(KEY_CACHED_LOCATION_LON, 0f).toDouble()
             val city = prefs.getString(KEY_CACHED_LOCATION_CITY, "") ?: ""
             val country = prefs.getString(KEY_CACHED_LOCATION_COUNTRY, "") ?: ""
+            val area = prefs.getString(KEY_CACHED_LOCATION_AREA, "") ?: ""
+            val subLocality = prefs.getString(KEY_CACHED_LOCATION_SUB_LOCALITY, "") ?: ""
+            val thoroughfare = prefs.getString(KEY_CACHED_LOCATION_THOROUGHFARE, "") ?: ""
+            val administrativeArea = prefs.getString(KEY_CACHED_LOCATION_ADMIN_AREA, "") ?: ""
             
             logPrefRead(KEY_CACHED_LOCATION_LAT, latitude, 0f)
             logPrefRead(KEY_CACHED_LOCATION_LON, longitude, 0f)
             logPrefRead(KEY_CACHED_LOCATION_CITY, city, "")
             logPrefRead(KEY_CACHED_LOCATION_COUNTRY, country, "")
+            logPrefRead(KEY_CACHED_LOCATION_AREA, area, "")
+            logPrefRead(KEY_CACHED_LOCATION_SUB_LOCALITY, subLocality, "")
+            logPrefRead(KEY_CACHED_LOCATION_THOROUGHFARE, thoroughfare, "")
+            logPrefRead(KEY_CACHED_LOCATION_ADMIN_AREA, administrativeArea, "")
             
             val location = Location(
                 latitude = latitude,
@@ -2068,7 +2090,11 @@ class PrayerSettingsRepository @Inject constructor(
                     val timezone = prefs.getFloat(KEY_CACHED_LOCATION_TIMEZONE, 0f).toDouble()
                     logPrefRead(KEY_CACHED_LOCATION_TIMEZONE, timezone, 0f)
                     timezone
-                }
+                },
+                area = area,
+                subLocality = subLocality,
+                thoroughfare = thoroughfare,
+                administrativeArea = administrativeArea
             )
             
             DayPrayerTimes(
@@ -2115,6 +2141,10 @@ class PrayerSettingsRepository @Inject constructor(
             remove(KEY_CACHED_LOCATION_COUNTRY)
             remove(KEY_CACHED_LOCATION_COUNTRY_CODE)
             remove(KEY_CACHED_LOCATION_TIMEZONE)
+            remove(KEY_CACHED_LOCATION_AREA)
+            remove(KEY_CACHED_LOCATION_SUB_LOCALITY)
+            remove(KEY_CACHED_LOCATION_THOROUGHFARE)
+            remove(KEY_CACHED_LOCATION_ADMIN_AREA)
             apply()
         }
     }
