@@ -34,6 +34,7 @@ import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
@@ -82,6 +83,24 @@ import androidx.compose.ui.unit.IntSize
 import android.util.Log
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.LaunchedEffect
+import com.starception.submission.feature.prayertimes.components.ElasticTopShape
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import kotlin.math.absoluteValue
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
@@ -90,7 +109,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -385,7 +403,6 @@ fun PrayerTimesScreen(
     
     // PULL-TO-REFRESH STATE - Simple implementation
     var isRefreshing by remember { mutableStateOf(false) }
-    var pullOffset by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
     
     // Track refresh state changes
@@ -469,12 +486,6 @@ fun PrayerTimesScreen(
         entryPoint.enhancedLocationService()
     }
     
-    // Smooth animation for pull offset
-    val animatedPullOffset by animateFloatAsState(
-        targetValue = pullOffset,
-        animationSpec = tween(durationMillis = 100),
-        label = "pullOffset"
-    )
 
     
     // REFRESH LOGIC - Handle pull-to-refresh action with location service checking
@@ -1081,56 +1092,87 @@ fun PrayerTimesScreen(
     
 
     
-    // Simple pull-to-refresh implementation - simplified approach
+    // Wobble pull-to-refresh implementation from platform samples
+    val maxDragDistance = with(LocalDensity.current) { 400.dp.toPx() }
+    var dragDistance by remember { mutableStateOf(0f) }
+    var isWobbling by remember { mutableStateOf(false) }
+    
+    // Animated drag distance with spring physics
+    val dragDistanceAnimated by animateFloatAsState(
+        targetValue = if (dragDistance > 0f) dragDistance else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioHighBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        finishedListener = {
+            if (isWobbling) {
+                isWobbling = false
+                // Trigger refresh when animation completes
+                if (dragDistance > 150f) {
+                    isRefreshing = true
+                }
+            }
+        }
+    )
+    
     Box(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragStart = { 
-                        isDragging = true
-                    },
-                    onDragEnd = {
-                        if (pullOffset > 100f) {
-                            isRefreshing = true
-                        }
-                        pullOffset = 0f
-                        isDragging = false
-                    },
-                    onVerticalDrag = { _, dragAmount ->
-                        if (dragAmount > 0) {
-                            val newOffset = (pullOffset + dragAmount * 0.5f).coerceAtMost(150f)
-                            pullOffset = newOffset
-                        } else {
-                            val newOffset = (pullOffset + dragAmount).coerceAtLeast(0f)
-                            pullOffset = newOffset
-                        }
+            .draggable(
+                onDragStopped = {
+                    isWobbling = true
+                    dragDistance = 0f
+                },
+                orientation = Orientation.Vertical,
+                state = rememberDraggableState { delta ->
+                    isWobbling = false
+                    dragDistance += delta
+                    // Only allow drag down
+                    if (dragDistance < 0f) {
+                        dragDistance = 0f
+                        return@rememberDraggableState
                     }
-                )
-            }
-    ) {
-        // Pull-to-refresh indicators temporarily hidden to remove gaps
-        /*Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .zIndex(10f),
-            contentAlignment = Alignment.Center
-        ) {
-            // Show professional refresh indicator when pulling or refreshing
-            RefreshIndicator(
-                isRefreshing = isRefreshing,
-                pullOffset = pullOffset
+                    if (dragDistance >= maxDragDistance) {
+                        dragDistance = maxDragDistance
+                    }
+                }
             )
-            
-            // Arrow animation temporarily hidden
-            if (!isRefreshing && pullOffset < 30f) {
-                FlowingArrowsAnimation(
-                    isPulling = isDragging,
-                    pullOffset = pullOffset,
-                    isRefreshing = isRefreshing
-                )
+    ) {
+        // Wobble instructions
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = 120.dp)
+        ) {
+            AnimatedVisibility(
+                enter = fadeIn(),
+                exit = fadeOut(),
+                visible = dragDistance == 0f && !isWobbling && !isRefreshing
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Pull down to refresh",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                    )
+                }
             }
-        }*/
+        }
+        
+        // Wobble shape
+        WobbleShape(
+            wobbleShapeHeight = 120.dp,
+            elasticTopPercent = dragDistanceAnimated / maxDragDistance,
+            isRefreshing = isRefreshing
+        )
         
         if (isLoading) {
             // Loading state with Material 3 design
@@ -1153,15 +1195,14 @@ fun PrayerTimesScreen(
                 }
             }
         } else {
-            // REMOVE SCROLL - it conflicts with pull-to-refresh detection
+            // Main content with responsive layout for wobble effect
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp)
                     .padding(
-                        top = 8.dp, // Further reduced for closer gap to Home header
-                        bottom = 0.dp // Eliminate all unused space
+                        top = 8.dp, // Space for wobble effect
+                        bottom = 0.dp
                     ),
                 verticalArrangement = Arrangement.Top
             ) {
@@ -1948,4 +1989,59 @@ private fun getLocationWithCountryCode(
     android.util.Log.d("LocationDisplay", "   📋 Using fallback: cleaned location string")
     return cleanLocationString
 }
+
+/**
+ * Wobble shape composable exactly from Android Platform Samples
+ * Composed of an ElasticTopShape on top of a RectangleShape
+ */
+@Composable
+private fun WobbleShape(wobbleShapeHeight: androidx.compose.ui.unit.Dp, elasticTopPercent: Float, isRefreshing: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Bottom
+    ) {
+        val halfOfTotalWobbleShapeHeight = wobbleShapeHeight.div(2)
+        
+        // Elastic top shape
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(halfOfTotalWobbleShapeHeight)
+                .clip(ElasticTopShape(elasticTopPercent))
+                .background(
+                    if (isRefreshing) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                    } else {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                    }
+                )
+        ) {
+            if (isRefreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+            }
+        }
+        
+        // Rectangle bottom shape
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(halfOfTotalWobbleShapeHeight)
+                .clip(RectangleShape)
+                .background(
+                    if (isRefreshing) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                    } else {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                    }
+                )
+        )
+    }
+}
+
 
