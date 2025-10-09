@@ -36,6 +36,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlin.math.sin
+import kotlin.math.PI
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.*
@@ -1138,51 +1141,42 @@ fun PrayerTimesScreen(
                 }
             )
     ) {
-        // Wobble instructions
+        // Home page content with wobble transformation applied to actual content
         Box(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 120.dp)
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
         ) {
-            AnimatedVisibility(
-                enter = fadeIn(),
-                exit = fadeOut(),
-                visible = dragDistance == 0f && !isWobbling && !isRefreshing
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Pull down to refresh",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                    )
-                }
-            }
-        }
-        
-        // Wobble shape at top for pull-to-refresh
-        if (dragDistanceAnimated > 0f || isRefreshing) {
+            // Wobble instructions
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .offset(y = (-60).dp + (dragDistanceAnimated * 0.3f).dp)
+                    .offset(y = 120.dp)
             ) {
-                WobbleShape(
-                    wobbleShapeHeight = 120.dp,
-                    elasticTopPercent = dragDistanceAnimated / maxDragDistance,
-                    isRefreshing = isRefreshing
-                )
+                AnimatedVisibility(
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    visible = dragDistance == 0f && !isWobbling && !isRefreshing
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Pull down to refresh",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Icon(
+                            imageVector = Icons.Filled.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                        )
+                    }
+                }
             }
-        }
-        
-        if (isLoading) {
+            
+            if (isLoading) {
             // Loading state with Material 3 design
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -1203,22 +1197,46 @@ fun PrayerTimesScreen(
                 }
             }
         } else {
-            // Main content with responsive layout for wobble effect
+            // Main content with wobble transformations applied to actual elements
+            val wobbleIntensity = dragDistanceAnimated / maxDragDistance
+            
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 24.dp)
                     .padding(
-                        top = 8.dp, // Space for wobble effect
+                        top = 8.dp + (wobbleIntensity * 40f).dp, // Dynamic wobble spacing
                         bottom = 0.dp
-                    ),
+                    )
+                    .offset(
+                        x = (sin(wobbleIntensity * PI * 2).toFloat() * 8f).dp,
+                        y = (wobbleIntensity * 20f).dp
+                    )
+                    .graphicsLayer {
+                        // Create elastic deformation effect
+                        scaleY = 1f + (wobbleIntensity * 0.1f)
+                        rotationZ = sin(wobbleIntensity * PI * 3).toFloat() * 2f
+                    },
                 verticalArrangement = Arrangement.Top
             ) {
 
 
                 
-                // Swipeable Big Tiles - Using extracted component with Qibla compass
-                SwipeableBigTiles(
+                // Swipeable Big Tiles with wobble effects
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(
+                            x = (sin(wobbleIntensity * PI * 4).toFloat() * 4f).dp,
+                            y = (sin(wobbleIntensity * PI * 2).toFloat() * 8f).dp
+                        )
+                        .graphicsLayer {
+                            scaleX = 1f + (wobbleIntensity * 0.05f)
+                            scaleY = 1f + (sin(wobbleIntensity * PI * 6).toFloat() * 0.02f)
+                            rotationZ = sin(wobbleIntensity * PI * 5).toFloat() * 1f
+                        }
+                ) {
+                    SwipeableBigTiles(
                     prayerTimes = prayerTimes,
                     currentTime = currentTime,
                     locationService = locationService,
@@ -1247,12 +1265,22 @@ fun PrayerTimesScreen(
                         showCompassPopup = true 
                     }
                 )
+                }
                 
-                // Instruction banner for prayer time adjustment
+                // Instruction banner for prayer time adjustment with wobble
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp), // Match big tiles horizontal constraint
+                        .padding(horizontal = 10.dp) // Match big tiles horizontal constraint
+                        .offset(
+                            x = (sin(wobbleIntensity * PI * 3).toFloat() * 6f).dp,
+                            y = (sin(wobbleIntensity * PI * 4).toFloat() * 4f).dp
+                        )
+                        .graphicsLayer {
+                            scaleX = 1f + (sin(wobbleIntensity * PI * 8).toFloat() * 0.03f)
+                            scaleY = 1f + (wobbleIntensity * 0.04f)
+                            rotationZ = sin(wobbleIntensity * PI * 7).toFloat() * 0.8f
+                        },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
                     ),
@@ -1335,11 +1363,20 @@ fun PrayerTimesScreen(
                 val defaultPrayers = listOf("Dhuhr", "Asr", "Maghrib", "Isha")
                 val additionalPrayers = listOf("Fajr", "Sunrise")
                 
-                // First row: Most relevant prayers (default view)
+                // First row: Most relevant prayers (default view) with wobble
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
+                        .padding(horizontal = 4.dp)
+                        .offset(
+                            x = (sin(wobbleIntensity * PI * 5).toFloat() * 5f).dp,
+                            y = (sin(wobbleIntensity * PI * 3).toFloat() * 6f).dp
+                        )
+                        .graphicsLayer {
+                            scaleX = 1f + (sin(wobbleIntensity * PI * 10).toFloat() * 0.02f)
+                            scaleY = 1f + (wobbleIntensity * 0.03f)
+                            rotationZ = sin(wobbleIntensity * PI * 9).toFloat() * 0.6f
+                        },
                         //.background(Color.Red.copy(alpha = 0.2f)), // DEBUG: Red background for first row
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -1376,11 +1413,20 @@ fun PrayerTimesScreen(
                     )
                 }
                 
-                // Second row: Remaining main prayers
+                // Second row: Remaining main prayers with wobble
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
+                        .padding(horizontal = 4.dp)
+                        .offset(
+                            x = (sin(wobbleIntensity * PI * 6).toFloat() * 4f).dp,
+                            y = (sin(wobbleIntensity * PI * 4).toFloat() * 7f).dp
+                        )
+                        .graphicsLayer {
+                            scaleX = 1f + (sin(wobbleIntensity * PI * 12).toFloat() * 0.025f)
+                            scaleY = 1f + (sin(wobbleIntensity * PI * 2).toFloat() * 0.02f)
+                            rotationZ = sin(wobbleIntensity * PI * 11).toFloat() * 0.7f
+                        },
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Maghrib
@@ -1885,6 +1931,7 @@ fun PrayerTimesScreen(
                 )
             }
         }
+        } // End of wobbly content Box
     }
 }
 
@@ -1998,60 +2045,5 @@ private fun getLocationWithCountryCode(
     return cleanLocationString
 }
 
-/**
- * Wobble shape composable exactly from Android Platform Samples
- * Composed of an ElasticTopShape on top of a RectangleShape
- */
-@Composable
-private fun WobbleShape(wobbleShapeHeight: androidx.compose.ui.unit.Dp, elasticTopPercent: Float, isRefreshing: Boolean) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(wobbleShapeHeight),
-        verticalArrangement = Arrangement.Top
-    ) {
-        val halfOfTotalWobbleShapeHeight = wobbleShapeHeight.div(2)
-        
-        // Elastic top shape
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(halfOfTotalWobbleShapeHeight)
-                .clip(ElasticTopShape(elasticTopPercent))
-                .background(
-                    if (isRefreshing) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                    } else {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                    }
-                )
-        ) {
-            if (isRefreshing) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    strokeWidth = 2.dp
-                )
-            }
-        }
-        
-        // Rectangle bottom shape
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(halfOfTotalWobbleShapeHeight)
-                .clip(RectangleShape)
-                .background(
-                    if (isRefreshing) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                    } else {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                    }
-                )
-        )
-    }
-}
 
 

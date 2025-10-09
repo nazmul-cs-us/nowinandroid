@@ -30,35 +30,35 @@ class ElasticTopShape(private val elasticTopPercent: Float) : Shape {
     ): Outline {
         val elasticTopPercent = elasticTopPercent.coerceIn(-1f, 1f)
 
-        // Need drawn shape to have space for elastic convex top to be drawn.
-        val heightOfBaseRectangle = size.height / 2
+        // Use full height for complete home page wobble
+        val heightOfBaseRectangle = size.height
         val halfWidthOfBaseRectangle = size.width / 2
 
         // The float values that represent values for the elastic band to be full up or fully down.
-        val maxBezierControlPointYElasticUp = -(heightOfBaseRectangle)
+        val maxBezierControlPointYElasticUp = -(size.height * 0.3f) // Allow 30% elastic stretch up
         // 5f is a buffer so user can see a little bit of the elastic band when fully down.
-        val maxBezierControlPointElasticDown = size.height + heightOfBaseRectangle - 5f
+        val maxBezierControlPointElasticDown = size.height + (size.height * 0.3f) - 5f
 
         val bezierControlPointY = if (elasticTopPercent < 0) {
             maxBezierControlPointYElasticUp + ((1 + elasticTopPercent) * size.height)
         } else if (elasticTopPercent == 0f) {
-            heightOfBaseRectangle
+            0f // Flat top when idle
         } else {
             maxBezierControlPointElasticDown - (1f - elasticTopPercent) *
-                (maxBezierControlPointElasticDown - heightOfBaseRectangle)
+                (maxBezierControlPointElasticDown - 0f)
         }
 
         val path = Path().apply {
-            moveTo(0f, heightOfBaseRectangle)
+            moveTo(0f, 0f) // Start from top-left
             quadraticBezierTo(
                 halfWidthOfBaseRectangle, // Half of width as bezier X control point for symmetry.
                 bezierControlPointY,
                 size.width, // curve to this X coordinate.
-                heightOfBaseRectangle // curve to this Y coordinate.
+                0f // curve to top-right
             )
             lineTo(size.width, size.height) // Draw right hand edge of rectangle.
             lineTo(0f, size.height) // Draw bottom edge of rectangle.
-            lineTo(0f, heightOfBaseRectangle) // Draw left hand edge of rectangle.
+            lineTo(0f, 0f) // Draw left hand edge back to top
             close()
         }
         return Outline.Generic(path)
