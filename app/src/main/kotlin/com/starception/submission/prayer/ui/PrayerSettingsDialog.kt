@@ -196,26 +196,56 @@ fun PrayerSettingsDialog(
                     PrayerSettingsScreen(
                         settings = settings,
                         onSettingsChanged = { newSettings ->
-                            Log.i("PrayerSettingsDialog", "📝 ALGORITHM: User changed settings")
+                            Log.i("PrayerSettingsDialog", "")
+                            Log.i("PrayerSettingsDialog", "📝 USER SETTINGS CHANGE DETECTED")
+                            Log.i("PrayerSettingsDialog", "=".repeat(70))
+                            Log.i("PrayerSettingsDialog", "🔄 Processing user settings modification...")
+                            
+                            // Log the specific changes
+                            if (settings.calculationMethod != newSettings.calculationMethod) {
+                                Log.i("PrayerSettingsDialog", "⚙️ Calculation method changed: ${settings.calculationMethod.name} → ${newSettings.calculationMethod.name}")
+                            }
+                            if (settings.asrMadhhab != newSettings.asrMadhhab) {
+                                Log.i("PrayerSettingsDialog", "⚖️ Asr madhhab changed: ${settings.asrMadhhab.name} → ${newSettings.asrMadhhab.name}")
+                            }
+                            if (settings.customIshaAngle != newSettings.customIshaAngle) {
+                                Log.i("PrayerSettingsDialog", "📐 Custom Isha angle changed: ${settings.customIshaAngle}° → ${newSettings.customIshaAngle}°")
+                            }
+                            if (settings.customFajrAngle != newSettings.customFajrAngle) {
+                                Log.i("PrayerSettingsDialog", "📐 Custom Fajr angle changed: ${settings.customFajrAngle}° → ${newSettings.customFajrAngle}°")
+                            }
                             
                             // Haptic feedback for settings change
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            Log.i("PrayerSettingsDialog", "📳 Haptic feedback triggered")
                             
                             // ALGORITHM: Update cached_prayer_settings and recalculate
                             GlobalScope.launch(Dispatchers.IO) {
+                                val saveStartTime = System.currentTimeMillis()
+                                Log.i("PrayerSettingsDialog", "💾 Starting background save operation...")
+                                
                                 try {
                                     // The repository.updateSettings follows the algorithm:
                                     // 1. Update cached_prayer_settings (JSON in preferences)
                                     // 2. Immediately recalculate prayer times
+                                    Log.i("PrayerSettingsDialog", "🔄 Calling repository.updateSettings()...")
                                     repository.updateSettings(newSettings)
+                                    Log.i("PrayerSettingsDialog", "✅ Repository update completed successfully")
                                     
                                     // Update local UI state
                                     withContext(Dispatchers.Main) {
                                         settings = newSettings
-                                        Log.i("PrayerSettingsDialog", "✅ Local UI updated")
+                                        val totalTime = System.currentTimeMillis() - saveStartTime
+                                        Log.i("PrayerSettingsDialog", "✅ Local UI state updated")
+                                        Log.i("PrayerSettingsDialog", "⏱️ Complete save operation took ${totalTime}ms")
+                                        Log.i("PrayerSettingsDialog", "🎯 Settings change processing completed successfully")
+                                        Log.i("PrayerSettingsDialog", "")
                                     }
                                 } catch (e: Exception) {
-                                    Log.e("PrayerSettingsDialog", "❌ Failed to update settings", e)
+                                    val totalTime = System.currentTimeMillis() - saveStartTime
+                                    Log.e("PrayerSettingsDialog", "❌ Settings save failed after ${totalTime}ms", e)
+                                    Log.e("PrayerSettingsDialog", "💥 Error details: ${e.message}")
+                                    Log.i("PrayerSettingsDialog", "")
                                 }
                             }
                         },
