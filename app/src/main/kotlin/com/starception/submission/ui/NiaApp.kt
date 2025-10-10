@@ -195,7 +195,7 @@ internal fun NiaApp(
             modifier = modifier.semantics {
                 testTagsAsResourceId = true
             },
-            containerColor = Color.Transparent,
+            containerColor = MaterialTheme.colorScheme.background,
             contentColor = MaterialTheme.colorScheme.onBackground,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             snackbarHost = {
