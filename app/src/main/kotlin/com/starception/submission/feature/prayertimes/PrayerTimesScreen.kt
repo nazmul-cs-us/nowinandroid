@@ -1128,10 +1128,10 @@ fun PrayerTimesScreen(
                         .padding(vertical = 8.dp)
                 ) {
                     Text(
-                        text = if (wobbleState.dragDistance >= 150f) {
+                        text = if (wobbleState.dragDistance >= 800f) {
                             "Release to refresh location"
                         } else {
-                            "Keep pulling to refresh location"
+                            "Keep pulling down to refresh location"
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
