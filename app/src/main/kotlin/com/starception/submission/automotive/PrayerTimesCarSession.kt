@@ -5,9 +5,9 @@ import androidx.car.app.Screen
 import androidx.car.app.Session
 
 /**
- * Simple Car Session for Prayer Times Android Auto app
+ * Car Session for Prayer Times Android Auto app
  * 
- * No dependency injection - basic session management
+ * Manages the session lifecycle and provides screens for prayer times
  */
 class PrayerTimesCarSession : Session() {
 
@@ -17,6 +17,8 @@ class PrayerTimesCarSession : Session() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Handle new intent if needed
+        // Refresh the current screen when new intent is received
+        carContext.getCarService(androidx.car.app.ScreenManager::class.java)
+            .getTop()?.invalidate()
     }
 }

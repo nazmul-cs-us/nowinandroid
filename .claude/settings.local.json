@@ -81,7 +81,8 @@
       "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/haptics/src/main/java/com/example/platform/ui/haptics/shapes/**)",
       "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/haptics/src/main/java/com/example/platform/ui/haptics/wobble/**)",
       "Read(/Users/smarterai/Documents/GitHub/platform-samples-main/samples/user-interface/haptics/src/main/java/com/example/platform/ui/haptics/wobble/**)",
-      "Bash(screencapture:*)"
+      "Bash(screencapture:*)",
+      "WebFetch(domain:developers.google.com)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
