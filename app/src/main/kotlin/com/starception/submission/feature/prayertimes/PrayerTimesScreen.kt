@@ -1092,40 +1092,90 @@ fun PrayerTimesScreen(
         onRefresh = { isRefreshing = true },
         modifier = modifier
     ) { wobbleState ->
-        // Home page content with wobble transformation applied to actual content
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            // Wobble instructions
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = 120.dp)
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Show pull instruction ONLY when dragging with smooth animation
+            AnimatedVisibility(
+                visible = wobbleState.dragDistance > 30f && !isRefreshing,
+                enter = fadeIn(
+                    animationSpec = tween(
+                        durationMillis = 300,
+                        easing = FastOutSlowInEasing
+                    )
+                ) + slideInVertically(
+                    initialOffsetY = { -it / 2 },
+                    animationSpec = tween(
+                        durationMillis = 300,
+                        easing = FastOutSlowInEasing
+                    )
+                ),
+                exit = fadeOut(
+                    animationSpec = tween(
+                        durationMillis = 200,
+                        easing = LinearOutSlowInEasing
+                    )
+                ) + slideOutVertically(
+                    targetOffsetY = { -it / 2 },
+                    animationSpec = tween(
+                        durationMillis = 200,
+                        easing = LinearOutSlowInEasing
+                    )
+                )
             ) {
-                AnimatedVisibility(
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                    visible = wobbleState.dragDistance == 0f && !wobbleState.isWobbling && !isRefreshing
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Pull down to refresh location",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Icon(
-                            imageVector = Icons.Filled.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                        )
-                    }
+                    Text(
+                        text = if (wobbleState.dragDistance >= 150f) {
+                            "Release to refresh location"
+                        } else {
+                            "Keep pulling to refresh location"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                    )
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
+
+            // Refreshing indicator
+            AnimatedVisibility(
+                visible = isRefreshing,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Refreshing location...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            // Home page content with wobble transformation applied to actual content
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
             
             if (isLoading) {
             // Loading state with Material 3 design
@@ -1861,7 +1911,8 @@ fun PrayerTimesScreen(
             }
         }
         } // End of wobbly content Box
-    }
+        } // End of Column
+    } // End of WobblePullToRefresh
 }
 
 /**
