@@ -1197,43 +1197,40 @@ fun PrayerTimesScreen(
                 }
             }
         } else {
-            // Main content with wobble transformations applied to actual elements
-            val wobbleIntensity = dragDistanceAnimated / maxDragDistance
+            // Main content with simple wobble transformations
+            val wobbleIntensity = (dragDistanceAnimated / maxDragDistance).coerceIn(0f, 1f)
             
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 24.dp)
                     .padding(
-                        top = 8.dp + (wobbleIntensity * 40f).dp, // Dynamic wobble spacing
+                        top = 8.dp + (wobbleIntensity * 30f).dp, // Simple wobble spacing
                         bottom = 0.dp
                     )
                     .offset(
-                        x = (sin(wobbleIntensity * PI * 2).toFloat() * 8f).dp,
-                        y = (wobbleIntensity * 20f).dp
+                        y = (wobbleIntensity * 15f).dp // Simple vertical offset
                     )
                     .graphicsLayer {
-                        // Create elastic deformation effect
-                        scaleY = 1f + (wobbleIntensity * 0.1f)
-                        rotationZ = sin(wobbleIntensity * PI * 3).toFloat() * 2f
+                        // Simple scale effect
+                        scaleY = 1f + (wobbleIntensity * 0.05f)
+                        scaleX = 1f + (wobbleIntensity * 0.02f)
                     },
                 verticalArrangement = Arrangement.Top
             ) {
 
 
                 
-                // Swipeable Big Tiles with wobble effects
+                // Swipeable Big Tiles with simple wobble
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(
-                            x = (sin(wobbleIntensity * PI * 4).toFloat() * 4f).dp,
-                            y = (sin(wobbleIntensity * PI * 2).toFloat() * 8f).dp
+                            y = (wobbleIntensity * 5f).dp
                         )
                         .graphicsLayer {
-                            scaleX = 1f + (wobbleIntensity * 0.05f)
-                            scaleY = 1f + (sin(wobbleIntensity * PI * 6).toFloat() * 0.02f)
-                            rotationZ = sin(wobbleIntensity * PI * 5).toFloat() * 1f
+                            scaleX = 1f + (wobbleIntensity * 0.03f)
+                            scaleY = 1f + (wobbleIntensity * 0.02f)
                         }
                 ) {
                     SwipeableBigTiles(
@@ -1273,13 +1270,11 @@ fun PrayerTimesScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 10.dp) // Match big tiles horizontal constraint
                         .offset(
-                            x = (sin(wobbleIntensity * PI * 3).toFloat() * 6f).dp,
-                            y = (sin(wobbleIntensity * PI * 4).toFloat() * 4f).dp
+                            y = (wobbleIntensity * 3f).dp
                         )
                         .graphicsLayer {
-                            scaleX = 1f + (sin(wobbleIntensity * PI * 8).toFloat() * 0.03f)
-                            scaleY = 1f + (wobbleIntensity * 0.04f)
-                            rotationZ = sin(wobbleIntensity * PI * 7).toFloat() * 0.8f
+                            scaleX = 1f + (wobbleIntensity * 0.02f)
+                            scaleY = 1f + (wobbleIntensity * 0.03f)
                         },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
@@ -1369,13 +1364,11 @@ fun PrayerTimesScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
                         .offset(
-                            x = (sin(wobbleIntensity * PI * 5).toFloat() * 5f).dp,
-                            y = (sin(wobbleIntensity * PI * 3).toFloat() * 6f).dp
+                            y = (wobbleIntensity * 4f).dp
                         )
                         .graphicsLayer {
-                            scaleX = 1f + (sin(wobbleIntensity * PI * 10).toFloat() * 0.02f)
+                            scaleX = 1f + (wobbleIntensity * 0.02f)
                             scaleY = 1f + (wobbleIntensity * 0.03f)
-                            rotationZ = sin(wobbleIntensity * PI * 9).toFloat() * 0.6f
                         },
                         //.background(Color.Red.copy(alpha = 0.2f)), // DEBUG: Red background for first row
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -1419,13 +1412,11 @@ fun PrayerTimesScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
                         .offset(
-                            x = (sin(wobbleIntensity * PI * 6).toFloat() * 4f).dp,
-                            y = (sin(wobbleIntensity * PI * 4).toFloat() * 7f).dp
+                            y = (wobbleIntensity * 6f).dp
                         )
                         .graphicsLayer {
-                            scaleX = 1f + (sin(wobbleIntensity * PI * 12).toFloat() * 0.025f)
-                            scaleY = 1f + (sin(wobbleIntensity * PI * 2).toFloat() * 0.02f)
-                            rotationZ = sin(wobbleIntensity * PI * 11).toFloat() * 0.7f
+                            scaleX = 1f + (wobbleIntensity * 0.025f)
+                            scaleY = 1f + (wobbleIntensity * 0.02f)
                         },
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
