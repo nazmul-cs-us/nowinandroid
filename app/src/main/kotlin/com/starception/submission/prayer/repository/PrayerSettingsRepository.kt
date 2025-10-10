@@ -736,15 +736,39 @@ class PrayerSettingsRepository @Inject constructor(
      */
     @Deprecated("Use separate preference update methods instead")
     fun updateSettings(settings: PrayerSettings, forceCommit: Boolean = false) {
-        Log.i(TAG, "📝 LEGACY USER SETTINGS CHANGE DETECTED - Converting to separate preferences")
+        Log.i(TAG, "")
+        Log.i(TAG, "📝 REPOSITORY UPDATE SETTINGS OPERATION")
+        Log.i(TAG, "=".repeat(80))
+        Log.i(TAG, "🔄 Processing user settings update from UI...")
+        val startTime = System.currentTimeMillis()
         
+        Log.i(TAG, "📊 Settings to save:")
+        Log.i(TAG, "  - Calculation Method: ${settings.calculationMethod.name}")
+        Log.i(TAG, "  - Asr Madhhab: ${settings.asrMadhhab.name}")
+        Log.i(TAG, "  - Custom Fajr Angle: ${settings.customFajrAngle}°")
+        Log.i(TAG, "  - Custom Isha Angle: ${settings.customIshaAngle}°")
+        Log.i(TAG, "  - Method Auto-Detected: ${settings.isMethodAutoDetected}")
+        Log.i(TAG, "  - Madhhab Auto-Detected: ${settings.isMadhhabAutoDetected}")
+        Log.i(TAG, "  - Country: ${settings.autoDetectedCountryName}")
+        Log.i(TAG, "  - Force Commit: $forceCommit")
+        
+        Log.i(TAG, "🔄 Converting legacy settings to separate preference structures...")
         val (calculation, location, notification) = settings.toSeparatePreferences()
         
+        Log.i(TAG, "💾 Saving calculation settings...")
         updateCalculationSettings(calculation, forceCommit)
+        
+        Log.i(TAG, "💾 Saving location preferences...")
         updateLocationPreferences(location, forceCommit)
+        
+        Log.i(TAG, "💾 Saving notification preferences...")
         updateNotificationPreferences(notification, forceCommit)
         
-        Log.i(TAG, "✅ LEGACY SETTINGS UPDATE COMPLETE")
+        val totalTime = System.currentTimeMillis() - startTime
+        Log.i(TAG, "✅ SETTINGS UPDATE OPERATION COMPLETED")
+        Log.i(TAG, "⏱️ Total operation time: ${totalTime}ms")
+        Log.i(TAG, "🎯 All settings have been persisted to SharedPreferences")
+        Log.i(TAG, "")
     }
     
     /**
@@ -2022,19 +2046,59 @@ class PrayerSettingsRepository @Inject constructor(
      * - Support partial cache recovery
      */
     fun getCachedPrayerTimes(): DayPrayerTimes? {
+        Log.i(TAG, "")
+        Log.i(TAG, "💾 CACHE RETRIEVAL OPERATION")
+        Log.i(TAG, "=".repeat(80))
+        Log.i(TAG, "🔍 Checking SharedPreferences for cached prayer times")
+        val startTime = System.currentTimeMillis()
+        
         return try {
             val cachedDateStr = prefs.getString(KEY_CACHED_PRAYER_DATE, null)
             logPrefRead(KEY_CACHED_PRAYER_DATE, cachedDateStr, "null")
-            if (cachedDateStr == null) return null
-            val cachedDate = LocalDate.parse(cachedDateStr)
             
-            // Only return cached data if it's for today
-            if (cachedDate != LocalDate.now()) {
+            if (cachedDateStr == null) {
+                Log.w(TAG, "❌ No cached prayer date found - cache is empty")
+                Log.i(TAG, "⏱️ Cache retrieval completed in ${System.currentTimeMillis() - startTime}ms")
+                Log.i(TAG, "")
                 return null
             }
             
+            Log.i(TAG, "📅 Found cached date: $cachedDateStr")
+            val cachedDate = LocalDate.parse(cachedDateStr)
+            val today = LocalDate.now()
+            Log.i(TAG, "📅 Today's date: $today")
+            Log.i(TAG, "🔄 Date comparison: cached=$cachedDate, today=$today, isToday=${cachedDate == today}")
+            
+            // Only return cached data if it's for today
+            if (cachedDate != today) {
+                Log.w(TAG, "❌ Cached data is stale - cached date is $cachedDate but today is $today")
+                Log.i(TAG, "🗑️ Cache validation failed - will need fresh calculation")
+                Log.i(TAG, "⏱️ Cache retrieval completed in ${System.currentTimeMillis() - startTime}ms")
+                Log.i(TAG, "")
+                return null
+            }
+            
+            Log.i(TAG, "✅ Cache date validation passed - data is for today")
+            Log.i(TAG, "🔍 Checking data completeness...")
+            
             // Check if all required data is present
-            if (!prefs.contains(KEY_CACHED_FAJR) || !prefs.contains(KEY_CACHED_LOCATION_LAT)) {
+            val hasAllRequiredData = prefs.contains(KEY_CACHED_FAJR) && 
+                                   prefs.contains(KEY_CACHED_LOCATION_LAT) &&
+                                   prefs.contains(KEY_CACHED_SUNRISE) &&
+                                   prefs.contains(KEY_CACHED_DHUHR) &&
+                                   prefs.contains(KEY_CACHED_ASR) &&
+                                   prefs.contains(KEY_CACHED_MAGHRIB) &&
+                                   prefs.contains(KEY_CACHED_ISHA)
+            
+            Log.i(TAG, "📊 Cache completeness check:")
+            Log.i(TAG, "  - Prayer times: ${if (prefs.contains(KEY_CACHED_FAJR)) "✅" else "❌"}")
+            Log.i(TAG, "  - Location data: ${if (prefs.contains(KEY_CACHED_LOCATION_LAT)) "✅" else "❌"}")
+            Log.i(TAG, "  - All required data: ${if (hasAllRequiredData) "✅" else "❌"}")
+            
+            if (!hasAllRequiredData) {
+                Log.w(TAG, "❌ Cache data is incomplete - missing required fields")
+                Log.i(TAG, "⏱️ Cache retrieval completed in ${System.currentTimeMillis() - startTime}ms")
+                Log.i(TAG, "")
                 return null
             }
             
@@ -2045,6 +2109,7 @@ class PrayerSettingsRepository @Inject constructor(
             val maghribMinutes = prefs.getInt(KEY_CACHED_MAGHRIB, -1)
             val ishaMinutes = prefs.getInt(KEY_CACHED_ISHA, -1)
             
+            Log.i(TAG, "🕐 Reading cached prayer times (as minutes since midnight):")
             logPrefRead(KEY_CACHED_FAJR, "$fajrMinutes (${LocalTime.ofSecondOfDay((fajrMinutes * 60).toLong())})", -1)
             logPrefRead(KEY_CACHED_SUNRISE, "$sunriseMinutes (${LocalTime.ofSecondOfDay((sunriseMinutes * 60).toLong())})", -1)
             logPrefRead(KEY_CACHED_DHUHR, "$dhuhrMinutes (${LocalTime.ofSecondOfDay((dhuhrMinutes * 60).toLong())})", -1)
@@ -2053,10 +2118,23 @@ class PrayerSettingsRepository @Inject constructor(
             logPrefRead(KEY_CACHED_ISHA, "$ishaMinutes (${LocalTime.ofSecondOfDay((ishaMinutes * 60).toLong())})", -1)
             
             // Validate all times are present
-            if (fajrMinutes == -1 || sunriseMinutes == -1 || dhuhrMinutes == -1 ||
-                asrMinutes == -1 || maghribMinutes == -1 || ishaMinutes == -1) {
+            val invalidTimes = listOf(
+                "Fajr" to fajrMinutes,
+                "Sunrise" to sunriseMinutes, 
+                "Dhuhr" to dhuhrMinutes,
+                "Asr" to asrMinutes,
+                "Maghrib" to maghribMinutes,
+                "Isha" to ishaMinutes
+            ).filter { it.second == -1 }
+            
+            if (invalidTimes.isNotEmpty()) {
+                Log.w(TAG, "❌ Invalid prayer times found: ${invalidTimes.map { it.first }}")
+                Log.i(TAG, "⏱️ Cache retrieval completed in ${System.currentTimeMillis() - startTime}ms")
+                Log.i(TAG, "")
                 return null
             }
+            
+            Log.i(TAG, "✅ All prayer times are valid")
             
             val latitude = prefs.getFloat(KEY_CACHED_LOCATION_LAT, 0f).toDouble()
             val longitude = prefs.getFloat(KEY_CACHED_LOCATION_LON, 0f).toDouble()
