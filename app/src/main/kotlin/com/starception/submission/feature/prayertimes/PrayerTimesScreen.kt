@@ -1096,7 +1096,7 @@ fun PrayerTimesScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             // Wobble instructions
             Box(
