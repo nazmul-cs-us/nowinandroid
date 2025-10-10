@@ -99,6 +99,9 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.LaunchedEffect
 import com.starception.submission.feature.prayertimes.components.ElasticTopShape
+import com.starception.submission.feature.prayertimes.wobble.WobblePullToRefresh
+import com.starception.submission.feature.prayertimes.wobble.wobbleTransform
+import com.starception.submission.feature.prayertimes.utils.convertToArabicNumerals
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -228,20 +231,7 @@ import java.time.Duration
  * - Verify currentTime updates every minute
  * - Track calculation timeouts and error handling
  */
-/**
- * Converts English numerals to Arabic-Indic numerals
- * Example: "12:19 PM" -> "١٢:١٩ PM"
- */
-private fun convertToArabicNumerals(text: String): String {
-    val arabicNumerals = mapOf(
-        '0' to '٠', '1' to '١', '2' to '٢', '3' to '٣', '4' to '٤',
-        '5' to '٥', '6' to '٦', '7' to '٧', '8' to '٨', '9' to '٩'
-    )
-    
-    return text.map { char ->
-        arabicNumerals[char] ?: char
-    }.joinToString("")
-}
+
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -1095,52 +1085,13 @@ fun PrayerTimesScreen(
     
 
     
-    // Wobble pull-to-refresh implementation from platform samples
-    val maxDragDistance = with(LocalDensity.current) { 400.dp.toPx() }
-    var dragDistance by remember { mutableStateOf(0f) }
-    var isWobbling by remember { mutableStateOf(false) }
+    // Use WobblePullToRefresh component
     
-    // Animated drag distance with spring physics
-    val dragDistanceAnimated by animateFloatAsState(
-        targetValue = if (dragDistance > 0f) dragDistance else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioHighBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        finishedListener = {
-            if (isWobbling) {
-                isWobbling = false
-                // Trigger refresh when animation completes
-                if (dragDistance > 150f) {
-                    isRefreshing = true
-                }
-            }
-        }
-    )
-    
-    Box(
+    WobblePullToRefresh(
+        isRefreshing = isRefreshing,
+        onRefresh = { isRefreshing = true },
         modifier = modifier
-            .fillMaxSize()
-            .draggable(
-                onDragStopped = {
-                    isWobbling = true
-                    dragDistance = 0f
-                },
-                orientation = Orientation.Vertical,
-                state = rememberDraggableState { delta ->
-                    isWobbling = false
-                    dragDistance += delta
-                    // Only allow drag down
-                    if (dragDistance < 0f) {
-                        dragDistance = 0f
-                        return@rememberDraggableState
-                    }
-                    if (dragDistance >= maxDragDistance) {
-                        dragDistance = maxDragDistance
-                    }
-                }
-            )
-    ) {
+    ) { wobbleState ->
         // Home page content with wobble transformation applied to actual content
         Box(
             modifier = Modifier
@@ -1156,7 +1107,7 @@ fun PrayerTimesScreen(
                 AnimatedVisibility(
                     enter = fadeIn(),
                     exit = fadeOut(),
-                    visible = dragDistance == 0f && !isWobbling && !isRefreshing
+                    visible = wobbleState.dragDistance == 0f && !wobbleState.isWobbling && !isRefreshing
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -1198,24 +1149,17 @@ fun PrayerTimesScreen(
             }
         } else {
             // Main content with simple wobble transformations
-            val wobbleIntensity = (dragDistanceAnimated / maxDragDistance).coerceIn(0f, 1f)
+            // Use wobbleState.wobbleIntensity from wobbleState
             
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 24.dp)
                     .padding(
-                        top = 8.dp + (wobbleIntensity * 30f).dp, // Simple wobble spacing
+                        top = 8.dp + (wobbleState.wobbleIntensity * 30f).dp, // Simple wobble spacing
                         bottom = 0.dp
                     )
-                    .offset(
-                        y = (wobbleIntensity * 15f).dp // Simple vertical offset
-                    )
-                    .graphicsLayer {
-                        // Simple scale effect
-                        scaleY = 1f + (wobbleIntensity * 0.05f)
-                        scaleX = 1f + (wobbleIntensity * 0.02f)
-                    },
+                    .wobbleTransform(wobbleState.wobbleIntensity),
                 verticalArrangement = Arrangement.Top
             ) {
 
@@ -1225,13 +1169,7 @@ fun PrayerTimesScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(
-                            y = (wobbleIntensity * 5f).dp
-                        )
-                        .graphicsLayer {
-                            scaleX = 1f + (wobbleIntensity * 0.03f)
-                            scaleY = 1f + (wobbleIntensity * 0.02f)
-                        }
+                        .wobbleTransform(wobbleState.wobbleIntensity, offsetMultiplier = 0.33f, scaleMultiplier = 0.6f)
                 ) {
                     SwipeableBigTiles(
                     prayerTimes = prayerTimes,
@@ -1270,11 +1208,11 @@ fun PrayerTimesScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 10.dp) // Match big tiles horizontal constraint
                         .offset(
-                            y = (wobbleIntensity * 3f).dp
+                            y = (wobbleState.wobbleIntensity * 3f).dp
                         )
                         .graphicsLayer {
-                            scaleX = 1f + (wobbleIntensity * 0.02f)
-                            scaleY = 1f + (wobbleIntensity * 0.03f)
+                            scaleX = 1f + (wobbleState.wobbleIntensity * 0.02f)
+                            scaleY = 1f + (wobbleState.wobbleIntensity * 0.03f)
                         },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
@@ -1364,11 +1302,11 @@ fun PrayerTimesScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
                         .offset(
-                            y = (wobbleIntensity * 4f).dp
+                            y = (wobbleState.wobbleIntensity * 4f).dp
                         )
                         .graphicsLayer {
-                            scaleX = 1f + (wobbleIntensity * 0.02f)
-                            scaleY = 1f + (wobbleIntensity * 0.03f)
+                            scaleX = 1f + (wobbleState.wobbleIntensity * 0.02f)
+                            scaleY = 1f + (wobbleState.wobbleIntensity * 0.03f)
                         },
                         //.background(Color.Red.copy(alpha = 0.2f)), // DEBUG: Red background for first row
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -1412,11 +1350,11 @@ fun PrayerTimesScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
                         .offset(
-                            y = (wobbleIntensity * 6f).dp
+                            y = (wobbleState.wobbleIntensity * 6f).dp
                         )
                         .graphicsLayer {
-                            scaleX = 1f + (wobbleIntensity * 0.025f)
-                            scaleY = 1f + (wobbleIntensity * 0.02f)
+                            scaleX = 1f + (wobbleState.wobbleIntensity * 0.025f)
+                            scaleY = 1f + (wobbleState.wobbleIntensity * 0.02f)
                         },
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
