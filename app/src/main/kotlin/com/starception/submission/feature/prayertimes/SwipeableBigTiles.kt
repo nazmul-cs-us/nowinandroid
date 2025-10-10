@@ -128,7 +128,13 @@ fun Modifier.geminiGradientEdge(
     topStart: Dp = 16.dp,
     topEnd: Dp = 16.dp,
     bottomStart: Dp = 16.dp,
-    bottomEnd: Dp = 16.dp
+    bottomEnd: Dp = 16.dp,
+    gradientColors: List<Color> = listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.secondary,
+        MaterialTheme.colorScheme.tertiary,
+        MaterialTheme.colorScheme.primaryContainer
+    )
 ): Modifier {
     val infiniteTransition = rememberInfiniteTransition(label = "geminiGradient")
     
@@ -160,13 +166,8 @@ fun Modifier.geminiGradientEdge(
         val shineProgress = shinePosition * perimeter
         val shineSize = 80f // Size of the traveling shine
         
-        // Create the gradient colors using Material 3 theme
-        val geminiColors = listOf(
-            Color(0xFF4CAF50), // Green - keeping for now, will be passed as parameter
-            Color(0xFF2196F3), // Blue
-            Color(0xFFE91E63), // Red
-            Color(0xFFFFEB3B)  // Yellow
-        )
+        // Use the gradient colors passed as parameters
+        val geminiColors = gradientColors
         
         // Draw a glowing edge that travels around the rounded perimeter
         when {
@@ -323,7 +324,13 @@ fun Modifier.sunshineAura(
     topStart: Dp = 20.dp,
     topEnd: Dp = 20.dp,
     bottomStart: Dp = 20.dp,
-    bottomEnd: Dp = 20.dp
+    bottomEnd: Dp = 20.dp,
+    auraColors: List<Color> = listOf(
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+        MaterialTheme.colorScheme.primaryContainer,
+        MaterialTheme.colorScheme.surface,
+        MaterialTheme.colorScheme.surfaceVariant
+    )
 ): Modifier {
     val infiniteTransition = rememberInfiniteTransition(label = "sunshineAura")
     
@@ -364,12 +371,12 @@ fun Modifier.sunshineAura(
         val bottomStartPx = bottomStart.toPx()
         val bottomEndPx = bottomEnd.toPx()
         
-        // Divine golden aura with enhanced layers (temporarily keeping hardcoded)
+        // Divine aura with theme-aware colors
         val auralayers = listOf(
-            Triple(16.dp.toPx(), primaryGlow * 1.1f, Color(0xFFFFD700)),      // Inner gold
-            Triple(26.dp.toPx(), primaryGlow * 0.9f, Color(0xFFFFE55C)),      // Mid gold  
-            Triple(36.dp.toPx(), primaryGlow * 0.7f, Color(0xFFFFF8DC)),      // Light cream
-            Triple(46.dp.toPx(), secondaryPulse * 0.5f, Color(0xFFFFFAF0)),   // Softest outer
+            Triple(16.dp.toPx(), primaryGlow * 1.1f, auraColors.getOrElse(0) { auraColors.first() }),      // Inner
+            Triple(26.dp.toPx(), primaryGlow * 0.9f, auraColors.getOrElse(1) { auraColors.first() }),      // Mid  
+            Triple(36.dp.toPx(), primaryGlow * 0.7f, auraColors.getOrElse(2) { auraColors.first() }),      // Light
+            Triple(46.dp.toPx(), secondaryPulse * 0.5f, auraColors.getOrElse(3) { auraColors.first() }),   // Outer
         )
         
         // Draw each aura layer
@@ -473,9 +480,9 @@ fun Modifier.sunshineAura(
                 path = highlightPath,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        Color(0xFFFFFFFF).copy(alpha = highlightAlpha * 0.8f),
-                        Color(0xFFFFE55C).copy(alpha = highlightAlpha * 0.5f),
-                        Color(0xFFFFD700).copy(alpha = highlightAlpha * 0.3f),
+                        auraColors.getOrElse(0) { auraColors.first() }.copy(alpha = highlightAlpha * 0.8f),
+                        auraColors.getOrElse(1) { auraColors.first() }.copy(alpha = highlightAlpha * 0.5f),
+                        auraColors.getOrElse(2) { auraColors.first() }.copy(alpha = highlightAlpha * 0.3f),
                         Color.Transparent
                     ),
                     start = Offset(0f, 0f),
