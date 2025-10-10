@@ -10,11 +10,12 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
-import androidx.lifecycle.lifecycleScope
 import com.starception.submission.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -129,8 +130,9 @@ class PrayerTimesMainScreen(carContext: CarContext) : Screen(carContext) {
             .build()
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     private fun loadSimplePrayerTimes() {
-        lifecycleScope.launch {
+        GlobalScope.launch {
             _isLoading.value = true
             
             // Simulate loading delay
