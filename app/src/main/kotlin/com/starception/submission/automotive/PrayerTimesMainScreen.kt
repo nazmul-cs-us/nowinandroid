@@ -14,18 +14,23 @@ import com.starception.submission.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 /**
- * Simple Android Auto screen displaying prayer times
+ * Android Auto screen displaying Islamic prayer times
  * 
- * No dependency injection - uses hardcoded data for demonstration
+ * Optimized for car displays with simple, distraction-free interface
  */
 class PrayerTimesMainScreen(carContext: CarContext) : Screen(carContext) {
+    
+    // Create a supervised scope for this screen
+    private val screenScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     // Simple data class for prayer times
     data class SimplePrayerTime(
@@ -130,9 +135,8 @@ class PrayerTimesMainScreen(carContext: CarContext) : Screen(carContext) {
             .build()
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
     private fun loadSimplePrayerTimes() {
-        GlobalScope.launch {
+        screenScope.launch {
             _isLoading.value = true
             
             // Simulate loading delay
