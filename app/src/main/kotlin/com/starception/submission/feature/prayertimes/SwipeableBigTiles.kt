@@ -712,6 +712,7 @@ fun SwipeableBigTiles(
     getPrayerProgress: () -> Pair<Int, Int>,
     getDailyStatsTitle: () -> String,
     getDailyStatsMessage: () -> String,
+    getCurrentActivity: () -> String,
     onCompassClick: () -> Unit
 ) {
     // Swipeable Big Tiles - HorizontalPager with 3 tiles and infinite scroll
@@ -748,7 +749,8 @@ fun SwipeableBigTiles(
                     getSmartTitle = getSmartTitle,
                     getSmartContent = getSmartContent,
                     getCurrentDate = getCurrentDate,
-                    getSmartFooter = getSmartFooter
+                    getSmartFooter = getSmartFooter,
+                    getCurrentActivity = getCurrentActivity
                 )
                 2 -> DailyStatsTile(
                     getPrayerProgress = getPrayerProgress,
@@ -1058,7 +1060,8 @@ private fun SmartInfoTile(
     getSmartTitle: () -> String,
     getSmartContent: () -> String,
     getCurrentDate: () -> String,
-    getSmartFooter: () -> String
+    getSmartFooter: () -> String,
+    getCurrentActivity: () -> String
 ) {
     Surface(
         modifier = Modifier
@@ -1083,10 +1086,10 @@ private fun SmartInfoTile(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Smart indicator
+                // Smart indicator with activity tracking
                 SmartIndicator(
-                    icon = Icons.Default.Schedule,
-                    label = "Prayer Status",
+                    icon = Icons.Default.Psychology,
+                    label = "Smart Tracking",
                     color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.align(Alignment.Start)
                 )
@@ -1120,17 +1123,32 @@ private fun SmartInfoTile(
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 2,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Current activity display
+                    val currentActivity = getCurrentActivity()
+                    Text(
+                        text = currentActivity,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
                 
-                // Bottom section - date context
+                // Bottom section - activity status
                 Text(
-                    text = getCurrentDate(),
+                    text = "🔊 Beeps when activity changes",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,

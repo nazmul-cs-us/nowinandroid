@@ -1244,6 +1244,14 @@ fun PrayerTimesScreen(
                         val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
                         SmartContentUtils.getDailyStatsMessage(completed, total) 
                     },
+                    getCurrentActivity = { 
+                        // Get current activity from ActivityTracker
+                        try {
+                            com.starception.submission.util.ActivityTracker.getCurrentActivity()
+                        } catch (e: Exception) {
+                            "UNKNOWN"
+                        }
+                    },
                     onCompassClick = { 
                         Log.d("PrayerTimes", "Compass clicked, showing popup")
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)

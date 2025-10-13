@@ -910,6 +910,7 @@ class PrayerSettingsRepository @Inject constructor(
             location = location ?: current.location
         )
         updateLocationPreferences(updated, forceCommit = true)
+        Log.i(TAG, "🔔 latthi mar!")
     }
     
     fun updateNotificationSound(sound: String) {
