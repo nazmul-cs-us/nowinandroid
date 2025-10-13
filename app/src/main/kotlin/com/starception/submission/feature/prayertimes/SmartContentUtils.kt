@@ -344,22 +344,19 @@ object SmartContentUtils {
                 val elapsedText = formatNotificationElapsedTime(elapsedMinutes)
                 val content = "$elapsedText since $prayerName"
                 
-                // Calculate prayer phase (same logic as notification service)
-                val phaseAction = when {
-                    elapsedMinutes <= 20 -> "Go to Mosque"
-                    elapsedMinutes <= 60 -> "Best Time" 
-                    else -> "Make Time"
+                // Calculate prayer phase (exact same logic and format as notification service)
+                val title = when {
+                    elapsedMinutes <= 20 -> "Go to Mosque for $prayerName"
+                    elapsedMinutes <= 60 -> "Best Time to Pray $prayerName"
+                    else -> "Make Time for $prayerName"
                 }
                 
-                // Title includes phase and prayer name to match notification format
-                val title = "$phaseAction for $prayerName"
-                
-                // Next prayer countdown with "Next:" prefix to match notification
+                // Next prayer countdown with "Next •" format to match notification exactly
                 val nextPrayerText = if (nextPrayer != null) {
                     val (nextName, nextTime) = nextPrayer
                     val timeUntilNext = Duration.between(currentTime, nextTime)
                     val nextFormatted = formatNotificationTimeRemaining(timeUntilNext.toMinutes())
-                    "Next: $nextName in $nextFormatted"
+                    "Next • $nextName in $nextFormatted"
                 } else ""
                 
                 return NotificationSyncContent(
@@ -377,16 +374,18 @@ object SmartContentUtils {
     
     /**
      * Format elapsed time exactly like the notification service
+     * Uses "minutes" spelled out for < 60 minutes, abbreviated for >= 60 minutes
      */
     private fun formatNotificationElapsedTime(minutes: Long): String {
         return when {
-            minutes < 60 -> "${minutes}m"
+            minutes == 0L -> "Just started"
+            minutes == 1L -> "1 minute"
+            minutes < 60 -> "$minutes minutes"
             else -> {
                 val hours = minutes / 60
                 val remainingMinutes = minutes % 60
                 when {
                     remainingMinutes == 0L -> "${hours}h"
-                    hours == 1L -> "1h ${remainingMinutes}m"
                     else -> "${hours}h ${remainingMinutes}m"
                 }
             }
