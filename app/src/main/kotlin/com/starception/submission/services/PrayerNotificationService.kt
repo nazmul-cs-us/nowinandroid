@@ -3,6 +3,7 @@ package com.starception.submission.services
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Build
@@ -15,6 +16,18 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.annotation.RequiresApi
 import com.starception.submission.R
+import com.google.android.gms.location.ActivityRecognition
+import com.google.android.gms.location.ActivityRecognitionClient
+import com.google.android.gms.location.DetectedActivity
+import com.google.android.gms.location.ActivityTransition
+import com.google.android.gms.location.ActivityTransitionRequest
+import com.google.android.gms.location.ActivityTransitionResult
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.ToneGenerator
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTime
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
@@ -22,6 +35,7 @@ import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.util.PrayerNotificationManager
 import com.starception.submission.util.GoogleSampleNotificationManager
 import com.starception.submission.util.AnrPreventionConfig
+import com.starception.submission.util.ActivityTracker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -52,6 +66,13 @@ class PrayerNotificationService : Service() {
     // Live Update notification manager (separate from foreground service)
     private lateinit var notificationManager: NotificationManager
     
+    // Activity Recognition
+    private lateinit var activityRecognitionClient: ActivityRecognitionClient
+    private var activityTransitionPendingIntent: PendingIntent? = null
+    private var currentActivity: String = "UNKNOWN"
+    private var activityReceiver: ActivityTransitionReceiver? = null
+    private var toneGenerator: ToneGenerator? = null
+    
     companion object {
         private const val TAG = "PrayerNotificationService"
         
@@ -59,6 +80,9 @@ class PrayerNotificationService : Service() {
         private const val NOTIFICATION_CHANNEL_ID = "prayer_live_update_channel"
         private const val NOTIFICATION_ID = 1001  // Foreground service notification ID
         private const val LIVE_UPDATE_NOTIFICATION_ID = 1002 // Separate Live Update notification ID
+        
+        // Activity recognition action
+        private const val ACTIVITY_TRANSITION_ACTION = "com.starception.submission.ACTIVITY_TRANSITION"
         
         // Check if service is running in another process (NON-BLOCKING with timeout)
         fun isServiceRunningInAnotherProcess(context: android.content.Context): Boolean {
@@ -114,6 +138,12 @@ class PrayerNotificationService : Service() {
             // Initialize notification manager for separate Live Update notifications
             notificationManager = getSystemService(NotificationManager::class.java)
             Log.d(TAG, "✓ Live Update notification manager initialized separately from foreground service")
+            
+            // Initialize activity recognition
+            initializeActivityRecognition()
+            
+            // Initialize ActivityTracker with initial state
+            ActivityTracker.updateActivity("STILL")
             
             Log.d(TAG, "✓ Service onCreate completed successfully")
         } catch (e: Exception) {
@@ -1174,6 +1204,237 @@ class PrayerNotificationService : Service() {
         return prayerData.fifth
     }
     
+    /**
+     * Initialize Activity Recognition
+     */
+    private fun initializeActivityRecognition() {
+        try {
+            activityRecognitionClient = ActivityRecognition.getClient(this)
+            
+            // Initialize tone generator for beep notifications
+            toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+            
+            // Create receiver for activity transitions
+            activityReceiver = ActivityTransitionReceiver()
+            val filter = IntentFilter(ACTIVITY_TRANSITION_ACTION)
+            registerReceiver(activityReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            
+            // Create pending intent for activity transitions
+            val intent = Intent(ACTIVITY_TRANSITION_ACTION)
+            activityTransitionPendingIntent = PendingIntent.getBroadcast(
+                this, 
+                0, 
+                intent, 
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            )
+            
+            // Start activity recognition
+            startActivityRecognition()
+            
+            Log.d(TAG, "✓ Activity recognition initialized successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize activity recognition: ${e.message}")
+        }
+    }
+    
+    /**
+     * Start activity recognition updates
+     */
+    private fun startActivityRecognition() {
+        try {
+            // Define activity transitions we want to detect
+            val transitions = mutableListOf<ActivityTransition>()
+            
+            val activities = listOf(
+                DetectedActivity.STILL,
+                DetectedActivity.WALKING,
+                DetectedActivity.RUNNING,
+                DetectedActivity.ON_BICYCLE,
+                DetectedActivity.IN_VEHICLE,
+                DetectedActivity.ON_FOOT,
+                DetectedActivity.TILTING
+            )
+            
+            activities.forEach { activity ->
+                transitions.add(
+                    ActivityTransition.Builder()
+                        .setActivityType(activity)
+                        .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+                        .build()
+                )
+                transitions.add(
+                    ActivityTransition.Builder()
+                        .setActivityType(activity)
+                        .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_EXIT)
+                        .build()
+                )
+            }
+            
+            val request = ActivityTransitionRequest(transitions)
+            
+            activityTransitionPendingIntent?.let { pendingIntent ->
+                activityRecognitionClient.requestActivityTransitionUpdates(request, pendingIntent)
+                    .addOnSuccessListener {
+                        Log.d(TAG, "✓ Activity transition updates requested successfully")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e(TAG, "Failed to request activity transition updates: ${e.message}")
+                    }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting activity recognition: ${e.message}")
+        }
+    }
+    
+    /**
+     * Get current activity for display
+     */
+    fun getCurrentActivity(): String {
+        return currentActivity
+    }
+    
+    /**
+     * Activity Transition Receiver
+     */
+    inner class ActivityTransitionReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (ActivityTransitionResult.hasResult(intent)) {
+                val result = ActivityTransitionResult.extractResult(intent)
+                result?.let { transitionResult ->
+                    for (event in transitionResult.transitionEvents) {
+                        val activityType = getActivityString(event.activityType)
+                        val transitionType = getTransitionString(event.transitionType)
+                        
+                        Log.d(TAG, "🏃 Activity Transition: $activityType - $transitionType")
+                        
+                        // Update current activity when entering a new activity
+                        if (event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER) {
+                            val previousActivity = currentActivity
+                            currentActivity = activityType
+                            
+                            // Only notify if activity actually changed
+                            if (previousActivity != currentActivity) {
+                                // Update ActivityTracker for UI components
+                                ActivityTracker.updateActivity(currentActivity)
+                                
+                                // Play beep notification
+                                playActivityChangeBeep()
+                                
+                                Log.i(TAG, "🔄 Activity changed from $previousActivity to $currentActivity")
+                                
+                                // Optionally send notification
+                                showActivityChangeNotification(currentActivity)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Play beep sound when activity changes
+     */
+    private fun playActivityChangeBeep() {
+        try {
+            // Play a short beep tone
+            toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
+            
+            // Also vibrate briefly if available
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            vibrator?.let {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    it.vibrate(VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.vibrate(100)
+                }
+            }
+            
+            Log.d(TAG, "🔊 Activity change beep played")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to play activity change beep: ${e.message}")
+        }
+    }
+    
+    /**
+     * Show notification when activity changes
+     */
+    private fun showActivityChangeNotification(activity: String) {
+        try {
+            val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+                .setContentTitle("Activity Changed")
+                .setContentText("Now: $activity")
+                .setSmallIcon(R.drawable.ic_prayer)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setAutoCancel(true)
+                .setSilent(true) // Silent since we play beep manually
+                .build()
+            
+            notificationManager.notify(1003, notification) // Different ID from other notifications
+            
+            Log.d(TAG, "📱 Activity change notification shown: $activity")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to show activity change notification: ${e.message}")
+        }
+    }
+    
+    /**
+     * Convert activity type to readable string
+     */
+    private fun getActivityString(activityType: Int): String {
+        return when (activityType) {
+            DetectedActivity.STILL -> "STILL"
+            DetectedActivity.WALKING -> "WALKING"
+            DetectedActivity.RUNNING -> "RUNNING"
+            DetectedActivity.ON_BICYCLE -> "CYCLING"
+            DetectedActivity.IN_VEHICLE -> "DRIVING"
+            DetectedActivity.ON_FOOT -> "ON_FOOT"
+            DetectedActivity.TILTING -> "TILTING"
+            DetectedActivity.UNKNOWN -> "UNKNOWN"
+            else -> "OTHER"
+        }
+    }
+    
+    /**
+     * Convert transition type to readable string
+     */
+    private fun getTransitionString(transitionType: Int): String {
+        return when (transitionType) {
+            ActivityTransition.ACTIVITY_TRANSITION_ENTER -> "ENTER"
+            ActivityTransition.ACTIVITY_TRANSITION_EXIT -> "EXIT"
+            else -> "UNKNOWN"
+        }
+    }
+    
+    /**
+     * Stop activity recognition updates
+     */
+    private fun stopActivityRecognition() {
+        try {
+            activityTransitionPendingIntent?.let { pendingIntent ->
+                activityRecognitionClient.removeActivityTransitionUpdates(pendingIntent)
+                    .addOnSuccessListener {
+                        Log.d(TAG, "✓ Activity transition updates removed successfully")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e(TAG, "Failed to remove activity transition updates: ${e.message}")
+                    }
+            }
+            
+            activityReceiver?.let {
+                unregisterReceiver(it)
+                activityReceiver = null
+            }
+            
+            toneGenerator?.release()
+            toneGenerator = null
+            
+            Log.d(TAG, "✓ Activity recognition stopped")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping activity recognition: ${e.message}")
+        }
+    }
 
     
     override fun onDestroy() {
@@ -1201,6 +1462,13 @@ class PrayerNotificationService : Service() {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Error cleaning up notifications", e)
+            }
+            
+            // Stop activity recognition
+            try {
+                stopActivityRecognition()
+            } catch (e: Exception) {
+                Log.w(TAG, "Error stopping activity recognition", e)
             }
             
             Log.d(TAG, "Modern service cleanup completed successfully")

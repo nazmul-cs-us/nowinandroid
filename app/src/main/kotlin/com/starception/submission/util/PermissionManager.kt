@@ -21,6 +21,7 @@ import androidx.fragment.app.FragmentActivity
  * PERMISSIONS MANAGED:
  * - Location permissions (fine and coarse) for accurate prayer time calculations
  * - Notification permissions (Android 13+) for prayer alerts
+ * - Activity recognition permissions for activity tracking with beep notifications
  * - Location services checking for GPS/Network availability
  * 
  * FEATURES:
@@ -45,6 +46,7 @@ class PermissionManager(private val activity: FragmentActivity) {
         // PERMISSION REQUEST CODES - Used to identify permission results
         const val LOCATION_PERMISSION_REQUEST_CODE = 1001     // For location permissions
         const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002 // For notification permissions
+        const val ACTIVITY_RECOGNITION_REQUEST_CODE = 1003    // For activity recognition permissions
     }
     
     /**
@@ -97,6 +99,33 @@ class PermissionManager(private val activity: FragmentActivity) {
             ) == PackageManager.PERMISSION_GRANTED
         } else {
             // Pre-Android 13: Notifications enabled by default, no permission needed
+            true
+        }
+    }
+    
+    /**
+     * ACTIVITY RECOGNITION PERMISSION CHECKER: Verifies if activity recognition permission is granted
+     * 
+     * Android 10+ requires explicit activity recognition permission to detect user activity changes.
+     * This permission is needed for beep notifications when activity changes.
+     * 
+     * VERSION HANDLING:
+     * - Android 10+: Checks ACTIVITY_RECOGNITION permission
+     * - Android 9 and below: Always returns true (no permission required)
+     * 
+     * EDIT THIS TO:
+     * - Add activity confidence level checking
+     * - Include specific activity type permission handling
+     */
+    fun isActivityRecognitionPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10+: Explicit activity recognition permission required
+            ContextCompat.checkSelfPermission(
+                activity,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            // Pre-Android 10: No permission needed for activity recognition
             true
         }
     }
@@ -167,12 +196,43 @@ class PermissionManager(private val activity: FragmentActivity) {
     }
     
     /**
+     * ACTIVITY RECOGNITION PERMISSION REQUESTER: Requests activity recognition permission from user
+     * 
+     * Shows system permission dialog for activity recognition access.
+     * This enables the app to detect when user's activity changes (walking, driving, etc.)
+     * and provide beep notifications.
+     * 
+     * PERMISSION FLOW:
+     * 1. Check if permission already granted
+     * 2. Show system permission dialog
+     * 3. Handle user response in onRequestPermissionsResult
+     * 
+     * EDIT THIS TO:
+     * - Add permission rationale dialog before requesting
+     * - Add custom permission explanation UI
+     */
+    fun requestActivityRecognitionPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isActivityRecognitionPermissionGranted()) {
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),
+                ACTIVITY_RECOGNITION_REQUEST_CODE
+            )
+        }
+    }
+    
+    /**
      * Check and request all necessary permissions
      */
     fun checkAndRequestPermissions() {
         // Request location permission if not granted
         if (!isLocationPermissionGranted()) {
             requestLocationPermission()
+        }
+        
+        // Request activity recognition permission if not granted
+        if (!isActivityRecognitionPermissionGranted()) {
+            requestActivityRecognitionPermission()
         }
         
         // Note: Notification permission is NOT requested automatically on startup
@@ -186,6 +246,11 @@ class PermissionManager(private val activity: FragmentActivity) {
     fun requestNotificationPermissionOnPrayerTimesOpen() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !isNotificationPermissionGranted()) {
             requestNotificationPermission()
+        }
+        
+        // Also request activity recognition permission for beep notifications
+        if (!isActivityRecognitionPermissionGranted()) {
+            requestActivityRecognitionPermission()
         }
     }
     
