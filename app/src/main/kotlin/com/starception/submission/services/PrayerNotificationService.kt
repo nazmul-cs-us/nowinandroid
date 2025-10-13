@@ -1220,12 +1220,15 @@ class PrayerNotificationService : Service() {
             registerReceiver(activityReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
             
             // Create pending intent for activity transitions
-            val intent = Intent(ACTIVITY_TRANSITION_ACTION)
+            // Note: Using explicit intent with component name for Android 14+ compatibility
+            val intent = Intent(ACTIVITY_TRANSITION_ACTION).apply {
+                setPackage(packageName) // Make intent explicit for Android 14+ security requirements
+            }
             activityTransitionPendingIntent = PendingIntent.getBroadcast(
                 this, 
                 0, 
                 intent, 
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             
             // Start activity recognition
@@ -1243,16 +1246,16 @@ class PrayerNotificationService : Service() {
     private fun startActivityRecognition() {
         try {
             // Define activity transitions we want to detect
+            // Using only commonly supported activities to avoid compatibility issues
             val transitions = mutableListOf<ActivityTransition>()
             
+            // Only use the most commonly supported activity types across all devices
             val activities = listOf(
-                DetectedActivity.STILL,
-                DetectedActivity.WALKING,
-                DetectedActivity.RUNNING,
-                DetectedActivity.ON_BICYCLE,
-                DetectedActivity.IN_VEHICLE,
-                DetectedActivity.ON_FOOT,
-                DetectedActivity.TILTING
+                DetectedActivity.STILL,        // Stationary (widely supported)
+                DetectedActivity.WALKING,      // Walking (widely supported)
+                DetectedActivity.RUNNING,      // Running (widely supported)
+                DetectedActivity.IN_VEHICLE    // In vehicle (widely supported)
+                // Removed: ON_BICYCLE, ON_FOOT, TILTING (not universally supported)
             )
             
             activities.forEach { activity ->
@@ -1275,14 +1278,18 @@ class PrayerNotificationService : Service() {
             activityTransitionPendingIntent?.let { pendingIntent ->
                 activityRecognitionClient.requestActivityTransitionUpdates(request, pendingIntent)
                     .addOnSuccessListener {
-                        Log.d(TAG, "✓ Activity transition updates requested successfully")
+                        Log.i(TAG, "✅ Activity transition updates requested successfully")
+                        Log.i(TAG, "📊 Tracking activities: ${activities.map { getActivityString(it) }.joinToString(", ")}")
                     }
                     .addOnFailureListener { e ->
-                        Log.e(TAG, "Failed to request activity transition updates: ${e.message}")
+                        Log.e(TAG, "❌ Failed to request activity transition updates: ${e.message}")
+                        Log.e(TAG, "🔍 This may indicate permission issues or unsupported device configuration")
                     }
+            } ?: run {
+                Log.e(TAG, "❌ Cannot start activity recognition: PendingIntent is null")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error starting activity recognition: ${e.message}")
+            Log.e(TAG, "❌ Error starting activity recognition: ${e.message}", e)
         }
     }
     

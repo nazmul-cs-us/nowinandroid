@@ -263,6 +263,13 @@ class MainActivity : FragmentActivity() {
                     Log.d("MainActivity", "Notification permission denied")
                 }
             }
+            PermissionManager.ACTIVITY_RECOGNITION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    Log.d("MainActivity", "Activity recognition permission granted")
+                } else {
+                    Log.d("MainActivity", "Activity recognition permission denied")
+                }
+            }
         }
     }
 
