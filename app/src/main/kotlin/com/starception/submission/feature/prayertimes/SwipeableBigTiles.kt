@@ -1091,86 +1091,125 @@ private fun SmartInfoTile(
         color = MaterialTheme.colorScheme.secondaryContainer,
         shadowElevation = 2.dp
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // Smart indicator
+            SmartIndicator(
+                icon = Icons.Default.Psychology,
+                label = "Smart Tracking",
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.align(Alignment.Start)
+            )
+            
+            // Main content - Side-by-side layout with proper alignment
             Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Smart indicator with activity tracking
-                SmartIndicator(
-                    icon = Icons.Default.Psychology,
-                    label = "Smart Tracking",
-                    color = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.align(Alignment.Start)
-                )
-                
-                // Main content section - takes more space
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                // Labels row - ensures they're on the same horizontal line
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Dynamic title based on time of day
                     Text(
-                        text = getSmartTitle(),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
-                    )
-                    
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Main prayer time content - slightly reduced size to make room
-                    Text(
-                        text = getSmartContent(),
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    
-                    Spacer(modifier = Modifier.height(6.dp))
-                    
-                    // Current activity display - adjusted for better visibility
-                    val currentActivity = getCurrentActivity()
-                    Text(
-                        text = currentActivity,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                        textAlign = TextAlign.Center,
+                        text = "Prayer Time",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp)
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    Spacer(modifier = Modifier.width(3.dp))
+                    
+                    Text(
+                        text = "Activity",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f)
                     )
                 }
                 
-                // Bottom section - activity status
-                Text(
-                    text = "🔊 Beeps when activity changes",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Content row with separator - ensures proper vertical alignment
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left: Prayer Time content
+                    Text(
+                        text = getSmartContent(),
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontSize = 22.sp,
+                            letterSpacing = (-0.4).sp
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    // Vertical divider with gradient effect
+                    Box(
+                        modifier = Modifier
+                            .width(3.dp)
+                            .height(60.dp)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f),
+                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                shape = RoundedCornerShape(2.dp)
+                            )
+                    )
+                    
+                    // Right: Activity content
+                    val currentActivity = getCurrentActivity()
+                    Text(
+                        text = currentActivity,
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontSize = 22.sp,
+                            letterSpacing = (-0.3).sp
+                        ),
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
+            
+            // Footer
+            Text(
+                text = "🔊 Beeps when activity changes",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
