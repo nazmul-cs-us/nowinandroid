@@ -345,22 +345,25 @@ object SmartContentUtils {
                 val content = "$elapsedText since $prayerName"
                 
                 // Calculate prayer phase (same logic as notification service)
-                val phase = when {
+                val phaseAction = when {
                     elapsedMinutes <= 20 -> "Go to Mosque"
                     elapsedMinutes <= 60 -> "Best Time" 
                     else -> "Make Time"
                 }
                 
-                // Next prayer countdown
+                // Title includes phase and prayer name to match notification format
+                val title = "$phaseAction for $prayerName"
+                
+                // Next prayer countdown with "Next:" prefix to match notification
                 val nextPrayerText = if (nextPrayer != null) {
                     val (nextName, nextTime) = nextPrayer
                     val timeUntilNext = Duration.between(currentTime, nextTime)
                     val nextFormatted = formatNotificationTimeRemaining(timeUntilNext.toMinutes())
-                    "$nextName in $nextFormatted"
+                    "Next: $nextName in $nextFormatted"
                 } else ""
                 
                 return NotificationSyncContent(
-                    title = phase,
+                    title = title,
                     content = content,
                     nextPrayerInfo = nextPrayerText
                 )
