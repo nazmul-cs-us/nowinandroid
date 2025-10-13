@@ -871,7 +871,7 @@ private fun NextPrayerTile(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(end = 16.dp) // Add space between text and compass
+                            .padding(end = 4.dp) // Minimal padding for maximum text space
                     ) {
                         // Get notification-synchronized content
                         val currentTime = remember { LocalTime.now() }
@@ -880,40 +880,54 @@ private fun NextPrayerTile(
                         }
                         
                         if (syncContent != null) {
-                            // Clean layout with readable fonts and shorter text
+                            // Clean layout with readable fonts and optimized spacing
                             Column(
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                // Prayer phase title - now much shorter, can use larger font
+                                // Prayer phase title - compact and readable
                                 Text(
                                     text = syncContent.title,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 
-                                // Main prayer time content - readable size
+                                // Main prayer time content - sized to fit longest text "59 minutes since Maghrib"
                                 Text(
                                     text = syncContent.content,
-                                    style = MaterialTheme.typography.headlineMedium,
+                                    style = MaterialTheme.typography.headlineSmall.copy(
+                                        fontSize = 22.sp,
+                                        letterSpacing = (-0.4).sp
+                                    ),
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    lineHeight = 24.sp
                                 )
                                 
-                                // Next prayer info - clean and readable
+                                // Next prayer info - enhanced with prominent chip styling
                                 if (syncContent.nextPrayerInfo.isNotEmpty()) {
-                                    Text(
-                                        text = syncContent.nextPrayerInfo,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                                        fontWeight = FontWeight.Normal,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = syncContent.nextPrayerInfo,
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontSize = 15.sp,
+                                                letterSpacing = (-0.2).sp
+                                            ),
+                                            color = MaterialTheme.colorScheme.tertiary,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
                                 }
                             }
                         } else if (mainPrayer != null) {
@@ -988,7 +1002,7 @@ private fun NextPrayerTile(
                     
                     Box(
                         modifier = Modifier
-                            .size(120.dp) // Constrain the compass size to fit within tile padding
+                            .size(100.dp) // Reduced size to give more space for text
                             .graphicsLayer {
                                 scaleX = compassScale
                                 scaleY = compassScale
@@ -1009,7 +1023,7 @@ private fun NextPrayerTile(
                         CompassProgressIndicator(
                             progress = 0.7f,
                             modifier = Modifier.fillMaxSize(),
-                            size = 120.dp,
+                            size = 100.dp,
                             locationService = locationService
                         )
                     }
