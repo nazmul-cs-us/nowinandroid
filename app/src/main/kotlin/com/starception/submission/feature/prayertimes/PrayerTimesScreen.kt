@@ -1851,29 +1851,23 @@ fun PrayerTimesScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.8f))
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = { offset ->
-                            // Calculate if tap is outside the dial area (350.dp diameter)
-                            val centerX = size.width / 2f
-                            val centerY = size.height / 2f
-                            val dialRadius = 175.dp.toPx() // 350.dp / 2
-                            val distance = kotlin.math.sqrt(
-                                (offset.x - centerX) * (offset.x - centerX) + 
-                                (offset.y - centerY) * (offset.y - centerY)
-                            )
-                            
-                            if (distance > dialRadius) {
-                                Log.d("PrayerTimes", "Tap outside dial area, closing popup")
-                                showPrayerDialPopup = false
-                                popupPrayerName = null
-                            }
-                        }
-                    )
-                },
+                .background(Color.Black.copy(alpha = 0.8f)),
             contentAlignment = Alignment.Center
         ) {
+            // Clickable background layer that fills the entire screen
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        // Tap anywhere to close
+                        Log.d("PrayerTimes", "Background tapped, closing popup")
+                        showPrayerDialPopup = false
+                        popupPrayerName = null
+                    }
+            )
             // State for adjustment in popup
             var timeAdjustment by remember { mutableStateOf(
                 when (popupPrayerName) {
@@ -1885,10 +1879,18 @@ fun PrayerTimesScreen(
                 }
             ) }
             
-            // Circular dial container - NO gesture interference
+            
+            // Circular dial container on top of the clickable background - shifted up to avoid nav bar
             Box(
                 modifier = Modifier
-                    .size(350.dp), // Larger size for better interaction
+                    .size(350.dp) // Larger size for better interaction
+                    .offset(y = (-300).dp) // Shift up to position dial in upper portion of screen
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        // Consume clicks on the dial itself so they don't propagate to background
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(

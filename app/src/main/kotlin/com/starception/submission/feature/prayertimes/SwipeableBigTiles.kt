@@ -931,51 +931,67 @@ private fun NextPrayerTile(
                                 }
                             }
                         } else if (mainPrayer != null) {
-                            // Fallback to legacy display if sync fails
-                            Text(
-                                text = mainPrayer.first,
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = getPrayerStatus(mainPrayer.first),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                                fontWeight = FontWeight.Medium
-                            )
+                            // Fallback: Show upcoming prayer in notification style
+                            val prayerName = mainPrayer.first
+                            val prayerStatus = getPrayerStatus(prayerName)
+                            val prayerTime = getPrayerTimeDisplay(prayerName)
                             
-                            Spacer(modifier = Modifier.height(12.dp))
-                            
-                            Text(
-                                text = getPrayerTimeDisplay(mainPrayer.first),
-                                style = MaterialTheme.typography.displaySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                // Title - notification style
+                                Text(
+                                    text = "Next Prayer: $prayerName",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                
+                                // Main content - prayer time with status
+                                Text(
+                                    text = "$prayerStatus • $prayerTime",
+                                    style = MaterialTheme.typography.headlineSmall.copy(
+                                        fontSize = 22.sp,
+                                        letterSpacing = (-0.4).sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    lineHeight = 24.sp
+                                )
+                            }
                         } else if (prayerTimes != null) {
-                            // Show Fajr as fallback when no current/next prayer is found
-                            Text(
-                                text = "Fajr",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "Tomorrow",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                                fontWeight = FontWeight.Medium
-                            )
-                            
-                            Spacer(modifier = Modifier.height(12.dp))
-                            
-                            Text(
-                                text = getPrayerTimeDisplay("Fajr"),
-                                style = MaterialTheme.typography.displaySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
+                            // Show tomorrow's Fajr in notification style
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                // Title - notification style
+                                Text(
+                                    text = "Next Prayer: Fajr",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                
+                                // Main content - tomorrow's Fajr time
+                                Text(
+                                    text = "Tomorrow • ${getPrayerTimeDisplay("Fajr")}",
+                                    style = MaterialTheme.typography.headlineSmall.copy(
+                                        fontSize = 22.sp,
+                                        letterSpacing = (-0.4).sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    lineHeight = 24.sp
+                                )
+                            }
                         }
                     }
                     
