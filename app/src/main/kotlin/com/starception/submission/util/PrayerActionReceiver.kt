@@ -79,20 +79,15 @@ class PrayerActionReceiver : BroadcastReceiver() {
         Log.i(TAG, "   Scheduled Time: $prayerTime")
         Log.i(TAG, "   Marked At: ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(timestamp))}")
         
-        // 🚧 TODO: CUSTOMIZE THIS SECTION FOR YOUR NEEDS 🚧
+        // 🚧 CUSTOMIZED IMPLEMENTATION 🚧
         
-        // === DUMMY EXECUTION CODE - REPLACE WITH YOUR IMPLEMENTATION ===
-        
-        // 1. PRAYER TRACKING DATABASE
-        // TODO: Record prayer completion in your database
-        // Example:
-        // prayerTrackingRepository.markPrayerAsCompleted(
-        //     prayerName = prayerName,
-        //     scheduledTime = prayerTime,
-        //     completedAt = timestamp,
-        //     userId = getCurrentUserId()
-        // )
-        Log.d(TAG, "💾 TODO: Save prayer completion to database")
+        // 1. PRAYER TRACKING - Save prayer completion
+        try {
+            PrayerTracker.markPrayerAsPrayed(prayerName)
+            Log.d(TAG, "💾 ✅ Saved prayer completion to tracker")
+        } catch (e: Exception) {
+            Log.e(TAG, "💾 ❌ Error saving prayer completion", e)
+        }
         
         // 2. ANALYTICS TRACKING
         // TODO: Track prayer completion for analytics
