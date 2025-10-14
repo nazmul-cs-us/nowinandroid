@@ -61,6 +61,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
@@ -712,6 +713,7 @@ fun SwipeableBigTiles(
     getPrayerProgress: () -> Pair<Int, Int>,
     getDailyStatsTitle: () -> String,
     getDailyStatsMessage: () -> String,
+    getPrayed: () -> Int = { 0 },
     getCurrentActivity: () -> String,
     onCompassClick: () -> Unit
 ) {
@@ -756,7 +758,8 @@ fun SwipeableBigTiles(
                 2 -> DailyStatsTile(
                     getPrayerProgress = getPrayerProgress,
                     getDailyStatsTitle = getDailyStatsTitle,
-                    getDailyStatsMessage = getDailyStatsMessage
+                    getDailyStatsMessage = getDailyStatsMessage,
+                    getPrayed = getPrayed
                 )
             }
         }
@@ -865,7 +868,10 @@ private fun NextPrayerTile(
                 )
                 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(top = 8.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1127,7 +1133,7 @@ private fun SmartInfoTile(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(top = 12.dp), // Add top padding to the whole content section
+                    .padding(top = 8.dp, bottom = 8.dp), // Balanced vertical padding
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -1146,7 +1152,7 @@ private fun SmartInfoTile(
                         modifier = Modifier.weight(1f)
                     )
                     
-                    Spacer(modifier = Modifier.width(3.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     
                     Text(
                         text = "Activity",
@@ -1158,11 +1164,13 @@ private fun SmartInfoTile(
                     )
                 }
                 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
                 // Content row with separator - ensures proper vertical alignment
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.Top // Changed from CenterVertically to Top to allow multi-line
                 ) {
@@ -1171,21 +1179,24 @@ private fun SmartInfoTile(
                         text = getSmartContent(),
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontSize = 22.sp,
-                            letterSpacing = (-0.4).sp
+                            letterSpacing = (-0.4).sp,
+                            lineHeight = 26.sp
                         ),
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 3, // Increased from 2 to 3 to show full text
-                        overflow = TextOverflow.Visible, // Changed from Ellipsis to Visible
-                        modifier = Modifier.weight(1f)
+                        maxLines = 3,
+                        overflow = TextOverflow.Visible,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
                     )
                     
                     // Vertical divider with gradient effect
                     Box(
                         modifier = Modifier
                             .width(3.dp)
-                            .height(60.dp)
+                            .height(80.dp)
                             .background(
                                 brush = Brush.verticalGradient(
                                     colors = listOf(
@@ -1205,19 +1216,22 @@ private fun SmartInfoTile(
                         text = currentActivity,
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontSize = 22.sp,
-                            letterSpacing = (-0.3).sp
+                            letterSpacing = (-0.3).sp,
+                            lineHeight = 26.sp
                         ),
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 3, // Increased to show full text
-                        overflow = TextOverflow.Visible, // Show full text without truncation
-                        modifier = Modifier.weight(1f)
+                        maxLines = 3,
+                        overflow = TextOverflow.Visible,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 8.dp)
                     )
                 }
             }
             
-            // Footer with increased top padding
+            // Footer with padding
             Text(
                 text = "🔊 Beeps when activity changes",
                 style = MaterialTheme.typography.bodyMedium,
@@ -1226,7 +1240,9 @@ private fun SmartInfoTile(
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
             )
         }
     }
@@ -1236,10 +1252,15 @@ private fun SmartInfoTile(
 private fun DailyStatsTile(
     getPrayerProgress: () -> Pair<Int, Int>,
     getDailyStatsTitle: () -> String,
-    getDailyStatsMessage: () -> String
+    getDailyStatsMessage: () -> String,
+    getPrayed: () -> Int = { 0 } // How many prayers user actually prayed (default to 0 for now)
 ) {
     val (completed, total) = getPrayerProgress()
     val progress = if (total > 0) completed.toFloat() / total.toFloat() else 0f
+    val remaining = total - completed
+    val prayed = getPrayed()
+    val progressPercentage = (progress * 100).toInt()
+    
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -1260,7 +1281,7 @@ private fun DailyStatsTile(
                 .padding(24.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Smart analytics indicator
+            // Header
             SmartIndicator(
                 icon = Icons.Default.AutoAwesome,
                 label = "Smart Analytics",
@@ -1268,57 +1289,192 @@ private fun DailyStatsTile(
                 modifier = Modifier.align(Alignment.Start)
             )
             
-            // Dynamic title based on progress
-            Text(
-                text = getDailyStatsTitle(),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                fontWeight = FontWeight.Medium
-            )
-            
-            // Progress visualization and stats
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            // Main content area with circular progress and stats
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = 8.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Prayer completion progress
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Left: Circular progress indicator with spacing
+                Box(
+                    modifier = Modifier.padding(end = 12.dp)
                 ) {
-                    Text(
-                        text = "$completed/$total",
-                        style = MaterialTheme.typography.displaySmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "prayers",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
+                    Box(
+                        modifier = Modifier.size(110.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Background circle
+                        CircularProgressIndicator(
+                            progress = { 1f },
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.15f),
+                            strokeWidth = 11.dp,
+                            trackColor = Color.Transparent,
+                            strokeCap = StrokeCap.Round
+                        )
+                        // Progress circle
+                        CircularProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.tertiary,
+                            strokeWidth = 11.dp,
+                            trackColor = Color.Transparent,
+                            strokeCap = StrokeCap.Round
+                        )
+                        // Center content with percentage and fraction - absolutely centered
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .offset(y = 0.dp), // Ensure no offset
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "$progressPercentage%",
+                                style = MaterialTheme.typography.headlineLarge.copy(
+                                    fontSize = 30.sp,
+                                    letterSpacing = (-0.5).sp
+                                ),
+                                color = MaterialTheme.colorScheme.tertiary,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "$completed/$total",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 12.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f),
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                 }
                 
-                // Progress bar
-                LinearProgressIndicator(
-                    progress = { progress },
+                // Right: Stats breakdown - 3 lines format
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = MaterialTheme.colorScheme.tertiary,
-                    trackColor = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.2f)
-                )
+                        .weight(1f)
+                        .padding(start = 4.dp, end = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    // Prayed stat - single line
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .background(
+                                    color = Color(0xFF4CAF50), // Green for prayed
+                                    shape = CircleShape
+                                )
+                        )
+                        Text(
+                            text = "Prayed:",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "$prayed prayers",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                letterSpacing = (-0.1).sp
+                            ),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    
+                    // Completed stat - single line
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    shape = CircleShape
+                                )
+                        )
+                        Text(
+                            text = "Completed:",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "$completed prayers",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                letterSpacing = (-0.1).sp
+                            ),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    
+                    // Remaining stat - single line
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.3f),
+                                    shape = CircleShape
+                                )
+                        )
+                        Text(
+                            text = "Remaining:",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "$remaining prayers",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                letterSpacing = (-0.1).sp
+                            ),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
             
-            // Contextual message
+            // Footer - motivational message based on progress
+            val motivationalMessage = when {
+                progress >= 0.8f -> "🌟 Excellent progress!"
+                progress >= 0.6f -> "💪 Keep it up!"
+                progress >= 0.4f -> "📿 Stay consistent"
+                progress >= 0.2f -> "🕌 Begin your day with prayer"
+                else -> "🤲 Prayer is the key to success"
+            }
+            
             Text(
-                text = getDailyStatsMessage(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                text = motivationalMessage,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    letterSpacing = (-0.1).sp
+                ),
+                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
             )
         }
     }

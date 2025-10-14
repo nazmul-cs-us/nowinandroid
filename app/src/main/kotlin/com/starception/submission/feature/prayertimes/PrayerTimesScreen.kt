@@ -1245,6 +1245,13 @@ fun PrayerTimesScreen(
                         val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
                         SmartContentUtils.getDailyStatsMessage(completed, total) 
                     },
+                    getPrayed = {
+                        try {
+                            com.starception.submission.util.PrayerTracker.getPrayedCountToday()
+                        } catch (e: Exception) {
+                            0
+                        }
+                    },
                     getCurrentActivity = { 
                         // Get current activity from ActivityTracker
                         try {

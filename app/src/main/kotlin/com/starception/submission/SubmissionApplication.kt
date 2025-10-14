@@ -48,6 +48,10 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
         Log.d("SubmissionApplication", "Application onCreate started")
         super.onCreate()
 
+        // Initialize Prayer Tracker for tracking completed prayers
+        com.starception.submission.util.PrayerTracker.initialize(this)
+        Log.d("SubmissionApplication", "Prayer Tracker initialized")
+
         // Verify ANR prevention configuration
         AnrPreventionConfig.isOptimizedForAnrPrevention()
         
