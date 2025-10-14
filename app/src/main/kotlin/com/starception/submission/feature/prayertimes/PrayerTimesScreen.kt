@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1879,20 +1880,41 @@ fun PrayerTimesScreen(
                 }
             ) }
             
-            
-            // Circular dial container on top of the clickable background - shifted up to avoid nav bar
+            // Circular dial container - no clickable to allow background taps through
             Box(
                 modifier = Modifier
                     .size(350.dp) // Larger size for better interaction
-                    .offset(y = (-300).dp) // Shift up to position dial in upper portion of screen
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        // Consume clicks on the dial itself so they don't propagate to background
-                    },
+                    .offset(y = (-300).dp), // Shift up to position dial in upper portion of screen
                 contentAlignment = Alignment.Center
             ) {
+                // Close button at top-right of dial
+                Surface(
+                    onClick = {
+                        Log.d("PrayerTimes", "✖️ Close button clicked")
+                        showPrayerDialPopup = false
+                        popupPrayerName = null
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .size(56.dp),
+                    shape = CircleShape,
+                    color = Color.White,
+                    shadowElevation = 8.dp
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.Black,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+                
                 com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
                     prayerName = safePrayerName,
                     originalTime = when (safePrayerName) {

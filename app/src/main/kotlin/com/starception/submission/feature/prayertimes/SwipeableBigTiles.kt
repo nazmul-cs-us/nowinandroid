@@ -736,6 +736,7 @@ fun SwipeableBigTiles(
             when (actualPage) {
                 0 -> NextPrayerTile(
                     prayerTimes = prayerTimes,
+                    currentTime = currentTime,
                     locationService = locationService,
                     getNextPrayer = getNextPrayer,
                     getCurrentPrayer = getCurrentPrayer,
@@ -822,6 +823,7 @@ fun SwipeableBigTiles(
 @Composable
 private fun NextPrayerTile(
     prayerTimes: DayPrayerTimes?,
+    currentTime: LocalTime,
     locationService: EnhancedLocationService,
     getNextPrayer: () -> Pair<String, LocalTime>?,
     getCurrentPrayer: () -> Pair<String, LocalTime>?,
@@ -873,8 +875,7 @@ private fun NextPrayerTile(
                             .weight(1f)
                             .padding(end = 4.dp) // Minimal padding for maximum text space
                     ) {
-                        // Get notification-synchronized content
-                        val currentTime = remember { LocalTime.now() }
+                        // Get notification-synchronized content using the SAME currentTime that updates every minute
                         val syncContent = remember(prayerTimes, currentTime) {
                             SmartContentUtils.getNotificationSyncContent(prayerTimes, currentTime)
                         }
@@ -1125,7 +1126,8 @@ private fun SmartInfoTile(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .weight(1f)
+                    .padding(top = 12.dp), // Add top padding to the whole content section
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -1162,7 +1164,7 @@ private fun SmartInfoTile(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top // Changed from CenterVertically to Top to allow multi-line
                 ) {
                     // Left: Prayer Time content
                     Text(
@@ -1174,8 +1176,8 @@ private fun SmartInfoTile(
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 3, // Increased from 2 to 3 to show full text
+                        overflow = TextOverflow.Visible, // Changed from Ellipsis to Visible
                         modifier = Modifier.weight(1f)
                     )
                     
@@ -1208,14 +1210,14 @@ private fun SmartInfoTile(
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 3, // Increased to show full text
+                        overflow = TextOverflow.Visible, // Show full text without truncation
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
             
-            // Footer
+            // Footer with increased top padding
             Text(
                 text = "🔊 Beeps when activity changes",
                 style = MaterialTheme.typography.bodyMedium,
@@ -1224,7 +1226,7 @@ private fun SmartInfoTile(
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
             )
         }
     }
