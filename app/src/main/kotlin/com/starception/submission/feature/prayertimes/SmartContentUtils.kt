@@ -324,18 +324,18 @@ object SmartContentUtils {
                 "Isha" to times.isha
             )
             
-            // Find current prayer (one that's happening now or recently passed)
-            val currentPrayer = allPrayers.find { (_, time) -> 
-                val endTime = time.plusHours(2) // Same 2-hour window as notification service
-                currentTime.isAfter(time) && currentTime.isBefore(endTime)
+            // Find current prayer (the most recent prayer that has passed)
+            val currentPrayer = allPrayers.findLast { (_, time) -> 
+                currentTime.isAfter(time)
             }
             
-            // Find next prayer
+            // Find next prayer (the next upcoming prayer)
             val nextPrayer = allPrayers.find { (_, time) -> 
                 currentTime.isBefore(time)
-            } ?: allPrayers.first() // Wrap to next day if needed
+            } ?: allPrayers.first() // Wrap to next day (tomorrow's Fajr) if needed
             
-            if (currentPrayer != null) {
+            // Show content if we have a current prayer (continues tracking until next prayer starts)
+            if (currentPrayer != null && nextPrayer != null) {
                 val (prayerName, prayerTime) = currentPrayer
                 val elapsedDuration = Duration.between(prayerTime, currentTime)
                 val elapsedMinutes = elapsedDuration.toMinutes()

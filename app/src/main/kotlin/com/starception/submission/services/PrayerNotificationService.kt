@@ -139,11 +139,11 @@ class PrayerNotificationService : Service() {
             notificationManager = getSystemService(NotificationManager::class.java)
             Log.d(TAG, "✓ Live Update notification manager initialized separately from foreground service")
             
-            // Initialize activity recognition
-            initializeActivityRecognition()
+            // TEMPORARILY DISABLED: Initialize activity recognition (causing ANR)
+            // initializeActivityRecognition()
             
             // Initialize ActivityTracker with initial state
-            ActivityTracker.updateActivity("STILL")
+            ActivityTracker.updateActivity("STILL (AR Disabled)")
             
             Log.d(TAG, "✓ Service onCreate completed successfully")
         } catch (e: Exception) {
