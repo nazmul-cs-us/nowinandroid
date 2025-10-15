@@ -1,28 +1,28 @@
 /**
  * SWIPEABLE BIG TILES COMPONENT
- * 
+ *
  * This file contains the main swipeable tiles component for the Prayer Times screen.
  * It provides an interactive horizontal pager with three distinct tiles showing different
  * prayer-related information with Material 3 design and infinite scrolling.
- * 
+ *
  * WHAT IT DOES:
  * - Creates a horizontal swipeable pager with 3 tiles (infinite scroll enabled)
  * - Shows Next Prayer, Smart Info, and Daily Stats tiles
  * - Displays page indicators and swipe hints for better UX
  * - Uses asymmetrical Material 3 shapes for visual appeal
  * - Provides real-time prayer status and progress tracking
- * 
+ *
  * WHERE IT'S USED:
  * - PrayerTimesScreen.kt: Main prayer times screen (line ~481-502)
  * - Replaces ~308 lines of inline swipeable tiles code
  * - Called through SwipeableBigTiles() composable function
- * 
+ *
  * COMPONENTS INCLUDED:
  * - SwipeableBigTiles(): Main composable function (exported)
  * - NextPrayerTile(): Shows current/next prayer with countdown timer
  * - SmartInfoTile(): Context-aware content based on time of day
  * - DailyStatsTile(): Prayer completion progress and statistics
- * 
+ *
  * FEATURES:
  * - HorizontalPager with infinite scrolling (Int.MAX_VALUE pages)
  * - Material 3 asymmetrical shapes and elevated surfaces
@@ -30,12 +30,12 @@
  * - Dynamic content that changes based on current time and prayer status
  * - Professional page indicators and swipe hints
  * - Responsive layout with proper spacing (12dp between elements)
- * 
+ *
  * DEPENDENCIES:
  * - PrayerTimeHelpers.kt: For prayer time calculations and formatting
  * - SmartContentUtils.kt: For smart content generation and progress tracking
  * - DayPrayerTimes model: Prayer times data structure
- * 
+ *
  * DESIGN PATTERNS:
  * - Component extraction: Moved from inline code to reusable component
  * - Function parameters: Accepts lambda functions for data access
@@ -114,7 +114,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import com.starception.submission.R
 import androidx.compose.animation.core.*
-import androidx.compose.ui.graphics.graphicsLayer
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
 import com.starception.submission.prayer.service.EnhancedLocationService
@@ -136,18 +135,18 @@ import androidx.compose.ui.graphics.StrokeCap
  */
 private fun getArabicCalendarInfo(): String {
     val today = LocalDate.now()
-    
+
     // Get Islamic month names
     val islamicMonths = arrayOf(
         "محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الثانية",
         "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
     )
-    
+
     val day = today.dayOfMonth
     val month = islamicMonths[today.monthValue - 1]
     val year = today.year
-    
-    // Return a simple format that should definitely be visible
+
+    // TODO: Replace this hardcoded value with a real Hijri date calculation library
     return "21 Rabi' al-thani, 1447 AH"
 }
 
@@ -166,7 +165,7 @@ fun Modifier.geminiGradientEdge(
     )
 ): Modifier {
     val infiniteTransition = rememberInfiniteTransition(label = "geminiGradient")
-    
+
     // Create a moving shine animation around the perimeter
     val shinePosition by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -177,11 +176,11 @@ fun Modifier.geminiGradientEdge(
         ),
         label = "shinePosition"
     )
-    
+
     return this.drawWithContent {
         // Draw the content first
         drawContent()
-        
+
         // Calculate corner radii in pixels
         val topStartPx = topStart.toPx()
         val topEndPx = topEnd.toPx()
@@ -189,15 +188,15 @@ fun Modifier.geminiGradientEdge(
         val bottomEndPx = bottomEnd.toPx()
         val borderWidthPx = borderWidth.toPx()
         val avgCornerRadius = (topStartPx + topEndPx + bottomStartPx + bottomEndPx) / 4f
-        
+
         // Calculate perimeter and shine position
         val perimeter = 2 * (size.width + size.height)
         val shineProgress = shinePosition * perimeter
         val shineSize = 80f // Size of the traveling shine
-        
+
         // Use the gradient colors passed as parameters
         val geminiColors = gradientColors
-        
+
         // Draw a glowing edge that travels around the rounded perimeter
         when {
             shineProgress <= size.width -> {
@@ -213,14 +212,14 @@ fun Modifier.geminiGradientEdge(
                     // Straight top edge
                     0f
                 }
-                
+
                 val currentColor = when {
                     x < size.width * 0.25f -> geminiColors[0] // Green
                     x < size.width * 0.5f -> geminiColors[1]  // Blue
                     x < size.width * 0.75f -> geminiColors[2] // Red
                     else -> geminiColors[3] // Yellow
                 }
-                
+
                 // Draw glowing circle at current position
                 drawCircle(
                     brush = Brush.radialGradient(
@@ -249,14 +248,14 @@ fun Modifier.geminiGradientEdge(
                     // Straight right edge
                     size.width
                 }
-                
+
                 val currentColor = when {
                     y < size.height * 0.25f -> geminiColors[1] // Blue
                     y < size.height * 0.5f -> geminiColors[2]  // Red
                     y < size.height * 0.75f -> geminiColors[3] // Yellow
                     else -> geminiColors[0] // Green
                 }
-                
+
                 // Draw glowing circle at current position
                 drawCircle(
                     brush = Brush.radialGradient(
@@ -285,14 +284,14 @@ fun Modifier.geminiGradientEdge(
                     // Straight bottom edge
                     size.height
                 }
-                
+
                 val currentColor = when {
                     x > size.width * 0.75f -> geminiColors[2] // Red
                     x > size.width * 0.5f -> geminiColors[3]  // Yellow
                     x > size.width * 0.25f -> geminiColors[0] // Green
                     else -> geminiColors[1] // Blue
                 }
-                
+
                 // Draw glowing circle at current position
                 drawCircle(
                     brush = Brush.radialGradient(
@@ -321,14 +320,14 @@ fun Modifier.geminiGradientEdge(
                     // Straight left edge
                     0f
                 }
-                
+
                 val currentColor = when {
                     y > size.height * 0.75f -> geminiColors[3] // Yellow
                     y > size.height * 0.5f -> geminiColors[0]  // Green
                     y > size.height * 0.25f -> geminiColors[1] // Blue
                     else -> geminiColors[2] // Red
                 }
-                
+
                 // Draw glowing circle at current position
                 drawCircle(
                     brush = Brush.radialGradient(
@@ -362,7 +361,7 @@ fun Modifier.sunshineAura(
     )
 ): Modifier {
     val infiniteTransition = rememberInfiniteTransition(label = "sunshineAura")
-    
+
     val primaryGlow by infiniteTransition.animateFloat(
         initialValue = 0.4f,
         targetValue = 0.9f,
@@ -372,7 +371,7 @@ fun Modifier.sunshineAura(
         ),
         label = "primaryGlow"
     )
-    
+
     val secondaryPulse by infiniteTransition.animateFloat(
         initialValue = 0.2f,
         targetValue = 0.6f,
@@ -382,7 +381,7 @@ fun Modifier.sunshineAura(
         ),
         label = "secondaryPulse"
     )
-    
+
     val divineShimmer by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 2 * kotlin.math.PI.toFloat(),
@@ -392,27 +391,27 @@ fun Modifier.sunshineAura(
         ),
         label = "divineShimmer"
     )
-    
+
     return this.drawBehind {
         // Convert custom corner radii to pixels
         val topStartPx = topStart.toPx()
         val topEndPx = topEnd.toPx()
         val bottomStartPx = bottomStart.toPx()
         val bottomEndPx = bottomEnd.toPx()
-        
+
         // Divine aura with theme-aware colors
         val auralayers = listOf(
             Triple(16.dp.toPx(), primaryGlow * 1.1f, auraColors.getOrElse(0) { auraColors.first() }),      // Inner
-            Triple(26.dp.toPx(), primaryGlow * 0.9f, auraColors.getOrElse(1) { auraColors.first() }),      // Mid  
+            Triple(26.dp.toPx(), primaryGlow * 0.9f, auraColors.getOrElse(1) { auraColors.first() }),      // Mid
             Triple(36.dp.toPx(), primaryGlow * 0.7f, auraColors.getOrElse(2) { auraColors.first() }),      // Light
             Triple(46.dp.toPx(), secondaryPulse * 0.5f, auraColors.getOrElse(3) { auraColors.first() }),   // Outer
         )
-        
+
         // Draw each aura layer
         auralayers.forEachIndexed { index, (glowSize, intensity, baseColor) ->
             val shimmerBoost = kotlin.math.sin(divineShimmer + index * 1.5f) * 0.15f + 0.85f
             val finalAlpha = intensity * shimmerBoost
-            
+
             if (finalAlpha > 0.05f) {
                 // Create more sophisticated gradient
                 val gradientColors = listOf(
@@ -422,7 +421,7 @@ fun Modifier.sunshineAura(
                     baseColor.copy(alpha = finalAlpha * 0.1f),
                     Color.Transparent
                 )
-                
+
                 // Create custom rounded rect path with asymmetric corners
                 val glowRect = androidx.compose.ui.geometry.Rect(
                     offset = Offset(-glowSize / 2, -glowSize / 2),
@@ -431,7 +430,7 @@ fun Modifier.sunshineAura(
                         height = size.height + glowSize
                     )
                 )
-                
+
                 val glowPath = androidx.compose.ui.graphics.Path().apply {
                     addRoundRect(
                         roundRect = androidx.compose.ui.geometry.RoundRect(
@@ -455,7 +454,7 @@ fun Modifier.sunshineAura(
                         )
                     )
                 }
-                
+
                 drawPath(
                     path = glowPath,
                     brush = Brush.radialGradient(
@@ -466,11 +465,11 @@ fun Modifier.sunshineAura(
                 )
             }
         }
-        
+
         // Divine highlights with celestial sparkles (more visible)
         val sparklePhase = kotlin.math.sin(divineShimmer * 1.3f) * 0.5f + 0.5f
         val highlightAlpha = primaryGlow * sparklePhase * 0.45f
-        
+
         if (highlightAlpha > 0.05f) {
             val highlightSize = 6.dp.toPx()
             val highlightRect = androidx.compose.ui.geometry.Rect(
@@ -480,7 +479,7 @@ fun Modifier.sunshineAura(
                     height = size.height + highlightSize * 2
                 )
             )
-            
+
             val highlightPath = androidx.compose.ui.graphics.Path().apply {
                 addRoundRect(
                     roundRect = androidx.compose.ui.geometry.RoundRect(
@@ -504,7 +503,7 @@ fun Modifier.sunshineAura(
                     )
                 )
             }
-            
+
             drawPath(
                 path = highlightPath,
                 brush = Brush.linearGradient(
@@ -531,17 +530,17 @@ fun SparklingStars(
     // Create 4 star shapes around the icon
     val sparklePositions = listOf(
         Pair(-0.35f, -0.35f), // Top-left
-        Pair(0.35f, -0.35f),  // Top-right  
+        Pair(0.35f, -0.35f),  // Top-right
         Pair(-0.35f, 0.35f),  // Bottom-left
         Pair(0.35f, 0.35f)    // Bottom-right
     )
-    
+
     sparklePositions.forEachIndexed { index, (offsetX, offsetY) ->
         // Stagger the sparkle timing for each star
         val staggeredAlpha = ((sparkleAnimation + index * 0.25f) % 1f).coerceIn(0f, 1f)
         val sparkleAlpha = if (staggeredAlpha < 0.5f) staggeredAlpha * 2f else (1f - staggeredAlpha) * 2f
         val sparkleScale = 0.3f + sparkleAlpha * 0.7f
-        
+
         Canvas(
             modifier = Modifier
                 .offset(
@@ -561,7 +560,7 @@ fun SparklingStars(
             val centerY = size.height / 2
             val outerRadius = size.width / 2
             val innerRadius = outerRadius * 0.4f
-            
+
             val starPath = androidx.compose.ui.graphics.Path().apply {
                 // Create 4-pointed star
                 moveTo(centerX, centerY - outerRadius) // Top point
@@ -574,7 +573,7 @@ fun SparklingStars(
                 lineTo(centerX - innerRadius * 0.3f, centerY - innerRadius * 0.3f)
                 close()
             }
-            
+
             drawPath(
                 path = starPath,
                 color = color.copy(alpha = sparkleAlpha * 0.8f)
@@ -591,7 +590,7 @@ fun SmartIndicator(
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "aiWorking")
-    
+
     // Different animations based on the type of AI work
     val (iconAnimation, backgroundAnimation) = when (label) {
         "Smart Prediction" -> {
@@ -661,7 +660,7 @@ fun SmartIndicator(
             Pair(sparkle, bgPulse)
         }
     }
-    
+
     Row(
         modifier = modifier
             .background(
@@ -703,7 +702,7 @@ fun SmartIndicator(
                         }
                     }
             )
-            
+
             // Sparkling effects for AI Content and Smart Analytics
             if (label == "AI Content" || label == "Smart Analytics") {
                 SparklingStars(
@@ -750,7 +749,7 @@ fun SwipeableBigTiles(
         pageCount = { Int.MAX_VALUE }, // Enable infinite scrolling
         initialPage = Int.MAX_VALUE / 2 // Start in the middle for smooth infinite scroll
     )
-    
+
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -791,7 +790,7 @@ fun SwipeableBigTiles(
                 )
             }
         }
-        
+
         // Page indicators for swipeable tiles
         Row(
             modifier = Modifier
@@ -807,9 +806,9 @@ fun SwipeableBigTiles(
                         .size(if (isSelected) 12.dp else 8.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isSelected) 
-                                MaterialTheme.colorScheme.primary 
-                            else 
+                            if (isSelected)
+                                MaterialTheme.colorScheme.primary
+                            else
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                         )
                 )
@@ -818,7 +817,7 @@ fun SwipeableBigTiles(
                 }
             }
         }
-        
+
         // Professional swipe hint
         Row(
             modifier = Modifier
@@ -894,7 +893,7 @@ private fun NextPrayerTile(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.Start)
                 )
-                
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -913,7 +912,7 @@ private fun NextPrayerTile(
                         val syncContent = remember(prayerTimes, currentTime) {
                             SmartContentUtils.getNotificationSyncContent(prayerTimes, currentTime)
                         }
-                        
+
                         if (syncContent != null) {
                             // Clean layout with readable fonts and optimized spacing
                             Column(
@@ -928,7 +927,7 @@ private fun NextPrayerTile(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                
+
                                 // Main prayer time content - sized to fit longest text "59 minutes since Maghrib"
                                 Text(
                                     text = syncContent.content,
@@ -942,7 +941,7 @@ private fun NextPrayerTile(
                                     overflow = TextOverflow.Ellipsis,
                                     lineHeight = 24.sp
                                 )
-                                
+
                                 // Next prayer info - enhanced with prominent chip styling
                                 if (syncContent.nextPrayerInfo.isNotEmpty()) {
                                     Surface(
@@ -970,7 +969,7 @@ private fun NextPrayerTile(
                             val prayerName = mainPrayer.first
                             val prayerStatus = getPrayerStatus(prayerName)
                             val prayerTime = getPrayerTimeDisplay(prayerName)
-                            
+
                             Column(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
@@ -983,7 +982,7 @@ private fun NextPrayerTile(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                
+
                                 // Main content - prayer time with status
                                 Text(
                                     text = "$prayerStatus • $prayerTime",
@@ -1012,7 +1011,7 @@ private fun NextPrayerTile(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                
+
                                 // Main content - tomorrow's Fajr time
                                 Text(
                                     text = "Tomorrow • ${getPrayerTimeDisplay("Fajr")}",
@@ -1029,10 +1028,10 @@ private fun NextPrayerTile(
                             }
                         }
                     }
-                    
+
                     // Material 3 expressive compass with enhanced interaction feedback
                     var isPressed by remember { mutableStateOf(false) }
-                    
+
                     val compassScale by animateFloatAsState(
                         targetValue = if (isPressed) 0.95f else 1f,
                         animationSpec = spring(
@@ -1041,7 +1040,7 @@ private fun NextPrayerTile(
                         ),
                         label = "compassPressScale"
                     )
-                    
+
                     val compassElevation by animateDpAsState(
                         targetValue = if (isPressed) 2.dp else 6.dp,
                         animationSpec = spring(
@@ -1050,7 +1049,7 @@ private fun NextPrayerTile(
                         ),
                         label = "compassElevation"
                     )
-                    
+
                     Box(
                         modifier = Modifier
                             .size(100.dp) // Reduced size to give more space for text
@@ -1060,7 +1059,7 @@ private fun NextPrayerTile(
                             }
                             .pointerInput(Unit) {
                                 detectTapGestures(
-                                    onPress = { 
+                                    onPress = {
                                         isPressed = true
                                         tryAwaitRelease()
                                         isPressed = false
@@ -1101,15 +1100,15 @@ private fun NextPrayerTile(
                     color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 3.dp
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 Text(
                     text = "Calculating Prayer Times",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                
+
                 Text(
                     text = "Getting your location...",
                     style = MaterialTheme.typography.bodyMedium,
@@ -1155,7 +1154,7 @@ private fun SmartInfoTile(
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.align(Alignment.Start)
             )
-            
+
             // Main content - Side-by-side layout with proper alignment
             Column(
                 modifier = Modifier
@@ -1179,9 +1178,9 @@ private fun SmartInfoTile(
                         textAlign = TextAlign.Center,
                         modifier = Modifier.weight(1f)
                     )
-                    
+
                     Spacer(modifier = Modifier.width(8.dp))
-                    
+
                     Text(
                         text = "Activity",
                         style = MaterialTheme.typography.titleSmall,
@@ -1191,9 +1190,9 @@ private fun SmartInfoTile(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Content row with separator - ensures proper vertical alignment
                 Row(
                     modifier = Modifier
@@ -1219,7 +1218,7 @@ private fun SmartInfoTile(
                             .weight(1f)
                             .padding(end = 8.dp)
                     )
-                    
+
                     // Vertical divider with gradient effect
                     Box(
                         modifier = Modifier
@@ -1237,7 +1236,7 @@ private fun SmartInfoTile(
                                 shape = RoundedCornerShape(2.dp)
                             )
                     )
-                    
+
                     // Right: Activity content
                     val currentActivity = getCurrentActivity()
                     Text(
@@ -1258,7 +1257,7 @@ private fun SmartInfoTile(
                     )
                 }
             }
-            
+
             // Footer with padding
             Text(
                 text = "🔊 Beeps when activity changes",
@@ -1281,14 +1280,14 @@ private fun DailyStatsTile(
     getPrayerProgress: () -> Pair<Int, Int>,
     getDailyStatsTitle: () -> String,
     getDailyStatsMessage: () -> String,
-    getPrayed: () -> Int = { 0 } // How many prayers user actually prayed (default to 0 for now)
+    getPrayed: () -> Int = { 0 }
 ) {
     val (completed, total) = getPrayerProgress()
     val progress = if (total > 0) completed.toFloat() / total.toFloat() else 0f
     val remaining = total - completed
     val prayed = getPrayed()
     val progressPercentage = (progress * 100).toInt()
-    
+
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -1313,20 +1312,18 @@ private fun DailyStatsTile(
             SmartIndicator(
                 icon = Icons.Default.AutoAwesome,
                 label = "Smart Analytics",
-                color = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.align(Alignment.Start)
+                color = MaterialTheme.colorScheme.tertiary
             )
-            
-            // Main content area with circular progress and stats in two columns
+
+            // Main Content
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-                    .padding(top = 8.dp),
+                    .weight(1f),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left Column: Circular progress indicator (1/3 of space)
+                // Left Column: Circular progress indicator
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
@@ -1335,7 +1332,6 @@ private fun DailyStatsTile(
                         modifier = Modifier.size(80.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Background circle
                         CircularProgressIndicator(
                             progress = { 1f },
                             modifier = Modifier.fillMaxSize(),
@@ -1344,7 +1340,6 @@ private fun DailyStatsTile(
                             trackColor = Color.Transparent,
                             strokeCap = StrokeCap.Round
                         )
-                        // Progress circle
                         CircularProgressIndicator(
                             progress = { progress },
                             modifier = Modifier.fillMaxSize(),
@@ -1353,43 +1348,40 @@ private fun DailyStatsTile(
                             trackColor = Color.Transparent,
                             strokeCap = StrokeCap.Round
                         )
-                        // Center content with percentage and fraction - absolutely centered
                         Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .offset(y = 15.dp), // Push down more to visual center
+                            modifier = Modifier.fillMaxSize(),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                                Text(
-                                    text = "$progressPercentage%",
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontSize = 22.sp,
-                                        letterSpacing = (-0.5).sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.tertiary,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "$completed/$total",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        fontSize = 10.sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f),
-                                    fontWeight = FontWeight.Medium,
-                                    textAlign = TextAlign.Center
-                                )
+                            Text(
+                                text = "$progressPercentage%",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontSize = 22.sp,
+                                    letterSpacing = (-0.5).sp
+                                ),
+                                color = MaterialTheme.colorScheme.tertiary,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "$completed/$total",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 10.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f),
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 }
-                
-                // Right Column: Stats breakdown - organized 3 lines format (2/3 of space)
+
+                // Right Column: Stats breakdown
                 Column(
                     modifier = Modifier
                         .weight(2f)
-                        .padding(start = 16.dp, top = 8.dp),
+                        .padding(start = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalAlignment = Alignment.Start
                 ) {
@@ -1421,7 +1413,7 @@ private fun DailyStatsTile(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    
+
                     // Completed stat
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -1438,6 +1430,7 @@ private fun DailyStatsTile(
                         Text(
                             text = "Completed •",
                             style = MaterialTheme.typography.titleSmall,
+                            // *** THIS IS THE FIX ***
                             color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
                             fontWeight = FontWeight.Medium
                         )
@@ -1450,7 +1443,7 @@ private fun DailyStatsTile(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    
+
                     // Remaining stat
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -1479,36 +1472,35 @@ private fun DailyStatsTile(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    
                 }
             }
-            
-            // Footer - Arabic calendar information - FULL WIDTH
+
+            // Footer
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 12.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                    .padding(vertical = 8.dp, horizontal = 12.dp),
+//                    .background(
+//                        color = MaterialTheme.colorScheme.secondaryContainer,
+//                        shape = RoundedCornerShape(8.dp)
+//                    )
+                    .padding(vertical = 8.dp, horizontal = 8.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.calendar_month_24),
                     contentDescription = "Calendar",
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.padding(top = 16.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "21 Rabi' al-thani, 1447 AH",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 16.dp)
                 )
             }
         }
