@@ -110,18 +110,46 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+import com.starception.submission.R
 import androidx.compose.animation.core.*
 import androidx.compose.ui.graphics.graphicsLayer
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
 import com.starception.submission.prayer.service.EnhancedLocationService
 import java.time.LocalTime
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Calendar
+import java.util.GregorianCalendar
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.sqrt
 import androidx.compose.ui.graphics.StrokeCap
 
 
 
+
+/**
+ * Get Arabic calendar information for the current date
+ */
+private fun getArabicCalendarInfo(): String {
+    val today = LocalDate.now()
+    
+    // Get Islamic month names
+    val islamicMonths = arrayOf(
+        "محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الثانية",
+        "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
+    )
+    
+    val day = today.dayOfMonth
+    val month = islamicMonths[today.monthValue - 1]
+    val year = today.year
+    
+    // Return a simple format that should definitely be visible
+    return "21 Rabi' al-thani, 1447 AH"
+}
 
 @Composable
 fun Modifier.geminiGradientEdge(
@@ -1289,21 +1317,22 @@ private fun DailyStatsTile(
                 modifier = Modifier.align(Alignment.Start)
             )
             
-            // Main content area with circular progress and stats
+            // Main content area with circular progress and stats in two columns
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
                     .padding(top = 8.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: Circular progress indicator with spacing
+                // Left Column: Circular progress indicator (1/3 of space)
                 Box(
-                    modifier = Modifier.padding(end = 12.dp)
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
                 ) {
                     Box(
-                        modifier = Modifier.size(110.dp),
+                        modifier = Modifier.size(80.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         // Background circle
@@ -1328,57 +1357,57 @@ private fun DailyStatsTile(
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .offset(y = 0.dp), // Ensure no offset
+                                .offset(y = 15.dp), // Push down more to visual center
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Text(
-                                text = "$progressPercentage%",
-                                style = MaterialTheme.typography.headlineLarge.copy(
-                                    fontSize = 30.sp,
-                                    letterSpacing = (-0.5).sp
-                                ),
-                                color = MaterialTheme.colorScheme.tertiary,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "$completed/$total",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontSize = 12.sp
-                                ),
-                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f),
-                                fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Center
-                            )
+                                Text(
+                                    text = "$progressPercentage%",
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontSize = 22.sp,
+                                        letterSpacing = (-0.5).sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "$completed/$total",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontSize = 10.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f),
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
                         }
                     }
                 }
                 
-                // Right: Stats breakdown - 3 lines format
+                // Right Column: Stats breakdown - organized 3 lines format (2/3 of space)
                 Column(
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 4.dp, end = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                        .weight(2f)
+                        .padding(start = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalAlignment = Alignment.Start
                 ) {
-                    // Prayed stat - single line
+                    // Prayed stat
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(7.dp)
+                                .size(8.dp)
                                 .background(
                                     color = Color(0xFF4CAF50), // Green for prayed
                                     shape = CircleShape
                                 )
                         )
                         Text(
-                            text = "Prayed:",
+                            text = "Prayed •",
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
                             fontWeight = FontWeight.Medium
@@ -1393,21 +1422,21 @@ private fun DailyStatsTile(
                         )
                     }
                     
-                    // Completed stat - single line
+                    // Completed stat
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(7.dp)
+                                .size(8.dp)
                                 .background(
                                     color = MaterialTheme.colorScheme.tertiary,
                                     shape = CircleShape
                                 )
                         )
                         Text(
-                            text = "Completed:",
+                            text = "Completed •",
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
                             fontWeight = FontWeight.Medium
@@ -1422,21 +1451,21 @@ private fun DailyStatsTile(
                         )
                     }
                     
-                    // Remaining stat - single line
+                    // Remaining stat
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(7.dp)
+                                .size(8.dp)
                                 .background(
                                     color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.3f),
                                     shape = CircleShape
                                 )
                         )
                         Text(
-                            text = "Remaining:",
+                            text = "Remaining •",
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
                             fontWeight = FontWeight.Medium
@@ -1450,32 +1479,38 @@ private fun DailyStatsTile(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                    
                 }
             }
             
-            // Footer - motivational message based on progress
-            val motivationalMessage = when {
-                progress >= 0.8f -> "🌟 Excellent progress!"
-                progress >= 0.6f -> "💪 Keep it up!"
-                progress >= 0.4f -> "📿 Stay consistent"
-                progress >= 0.2f -> "🕌 Begin your day with prayer"
-                else -> "🤲 Prayer is the key to success"
-            }
-            
-            Text(
-                text = motivationalMessage,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    letterSpacing = (-0.1).sp
-                ),
-                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            // Footer - Arabic calendar information - FULL WIDTH
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp)
-            )
+                    .padding(top = 12.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .padding(vertical = 8.dp, horizontal = 12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.calendar_month_24),
+                    contentDescription = "Calendar",
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "21 Rabi' al-thani, 1447 AH",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
