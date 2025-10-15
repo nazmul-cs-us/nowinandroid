@@ -1322,7 +1322,7 @@ private fun DailyStatsTile(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(top = 8.dp, bottom = 8.dp),
+                    .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1389,7 +1389,7 @@ private fun DailyStatsTile(
                 Column(
                     modifier = Modifier
                         .weight(2f)
-                        .padding(start = 16.dp),
+                        .padding(start = 16.dp, top = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalAlignment = Alignment.Start
                 ) {
