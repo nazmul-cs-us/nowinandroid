@@ -135,19 +135,105 @@ import androidx.compose.ui.graphics.StrokeCap
  */
 private fun getArabicCalendarInfo(): String {
     val today = LocalDate.now()
-
+    
+    // Convert Gregorian to Hijri using Umm al-Qura algorithm
+    val hijriDate = convertToHijri(today)
+    
     // Get Islamic month names
     val islamicMonths = arrayOf(
         "محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الثانية",
         "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
     )
+    
+    val day = hijriDate.first
+    val month = islamicMonths[hijriDate.second - 1]
+    val year = hijriDate.third
+    
+    return "$day $month, $year AH"
+}
 
-    val day = today.dayOfMonth
-    val month = islamicMonths[today.monthValue - 1]
-    val year = today.year
-
-    // TODO: Replace this hardcoded value with a real Hijri date calculation library
-    return "21 Rabi' al-thani, 1447 AH"
+/**
+ * Convert Gregorian date to Hijri date using Umm al-Qura algorithm
+ * Returns Triple(day, month, year) in Hijri calendar
+ */
+private fun convertToHijri(gregorianDate: LocalDate): Triple<Int, Int, Int> {
+    val year = gregorianDate.year
+    val month = gregorianDate.monthValue
+    val day = gregorianDate.dayOfMonth
+    
+    // Umm al-Qura algorithm constants
+    val epoch = 227015 // Hijri epoch in days since 1 Jan 1 CE
+    val cycleLength = 10631 // Length of 30-year cycle in days
+    
+    // Convert Gregorian date to days since epoch
+    val gregorianDays = gregorianDate.toEpochDay() + epoch
+    
+    // Calculate 30-year cycles
+    val cycles = gregorianDays / cycleLength
+    var remainingDays = gregorianDays % cycleLength
+    
+    // Calculate year within cycle
+    var hijriYear = cycles * 30 + 1
+    
+    // Month lengths in 30-year cycle (1=30 days, 0=29 days)
+    val monthLengths = intArrayOf(
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 1
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 2
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 3
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 4
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 5
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 6
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 7
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 8
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 9
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 10
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 11
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 12
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 13
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 14
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 15
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 16
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 17
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 18
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 19
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 20
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 21
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 22
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 23
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 24
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 25
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 26
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 27
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, // Year 28
+        1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, // Year 29
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0  // Year 30
+    )
+    
+    // Find the year and month
+    var hijriMonth = 1
+    var hijriDay = 1
+    
+    for (yearIndex in 0 until 30) {
+        val yearDays = monthLengths.sliceArray(yearIndex * 12 until (yearIndex + 1) * 12).sum() + 354
+        if (remainingDays < yearDays) {
+            hijriYear += yearIndex
+            break
+        }
+        remainingDays -= yearDays
+    }
+    
+    // Find the month within the year
+    for (monthIndex in 0 until 12) {
+        val monthDays = monthLengths[((hijriYear - 1) % 30 * 12 + monthIndex).toInt()] + 29
+        if (remainingDays < monthDays) {
+            hijriMonth = monthIndex + 1
+            hijriDay = (remainingDays + 1).toInt()
+            break
+        }
+        remainingDays -= monthDays
+    }
+    
+    return Triple(hijriDay, hijriMonth, hijriYear.toInt())
 }
 
 @Composable
