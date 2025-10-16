@@ -365,6 +365,77 @@ fun Modifier.geminiGradientEdge(
 }
 
 @Composable
+fun Modifier.aiTextGlow(
+    glowColors: List<Color> = listOf(
+        Color(0xFFFF6B6B), // Red
+        Color(0xFFFFD93D), // Yellow
+        Color(0xFF6BCF7F), // Green
+        Color(0xFF4D96FF), // Blue
+        Color(0xFFB565D8)  // Violet
+    )
+): Modifier {
+    val infiniteTransition = rememberInfiniteTransition(label = "textGlow")
+
+    // Slower shimmer animation (3 seconds)
+    val shimmerPosition by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+
+    // Subtle pulsing
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    return this.drawBehind {
+        // Calculate color index based on shimmer position
+        val colorCount = glowColors.size
+        val currentIndex = (shimmerPosition * colorCount).toInt() % colorCount
+        val nextIndex = (currentIndex + 1) % colorCount
+        val fraction = (shimmerPosition * colorCount) - currentIndex
+
+        // Interpolate between current and next color
+        val currentColor = glowColors[currentIndex]
+        val nextColor = glowColors[nextIndex]
+
+        val glowColor = Color(
+            red = currentColor.red + (nextColor.red - currentColor.red) * fraction,
+            green = currentColor.green + (nextColor.green - currentColor.green) * fraction,
+            blue = currentColor.blue + (nextColor.blue - currentColor.blue) * fraction,
+            alpha = 0.6f * pulseAlpha
+        )
+
+        // Draw soft glow behind text
+        drawRoundRect(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    glowColor.copy(alpha = 0.4f * pulseAlpha),
+                    glowColor.copy(alpha = 0.2f * pulseAlpha),
+                    Color.Transparent
+                ),
+                center = Offset(size.width / 2, size.height / 2),
+                radius = size.maxDimension * 0.8f
+            ),
+            topLeft = Offset(-8.dp.toPx(), -8.dp.toPx()),
+            size = Size(size.width + 16.dp.toPx(), size.height + 16.dp.toPx()),
+            cornerRadius = CornerRadius(12.dp.toPx()),
+            blendMode = BlendMode.Screen
+        )
+    }
+}
+
+@Composable
 fun Modifier.sunshineAura(
     topStart: Dp = 20.dp,
     topEnd: Dp = 20.dp,
@@ -959,12 +1030,14 @@ private fun NextPrayerTile(
                                     lineHeight = 24.sp
                                 )
 
-                                // Next prayer info - enhanced with prominent chip styling
+                                // Next prayer info - enhanced with prominent chip styling and AI glow
                                 if (syncContent.nextPrayerInfo.isNotEmpty()) {
                                     Surface(
-                                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
+                                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.0f),
                                         shape = RoundedCornerShape(10.dp),
-                                        modifier = Modifier.padding(top = 2.dp)
+                                        modifier = Modifier
+                                            .padding(top = 2.dp)
+                                            .aiTextGlow()
                                     ) {
                                         Text(
                                             text = syncContent.nextPrayerInfo,
