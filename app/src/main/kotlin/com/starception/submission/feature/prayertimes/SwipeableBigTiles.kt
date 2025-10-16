@@ -99,6 +99,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -244,193 +245,123 @@ fun Modifier.geminiGradientEdge(
     bottomStart: Dp = 16.dp,
     bottomEnd: Dp = 16.dp,
     gradientColors: List<Color> = listOf(
-        MaterialTheme.colorScheme.primary,
-        MaterialTheme.colorScheme.secondary,
-        MaterialTheme.colorScheme.tertiary,
-        MaterialTheme.colorScheme.primaryContainer
+        Color(0xFFFF6B6B), // Red
+        Color(0xFFFFD93D), // Yellow
+        Color(0xFF6BCF7F), // Green
+        Color(0xFF4D96FF), // Blue
+        Color(0xFFB565D8)  // Violet
     )
 ): Modifier {
-    val infiniteTransition = rememberInfiniteTransition(label = "geminiGradient")
+    val infiniteTransition = rememberInfiniteTransition(label = "aiGlow")
 
-    // Create a moving shine animation around the perimeter
+    // Slower, more premium animation (4 seconds)
     val shinePosition by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = androidx.compose.animation.core.LinearEasing),
+            animation = tween(4000, easing = androidx.compose.animation.core.LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "shinePosition"
     )
 
-    return this.drawWithContent {
-        // Draw the content first
-        drawContent()
+    // Subtle pulsing effect for premium feel
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
 
-        // Calculate corner radii in pixels
-        val topStartPx = topStart.toPx()
-        val topEndPx = topEnd.toPx()
-        val bottomStartPx = bottomStart.toPx()
-        val bottomEndPx = bottomEnd.toPx()
-        val borderWidthPx = borderWidth.toPx()
-        val avgCornerRadius = (topStartPx + topEndPx + bottomStartPx + bottomEndPx) / 4f
-
-        // Calculate perimeter and shine position
-        val perimeter = 2 * (size.width + size.height)
-        val shineProgress = shinePosition * perimeter
-        val shineSize = 80f // Size of the traveling shine
-
-        // Use the gradient colors passed as parameters
-        val geminiColors = gradientColors
-
-        // Draw a glowing edge that travels around the rounded perimeter
-        when {
-            shineProgress <= size.width -> {
-                // Top edge (left to right) - follow rounded corners
-                val x = shineProgress
-                val y = if (x < avgCornerRadius) {
-                    // Left rounded corner - calculate y position on circle
-                    avgCornerRadius - sqrt(avgCornerRadius * avgCornerRadius - (avgCornerRadius - x) * (avgCornerRadius - x))
-                } else if (x > size.width - avgCornerRadius) {
-                    // Right rounded corner - calculate y position on circle
-                    avgCornerRadius - sqrt(avgCornerRadius * avgCornerRadius - (x - (size.width - avgCornerRadius)) * (x - (size.width - avgCornerRadius)))
-                } else {
-                    // Straight top edge
-                    0f
-                }
-
-                val currentColor = when {
-                    x < size.width * 0.25f -> geminiColors[0] // Green
-                    x < size.width * 0.5f -> geminiColors[1]  // Blue
-                    x < size.width * 0.75f -> geminiColors[2] // Red
-                    else -> geminiColors[3] // Yellow
-                }
-
-                // Draw glowing circle at current position
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 1.0f),
-                            currentColor.copy(alpha = 0.9f),
-                            currentColor.copy(alpha = 0.6f),
-                            Color.Transparent
-                        ),
-                        radius = 60f
-                    ),
-                    radius = 60f,
-                    center = Offset(x, y)
-                )
-            }
-            shineProgress <= size.width + size.height -> {
-                // Right edge (top to bottom) - follow rounded corners
-                val y = shineProgress - size.width
-                val x = if (y < avgCornerRadius) {
-                    // Top rounded corner - calculate x position on circle
-                    size.width - avgCornerRadius + sqrt(avgCornerRadius * avgCornerRadius - (avgCornerRadius - y) * (avgCornerRadius - y))
-                } else if (y > size.height - avgCornerRadius) {
-                    // Bottom rounded corner - calculate x position on circle
-                    size.width - avgCornerRadius + sqrt(avgCornerRadius * avgCornerRadius - (y - (size.height - avgCornerRadius)) * (y - (size.height - avgCornerRadius)))
-                } else {
-                    // Straight right edge
-                    size.width
-                }
-
-                val currentColor = when {
-                    y < size.height * 0.25f -> geminiColors[1] // Blue
-                    y < size.height * 0.5f -> geminiColors[2]  // Red
-                    y < size.height * 0.75f -> geminiColors[3] // Yellow
-                    else -> geminiColors[0] // Green
-                }
-
-                // Draw glowing circle at current position
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 1.0f),
-                            currentColor.copy(alpha = 0.9f),
-                            currentColor.copy(alpha = 0.6f),
-                            Color.Transparent
-                        ),
-                        radius = 60f
-                    ),
-                    radius = 60f,
-                    center = Offset(x, y)
-                )
-            }
-            shineProgress <= 2 * size.width + size.height -> {
-                // Bottom edge (right to left) - follow rounded corners
-                val x = size.width - (shineProgress - size.width - size.height)
-                val y = if (x < avgCornerRadius) {
-                    // Left rounded corner - calculate y position on circle
-                    size.height - avgCornerRadius + sqrt(avgCornerRadius * avgCornerRadius - (avgCornerRadius - x) * (avgCornerRadius - x))
-                } else if (x > size.width - avgCornerRadius) {
-                    // Right rounded corner - calculate y position on circle
-                    size.height - avgCornerRadius + sqrt(avgCornerRadius * avgCornerRadius - (x - (size.width - avgCornerRadius)) * (x - (size.width - avgCornerRadius)))
-                } else {
-                    // Straight bottom edge
-                    size.height
-                }
-
-                val currentColor = when {
-                    x > size.width * 0.75f -> geminiColors[2] // Red
-                    x > size.width * 0.5f -> geminiColors[3]  // Yellow
-                    x > size.width * 0.25f -> geminiColors[0] // Green
-                    else -> geminiColors[1] // Blue
-                }
-
-                // Draw glowing circle at current position
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 1.0f),
-                            currentColor.copy(alpha = 0.9f),
-                            currentColor.copy(alpha = 0.6f),
-                            Color.Transparent
-                        ),
-                        radius = 60f
-                    ),
-                    radius = 60f,
-                    center = Offset(x, y)
-                )
-            }
-            else -> {
-                // Left edge (bottom to top) - follow rounded corners
-                val y = size.height - (shineProgress - 2 * size.width - size.height)
-                val x = if (y < avgCornerRadius) {
-                    // Top rounded corner - calculate x position on circle
-                    avgCornerRadius - sqrt(avgCornerRadius * avgCornerRadius - (avgCornerRadius - y) * (avgCornerRadius - y))
-                } else if (y > size.height - avgCornerRadius) {
-                    // Bottom rounded corner - calculate x position on circle
-                    avgCornerRadius - sqrt(avgCornerRadius * avgCornerRadius - (y - (size.height - avgCornerRadius)) * (y - (size.height - avgCornerRadius)))
-                } else {
-                    // Straight left edge
-                    0f
-                }
-
-                val currentColor = when {
-                    y > size.height * 0.75f -> geminiColors[3] // Yellow
-                    y > size.height * 0.5f -> geminiColors[0]  // Green
-                    y > size.height * 0.25f -> geminiColors[1] // Blue
-                    else -> geminiColors[2] // Red
-                }
-
-                // Draw glowing circle at current position
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 1.0f),
-                            currentColor.copy(alpha = 0.9f),
-                            currentColor.copy(alpha = 0.6f),
-                            Color.Transparent
-                        ),
-                        radius = 60f
-                    ),
-                    radius = 60f,
-                    center = Offset(x, y)
-                )
-            }
+    return this
+        .drawWithContent {
+            drawContent()
         }
-    }
+        .drawBehind {
+            val cornerRadius = 32.dp.toPx()
+
+            // Draw subtle base glow around entire border (ambient light)
+            drawRoundRect(
+                brush = Brush.linearGradient(
+                    colors = gradientColors.map { it.copy(alpha = 0.15f * pulseAlpha) },
+                    start = Offset(0f, 0f),
+                    end = Offset(size.width, size.height)
+                ),
+                topLeft = Offset(-4.dp.toPx(), -4.dp.toPx()),
+                size = Size(size.width + 8.dp.toPx(), size.height + 8.dp.toPx()),
+                cornerRadius = CornerRadius(cornerRadius + 4.dp.toPx()),
+                blendMode = BlendMode.Screen
+            )
+
+            // Calculate traveling light position
+            val perimeter = 2 * (size.width + size.height)
+            val travelProgress = shinePosition * perimeter
+
+            // Determine position and color based on progress
+            val (x, y, colorIndex) = when {
+                travelProgress <= size.width -> {
+                    // Top edge
+                    Triple(travelProgress, 0f, 0)
+                }
+                travelProgress <= size.width + size.height -> {
+                    // Right edge
+                    Triple(size.width, travelProgress - size.width, 1)
+                }
+                travelProgress <= 2 * size.width + size.height -> {
+                    // Bottom edge
+                    Triple(size.width - (travelProgress - size.width - size.height), size.height, 2)
+                }
+                else -> {
+                    // Left edge
+                    Triple(0f, size.height - (travelProgress - 2 * size.width - size.height), 3)
+                }
+            }
+
+            // Get current gradient color with smooth transitions
+            val currentColor = gradientColors[colorIndex % gradientColors.size]
+            val nextColor = gradientColors[(colorIndex + 1) % gradientColors.size]
+
+            // Draw main traveling glow with blur effect (larger radius for diffusion)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.9f * pulseAlpha),
+                        currentColor.copy(alpha = 0.8f * pulseAlpha),
+                        currentColor.copy(alpha = 0.5f * pulseAlpha),
+                        nextColor.copy(alpha = 0.3f * pulseAlpha),
+                        Color.Transparent
+                    ),
+                    radius = 100f
+                ),
+                radius = 100f,
+                center = Offset(x, y),
+                blendMode = BlendMode.Screen
+            )
+
+            // Draw secondary softer glow (the "bleeding" effect)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        currentColor.copy(alpha = 0.4f * pulseAlpha),
+                        currentColor.copy(alpha = 0.2f * pulseAlpha),
+                        Color.Transparent
+                    ),
+                    radius = 150f
+                ),
+                radius = 150f,
+                center = Offset(x, y),
+                blendMode = BlendMode.Screen
+            )
+        }
+        .graphicsLayer {
+            // Add subtle depth with shadow (neumorphism)
+            shadowElevation = 4.dp.toPx()
+            shape = RoundedCornerShape(32.dp)
+            clip = false
+        }
 }
 
 @Composable
