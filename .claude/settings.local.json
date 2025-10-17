@@ -104,7 +104,12 @@
       "Bash(awk:*)",
       "Read(/tmp/**)",
       "Read(/tmp/**)",
-      "Read(/tmp/**)"
+      "Read(/tmp/**)",
+      "Read(//Users/smarterai/Desktop/quran/MisharyRashidAlafasyQuranmp3.info/**)",
+      "Read(//Users/smarterai/Desktop/quran/bengali_translation/AlQuranWithBengaliBanglaTranslation-ReciterMisharyRashidAl-Afasy/**)",
+      "Read(//tmp/**)",
+      "Read(//Users/smarterai/Desktop/quran/Quran_With_English_Translation/**)",
+      "Bash(open:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

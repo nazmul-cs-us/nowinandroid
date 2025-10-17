@@ -23,11 +23,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     
     <!-- Compass functionality - from original Compass-main app -->
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
@@ -94,6 +98,12 @@
                 <action android:name="com.starception.submission.MARK_AS_PRAYED" />
             </intent-filter>
         </receiver>
+
+        <!-- Quran Playback Service for background audio -->
+        <service
+            android:name=".feature.quran.QuranPlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
         
         <!-- Android Auto Car App Service -->
         <service
