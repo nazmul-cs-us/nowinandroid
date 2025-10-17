@@ -105,7 +105,10 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.play.services.location)
     implementation(libs.accompanist.permissions)
-    
+
+    // Media support for playback controls
+    implementation("androidx.media:media:1.7.0")
+
     // Android Auto support
     implementation(libs.androidx.car.app)
 
