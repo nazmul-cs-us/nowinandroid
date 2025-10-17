@@ -1870,6 +1870,7 @@ fun PrayerTimesScreen(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         // Tap anywhere to close
                         Log.d("PrayerTimes", "Background tapped, closing popup")
                         showPrayerDialPopup = false
@@ -1897,6 +1898,7 @@ fun PrayerTimesScreen(
                 // Close button at top-right of dial
                 Surface(
                     onClick = {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         Log.d("PrayerTimes", "✖️ Close button clicked")
                         showPrayerDialPopup = false
                         popupPrayerName = null

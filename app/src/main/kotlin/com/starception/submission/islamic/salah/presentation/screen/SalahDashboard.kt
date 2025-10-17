@@ -15,6 +15,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -99,6 +101,8 @@ private fun SalahTopBar(
     onSettingsClick: () -> Unit,
     onRefreshClick: () -> Unit
 ) {
+    val hapticFeedback = LocalHapticFeedback.current
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -118,13 +122,16 @@ private fun SalahTopBar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        
+
         // Action buttons
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             IconButton(
-                onClick = onRefreshClick,
+                onClick = {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onRefreshClick()
+                },
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f))
@@ -135,9 +142,12 @@ private fun SalahTopBar(
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
-            
+
             IconButton(
-                onClick = onSettingsClick,
+                onClick = {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onSettingsClick()
+                },
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f))

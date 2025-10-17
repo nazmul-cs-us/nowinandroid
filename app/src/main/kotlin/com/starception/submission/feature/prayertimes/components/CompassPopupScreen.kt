@@ -41,6 +41,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import kotlin.math.*
 import com.starception.submission.prayer.service.EnhancedLocationService
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,6 +76,7 @@ fun CompassPopupScreen(
     onDismiss: () -> Unit
 ) {
     val density = LocalDensity.current
+    val hapticFeedback = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     var dragState by remember { mutableFloatStateOf(0f) }
     val dragThreshold = with(density) { 60.dp.toPx() } // Reduced threshold for easier closing
@@ -214,7 +217,8 @@ fun CompassPopupScreen(
                     }
             ) {
                 IconButton(
-                    onClick = { 
+                    onClick = {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         Log.d("CompassPopup", "Close button clicked!")
                         isVisible = false // Trigger exit animation
                         // Delay actual dismiss to allow exit animation
