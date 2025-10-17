@@ -78,13 +78,18 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -1482,25 +1487,82 @@ private fun DailyStatsTile(
         shadowElevation = 2.dp
     ) {
         if (showSurahList) {
+            // Search query state
+            var searchQuery by remember { mutableStateOf("") }
+
+            // Filter surahs based on search query
+            val filteredSurahs = remember(searchQuery) {
+                if (searchQuery.isBlank()) {
+                    QuranData.surahs
+                } else {
+                    QuranData.surahs.filter { surah ->
+                        surah.nameEnglish.contains(searchQuery, ignoreCase = true) ||
+                        surah.nameArabic.contains(searchQuery, ignoreCase = true) ||
+                        surah.number.toString().contains(searchQuery)
+                    }
+                }
+            }
+
             // LIST VIEW - Show scrollable Surah list with Material 3 expressive design
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 12.dp, start = 16.dp, end = 16.dp, bottom = 12.dp)
+                    .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
             ) {
-                // Header with Material 3 expressive styling
+                // Header with search bar and close button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Select Surah",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                        fontWeight = FontWeight.Bold
+                    // Search bar with Material 3 design - compact size
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        placeholder = {
+                            Text(
+                                text = "Search by name or number...",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { searchQuery = "" },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Clear search",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
+                            focusedIndicatorColor = MaterialTheme.colorScheme.tertiary,
+                            unfocusedIndicatorColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+                        ),
+                        textStyle = MaterialTheme.typography.bodySmall
                     )
 
+                    // Close button
                     Surface(
                         onClick = {
                             view.performHapticFeedback(
@@ -1525,12 +1587,22 @@ private fun DailyStatsTile(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
+                // Results count
+                if (searchQuery.isNotEmpty()) {
+                    Text(
+                        text = "${filteredSurahs.size} result${if (filteredSurahs.size != 1) "s" else ""}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
+
                 // Scrollable Surah list with compact spacing
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    items(QuranData.surahs) { surah ->
+                    items(filteredSurahs) { surah ->
                         val index = surah.number - 1
                         Surface(
                             onClick = {
