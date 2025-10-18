@@ -954,7 +954,8 @@ fun SwipeableBigTiles(
                     getSmartContent = getSmartContent,
                     getCurrentDate = getCurrentDate,
                     getSmartFooter = getSmartFooter,
-                    getCurrentActivity = getCurrentActivity
+                    getCurrentActivity = getCurrentActivity,
+                    getPrayed = getPrayed
                 )
                 2 -> DailyStatsTile(
                     getPrayerProgress = getPrayerProgress,
@@ -1061,13 +1062,24 @@ private fun NextPrayerTile(
                     .padding(24.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Smart AI indicator
-                SmartIndicator(
-                    icon = Icons.Default.Psychology,
-                    label = "Smart Prediction",
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.align(Alignment.Start)
-                )
+                // Header: Icon + Title (matching Quran Player style)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Psychology,
+                        contentDescription = "Smart Prediction",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = "Smart Prediction",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
                 Row(
                     modifier = Modifier
@@ -1306,7 +1318,8 @@ private fun SmartInfoTile(
     getSmartContent: () -> String,
     getCurrentDate: () -> String,
     getSmartFooter: () -> String,
-    getCurrentActivity: () -> String
+    getCurrentActivity: () -> String,
+    getPrayed: () -> Int = { 0 }
 ) {
     val view = LocalView.current
     Surface(
@@ -1329,13 +1342,24 @@ private fun SmartInfoTile(
                 .padding(24.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Smart indicator
-            SmartIndicator(
-                icon = Icons.Default.Psychology,
-                label = "Smart Tracking",
-                color = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.align(Alignment.Start)
-            )
+            // Header: Icon + Title (matching Quran Player style)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Psychology,
+                    contentDescription = "Smart Tracking",
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = "Smart Tracking",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
             // Main content - Side-by-side layout with proper alignment
             Column(
@@ -1353,7 +1377,7 @@ private fun SmartInfoTile(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Prayer Time",
+                        text = "Prayers Done",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
                         fontWeight = FontWeight.SemiBold,
@@ -1364,7 +1388,7 @@ private fun SmartInfoTile(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
-                        text = "Activity",
+                        text = "Current",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
                         fontWeight = FontWeight.SemiBold,
@@ -1383,9 +1407,9 @@ private fun SmartInfoTile(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.Top // Changed from CenterVertically to Top to allow multi-line
                 ) {
-                    // Left: Prayer Time content
+                    // Left: Prayers Prayed Today count
                     Text(
-                        text = getSmartContent(),
+                        text = "${getPrayed()} / 5",
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontSize = 22.sp,
                             letterSpacing = (-0.4).sp,

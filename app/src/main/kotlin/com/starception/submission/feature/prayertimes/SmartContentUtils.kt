@@ -76,12 +76,12 @@ object SmartContentUtils {
     // Get smart information based on time of day and prayer status
     fun getSmartTitle(currentTime: LocalTime): String {
         val hour = currentTime.hour
-        
+
         return when {
-            hour in 5..11 -> "Morning Focus"
-            hour in 12..17 -> "Afternoon Progress"
-            hour in 18..22 -> "Evening Reflection"
-            else -> "Night Preparation"
+            hour in 5..11 -> "Morning Light"
+            hour in 12..17 -> "Day's Journey"
+            hour in 18..22 -> "Evening Peace"
+            else -> "Night's Rest"
         }
     }
     
@@ -107,10 +107,10 @@ object SmartContentUtils {
         // Fallback to time-based spiritual guidance
         val hour = currentTime.hour
         val result = when {
-            hour in 5..11 -> "Start your day with intention and gratitude"
-            hour in 12..17 -> "Keep Allah in your thoughts as you work"
-            hour in 18..22 -> "Reflect on today's blessings and lessons"
-            else -> "Prepare your heart for tomorrow's opportunities"
+            hour in 5..11 -> "Begin with gratitude"
+            hour in 12..17 -> "Remember Allah"
+            hour in 18..22 -> "Count your blessings"
+            else -> "Rest with peace"
         }
         android.util.Log.d("SmartContentUtils", "Returning fallback content: $result")
         return result
@@ -121,9 +121,9 @@ object SmartContentUtils {
         nextPrayer: Pair<String, LocalTime>?
     ): String {
         return when {
-            currentPrayer != null -> "In ${currentPrayer.first} time"
-            nextPrayer != null -> "Approaching ${nextPrayer.first}"
-            else -> "Stay mindful"
+            currentPrayer != null -> "${currentPrayer.first} time"
+            nextPrayer != null -> "${nextPrayer.first} approaching"
+            else -> "Be mindful"
         }
     }
     
@@ -148,21 +148,21 @@ object SmartContentUtils {
     
     fun getDailyStatsTitle(completed: Int, total: Int): String {
         return when {
-            completed == total -> "Perfect Day!"
-            completed >= 3 -> "Great Progress"
-            completed >= 1 -> "Keep Going"
-            else -> "New Day Begins"
+            completed == total -> "Alhamdulillah"
+            completed >= 3 -> "Keep it up"
+            completed >= 1 -> "Continue strong"
+            else -> "Fresh start"
         }
     }
-    
+
     fun getDailyStatsMessage(completed: Int, total: Int): String {
         val remaining = total - completed
-        
+
         return when {
-            completed == total -> "All prayers completed with devotion"
-            remaining == 1 -> "1 prayer remaining today"
-            remaining > 1 -> "$remaining prayers remaining today"
-            else -> "Ready to begin the day with prayer"
+            completed == total -> "All prayers done"
+            remaining == 1 -> "One prayer left"
+            remaining > 1 -> "$remaining prayers left"
+            else -> "Begin your day"
         }
     }
     
@@ -227,16 +227,15 @@ object SmartContentUtils {
                 else -> {
                     val (minutes, prayerName) = minutesAndPrayer
                     when {
-                        minutes == 0 -> "Just finished $prayerName"
+                        minutes == 0 -> "$prayerName ended"
                         minutes < 0 -> "$prayerName in ${-minutes}m"
-                        minutes < 60 -> "${minutes}m since $prayerName"
+                        minutes < 60 -> "${minutes}m after $prayerName"
                         else -> {
                             val hours = minutes / 60
                             val remainingMinutes = minutes % 60
                             when {
-                                remainingMinutes == 0 -> "${hours}h since $prayerName"
-                                hours == 1 -> "1h ${remainingMinutes}m since $prayerName"
-                                else -> "${hours}h ${remainingMinutes}m since $prayerName"
+                                remainingMinutes == 0 -> "${hours}h after $prayerName"
+                                else -> "${hours}h ${remainingMinutes}m after $prayerName"
                             }
                         }
                     }
