@@ -381,9 +381,24 @@ fun PrayerTimesScreen(
     
     // REAL-TIME CLOCK STATE - Updates every minute for live prayer status
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
-    
+
+    // PRAYER COUNTER STATE - Tracks how many prayers have been marked as prayed today
+    var prayedCount by remember { mutableStateOf(
+        try {
+            com.starception.submission.util.PrayerTracker.getPrayedCountToday()
+        } catch (e: Exception) {
+            0
+        }
+    ) }
+
     // Track current time updates for prayer status calculations
     LaunchedEffect(currentTime) {
+        // Update prayed count when time changes (this happens every minute)
+        prayedCount = try {
+            com.starception.submission.util.PrayerTracker.getPrayedCountToday()
+        } catch (e: Exception) {
+            0
+        }
         android.util.Log.d("PrayerTimesScreen", "⏰ CURRENT TIME UPDATED: $currentTime")
         prayerTimes?.let { times ->
             val nextPrayer = times.getNextPrayer()
@@ -1245,13 +1260,7 @@ fun PrayerTimesScreen(
                         val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
                         SmartContentUtils.getDailyStatsMessage(completed, total) 
                     },
-                    getPrayed = {
-                        try {
-                            com.starception.submission.util.PrayerTracker.getPrayedCountToday()
-                        } catch (e: Exception) {
-                            0
-                        }
-                    },
+                    getPrayed = { prayedCount },
                     getCurrentActivity = { 
                         // Get current activity from ActivityTracker
                         try {
