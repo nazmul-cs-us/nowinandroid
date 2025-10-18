@@ -239,12 +239,17 @@ class QuranPlaybackService : Service() {
     private fun updateMediaSessionMetadata() {
         val surah = QuranData.surahs[currentSurahIndex]
 
+        // Load app icon as album art
+        val appIcon = BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+
         mediaSession?.setMetadata(
             MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, surah.nameEnglish)
                 .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "القرآن الكريم")
                 .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Quran - ${surah.nameArabic}")
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, getDuration().toLong())
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, appIcon)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, appIcon)
                 .build()
         )
     }
@@ -318,7 +323,7 @@ class QuranPlaybackService : Service() {
             .setContentTitle(surah.nameEnglish)
             .setContentText("${surah.nameArabic} - القرآن الكريم")
             .setSubText("Quran Player")
-            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setSmallIcon(R.drawable.ic_notification_calligraphy)
             .setContentIntent(contentPendingIntent)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)
