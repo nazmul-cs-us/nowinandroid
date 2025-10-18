@@ -323,7 +323,7 @@ class QuranPlaybackService : Service() {
             .setContentTitle(surah.nameEnglish)
             .setContentText("${surah.nameArabic} - القرآن الكريم")
             .setSubText("Quran Player")
-            .setSmallIcon(R.drawable.ic_notification_calligraphy)
+            .setSmallIcon(R.drawable.transparent_greyscaled)
             .setContentIntent(contentPendingIntent)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)
