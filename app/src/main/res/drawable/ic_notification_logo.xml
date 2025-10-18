@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Monochrome white version of the app's Arabic calligraphy logo -->
+    <!-- Simplified "Allah" calligraphy for notification icon -->
+
+    <!-- Left stroke (dark blue part in original) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,8 L6,20 L8,20 L9.5,12 L10,8 Z"/>
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10.5,6 C10.5,5.5 10.5,5 11,4.5 L12,4 L12.5,4.5 L12.5,8 L11.5,12 L10.5,12 Z"/>
+
+    <!-- Center tall stroke -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,3 L13.5,3 L14,4 L14,18 L12.5,20 L11.5,19.5 L11.5,5 Z"/>
+
+    <!-- Right strokes (teal part in original) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M15,6 L16,5 L17,5.5 L18,8 L17,10 L15.5,9 Z"/>
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16.5,10 L18,10.5 L19,12 L19,16 L17.5,18 L16,17 L15.5,14 Z"/>
+
+    <!-- Bottom curve -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M9,18 C9,18 10,19.5 11.5,20 C13,20.5 15,20.5 16.5,19.5 C18,18.5 18.5,17 18.5,17 L17,17.5 C17,17.5 16,18.5 14.5,18.5 C13,18.5 11.5,18 10.5,17.5 L9,18 Z"/>
+</vector>
