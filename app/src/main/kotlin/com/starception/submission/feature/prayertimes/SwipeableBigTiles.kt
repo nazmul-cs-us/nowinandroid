@@ -46,6 +46,7 @@ package com.starception.submission.feature.prayertimes
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -1377,97 +1378,126 @@ private fun SmartInfoTile(
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Labels row - ensures they're on the same horizontal line
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Prayers Done",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = "Current",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Content row with separator - ensures proper vertical alignment
+                // Content row with side-by-side columns for professional layout
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp),
+                        .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.Top // Changed from CenterVertically to Top to allow multi-line
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left: Prayers Prayed Today count
-                    Text(
-                        text = "${getPrayed()} / 5",
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontSize = 22.sp,
-                            letterSpacing = (-0.4).sp,
-                            lineHeight = 26.sp
-                        ),
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 3,
-                        overflow = TextOverflow.Visible,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp)
-                    )
+                    // Left: Prayers Done column
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Prayer indicators (F D A M I) - Compact to fit all 5
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val prayers = listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha")
+                            val prayerInitials = listOf("F", "D", "A", "M", "I")
+
+                            prayerInitials.forEachIndexed { index, initial ->
+                                val isPrayed = com.starception.submission.util.PrayerTracker.isPrayerMarkedToday(prayers[index])
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .background(
+                                            color = if (isPrayed)
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f),
+                                            shape = CircleShape
+                                        )
+                                        .border(
+                                            width = if (isPrayed) 0.dp else 1.dp,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.3f),
+                                            shape = CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = initial,
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = if (isPrayed)
+                                            MaterialTheme.colorScheme.onPrimary
+                                        else
+                                            MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Label
+                        Text(
+                            text = "Prayers Tracker",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontSize = 13.sp,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
 
                     // Vertical divider with gradient effect
                     Box(
                         modifier = Modifier
-                            .width(3.dp)
-                            .height(80.dp)
+                            .width(2.dp)
+                            .height(60.dp)
                             .background(
                                 brush = Brush.verticalGradient(
                                     colors = listOf(
                                         Color.Transparent,
-                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f),
-                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f),
+                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f),
+                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f),
                                         Color.Transparent
                                     )
                                 ),
-                                shape = RoundedCornerShape(2.dp)
+                                shape = RoundedCornerShape(1.dp)
                             )
                     )
 
-                    // Right: Activity content
-                    val currentActivity = getCurrentActivity()
-                    Text(
-                        text = currentActivity,
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontSize = 22.sp,
-                            letterSpacing = (-0.3).sp,
-                            lineHeight = 26.sp
-                        ),
-                        color = MaterialTheme.colorScheme.secondary,
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 3,
-                        overflow = TextOverflow.Visible,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 8.dp)
-                    )
+                    // Right: Current Activity column
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Value
+                        val currentActivity = getCurrentActivity()
+                        Text(
+                            text = currentActivity,
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontSize = 28.sp,
+                                letterSpacing = (-0.5).sp
+                            ),
+                            color = MaterialTheme.colorScheme.secondary,
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        // Label
+                        Text(
+                            text = "Current Activity",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontSize = 13.sp,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
             }
