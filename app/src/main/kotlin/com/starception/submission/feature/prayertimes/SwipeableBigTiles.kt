@@ -125,6 +125,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import com.starception.submission.R
 import androidx.compose.animation.core.*
+import androidx.compose.material.icons.filled.BatchPrediction
+import androidx.compose.material.icons.filled.BubbleChart
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
 import com.starception.submission.prayer.service.EnhancedLocationService
@@ -1068,10 +1070,10 @@ private fun NextPrayerTile(
                     horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Psychology,
+                        imageVector = Icons.Default.BatchPrediction,
                         contentDescription = "Smart Prediction",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                     Text(
                         text = "Smart Prediction",
@@ -1348,10 +1350,10 @@ private fun SmartInfoTile(
                 horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Psychology,
+                    imageVector = Icons.Default.BubbleChart,
                     contentDescription = "Smart Tracking",
                     tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(20.dp)
                 )
                 Text(
                     text = "Smart Tracking",
@@ -1361,13 +1363,18 @@ private fun SmartInfoTile(
                 )
             }
 
-            // Main content - Side-by-side layout with proper alignment
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(top = 8.dp, bottom = 8.dp), // Balanced vertical padding
-                verticalArrangement = Arrangement.Center,
+                    .padding(top = 20.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+            // Main content - Side-by-side layout with proper alignment
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Labels row - ensures they're on the same horizontal line
@@ -1378,7 +1385,7 @@ private fun SmartInfoTile(
                 ) {
                     Text(
                         text = "Prayers Done",
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
@@ -1389,7 +1396,7 @@ private fun SmartInfoTile(
 
                     Text(
                         text = "Current",
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
@@ -1397,7 +1404,7 @@ private fun SmartInfoTile(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Content row with separator - ensures proper vertical alignment
                 Row(
@@ -1462,6 +1469,7 @@ private fun SmartInfoTile(
                             .padding(start = 8.dp)
                     )
                 }
+            }
             }
 
             // Footer with padding
@@ -1741,10 +1749,10 @@ private fun DailyStatsTile(
                             imageVector = Icons.Default.AutoAwesome,
                             contentDescription = "Quran",
                             tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "القرآن الكريم",
+                            text = "The Noble Quran",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onTertiaryContainer,
                             fontWeight = FontWeight.Bold
