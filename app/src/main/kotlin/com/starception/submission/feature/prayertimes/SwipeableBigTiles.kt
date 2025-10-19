@@ -119,6 +119,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1348,7 +1349,8 @@ private fun SmartInfoTile(
             // Header: Icon + Title (matching Quran Player style)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.padding(bottom = 2.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.BubbleChart,
@@ -1388,13 +1390,15 @@ private fun SmartInfoTile(
                 ) {
                     // Left: Prayers Done column
                     Column(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // Prayer indicators (F D A M I) - Compact to fit all 5
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             val prayers = listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha")
@@ -1405,7 +1409,7 @@ private fun SmartInfoTile(
 
                                 Box(
                                     modifier = Modifier
-                                        .size(26.dp)
+                                        .size(24.dp)
                                         .background(
                                             color = if (isPrayed)
                                                 MaterialTheme.colorScheme.primary
@@ -1417,19 +1421,25 @@ private fun SmartInfoTile(
                                             width = if (isPrayed) 0.dp else 1.dp,
                                             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.3f),
                                             shape = CircleShape
-                                        ),
+                                        )
+                                        .wrapContentSize(Alignment.Center),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = initial,
-                                        style = MaterialTheme.typography.labelLarge.copy(
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            lineHeight = 11.sp,
+                                            platformStyle = PlatformTextStyle(
+                                                includeFontPadding = false
+                                            )
                                         ),
                                         color = if (isPrayed)
                                             MaterialTheme.colorScheme.onPrimary
                                         else
-                                            MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
+                                            MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f),
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }
