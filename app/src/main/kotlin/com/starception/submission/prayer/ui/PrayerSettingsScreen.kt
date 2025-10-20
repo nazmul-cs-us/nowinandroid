@@ -335,199 +335,52 @@ private fun CalculationMethodDropdown(
     autoDetectedCountry: String? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val hapticFeedback = LocalHapticFeedback.current
-    
-    // Material 3 expressive animation for dropdown expansion
-    val dropdownScale by animateFloatAsState(
-        targetValue = if (expanded) 1.02f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessHigh
-        ),
-        label = "dropdown_scale"
-    )
-    
-    val textFieldElevation by animateFloatAsState(
-        targetValue = if (expanded) 4f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "textfield_elevation"
-    )
-    
-    Column(modifier = modifier) {
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { 
-                if (it != expanded) {
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                }
-                expanded = it 
-            },
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = selectedMethod.displayName,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Method") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
-                .graphicsLayer {
-                    scaleX = dropdownScale
-                    scaleY = dropdownScale
-                }
-        ) {
-            OutlinedTextField(
-                value = selectedMethod.displayName,
-                onValueChange = {},
-                readOnly = true,
-                label = { 
-                    Text(
-                        "Method",
-                        modifier = Modifier.graphicsLayer {
-                            alpha = if (expanded) 0.8f else 1f
-                        }
-                    ) 
-                },
-                trailingIcon = { 
-                    val iconRotation by animateFloatAsState(
-                        targetValue = if (expanded) 180f else 0f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessHigh
-                        ),
-                        label = "icon_rotation"
-                    )
-                    
-                    Box(
-                        modifier = Modifier.graphicsLayer {
-                            rotationZ = iconRotation
-                        }
-                    ) {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .menuAnchor()
-                    .graphicsLayer {
-                        shadowElevation = textFieldElevation
-                    },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                .menuAnchor(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        
-            // Enhanced dropdown menu with Material 3 expressive animations
-            AnimatedVisibility(
-                visible = expanded,
-                enter = fadeIn(
-                    animationSpec = tween(
-                        durationMillis = 200,
-                        easing = FastOutSlowInEasing
-                    )
-                ) + expandVertically(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    )
-                ) + scaleIn(
-                    initialScale = 0.92f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessHigh
-                    )
-                ),
-                exit = fadeOut(
-                    animationSpec = tween(
-                        durationMillis = 150,
-                        easing = FastOutLinearInEasing
-                    )
-                ) + shrinkVertically(
-                    animationSpec = tween(
-                        durationMillis = 200,
-                        easing = FastOutLinearInEasing
-                    )
-                ) + scaleOut(
-                    targetScale = 0.95f,
-                    animationSpec = tween(
-                        durationMillis = 150,
-                        easing = FastOutLinearInEasing
-                    )
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            CalculationMethod.values().forEach { method ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(method.displayName)
+                            Text(
+                                text = method.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    onClick = {
+                        onMethodSelected(method)
+                        expanded = false
+                    }
                 )
-            ) {
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                    modifier = Modifier.graphicsLayer {
-                        // Subtle entrance glow effect
-                        shadowElevation = 8f
-                    }
-                ) {
-                    CalculationMethod.values().forEachIndexed { index, method ->
-                        // Staggered animation for each menu item
-                        var itemVisible by remember { mutableStateOf(false) }
-                        
-                        LaunchedEffect(expanded) {
-                            if (expanded) {
-                                kotlinx.coroutines.delay(index * 30L) // 30ms stagger
-                                itemVisible = true
-                            } else {
-                                itemVisible = false
-                            }
-                        }
-                        
-                        AnimatedVisibility(
-                            visible = itemVisible,
-                            enter = fadeIn(
-                                animationSpec = tween(
-                                    durationMillis = 200,
-                                    easing = FastOutSlowInEasing
-                                )
-                            ) + scaleIn(
-                                initialScale = 0.9f,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessHigh
-                                )
-                            )
-                        ) {
-                            var itemPressed by remember { mutableStateOf(false) }
-                            
-                            val itemScale by animateFloatAsState(
-                                targetValue = if (itemPressed) 0.95f else 1f,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessHigh
-                                ),
-                                label = "item_scale"
-                            )
-                            
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(method.displayName)
-                                        Text(
-                                            text = method.description,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onMethodSelected(method)
-                                    expanded = false
-                                },
-                                modifier = Modifier.graphicsLayer {
-                                    scaleX = itemScale
-                                    scaleY = itemScale
-                                }
-                            )
-                        }
-                    }
-                }
             }
         }
-        
     }
 }
 
