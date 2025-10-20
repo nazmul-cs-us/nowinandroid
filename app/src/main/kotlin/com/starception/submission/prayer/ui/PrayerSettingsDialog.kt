@@ -86,7 +86,19 @@ fun PrayerSettingsDialog(
             val initialSettings = when {
                 cachedSettings != null -> {
                     Log.i("PrayerSettingsDialog", "✅ Using cached prayer settings")
-                    cachedSettings
+
+                    // IMPORTANT: Merge auto-detected country info into cached settings for restore button
+                    if (autoDetectedSettings != null && cachedCountry != null) {
+                        Log.i("PrayerSettingsDialog", "   🔄 Merging auto-detected country info into cached settings")
+                        Log.i("PrayerSettingsDialog", "   🌍 Country: ${autoDetectedSettings.autoDetectedCountryName} ($cachedCountry)")
+                        cachedSettings.copy(
+                            autoDetectedCountryName = autoDetectedSettings.autoDetectedCountryName,
+                            autoDetectedCountryCode = autoDetectedSettings.autoDetectedCountryCode
+                        )
+                    } else {
+                        Log.w("PrayerSettingsDialog", "   ⚠️ No auto-detected country info available to merge")
+                        cachedSettings
+                    }
                 }
                 autoDetectedSettings != null -> {
                     Log.i("PrayerSettingsDialog", "✅ Using auto-detected settings for $cachedCountry")
@@ -109,12 +121,26 @@ fun PrayerSettingsDialog(
     
     // ALGORITHM: Restore Option Logic
     // Compare cached_prayer_settings with auto-detected settings to show/hide restore option
-    val hasSettingsChanged = remember(settings, isLoading) {
-        if (isLoading) {
-            false
+    // Use mutableStateOf to reactively update when settings change
+    var hasSettingsChanged by remember { mutableStateOf(false) }
+
+    // LaunchedEffect to re-evaluate restore option when settings change
+    LaunchedEffect(settings, isLoading) {
+        if (!isLoading) {
+            Log.i("PrayerSettingsDialog", "🔄 RE-EVALUATING RESTORE OPTION")
+            Log.i("PrayerSettingsDialog", "   Current settings: ${settings.calculationMethod.name}, ${settings.asrMadhhab.name}")
+            Log.i("PrayerSettingsDialog", "   autoDetectedCountryName: '${settings.autoDetectedCountryName}'")
+            Log.i("PrayerSettingsDialog", "   autoDetectedCountryCode: '${settings.autoDetectedCountryCode}'")
+
+            // Call repository to check if restore option should be shown
+            val shouldShow = repository.shouldShowRestoreOption()
+
+            Log.i("PrayerSettingsDialog", "   Restore option result: ${if (shouldShow) "SHOW" else "HIDE"}")
+            Log.i("PrayerSettingsDialog", "   hasSettingsChanged will be set to: $shouldShow")
+            Log.i("PrayerSettingsDialog", "   UI condition check: hasSettingsChanged=$shouldShow && autoDetectedCountryName='${settings.autoDetectedCountryName}' (isNotEmpty=${settings.autoDetectedCountryName?.isNotEmpty()})")
+            hasSettingsChanged = shouldShow
         } else {
-            // Use algorithm's shouldShowRestoreOption method
-            repository.shouldShowRestoreOption()
+            hasSettingsChanged = false
         }
     }
     

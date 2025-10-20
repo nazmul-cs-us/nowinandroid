@@ -46,8 +46,9 @@ fun WobblePullToRefresh(
     // Wobble state management
     val maxDragDistance = with(LocalDensity.current) { 400.dp.toPx() }
     var dragDistance by remember { mutableStateOf(0f) }
+    var lastDragDistance by remember { mutableStateOf(0f) }  // Save the distance before reset
     var isWobbling by remember { mutableStateOf(false) }
-    
+
     // Animated drag distance with spring physics
     val dragDistanceAnimated by animateFloatAsState(
         targetValue = if (dragDistance > 0f) dragDistance else 0f,
@@ -58,9 +59,13 @@ fun WobblePullToRefresh(
         finishedListener = {
             if (isWobbling) {
                 isWobbling = false
-                // Trigger refresh when animation completes
-                if (dragDistance > 150f) {
+                // Trigger refresh when animation completes - use saved distance
+                android.util.Log.d("WobblePullToRefresh", "🔄 DRAG ENDED: lastDragDistance=$lastDragDistance, threshold=150f")
+                if (lastDragDistance > 150f) {
+                    android.util.Log.d("WobblePullToRefresh", "✅ TRIGGERING REFRESH (lastDragDistance > 150f)")
                     onRefresh()
+                } else {
+                    android.util.Log.w("WobblePullToRefresh", "❌ NOT TRIGGERING REFRESH (lastDragDistance=$lastDragDistance < 150f)")
                 }
             }
         }
