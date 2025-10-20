@@ -1990,7 +1990,9 @@ private fun getLocationWithCountryCode(
     
     // Clean up the location string by removing redundant country information
     val cleanLocationString = locationString
-        .replace(Regex(",\\s*(UAE|United Arab Emirates)"), "") // Remove existing country references
+        .replace(Regex(",\\s*(UAE|United Arab Emirates)\\s*\\([A-Z]{2}\\)"), "") // Remove country name with code
+        .replace(Regex(",\\s*(UAE|United Arab Emirates)"), "") // Remove country name only
+        .replace(Regex("\\s*\\([A-Z]{2}\\)"), "") // Remove country code in parentheses
         .replace(Regex("\\s+"), " ") // Normalize whitespace
         .trim()
     
