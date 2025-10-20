@@ -20,7 +20,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 
 /**
@@ -43,11 +45,13 @@ fun WobblePullToRefresh(
     modifier: Modifier = Modifier,
     content: @Composable (wobbleState: WobbleState) -> Unit
 ) {
+    // Get haptic feedback for tactile response
+    val hapticFeedback = LocalHapticFeedback.current
+
     // Wobble state management
     val maxDragDistance = with(LocalDensity.current) { 400.dp.toPx() }
     var dragDistance by remember { mutableStateOf(0f) }
-    var lastDragDistance by remember { mutableStateOf(0f) }  // Save the distance before reset
-    var isWobbling by remember { mutableStateOf(false) }
+    var hasTriggeredThresholdHaptic by remember { mutableStateOf(false) }  // Track if threshold haptic was triggered
 
     // Animated drag distance with spring physics
     val dragDistanceAnimated by animateFloatAsState(
@@ -55,20 +59,7 @@ fun WobblePullToRefresh(
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioHighBouncy,
             stiffness = Spring.StiffnessMedium
-        ),
-        finishedListener = {
-            if (isWobbling) {
-                isWobbling = false
-                // Trigger refresh when animation completes - use saved distance
-                android.util.Log.d("WobblePullToRefresh", "🔄 DRAG ENDED: lastDragDistance=$lastDragDistance, threshold=150f")
-                if (lastDragDistance > 150f) {
-                    android.util.Log.d("WobblePullToRefresh", "✅ TRIGGERING REFRESH (lastDragDistance > 150f)")
-                    onRefresh()
-                } else {
-                    android.util.Log.w("WobblePullToRefresh", "❌ NOT TRIGGERING REFRESH (lastDragDistance=$lastDragDistance < 150f)")
-                }
-            }
-        }
+        )
     )
     
     // Calculate wobble intensity
@@ -77,7 +68,7 @@ fun WobblePullToRefresh(
     // Create wobble state for content
     val wobbleState = WobbleState(
         dragDistance = dragDistanceAnimated,
-        isWobbling = isWobbling,
+        isWobbling = false,  // Not used anymore
         maxDragDistance = maxDragDistance,
         wobbleIntensity = wobbleIntensity
     )
@@ -87,13 +78,30 @@ fun WobblePullToRefresh(
             .fillMaxSize()
             .draggable(
                 onDragStopped = {
-                    isWobbling = true
+                    // Check if we should trigger refresh
+                    if (dragDistance > 150f && !isRefreshing) {
+                        android.util.Log.d("WobblePullToRefresh", "✅ TRIGGERING REFRESH (dragDistance=$dragDistance > 150f)")
+                        // Haptic feedback for successful pull-to-refresh
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onRefresh()
+                    } else {
+                        android.util.Log.w("WobblePullToRefresh", "❌ NOT TRIGGERING REFRESH (dragDistance=$dragDistance, isRefreshing=$isRefreshing)")
+                    }
+
+                    // Reset states
                     dragDistance = 0f
+                    hasTriggeredThresholdHaptic = false
                 },
                 orientation = Orientation.Vertical,
                 state = rememberDraggableState { delta ->
-                    isWobbling = false
+                    // Don't allow dragging while refreshing
+                    if (isRefreshing) {
+                        return@rememberDraggableState
+                    }
+
+                    val previousDistance = dragDistance
                     dragDistance += delta
+
                     // Only allow drag down
                     if (dragDistance < 0f) {
                         dragDistance = 0f
@@ -101,6 +109,13 @@ fun WobblePullToRefresh(
                     }
                     if (dragDistance >= maxDragDistance) {
                         dragDistance = maxDragDistance
+                    }
+
+                    // Trigger haptic feedback when crossing the refresh threshold
+                    if (!hasTriggeredThresholdHaptic && previousDistance < 150f && dragDistance >= 150f) {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        hasTriggeredThresholdHaptic = true
+                        android.util.Log.d("WobblePullToRefresh", "📳 Threshold crossed - haptic feedback triggered")
                     }
                 }
             )
