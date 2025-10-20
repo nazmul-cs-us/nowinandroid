@@ -757,17 +757,60 @@ class PrayerSettingsRepository @Inject constructor(
         
         Log.i(TAG, "💾 Saving calculation settings...")
         updateCalculationSettings(calculation, forceCommit)
-        
+
         Log.i(TAG, "💾 Saving location preferences...")
         updateLocationPreferences(location, forceCommit)
-        
+
         Log.i(TAG, "💾 Saving notification preferences...")
         updateNotificationPreferences(notification, forceCommit)
-        
+
+        // ALGORITHM: Also save to cached_prayer_settings for restore comparison
+        Log.i(TAG, "")
+        Log.i(TAG, "💾 ALGORITHM STEP: Save to cached_prayer_settings (for restore logic)")
+        val cacheStartTime = System.currentTimeMillis()
+        saveCachedPrayerSettings(settings)
+        val cacheTime = System.currentTimeMillis() - cacheStartTime
+        Log.i(TAG, "✅ Cached prayer settings saved successfully (${cacheTime}ms)")
+
+        // Verify what was actually saved
+        Log.i(TAG, "")
+        Log.i(TAG, "🔍 VERIFICATION: Reading back saved settings")
+        val verifyStartTime = System.currentTimeMillis()
+        val savedSettings = getCachedPrayerSettings()
+        val verifyTime = System.currentTimeMillis() - verifyStartTime
+        if (savedSettings != null) {
+            Log.i(TAG, "✅ VERIFICATION SUCCESSFUL (${verifyTime}ms)")
+            Log.i(TAG, "📋 VERIFIED SAVED SETTINGS:")
+            Log.i(TAG, "   🕌 Method: ${savedSettings.calculationMethod.displayName}")
+            Log.i(TAG, "   🤲 Madhhab: ${savedSettings.asrMadhhab.displayName}")
+            Log.i(TAG, "   🌅 Fajr Angle: ${savedSettings.customFajrAngle ?: "default"}")
+            Log.i(TAG, "   🌙 Isha Angle: ${savedSettings.customIshaAngle ?: "default"}")
+            Log.i(TAG, "   ⏰ Isha Delay: ${savedSettings.customIshaDelay ?: "default"}")
+        } else {
+            Log.e(TAG, "❌ VERIFICATION FAILED: Could not read back saved settings")
+        }
+
+        // Check restore option status after save
+        Log.i(TAG, "")
+        Log.i(TAG, "🔄 RESTORE OPTION CHECK: Evaluating if restore button should show")
+        val restoreCheckStart = System.currentTimeMillis()
+        val shouldShowRestore = shouldShowRestoreOption()
+        val restoreCheckTime = System.currentTimeMillis() - restoreCheckStart
+        Log.i(TAG, "🎯 RESTORE DECISION: ${if (shouldShowRestore) "SHOW" else "HIDE"} restore button (${restoreCheckTime}ms)")
+
         val totalTime = System.currentTimeMillis() - startTime
+        Log.i(TAG, "")
         Log.i(TAG, "✅ SETTINGS UPDATE OPERATION COMPLETED")
         Log.i(TAG, "⏱️ Total operation time: ${totalTime}ms")
         Log.i(TAG, "🎯 All settings have been persisted to SharedPreferences")
+        Log.i(TAG, "📊 OPERATION SUMMARY:")
+        Log.i(TAG, "   ✅ Calculation settings saved")
+        Log.i(TAG, "   ✅ Location preferences saved")
+        Log.i(TAG, "   ✅ Notification preferences saved")
+        Log.i(TAG, "   ✅ Cached prayer settings updated")
+        Log.i(TAG, "   ✅ Settings verified successfully")
+        Log.i(TAG, "   ✅ Restore option evaluated: ${if (shouldShowRestore) "SHOW" else "HIDE"}")
+        Log.i(TAG, "=".repeat(80))
         Log.i(TAG, "")
     }
     
@@ -1232,7 +1275,13 @@ class PrayerSettingsRepository @Inject constructor(
                 asrMadhhab = asrMadhhab,
                 customFajrAngle = customFajrAngle,
                 customIshaAngle = customIshaAngle,
-                customIshaDelay = customIshaDelay
+                customIshaDelay = customIshaDelay,
+                // Set auto-detection metadata for restore button functionality
+                isMethodAutoDetected = true,
+                isMadhhabAutoDetected = true,
+                areCustomAnglesAutoDetected = (customFajrAngle != null || customIshaAngle != null || customIshaDelay != null),
+                autoDetectedCountryName = countryName,
+                autoDetectedCountryCode = countryCode
             )
             
             val totalTime = System.currentTimeMillis() - startTime
@@ -1478,9 +1527,21 @@ class PrayerSettingsRepository @Inject constructor(
                 Log.i(TAG, "🎯 ALGORITHM CHOICE: Using cached prayer settings (Priority 1)")
                 Log.i(TAG, "   ✅ Reason: User has previously configured settings")
                 Log.i(TAG, "   📍 Source: User's cached preferences (JSON from SharedPreferences)")
-                cachedSettings
+
+                // IMPORTANT: Merge auto-detected country info into cached settings for restore button
+                if (autoDetectedSettings != null && cachedCountry != null) {
+                    Log.i(TAG, "   🔄 Merging auto-detected country info into cached settings")
+                    Log.i(TAG, "   🌍 Country: ${autoDetectedSettings.autoDetectedCountryName} ($cachedCountry)")
+                    cachedSettings.copy(
+                        autoDetectedCountryName = autoDetectedSettings.autoDetectedCountryName,
+                        autoDetectedCountryCode = autoDetectedSettings.autoDetectedCountryCode
+                    )
+                } else {
+                    Log.w(TAG, "   ⚠️ No auto-detected country info available to merge")
+                    cachedSettings
+                }
             }
-            
+
             // Priority 2: Use auto-detected settings + defaults
             autoDetectedSettings != null -> {
                 Log.i(TAG, "🎯 ALGORITHM CHOICE: Using auto-detected settings + defaults (Priority 2)")
@@ -1489,7 +1550,7 @@ class PrayerSettingsRepository @Inject constructor(
                 Log.i(TAG, "   💡 Note: Missing fields (Time Adjustments, etc.) filled with defaults")
                 autoDetectedSettings
             }
-            
+
             // Priority 3: Fallback to system defaults
             else -> {
                 Log.w(TAG, "🎯 ALGORITHM CHOICE: Using system defaults (Priority 3 - Fallback)")

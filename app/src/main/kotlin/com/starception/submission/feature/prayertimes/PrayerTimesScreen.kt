@@ -560,24 +560,30 @@ fun PrayerTimesScreen(
                 
                 // Calculate with 3-second timeout to prevent infinite loading
                 android.util.Log.d("PullToRefresh", "STEP 2: Starting prayer time calculation with 3-second timeout...")
+                android.util.Log.d("PullToRefresh", "CURRENT LOCATION BEFORE REFRESH: \"$location\"")
                 val startTime = System.currentTimeMillis()
                 try {
                     // Run calculation with timeout protection
                     android.util.Log.d("PullToRefresh", "TIMEOUT PROTECTION: Calculation has maximum 3000ms to complete")
-                    withTimeout(3000L) { 
+                    withTimeout(3000L) {
                         withContext(Dispatchers.Default) {
                             android.util.Log.d("PullToRefresh", "CALCULATION START: Creating PrayerTimesCalculator and running calculation")
                             val calculator = PrayerTimesCalculator(context)
                             val result = calculator.calculateDefaultPrayerTimes()
-                            
+
                             android.util.Log.d("PullToRefresh", "CALCULATION RESULT: Prayer times = ${if (result.first != null) "SUCCESS" else "NULL"}")
-                            android.util.Log.d("PullToRefresh", "CALCULATION RESULT: Location = \"${result.second}\"")
-                            
+                            android.util.Log.d("PullToRefresh", "CALCULATION RESULT: New location = \"${result.second}\"")
+                            android.util.Log.d("PullToRefresh", "LOCATION COMPARISON: Old=\"$location\" → New=\"${result.second}\"")
+                            android.util.Log.d("PullToRefresh", "LOCATION CHANGED: ${location != result.second}")
+
                             prayerTimes = result.first   // Calculated prayer times (or null if failed)
                             location = result.second     // Location name for display
+
+                            android.util.Log.d("PullToRefresh", "STATE UPDATED: location variable now = \"$location\"")
                         }
                     }
                     android.util.Log.d("PullToRefresh", "Calculation completed successfully in ${System.currentTimeMillis() - startTime}ms")
+                    android.util.Log.d("PullToRefresh", "FINAL LOCATION AFTER REFRESH: \"$location\"")
                 } catch (e: TimeoutCancellationException) {
                     android.util.Log.w("PullToRefresh", "Calculation timed out after 3 seconds, keeping existing data")
                     // Keep current prayer times if they exist, or show default location
