@@ -63,6 +63,15 @@ public class DuaManager implements ActivityDetectionService.ActivityChangeCallba
             )
         );
         
+        // On Phone - Protection dua for safe usage
+        duaMap.put(ActivityDetectionService.ActivityType.ON_PHONE, 
+            new DuaInfo(
+                "Allahumma baarik li fi hadha wa qini sharrahu", // Text for display
+                null, // Audio resource - add actual file to res/raw/
+                "O Allah, bless me in this and protect me from its harm - for mindful phone usage"
+            )
+        );
+        
         // Walking - Travel duas
         duaMap.put(ActivityDetectionService.ActivityType.WALKING,
             new DuaInfo(

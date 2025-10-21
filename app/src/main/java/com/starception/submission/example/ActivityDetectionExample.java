@@ -75,6 +75,9 @@ public class ActivityDetectionExample {
                     case DRIVING:
                         Log.i(TAG, "Playing travel dua for safe driving");
                         break;
+                    case ON_PHONE:
+                        Log.i(TAG, "Playing protection dua for mindful phone usage");
+                        break;
                     case WALKING:
                         Log.i(TAG, "Playing walking dua for safe travel");
                         break;
