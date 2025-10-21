@@ -43,12 +43,36 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     private static final long LOCATION_UPDATE_INTERVAL = 1000; // 1 second
     private static final float LOCATION_UPDATE_DISTANCE = 1.0f; // 1 meter
     
-    // Activity detection thresholds - Adjusted for better walking detection
-    private static final double WALKING_VARIANCE_THRESHOLD = 0.5; // Variance threshold for walking
-    private static final double RUNNING_VARIANCE_THRESHOLD = 1.5; // Variance threshold for running
+    // Activity detection thresholds - Improved to distinguish walking from running and phone pickup
+    private static final double WALKING_VARIANCE_MIN = 0.8; // Minimum variance for walking
+    private static final double WALKING_VARIANCE_MAX = 2.5; // Maximum variance for walking
+    private static final double WALKING_GYRO_MIN = 0.4; // Minimum gyro for walking (arm swing)
+    private static final double WALKING_GYRO_MAX = 1.8; // Maximum gyro for walking
+    private static final double WALKING_SPEED_MIN = 0.3; // m/s (1 km/h) - minimum speed to distinguish from phone pickup
+    private static final double WALKING_SPEED_MAX = 2.5; // m/s (~9 km/h, typical walking speed is 1.4 m/s)
+
+    private static final double RUNNING_VARIANCE_MIN = 2.0; // Minimum variance for running (higher impact)
+    private static final double RUNNING_GYRO_MIN = 1.5; // Minimum gyro for running (more rotational movement)
+    private static final double RUNNING_SPEED_MIN = 2.0; // m/s (~7 km/h, typical running starts at 6 km/h)
+
     private static final double DRIVING_SPEED_THRESHOLD = 5.0; // m/s (18 km/h)
-    private static final double STATIONARY_VARIANCE_THRESHOLD = 0.1; // Very low variance = stationary
+    private static final double STATIONARY_VARIANCE_THRESHOLD = 0.15; // Slightly higher for better stability
     private static final double STATIONARY_ACCEL_THRESHOLD = 0.3; // Lower threshold for stationary
+
+    // Phone usage detection thresholds
+    private static final double ON_PHONE_VARIANCE_THRESHOLD = 0.4; // Moderate variance from phone usage
+    private static final double ON_PHONE_GYRO_THRESHOLD = 0.3; // Moderate rotation from phone handling
+    
+    // Phone holding detection - when phone is held but still
+    private static final double GRAVITY_ACCEL = 9.8; // Standard gravity
+    private static final double HELD_PHONE_ACCEL_MIN = 8.5; // Minimum accel when phone is held at angle (more restrictive)
+    private static final double HELD_PHONE_ACCEL_MAX = 11.0; // Maximum accel when phone is held
+    private static final double FLAT_SURFACE_TOLERANCE = 1.0; // Tolerance for flat surface detection
+    
+    // Better detection for held phone vs flat surface
+    private static final double HELD_VS_FLAT_GRAVITY_THRESHOLD = 0.5; // Difference from perfect gravity when held
+    private static final double MICRO_MOVEMENT_THRESHOLD = 0.08; // Very small movements indicate holding (hand tremor)
+    private static final double PERFECT_FLAT_TOLERANCE = 0.15; // Very strict tolerance for truly flat surface (must be almost exactly 9.8)
     
     // Data collection window (seconds)
     private static final int DATA_WINDOW_SIZE = 3; // 3 seconds of data
@@ -127,6 +151,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
      */
     public enum ActivityType {
         STATIONARY,  // User is at rest
+        ON_PHONE,    // User is actively using the phone
         WALKING,     // User is walking
         RUNNING,     // User is running
         DRIVING,     // User is in a vehicle
@@ -188,6 +213,9 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         
         this.callback = callback;
         isRunning.set(true);
+        
+        // Initialize timing variables
+        lastActivityChange = System.currentTimeMillis();
         
         // Register sensor listeners
         if (accelerometer != null) {
@@ -363,43 +391,104 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     
     /**
      * Determine activity type based on sensor data
+     *
+     * Priority order (based on real sensor data analysis):
+     * 1. DRIVING - High speed (most reliable)
+     * 2. RUNNING - High variance + high gyro + higher speed
+     * 3. WALKING - Moderate variance + moderate gyro + low speed
+     * 4. STATIONARY - Gyro ≤ 0.003 (sensor noise) + variance ≤ 0.005 + flat surface
+     * 5. ON_PHONE - Gyro > 0.003 (hand tremors) OR held at angle with movement
+     * 6. ON_PHONE (fallback) - Any other movement patterns
      */
     private ActivityType determineActivity(double avgAccel, double accelVariance, double avgGyro, double maxSpeed) {
-        Log.d(TAG, String.format("Activity Analysis - Accel: %.2f, Variance: %.2f, Gyro: %.2f, Speed: %.2f", 
+        Log.d(TAG, String.format("Activity Analysis - Accel: %.2f, Variance: %.2f, Gyro: %.2f, Speed: %.2f m/s",
                 avgAccel, accelVariance, avgGyro, maxSpeed));
-        
-        // High speed indicates driving (most reliable indicator)
+
+        // 1. High speed indicates DRIVING (most reliable indicator)
         if (maxSpeed > DRIVING_SPEED_THRESHOLD) {
-            Log.d(TAG, "Detected: DRIVING (speed: " + maxSpeed + ")");
+            Log.d(TAG, "Detected: DRIVING (speed: " + String.format("%.2f", maxSpeed) + " m/s / " + String.format("%.1f", maxSpeed * 3.6) + " km/h)");
             return ActivityType.DRIVING;
         }
-        
-        // Use variance as primary indicator for movement activities
-        // Very low variance indicates stationary/standing
-        if (accelVariance <= STATIONARY_VARIANCE_THRESHOLD && avgGyro < 0.3) {
-            Log.d(TAG, "Detected: STATIONARY (low variance: " + accelVariance + ")");
-            return ActivityType.STATIONARY;
-        }
-        
-        // High variance with moderate gyro indicates running
-        if (accelVariance >= RUNNING_VARIANCE_THRESHOLD && avgGyro > 1.0) {
-            Log.d(TAG, "Detected: RUNNING (high variance: " + accelVariance + ")");
+
+        // 2. RUNNING detection - High impact, high rotation, faster speed
+        // Running has higher variance (more impact) and higher gyro (more body rotation)
+        // Must meet ALL criteria: high variance AND high gyro (OR high speed if GPS available)
+        boolean hasRunningVariance = accelVariance >= RUNNING_VARIANCE_MIN;
+        boolean hasRunningGyro = avgGyro >= RUNNING_GYRO_MIN;
+        boolean hasRunningSpeed = maxSpeed >= RUNNING_SPEED_MIN && maxSpeed < DRIVING_SPEED_THRESHOLD;
+
+        // Running if: (high variance AND high gyro) OR (high speed with significant movement)
+        if ((hasRunningVariance && hasRunningGyro) || (hasRunningSpeed && accelVariance >= RUNNING_VARIANCE_MIN)) {
+            Log.d(TAG, "Detected: RUNNING (variance: " + String.format("%.2f", accelVariance) +
+                       ", gyro: " + String.format("%.2f", avgGyro) +
+                       ", speed: " + String.format("%.2f", maxSpeed) + " m/s)");
             return ActivityType.RUNNING;
         }
-        
-        // Medium variance indicates walking (most common case)
-        if (accelVariance >= WALKING_VARIANCE_THRESHOLD && accelVariance < RUNNING_VARIANCE_THRESHOLD) {
-            Log.d(TAG, "Detected: WALKING (medium variance: " + accelVariance + ")");
+
+        // 3. WALKING detection - Moderate impact, moderate rotation, low speed
+        // Walking has rhythmic but moderate variance and gyro from natural gait
+        // CRITICAL: Walking requires ACTUAL MOVEMENT (speed > 0.3 m/s) to distinguish from phone pickup
+        boolean hasWalkingVariance = accelVariance >= WALKING_VARIANCE_MIN && accelVariance < WALKING_VARIANCE_MAX;
+        boolean hasWalkingGyro = avgGyro >= WALKING_GYRO_MIN && avgGyro < WALKING_GYRO_MAX;
+        boolean hasWalkingSpeed = maxSpeed >= WALKING_SPEED_MIN && maxSpeed < WALKING_SPEED_MAX; // Must be moving
+
+        // Walking if: correct variance range AND correct gyro range AND actually moving
+        // This prevents brief phone pickups (speed = 0) from being classified as walking
+        if (hasWalkingVariance && hasWalkingGyro && hasWalkingSpeed) {
+            Log.d(TAG, "Detected: WALKING (variance: " + String.format("%.2f", accelVariance) +
+                       ", gyro: " + String.format("%.2f", avgGyro) +
+                       ", speed: " + String.format("%.2f", maxSpeed) + " m/s)");
             return ActivityType.WALKING;
         }
-        
-        // If we have some movement but can't classify it precisely
-        if (accelVariance > STATIONARY_VARIANCE_THRESHOLD) {
-            Log.d(TAG, "Detected: WALKING (fallback for variance: " + accelVariance + ")");
-            return ActivityType.WALKING; // Default to walking for any significant movement
+
+        // 4. STATIONARY (check BEFORE on_phone) - Phone on flat surface, completely still
+        // ONLY stationary if phone is on a flat surface with ZERO movement
+        // Based on real sensor data: table = gyro ~0.0005-0.002, variance ~0.0000-0.003
+        if (accelVariance <= 0.005 && // Phones on table show variance < 0.003
+            avgGyro <= 0.003 && // Phones on table show gyro < 0.002 (sensor noise only)
+            Math.abs(avgAccel - GRAVITY_ACCEL) <= PERFECT_FLAT_TOLERANCE) {
+            Log.d(TAG, "Detected: STATIONARY (phone on surface - accel: " + String.format("%.2f", avgAccel) +
+                       ", variance: " + String.format("%.4f", accelVariance) +
+                       ", gyro: " + String.format("%.4f", avgGyro) + ")");
+            return ActivityType.STATIONARY;
         }
-        
-        Log.d(TAG, "Detected: UNKNOWN (variance: " + accelVariance + ", gyro: " + avgGyro + ")");
+
+        // 5. ON_PHONE - Phone is being held or used
+        // Holding a phone (even steady) creates micro-movements greater than sensor noise
+        // Check if phone is being held at an angle (not flat) AND has movement
+        if (avgAccel >= HELD_PHONE_ACCEL_MIN && avgAccel <= HELD_PHONE_ACCEL_MAX &&
+            (avgGyro > 0.003 || accelVariance > 0.005)) {
+            Log.d(TAG, "Detected: ON_PHONE (phone held at angle - accel: " + String.format("%.2f", avgAccel) +
+                       ", variance: " + String.format("%.4f", accelVariance) +
+                       ", gyro: " + String.format("%.4f", avgGyro) + ")");
+            return ActivityType.ON_PHONE;
+        }
+
+        // If there's gyro movement above sensor noise, it's likely being held
+        // Hand tremors typically create gyro > 0.003 (above table noise of ~0.002)
+        if (avgGyro > 0.003) {
+            Log.d(TAG, "Detected: ON_PHONE (micro-movements detected - variance: " + String.format("%.4f", accelVariance) +
+                       ", gyro: " + String.format("%.4f", avgGyro) + ")");
+            return ActivityType.ON_PHONE;
+        }
+
+        // Default to ON_PHONE for any other low movement
+        // This catches edge cases and ensures phone in hand is never classified as stationary
+        if (accelVariance <= STATIONARY_VARIANCE_THRESHOLD || avgGyro <= 0.15) {
+            Log.d(TAG, "Detected: ON_PHONE (holding or low movement - variance: " + String.format("%.4f", accelVariance) +
+                       ", gyro: " + String.format("%.4f", avgGyro) + ")");
+            return ActivityType.ON_PHONE;
+        }
+
+        // Any other movement should be ON_PHONE (phone handling, gestures, etc.)
+        if (avgGyro > 0.15 || accelVariance > STATIONARY_VARIANCE_THRESHOLD) {
+            Log.d(TAG, "Detected: ON_PHONE (device handling - variance: " + String.format("%.2f", accelVariance) +
+                       ", gyro: " + String.format("%.2f", avgGyro) + ")");
+            return ActivityType.ON_PHONE;
+        }
+
+        Log.d(TAG, "Detected: UNKNOWN (variance: " + String.format("%.2f", accelVariance) +
+                   ", gyro: " + String.format("%.2f", avgGyro) + ")");
         return ActivityType.UNKNOWN;
     }
     

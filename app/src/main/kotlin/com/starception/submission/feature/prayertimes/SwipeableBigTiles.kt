@@ -84,6 +84,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -1599,38 +1600,43 @@ private fun SmartInfoTile(
             }
             }
 
-            // Footer with dynamic speaker icon
+            // Footer with notification mode selector
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)
                     .clickable {
-                        // Toggle beep sound
-                        com.starception.submission.util.ActivityTracker.toggleBeepSound()
+                        // Cycle through notification modes
+                        com.starception.submission.util.ActivityTracker.cycleNotificationMode()
                     },
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Dynamic speaker icon based on beep state
-                val isBeepEnabled by com.starception.submission.util.ActivityTracker.isBeepEnabled.collectAsStateWithLifecycle()
-                
+                // Dynamic icon and text based on notification mode
+                val notificationMode by com.starception.submission.util.ActivityTracker.notificationMode.collectAsStateWithLifecycle()
+
+                val (icon, text, alpha) = when (notificationMode) {
+                    com.starception.submission.util.NotificationMode.SPEAKER ->
+                        Triple(Icons.Default.VolumeUp, "Sound + Vibrate", 0.8f)
+                    com.starception.submission.util.NotificationMode.VIBRATE ->
+                        Triple(Icons.Default.Vibration, "Vibrate Only", 0.7f)
+                    com.starception.submission.util.NotificationMode.MUTE ->
+                        Triple(Icons.Default.VolumeOff, "Mute", 0.4f)
+                }
+
                 Icon(
-                    imageVector = if (isBeepEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                    contentDescription = if (isBeepEnabled) "Mute beeps" else "Unmute beeps",
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(
-                        alpha = if (isBeepEnabled) 0.8f else 0.4f
-                    ),
-                    modifier = Modifier.size(16.dp)
+                    imageVector = icon,
+                    contentDescription = "Notification mode: $text",
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = alpha),
+                    modifier = Modifier.size(20.dp)
                 )
-                
-                Spacer(modifier = Modifier.width(4.dp))
-                
+
+                Spacer(modifier = Modifier.width(6.dp))
+
                 Text(
-                    text = "${if (isBeepEnabled) "Beeps" else "Muted"} when activity changes",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(
-                        alpha = if (isBeepEnabled) 0.6f else 0.4f
-                    ),
+                    text = "$text on activity change",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = alpha),
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

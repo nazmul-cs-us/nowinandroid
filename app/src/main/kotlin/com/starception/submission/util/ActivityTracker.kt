@@ -15,8 +15,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import com.starception.submission.sensor.ActivityDetectionService
 
 /**
+ * Notification mode for activity changes
+ */
+enum class NotificationMode {
+    SPEAKER,   // Sound + Vibrate
+    VIBRATE,   // Vibrate only
+    MUTE       // No notification
+}
+
+/**
  * ActivityTracker - Singleton to track current user activity using sensor-based detection
- * 
+ *
  * This provides a way for the ActivityDetectionService to update the current activity
  * and for UI components to observe the current activity state. It integrates with
  * our new sensor-based activity detection system.
@@ -24,8 +33,14 @@ import com.starception.submission.sensor.ActivityDetectionService
 object ActivityTracker {
     private val _currentActivity = MutableStateFlow("Initializing...")
     val currentActivity: StateFlow<String> = _currentActivity.asStateFlow()
-    
+
+    private val _notificationMode = MutableStateFlow(NotificationMode.SPEAKER)
+    val notificationMode: StateFlow<NotificationMode> = _notificationMode.asStateFlow()
+
+    // Deprecated - kept for backwards compatibility
+    @Deprecated("Use notificationMode instead", ReplaceWith("notificationMode"))
     private val _isBeepEnabled = MutableStateFlow(true)
+    @Deprecated("Use notificationMode instead", ReplaceWith("notificationMode"))
     val isBeepEnabled: StateFlow<Boolean> = _isBeepEnabled.asStateFlow()
     
     private var activityDetectionService: ActivityDetectionService? = null
@@ -147,6 +162,7 @@ object ActivityTracker {
     private fun activityToString(activity: ActivityDetectionService.ActivityType): String {
         return when (activity) {
             ActivityDetectionService.ActivityType.STATIONARY -> "Still"
+            ActivityDetectionService.ActivityType.ON_PHONE -> "On Phone"
             ActivityDetectionService.ActivityType.WALKING -> "Walking"
             ActivityDetectionService.ActivityType.RUNNING -> "Running"
             ActivityDetectionService.ActivityType.DRIVING -> "Driving"
@@ -180,20 +196,42 @@ object ActivityTracker {
     }
     
     /**
-     * Play beep sound when activity changes (only if enabled)
+     * Play notification when activity changes (based on selected mode)
      */
     private fun playActivityChangeBeep() {
-        // Only play beep if it's enabled
-        if (!_isBeepEnabled.value) {
-            Log.d("ActivityTracker", "🔇 Activity change beep muted")
-            return
+        when (_notificationMode.value) {
+            NotificationMode.MUTE -> {
+                Log.d("ActivityTracker", "🔇 Activity change notification muted")
+                return
+            }
+            NotificationMode.SPEAKER -> {
+                playSound()
+                playVibration()
+                Log.d("ActivityTracker", "🔊 Activity change: Sound + Vibrate")
+            }
+            NotificationMode.VIBRATE -> {
+                playVibration()
+                Log.d("ActivityTracker", "📳 Activity change: Vibrate only")
+            }
         }
-        
+    }
+
+    /**
+     * Play sound notification
+     */
+    private fun playSound() {
         try {
-            // Play a short beep tone
             toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
-            
-            // Also vibrate briefly if available
+        } catch (e: Exception) {
+            Log.e("ActivityTracker", "Failed to play sound: ${e.message}")
+        }
+    }
+
+    /**
+     * Play vibration notification
+     */
+    private fun playVibration() {
+        try {
             context?.let { ctx ->
                 val vibrator = ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
                 vibrator?.let { vib ->
@@ -205,26 +243,64 @@ object ActivityTracker {
                     }
                 }
             }
-            
-            Log.d("ActivityTracker", "🔊 Activity change beep played")
         } catch (e: Exception) {
-            Log.e("ActivityTracker", "Failed to play activity change beep: ${e.message}")
+            Log.e("ActivityTracker", "Failed to vibrate: ${e.message}")
         }
     }
     
     /**
-     * Toggle beep sound on/off
+     * Cycle through notification modes: Speaker → Vibrate → Mute → Speaker
      */
-    fun toggleBeepSound() {
-        _isBeepEnabled.value = !_isBeepEnabled.value
-        Log.d("ActivityTracker", "🔊 Beep sound ${if (_isBeepEnabled.value) "enabled" else "disabled"}")
+    fun cycleNotificationMode() {
+        _notificationMode.value = when (_notificationMode.value) {
+            NotificationMode.SPEAKER -> NotificationMode.VIBRATE
+            NotificationMode.VIBRATE -> NotificationMode.MUTE
+            NotificationMode.MUTE -> NotificationMode.SPEAKER
+        }
+        // Update deprecated field for backwards compatibility
+        _isBeepEnabled.value = (_notificationMode.value != NotificationMode.MUTE)
+
+        val modeText = when (_notificationMode.value) {
+            NotificationMode.SPEAKER -> "Speaker (Sound + Vibrate)"
+            NotificationMode.VIBRATE -> "Vibrate Only"
+            NotificationMode.MUTE -> "Mute"
+        }
+        Log.d("ActivityTracker", "🔔 Notification mode: $modeText")
     }
-    
+
+    /**
+     * Set notification mode directly
+     */
+    fun setNotificationMode(mode: NotificationMode) {
+        _notificationMode.value = mode
+        // Update deprecated field for backwards compatibility
+        _isBeepEnabled.value = (mode != NotificationMode.MUTE)
+        Log.d("ActivityTracker", "🔔 Notification mode set to: $mode")
+    }
+
+    /**
+     * Get current notification mode
+     */
+    fun getNotificationMode(): NotificationMode {
+        return _notificationMode.value
+    }
+
+    // Deprecated methods - kept for backwards compatibility
+    /**
+     * Toggle beep sound on/off
+     * @deprecated Use cycleNotificationMode() instead
+     */
+    @Deprecated("Use cycleNotificationMode() instead", ReplaceWith("cycleNotificationMode()"))
+    fun toggleBeepSound() {
+        cycleNotificationMode()
+    }
+
     /**
      * Set beep sound state
+     * @deprecated Use setNotificationMode() instead
      */
+    @Deprecated("Use setNotificationMode() instead", ReplaceWith("setNotificationMode(if (enabled) NotificationMode.SPEAKER else NotificationMode.MUTE)"))
     fun setBeepEnabled(enabled: Boolean) {
-        _isBeepEnabled.value = enabled
-        Log.d("ActivityTracker", "🔊 Beep sound ${if (enabled) "enabled" else "disabled"}")
+        setNotificationMode(if (enabled) NotificationMode.SPEAKER else NotificationMode.MUTE)
     }
 }
