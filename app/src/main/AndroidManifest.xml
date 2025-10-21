@@ -35,6 +35,9 @@
     
     <!-- Compass functionality - from original Compass-main app -->
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
+    <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     
     <!-- Android Auto permissions -->
     <uses-feature
@@ -104,6 +107,12 @@
             android:name=".feature.quran.QuranPlaybackService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+            
+        <!-- Activity-Based Dua Service for sensor-based activity detection -->
+        <service
+            android:name=".service.ActivityBasedDuaService"
+            android:exported="false"
+            android:enabled="true" />
         
         <!-- Android Auto Car App Service -->
         <service

@@ -1,28 +1,28 @@
 /**
  * SWIPEABLE BIG TILES COMPONENT
- *
+ * 
  * This file contains the main swipeable tiles component for the Prayer Times screen.
  * It provides an interactive horizontal pager with three distinct tiles showing different
  * prayer-related information with Material 3 design and infinite scrolling.
- *
+ * 
  * WHAT IT DOES:
  * - Creates a horizontal swipeable pager with 3 tiles (infinite scroll enabled)
  * - Shows Next Prayer, Smart Info, and Daily Stats tiles
  * - Displays page indicators and swipe hints for better UX
  * - Uses asymmetrical Material 3 shapes for visual appeal
  * - Provides real-time prayer status and progress tracking
- *
+ * 
  * WHERE IT'S USED:
  * - PrayerTimesScreen.kt: Main prayer times screen (line ~481-502)
  * - Replaces ~308 lines of inline swipeable tiles code
  * - Called through SwipeableBigTiles() composable function
- *
+ * 
  * COMPONENTS INCLUDED:
  * - SwipeableBigTiles(): Main composable function (exported)
  * - NextPrayerTile(): Shows current/next prayer with countdown timer
  * - SmartInfoTile(): Context-aware content based on time of day
  * - DailyStatsTile(): Prayer completion progress and statistics
- *
+ * 
  * FEATURES:
  * - HorizontalPager with infinite scrolling (Int.MAX_VALUE pages)
  * - Material 3 asymmetrical shapes and elevated surfaces
@@ -30,12 +30,12 @@
  * - Dynamic content that changes based on current time and prayer status
  * - Professional page indicators and swipe hints
  * - Responsive layout with proper spacing (12dp between elements)
- *
+ * 
  * DEPENDENCIES:
  * - PrayerTimeHelpers.kt: For prayer time calculations and formatting
  * - SmartContentUtils.kt: For smart content generation and progress tracking
  * - DayPrayerTimes model: Prayer times data structure
- *
+ * 
  * DESIGN PATTERNS:
  * - Component extraction: Moved from inline code to reusable component
  * - Function parameters: Accepts lambda functions for data access
@@ -46,6 +46,7 @@ package com.starception.submission.feature.prayertimes
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -81,6 +82,8 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -151,9 +154,69 @@ import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.QuranPlayerViewModel
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
+import androidx.activity.ComponentActivity
+import androidx.core.app.ActivityCompat
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 
 
 
+
+/**
+ * Request activity detection permissions
+ */
+private fun requestActivityPermissions(context: Context) {
+    try {
+        if (context is ComponentActivity) {
+            val permissions = mutableListOf<String>()
+            
+            // Check location permissions
+            val hasLocationFine = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, 
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            val hasLocationCoarse = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, 
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            if (!hasLocationFine) {
+                permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+            if (!hasLocationCoarse) {
+                permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            }
+            
+            // Check activity recognition permission
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val hasActivityRecognition = androidx.core.content.ContextCompat.checkSelfPermission(
+                    context, 
+                    Manifest.permission.ACTIVITY_RECOGNITION
+                ) == PackageManager.PERMISSION_GRANTED
+                
+                if (!hasActivityRecognition) {
+                    permissions.add(Manifest.permission.ACTIVITY_RECOGNITION)
+                }
+            }
+            
+            // Request missing permissions
+            if (permissions.isNotEmpty()) {
+                ActivityCompat.requestPermissions(
+                    context,
+                    permissions.toTypedArray(),
+                    1001 // REQUEST_CODE for activity permissions
+                )
+            }
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("SwipeableBigTiles", "Error requesting permissions", e)
+    }
+}
 
 /**
  * Get Arabic calendar information for the current date
@@ -277,7 +340,7 @@ fun Modifier.geminiGradientEdge(
     )
 ): Modifier {
     val infiniteTransition = rememberInfiniteTransition(label = "aiGlow")
-
+    
     // Slower, more premium animation (4 seconds)
     val shinePosition by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -288,7 +351,7 @@ fun Modifier.geminiGradientEdge(
         ),
         label = "shinePosition"
     )
-
+    
     // Subtle pulsing effect for premium feel
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.6f,
@@ -302,7 +365,7 @@ fun Modifier.geminiGradientEdge(
 
     return this
         .drawWithContent {
-            drawContent()
+        drawContent()
         }
         .drawBehind {
             val cornerRadius = 32.dp.toPx()
@@ -321,7 +384,7 @@ fun Modifier.geminiGradientEdge(
             )
 
             // Calculate traveling light position
-            val perimeter = 2 * (size.width + size.height)
+        val perimeter = 2 * (size.width + size.height)
             val travelProgress = shinePosition * perimeter
 
             // Determine position and color based on progress
@@ -349,15 +412,15 @@ fun Modifier.geminiGradientEdge(
             val nextColor = gradientColors[(colorIndex + 1) % gradientColors.size]
 
             // Draw main traveling glow with blur effect (larger radius for diffusion)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
                         Color.White.copy(alpha = 0.9f * pulseAlpha),
                         currentColor.copy(alpha = 0.8f * pulseAlpha),
                         currentColor.copy(alpha = 0.5f * pulseAlpha),
                         nextColor.copy(alpha = 0.3f * pulseAlpha),
-                        Color.Transparent
-                    ),
+                            Color.Transparent
+                        ),
                     radius = 100f
                 ),
                 radius = 100f,
@@ -366,13 +429,13 @@ fun Modifier.geminiGradientEdge(
             )
 
             // Draw secondary softer glow (the "bleeding" effect)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
                         currentColor.copy(alpha = 0.4f * pulseAlpha),
                         currentColor.copy(alpha = 0.2f * pulseAlpha),
-                        Color.Transparent
-                    ),
+                            Color.Transparent
+                        ),
                     radius = 150f
                 ),
                 radius = 150f,
@@ -442,11 +505,11 @@ fun Modifier.compactGlow(
 
         // Tight, precise glow that follows the shape
         drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
                     glowColor.copy(alpha = 0.15f * pulseAlpha),
-                    Color.Transparent
-                ),
+                            Color.Transparent
+                        ),
                 center = center,
                 radius = size.minDimension * 0.4f  // Smaller radius for precision
             )
@@ -508,12 +571,12 @@ fun Modifier.aiTextGlow(
 
         // Draw soft glow behind text
         drawRoundRect(
-            brush = Brush.radialGradient(
-                colors = listOf(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
                     glowColor.copy(alpha = 0.4f * pulseAlpha),
                     glowColor.copy(alpha = 0.2f * pulseAlpha),
-                    Color.Transparent
-                ),
+                            Color.Transparent
+                        ),
                 center = Offset(size.width / 2, size.height / 2),
                 radius = size.maxDimension * 0.8f
             ),
@@ -539,7 +602,7 @@ fun Modifier.sunshineAura(
     )
 ): Modifier {
     val infiniteTransition = rememberInfiniteTransition(label = "sunshineAura")
-
+    
     val primaryGlow by infiniteTransition.animateFloat(
         initialValue = 0.4f,
         targetValue = 0.9f,
@@ -549,7 +612,7 @@ fun Modifier.sunshineAura(
         ),
         label = "primaryGlow"
     )
-
+    
     val secondaryPulse by infiniteTransition.animateFloat(
         initialValue = 0.2f,
         targetValue = 0.6f,
@@ -559,7 +622,7 @@ fun Modifier.sunshineAura(
         ),
         label = "secondaryPulse"
     )
-
+    
     val divineShimmer by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 2 * kotlin.math.PI.toFloat(),
@@ -569,27 +632,27 @@ fun Modifier.sunshineAura(
         ),
         label = "divineShimmer"
     )
-
+    
     return this.drawBehind {
         // Convert custom corner radii to pixels
         val topStartPx = topStart.toPx()
         val topEndPx = topEnd.toPx()
         val bottomStartPx = bottomStart.toPx()
         val bottomEndPx = bottomEnd.toPx()
-
+        
         // Divine aura with theme-aware colors
         val auralayers = listOf(
             Triple(16.dp.toPx(), primaryGlow * 1.1f, auraColors.getOrElse(0) { auraColors.first() }),      // Inner
-            Triple(26.dp.toPx(), primaryGlow * 0.9f, auraColors.getOrElse(1) { auraColors.first() }),      // Mid
+            Triple(26.dp.toPx(), primaryGlow * 0.9f, auraColors.getOrElse(1) { auraColors.first() }),      // Mid  
             Triple(36.dp.toPx(), primaryGlow * 0.7f, auraColors.getOrElse(2) { auraColors.first() }),      // Light
             Triple(46.dp.toPx(), secondaryPulse * 0.5f, auraColors.getOrElse(3) { auraColors.first() }),   // Outer
         )
-
+        
         // Draw each aura layer
         auralayers.forEachIndexed { index, (glowSize, intensity, baseColor) ->
             val shimmerBoost = kotlin.math.sin(divineShimmer + index * 1.5f) * 0.15f + 0.85f
             val finalAlpha = intensity * shimmerBoost
-
+            
             if (finalAlpha > 0.05f) {
                 // Create more sophisticated gradient
                 val gradientColors = listOf(
@@ -599,7 +662,7 @@ fun Modifier.sunshineAura(
                     baseColor.copy(alpha = finalAlpha * 0.1f),
                     Color.Transparent
                 )
-
+                
                 // Create custom rounded rect path with asymmetric corners
                 val glowRect = androidx.compose.ui.geometry.Rect(
                     offset = Offset(-glowSize / 2, -glowSize / 2),
@@ -608,7 +671,7 @@ fun Modifier.sunshineAura(
                         height = size.height + glowSize
                     )
                 )
-
+                
                 val glowPath = androidx.compose.ui.graphics.Path().apply {
                     addRoundRect(
                         roundRect = androidx.compose.ui.geometry.RoundRect(
@@ -632,7 +695,7 @@ fun Modifier.sunshineAura(
                         )
                     )
                 }
-
+                
                 drawPath(
                     path = glowPath,
                     brush = Brush.radialGradient(
@@ -643,11 +706,11 @@ fun Modifier.sunshineAura(
                 )
             }
         }
-
+        
         // Divine highlights with celestial sparkles (more visible)
         val sparklePhase = kotlin.math.sin(divineShimmer * 1.3f) * 0.5f + 0.5f
         val highlightAlpha = primaryGlow * sparklePhase * 0.45f
-
+        
         if (highlightAlpha > 0.05f) {
             val highlightSize = 6.dp.toPx()
             val highlightRect = androidx.compose.ui.geometry.Rect(
@@ -657,7 +720,7 @@ fun Modifier.sunshineAura(
                     height = size.height + highlightSize * 2
                 )
             )
-
+            
             val highlightPath = androidx.compose.ui.graphics.Path().apply {
                 addRoundRect(
                     roundRect = androidx.compose.ui.geometry.RoundRect(
@@ -681,7 +744,7 @@ fun Modifier.sunshineAura(
                     )
                 )
             }
-
+            
             drawPath(
                 path = highlightPath,
                 brush = Brush.linearGradient(
@@ -708,17 +771,17 @@ fun SparklingStars(
     // Create 4 star shapes around the icon
     val sparklePositions = listOf(
         Pair(-0.35f, -0.35f), // Top-left
-        Pair(0.35f, -0.35f),  // Top-right
+        Pair(0.35f, -0.35f),  // Top-right  
         Pair(-0.35f, 0.35f),  // Bottom-left
         Pair(0.35f, 0.35f)    // Bottom-right
     )
-
+    
     sparklePositions.forEachIndexed { index, (offsetX, offsetY) ->
         // Stagger the sparkle timing for each star
         val staggeredAlpha = ((sparkleAnimation + index * 0.25f) % 1f).coerceIn(0f, 1f)
         val sparkleAlpha = if (staggeredAlpha < 0.5f) staggeredAlpha * 2f else (1f - staggeredAlpha) * 2f
         val sparkleScale = 0.3f + sparkleAlpha * 0.7f
-
+        
         Canvas(
             modifier = Modifier
                 .offset(
@@ -738,7 +801,7 @@ fun SparklingStars(
             val centerY = size.height / 2
             val outerRadius = size.width / 2
             val innerRadius = outerRadius * 0.4f
-
+            
             val starPath = androidx.compose.ui.graphics.Path().apply {
                 // Create 4-pointed star
                 moveTo(centerX, centerY - outerRadius) // Top point
@@ -751,7 +814,7 @@ fun SparklingStars(
                 lineTo(centerX - innerRadius * 0.3f, centerY - innerRadius * 0.3f)
                 close()
             }
-
+            
             drawPath(
                 path = starPath,
                 color = color.copy(alpha = sparkleAlpha * 0.8f)
@@ -768,7 +831,7 @@ fun SmartIndicator(
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "aiWorking")
-
+    
     // Different animations based on the type of AI work
     val (iconAnimation, backgroundAnimation) = when (label) {
         "Smart Prediction" -> {
@@ -838,7 +901,7 @@ fun SmartIndicator(
             Pair(sparkle, bgPulse)
         }
     }
-
+    
     Row(
         modifier = modifier
             .background(
@@ -880,7 +943,7 @@ fun SmartIndicator(
                         }
                     }
             )
-
+            
             // Sparkling effects for AI Content and Smart Analytics
             if (label == "AI Content" || label == "Smart Analytics") {
                 SparklingStars(
@@ -927,7 +990,7 @@ fun SwipeableBigTiles(
         pageCount = { Int.MAX_VALUE }, // Enable infinite scrolling
         initialPage = Int.MAX_VALUE / 2 // Start in the middle for smooth infinite scroll
     )
-
+    
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -969,7 +1032,7 @@ fun SwipeableBigTiles(
                 )
             }
         }
-
+        
         // Page indicators for swipeable tiles
         Row(
             modifier = Modifier
@@ -985,9 +1048,9 @@ fun SwipeableBigTiles(
                         .size(if (isSelected) 12.dp else 8.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isSelected)
-                                MaterialTheme.colorScheme.primary
-                            else
+                            if (isSelected) 
+                                MaterialTheme.colorScheme.primary 
+                            else 
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                         )
                 )
@@ -996,7 +1059,7 @@ fun SwipeableBigTiles(
                 }
             }
         }
-
+        
         // Professional swipe hint
         Row(
             modifier = Modifier
@@ -1103,7 +1166,7 @@ private fun NextPrayerTile(
                         val syncContent = remember(prayerTimes, currentTime) {
                             SmartContentUtils.getNotificationSyncContent(prayerTimes, currentTime)
                         }
-
+                        
                         if (syncContent != null) {
                             // Clean layout with readable fonts and optimized spacing
                             Column(
@@ -1118,7 +1181,7 @@ private fun NextPrayerTile(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-
+                                
                                 // Main prayer time content - sized to fit longest text "59 minutes since Maghrib"
                                 Text(
                                     text = syncContent.content,
@@ -1132,7 +1195,7 @@ private fun NextPrayerTile(
                                     overflow = TextOverflow.Ellipsis,
                                     lineHeight = 24.sp
                                 )
-
+                                
                                 // Next prayer info - enhanced with prominent chip styling and AI glow
                                 if (syncContent.nextPrayerInfo.isNotEmpty()) {
                                     Surface(
@@ -1142,18 +1205,18 @@ private fun NextPrayerTile(
                                             .padding(top = 2.dp)
                                             .aiTextGlow()
                                     ) {
-                                        Text(
-                                            text = syncContent.nextPrayerInfo,
+                                    Text(
+                                        text = syncContent.nextPrayerInfo,
                                             style = MaterialTheme.typography.titleMedium.copy(
                                                 fontSize = 15.sp,
                                                 letterSpacing = (-0.2).sp
                                             ),
                                             color = MaterialTheme.colorScheme.tertiary,
                                             fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
+                                        maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
+                                    )
                                     }
                                 }
                             }
@@ -1167,28 +1230,28 @@ private fun NextPrayerTile(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 // Title - notification style
-                                Text(
+                            Text(
                                     text = "Next Prayer: $prayerName",
                                     style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
 
                                 // Main content - prayer time with status
-                                Text(
+                            Text(
                                     text = "$prayerStatus • $prayerTime",
                                     style = MaterialTheme.typography.headlineSmall.copy(
                                         fontSize = 22.sp,
                                         letterSpacing = (-0.4).sp
                                     ),
-                                    color = MaterialTheme.colorScheme.primary,
+                                color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                     lineHeight = 24.sp
-                                )
+                            )
                             }
                         } else if (prayerTimes != null) {
                             // Show tomorrow's Fajr in notification style
@@ -1196,35 +1259,35 @@ private fun NextPrayerTile(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 // Title - notification style
-                                Text(
+                            Text(
                                     text = "Next Prayer: Fajr",
                                     style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
 
                                 // Main content - tomorrow's Fajr time
-                                Text(
+                            Text(
                                     text = "Tomorrow • ${getPrayerTimeDisplay("Fajr")}",
                                     style = MaterialTheme.typography.headlineSmall.copy(
                                         fontSize = 22.sp,
                                         letterSpacing = (-0.4).sp
                                     ),
-                                    color = MaterialTheme.colorScheme.primary,
+                                color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                     lineHeight = 24.sp
-                                )
+                            )
                             }
                         }
                     }
-
+                    
                     // Material 3 expressive compass with enhanced interaction feedback
                     var isPressed by remember { mutableStateOf(false) }
-
+                    
                     val compassScale by animateFloatAsState(
                         targetValue = if (isPressed) 0.95f else 1f,
                         animationSpec = spring(
@@ -1233,7 +1296,7 @@ private fun NextPrayerTile(
                         ),
                         label = "compassPressScale"
                     )
-
+                    
                     val compassElevation by animateDpAsState(
                         targetValue = if (isPressed) 2.dp else 6.dp,
                         animationSpec = spring(
@@ -1242,7 +1305,7 @@ private fun NextPrayerTile(
                         ),
                         label = "compassElevation"
                     )
-
+                    
                     Box(
                         modifier = Modifier
                             .size(100.dp) // Reduced size to give more space for text
@@ -1252,7 +1315,7 @@ private fun NextPrayerTile(
                             }
                             .pointerInput(Unit) {
                                 detectTapGestures(
-                                    onPress = {
+                                    onPress = { 
                                         isPressed = true
                                         tryAwaitRelease()
                                         isPressed = false
@@ -1297,15 +1360,15 @@ private fun NextPrayerTile(
                     color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 3.dp
                 )
-
+                
                 Spacer(modifier = Modifier.height(16.dp))
-
+                
                 Text(
                     text = "Calculating Prayer Times",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-
+                
                 Text(
                     text = "Getting your location...",
                     style = MaterialTheme.typography.bodyMedium,
@@ -1344,8 +1407,8 @@ private fun SmartInfoTile(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(24.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
             // Header: Icon + Title (matching Quran Player style)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1367,8 +1430,8 @@ private fun SmartInfoTile(
             }
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
                     .weight(1f)
                     .padding(top = 20.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1378,8 +1441,8 @@ private fun SmartInfoTile(
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.Top,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                 // Content row with side-by-side columns for professional layout
                 Row(
                     modifier = Modifier
@@ -1425,7 +1488,7 @@ private fun SmartInfoTile(
                                         .wrapContentSize(Alignment.Center),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
+                    Text(
                                         text = initial,
                                         style = MaterialTheme.typography.labelMedium.copy(
                                             fontSize = 11.sp,
@@ -1439,23 +1502,23 @@ private fun SmartInfoTile(
                                             MaterialTheme.colorScheme.onPrimary
                                         else
                                             MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f),
-                                        textAlign = TextAlign.Center
-                                    )
+                        textAlign = TextAlign.Center
+                    )
                                 }
                             }
                         }
-
+                    
                         // Label
-                        Text(
+                    Text(
                             text = "Prayers Tracker",
                             style = MaterialTheme.typography.labelLarge.copy(
                                 fontSize = 13.sp,
                                 letterSpacing = 0.5.sp
                             ),
                             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center
-                        )
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
                     }
 
                     // Vertical divider with gradient effect
@@ -1482,49 +1545,97 @@ private fun SmartInfoTile(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Value
-                        val currentActivity = getCurrentActivity()
-                        Text(
-                            text = currentActivity,
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontSize = 28.sp,
-                                letterSpacing = (-0.5).sp
-                            ),
-                            color = MaterialTheme.colorScheme.secondary,
-                            textAlign = TextAlign.Center,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        // Label
-                        Text(
-                            text = "Current Activity",
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontSize = 13.sp,
-                                letterSpacing = 0.5.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center
-                        )
+                        // Value - Use StateFlow for real-time updates
+                        val currentActivityFlow = com.starception.submission.util.ActivityTracker.currentActivity
+                        val currentActivity by currentActivityFlow.collectAsStateWithLifecycle()
+                        val context = LocalContext.current
+                        val needsPermissions = currentActivity.startsWith("Need:")
+                        
+                        Column(
+                            modifier = if (needsPermissions) {
+                                Modifier.clickable {
+                                    // Request permissions when clicked if needed
+                                    requestActivityPermissions(context)
+                                }
+                            } else {
+                                Modifier
+                            },
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                    Text(
+                        text = currentActivity,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontSize = 28.sp,
+                                    letterSpacing = (-0.5).sp
+                                ),
+                                color = if (needsPermissions) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.secondary
+                                },
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            // Label
+                            Text(
+                                text = if (needsPermissions) "Tap to grant permissions" else "Current Activity",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontSize = 13.sp,
+                                    letterSpacing = 0.5.sp
+                                ),
+                                color = if (needsPermissions) {
+                                    MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                },
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
             }
 
-            // Footer with padding
-            Text(
-                text = "🔊 Beeps when activity changes",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            // Footer with dynamic speaker icon
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)
-            )
+                    .clickable {
+                        // Toggle beep sound
+                        com.starception.submission.util.ActivityTracker.toggleBeepSound()
+                    },
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Dynamic speaker icon based on beep state
+                val isBeepEnabled by com.starception.submission.util.ActivityTracker.isBeepEnabled.collectAsStateWithLifecycle()
+                
+                Icon(
+                    imageVector = if (isBeepEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                    contentDescription = if (isBeepEnabled) "Mute beeps" else "Unmute beeps",
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(
+                        alpha = if (isBeepEnabled) 0.8f else 0.4f
+                    ),
+                    modifier = Modifier.size(16.dp)
+                )
+                
+                Spacer(modifier = Modifier.width(4.dp))
+                
+                Text(
+                    text = "${if (isBeepEnabled) "Beeps" else "Muted"} when activity changes",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(
+                        alpha = if (isBeepEnabled) 0.6f else 0.4f
+                    ),
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -1576,9 +1687,9 @@ private fun DailyStatsTile(
             }
 
             // LIST VIEW - Show scrollable Surah list with Material 3 expressive design
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
                     .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
             ) {
                 // Header with search bar and close button
@@ -1650,18 +1761,18 @@ private fun DailyStatsTile(
                         Text(
                             text = "Close",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
+                color = MaterialTheme.colorScheme.tertiary,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                        )
+            )
                     }
                 }
-
+            
                 Spacer(modifier = Modifier.height(6.dp))
 
                 // Results count
                 if (searchQuery.isNotEmpty()) {
-                    Text(
+            Text(
                         text = "${filteredSurahs.size} result${if (filteredSurahs.size != 1) "s" else ""}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
@@ -1701,8 +1812,8 @@ private fun DailyStatsTile(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 // Smaller number badge
                                 Surface(
@@ -1713,22 +1824,22 @@ private fun DailyStatsTile(
                                     Box(
                                         contentAlignment = Alignment.Center,
                                         modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        Text(
+                ) {
+                    Text(
                                             text = "${surah.number}",
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.tertiary,
+                        color = MaterialTheme.colorScheme.tertiary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 11.sp
-                                        )
+                    )
                                     }
                                 }
 
                                 // Surah names - compact and professional
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
+                    Text(
                                         text = surah.nameArabic,
-                                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -1750,7 +1861,7 @@ private fun DailyStatsTile(
                                     color = MaterialTheme.colorScheme.tertiary,
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 10.sp,
-                                    modifier = Modifier
+                    modifier = Modifier
                                         .background(
                                             MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
                                             RoundedCornerShape(4.dp)
@@ -1820,7 +1931,7 @@ private fun DailyStatsTile(
                                 com.starception.submission.feature.quran.AudioLanguage.ENGLISH_TRANSLATION -> "EN"
                             },
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
+                    color = MaterialTheme.colorScheme.tertiary,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                         )
@@ -1857,7 +1968,7 @@ private fun DailyStatsTile(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier.size(28.dp)
                             ) {
-                                Text(
+            Text(
                                     text = "${viewModel.currentSurahIndex + 1}",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.tertiary,
@@ -1871,7 +1982,7 @@ private fun DailyStatsTile(
                             Text(
                                 text = QuranData.surahs[viewModel.currentSurahIndex].nameArabic,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
                             )

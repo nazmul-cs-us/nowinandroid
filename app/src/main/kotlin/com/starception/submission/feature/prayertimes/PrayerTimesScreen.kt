@@ -239,7 +239,7 @@ import java.time.Duration
 fun PrayerTimesScreen(
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
+    val screenContext = LocalContext.current
     
     // COMPREHENSIVE UI LOGGING SYSTEM
     LaunchedEffect(Unit) {
@@ -248,7 +248,7 @@ fun PrayerTimesScreen(
         android.util.Log.i("PrayerTimesScreen", "=".repeat(60))
         android.util.Log.i("PrayerTimesScreen", "🚀 Screen initialization started")
         android.util.Log.i("PrayerTimesScreen", "⏰ Timestamp: ${LocalDateTime.now()}")
-        android.util.Log.i("PrayerTimesScreen", "📱 Context: ${context.javaClass.simpleName}")
+        android.util.Log.i("PrayerTimesScreen", "📱 Context: ${screenContext.javaClass.simpleName}")
         android.util.Log.i("PrayerTimesScreen", "")
     }
     
@@ -270,7 +270,7 @@ fun PrayerTimesScreen(
     val (initialPrayerTimes, initialLocation, initialLoading) = remember {
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
-                context.applicationContext,
+                screenContext.applicationContext,
                 PrayerTimeCalculatorEntryPoint::class.java
             )
             val cache = entryPoint.locationCache()
@@ -440,7 +440,7 @@ fun PrayerTimesScreen(
     suspend fun refreshStoredOffsets() {
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
-                context.applicationContext,
+                screenContext.applicationContext,
                 com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
             )
             val repository = entryPoint.prayerSettingsRepository()
@@ -465,7 +465,7 @@ fun PrayerTimesScreen(
     LaunchedEffect(offsetRefreshTrigger) {
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
-                context.applicationContext,
+                screenContext.applicationContext,
                 com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
             )
             val repository = entryPoint.prayerSettingsRepository()
@@ -489,7 +489,7 @@ fun PrayerTimesScreen(
     // LOCATION SERVICE - For Qibla compass functionality
     val locationService = remember {
         val entryPoint = EntryPointAccessors.fromApplication(
-            context.applicationContext,
+            screenContext.applicationContext,
             PrayerTimeCalculatorEntryPoint::class.java
         )
         entryPoint.enhancedLocationService()
@@ -507,7 +507,7 @@ fun PrayerTimesScreen(
                 
                 // Get location service to check if services are enabled
                 val entryPoint = EntryPointAccessors.fromApplication(
-                    context.applicationContext,
+                    screenContext.applicationContext,
                     PrayerTimeCalculatorEntryPoint::class.java
                 )
                 val locationService = entryPoint.enhancedLocationService()
@@ -544,7 +544,7 @@ fun PrayerTimesScreen(
                 try {
                     // Access the LocationCache service through Hilt dependency injection
                     val entryPoint = EntryPointAccessors.fromApplication(
-                        context.applicationContext,
+                        screenContext.applicationContext,
                         PrayerTimeCalculatorEntryPoint::class.java
                     )
                     val cache = entryPoint.locationCache()
@@ -568,7 +568,7 @@ fun PrayerTimesScreen(
                     withTimeout(3000L) {
                         withContext(Dispatchers.Default) {
                             android.util.Log.d("PullToRefresh", "CALCULATION START: Creating PrayerTimesCalculator and running calculation")
-                            val calculator = PrayerTimesCalculator(context)
+                            val calculator = PrayerTimesCalculator(screenContext)
                             val result = calculator.calculateDefaultPrayerTimes()
 
                             android.util.Log.d("PullToRefresh", "CALCULATION RESULT: Prayer times = ${if (result.first != null) "SUCCESS" else "NULL"}")
@@ -612,6 +612,33 @@ fun PrayerTimesScreen(
     val locationPermissionState = rememberPermissionState(
         permission = Manifest.permission.ACCESS_FINE_LOCATION
     )
+    
+    // Activity recognition permission for activity detection
+    val activityRecognitionPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        rememberPermissionState(
+            permission = Manifest.permission.ACTIVITY_RECOGNITION
+        )
+    } else {
+        null // Not needed on older Android versions
+    }
+    
+    // Monitor permission changes and re-initialize ActivityTracker
+    val activityContext = LocalContext.current
+    LaunchedEffect(locationPermissionState.status, activityRecognitionPermissionState?.status) {
+        // Check if both location and activity recognition permissions are now granted
+        val locationGranted = locationPermissionState.status is com.google.accompanist.permissions.PermissionStatus.Granted
+        val activityGranted = activityRecognitionPermissionState?.status is com.google.accompanist.permissions.PermissionStatus.Granted 
+            || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+        
+        if (locationGranted && activityGranted) {
+            // Re-initialize ActivityTracker in case permissions were just granted
+            try {
+                com.starception.submission.util.ActivityTracker.reinitializeIfNeeded(activityContext)
+            } catch (e: Exception) {
+                Log.e("PrayerTimesScreen", "Error reinitializing ActivityTracker", e)
+            }
+        }
+    }
     
     // COMPREHENSIVE PERMISSION STATE LOGGING
     LaunchedEffect(notificationPermissionState.status) {
@@ -809,7 +836,7 @@ fun PrayerTimesScreen(
                         // Save the adjustment to Prayer settings using repository
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
-                                val repository = com.starception.submission.prayer.repository.PrayerSettingsRepository(context)
+                                val repository = com.starception.submission.prayer.repository.PrayerSettingsRepository(screenContext)
                                 repository.updateSinglePrayerOffset(prayerName, finalAdjustment)
                                 android.util.Log.i("PrayerTimesScreen", "✅ SAVE SUCCESS: $prayerName offset saved as $finalAdjustment minutes")
                                 
@@ -1024,7 +1051,7 @@ fun PrayerTimesScreen(
         try {
             // Run calculation on background thread to prevent UI blocking
             withContext(Dispatchers.Default) {
-                val calculator = PrayerTimesCalculator(context)
+                val calculator = PrayerTimesCalculator(screenContext)
                 // This uses our improved 3-second timeout system
                 val result = calculator.calculateDefaultPrayerTimes()
                 
@@ -1055,7 +1082,7 @@ fun PrayerTimesScreen(
         android.util.Log.d("PrayerScreen", "STEP 1: Checking for instant cached data...")
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
-                context.applicationContext,
+                screenContext.applicationContext,
                 PrayerTimeCalculatorEntryPoint::class.java
             )
             val cache = entryPoint.locationCache()
@@ -1734,7 +1761,7 @@ fun PrayerTimesScreen(
                         showLocationServiceDialog = false
                         // Open device location settings
                         val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-                        context.startActivity(intent)
+                        screenContext.startActivity(intent)
                     },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.primary

@@ -142,8 +142,14 @@ class PrayerNotificationService : Service() {
             // TEMPORARILY DISABLED: Initialize activity recognition (causing ANR)
             // initializeActivityRecognition()
             
-            // Initialize ActivityTracker with initial state
-            ActivityTracker.updateActivity("STILL (AR Disabled)")
+            // Initialize ActivityTracker with sensor-based detection
+            try {
+                ActivityTracker.initialize(this)
+                Log.d(TAG, "✓ ActivityTracker initialized with sensor-based detection")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error initializing ActivityTracker", e)
+                ActivityTracker.updateActivity("Detection Error")
+            }
             
             Log.d(TAG, "✓ Service onCreate completed successfully")
         } catch (e: Exception) {
@@ -1476,6 +1482,14 @@ class PrayerNotificationService : Service() {
                 stopActivityRecognition()
             } catch (e: Exception) {
                 Log.w(TAG, "Error stopping activity recognition", e)
+            }
+            
+            // Stop ActivityTracker sensor detection
+            try {
+                ActivityTracker.stopDetection()
+                Log.d(TAG, "✓ ActivityTracker detection stopped")
+            } catch (e: Exception) {
+                Log.w(TAG, "Error stopping ActivityTracker", e)
             }
             
             Log.d(TAG, "Modern service cleanup completed successfully")
