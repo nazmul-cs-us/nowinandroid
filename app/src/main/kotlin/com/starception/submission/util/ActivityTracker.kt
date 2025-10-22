@@ -8,6 +8,7 @@ import android.os.Vibrator
 import android.util.Log
 import android.media.ToneGenerator
 import android.media.AudioManager
+import android.media.MediaPlayer
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +48,8 @@ object ActivityTracker {
     private var isInitialized = false
     private var context: Context? = null
     private var toneGenerator: ToneGenerator? = null
+    private var mediaPlayer: MediaPlayer? = null
+    private var previousActivity: String = ""
     
     /**
      * Initialize the activity tracker with sensor-based detection
@@ -123,7 +126,15 @@ object ActivityTracker {
      * Update the current activity (called from ActivityDetectionService callback)
      */
     fun updateActivity(activity: String) {
+        val oldActivity = previousActivity
+        previousActivity = _currentActivity.value
         _currentActivity.value = activity
+
+        // Play driving audio when transitioning to driving
+        if (activity == "Driving" && oldActivity != "Driving") {
+            playDrivingAudio()
+            Log.d("ActivityTracker", "🚗 Driving started - playing travel dua")
+        }
     }
     
     /**
@@ -146,13 +157,21 @@ object ActivityTracker {
     fun stopDetection() {
         activityDetectionService?.stopDetection()
         _currentActivity.value = "Stopped"
-        
+
         // Clean up ToneGenerator
         try {
             toneGenerator?.release()
             toneGenerator = null
         } catch (e: Exception) {
             Log.w("ActivityTracker", "Error releasing ToneGenerator: ${e.message}")
+        }
+
+        // Clean up MediaPlayer
+        try {
+            mediaPlayer?.release()
+            mediaPlayer = null
+        } catch (e: Exception) {
+            Log.w("ActivityTracker", "Error releasing MediaPlayer: ${e.message}")
         }
     }
     
@@ -245,6 +264,35 @@ object ActivityTracker {
             }
         } catch (e: Exception) {
             Log.e("ActivityTracker", "Failed to vibrate: ${e.message}")
+        }
+    }
+
+    /**
+     * Play driving audio (travel dua) when driving starts
+     */
+    private fun playDrivingAudio() {
+        try {
+            context?.let { ctx ->
+                // Release any existing MediaPlayer instance
+                mediaPlayer?.release()
+
+                // Create and play the travel dua audio
+                val resId = ctx.resources.getIdentifier("travel_dua", "raw", ctx.packageName)
+                if (resId != 0) {
+                    mediaPlayer = MediaPlayer.create(ctx, resId)
+                    mediaPlayer?.setOnCompletionListener { mp ->
+                        mp.release()
+                        mediaPlayer = null
+                        Log.d("ActivityTracker", "🎵 Travel dua audio completed")
+                    }
+                    mediaPlayer?.start()
+                    Log.d("ActivityTracker", "🎵 Playing travel dua audio")
+                } else {
+                    Log.e("ActivityTracker", "Failed to find travel_dua.wav in resources")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ActivityTracker", "Failed to play driving audio: ${e.message}")
         }
     }
     
