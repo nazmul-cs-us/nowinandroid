@@ -33,6 +33,12 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     
+    <!-- Prayer notification permissions -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.ALARM" />
+    
     <!-- Compass functionality - from original Compass-main app -->
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
     <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" />
@@ -99,6 +105,24 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.starception.submission.MARK_AS_PRAYED" />
+            </intent-filter>
+        </receiver>
+        
+        <!-- Prayer Notification Receiver for AlarmManager-triggered notifications -->
+        <receiver
+            android:name=".prayer.receiver.PrayerNotificationReceiver"
+            android:exported="false" />
+        
+        <!-- Prayer Boot Receiver for automatic rescheduling after device restart -->
+        <receiver
+            android:name=".prayer.receiver.PrayerBootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <data android:scheme="package" />
             </intent-filter>
         </receiver>
 

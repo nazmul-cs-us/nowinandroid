@@ -112,7 +112,12 @@ dependencies {
     // Android Auto support
     implementation(libs.androidx.car.app)
 
+    // WorkManager for reliable prayer notifications
+    implementation(libs.androidx.work.ktx)
+    implementation(libs.hilt.ext.work)
+
     ksp(libs.hilt.compiler)
+    ksp(libs.hilt.ext.compiler)
 
     debugImplementation(libs.androidx.compose.ui.testManifest)
     debugImplementation(projects.uiTestHiltManifest)

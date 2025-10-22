@@ -153,6 +153,18 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Celebration
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.delay
 import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.QuranPlayerViewModel
 import androidx.compose.ui.platform.LocalContext
@@ -767,6 +779,7 @@ fun Modifier.sunshineAura(
         }
     }
 }
+
 
 @Composable
 fun SparklingStars(
