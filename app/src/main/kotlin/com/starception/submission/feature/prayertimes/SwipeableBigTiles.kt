@@ -165,6 +165,9 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.PermissionStatus
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
 
 
 
@@ -1727,6 +1730,7 @@ private fun AnimatedFlipText(
     }
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 private fun DailyStatsTile(
     getPrayerProgress: () -> Pair<Int, Int>,
@@ -1741,6 +1745,20 @@ private fun DailyStatsTile(
     }
 
     var showSurahList by remember { mutableStateOf(false) }
+    
+    // Audio permission state for Quran playback
+    val audioPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        rememberPermissionState(permission = Manifest.permission.READ_MEDIA_AUDIO)
+    } else {
+        rememberPermissionState(permission = Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
+    
+    // Handle permission changes
+    LaunchedEffect(audioPermissionState.status) {
+        if (audioPermissionState.status is PermissionStatus.Granted) {
+            viewModel.clearPermissionError()
+        }
+    }
 
     Surface(
         modifier = Modifier
@@ -1881,8 +1899,12 @@ private fun DailyStatsTile(
                                     HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
                                 )
                                 viewModel.selectSurah(index)
-                                viewModel.playSurah(index)
-                                showSurahList = false  // Go back to player view
+                                if (viewModel.needsAudioPermission) {
+                                    audioPermissionState.launchPermissionRequest()
+                                } else {
+                                    viewModel.playSurah(index)
+                                    showSurahList = false  // Go back to player view
+                                }
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(8.dp),
@@ -2114,7 +2136,11 @@ private fun DailyStatsTile(
                                     HapticFeedbackConstants.CONTEXT_CLICK,
                                     HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
                                 )
-                                viewModel.togglePlayPause()
+                                if (viewModel.needsAudioPermission) {
+                                    audioPermissionState.launchPermissionRequest()
+                                } else {
+                                    viewModel.togglePlayPause()
+                                }
                             },
                             modifier = Modifier
                                 .size(42.dp)
