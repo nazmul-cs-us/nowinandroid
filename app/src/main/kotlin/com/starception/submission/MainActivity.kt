@@ -135,6 +135,9 @@ class MainActivity : FragmentActivity() {
     @Inject
     lateinit var prayerNotificationServiceManager: com.starception.submission.prayer.service.PrayerNotificationServiceManager
 
+    @Inject
+    lateinit var notificationSystemHealthCheck: com.starception.submission.prayer.util.NotificationSystemHealthCheck
+
     // EMERGENCY FIX: ViewModel disabled to prevent main thread blocking
     // TODO: Re-enable after fixing performance issues
     // private var viewModel: MainActivityViewModel? = null
@@ -336,6 +339,22 @@ class MainActivity : FragmentActivity() {
                 prayerNotificationServiceManager.initializeNotificationSystem()
                 
                 Log.d("MainActivity", "Prayer notification system initialized successfully")
+                
+                // Perform health check to verify everything is working
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val healthResult = notificationSystemHealthCheck.performHealthCheck()
+                        if (healthResult.isFullyOperational()) {
+                            Log.i("MainActivity", "🎉 Notification system is fully operational!")
+                        } else if (healthResult.canDeliverNotifications()) {
+                            Log.w("MainActivity", "⚠️ Notification system operational but with some limitations")
+                        } else {
+                            Log.e("MainActivity", "❌ Notification system has critical issues")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Error during health check", e)
+                    }
+                }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error starting prayer notification system", e)
             }
