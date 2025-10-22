@@ -124,6 +124,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -131,6 +132,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import com.starception.submission.R
 import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.filled.BatchPrediction
 import androidx.compose.material.icons.filled.BubbleChart
 import com.starception.submission.prayer.model.DayPrayerTimes
@@ -1563,8 +1565,9 @@ private fun SmartInfoTile(
                             },
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                    Text(
-                        text = currentActivity,
+                            // Animated flip text like airport board
+                            AnimatedFlipText(
+                                text = currentActivity,
                                 style = MaterialTheme.typography.headlineMedium.copy(
                                     fontSize = 28.sp,
                                     letterSpacing = (-0.5).sp
@@ -1574,10 +1577,8 @@ private fun SmartInfoTile(
                                 } else {
                                     MaterialTheme.colorScheme.secondary
                                 },
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2
                             )
                             // Label
                             Text(
@@ -1617,11 +1618,11 @@ private fun SmartInfoTile(
 
                 val (icon, text, alpha) = when (notificationMode) {
                     com.starception.submission.util.NotificationMode.SPEAKER ->
-                        Triple(Icons.Default.VolumeUp, "Sound + Vibrate", 0.8f)
+                        Triple(Icons.Default.VolumeUp, "Alerts Enabled", 0.8f)
                     com.starception.submission.util.NotificationMode.VIBRATE ->
-                        Triple(Icons.Default.Vibration, "Vibrate Only", 0.7f)
+                        Triple(Icons.Default.Vibration, "Haptics Only", 0.7f)
                     com.starception.submission.util.NotificationMode.MUTE ->
-                        Triple(Icons.Default.VolumeOff, "Mute", 0.4f)
+                        Triple(Icons.Default.VolumeOff, "Silent Mode", 0.4f)
                 }
 
                 Icon(
@@ -1634,7 +1635,7 @@ private fun SmartInfoTile(
                 Spacer(modifier = Modifier.width(6.dp))
 
                 Text(
-                    text = "$text on activity change",
+                    text = text,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = alpha),
                     fontWeight = FontWeight.Medium,
@@ -1642,6 +1643,86 @@ private fun SmartInfoTile(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+        }
+    }
+}
+
+/**
+ * Animated flip text component like airport arrival/departure boards
+ */
+@Composable
+private fun AnimatedFlipText(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    fontWeight: FontWeight,
+    maxLines: Int,
+    modifier: Modifier = Modifier
+) {
+    var currentText by remember { mutableStateOf(text) }
+    var previousText by remember { mutableStateOf(text) }
+
+    // Detect text change and trigger animation
+    LaunchedEffect(text) {
+        if (text != currentText) {
+            previousText = currentText
+            currentText = text
+        }
+    }
+
+    // Animation for flip effect
+    val animationProgress = remember { Animatable(0f) }
+
+    LaunchedEffect(currentText) {
+        if (currentText != previousText) {
+            animationProgress.snapTo(0f)
+            animationProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = 400,
+                    easing = FastOutSlowInEasing
+                )
+            )
+        }
+    }
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        // Show previous text flipping out
+        if (animationProgress.value < 0.5f) {
+            Text(
+                text = previousText,
+                style = style,
+                color = color.copy(alpha = 1f - (animationProgress.value * 2)),
+                textAlign = TextAlign.Center,
+                fontWeight = fontWeight,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .graphicsLayer {
+                        rotationX = animationProgress.value * 90f
+                        cameraDistance = 8f * density
+                    }
+            )
+        }
+        // Show new text flipping in
+        else {
+            Text(
+                text = currentText,
+                style = style,
+                color = color.copy(alpha = (animationProgress.value - 0.5f) * 2),
+                textAlign = TextAlign.Center,
+                fontWeight = fontWeight,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .graphicsLayer {
+                        rotationX = -90f + ((animationProgress.value - 0.5f) * 180f)
+                        cameraDistance = 8f * density
+                    }
+            )
         }
     }
 }
