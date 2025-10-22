@@ -428,13 +428,17 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         // 3. WALKING detection - Moderate impact, moderate rotation, low speed
         // Walking has rhythmic but moderate variance and gyro from natural gait
         // CRITICAL: Walking requires ACTUAL MOVEMENT (speed > 0.3 m/s) to distinguish from phone pickup
+        // PRIORITY: Speed is most reliable indicator - if moving at walking speed with walking variance, it's walking
         boolean hasWalkingVariance = accelVariance >= WALKING_VARIANCE_MIN && accelVariance < WALKING_VARIANCE_MAX;
         boolean hasWalkingGyro = avgGyro >= WALKING_GYRO_MIN && avgGyro < WALKING_GYRO_MAX;
         boolean hasWalkingSpeed = maxSpeed >= WALKING_SPEED_MIN && maxSpeed < WALKING_SPEED_MAX; // Must be moving
 
-        // Walking if: correct variance range AND correct gyro range AND actually moving
-        // This prevents brief phone pickups (speed = 0) from being classified as walking
-        if (hasWalkingVariance && hasWalkingGyro && hasWalkingSpeed) {
+        // Walking if: (correct variance AND speed) regardless of gyro
+        // OR (correct variance AND correct gyro range AND actually moving)
+        // This allows walking while using phone (high gyro from combined movement)
+        if (hasWalkingVariance && hasWalkingSpeed) {
+            // If we have walking variance and walking speed, it's walking
+            // Even if gyro is high from phone usage
             Log.d(TAG, "Detected: WALKING (variance: " + String.format("%.2f", accelVariance) +
                        ", gyro: " + String.format("%.2f", avgGyro) +
                        ", speed: " + String.format("%.2f", maxSpeed) + " m/s)");
