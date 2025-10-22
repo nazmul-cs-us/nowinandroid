@@ -132,6 +132,9 @@ class MainActivity : FragmentActivity() {
     @Inject
     lateinit var userNewsResourceRepository: UserNewsResourceRepository  // News data access
 
+    @Inject
+    lateinit var prayerNotificationServiceManager: com.starception.submission.prayer.service.PrayerNotificationServiceManager
+
     // EMERGENCY FIX: ViewModel disabled to prevent main thread blocking
     // TODO: Re-enable after fixing performance issues
     // private var viewModel: MainActivityViewModel? = null
@@ -321,31 +324,20 @@ class MainActivity : FragmentActivity() {
      * NON-BLOCKING: Start prayer service in background coroutine
      */
     private fun startPrayerServiceIfNeeded() {
-        Log.d("MainActivity", "Starting prayer service in background")
+        Log.d("MainActivity", "Starting prayer notification system in background")
         
         lifecycleScope.launch {
             try {
                 // Start auto-detection FIRST (independent of service and settings dialog)
                 startLocationBasedAutoDetection()
                 
-                // Then start prayer service
-                // Check if service is running and healthy
-                if (PrayerNotificationService.isServiceRunningInAnotherProcess(this@MainActivity)) {
-                    Log.d("MainActivity", "Prayer service already running - letting it continue")
-                    return@launch
-                }
+                // Initialize the complete prayer notification system
+                // This includes both foreground service and backup notifications
+                prayerNotificationServiceManager.initializeNotificationSystem()
                 
-                // Start service since none is running
-                Log.d("MainActivity", "No service running, starting new prayer service")
-                val intent = Intent(this@MainActivity, PrayerNotificationService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(intent)
-                } else {
-                    startService(intent)
-                }
-                Log.d("MainActivity", "Prayer service started successfully")
+                Log.d("MainActivity", "Prayer notification system initialized successfully")
             } catch (e: Exception) {
-                Log.e("MainActivity", "Error starting prayer service", e)
+                Log.e("MainActivity", "Error starting prayer notification system", e)
             }
         }
     }
