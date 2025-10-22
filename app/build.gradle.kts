@@ -116,8 +116,13 @@ dependencies {
     implementation(libs.androidx.work.ktx)
     implementation(libs.hilt.ext.work)
 
+    // Room Database for Quran
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+
     ksp(libs.hilt.compiler)
     ksp(libs.hilt.ext.compiler)
+    ksp(libs.room.compiler)
 
     debugImplementation(libs.androidx.compose.ui.testManifest)
     debugImplementation(projects.uiTestHiltManifest)
