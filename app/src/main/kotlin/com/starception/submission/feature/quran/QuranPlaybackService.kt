@@ -36,6 +36,7 @@ class QuranPlaybackService : Service() {
 
     private var currentSurahIndex = 0
     private var audioLanguage = AudioLanguage.ARABIC_ONLY
+    private var wasPlayingBeforeChange = false
 
     private val quranArabicPath = "/sdcard/Quran/Arabic"
     private val quranBengaliPath = "/sdcard/Quran/Bengali"
@@ -128,12 +129,19 @@ class QuranPlaybackService : Service() {
                 playNext()
             }
             setOnPreparedListener { mp ->
-                mp.start()
-                onPlaybackStateChanged?.invoke(true)
+                // Only auto-start if we were playing before the track change
+                if (wasPlayingBeforeChange) {
+                    mp.start()
+                    onPlaybackStateChanged?.invoke(true)
+                    updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+                    startProgressUpdates()
+                } else {
+                    // Stay paused
+                    onPlaybackStateChanged?.invoke(false)
+                    updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
+                }
                 updateMediaSessionMetadata() // Update with actual duration
-                updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
                 updateNotification()
-                startProgressUpdates()
             }
             setOnErrorListener { _, what, extra ->
                 Log.e("QuranService", "MediaPlayer error: what=$what, extra=$extra")
@@ -142,8 +150,11 @@ class QuranPlaybackService : Service() {
         }
     }
 
-    fun playSurah(index: Int) {
+    fun playSurah(index: Int, shouldAutoPlay: Boolean = true) {
         try {
+            // Save the current playing state before changing tracks
+            wasPlayingBeforeChange = shouldAutoPlay
+            
             currentSurahIndex = index
             val audioFile = getAudioFile(index)
 
@@ -190,13 +201,17 @@ class QuranPlaybackService : Service() {
     }
 
     fun playNext() {
+        // Preserve the current playing state
+        val shouldAutoPlay = mediaPlayer?.isPlaying ?: false
         currentSurahIndex = (currentSurahIndex + 1) % QuranData.surahs.size
-        playSurah(currentSurahIndex)
+        playSurah(currentSurahIndex, shouldAutoPlay)
     }
 
     fun playPrevious() {
+        // Preserve the current playing state
+        val shouldAutoPlay = mediaPlayer?.isPlaying ?: false
         currentSurahIndex = if (currentSurahIndex > 0) currentSurahIndex - 1 else QuranData.surahs.size - 1
-        playSurah(currentSurahIndex)
+        playSurah(currentSurahIndex, shouldAutoPlay)
     }
 
     fun setAudioLanguage(language: AudioLanguage) {
