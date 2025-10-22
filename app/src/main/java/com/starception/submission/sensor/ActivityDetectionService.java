@@ -427,22 +427,34 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
 
         // 3. WALKING detection - Moderate impact, moderate rotation, low speed
         // Walking has rhythmic but moderate variance and gyro from natural gait
-        // CRITICAL: Walking requires ACTUAL MOVEMENT (speed > 0.3 m/s) to distinguish from phone pickup
-        // PRIORITY: Speed is most reliable indicator - if moving at walking speed with walking variance, it's walking
+        // Works with or without GPS - uses variance pattern as primary indicator
         boolean hasWalkingVariance = accelVariance >= WALKING_VARIANCE_MIN && accelVariance < WALKING_VARIANCE_MAX;
         boolean hasWalkingGyro = avgGyro >= WALKING_GYRO_MIN && avgGyro < WALKING_GYRO_MAX;
-        boolean hasWalkingSpeed = maxSpeed >= WALKING_SPEED_MIN && maxSpeed < WALKING_SPEED_MAX; // Must be moving
+        boolean hasWalkingSpeed = maxSpeed >= WALKING_SPEED_MIN && maxSpeed < WALKING_SPEED_MAX;
+        boolean hasGPSData = maxSpeed > 0.1; // GPS is providing data
 
-        // Walking if: (correct variance AND speed) regardless of gyro
-        // OR (correct variance AND correct gyro range AND actually moving)
-        // This allows walking while using phone (high gyro from combined movement)
-        if (hasWalkingVariance && hasWalkingSpeed) {
-            // If we have walking variance and walking speed, it's walking
-            // Even if gyro is high from phone usage
-            Log.d(TAG, "Detected: WALKING (variance: " + String.format("%.2f", accelVariance) +
-                       ", gyro: " + String.format("%.2f", avgGyro) +
-                       ", speed: " + String.format("%.2f", maxSpeed) + " m/s)");
-            return ActivityType.WALKING;
+        // Walking detection with or without GPS:
+        // WITH GPS: Use speed + variance (most reliable)
+        // WITHOUT GPS: Use variance + gyro pattern (fallback for indoors)
+        if (hasWalkingVariance) {
+            if (hasGPSData) {
+                // GPS available - use speed for confirmation
+                if (hasWalkingSpeed) {
+                    Log.d(TAG, "Detected: WALKING (GPS) (variance: " + String.format("%.2f", accelVariance) +
+                               ", gyro: " + String.format("%.2f", avgGyro) +
+                               ", speed: " + String.format("%.2f", maxSpeed) + " m/s)");
+                    return ActivityType.WALKING;
+                }
+            } else {
+                // No GPS - use sensor pattern (variance + gyro)
+                // Only if gyro is in walking range to avoid false positives
+                if (hasWalkingGyro) {
+                    Log.d(TAG, "Detected: WALKING (sensors) (variance: " + String.format("%.2f", accelVariance) +
+                               ", gyro: " + String.format("%.2f", avgGyro) +
+                               ", speed: N/A)");
+                    return ActivityType.WALKING;
+                }
+            }
         }
 
         // 4. STATIONARY (check BEFORE on_phone) - Phone on flat surface, completely still
