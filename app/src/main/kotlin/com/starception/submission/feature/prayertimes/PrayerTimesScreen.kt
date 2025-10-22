@@ -622,6 +622,20 @@ fun PrayerTimesScreen(
         null // Not needed on older Android versions
     }
     
+    // Storage/Media audio permission for Quran playback from SD card
+    // This will be requested only when user tries to play Quran audio
+    val audioPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        // Android 13+ uses READ_MEDIA_AUDIO
+        rememberPermissionState(
+            permission = Manifest.permission.READ_MEDIA_AUDIO
+        )
+    } else {
+        // Android 12 and below use READ_EXTERNAL_STORAGE
+        rememberPermissionState(
+            permission = Manifest.permission.READ_EXTERNAL_STORAGE
+        )
+    }
+    
     // Monitor permission changes and re-initialize ActivityTracker
     val activityContext = LocalContext.current
     LaunchedEffect(locationPermissionState.status, activityRecognitionPermissionState?.status) {
@@ -679,6 +693,7 @@ fun PrayerTimesScreen(
         val locationStatus = locationPermissionState.status
         if (locationStatus is Denied && !locationStatus.shouldShowRationale) {
             locationPermissionState.launchPermissionRequest()
+            kotlinx.coroutines.delay(500) // Small delay between permission requests
         }
         
         // STEP 2: Request notification permission for prayer alerts (Android 13+)
@@ -687,8 +702,12 @@ fun PrayerTimesScreen(
             val notificationStatus = notificationPermissionState.status
             if (notificationStatus is Denied && !notificationStatus.shouldShowRationale) {
                 notificationPermissionState.launchPermissionRequest()
+                kotlinx.coroutines.delay(500) // Small delay between permission requests
             }
         }
+        
+        // STEP 3: Audio permission will be requested only when user tries to play Quran audio
+        // No automatic request here - permission will be requested on-demand
     }
     
     // LIVE CLOCK UPDATES - Updates current time every minute for real-time prayer status

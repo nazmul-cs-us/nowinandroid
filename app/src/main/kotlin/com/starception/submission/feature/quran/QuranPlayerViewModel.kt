@@ -1,12 +1,16 @@
 package com.starception.submission.feature.quran
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
@@ -36,6 +40,9 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
 
     private var _errorMessage = mutableStateOf<String?>(null)
     val errorMessage: String? get() = _errorMessage.value
+
+    private var _needsAudioPermission = mutableStateOf(false)
+    val needsAudioPermission: Boolean get() = _needsAudioPermission.value
 
     val currentSurah: Surah
         get() = QuranData.surahs[currentSurahIndex]
@@ -92,8 +99,24 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
         context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
+    private fun hasAudioPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
     fun playSurah(index: Int) {
         if (index < 0 || index >= QuranData.surahs.size) return
+        
+        if (!hasAudioPermission()) {
+            _needsAudioPermission.value = true
+            _errorMessage.value = "Audio permission needed to play Quran files from SD card"
+            return
+        }
+        
+        _needsAudioPermission.value = false
         _isLoading.value = true
         _errorMessage.value = null
         _currentSurahIndex.value = index
@@ -119,7 +142,13 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
 
     fun togglePlayPause() {
         if (currentPosition == 0 && duration == 0 && !isPlaying) {
-            // First time playing
+            // First time playing - check permission first
+            if (!hasAudioPermission()) {
+                _needsAudioPermission.value = true
+                _errorMessage.value = "Audio permission needed to play Quran files from SD card"
+                return
+            }
+            _needsAudioPermission.value = false
             playSurah(currentSurahIndex)
         } else {
             playbackService?.togglePlayPause()
@@ -137,6 +166,11 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
     fun seekTo(position: Int) {
         playbackService?.seekTo(position)
         _currentPosition.value = position
+    }
+
+    fun clearPermissionError() {
+        _needsAudioPermission.value = false
+        _errorMessage.value = null
     }
 
     private fun startProgressTracking() {
