@@ -3,6 +3,7 @@ package com.starception.submission.prayer.service
 import android.content.Context
 import android.util.Log
 import com.starception.submission.prayer.model.DayPrayerTimes
+import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.prayer.scheduler.PrayerNotificationScheduler
 import com.starception.submission.services.PrayerNotificationService
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,7 +30,8 @@ import javax.inject.Singleton
 @Singleton
 class PrayerNotificationServiceManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val prayerTimeCalculatorService: PrayerTimeCalculatorService
+    private val prayerTimeCalculatorService: PrayerTimeCalculatorService,
+    private val prayerSettingsRepository: PrayerSettingsRepository
 ) {
     
     companion object {
@@ -79,32 +81,76 @@ class PrayerNotificationServiceManager @Inject constructor(
      */
     private suspend fun scheduleBackupNotifications() {
         try {
-            Log.d(TAG, "📅 Scheduling backup notifications")
+            Log.d(TAG, "📅 Scheduling backup notifications with REAL prayer times")
             
             // Cancel any existing backup notifications
             PrayerNotificationScheduler.cancelAllPrayerNotifications(context)
             
-            // For now, schedule test notifications
-            // TODO: Integrate with actual prayer time calculation service
-            val testPrayerTimes = mapOf(
-                "Fajr" to "05:30",
-                "Dhuhr" to "12:15",
-                "Asr" to "15:45",
-                "Maghrib" to "18:20",
-                "Isha" to "19:45"
-            )
+            // Get actual prayer times for today
+            val prayerTimes = getPrayerTimesForToday()
+            
+            if (prayerTimes.isEmpty()) {
+                Log.w(TAG, "⚠️ No prayer times available, cannot schedule backup notifications")
+                return
+            }
+            
+            Log.d(TAG, "📋 Prayer times retrieved:")
+            prayerTimes.forEach { (name, time) ->
+                Log.d(TAG, "   $name: $time")
+            }
             
             // Schedule all prayer notifications with 15-minute reminders
             PrayerNotificationScheduler.scheduleAllPrayerNotifications(
                 context = context,
-                prayerTimes = testPrayerTimes,
+                prayerTimes = prayerTimes,
                 reminderMinutes = 15
             )
             
-            Log.d(TAG, "✅ Scheduled ${testPrayerTimes.size} test backup prayer notifications")
+            Log.d(TAG, "✅ Scheduled ${prayerTimes.size} backup prayer notifications")
             
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to schedule backup notifications", e)
+        }
+    }
+    
+    /**
+     * Get prayer times for today from the calculator service
+     */
+    private suspend fun getPrayerTimesForToday(): Map<String, String> {
+        return try {
+            val today = LocalDate.now()
+            val formatter = DateTimeFormatter.ofPattern("HH:mm")
+            
+            // Get current settings
+            val settings = prayerSettingsRepository.getSettings()
+            
+            // Calculate prayer times for today
+            val dayPrayerTimes = prayerTimeCalculatorService.calculatePrayerTimes(
+                date = today,
+                location = settings.location ?: return emptyMap(),
+                settings = settings
+            )
+            
+            // Check if dayPrayerTimes is null
+            if (dayPrayerTimes == null) {
+                Log.w(TAG, "⚠️ Prayer times calculation returned null")
+                return emptyMap()
+            }
+            
+            // Convert to map of name -> time string
+            val prayerTimesMap = mutableMapOf<String, String>()
+            
+            prayerTimesMap["Fajr"] = dayPrayerTimes.fajr.format(formatter)
+            prayerTimesMap["Dhuhr"] = dayPrayerTimes.dhuhr.format(formatter)
+            prayerTimesMap["Asr"] = dayPrayerTimes.asr.format(formatter)
+            prayerTimesMap["Maghrib"] = dayPrayerTimes.maghrib.format(formatter)
+            prayerTimesMap["Isha"] = dayPrayerTimes.isha.format(formatter)
+            
+            prayerTimesMap
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to get prayer times for today", e)
+            emptyMap()
         }
     }
     

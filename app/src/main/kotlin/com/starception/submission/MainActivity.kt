@@ -149,6 +149,10 @@ class MainActivity : FragmentActivity() {
         
         // EDGE-TO-EDGE DISPLAY - Modern Android UI extending behind system bars
         enableEdgeToEdge()
+        
+        // Initialize ActivityTracker to load saved notification mode preference
+        com.starception.submission.util.ActivityTracker.initialize(this)
+        Log.d("MainActivity", "✅ ActivityTracker initialized with saved notification mode preference")
 
         // PERMISSION HANDLING (Currently disabled for performance)
         // TODO: Re-enable after optimizing to prevent ANR
@@ -324,20 +328,28 @@ class MainActivity : FragmentActivity() {
      * NON-BLOCKING: Start prayer service in background coroutine
      */
     private fun startPrayerServiceIfNeeded() {
-        Log.d("MainActivity", "Starting prayer notification system in background")
+        Log.d("MainActivity", "🚀 Starting prayer notification system in background")
         
         lifecycleScope.launch {
             try {
                 // Start auto-detection FIRST (independent of service and settings dialog)
+                Log.d("MainActivity", "📍 Step 1: Starting location-based auto-detection...")
                 startLocationBasedAutoDetection()
+                Log.d("MainActivity", "✅ Step 1: Auto-detection completed")
                 
                 // Initialize the complete prayer notification system
                 // This includes both foreground service and backup notifications
+                Log.d("MainActivity", "⏰ Step 2: Initializing prayer notification system...")
                 prayerNotificationServiceManager.initializeNotificationSystem()
+                Log.d("MainActivity", "✅ Step 2: Notification system initialized")
                 
-                Log.d("MainActivity", "Prayer notification system initialized successfully")
+                Log.d("MainActivity", "🎉 Prayer notification system initialized successfully!")
+                Log.d("MainActivity", "   - Foreground service: Running")
+                Log.d("MainActivity", "   - Backup notifications: Scheduled")
+                Log.d("MainActivity", "   - Boot receiver: Ready")
             } catch (e: Exception) {
-                Log.e("MainActivity", "Error starting prayer notification system", e)
+                Log.e("MainActivity", "❌ Error starting prayer notification system", e)
+                e.printStackTrace()
             }
         }
     }

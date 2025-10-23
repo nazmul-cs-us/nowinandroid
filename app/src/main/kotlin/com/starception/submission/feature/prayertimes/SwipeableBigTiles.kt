@@ -1618,13 +1618,14 @@ private fun SmartInfoTile(
             }
 
             // Footer with notification mode selector
+            val context = androidx.compose.ui.platform.LocalContext.current
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)
                     .clickable {
-                        // Cycle through notification modes
-                        com.starception.submission.util.ActivityTracker.cycleNotificationMode()
+                        // Cycle through notification modes with persistence
+                        com.starception.submission.util.ActivityTracker.cycleNotificationMode(context)
                     },
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
