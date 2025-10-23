@@ -50,6 +50,7 @@ fun LazyStaggeredGridScope.newsFeed(
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
     onExpandedCardClick: () -> Unit = {},
+    onSurahClick: (Int) -> Unit = {},
 ) {
     when (feedState) {
         NewsFeedUiState.Loading -> Unit
@@ -63,6 +64,9 @@ fun LazyStaggeredGridScope.newsFeed(
                 val analyticsHelper = LocalAnalyticsHelper.current
                 val backgroundColor = MaterialTheme.colorScheme.background.toArgb()
 
+                // Check if this is a Surah news item
+                val surahNumber = extractSurahNumber(userNewsResource.url)
+                
                 NewsResourceCardExpanded(
                     userNewsResource = userNewsResource,
                     isBookmarked = userNewsResource.isSaved,
@@ -71,7 +75,14 @@ fun LazyStaggeredGridScope.newsFeed(
                         analyticsHelper.logNewsResourceOpened(
                             newsResourceId = userNewsResource.id,
                         )
-                        launchCustomChromeTab(context, Uri.parse(userNewsResource.url), backgroundColor)
+                        
+                        // If it's a Surah, navigate to Surah detail screen
+                        if (surahNumber != null) {
+                            onSurahClick(surahNumber)
+                        } else {
+                            // Otherwise, open in Chrome Custom Tab
+                            launchCustomChromeTab(context, Uri.parse(userNewsResource.url), backgroundColor)
+                        }
 
                         onNewsResourceViewed(userNewsResource.id)
                     },
@@ -89,6 +100,20 @@ fun LazyStaggeredGridScope.newsFeed(
                 )
             }
         }
+    }
+}
+
+/**
+ * Extract Surah number from quran.com URL
+ * Returns null if not a Surah URL
+ * Example: "https://quran.com/1" -> 1
+ */
+fun extractSurahNumber(url: String): Int? {
+    return try {
+        val regex = Regex("https?://quran\\.com/(\\d+)$")
+        regex.find(url)?.groupValues?.get(1)?.toIntOrNull()
+    } catch (e: Exception) {
+        null
     }
 }
 

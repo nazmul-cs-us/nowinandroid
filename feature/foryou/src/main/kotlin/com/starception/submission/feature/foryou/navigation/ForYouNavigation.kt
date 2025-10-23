@@ -37,10 +37,12 @@ fun NavController.navigateToForYou(navOptions: NavOptions) = navigate(route = Fo
  *  This should be supplied from a separate module.
  *
  *  @param onTopicClick - Called when a topic is clicked, contains the ID of the topic
+ *  @param onSurahClick - Called when a Surah news item is clicked, contains the Surah number
  *  @param topicDestination - Destination for topic content
  */
 fun NavGraphBuilder.forYouSection(
     onTopicClick: (String) -> Unit,
+    onSurahClick: (Int) -> Unit = {},
     topicDestination: NavGraphBuilder.() -> Unit,
 ) {
     navigation<ForYouBaseRoute>(startDestination = ForYouRoute) {
@@ -58,7 +60,10 @@ fun NavGraphBuilder.forYouSection(
                 },
             ),
         ) {
-            ForYouScreen(onTopicClick)
+            ForYouScreen(
+                onTopicClick = onTopicClick,
+                onSurahClick = onSurahClick
+            )
         }
         topicDestination()
     }

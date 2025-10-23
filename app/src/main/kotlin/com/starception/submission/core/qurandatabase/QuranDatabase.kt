@@ -44,6 +44,7 @@ abstract class QuranDatabase : RoomDatabase() {
                 )
                     .createFromAsset("databases/$DATABASE_NAME") // Load from assets
                     .fallbackToDestructiveMigration() // For development
+                    .setJournalMode(JournalMode.TRUNCATE) // Simplify for pre-packaged DB
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)

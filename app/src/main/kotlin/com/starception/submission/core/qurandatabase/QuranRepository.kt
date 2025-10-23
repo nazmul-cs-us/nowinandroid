@@ -61,13 +61,26 @@ class QuranRepository @Inject constructor(
      */
     suspend fun getSurahByNumber(surahNumber: Int): Surah? = withContext(Dispatchers.IO) {
         try {
-            val entity = quranDao.getSurahByNumber(surahNumber)
-            entity?.let {
-                val ayahCount = quranDao.getAyahCount(it.id)
-                it.toSurah(ayahCount)
+            Log.d(TAG, "🔍 Getting Surah by number: $surahNumber")
+            val allSurahs = quranDao.getAllSurahsOnce()
+            Log.d(TAG, "📊 Total Surahs in DB: ${allSurahs.size}")
+            if (allSurahs.isNotEmpty()) {
+                Log.d(TAG, "📖 Sample Surah: ${allSurahs.first().nameEnglish} (number=${allSurahs.first().number})")
             }
+            
+            val entity = quranDao.getSurahByNumber(surahNumber)
+            if (entity == null) {
+                Log.e(TAG, "❌ Surah with number $surahNumber not found")
+                return@withContext null
+            }
+            
+            Log.d(TAG, "✅ Found Surah: ${entity.nameEnglish} (ID: ${entity.id}, Number: ${entity.number})")
+            val ayahCount = quranDao.getAyahCount(entity.id)
+            Log.d(TAG, "📄 Ayah count: $ayahCount")
+            entity.toSurah(ayahCount)
         } catch (e: Exception) {
-            Log.e(TAG, "Error loading Surah $surahNumber", e)
+            Log.e(TAG, "❌ Error loading Surah $surahNumber", e)
+            e.printStackTrace()
             null
         }
     }

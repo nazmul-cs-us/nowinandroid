@@ -74,6 +74,16 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     private static final double MICRO_MOVEMENT_THRESHOLD = 0.08; // Very small movements indicate holding (hand tremor)
     private static final double PERFECT_FLAT_TOLERANCE = 0.15; // Very strict tolerance for truly flat surface (must be almost exactly 9.8)
     
+    // Phone orientation detection thresholds
+    private static final double PORTRAIT_ACCEL_Z_MIN = 8.0; // Z-axis dominates when phone is vertical
+    private static final double LANDSCAPE_ACCEL_X_MIN = 8.0; // X-axis dominates when phone is horizontal
+    private static final double FLAT_ACCEL_Y_MIN = 8.0; // Y-axis dominates when phone is flat
+    private static final double ORIENTATION_THRESHOLD = 0.6; // Ratio threshold for clear orientation
+    
+    // Pocket detection - phone vertical with rhythmic walking motion
+    private static final double POCKET_GYRO_MAX = 0.8; // Less rotation than active use
+    private static final double POCKET_VARIANCE_MIN = 0.5; // Rhythmic walking pattern
+    
     // Data collection window (seconds)
     private static final int DATA_WINDOW_SIZE = 3; // 3 seconds of data
     private static final int ANALYSIS_INTERVAL = 2000; // Analyze every 2 seconds
@@ -89,10 +99,23 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     private ConcurrentLinkedQueue<GyroscopeData> gyroData;
     private ConcurrentLinkedQueue<LocationData> locationData;
     
+    // Current phone orientation
+    private PhoneOrientation currentOrientation = PhoneOrientation.UNKNOWN;
+    
     // Current state
     private AtomicBoolean isRunning = new AtomicBoolean(false);
     private ActivityType currentActivity = ActivityType.UNKNOWN;
     private long lastActivityChange = 0;
+    
+    // Activity stability tracking - prevent false detections from brief movements
+    private ActivityType pendingActivity = ActivityType.UNKNOWN;
+    private long pendingActivityStartTime = 0;
+    private static final long ACTIVITY_CONFIRMATION_TIME = 1500; // 1.5 seconds minimum
+    
+    // Hysteresis: Make activities "sticky" to prevent rapid flipping
+    private static final int STABLE_DETECTION_COUNT = 3; // Need 3 consecutive detections (6 seconds)
+    private int consecutiveDetectionCount = 0;
+    private ActivityType lastDetectedActivity = ActivityType.UNKNOWN;
     private final Handler handler = new Handler(Looper.getMainLooper());
     
     // Callbacks
@@ -156,6 +179,18 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         RUNNING,     // User is running
         DRIVING,     // User is in a vehicle
         UNKNOWN      // Activity cannot be determined
+    }
+    
+    /**
+     * Phone orientation/position detection for improved accuracy
+     */
+    public enum PhoneOrientation {
+        PORTRAIT,      // Phone held vertically (typical phone use)
+        LANDSCAPE,     // Phone held horizontally (watching videos)
+        FLAT_UP,       // Phone lying flat, screen up (on table)
+        FLAT_DOWN,     // Phone lying flat, screen down
+        IN_POCKET,     // Phone in pocket (vertical, walking motion)
+        UNKNOWN        // Cannot determine orientation
     }
     
     /**
@@ -301,19 +336,69 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         // Get recent location data
         double maxSpeed = getMaxSpeedInWindow(windowStart);
         
-        // Determine activity based on thresholds
-        ActivityType detectedActivity = determineActivity(avgAccel, accelVariance, avgGyro, maxSpeed);
+        // Detect phone orientation for better activity classification
+        PhoneOrientation orientation = detectPhoneOrientation(windowStart);
+        currentOrientation = orientation;
+        
+        // Determine activity based on thresholds AND orientation
+        ActivityType detectedActivity = determineActivity(avgAccel, accelVariance, avgGyro, maxSpeed, orientation);
+        
+        // HYSTERESIS: Make activities sticky to prevent rapid flipping
+        // Only change if we get 3 consecutive different detections
+        if (detectedActivity == lastDetectedActivity) {
+            consecutiveDetectionCount++;
+        } else {
+            consecutiveDetectionCount = 1;
+            lastDetectedActivity = detectedActivity;
+        }
+        
+        // Don't change activity unless we have stable detections OR immediate transitions
+        boolean isStableDetection = (consecutiveDetectionCount >= STABLE_DETECTION_COUNT);
+        boolean isImmediateTransition = (detectedActivity == ActivityType.DRIVING || 
+                                         (currentActivity == ActivityType.STATIONARY && detectedActivity != ActivityType.WALKING));
+        
+        // IMPROVED: Require confirmation for WALKING to prevent false positives
+        boolean needsConfirmation = (detectedActivity == ActivityType.WALKING && maxSpeed < 0.1);
+        
+        if (needsConfirmation && !isStableDetection) {
+            // Walking needs both time confirmation AND stable detections
+            if (detectedActivity != pendingActivity) {
+                pendingActivity = detectedActivity;
+                pendingActivityStartTime = currentTime;
+                Log.d(TAG, "Pending activity: " + detectedActivity + " (count: " + consecutiveDetectionCount + 
+                      "/" + STABLE_DETECTION_COUNT + ")");
+                return;
+            } else {
+                long timePending = currentTime - pendingActivityStartTime;
+                if (timePending < ACTIVITY_CONFIRMATION_TIME) {
+                    Log.d(TAG, "Confirming: " + detectedActivity + " (time: " + timePending + "ms, count: " + 
+                          consecutiveDetectionCount + "/" + STABLE_DETECTION_COUNT + ")");
+                    return;
+                }
+            }
+        } else if (!isStableDetection && !isImmediateTransition) {
+            // Not stable yet, wait for more consistent detections
+            Log.d(TAG, "Waiting for stable detection: " + detectedActivity + " (count: " + 
+                  consecutiveDetectionCount + "/" + STABLE_DETECTION_COUNT + ")");
+            return;
+        } else {
+            pendingActivity = ActivityType.UNKNOWN;
+            pendingActivityStartTime = 0;
+        }
         
         // Update activity if changed
         if (detectedActivity != currentActivity) {
             ActivityType previousActivity = currentActivity;
             currentActivity = detectedActivity;
             lastActivityChange = currentTime;
+            pendingActivity = ActivityType.UNKNOWN;
+            consecutiveDetectionCount = 0; // Reset for next transition
             
             Log.i(TAG, "Activity changed: " + previousActivity + " -> " + currentActivity + 
                   " (Accel: " + String.format("%.2f", avgAccel) + 
                   ", Gyro: " + String.format("%.2f", avgGyro) + 
-                  ", Speed: " + String.format("%.2f", maxSpeed) + " m/s)");
+                  ", Speed: " + String.format("%.2f", maxSpeed) + " m/s" +
+                  ", Orientation: " + orientation + ")");
             
             if (callback != null) {
                 callback.onActivityChanged(detectedActivity, previousActivity);
@@ -390,19 +475,19 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     }
     
     /**
-     * Determine activity type based on sensor data
+     * Determine activity type based on sensor data AND phone orientation
      *
      * Priority order (based on real sensor data analysis):
      * 1. DRIVING - High speed (most reliable)
      * 2. RUNNING - High variance + high gyro + higher speed
-     * 3. WALKING - Moderate variance + moderate gyro + low speed
+     * 3. WALKING - Moderate variance + moderate gyro + low speed + orientation check
      * 4. STATIONARY - Gyro ≤ 0.003 (sensor noise) + variance ≤ 0.005 + flat surface
-     * 5. ON_PHONE - Gyro > 0.003 (hand tremors) OR held at angle with movement
+     * 5. ON_PHONE - Gyro > 0.003 (hand tremors) OR held at angle with movement + portrait/landscape orientation
      * 6. ON_PHONE (fallback) - Any other movement patterns
      */
-    private ActivityType determineActivity(double avgAccel, double accelVariance, double avgGyro, double maxSpeed) {
-        Log.d(TAG, String.format("Activity Analysis - Accel: %.2f, Variance: %.2f, Gyro: %.2f, Speed: %.2f m/s",
-                avgAccel, accelVariance, avgGyro, maxSpeed));
+    private ActivityType determineActivity(double avgAccel, double accelVariance, double avgGyro, double maxSpeed, PhoneOrientation orientation) {
+        Log.d(TAG, String.format("Activity Analysis - Accel: %.2f, Variance: %.2f, Gyro: %.2f, Speed: %.2f m/s, Orientation: %s",
+                avgAccel, accelVariance, avgGyro, maxSpeed, orientation));
 
         // 1. High speed indicates DRIVING (most reliable indicator)
         if (maxSpeed > DRIVING_SPEED_THRESHOLD) {
@@ -425,24 +510,34 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
             return ActivityType.RUNNING;
         }
 
-        // 3. WALKING detection - Moderate impact, moderate rotation, low speed
+        // 3. WALKING detection - Moderate impact, moderate rotation, low speed + orientation check
         // Walking has rhythmic but moderate variance and gyro from natural gait
         // Works with or without GPS - uses variance pattern as primary indicator
+        // IMPROVED: Use phone orientation to distinguish walking from phone use
         boolean hasWalkingVariance = accelVariance >= WALKING_VARIANCE_MIN && accelVariance < WALKING_VARIANCE_MAX;
         boolean hasWalkingGyro = avgGyro >= WALKING_GYRO_MIN && avgGyro < WALKING_GYRO_MAX;
         boolean hasWalkingSpeed = maxSpeed >= WALKING_SPEED_MIN && maxSpeed < WALKING_SPEED_MAX;
         boolean hasGPSData = maxSpeed > 0.1; // GPS is providing data
+        
+        // Check if phone orientation suggests walking (in pocket or in hand while moving)
+        // Phone in pocket: typically portrait orientation with less gyro rotation
+        // Phone being used while walking: portrait/landscape with more gyro
+        boolean orientationSuggestsWalking = (orientation == PhoneOrientation.PORTRAIT || 
+                                              orientation == PhoneOrientation.IN_POCKET ||
+                                              orientation == PhoneOrientation.UNKNOWN); // Unknown could be pocket
 
         // Walking detection with or without GPS:
-        // WITH GPS: Use speed + variance (most reliable)
+        // WITH GPS: Use speed + variance (most reliable) - REQUIRED both variance AND gyro for confidence
         // WITHOUT GPS: Use variance + gyro pattern (fallback for indoors)
-        if (hasWalkingVariance) {
+        if (hasWalkingVariance && orientationSuggestsWalking) {
             if (hasGPSData) {
-                // GPS available - use speed for confirmation
-                if (hasWalkingSpeed) {
+                // GPS available - require BOTH speed AND gyro for more confidence
+                // This prevents "on phone while standing" from being detected as walking
+                if (hasWalkingSpeed && hasWalkingGyro) {
                     Log.d(TAG, "Detected: WALKING (GPS) (variance: " + String.format("%.2f", accelVariance) +
                                ", gyro: " + String.format("%.2f", avgGyro) +
-                               ", speed: " + String.format("%.2f", maxSpeed) + " m/s)");
+                               ", speed: " + String.format("%.2f", maxSpeed) + " m/s" +
+                               ", orientation: " + orientation + ")");
                     return ActivityType.WALKING;
                 }
             } else {
@@ -451,7 +546,8 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
                 if (hasWalkingGyro) {
                     Log.d(TAG, "Detected: WALKING (sensors) (variance: " + String.format("%.2f", accelVariance) +
                                ", gyro: " + String.format("%.2f", avgGyro) +
-                               ", speed: N/A)");
+                               ", speed: N/A" +
+                               ", orientation: " + orientation + ")");
                     return ActivityType.WALKING;
                 }
             }
@@ -460,38 +556,67 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         // 4. STATIONARY (check BEFORE on_phone) - Phone on flat surface, completely still
         // ONLY stationary if phone is on a flat surface with ZERO movement
         // Based on real sensor data: table = gyro ~0.0005-0.002, variance ~0.0000-0.003
-        if (accelVariance <= 0.005 && // Phones on table show variance < 0.003
-            avgGyro <= 0.003 && // Phones on table show gyro < 0.002 (sensor noise only)
-            Math.abs(avgAccel - GRAVITY_ACCEL) <= PERFECT_FLAT_TOLERANCE) {
-            Log.d(TAG, "Detected: STATIONARY (phone on surface - accel: " + String.format("%.2f", avgAccel) +
+        // ROBUST: If sensors show PERFECT stillness, assume STATIONARY regardless of orientation
+        // (Some devices have different coordinate systems, so we prioritize sensor stillness)
+        boolean meetsStationarySensorCriteria = (accelVariance <= 0.005 && 
+                                                  avgGyro <= 0.003 && 
+                                                  Math.abs(avgAccel - GRAVITY_ACCEL) <= PERFECT_FLAT_TOLERANCE);
+        
+        // IMPROVED: If phone is PERFECTLY still, it's on a surface (handles camera bumps!)
+        // Camera bumps cause phone to tilt, so we can't rely on orientation alone
+        // Instead, use VERY strict stillness criteria: variance < 0.002, gyro < 0.002
+        boolean isPerfectlyStill = (accelVariance <= 0.0015 && avgGyro <= 0.0015);
+        
+        if (isPerfectlyStill && meetsStationarySensorCriteria) {
+            Log.d(TAG, "Detected: STATIONARY (perfectly still on surface - accel: " + String.format("%.2f", avgAccel) +
+                       ", variance: " + String.format("%.4f", accelVariance) +
+                       ", gyro: " + String.format("%.4f", avgGyro) +
+                       ", orientation: " + orientation + ")");
+            return ActivityType.STATIONARY;
+        }
+        
+        // If sensors show some movement (even tiny), it's likely being held
+        if (meetsStationarySensorCriteria && !isPerfectlyStill) {
+            Log.d(TAG, "Detected: ON_PHONE (slight movement detected - orientation: " + orientation +
                        ", variance: " + String.format("%.4f", accelVariance) +
                        ", gyro: " + String.format("%.4f", avgGyro) + ")");
-            return ActivityType.STATIONARY;
+            return ActivityType.ON_PHONE;
         }
 
         // 5. ON_PHONE - Phone is being held or used
+        // IMPROVED: Use orientation to confirm phone is being actively used
+        // Portrait/Landscape/FlatUp orientation strongly suggests phone is being held and used
+        // FLAT_UP added: When reading while holding phone flat (common use case)
+        boolean orientationSuggestsPhoneUse = (orientation == PhoneOrientation.PORTRAIT || 
+                                               orientation == PhoneOrientation.LANDSCAPE ||
+                                               orientation == PhoneOrientation.FLAT_UP);
+        
         // Holding a phone (even steady) creates micro-movements greater than sensor noise
         // Check if phone is being held at an angle (not flat) AND has movement
         if (avgAccel >= HELD_PHONE_ACCEL_MIN && avgAccel <= HELD_PHONE_ACCEL_MAX &&
             (avgGyro > 0.003 || accelVariance > 0.005)) {
-            Log.d(TAG, "Detected: ON_PHONE (phone held at angle - accel: " + String.format("%.2f", avgAccel) +
-                       ", variance: " + String.format("%.4f", accelVariance) +
-                       ", gyro: " + String.format("%.4f", avgGyro) + ")");
-            return ActivityType.ON_PHONE;
+            // If orientation confirms phone use, definitely ON_PHONE
+            if (orientationSuggestsPhoneUse) {
+                Log.d(TAG, "Detected: ON_PHONE (held + " + orientation + " - accel: " + String.format("%.2f", avgAccel) +
+                           ", variance: " + String.format("%.4f", accelVariance) +
+                           ", gyro: " + String.format("%.4f", avgGyro) + ")");
+                return ActivityType.ON_PHONE;
+            }
+            // Otherwise might be walking with phone, continue checking
         }
 
-        // If there's gyro movement above sensor noise, it's likely being held
+        // If there's gyro movement above sensor noise AND portrait/landscape orientation
         // Hand tremors typically create gyro > 0.003 (above table noise of ~0.002)
-        if (avgGyro > 0.003) {
-            Log.d(TAG, "Detected: ON_PHONE (micro-movements detected - variance: " + String.format("%.4f", accelVariance) +
+        if (avgGyro > 0.003 && orientationSuggestsPhoneUse) {
+            Log.d(TAG, "Detected: ON_PHONE (" + orientation + " with micro-movements - variance: " + String.format("%.4f", accelVariance) +
                        ", gyro: " + String.format("%.4f", avgGyro) + ")");
             return ActivityType.ON_PHONE;
         }
 
-        // Default to ON_PHONE for any other low movement
-        // This catches edge cases and ensures phone in hand is never classified as stationary
-        if (accelVariance <= STATIONARY_VARIANCE_THRESHOLD || avgGyro <= 0.15) {
-            Log.d(TAG, "Detected: ON_PHONE (holding or low movement - variance: " + String.format("%.4f", accelVariance) +
+        // Default to ON_PHONE for any other low movement WITH phone-use orientation
+        // This catches edge cases like reading while phone is held still
+        if ((accelVariance <= STATIONARY_VARIANCE_THRESHOLD || avgGyro <= 0.15) && orientationSuggestsPhoneUse) {
+            Log.d(TAG, "Detected: ON_PHONE (" + orientation + " holding or low movement - variance: " + String.format("%.4f", accelVariance) +
                        ", gyro: " + String.format("%.4f", avgGyro) + ")");
             return ActivityType.ON_PHONE;
         }
@@ -503,7 +628,18 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
             return ActivityType.ON_PHONE;
         }
 
-        Log.d(TAG, "Detected: UNKNOWN (variance: " + String.format("%.2f", accelVariance) +
+        // ROBUST FALLBACK: If we reach here, phone is likely being held/used
+        // It's not walking, running, driving, or truly stationary
+        // Better to show ON_PHONE than UNKNOWN (more useful feedback)
+        if (avgGyro > 0 || accelVariance > 0) {
+            Log.d(TAG, "Detected: ON_PHONE (fallback - has movement but unclear pattern - variance: " + 
+                       String.format("%.2f", accelVariance) + ", gyro: " + String.format("%.2f", avgGyro) + 
+                       ", orientation: " + orientation + ")");
+            return ActivityType.ON_PHONE;
+        }
+        
+        // Final fallback - should almost never reach here
+        Log.d(TAG, "Detected: UNKNOWN (no movement detected - variance: " + String.format("%.2f", accelVariance) +
                    ", gyro: " + String.format("%.2f", avgGyro) + ")");
         return ActivityType.UNKNOWN;
     }
@@ -579,10 +715,78 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     }
     
     /**
+     * Detect phone orientation based on accelerometer data
+     * Uses the dominant axis to determine how the phone is positioned
+     */
+    private PhoneOrientation detectPhoneOrientation(long windowStart) {
+        if (accelData.isEmpty()) {
+            return PhoneOrientation.UNKNOWN;
+        }
+        
+        // Calculate average acceleration on each axis (keep signs!)
+        double avgX = 0, avgY = 0, avgZ = 0;
+        int count = 0;
+        
+        for (AccelerometerData data : accelData) {
+            if (data.timestamp >= windowStart) {
+                avgX += data.x;  // Keep sign for direction
+                avgY += data.y;  // Keep sign for direction
+                avgZ += data.z;  // Keep sign for direction
+                count++;
+            }
+        }
+        
+        if (count == 0) {
+            return PhoneOrientation.UNKNOWN;
+        }
+        
+        avgX /= count;
+        avgY /= count;
+        avgZ /= count;
+        
+        // Use absolute values for comparison
+        double absX = Math.abs(avgX);
+        double absY = Math.abs(avgY);
+        double absZ = Math.abs(avgZ);
+        
+        // DEBUG: Log actual axis values to diagnose orientation issues
+        Log.d(TAG, String.format("Orientation Axes - X:%.2f, Y:%.2f, Z:%.2f (abs: X:%.2f, Y:%.2f, Z:%.2f)", 
+              avgX, avgY, avgZ, absX, absY, absZ));
+        
+        // Determine dominant axis (check FLAT first - most reliable)
+        // Y-axis dominant: Phone flat (on table)
+        // Z-axis dominant: Phone vertical (portrait)
+        // X-axis dominant: Phone horizontal (landscape)
+        
+        // FLAT detection - Y-axis dominant (RELAXED threshold for better detection)
+        if (absY > 7.0 && absY > absX * 1.2 && absY > absZ * 1.2) {
+            Log.d(TAG, "Orientation: FLAT (Y-axis dominant: " + String.format("%.2f", absY) + ")");
+            return avgY > 0 ? PhoneOrientation.FLAT_UP : PhoneOrientation.FLAT_DOWN;
+        } 
+        // PORTRAIT detection - Z-axis dominant
+        else if (absZ > 8.0 && absZ > absX * 1.3 && absZ > absY * 1.3) {
+            return PhoneOrientation.PORTRAIT;
+        } 
+        // LANDSCAPE detection - X-axis dominant  
+        else if (absX > 8.0 && absX > absY * 1.3 && absX > absZ * 1.3) {
+            return PhoneOrientation.LANDSCAPE;
+        }
+        
+        return PhoneOrientation.UNKNOWN;
+    }
+    
+    /**
      * Get current detected activity
      */
     public ActivityType getCurrentActivity() {
         return currentActivity;
+    }
+    
+    /**
+     * Get current phone orientation
+     */
+    public PhoneOrientation getCurrentOrientation() {
+        return currentOrientation;
     }
     
     /**

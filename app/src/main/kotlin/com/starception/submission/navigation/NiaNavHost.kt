@@ -29,6 +29,8 @@ import com.starception.submission.feature.topic.navigation.navigateToTopic
 import com.starception.submission.feature.topic.navigation.topicScreen
 import com.starception.submission.feature.prayertimes.navigation.prayerTimesScreen
 import com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute
+import com.starception.submission.feature.surah.navigation.navigateToSurah
+import com.starception.submission.feature.surah.navigation.surahScreen
 import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.ui.NiaAppState
 import com.starception.submission.ui.interests2pane.interestsListDetailScreen
@@ -54,6 +56,7 @@ fun NiaNavHost(
     ) {
         forYouSection(
             onTopicClick = navController::navigateToTopic,
+            onSurahClick = navController::navigateToSurah,
         ) {
             topicScreen(
                 showBackButton = true,
@@ -72,5 +75,8 @@ fun NiaNavHost(
         )
         interestsListDetailScreen()
         prayerTimesScreen()
+        surahScreen(
+            onBackClick = navController::popBackStack
+        )
     }
 }

@@ -30,8 +30,19 @@ enum class NotificationMode {
  * This provides a way for the ActivityDetectionService to update the current activity
  * and for UI components to observe the current activity state. It integrates with
  * our new sensor-based activity detection system.
+ * 
+ * Notification Mode Persistence:
+ * - Stores user's notification preference (SPEAKER/VIBRATE/MUTE)
+ * - Persists across app restarts using SharedPreferences
+ * - Automatically loads saved preference on initialization
  */
 object ActivityTracker {
+    private const val PREFS_NAME = "activity_tracker_prefs"
+    private const val KEY_NOTIFICATION_MODE = "notification_mode"
+    
+    // Travel Dua cooldown settings
+    private const val DUA_COOLDOWN_MILLIS = 5 * 60 * 1000L // 5 minutes in milliseconds
+    
     private val _currentActivity = MutableStateFlow("Initializing...")
     val currentActivity: StateFlow<String> = _currentActivity.asStateFlow()
 
@@ -51,8 +62,13 @@ object ActivityTracker {
     private var mediaPlayer: MediaPlayer? = null
     private var previousActivity: String = ""
     
+    // Dua cooldown tracking
+    private var lastDuaPlayTime: Long = 0L
+    private var lastDrivingTime: Long = 0L
+    
     /**
      * Initialize the activity tracker with sensor-based detection
+     * Also loads saved notification mode preference from storage
      */
     fun initialize(context: Context) {
         if (isInitialized) return
@@ -60,6 +76,12 @@ object ActivityTracker {
         try {
             this.context = context.applicationContext
             activityDetectionService = ActivityDetectionService(context.applicationContext)
+            
+            // Load saved notification mode preference
+            val savedMode = loadNotificationMode(context)
+            _notificationMode.value = savedMode
+            _isBeepEnabled.value = (savedMode != NotificationMode.MUTE)
+            Log.d("ActivityTracker", "📱 Loaded saved notification mode: $savedMode")
             
             // Initialize ToneGenerator for beep sounds
             try {
@@ -124,16 +146,44 @@ object ActivityTracker {
     
     /**
      * Update the current activity (called from ActivityDetectionService callback)
+     * IMPROVED: Smart cooldown for travel dua to prevent replaying at traffic lights
      */
     fun updateActivity(activity: String) {
+        val currentTime = System.currentTimeMillis()
         val oldActivity = previousActivity
         previousActivity = _currentActivity.value
         _currentActivity.value = activity
 
         // Play driving audio when transitioning to driving
+        // IMPROVED LOGIC: Only play if either:
+        // 1. We weren't driving recently (> 5 minutes ago)
+        // 2. OR we were driving recently BUT were in a different activity for > 5 minutes
         if (activity == "Driving" && oldActivity != "Driving") {
-            playDrivingAudio()
-            Log.d("ActivityTracker", "🚗 Driving started - playing travel dua")
+            val timeSinceLastDua = currentTime - lastDuaPlayTime
+            val timeSinceLastDriving = currentTime - lastDrivingTime
+            
+            // Case 1: First time driving or long time since last driving session
+            if (timeSinceLastDua >= DUA_COOLDOWN_MILLIS) {
+                playDrivingAudio()
+                lastDuaPlayTime = currentTime
+                lastDrivingTime = currentTime
+                Log.d("ActivityTracker", "🚗 Driving started - playing travel dua (cooldown expired)")
+            }
+            // Case 2: We were driving recently, stopped briefly (e.g., traffic light), now driving again
+            else if (timeSinceLastDriving < DUA_COOLDOWN_MILLIS) {
+                // Within cooldown threshold - don't replay dua
+                lastDrivingTime = currentTime // Update last driving time
+                Log.d("ActivityTracker", "🚗 Driving resumed within ${(DUA_COOLDOWN_MILLIS - timeSinceLastDua) / 1000}s cooldown - skipping dua")
+            }
+            // Case 3: Long time since driving but short time since last dua (edge case)
+            else {
+                Log.d("ActivityTracker", "🚗 Driving started but dua cooldown active for ${(DUA_COOLDOWN_MILLIS - timeSinceLastDua) / 1000}s more")
+            }
+        }
+        
+        // Track when we're driving to detect brief stops
+        if (activity == "Driving") {
+            lastDrivingTime = currentTime
         }
     }
     
@@ -297,9 +347,41 @@ object ActivityTracker {
     }
     
     /**
-     * Cycle through notification modes: Speaker → Vibrate → Mute → Speaker
+     * Load saved notification mode from SharedPreferences
      */
-    fun cycleNotificationMode() {
+    private fun loadNotificationMode(context: Context): NotificationMode {
+        return try {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val modeName = prefs.getString(KEY_NOTIFICATION_MODE, NotificationMode.SPEAKER.name)
+            val mode = NotificationMode.valueOf(modeName ?: NotificationMode.SPEAKER.name)
+            Log.d("ActivityTracker", "📥 Loaded notification mode from storage: $mode")
+            mode
+        } catch (e: Exception) {
+            Log.e("ActivityTracker", "❌ Failed to load notification mode, using default: ${e.message}")
+            NotificationMode.SPEAKER
+        }
+    }
+    
+    /**
+     * Save notification mode to SharedPreferences
+     */
+    private fun saveNotificationMode(context: Context, mode: NotificationMode) {
+        try {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putString(KEY_NOTIFICATION_MODE, mode.name)
+                .apply()
+            Log.d("ActivityTracker", "💾 Saved notification mode to storage: $mode")
+        } catch (e: Exception) {
+            Log.e("ActivityTracker", "❌ Failed to save notification mode: ${e.message}")
+        }
+    }
+    
+    /**
+     * Cycle through notification modes: Speaker → Vibrate → Mute → Speaker
+     * Now with automatic persistence!
+     */
+    fun cycleNotificationMode(context: Context? = null) {
         _notificationMode.value = when (_notificationMode.value) {
             NotificationMode.SPEAKER -> NotificationMode.VIBRATE
             NotificationMode.VIBRATE -> NotificationMode.MUTE
@@ -313,17 +395,29 @@ object ActivityTracker {
             NotificationMode.VIBRATE -> "Vibrate Only"
             NotificationMode.MUTE -> "Mute"
         }
-        Log.d("ActivityTracker", "🔔 Notification mode: $modeText")
+        Log.d("ActivityTracker", "🔔 Notification mode changed to: $modeText")
+        
+        // Save to persistent storage if context provided
+        context?.let { 
+            saveNotificationMode(it, _notificationMode.value)
+            Log.d("ActivityTracker", "💾 Preference saved and will persist across app restarts")
+        }
     }
 
     /**
-     * Set notification mode directly
+     * Set notification mode directly with automatic persistence
      */
-    fun setNotificationMode(mode: NotificationMode) {
+    fun setNotificationMode(mode: NotificationMode, context: Context? = null) {
         _notificationMode.value = mode
         // Update deprecated field for backwards compatibility
         _isBeepEnabled.value = (mode != NotificationMode.MUTE)
         Log.d("ActivityTracker", "🔔 Notification mode set to: $mode")
+        
+        // Save to persistent storage if context provided
+        context?.let { 
+            saveNotificationMode(it, mode)
+            Log.d("ActivityTracker", "💾 Preference saved")
+        }
     }
 
     /**
