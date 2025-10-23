@@ -47,7 +47,7 @@ object PrayerNotificationScheduler {
         context: Context,
         prayerName: String,
         prayerTime: String,
-        reminderMinutes: Int = 15
+        reminderMinutes: Int = 20
     ) {
         try {
             Log.d(TAG, "📅 Scheduling prayer notification: $prayerName at $prayerTime")
@@ -97,7 +97,7 @@ object PrayerNotificationScheduler {
     fun scheduleAllPrayerNotifications(
         context: Context,
         prayerTimes: Map<String, String>,
-        reminderMinutes: Int = 15
+        reminderMinutes: Int = 20
     ) {
         Log.d(TAG, "📅 Scheduling all prayer notifications for today")
         
