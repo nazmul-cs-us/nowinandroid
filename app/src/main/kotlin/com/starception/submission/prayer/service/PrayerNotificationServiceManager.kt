@@ -49,11 +49,23 @@ class PrayerNotificationServiceManager @Inject constructor(
             try {
                 Log.d(TAG, "🚀 Initializing complete prayer notification system")
                 
+                // Check if we can schedule exact alarms
+                val canScheduleExact = PrayerNotificationScheduler.canScheduleExactAlarms(context)
+                if (!canScheduleExact) {
+                    Log.w(TAG, "⚠️ Cannot schedule exact alarms - permission not granted")
+                    Log.w(TAG, "📝 User must enable 'Alarms & reminders' in app settings")
+                }
+                
                 // 1. Start the foreground service for live updates
                 startForegroundService()
                 
                 // 2. Schedule backup notifications for exact timing
                 scheduleBackupNotifications()
+                
+                // 3. Schedule a test notification (2 minutes from now) to verify system works
+                if (canScheduleExact) {
+                    PrayerNotificationScheduler.scheduleTestNotification(context, delaySeconds = 120)
+                }
                 
                 Log.d(TAG, "✅ Prayer notification system initialized successfully")
                 
