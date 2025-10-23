@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import androidx.work.*
 import com.starception.submission.prayer.worker.PrayerNotificationWorker
@@ -158,6 +159,43 @@ object PrayerNotificationScheduler {
         // Implementation would reload prayer times and reschedule
     }
     
+    /**
+     * Check if exact alarm permission is granted (Android 12+)
+     */
+    fun canScheduleExactAlarms(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val canSchedule = alarmManager.canScheduleExactAlarms()
+            Log.d(TAG, "📱 Can schedule exact alarms: $canSchedule")
+            return canSchedule
+        }
+        return true // Pre-Android 12 doesn't need this permission
+    }
+    
+    /**
+     * Schedule a test notification to verify the system works
+     */
+    fun scheduleTestNotification(context: Context, delaySeconds: Int = 60) {
+        try {
+            Log.d(TAG, "🧪 Scheduling TEST notification in $delaySeconds seconds")
+            
+            val testTime = LocalTime.now().plusSeconds(delaySeconds.toLong())
+            val testDateTime = LocalDateTime.of(LocalDate.now(), testTime)
+            
+            schedulePrayerNotification(
+                context = context,
+                prayerName = "Test Prayer",
+                prayerTime = testTime.format(DateTimeFormatter.ofPattern("HH:mm")),
+                reminderMinutes = 0 // No reminder for test
+            )
+            
+            Log.d(TAG, "✅ Test notification scheduled for $testDateTime")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to schedule test notification", e)
+        }
+    }
+    
     private fun scheduleExactNotification(
         context: Context,
         prayerName: String,
@@ -178,13 +216,12 @@ object PrayerNotificationScheduler {
         val delayMillis = java.time.Duration.between(currentTime, notificationTime).toMillis()
         
         if (delayMillis > 0) {
-            // Use WorkManager for Android 6+ (more reliable)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                scheduleWithWorkManager(context, prayerName, prayerTime, notificationType, delayMillis)
-            } else {
-                // Use AlarmManager for older Android versions
-                scheduleWithAlarmManager(context, prayerName, prayerTime, notificationType, notificationTime, requestCode)
-            }
+            // Use BOTH systems for maximum reliability
+            // 1. WorkManager (good for reliability and constraints)
+            scheduleWithWorkManager(context, prayerName, prayerTime, notificationType, delayMillis)
+            
+            // 2. AlarmManager (best for exact timing, works even in deep sleep)
+            scheduleWithAlarmManager(context, prayerName, prayerTime, notificationType, notificationTime, requestCode)
         }
     }
     
@@ -218,7 +255,7 @@ object PrayerNotificationScheduler {
         val workManager = WorkManager.getInstance(context)
         workManager.enqueue(workRequest)
         
-        Log.d(TAG, "📱 Scheduled with WorkManager: $prayerName in ${delayMillis / 1000}s")
+        Log.d(TAG, "📱 Scheduled with WorkManager: $prayerName ($notificationType) in ${delayMillis / 1000}s")
     }
     
     private fun scheduleWithAlarmManager(
@@ -229,32 +266,51 @@ object PrayerNotificationScheduler {
         notificationTime: LocalDateTime,
         requestCode: Int
     ) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = createNotificationIntent(context, prayerName, prayerTime, notificationType)
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            requestCode,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        
-        val triggerTime = notificationTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                triggerTime,
-                pendingIntent
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            
+            // Check if we can schedule exact alarms (Android 12+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!alarmManager.canScheduleExactAlarms()) {
+                    Log.w(TAG, "⚠️ Cannot schedule exact alarms - permission not granted. Opening settings...")
+                    // Note: We can't open settings automatically, user must grant permission manually
+                    // The app will still try to use WorkManager as fallback
+                    return
+                }
+            }
+            
+            val intent = createNotificationIntent(context, prayerName, prayerTime, notificationType)
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-        } else {
-            alarmManager.setExact(
-                AlarmManager.RTC_WAKEUP,
-                triggerTime,
-                pendingIntent
-            )
+            
+            val triggerTime = notificationTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+            }
+            
+            val delaySeconds = java.time.Duration.between(LocalDateTime.now(), notificationTime).seconds
+            Log.d(TAG, "⏰ Scheduled with AlarmManager: $prayerName ($notificationType) in ${delaySeconds}s at $notificationTime")
+            
+        } catch (e: SecurityException) {
+            Log.e(TAG, "❌ SecurityException scheduling alarm - exact alarm permission not granted", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to schedule with AlarmManager", e)
         }
-        
-        Log.d(TAG, "⏰ Scheduled with AlarmManager: $prayerName at $notificationTime")
     }
     
     private fun createNotificationIntent(

@@ -1,10 +1,15 @@
 package com.starception.submission.prayer.receiver
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import androidx.work.*
+import com.starception.submission.R
 import com.starception.submission.prayer.worker.PrayerNotificationWorker
 import java.util.concurrent.TimeUnit
 
@@ -21,10 +26,6 @@ import java.util.concurrent.TimeUnit
  */
 class PrayerNotificationReceiver : BroadcastReceiver() {
     
-    companion object {
-        private const val TAG = "PrayerNotificationReceiver"
-    }
-    
     override fun onReceive(context: Context, intent: Intent) {
         try {
             Log.d(TAG, "📱 PrayerNotificationReceiver triggered")
@@ -36,8 +37,8 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             
             Log.d(TAG, "Processing: $prayerName at $prayerTime (type: $notificationType)")
             
-            // Convert to WorkManager job for better reliability
-            scheduleWorkManagerJob(context, prayerName, prayerTime, notificationType)
+            // Show notification directly (WorkManager has issues with Hilt)
+            showPrayerNotification(context, prayerName, prayerTime, notificationType)
             
         } catch (e: Exception) {
             Log.e(TAG, "❌ PrayerNotificationReceiver failed", e)
@@ -74,6 +75,83 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
         workManager.enqueue(workRequest)
         
         Log.d(TAG, "✅ Scheduled WorkManager job for $prayerName")
+    }
+    
+    private fun showPrayerNotification(
+        context: Context,
+        prayerName: String,
+        prayerTime: String,
+        notificationType: String
+    ) {
+        try {
+            // Create notification channel
+            createNotificationChannel(context)
+            
+            val notificationId = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) 2001 else 2002
+            
+            val notification = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) {
+                // Prayer time notification
+                NotificationCompat.Builder(context, CHANNEL_ID)
+                    .setContentTitle("🕌 $prayerName Time")
+                    .setContentText("It's time for $prayerName prayer at $prayerTime")
+                    .setStyle(NotificationCompat.BigTextStyle()
+                        .bigText("🕌 $prayerName Prayer Time\n\n" +
+                                "Time: $prayerTime\n" +
+                                "May Allah accept your prayers. Ameen."))
+                    .setSmallIcon(R.drawable.ic_prayer)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                    .setAutoCancel(true)
+                    .setOngoing(false)
+                    .build()
+            } else {
+                // Prayer reminder notification
+                NotificationCompat.Builder(context, CHANNEL_ID)
+                    .setContentTitle("⏰ Prayer Reminder")
+                    .setContentText("$prayerName prayer is approaching at $prayerTime")
+                    .setStyle(NotificationCompat.BigTextStyle()
+                        .bigText("⏰ Prayer Reminder\n\n" +
+                                "$prayerName prayer will be at $prayerTime\n" +
+                                "Please prepare for your prayer."))
+                    .setSmallIcon(R.drawable.ic_prayer)
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                    .setAutoCancel(true)
+                    .setOngoing(false)
+                    .build()
+            }
+            
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.notify(notificationId, notification)
+            
+            Log.d(TAG, "📱 Posted prayer notification: $prayerName ($notificationType) at $prayerTime")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to show prayer notification", e)
+        }
+    }
+    
+    private fun createNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifications for prayer times and reminders"
+                enableLights(true)
+                enableVibration(true)
+            }
+            
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+    
+    companion object {
+        private const val TAG = "PrayerNotificationReceiver"
+        private const val CHANNEL_ID = "prayer_scheduled_notifications"
+        private const val CHANNEL_NAME = "Scheduled Prayer Notifications"
     }
 }
 
