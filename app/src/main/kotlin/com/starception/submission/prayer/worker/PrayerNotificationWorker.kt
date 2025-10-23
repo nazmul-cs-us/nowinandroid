@@ -114,17 +114,20 @@ class PrayerNotificationWorker @AssistedInject constructor(
 
     private fun showPrayerTimeNotification(prayerName: String, prayerTime: String) {
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("🕌 $prayerName Time")
-            .setContentText("It's time for $prayerName prayer at $prayerTime")
+            .setContentTitle("$prayerName Prayer Time")
+            .setContentText("It's time for $prayerName prayer • $prayerTime")
             .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("🕌 $prayerName Prayer Time\n\n" +
-                        "Time: $prayerTime\n" +
-                        "May Allah accept your prayers. Ameen."))
+                .bigText("🕌 Time for $prayerName Prayer\n\n" +
+                        "Prayer time: $prayerTime\n\n" +
+                        "اَللّٰهُمَّ تَقَبَّلْ مِنَّا\n" +
+                        "O Allah, accept from us\n\n" +
+                        "May your prayer be accepted. Ameen."))
             .setSmallIcon(R.drawable.ic_prayer)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
             .setOngoing(false)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
 
         val notificationManager = applicationContext
@@ -136,17 +139,22 @@ class PrayerNotificationWorker @AssistedInject constructor(
 
     private fun showPrayerReminderNotification(prayerName: String, prayerTime: String) {
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("⏰ Prayer Reminder")
-            .setContentText("$prayerName prayer is approaching at $prayerTime")
+            .setContentTitle("Upcoming: $prayerName Prayer")
+            .setContentText("$prayerName prayer in 20 minutes • $prayerTime")
             .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("⏰ Prayer Reminder\n\n" +
-                        "$prayerName prayer will be at $prayerTime\n" +
-                        "Please prepare for your prayer."))
+                .bigText("⏰ Prayer Time Approaching\n\n" +
+                        "$prayerName prayer will begin at $prayerTime\n" +
+                        "Time remaining: 20 minutes\n\n" +
+                        "Please prepare for prayer:\n" +
+                        "• Perform wudu (ablution)\n" +
+                        "• Find a clean prayer space\n" +
+                        "• Face towards the Qibla"))
             .setSmallIcon(R.drawable.ic_prayer)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setOngoing(false)
+            .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
             .build()
 
         val notificationManager = applicationContext

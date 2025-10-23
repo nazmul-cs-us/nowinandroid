@@ -62,10 +62,10 @@ class PrayerNotificationServiceManager @Inject constructor(
                 // 2. Schedule backup notifications for exact timing
                 scheduleBackupNotifications()
                 
-                // 3. Schedule a test notification (2 minutes from now) to verify system works
-                if (canScheduleExact) {
-                    PrayerNotificationScheduler.scheduleTestNotification(context, delaySeconds = 120)
-                }
+                // 3. Test notification disabled - system is working!
+                // if (canScheduleExact) {
+                //     PrayerNotificationScheduler.scheduleTestNotification(context, delaySeconds = 120)
+                // }
                 
                 Log.d(TAG, "✅ Prayer notification system initialized successfully")
                 
@@ -111,11 +111,11 @@ class PrayerNotificationServiceManager @Inject constructor(
                 Log.d(TAG, "   $name: $time")
             }
             
-            // Schedule all prayer notifications with 15-minute reminders
+            // Schedule all prayer notifications with 20-minute reminders
             PrayerNotificationScheduler.scheduleAllPrayerNotifications(
                 context = context,
                 prayerTimes = prayerTimes,
-                reminderMinutes = 15
+                reminderMinutes = 20
             )
             
             Log.d(TAG, "✅ Scheduled ${prayerTimes.size} backup prayer notifications")
