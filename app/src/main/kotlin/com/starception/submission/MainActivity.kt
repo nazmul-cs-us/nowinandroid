@@ -59,6 +59,7 @@ import com.starception.submission.prayer.model.CalculationMethod
 import android.location.Location as AndroidLocation
 import com.starception.submission.util.isSystemInDarkTheme
 import com.starception.submission.util.PermissionManager
+import com.starception.submission.util.ActivityBasedDuaHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dagger.hilt.android.AndroidEntryPoint
@@ -343,14 +344,32 @@ class MainActivity : FragmentActivity() {
                 prayerNotificationServiceManager.initializeNotificationSystem()
                 Log.d("MainActivity", "✅ Step 2: Notification system initialized")
                 
+                // Start activity detection service for dua playing
+                Log.d("MainActivity", "🎯 Step 3: Starting activity detection service...")
+                startActivityDetectionService()
+                Log.d("MainActivity", "✅ Step 3: Activity detection service started")
+                
                 Log.d("MainActivity", "🎉 Prayer notification system initialized successfully!")
                 Log.d("MainActivity", "   - Foreground service: Running")
                 Log.d("MainActivity", "   - Backup notifications: Scheduled")
                 Log.d("MainActivity", "   - Boot receiver: Ready")
+                Log.d("MainActivity", "   - Activity detection: Running")
             } catch (e: Exception) {
                 Log.e("MainActivity", "❌ Error starting prayer notification system", e)
                 e.printStackTrace()
             }
+        }
+    }
+    
+    /**
+     * Start activity detection service for automatic dua playing
+     */
+    private fun startActivityDetectionService() {
+        try {
+            ActivityBasedDuaHelper.startActivityDetection(this)
+            Log.d("MainActivity", "✅ Activity detection service started successfully")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "❌ Error starting activity detection service", e)
         }
     }
     

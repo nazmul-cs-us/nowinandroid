@@ -1595,11 +1595,11 @@ private fun SmartInfoTile(
                             )
                     )
 
-                    // Right: Current Activity column
+                    // Right: Current Activity column with Position detection
                     Column(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         // Value - Use StateFlow for real-time updates
                         val currentActivityFlow = com.starception.submission.util.ActivityTracker.currentActivity
@@ -1616,7 +1616,8 @@ private fun SmartInfoTile(
                             } else {
                                 Modifier
                             },
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             // Animated flip text like airport board
                             AnimatedFlipText(
@@ -1633,6 +1634,51 @@ private fun SmartInfoTile(
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 2
                             )
+                            
+                            // Phone Position Display (NEW - based on research paper)
+                            val phonePositionFlow = com.starception.submission.util.ActivityTracker.phonePosition
+                            val phonePosition by phonePositionFlow.collectAsStateWithLifecycle()
+                            
+                            // Position badge with icon
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .padding(vertical = 2.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = when (phonePosition) {
+                                        "HAND" -> Icons.Default.Star
+                                        "POCKET" -> Icons.Default.VolumeOff
+                                        "DESK" -> Icons.Default.Schedule
+                                        else -> Icons.Default.BubbleChart
+                                    },
+                                    contentDescription = "Phone Position",
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = when (phonePosition) {
+                                        "HAND" -> "In Hand"
+                                        "POCKET" -> "In Pocket"
+                                        "DESK" -> "On Desk"
+                                        else -> "Unknown"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp,
+                                        letterSpacing = 0.3.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            
                             // Label
                             Text(
                                 text = if (needsPermissions) "Tap to grant permissions" else "Current Activity",

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.starception.submission.sensor.ActivityDetectionService
+import com.starception.submission.config.ActivityDetectionConfig
 
 /**
  * Notification mode for activity changes
@@ -40,11 +41,11 @@ object ActivityTracker {
     private const val PREFS_NAME = "activity_tracker_prefs"
     private const val KEY_NOTIFICATION_MODE = "notification_mode"
     
-    // Travel Dua cooldown settings
-    private const val DUA_COOLDOWN_MILLIS = 5 * 60 * 1000L // 5 minutes in milliseconds
-    
     private val _currentActivity = MutableStateFlow("Initializing...")
     val currentActivity: StateFlow<String> = _currentActivity.asStateFlow()
+    
+    private val _phonePosition = MutableStateFlow("UNKNOWN")
+    val phonePosition: StateFlow<String> = _phonePosition.asStateFlow()
 
     private val _notificationMode = MutableStateFlow(NotificationMode.SPEAKER)
     val notificationMode: StateFlow<NotificationMode> = _notificationMode.asStateFlow()
@@ -65,6 +66,10 @@ object ActivityTracker {
     // Dua cooldown tracking
     private var lastDuaPlayTime: Long = 0L
     private var lastDrivingTime: Long = 0L
+    
+    // Handler for delayed dua playback
+    private val duaHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var pendingDuaRunnable: Runnable? = null
     
     /**
      * Initialize the activity tracker with sensor-based detection
@@ -99,6 +104,8 @@ object ActivityTracker {
                         previousActivity: ActivityDetectionService.ActivityType
                     ) {
                         updateActivity(activityToString(newActivity))
+                        // Update phone position
+                        updatePhonePosition()
                         // Play beep sound when activity changes
                         playActivityChangeBeep()
                     }
@@ -154,7 +161,7 @@ object ActivityTracker {
         previousActivity = _currentActivity.value
         _currentActivity.value = activity
 
-        // Play driving audio when transitioning to driving
+        // Play driving audio when transitioning to driving (WITH DELAY)
         // IMPROVED LOGIC: Only play if either:
         // 1. We weren't driving recently (> 5 minutes ago)
         // 2. OR we were driving recently BUT were in a different activity for > 5 minutes
@@ -163,27 +170,45 @@ object ActivityTracker {
             val timeSinceLastDriving = currentTime - lastDrivingTime
             
             // Case 1: First time driving or long time since last driving session
-            if (timeSinceLastDua >= DUA_COOLDOWN_MILLIS) {
-                playDrivingAudio()
+            if (timeSinceLastDua >= ActivityDetectionConfig.DUA_COOLDOWN_MILLIS) {
+                // Schedule dua playback with delay to give user time to settle in
+                scheduleDrivingDuaWithDelay()
                 lastDuaPlayTime = currentTime
                 lastDrivingTime = currentTime
-                Log.d("ActivityTracker", "🚗 Driving started - playing travel dua (cooldown expired)")
+                Log.d("ActivityTracker", "🚗 Driving started - scheduling travel dua in ${ActivityDetectionConfig.DUA_PLAYBACK_DELAY_SECONDS}s (must stay driving)")
             }
             // Case 2: We were driving recently, stopped briefly (e.g., traffic light), now driving again
-            else if (timeSinceLastDriving < DUA_COOLDOWN_MILLIS) {
+            else if (timeSinceLastDriving < ActivityDetectionConfig.DUA_COOLDOWN_MILLIS) {
                 // Within cooldown threshold - don't replay dua
                 lastDrivingTime = currentTime // Update last driving time
-                Log.d("ActivityTracker", "🚗 Driving resumed within ${(DUA_COOLDOWN_MILLIS - timeSinceLastDua) / 1000}s cooldown - skipping dua")
+                Log.d("ActivityTracker", "🚗 Driving resumed within ${(ActivityDetectionConfig.DUA_COOLDOWN_MILLIS - timeSinceLastDua) / 1000}s cooldown - skipping dua")
             }
             // Case 3: Long time since driving but short time since last dua (edge case)
             else {
-                Log.d("ActivityTracker", "🚗 Driving started but dua cooldown active for ${(DUA_COOLDOWN_MILLIS - timeSinceLastDua) / 1000}s more")
+                Log.d("ActivityTracker", "🚗 Driving started but dua cooldown active for ${(ActivityDetectionConfig.DUA_COOLDOWN_MILLIS - timeSinceLastDua) / 1000}s more")
             }
+        }
+        
+        // Cancel pending dua if user stops driving before delay expires
+        if (activity != "Driving" && oldActivity == "Driving") {
+            cancelPendingDua()
         }
         
         // Track when we're driving to detect brief stops
         if (activity == "Driving") {
             lastDrivingTime = currentTime
+        }
+    }
+    
+    /**
+     * Update phone position from service (NEW - research paper method)
+     */
+    private fun updatePhonePosition() {
+        activityDetectionService?.let { service ->
+            if (service.isRunning()) {
+                val position = service.getCurrentPosition()
+                _phonePosition.value = position.name
+            }
         }
     }
     
@@ -199,6 +224,20 @@ object ActivityTracker {
         }
         
         return _currentActivity.value
+    }
+    
+    /**
+     * Get current phone position synchronously for UI (NEW)
+     */
+    fun getCurrentPhonePosition(): String {
+        // If we have an active service, try to get the current position from it
+        activityDetectionService?.let { service ->
+            if (service.isRunning()) {
+                return service.getCurrentPosition().name
+            }
+        }
+        
+        return _phonePosition.value
     }
     
     /**
@@ -317,6 +356,41 @@ object ActivityTracker {
         }
     }
 
+    /**
+     * Schedule driving dua with delay - user must stay in driving mode
+     */
+    private fun scheduleDrivingDuaWithDelay() {
+        // Cancel any existing pending dua
+        cancelPendingDua()
+        
+        // Create new runnable
+        pendingDuaRunnable = Runnable {
+            // Verify user is still driving before playing
+            if (_currentActivity.value == "Driving") {
+                playDrivingAudio()
+                Log.d("ActivityTracker", "🎵 Playing travel dua - user stayed driving for ${ActivityDetectionConfig.DUA_PLAYBACK_DELAY_SECONDS}s")
+            } else {
+                Log.d("ActivityTracker", "⏭️ Skipping travel dua - user no longer driving (current: ${_currentActivity.value})")
+            }
+            pendingDuaRunnable = null
+        }
+        
+        // Schedule for delay
+        duaHandler.postDelayed(pendingDuaRunnable!!, ActivityDetectionConfig.DUA_PLAYBACK_DELAY_MILLIS)
+        Log.d("ActivityTracker", "⏰ Travel dua scheduled - will play in ${ActivityDetectionConfig.DUA_PLAYBACK_DELAY_SECONDS}s if user stays driving")
+    }
+    
+    /**
+     * Cancel pending dua playback
+     */
+    private fun cancelPendingDua() {
+        pendingDuaRunnable?.let {
+            duaHandler.removeCallbacks(it)
+            pendingDuaRunnable = null
+            Log.d("ActivityTracker", "❌ Cancelled pending travel dua - user stopped driving")
+        }
+    }
+    
     /**
      * Play driving audio (travel dua) when driving starts
      */
