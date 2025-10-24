@@ -92,14 +92,13 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             val notification = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) {
                 // Prayer time notification - when it's actually prayer time
                 NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setContentTitle("$prayerName Prayer Time")
-                    .setContentText("It's time for $prayerName prayer • $prayerTime")
+                    .setContentTitle("$prayerName Prayer")
+                    .setContentText("It's time for $prayerName • $prayerTime")
                     .setStyle(NotificationCompat.BigTextStyle()
-                        .bigText("🕌 Time for $prayerName Prayer\n\n" +
-                                "Prayer time: $prayerTime\n\n" +
+                        .bigText("$prayerName Prayer Time\n\n" +
+                                "Time: $prayerTime\n" +
                                 "اَللّٰهُمَّ تَقَبَّلْ مِنَّا\n" +
-                                "O Allah, accept from us\n\n" +
-                                "May your prayer be accepted. Ameen."))
+                                "(O Allah, accept from us)"))
                     .setSmallIcon(R.drawable.ic_prayer)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setCategory(NotificationCompat.CATEGORY_ALARM)
@@ -110,16 +109,12 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             } else {
                 // Prayer reminder notification - 20 minutes before prayer
                 NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setContentTitle("Upcoming: $prayerName Prayer")
-                    .setContentText("$prayerName prayer in 20 minutes • $prayerTime")
+                    .setContentTitle("$prayerName in 20 min")
+                    .setContentText("Starts at $prayerTime")
                     .setStyle(NotificationCompat.BigTextStyle()
-                        .bigText("⏰ Prayer Time Approaching\n\n" +
-                                "$prayerName prayer will begin at $prayerTime\n" +
-                                "Time remaining: 20 minutes\n\n" +
-                                "Please prepare for prayer:\n" +
-                                "• Perform wudu (ablution)\n" +
-                                "• Find a clean prayer space\n" +
-                                "• Face towards the Qibla"))
+                        .bigText("$prayerName Prayer in 20 minutes\n\n" +
+                                "Time: $prayerTime\n" +
+                                "Prepare: Wudu • Clean space • Qibla"))
                     .setSmallIcon(R.drawable.ic_prayer)
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setCategory(NotificationCompat.CATEGORY_REMINDER)
