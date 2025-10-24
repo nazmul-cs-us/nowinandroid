@@ -51,4 +51,5 @@ object ActivityBasedDuaHelper {
         // a more robust method like checking service state through a bound service
         return true // Placeholder - you could implement proper service state checking
     }
+    
 }
