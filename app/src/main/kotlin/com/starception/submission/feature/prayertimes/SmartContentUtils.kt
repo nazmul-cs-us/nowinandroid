@@ -176,42 +176,135 @@ object SmartContentUtils {
         getCurrentPrayer: (() -> Pair<String, LocalTime>?)? = null
     ): Pair<Int, String>? {
         return try {
-            val times = prayerTimes ?: return null
+            val times = prayerTimes ?: run {
+                android.util.Log.d("SmartPrediction", "❌ No prayer times available")
+                return null
+            }
+            
+            android.util.Log.d("SmartPrediction", "📊 Current time: $currentTime")
+            android.util.Log.d("SmartPrediction", "📊 Prayer times - Fajr: ${times.fajr}, Dhuhr: ${times.dhuhr}, Asr: ${times.asr}, Maghrib: ${times.maghrib}, Isha: ${times.isha}")
             
             // First try to get current prayer (within 30-min window)
             val currentPrayer = getCurrentPrayer?.invoke()
-            val targetPrayer = if (currentPrayer != null) {
-                currentPrayer
-            } else {
-                // If no current prayer, find the most recent prayer that has passed
-                val allPrayerTimes = listOf(
-                    "Fajr" to times.fajr,
-                    "Dhuhr" to times.dhuhr,
-                    "Asr" to times.asr,
-                    "Maghrib" to times.maghrib,
-                    "Isha" to times.isha
-                )
+            
+            if (currentPrayer != null) {
+                // We have a current active prayer
+                val (prayerName, prayerTime) = currentPrayer
+                val duration = Duration.between(prayerTime, currentTime)
+                val minutes = duration.toMinutes().toInt()
                 
-                allPrayerTimes
-                    .filter { (_, time) -> currentTime.isAfter(time) }
-                    .maxByOrNull { (_, time) -> time }
+                android.util.Log.d("SmartPrediction", "✅ Current active prayer: $prayerName at $prayerTime")
+                android.util.Log.d("SmartPrediction", "⏱️ Minutes since $prayerName: $minutes")
+                
+                return when {
+                    minutes < -720 -> {
+                        android.util.Log.d("SmartPrediction", "⚠️ Minutes < -720, returning null")
+                        null
+                    }
+                    minutes > 720 -> {
+                        android.util.Log.d("SmartPrediction", "⚠️ Minutes > 720, returning null")
+                        null
+                    }
+                    else -> {
+                        android.util.Log.d("SmartPrediction", "✅ Returning: ($minutes, $prayerName)")
+                        Pair(minutes, prayerName)
+                    }
+                }
+            }
+            
+            android.util.Log.d("SmartPrediction", "ℹ️ No current active prayer")
+            
+            // No current active prayer - determine if we should show last prayer or next prayer
+            val allPrayerTimes = listOf(
+                "Fajr" to times.fajr,
+                "Dhuhr" to times.dhuhr,
+                "Asr" to times.asr,
+                "Maghrib" to times.maghrib,
+                "Isha" to times.isha
+            )
+            
+            val passedPrayers = allPrayerTimes.filter { (_, time) -> currentTime.isAfter(time) }
+            val upcomingPrayers = allPrayerTimes.filter { (_, time) -> currentTime.isBefore(time) }
+            
+            android.util.Log.d("SmartPrediction", "📋 Passed prayers: ${passedPrayers.map { it.first }}")
+            android.util.Log.d("SmartPrediction", "📋 Upcoming prayers: ${upcomingPrayers.map { it.first }}")
+            
+            // Determine which prayer to show
+            val targetPrayer = when {
+                upcomingPrayers.isNotEmpty() -> {
+                    // There's an upcoming prayer today - show countdown to it
+                    val next = upcomingPrayers.first()
+                    android.util.Log.d("SmartPrediction", "⏭️ Next upcoming prayer: ${next.first} at ${next.second}")
+                    next
+                }
+                passedPrayers.isNotEmpty() -> {
+                    // All today's prayers passed - show time since last prayer (Isha)
+                    // But only if it's been less than 3 hours since Isha
+                    val lastPrayer = passedPrayers.last()
+                    val minutesSinceLast = Duration.between(lastPrayer.second, currentTime).toMinutes().toInt()
+                    android.util.Log.d("SmartPrediction", "🌙 All prayers passed. Last: ${lastPrayer.first} at ${lastPrayer.second}")
+                    android.util.Log.d("SmartPrediction", "⏱️ Minutes since ${lastPrayer.first}: $minutesSinceLast")
+                    
+                    if (minutesSinceLast <= 180) { // 3 hours
+                        android.util.Log.d("SmartPrediction", "✅ Within 3 hours, showing time since ${lastPrayer.first}")
+                        lastPrayer
+                    } else {
+                        // It's late night, show countdown to tomorrow's Fajr
+                        val minutesUntilMidnight = Duration.between(currentTime, LocalTime.MAX).toMinutes()
+                        val minutesFromMidnightToFajr = Duration.between(LocalTime.MIN, times.fajr).toMinutes()
+                        val totalMinutesUntilFajr = (minutesUntilMidnight + minutesFromMidnightToFajr + 1).toInt()
+                        
+                        android.util.Log.d("SmartPrediction", "🌃 Late night mode activated")
+                        android.util.Log.d("SmartPrediction", "⏰ Minutes until midnight: $minutesUntilMidnight")
+                        android.util.Log.d("SmartPrediction", "⏰ Minutes from midnight to Fajr: $minutesFromMidnightToFajr")
+                        android.util.Log.d("SmartPrediction", "⏰ Total minutes until tomorrow's Fajr: $totalMinutesUntilFajr")
+                        android.util.Log.d("SmartPrediction", "✅ Returning: (-$totalMinutesUntilFajr, Fajr)")
+                        
+                        return Pair(-totalMinutesUntilFajr, "Fajr")
+                    }
+                }
+                else -> {
+                    android.util.Log.d("SmartPrediction", "⚠️ No passed or upcoming prayers found")
+                    null
+                }
             }
             
             if (targetPrayer != null) {
                 val (prayerName, prayerTime) = targetPrayer
-                val duration = Duration.between(prayerTime, currentTime)
-                val minutes = duration.toMinutes().toInt()
+                val duration = if (currentTime.isBefore(prayerTime)) {
+                    Duration.between(currentTime, prayerTime)
+                } else {
+                    Duration.between(prayerTime, currentTime)
+                }
+                val minutes = if (currentTime.isBefore(prayerTime)) {
+                    -duration.toMinutes().toInt() // Negative for upcoming prayers
+                } else {
+                    duration.toMinutes().toInt() // Positive for passed prayers
+                }
                 
-                // Limit to reasonable range to prevent display issues
+                android.util.Log.d("SmartPrediction", "🎯 Target prayer: $prayerName at $prayerTime")
+                android.util.Log.d("SmartPrediction", "⏱️ Calculated minutes: $minutes")
+                
                 return when {
-                    minutes < -720 -> null // More than 12 hours before prayer - don't show
-                    minutes > 720 -> null  // More than 12 hours after prayer - don't show
-                    else -> Pair(minutes, prayerName)
+                    minutes < -720 -> {
+                        android.util.Log.d("SmartPrediction", "⚠️ Minutes < -720, returning null")
+                        null
+                    }
+                    minutes > 720 -> {
+                        android.util.Log.d("SmartPrediction", "⚠️ Minutes > 720, returning null")
+                        null
+                    }
+                    else -> {
+                        android.util.Log.d("SmartPrediction", "✅ Final result: ($minutes, $prayerName)")
+                        Pair(minutes, prayerName)
+                    }
                 }
             }
             
+            android.util.Log.d("SmartPrediction", "❌ No target prayer determined, returning null")
             return null
         } catch (e: Exception) {
+            android.util.Log.e("SmartPrediction", "❌ Exception in getMinutesSinceCurrentPrayer", e)
             null // Return null on any error
         }
     }
@@ -329,9 +422,22 @@ object SmartContentUtils {
             }
             
             // Find next prayer (the next upcoming prayer)
-            val nextPrayer = allPrayers.find { (_, time) -> 
+            val nextPrayerToday = allPrayers.find { (_, time) -> 
                 currentTime.isBefore(time)
-            } ?: allPrayers.first() // Wrap to next day (tomorrow's Fajr) if needed
+            }
+            
+            val nextPrayer: Pair<String, LocalTime>?
+            val isNextPrayerTomorrow: Boolean
+            
+            if (nextPrayerToday != null) {
+                // There's a prayer left today
+                nextPrayer = nextPrayerToday
+                isNextPrayerTomorrow = false
+            } else {
+                // All prayers passed, next is tomorrow's Fajr
+                nextPrayer = allPrayers.first()  // Fajr
+                isNextPrayerTomorrow = true
+            }
             
             // Show content if we have a current prayer (continues tracking until next prayer starts)
             if (currentPrayer != null && nextPrayer != null) {
@@ -353,8 +459,16 @@ object SmartContentUtils {
                 // Next prayer countdown with "Next •" format to match notification exactly
                 val nextPrayerText = if (nextPrayer != null) {
                     val (nextName, nextTime) = nextPrayer
-                    val timeUntilNext = Duration.between(currentTime, nextTime)
-                    val nextFormatted = formatNotificationTimeRemaining(timeUntilNext.toMinutes())
+                    val timeUntilNext = if (isNextPrayerTomorrow) {
+                        // Calculate time until tomorrow's Fajr
+                        val minutesUntilMidnight = Duration.between(currentTime, LocalTime.MAX).toMinutes()
+                        val minutesFromMidnightToFajr = Duration.between(LocalTime.MIN, nextTime).toMinutes()
+                        minutesUntilMidnight + minutesFromMidnightToFajr + 1
+                    } else {
+                        // Calculate time until today's next prayer
+                        Duration.between(currentTime, nextTime).toMinutes()
+                    }
+                    val nextFormatted = formatNotificationTimeRemaining(timeUntilNext)
                     "Next • $nextName in $nextFormatted"
                 } else ""
                 
