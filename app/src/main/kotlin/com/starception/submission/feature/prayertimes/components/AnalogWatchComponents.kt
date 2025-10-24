@@ -840,7 +840,7 @@ fun FloatingPrayerLabels(prayerTimes: DayPrayerTimes, watchSize: Dp) {
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = time.format(DateTimeFormatter.ofPattern("HH:mm")),
+                            text = time.format(DateTimeFormatter.ofPattern("h:mm a")),
                             style = MaterialTheme.typography.bodySmall,
                             color = if (isActive) Color.White else Color(0xFFFFD700),
                             fontWeight = FontWeight.Medium,

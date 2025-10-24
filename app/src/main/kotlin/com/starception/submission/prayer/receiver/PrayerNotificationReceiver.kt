@@ -5,9 +5,12 @@ import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.work.*
 import com.starception.submission.R
 import com.starception.submission.prayer.worker.PrayerNotificationWorker
@@ -89,6 +92,9 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             
             val notificationId = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) 2001 else 2002
             
+            // Create large icon bitmap for notification
+            val largeIcon = ContextCompat.getDrawable(context, R.drawable.ic_prayer_time_24)?.toBitmap()
+            
             val notification = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) {
                 // Prayer time notification - when it's actually prayer time
                 NotificationCompat.Builder(context, CHANNEL_ID)
@@ -100,6 +106,7 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                                 "اَللّٰهُمَّ تَقَبَّلْ مِنَّا\n" +
                                 "(O Allah, accept from us)"))
                     .setSmallIcon(R.drawable.ic_prayer)
+                    .setLargeIcon(largeIcon)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setCategory(NotificationCompat.CATEGORY_ALARM)
                     .setAutoCancel(true)
@@ -116,6 +123,7 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                                 "Time: $prayerTime\n" +
                                 "Prepare: Wudu • Clean space • Qibla"))
                     .setSmallIcon(R.drawable.ic_prayer)
+                    .setLargeIcon(largeIcon)
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setCategory(NotificationCompat.CATEGORY_REMINDER)
                     .setAutoCancel(true)
