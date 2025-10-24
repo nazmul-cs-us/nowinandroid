@@ -110,7 +110,10 @@
       "Read(//tmp/**)",
       "Read(//Users/smarterai/Desktop/quran/Quran_With_English_Translation/**)",
       "Bash(open:*)",
-      "Read(//Users/smarterai/Desktop/**)"
+      "Read(//Users/smarterai/Desktop/**)",
+      "Bash(kill:*)",
+      "WebSearch",
+      "Read(//Users/smarterai/Documents/GitHub/material-components-android-master/**)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
