@@ -6,6 +6,8 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -113,6 +115,9 @@ class PrayerNotificationWorker @AssistedInject constructor(
     }
 
     private fun showPrayerTimeNotification(prayerName: String, prayerTime: String) {
+        // Create large icon bitmap for notification
+        val largeIcon = ContextCompat.getDrawable(applicationContext, R.drawable.ic_prayer_time_24)?.toBitmap()
+        
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setContentTitle("$prayerName Prayer")
             .setContentText("It's time for $prayerName • $prayerTime")
@@ -122,6 +127,7 @@ class PrayerNotificationWorker @AssistedInject constructor(
                         "اَللّٰهُمَّ تَقَبَّلْ مِنَّا\n" +
                         "(O Allah, accept from us)"))
             .setSmallIcon(R.drawable.ic_prayer)
+            .setLargeIcon(largeIcon)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
@@ -137,6 +143,9 @@ class PrayerNotificationWorker @AssistedInject constructor(
     }
 
     private fun showPrayerReminderNotification(prayerName: String, prayerTime: String) {
+        // Create large icon bitmap for notification
+        val largeIcon = ContextCompat.getDrawable(applicationContext, R.drawable.ic_prayer_time_24)?.toBitmap()
+        
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setContentTitle("$prayerName in 20 min")
             .setContentText("Starts at $prayerTime")
@@ -145,6 +154,7 @@ class PrayerNotificationWorker @AssistedInject constructor(
                         "Time: $prayerTime\n" +
                         "Prepare: Wudu • Clean space • Qibla"))
             .setSmallIcon(R.drawable.ic_prayer)
+            .setLargeIcon(largeIcon)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
@@ -170,7 +180,7 @@ class PrayerNotificationWorker @AssistedInject constructor(
             PrayerNotificationScheduler.schedulePrayerNotification(
                 applicationContext,
                 "Test Prayer",
-                testTime.format(DateTimeFormatter.ofPattern("HH:mm"))
+                testTime.format(DateTimeFormatter.ofPattern("h:mm a"))
             )
             
             Log.d(TAG, "📅 Scheduled test prayer notification at ${testTime}")

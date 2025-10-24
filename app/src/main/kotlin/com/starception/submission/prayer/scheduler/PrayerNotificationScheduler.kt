@@ -40,7 +40,7 @@ object PrayerNotificationScheduler {
      * 
      * @param context Application context
      * @param prayerName Name of the prayer (Fajr, Dhuhr, etc.)
-     * @param prayerTime Time in HH:mm format
+     * @param prayerTime Time in h:mm a format (12-hour with AM/PM)
      * @param reminderMinutes Minutes before prayer to show reminder (optional)
      */
     fun schedulePrayerNotification(
@@ -185,7 +185,7 @@ object PrayerNotificationScheduler {
             schedulePrayerNotification(
                 context = context,
                 prayerName = "Test Prayer",
-                prayerTime = testTime.format(DateTimeFormatter.ofPattern("HH:mm")),
+                prayerTime = testTime.format(DateTimeFormatter.ofPattern("h:mm a")),
                 reminderMinutes = 0 // No reminder for test
             )
             
@@ -328,7 +328,7 @@ object PrayerNotificationScheduler {
     
     private fun parsePrayerTime(prayerTime: String): LocalDateTime? {
         return try {
-            val time = LocalTime.parse(prayerTime, DateTimeFormatter.ofPattern("HH:mm"))
+            val time = LocalTime.parse(prayerTime, DateTimeFormatter.ofPattern("h:mm a"))
             LocalDateTime.of(LocalDate.now(), time)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse prayer time: $prayerTime", e)

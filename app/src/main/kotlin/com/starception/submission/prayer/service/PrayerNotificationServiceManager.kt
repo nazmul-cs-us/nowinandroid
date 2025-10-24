@@ -131,7 +131,7 @@ class PrayerNotificationServiceManager @Inject constructor(
     private suspend fun getPrayerTimesForToday(): Map<String, String> {
         return try {
             val today = LocalDate.now()
-            val formatter = DateTimeFormatter.ofPattern("HH:mm")
+            val formatter = DateTimeFormatter.ofPattern("h:mm a")
             
             // Get current settings
             val settings = prayerSettingsRepository.getSettings()
