@@ -1041,7 +1041,8 @@ fun SwipeableBigTiles(
                     getCurrentDate = getCurrentDate,
                     getSmartFooter = getSmartFooter,
                     getCurrentActivity = getCurrentActivity,
-                    getPrayed = getPrayed
+                    getPrayed = getPrayed,
+                    prayerTimes = prayerTimes
                 )
                 2 -> DailyStatsTile(
                     getPrayerProgress = getPrayerProgress,
@@ -1405,8 +1406,11 @@ private fun SmartInfoTile(
     getCurrentDate: () -> String,
     getSmartFooter: () -> String,
     getCurrentActivity: () -> String,
-    getPrayed: () -> Int = { 0 }
+    getPrayed: () -> Int = { 0 },
+    prayerTimes: DayPrayerTimes? = null
 ) {
+    // State for bubble popup
+    var selectedPrayer by remember { mutableStateOf<com.starception.submission.feature.prayertimes.components.PrayerBubbleData?>(null) }
     val view = LocalView.current
     Surface(
         modifier = Modifier
@@ -1488,10 +1492,43 @@ private fun SmartInfoTile(
 
                             prayerInitials.forEachIndexed { index, initial ->
                                 val isPrayed = com.starception.submission.util.PrayerTracker.isPrayerMarkedToday(prayers[index])
+                                val prayerName = prayers[index]
+
+                                // Get prayer time from prayerTimes
+                                val prayerTime = prayerTimes?.let {
+                                    when (prayerName) {
+                                        "Fajr" -> it.fajr
+                                        "Dhuhr" -> it.dhuhr
+                                        "Asr" -> it.asr
+                                        "Maghrib" -> it.maghrib
+                                        "Isha" -> it.isha
+                                        else -> null
+                                    }
+                                }
 
                                 Box(
                                     modifier = Modifier
                                         .size(24.dp)
+                                        .clickable(
+                                            indication = null,
+                                            interactionSource = remember { MutableInteractionSource() }
+                                        ) {
+                                            // Create bubble data and show popup
+                                            android.util.Log.d("PrayerBubble", "Prayer clicked: $prayerName, prayerTime: $prayerTime")
+                                            if (prayerTime != null) {
+                                                selectedPrayer = com.starception.submission.feature.prayertimes.components.PrayerBubbleData(
+                                                    name = prayerName,
+                                                    arabicName = com.starception.submission.feature.prayertimes.components.getArabicPrayerName(prayerName),
+                                                    time = prayerTime.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a")),
+                                                    isPrayed = isPrayed,
+                                                    initial = initial
+                                                )
+                                                android.util.Log.d("PrayerBubble", "Bubble data created, showing popup")
+                                                view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                                            } else {
+                                                android.util.Log.e("PrayerBubble", "prayerTime is null for $prayerName")
+                                            }
+                                        }
                                         .background(
                                             color = if (isPrayed)
                                                 MaterialTheme.colorScheme.primary
@@ -1661,6 +1698,14 @@ private fun SmartInfoTile(
                 )
             }
         }
+    }
+
+    // Show 3D Bubble Popup when prayer is selected
+    selectedPrayer?.let { prayerData ->
+        com.starception.submission.feature.prayertimes.components.PrayerBubblePopup(
+            prayerData = prayerData,
+            onDismiss = { selectedPrayer = null }
+        )
     }
 }
 

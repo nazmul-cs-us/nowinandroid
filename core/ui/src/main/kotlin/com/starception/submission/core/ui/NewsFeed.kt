@@ -39,6 +39,12 @@ import androidx.compose.ui.unit.dp
 import com.starception.submission.core.analytics.LocalAnalyticsHelper
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.UserNewsResource
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /**
  * An extension on [LazyListScope] defining a feed with news resources.
@@ -66,7 +72,46 @@ fun LazyStaggeredGridScope.newsFeed(
 
                 // Check if this is a Surah news item
                 val surahNumber = extractSurahNumber(userNewsResource.url)
-                
+
+                // State for floating toolbar
+                var showFloatingToolbar by remember { mutableStateOf(false) }
+
+                // Show floating toolbar for Surah items
+                if (showFloatingToolbar && surahNumber != null) {
+                    SurahFloatingToolbar(
+                        visible = showFloatingToolbar,
+                        surahNumber = surahNumber,
+                        surahName = userNewsResource.title,
+                        onDismiss = { showFloatingToolbar = false },
+                        onPlayAudio = {
+                            // TODO: Implement play Surah audio
+                            android.util.Log.d("SurahToolbar", "Play audio for Surah $surahNumber")
+                        },
+                        onBookmark = {
+                            onNewsResourcesCheckedChanged(
+                                userNewsResource.id,
+                                !userNewsResource.isSaved
+                            )
+                        },
+                        onShare = {
+                            // Share Surah
+                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_TEXT,
+                                    "Check out Surah ${userNewsResource.title}: ${userNewsResource.url}")
+                            }
+                            context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Surah"))
+                        },
+                        onDownload = {
+                            // TODO: Implement download Surah
+                            android.util.Log.d("SurahToolbar", "Download Surah $surahNumber")
+                        },
+                        onInfo = {
+                            onSurahClick(surahNumber)
+                        }
+                    )
+                }
+
                 NewsResourceCardExpanded(
                     userNewsResource = userNewsResource,
                     isBookmarked = userNewsResource.isSaved,
@@ -96,7 +141,19 @@ fun LazyStaggeredGridScope.newsFeed(
                     onTopicClick = onTopicClick,
                     modifier = Modifier
                         .padding(horizontal = 8.dp)
-                        .animateItem(),
+                        .animateItem()
+                        .then(
+                            // Add long-press detection for Surah items
+                            if (surahNumber != null) {
+                                Modifier.pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onLongPress = {
+                                            showFloatingToolbar = true
+                                        }
+                                    )
+                                }
+                            } else Modifier
+                        ),
                 )
             }
         }
