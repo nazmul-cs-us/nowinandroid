@@ -1,28 +1,39 @@
 package com.starception.submission.service;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
+import androidx.core.app.NotificationCompat;
 
+import com.starception.submission.MainActivity;
+import com.starception.submission.R;
 import com.starception.submission.dua.DuaManager;
 import com.starception.submission.sensor.ActivityDetectionService;
 
 /**
- * ACTIVITY-BASED DUA SERVICE: Background service for continuous activity detection and dua playing
+ * ACTIVITY-BASED DUA SERVICE: Foreground service for continuous activity detection and dua playing
  * 
- * This service runs in the background to continuously monitor user activity and play
- * appropriate duas when activity changes. It integrates with the existing prayer app
- * architecture and provides seamless dua recommendations.
+ * This service runs as a foreground service to continuously monitor user activity and play
+ * appropriate duas when activity changes. Running as foreground service ensures Android
+ * won't kill it when the app is in the background, allowing reliable driving detection.
  */
 public class ActivityBasedDuaService extends Service {
     
     private static final String TAG = "ActivityBasedDuaService";
     private static final String ACTION_START_DETECTION = "com.starception.submission.START_ACTIVITY_DETECTION";
     private static final String ACTION_STOP_DETECTION = "com.starception.submission.STOP_ACTIVITY_DETECTION";
+    private static final String CHANNEL_ID = "activity_detection_channel";
+    private static final int NOTIFICATION_ID = 3001;
     
     private DuaManager duaManager;
     private boolean isServiceRunning = false;
+    private NotificationManager notificationManager;
     
     @Override
     public void onCreate() {
@@ -30,6 +41,8 @@ public class ActivityBasedDuaService extends Service {
         Log.i(TAG, "ActivityBasedDuaService created");
         
         duaManager = new DuaManager(this);
+        notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        createNotificationChannel();
     }
     
     @Override
@@ -69,7 +82,7 @@ public class ActivityBasedDuaService extends Service {
     }
     
     /**
-     * Start activity detection and dua playing
+     * Start activity detection and dua playing as foreground service
      */
     private void startActivityDetection() {
         if (isServiceRunning) {
@@ -84,6 +97,11 @@ public class ActivityBasedDuaService extends Service {
         }
         
         try {
+            // Start as foreground service to prevent Android from killing it
+            Notification notification = createNotification("Monitoring activity...");
+            startForeground(NOTIFICATION_ID, notification);
+            Log.i(TAG, "✅ Started as foreground service");
+            
             duaManager.start();
             isServiceRunning = true;
             Log.i(TAG, "Activity detection and dua playing started");
@@ -94,6 +112,7 @@ public class ActivityBasedDuaService extends Service {
             
         } catch (Exception e) {
             Log.e(TAG, "Error starting activity detection", e);
+            stopForeground(true);
             stopSelf();
         }
     }
@@ -110,6 +129,7 @@ public class ActivityBasedDuaService extends Service {
         try {
             duaManager.stop();
             isServiceRunning = false;
+            stopForeground(true);
             Log.i(TAG, "Activity detection and dua playing stopped");
         } catch (Exception e) {
             Log.e(TAG, "Error stopping activity detection", e);
@@ -126,8 +146,49 @@ public class ActivityBasedDuaService extends Service {
             duaManager.cleanup();
         }
         
+        stopForeground(true);
         isServiceRunning = false;
         super.onDestroy();
+    }
+    
+    /**
+     * Create notification channel for Android O and above
+     */
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID,
+                "Activity Detection",
+                NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("Monitors your activity for travel dua");
+            channel.setShowBadge(false);
+            notificationManager.createNotificationChannel(channel);
+            Log.d(TAG, "Notification channel created");
+        }
+    }
+    
+    /**
+     * Create foreground service notification
+     */
+    private Notification createNotification(String contentText) {
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            notificationIntent,
+            PendingIntent.FLAG_IMMUTABLE
+        );
+        
+        return new NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Smart Activity Tracking")
+            .setContentText(contentText)
+            .setSmallIcon(R.drawable.ic_prayer)
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setShowWhen(false)
+            .build();
     }
     
     /**
