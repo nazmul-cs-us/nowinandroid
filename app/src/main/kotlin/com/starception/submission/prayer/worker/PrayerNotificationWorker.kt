@@ -3,16 +3,11 @@ package com.starception.submission.prayer.worker
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.os.Build
 import android.util.Log
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.Density
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -120,8 +115,8 @@ class PrayerNotificationWorker @AssistedInject constructor(
     }
 
     private fun showPrayerTimeNotification(prayerName: String, prayerTime: String) {
-        // Create large icon from Material Icon
-        val largeIcon = createBitmapFromImageVector(applicationContext, Icons.Filled.AccessTime)
+        // Create large icon from app launcher icon
+        val largeIcon = ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
         
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setContentTitle("$prayerName Prayer")
@@ -148,8 +143,8 @@ class PrayerNotificationWorker @AssistedInject constructor(
     }
 
     private fun showPrayerReminderNotification(prayerName: String, prayerTime: String) {
-        // Create large icon from Material Icon
-        val largeIcon = createBitmapFromImageVector(applicationContext, Icons.Filled.AccessTime)
+        // Create large icon from app launcher icon
+        val largeIcon = ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
         
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setContentTitle("$prayerName in 20 min")
@@ -192,41 +187,6 @@ class PrayerNotificationWorker @AssistedInject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule next prayer notification", e)
         }
-    }
-    
-    /**
-     * Convert Material Icon (ImageVector) to Bitmap for notification large icon
-     * Creates a simple clock icon for prayer notifications
-     */
-    private fun createBitmapFromImageVector(context: Context, imageVector: ImageVector): Bitmap {
-        val density = context.resources.displayMetrics.density
-        val sizePx = (48 * density).toInt() // 48dp icon size
-        
-        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        
-        // Draw icon with Material 3 primary color
-        val paint = android.graphics.Paint().apply {
-            color = 0xFF6750A4.toInt() // Material 3 primary color
-            isAntiAlias = true
-            style = android.graphics.Paint.Style.STROKE
-            strokeWidth = 3f * density
-        }
-        
-        val centerX = sizePx / 2f
-        val centerY = sizePx / 2f
-        val radius = sizePx / 2.5f
-        
-        // Draw clock circle
-        canvas.drawCircle(centerX, centerY, radius, paint)
-        
-        // Draw clock hands (simple style)
-        paint.style = android.graphics.Paint.Style.FILL
-        paint.strokeWidth = 2f * density
-        canvas.drawLine(centerX, centerY, centerX, centerY - radius * 0.6f, paint) // Hour hand
-        canvas.drawLine(centerX, centerY, centerX + radius * 0.5f, centerY, paint) // Minute hand
-        
-        return bitmap
     }
 
 }
