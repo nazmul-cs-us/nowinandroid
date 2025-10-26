@@ -105,6 +105,59 @@ class PrayerSettingsRepository @Inject constructor(
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
     
+    init {
+        // Load preferences from storage on repository creation
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            try {
+                Log.i(TAG, "🚀 PrayerSettingsRepository initialization started")
+                loadAllSettings()
+                _settingsLoaded = true
+                Log.i(TAG, "✅ PrayerSettingsRepository initialization completed")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error during repository initialization", e)
+            }
+        }
+    }
+    
+    /**
+     * RE-INITIALIZE WITH LOCATION: Called when location becomes available for the first time
+     * This allows country-based auto-detection to happen after initial app launch
+     */
+    fun reinitializeWithLocation() {
+        val currentSettings = getCalculationSettings()
+        val cachedCountry = getCachedCountry()
+        
+        // Only re-initialize if:
+        // 1. Current settings are still defaults (MUSLIM_WORLD_LEAGUE)
+        // 2. We now have a country code available
+        if (currentSettings.calculationMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE && 
+            cachedCountry != null) {
+            
+            Log.i(TAG, "🔄 RE-INITIALIZING: Location now available for country '$cachedCountry'")
+            
+            val autoDetectedSettings = getAutoDetectedSettingsForCountry(cachedCountry)
+            if (autoDetectedSettings != null) {
+                Log.i(TAG, "✅ Applying country-specific settings for '$cachedCountry'")
+                
+                // Update calculation settings with auto-detected values
+                val updatedSettings = PrayerCalculationSettings(
+                    calculationMethod = autoDetectedSettings.calculationMethod,
+                    asrMadhhab = autoDetectedSettings.asrMadhhab,
+                    highLatitudeAdjustment = autoDetectedSettings.highLatitudeAdjustment,
+                    customFajrAngle = autoDetectedSettings.customFajrAngle,
+                    customIshaAngle = autoDetectedSettings.customIshaAngle,
+                    customIshaDelay = autoDetectedSettings.customIshaDelay,
+                    timeOffsets = autoDetectedSettings.timeOffsets
+                )
+                
+                updateCalculationSettings(updatedSettings, forceCommit = true)
+                Log.i(TAG, "🎯 Country-based auto-detection applied successfully")
+            }
+        } else {
+            Log.d(TAG, "⏭️ Skipping re-initialization: method=${currentSettings.calculationMethod.name}, country=$cachedCountry")
+        }
+    }
+    
     // COMPREHENSIVE PREFERENCE LOGGING SYSTEM - Enhanced logging with detailed data tracking
     // This provides complete visibility into all preference operations for debugging and monitoring
     
@@ -383,6 +436,7 @@ class PrayerSettingsRepository @Inject constructor(
     private val json = Json {
         ignoreUnknownKeys = true    // For backward compatibility
         prettyPrint = false         // Compact storage
+        encodeDefaults = true       // Include fields with default values in JSON
     }
     
     // REACTIVE DATA FLOW - Separate flows for each preference type
@@ -2386,7 +2440,8 @@ class PrayerSettingsRepository @Inject constructor(
             val settingsJson = prefs.getString(KEY_CALCULATION_SETTINGS_JSON, null)
             logPrefReadJson(KEY_CALCULATION_SETTINGS_JSON, settingsJson, "prayer calculation settings")
             
-            if (settingsJson != null) {
+            // Check if JSON is empty or just contains empty object "{}"
+            if (settingsJson != null && settingsJson.trim() != "{}" && settingsJson.trim().isNotEmpty()) {
                 val settings = json.decodeFromString<PrayerCalculationSettings>(settingsJson)
                 
                 // ENHANCED LOADING LOGGING
@@ -2409,7 +2464,7 @@ class PrayerSettingsRepository @Inject constructor(
                 
                 settings
             } else {
-                Log.i(TAG, "📭 NO DATA FOUND: '$KEY_CALCULATION_SETTINGS_JSON' is empty - will use defaults")
+                Log.i(TAG, "📭 NO DATA FOUND: '$KEY_CALCULATION_SETTINGS_JSON' is empty or contains empty JSON object - will trigger auto-initialization")
                 null
             }
         } catch (e: Exception) {
@@ -2422,9 +2477,11 @@ class PrayerSettingsRepository @Inject constructor(
         return try {
             val settingsJson = prefs.getString(KEY_LOCATION_PREFERENCES_JSON, null)
             logPrefReadJson(KEY_LOCATION_PREFERENCES_JSON, settingsJson, "location preferences")
-            if (settingsJson != null) {
+            // Check if JSON is empty or just contains empty object "{}"
+            if (settingsJson != null && settingsJson.trim() != "{}" && settingsJson.trim().isNotEmpty()) {
                 json.decodeFromString<PrayerLocationPreferences>(settingsJson)
             } else {
+                Log.i(TAG, "📭 NO DATA FOUND: '$KEY_LOCATION_PREFERENCES_JSON' is empty or contains empty JSON object - will trigger auto-initialization")
                 null
             }
         } catch (e: Exception) {
@@ -2437,9 +2494,11 @@ class PrayerSettingsRepository @Inject constructor(
         return try {
             val settingsJson = prefs.getString(KEY_NOTIFICATION_PREFERENCES_JSON, null)
             logPrefReadJson(KEY_NOTIFICATION_PREFERENCES_JSON, settingsJson, "notification preferences")
-            if (settingsJson != null) {
+            // Check if JSON is empty or just contains empty object "{}"
+            if (settingsJson != null && settingsJson.trim() != "{}" && settingsJson.trim().isNotEmpty()) {
                 json.decodeFromString<PrayerNotificationPreferences>(settingsJson)
             } else {
+                Log.i(TAG, "📭 NO DATA FOUND: '$KEY_NOTIFICATION_PREFERENCES_JSON' is empty or contains empty JSON object - will trigger auto-initialization")
                 null
             }
         } catch (e: Exception) {
@@ -2510,6 +2569,12 @@ class PrayerSettingsRepository @Inject constructor(
         
         verifyPrefWrite(KEY_LOCATION_PREFERENCES_JSON, settingsJson, "location preferences")
         Log.i(TAG, "✅ Location preferences saved successfully")
+        
+        // Check if we need to re-initialize with country-based auto-detection
+        if (preferences.location != null) {
+            reinitializeWithLocation()
+        }
+        
         Log.i(TAG, "")
     }
     
