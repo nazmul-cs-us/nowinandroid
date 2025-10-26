@@ -24,6 +24,7 @@ enum class CalculationMethod(
     UMM_AL_QURA(
         displayName = "Umm al-Qura (Makkah)",
         fajrAngle = 18.5,
+        ishaAngle = 0.0,  // Uses time-based calculation (ishaDelay) instead of angle
         ishaDelay = 90, // 120 in Ramadan, 90 in other months
         description = "Used in Saudi Arabia"
     ),
