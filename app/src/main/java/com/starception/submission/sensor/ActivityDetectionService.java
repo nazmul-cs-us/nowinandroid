@@ -37,6 +37,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ActivityDetectionService implements SensorEventListener, LocationListener {
     
     private static final String TAG = "ActivityDetection";
+    private static final boolean ENABLE_DEBUG_LOGGING = false; // Set to false to disable all debug logs
+    
+    // Helper method for conditional logging
+    private void logDebug(String message) {
+        if (ENABLE_DEBUG_LOGGING) {
+            logDebug( message);
+        }
+    }
     
     // Sensor sampling frequencies
     private static final int SENSOR_DELAY_US = SensorManager.SENSOR_DELAY_UI; // ~60Hz
@@ -385,20 +393,20 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
             if (detectedActivity != pendingActivity) {
                 pendingActivity = detectedActivity;
                 pendingActivityStartTime = currentTime;
-                Log.d(TAG, "Pending activity: " + detectedActivity + " (count: " + consecutiveDetectionCount + 
+                logDebug("Pending activity: " + detectedActivity + " (count: " + consecutiveDetectionCount + 
                       "/" + STABLE_DETECTION_COUNT + ")");
                 return;
             } else {
                 long timePending = currentTime - pendingActivityStartTime;
                 if (timePending < ACTIVITY_CONFIRMATION_TIME) {
-                    Log.d(TAG, "Confirming: " + detectedActivity + " (time: " + timePending + "ms, count: " + 
+                    logDebug( "Confirming: " + detectedActivity + " (time: " + timePending + "ms, count: " + 
                           consecutiveDetectionCount + "/" + STABLE_DETECTION_COUNT + ")");
                     return;
                 }
             }
         } else if (!isStableDetection && !isImmediateTransition) {
             // Not stable yet, wait for more consistent detections
-            Log.d(TAG, "Waiting for stable detection: " + detectedActivity + " (count: " + 
+            logDebug( "Waiting for stable detection: " + detectedActivity + " (count: " + 
                   consecutiveDetectionCount + "/" + STABLE_DETECTION_COUNT + ")");
             return;
         } else {
@@ -507,18 +515,19 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
      * 6. ON_PHONE (fallback) - Any other movement patterns
      */
     private ActivityType determineActivity(double avgAccel, double accelVariance, double avgGyro, double maxSpeed, PhoneOrientation orientation, PhonePosition position) {
-        Log.d(TAG, "═══════════════════════════════════════════════════════");
-        Log.d(TAG, String.format("📊 ACTIVITY ANALYSIS:"));
-        Log.d(TAG, String.format("  • Accel Avg: %.3f (gravity: %.1f)", avgAccel, GRAVITY_ACCEL));
-        Log.d(TAG, String.format("  • Accel Variance: %.3f", accelVariance));
-        Log.d(TAG, String.format("  • Gyro Avg: %.3f", avgGyro));
-        Log.d(TAG, String.format("  • Max Speed: %.2f m/s (%.1f km/h)", maxSpeed, maxSpeed * 3.6));
-        Log.d(TAG, String.format("  • Orientation: %s", orientation));
-        Log.d(TAG, String.format("  • Position: %s", position));
+        // Logging disabled for performance
+        // Log.d(TAG, "═══════════════════════════════════════════════════════");
+        // Log.d(TAG, String.format("📊 ACTIVITY ANALYSIS:"));
+        // Log.d(TAG, String.format("  • Accel Avg: %.3f (gravity: %.1f)", avgAccel, GRAVITY_ACCEL));
+        // Log.d(TAG, String.format("  • Accel Variance: %.3f", accelVariance));
+        // Log.d(TAG, String.format("  • Gyro Avg: %.3f", avgGyro));
+        // Log.d(TAG, String.format("  • Max Speed: %.2f m/s (%.1f km/h)", maxSpeed, maxSpeed * 3.6));
+        // Log.d(TAG, String.format("  • Orientation: %s", orientation));
+        // Log.d(TAG, String.format("  • Position: %s", position));
 
         // 1. High speed indicates DRIVING (most reliable indicator)
         if (maxSpeed > DRIVING_SPEED_THRESHOLD) {
-            Log.d(TAG, "Detected: DRIVING (speed: " + String.format("%.2f", maxSpeed) + " m/s / " + String.format("%.1f", maxSpeed * 3.6) + " km/h)");
+            logDebug( "Detected: DRIVING (speed: " + String.format("%.2f", maxSpeed) + " m/s / " + String.format("%.1f", maxSpeed * 3.6) + " km/h)");
             return ActivityType.DRIVING;
         }
 
@@ -531,7 +540,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
 
         // Running if: (high variance AND high gyro) OR (high speed with significant movement)
         if ((hasRunningVariance && hasRunningGyro) || (hasRunningSpeed && accelVariance >= RUNNING_VARIANCE_MIN)) {
-            Log.d(TAG, "Detected: RUNNING (variance: " + String.format("%.2f", accelVariance) +
+            logDebug( "Detected: RUNNING (variance: " + String.format("%.2f", accelVariance) +
                        ", gyro: " + String.format("%.2f", avgGyro) +
                        ", speed: " + String.format("%.2f", maxSpeed) + " m/s)");
             return ActivityType.RUNNING;
@@ -562,30 +571,30 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
                                               orientation == PhoneOrientation.IN_POCKET ||
                                               orientation == PhoneOrientation.UNKNOWN); // Unknown could be pocket
 
-        // Log walking detection thresholds for debugging
-        Log.d(TAG, "🚶 WALKING DETECTION CHECKS:");
-        Log.d(TAG, String.format("  • Walking Variance: %.3f (range: %.1f-%.1f) - %s", 
-                accelVariance, WALKING_VARIANCE_MIN, WALKING_VARIANCE_MAX, 
-                hasWalkingVariance ? "✓ PASS" : "✗ FAIL"));
-        Log.d(TAG, String.format("  • Walking Gyro: %.3f (range: %.1f-%.1f) - %s", 
-                avgGyro, WALKING_GYRO_MIN, WALKING_GYRO_MAX, 
-                hasWalkingGyro ? "✓ PASS" : "✗ FAIL"));
-        Log.d(TAG, String.format("  • Walking Speed: %.2f m/s (range: %.1f-%.1f) - %s", 
-                maxSpeed, WALKING_SPEED_MIN, WALKING_SPEED_MAX, 
-                hasWalkingSpeed ? "✓ PASS" : "✗ FAIL"));
-        Log.d(TAG, String.format("  • Minimal Gyro: %.3f (min: %.2f) - %s", 
-                avgGyro, 0.15, 
-                hasMinimalGyro ? "✓ PASS" : "✗ FAIL"));
-        Log.d(TAG, String.format("  • GPS Available: %s", hasGPSData ? "YES" : "NO"));
-        Log.d(TAG, String.format("  • Position Suggests Walking: %s (%s)", 
-                positionSuggestsWalking ? "YES" : "NO", position));
-        Log.d(TAG, String.format("  • Orientation Suggests Walking: %s (%s)", 
-                orientationSuggestsWalking ? "YES" : "NO", orientation));
+        // Logging disabled for performance
+        // Log.d(TAG, "🚶 WALKING DETECTION CHECKS:");
+        // Log.d(TAG, String.format("  • Walking Variance: %.3f (range: %.1f-%.1f) - %s", 
+        //         accelVariance, WALKING_VARIANCE_MIN, WALKING_VARIANCE_MAX, 
+        //         hasWalkingVariance ? "✓ PASS" : "✗ FAIL"));
+        // Log.d(TAG, String.format("  • Walking Gyro: %.3f (range: %.1f-%.1f) - %s", 
+        //         avgGyro, WALKING_GYRO_MIN, WALKING_GYRO_MAX, 
+        //         hasWalkingGyro ? "✓ PASS" : "✗ FAIL"));
+        // Log.d(TAG, String.format("  • Walking Speed: %.2f m/s (range: %.1f-%.1f) - %s", 
+        //         maxSpeed, WALKING_SPEED_MIN, WALKING_SPEED_MAX, 
+        //         hasWalkingSpeed ? "✓ PASS" : "✗ FAIL"));
+        // Log.d(TAG, String.format("  • Minimal Gyro: %.3f (min: %.2f) - %s", 
+        //         avgGyro, 0.15, 
+        //         hasMinimalGyro ? "✓ PASS" : "✗ FAIL"));
+        // Log.d(TAG, String.format("  • GPS Available: %s", hasGPSData ? "YES" : "NO"));
+        // Log.d(TAG, String.format("  • Position Suggests Walking: %s (%s)", 
+        //         positionSuggestsWalking ? "YES" : "NO", position));
+        // Log.d(TAG, String.format("  • Orientation Suggests Walking: %s (%s)", 
+        //         orientationSuggestsWalking ? "YES" : "NO", orientation));
         
         // ENHANCED Walking detection with position awareness:
         // HIGH CONFIDENCE: POCKET position + rhythmic variance = definitely walking
         if (position == PhonePosition.POCKET && hasWalkingVariance) {
-            Log.d(TAG, "✅ Detected: WALKING (POCKET + rhythmic variance)");
+            logDebug( "✅ Detected: WALKING (POCKET + rhythmic variance)");
             return ActivityType.WALKING;
         }
         
@@ -598,27 +607,27 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
                 // GPS available - variance + (gyro OR speed) for confidence
                 // This allows walking detection even with low gyro if speed confirms it
                 if (hasWalkingSpeed || hasWalkingGyro) {
-                    Log.d(TAG, "✅ Detected: WALKING (GPS confirmed)");
+                    logDebug( "✅ Detected: WALKING (GPS confirmed)");
                     return ActivityType.WALKING;
                 } else {
-                    Log.d(TAG, "⚠️ Walking variance detected but speed/gyro don't confirm");
+                    logDebug( "⚠️ Walking variance detected but speed/gyro don't confirm");
                 }
             } else {
                 // No GPS - trust variance pattern more!
                 // Walking has very distinctive rhythmic variance (0.4-2.5) from footsteps
                 // Even with minimal gyro (looking at phone while walking), variance shows walking
                 if (hasMinimalGyro) {
-                    Log.d(TAG, "✅ Detected: WALKING (sensor-based, no GPS)");
+                    logDebug( "✅ Detected: WALKING (sensor-based, no GPS)");
                     return ActivityType.WALKING;
                 } else {
-                    Log.d(TAG, String.format("⚠️ Walking variance detected but gyro too low (%.3f < 0.15)", avgGyro));
+                    logDebug( String.format("⚠️ Walking variance detected but gyro too low (%.3f < 0.15)", avgGyro));
                 }
             }
         } else {
             if (!hasWalkingVariance) {
-                Log.d(TAG, "⚠️ Walking NOT detected: Variance out of range");
+                logDebug( "⚠️ Walking NOT detected: Variance out of range");
             } else if (!orientationSuggestsWalking && !positionSuggestsWalking) {
-                Log.d(TAG, "⚠️ Walking NOT detected: Orientation and position don't suggest walking");
+                logDebug( "⚠️ Walking NOT detected: Orientation and position don't suggest walking");
             }
         }
 
@@ -637,14 +646,14 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         
         // HIGH CONFIDENCE: DESK position + perfectly still = definitely stationary
         if (position == PhonePosition.DESK && isPerfectlyStill) {
-            Log.d(TAG, "Detected: STATIONARY (DESK position + perfectly still - accel: " + String.format("%.2f", avgAccel) +
+            logDebug( "Detected: STATIONARY (DESK position + perfectly still - accel: " + String.format("%.2f", avgAccel) +
                        ", variance: " + String.format("%.4f", accelVariance) +
                        ", gyro: " + String.format("%.4f", avgGyro) + ")");
             return ActivityType.STATIONARY;
         }
         
         if (isPerfectlyStill && meetsStationarySensorCriteria) {
-            Log.d(TAG, "Detected: STATIONARY (perfectly still on surface - accel: " + String.format("%.2f", avgAccel) +
+            logDebug( "Detected: STATIONARY (perfectly still on surface - accel: " + String.format("%.2f", avgAccel) +
                        ", variance: " + String.format("%.4f", accelVariance) +
                        ", gyro: " + String.format("%.4f", avgGyro) +
                        ", orientation: " + orientation +
@@ -654,7 +663,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         
         // If sensors show some movement (even tiny), it's likely being held
         if (meetsStationarySensorCriteria && !isPerfectlyStill) {
-            Log.d(TAG, "Detected: ON_PHONE (slight movement detected - orientation: " + orientation +
+            logDebug( "Detected: ON_PHONE (slight movement detected - orientation: " + orientation +
                        ", variance: " + String.format("%.4f", accelVariance) +
                        ", gyro: " + String.format("%.4f", avgGyro) + ")");
             return ActivityType.ON_PHONE;
@@ -670,7 +679,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         
         // HIGH CONFIDENCE: HAND position = definitely being used (research paper finding)
         if (position == PhonePosition.HAND) {
-            Log.d(TAG, "Detected: ON_PHONE (HAND position - variance: " + String.format("%.4f", accelVariance) +
+            logDebug( "Detected: ON_PHONE (HAND position - variance: " + String.format("%.4f", accelVariance) +
                        ", gyro: " + String.format("%.4f", avgGyro) + ")");
             return ActivityType.ON_PHONE;
         }
@@ -681,7 +690,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
             (avgGyro > 0.003 || accelVariance > 0.005)) {
             // If orientation confirms phone use, definitely ON_PHONE
             if (orientationSuggestsPhoneUse) {
-                Log.d(TAG, "Detected: ON_PHONE (held + " + orientation + " - accel: " + String.format("%.2f", avgAccel) +
+                logDebug( "Detected: ON_PHONE (held + " + orientation + " - accel: " + String.format("%.2f", avgAccel) +
                            ", variance: " + String.format("%.4f", accelVariance) +
                            ", gyro: " + String.format("%.4f", avgGyro) +
                            ", position: " + position + ")");
@@ -693,7 +702,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         // If there's gyro movement above sensor noise AND portrait/landscape orientation
         // Hand tremors typically create gyro > 0.003 (above table noise of ~0.002)
         if (avgGyro > 0.003 && orientationSuggestsPhoneUse) {
-            Log.d(TAG, "Detected: ON_PHONE (" + orientation + " with micro-movements - variance: " + String.format("%.4f", accelVariance) +
+            logDebug( "Detected: ON_PHONE (" + orientation + " with micro-movements - variance: " + String.format("%.4f", accelVariance) +
                        ", gyro: " + String.format("%.4f", avgGyro) + ")");
             return ActivityType.ON_PHONE;
         }
@@ -701,14 +710,14 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         // Default to ON_PHONE for any other low movement WITH phone-use orientation
         // This catches edge cases like reading while phone is held still
         if ((accelVariance <= STATIONARY_VARIANCE_THRESHOLD || avgGyro <= 0.15) && orientationSuggestsPhoneUse) {
-            Log.d(TAG, "Detected: ON_PHONE (" + orientation + " holding or low movement - variance: " + String.format("%.4f", accelVariance) +
+            logDebug( "Detected: ON_PHONE (" + orientation + " holding or low movement - variance: " + String.format("%.4f", accelVariance) +
                        ", gyro: " + String.format("%.4f", avgGyro) + ")");
             return ActivityType.ON_PHONE;
         }
 
         // Any other movement should be ON_PHONE (phone handling, gestures, etc.)
         if (avgGyro > 0.15 || accelVariance > STATIONARY_VARIANCE_THRESHOLD) {
-            Log.d(TAG, "Detected: ON_PHONE (device handling - variance: " + String.format("%.2f", accelVariance) +
+            logDebug( "Detected: ON_PHONE (device handling - variance: " + String.format("%.2f", accelVariance) +
                        ", gyro: " + String.format("%.2f", avgGyro) + ")");
             return ActivityType.ON_PHONE;
         }
@@ -717,14 +726,14 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         // It's not walking, running, driving, or truly stationary
         // Better to show ON_PHONE than UNKNOWN (more useful feedback)
         if (avgGyro > 0 || accelVariance > 0) {
-            Log.d(TAG, "Detected: ON_PHONE (fallback - has movement but unclear pattern - variance: " + 
+            logDebug( "Detected: ON_PHONE (fallback - has movement but unclear pattern - variance: " + 
                        String.format("%.2f", accelVariance) + ", gyro: " + String.format("%.2f", avgGyro) + 
                        ", orientation: " + orientation + ")");
             return ActivityType.ON_PHONE;
         }
         
         // Final fallback - should almost never reach here
-        Log.d(TAG, "Detected: UNKNOWN (no movement detected - variance: " + String.format("%.2f", accelVariance) +
+        logDebug( "Detected: UNKNOWN (no movement detected - variance: " + String.format("%.2f", accelVariance) +
                    ", gyro: " + String.format("%.2f", avgGyro) + ")");
         return ActivityType.UNKNOWN;
     }
@@ -767,7 +776,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        Log.d(TAG, "Sensor accuracy changed: " + sensor.getName() + " = " + accuracy);
+        logDebug( "Sensor accuracy changed: " + sensor.getName() + " = " + accuracy);
     }
     
     // LocationListener implementation
@@ -786,17 +795,17 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     
     @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {
-        Log.d(TAG, "Location provider status changed: " + provider + " = " + status);
+        logDebug( "Location provider status changed: " + provider + " = " + status);
     }
     
     @Override
     public void onProviderEnabled(String provider) {
-        Log.d(TAG, "Location provider enabled: " + provider);
+        logDebug( "Location provider enabled: " + provider);
     }
     
     @Override
     public void onProviderDisabled(String provider) {
-        Log.d(TAG, "Location provider disabled: " + provider);
+        logDebug( "Location provider disabled: " + provider);
     }
     
     /**
@@ -864,7 +873,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         double rollVariance = (sumRollSq / count) - (avgRoll * avgRoll);
         double orientationVariance = pitchVariance + rollVariance; // Combined orientation change
         
-        Log.d(TAG, String.format("Position Detection - Pitch: %.1f°(var:%.1f), Roll: %.1f°(var:%.1f), AccelVar: %.3f, Gyro: %.3f",
+        logDebug( String.format("Position Detection - Pitch: %.1f°(var:%.1f), Roll: %.1f°(var:%.1f), AccelVar: %.3f, Gyro: %.3f",
               avgPitch, pitchVariance, avgRoll, rollVariance, accelVariance, avgGyro));
         
         // DESK detection: Flat orientation + minimal movement + VERY stable orientation
@@ -876,7 +885,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         boolean isMinimalMovement = accelVariance < 0.01 && avgGyro < 0.01;
         
         if (isFlatOrientation && isVeryStableOrientation && isMinimalMovement) {
-            Log.d(TAG, "Position: DESK (flat + very stable + minimal movement)");
+            logDebug( "Position: DESK (flat + very stable + minimal movement)");
             return PhonePosition.DESK;
         }
         
@@ -889,7 +898,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         boolean hasLimitedRotation = avgGyro < 0.8; // Less rotation than active use
         
         if (isVerticalOrientation && hasRhythmicMovement && isStableInPocket && hasLimitedRotation) {
-            Log.d(TAG, "Position: POCKET (vertical + rhythmic + stable angles)");
+            logDebug( "Position: POCKET (vertical + rhythmic + stable angles)");
             return PhonePosition.POCKET;
         }
         
@@ -900,7 +909,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         boolean hasActiveMovement = (accelVariance > 0.1 || avgGyro > 0.2); // Active handling
         
         if (hasFrequentOrientationChanges && hasActiveMovement) {
-            Log.d(TAG, "Position: HAND (frequent orientation changes + active movement)");
+            logDebug( "Position: HAND (frequent orientation changes + active movement)");
             return PhonePosition.HAND;
         }
         
@@ -913,7 +922,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         boolean hasSmallOrientationChanges = orientationVariance >= 5 && orientationVariance < 150; // Some micro-movements
         
         if (isViewingAngle && (hasLowButNonZeroMovement || hasSmallOrientationChanges)) {
-            Log.d(TAG, "Position: HAND (viewing angle " + String.format("%.1f", avgPitch) + 
+            logDebug( "Position: HAND (viewing angle " + String.format("%.1f", avgPitch) + 
                   "° + steady holding)");
             return PhonePosition.HAND;
         }
@@ -921,23 +930,23 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         // Fallback: Use simple heuristics
         // High variance + high gyro = likely HAND
         if (accelVariance > 0.4 && avgGyro > 0.4) {
-            Log.d(TAG, "Position: HAND (fallback - high variance + gyro)");
+            logDebug( "Position: HAND (fallback - high variance + gyro)");
             return PhonePosition.HAND;
         }
         
         // Very low movement + angled = likely HAND (held still)
         if (isViewingAngle && accelVariance < 0.05 && avgGyro < 0.05) {
-            Log.d(TAG, "Position: HAND (fallback - angled + very low movement = held still)");
+            logDebug( "Position: HAND (fallback - angled + very low movement = held still)");
             return PhonePosition.HAND;
         }
         
         // Very low movement + flat orientation = likely DESK
         if (isFlatOrientation && accelVariance < 0.05 && avgGyro < 0.05) {
-            Log.d(TAG, "Position: DESK (fallback - flat + very low movement)");
+            logDebug( "Position: DESK (fallback - flat + very low movement)");
             return PhonePosition.DESK;
         }
         
-        Log.d(TAG, "Position: UNKNOWN (doesn't match clear patterns)");
+        logDebug( "Position: UNKNOWN (doesn't match clear patterns)");
         return PhonePosition.UNKNOWN;
     }
     
@@ -977,7 +986,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         double absZ = Math.abs(avgZ);
         
         // DEBUG: Log actual axis values to diagnose orientation issues
-        Log.d(TAG, String.format("Orientation Axes - X:%.2f, Y:%.2f, Z:%.2f (abs: X:%.2f, Y:%.2f, Z:%.2f)", 
+        logDebug( String.format("Orientation Axes - X:%.2f, Y:%.2f, Z:%.2f (abs: X:%.2f, Y:%.2f, Z:%.2f)", 
               avgX, avgY, avgZ, absX, absY, absZ));
         
         // Determine dominant axis (check FLAT first - most reliable)
@@ -987,7 +996,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         
         // FLAT detection - Y-axis dominant (RELAXED threshold for better detection)
         if (absY > 7.0 && absY > absX * 1.2 && absY > absZ * 1.2) {
-            Log.d(TAG, "Orientation: FLAT (Y-axis dominant: " + String.format("%.2f", absY) + ")");
+            logDebug( "Orientation: FLAT (Y-axis dominant: " + String.format("%.2f", absY) + ")");
             return avgY > 0 ? PhoneOrientation.FLAT_UP : PhoneOrientation.FLAT_DOWN;
         } 
         // PORTRAIT detection - Z-axis dominant
