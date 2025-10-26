@@ -113,7 +113,8 @@
       "Read(//Users/smarterai/Desktop/**)",
       "Bash(kill:*)",
       "WebSearch",
-      "Read(//Users/smarterai/Documents/GitHub/material-components-android-master/**)"
+      "Read(//Users/smarterai/Documents/GitHub/material-components-android-master/**)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

@@ -1310,30 +1310,86 @@ class PrayerSettingsRepository @Inject constructor(
             Log.i(TAG, "🔄 Method mapping complete:")
             Log.i(TAG, "   - Mapped to: ${calculationMethod.displayName}")
             Log.i(TAG, "   - Asr method: ${asrMadhhab.displayName}")
-            
-            // 6. Extract custom angles if available
-            val customFajrAngle = countryEntry["customFajrAngle"]?.jsonPrimitive?.doubleOrNull
-            val customIshaAngle = countryEntry["customIshaAngle"]?.jsonPrimitive?.doubleOrNull
-            val customIshaDelay = countryEntry["customIshaDelay"]?.jsonPrimitive?.intOrNull
-            
-            if (customFajrAngle != null || customIshaAngle != null || customIshaDelay != null) {
-                Log.i(TAG, "⚙️ Custom angles found:")
-                Log.i(TAG, "   - Custom Fajr angle: $customFajrAngle°")
-                Log.i(TAG, "   - Custom Isha angle: $customIshaAngle°")
-                Log.i(TAG, "   - Custom Isha delay: $customIshaDelay min")
+
+            // 6. Extract calculation parameters with method defaults, then override if country specifies
+            // IMPORTANT: Angles go to root, Offsets go to timeOffsets
+
+            // Step 1: Get calculation method defaults
+            val methodFajrAngle = calculationMethod.fajrAngle
+            val methodIshaAngle = calculationMethod.ishaAngle
+            val methodMaghribOffset = calculationMethod.maghribOffset
+            val methodIshaOffset = calculationMethod.ishaDelay  // This is actually an offset, not an angle
+
+            Log.i(TAG, "📐 Calculation Method Defaults:")
+            Log.i(TAG, "   - Fajr angle: $methodFajrAngle°")
+            Log.i(TAG, "   - Isha angle: $methodIshaAngle°")
+            Log.i(TAG, "   - Maghrib offset: $methodMaghribOffset min")
+            Log.i(TAG, "   - Isha offset: $methodIshaOffset min")
+
+            // Step 2: Override ANGLES with country-specific values if present
+            val customFajrAngle = countryEntry["customFajrAngle"]?.jsonPrimitive?.doubleOrNull ?: methodFajrAngle
+            val customIshaAngle = countryEntry["customIshaAngle"]?.jsonPrimitive?.doubleOrNull ?: methodIshaAngle
+
+            // Check if country overrode angle values
+            val fajrOverridden = countryEntry["customFajrAngle"] != null
+            val ishaAngleOverridden = countryEntry["customIshaAngle"] != null
+
+            // Step 3: Extract time offsets (country JSON + method offsets + user adjustments)
+            val timeOffsetsJson = countryEntry["timeOffsets"]?.jsonObject
+            val countryTimeOffsets = PrayerTimeOffsets(
+                fajr = timeOffsetsJson?.get("fajr")?.jsonPrimitive?.intOrNull ?: 0,
+                sunrise = timeOffsetsJson?.get("sunrise")?.jsonPrimitive?.intOrNull ?: 0,
+                dhuhr = timeOffsetsJson?.get("dhuhr")?.jsonPrimitive?.intOrNull ?: 0,
+                asr = timeOffsetsJson?.get("asr")?.jsonPrimitive?.intOrNull ?: 0,
+                maghrib = timeOffsetsJson?.get("maghrib")?.jsonPrimitive?.intOrNull ?: (methodMaghribOffset),
+                isha = timeOffsetsJson?.get("isha")?.jsonPrimitive?.intOrNull ?: (methodIshaOffset ?: 0)
+            )
+
+            // Log calculation angles (show which were overridden by country)
+            if (fajrOverridden || ishaAngleOverridden) {
+                Log.i(TAG, "⚙️ COUNTRY-SPECIFIC ANGLE OVERRIDES found:")
+                if (fajrOverridden) Log.i(TAG, "   - Fajr angle: $customFajrAngle° (OVERRIDDEN from $methodFajrAngle°)")
+                else Log.i(TAG, "   - Fajr angle: $customFajrAngle° (from method)")
+
+                if (ishaAngleOverridden) Log.i(TAG, "   - Isha angle: $customIshaAngle° (OVERRIDDEN from $methodIshaAngle°)")
+                else Log.i(TAG, "   - Isha angle: $customIshaAngle° (from method)")
+            } else {
+                Log.i(TAG, "⚙️ CALCULATION ANGLES: Using calculation method defaults")
+                Log.i(TAG, "   - Fajr angle: $customFajrAngle° (from method)")
+                Log.i(TAG, "   - Isha angle: $customIshaAngle° (from method)")
+            }
+
+            // Log time offsets (show which values came from where)
+            val hasNonZeroOffsets = countryTimeOffsets.fajr != 0 || countryTimeOffsets.sunrise != 0 ||
+                                    countryTimeOffsets.dhuhr != 0 || countryTimeOffsets.asr != 0 ||
+                                    countryTimeOffsets.maghrib != 0 || countryTimeOffsets.isha != 0
+
+            if (hasNonZeroOffsets) {
+                Log.i(TAG, "⚙️ TIME OFFSETS (from method offsets + country adjustments):")
+                if (countryTimeOffsets.fajr != 0) Log.i(TAG, "   - Fajr: ${countryTimeOffsets.fajr} min")
+                if (countryTimeOffsets.sunrise != 0) Log.i(TAG, "   - Sunrise: ${countryTimeOffsets.sunrise} min")
+                if (countryTimeOffsets.dhuhr != 0) Log.i(TAG, "   - Dhuhr: ${countryTimeOffsets.dhuhr} min")
+                if (countryTimeOffsets.asr != 0) Log.i(TAG, "   - Asr: ${countryTimeOffsets.asr} min")
+                if (countryTimeOffsets.maghrib != 0) Log.i(TAG, "   - Maghrib: ${countryTimeOffsets.maghrib} min (from method)")
+                if (countryTimeOffsets.isha != 0) Log.i(TAG, "   - Isha: ${countryTimeOffsets.isha} min (from method)")
+            } else {
+                Log.i(TAG, "⚙️ TIME OFFSETS: All zero")
             }
             
-            // 7. Create prayer settings with default values (legacy compatibility)
+            // 8. Create prayer settings with country-specific overrides
+            // IMPORTANT: Angles stored at root, Offsets stored in timeOffsets
             val autoDetectedSettings = PrayerSettings(
                 calculationMethod = calculationMethod,
                 asrMadhhab = asrMadhhab,
                 customFajrAngle = customFajrAngle,
                 customIshaAngle = customIshaAngle,
-                customIshaDelay = customIshaDelay,
+                customIshaDelay = null,  // Not used - Isha offset goes to timeOffsets.isha
+                // Time offsets include method offsets (maghrib, isha) + country adjustments
+                timeOffsets = countryTimeOffsets,
                 // Set auto-detection metadata for restore button functionality
                 isMethodAutoDetected = true,
                 isMadhhabAutoDetected = true,
-                areCustomAnglesAutoDetected = (customFajrAngle != null || customIshaAngle != null || customIshaDelay != null),
+                areCustomAnglesAutoDetected = (fajrOverridden || ishaAngleOverridden),
                 autoDetectedCountryName = countryName,
                 autoDetectedCountryCode = countryCode
             )
@@ -1343,14 +1399,11 @@ class PrayerSettingsRepository @Inject constructor(
             Log.i(TAG, "📊 FINAL AUTO-DETECTED SETTINGS FOR $countryName:")
             Log.i(TAG, "   🕌 Calculation Method: ${autoDetectedSettings.calculationMethod.name} (${autoDetectedSettings.calculationMethod.displayName})")
             Log.i(TAG, "   🤲 Asr Madhhab: ${autoDetectedSettings.asrMadhhab.name} (${autoDetectedSettings.asrMadhhab.displayName})")
-            Log.i(TAG, "   🌅 Custom Fajr Angle: ${autoDetectedSettings.customFajrAngle ?: "null"}")
-            Log.i(TAG, "   🌙 Custom Isha Angle: ${autoDetectedSettings.customIshaAngle ?: "null"}")
-            Log.i(TAG, "   ⏰ Custom Isha Delay: ${autoDetectedSettings.customIshaDelay ?: "null"}")
-            Log.i(TAG, "   🔧 Time Adjustments: ALL DEFAULTS (Fajr=${autoDetectedSettings.timeOffsets.fajr}, Sunrise=${autoDetectedSettings.timeOffsets.sunrise}, Dhuhr=${autoDetectedSettings.timeOffsets.dhuhr}, Asr=${autoDetectedSettings.timeOffsets.asr}, Maghrib=${autoDetectedSettings.timeOffsets.maghrib}, Isha=${autoDetectedSettings.timeOffsets.isha})")
+            Log.i(TAG, "   🌅 Fajr Angle: ${autoDetectedSettings.customFajrAngle}° ${if (fajrOverridden) "(country override)" else "(from method)"}")
+            Log.i(TAG, "   🌙 Isha Angle: ${autoDetectedSettings.customIshaAngle}° ${if (ishaAngleOverridden) "(country override)" else "(from method)"}")
+            Log.i(TAG, "   ⏰ Time Offsets: Fajr=${autoDetectedSettings.timeOffsets.fajr}, Sunrise=${autoDetectedSettings.timeOffsets.sunrise}, Dhuhr=${autoDetectedSettings.timeOffsets.dhuhr}, Asr=${autoDetectedSettings.timeOffsets.asr}, Maghrib=${autoDetectedSettings.timeOffsets.maghrib} (method), Isha=${autoDetectedSettings.timeOffsets.isha} (method)")
             Log.i(TAG, "   🧭 High Latitude Method: ${autoDetectedSettings.highLatitudeAdjustment.name}")
             Log.i(TAG, "   📍 Use GPS: ${autoDetectedSettings.useGpsLocation} (default)")
-            Log.i(TAG, "   🕌 Method: ${autoDetectedSettings.calculationMethod.displayName}")
-            Log.i(TAG, "   🤲 Madhhab: ${autoDetectedSettings.asrMadhhab.displayName}")
             Log.i(TAG, "   🌍 Detected for Country: $countryName ($countryCode)")
             Log.i(TAG, "   📄 Generated Settings JSON:")
             Log.i(TAG, "   🔥 JSON CONTENT:")
