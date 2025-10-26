@@ -46,13 +46,13 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     // Activity detection thresholds - Improved to distinguish walking from running and phone pickup
     // Widened variance range to catch more walking patterns (slow, normal, fast)
     private static final double WALKING_VARIANCE_MIN = 0.4; // Minimum variance for walking (reduced for slow/careful walking)
-    private static final double WALKING_VARIANCE_MAX = 2.5; // Maximum variance for walking
+    private static final double WALKING_VARIANCE_MAX = 4.0; // Maximum variance for walking (increased from 2.5 - normal walking can reach 3.0+)
     private static final double WALKING_GYRO_MIN = 0.3; // Minimum gyro for walking (reduced for phone in pocket)
     private static final double WALKING_GYRO_MAX = 1.8; // Maximum gyro for walking
     private static final double WALKING_SPEED_MIN = 0.3; // m/s (1 km/h) - minimum speed to distinguish from phone pickup
     private static final double WALKING_SPEED_MAX = 2.5; // m/s (~9 km/h, typical walking speed is 1.4 m/s)
 
-    private static final double RUNNING_VARIANCE_MIN = 2.0; // Minimum variance for running (higher impact)
+    private static final double RUNNING_VARIANCE_MIN = 3.5; // Minimum variance for running (higher impact) - increased to match new walking max
     private static final double RUNNING_GYRO_MIN = 1.5; // Minimum gyro for running (more rotational movement)
     private static final double RUNNING_SPEED_MIN = 2.0; // m/s (~7 km/h, typical running starts at 6 km/h)
 
@@ -507,8 +507,14 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
      * 6. ON_PHONE (fallback) - Any other movement patterns
      */
     private ActivityType determineActivity(double avgAccel, double accelVariance, double avgGyro, double maxSpeed, PhoneOrientation orientation, PhonePosition position) {
-        Log.d(TAG, String.format("Activity Analysis - Accel: %.2f, Variance: %.2f, Gyro: %.2f, Speed: %.2f m/s, Orientation: %s, Position: %s",
-                avgAccel, accelVariance, avgGyro, maxSpeed, orientation, position));
+        Log.d(TAG, "═══════════════════════════════════════════════════════");
+        Log.d(TAG, String.format("📊 ACTIVITY ANALYSIS:"));
+        Log.d(TAG, String.format("  • Accel Avg: %.3f (gravity: %.1f)", avgAccel, GRAVITY_ACCEL));
+        Log.d(TAG, String.format("  • Accel Variance: %.3f", accelVariance));
+        Log.d(TAG, String.format("  • Gyro Avg: %.3f", avgGyro));
+        Log.d(TAG, String.format("  • Max Speed: %.2f m/s (%.1f km/h)", maxSpeed, maxSpeed * 3.6));
+        Log.d(TAG, String.format("  • Orientation: %s", orientation));
+        Log.d(TAG, String.format("  • Position: %s", position));
 
         // 1. High speed indicates DRIVING (most reliable indicator)
         if (maxSpeed > DRIVING_SPEED_THRESHOLD) {
@@ -556,12 +562,30 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
                                               orientation == PhoneOrientation.IN_POCKET ||
                                               orientation == PhoneOrientation.UNKNOWN); // Unknown could be pocket
 
+        // Log walking detection thresholds for debugging
+        Log.d(TAG, "🚶 WALKING DETECTION CHECKS:");
+        Log.d(TAG, String.format("  • Walking Variance: %.3f (range: %.1f-%.1f) - %s", 
+                accelVariance, WALKING_VARIANCE_MIN, WALKING_VARIANCE_MAX, 
+                hasWalkingVariance ? "✓ PASS" : "✗ FAIL"));
+        Log.d(TAG, String.format("  • Walking Gyro: %.3f (range: %.1f-%.1f) - %s", 
+                avgGyro, WALKING_GYRO_MIN, WALKING_GYRO_MAX, 
+                hasWalkingGyro ? "✓ PASS" : "✗ FAIL"));
+        Log.d(TAG, String.format("  • Walking Speed: %.2f m/s (range: %.1f-%.1f) - %s", 
+                maxSpeed, WALKING_SPEED_MIN, WALKING_SPEED_MAX, 
+                hasWalkingSpeed ? "✓ PASS" : "✗ FAIL"));
+        Log.d(TAG, String.format("  • Minimal Gyro: %.3f (min: %.2f) - %s", 
+                avgGyro, 0.15, 
+                hasMinimalGyro ? "✓ PASS" : "✗ FAIL"));
+        Log.d(TAG, String.format("  • GPS Available: %s", hasGPSData ? "YES" : "NO"));
+        Log.d(TAG, String.format("  • Position Suggests Walking: %s (%s)", 
+                positionSuggestsWalking ? "YES" : "NO", position));
+        Log.d(TAG, String.format("  • Orientation Suggests Walking: %s (%s)", 
+                orientationSuggestsWalking ? "YES" : "NO", orientation));
+        
         // ENHANCED Walking detection with position awareness:
         // HIGH CONFIDENCE: POCKET position + rhythmic variance = definitely walking
         if (position == PhonePosition.POCKET && hasWalkingVariance) {
-            Log.d(TAG, "Detected: WALKING (POCKET position + rhythmic variance: " + String.format("%.2f", accelVariance) +
-                       ", gyro: " + String.format("%.2f", avgGyro) +
-                       ", speed: " + String.format("%.2f", maxSpeed) + " m/s)");
+            Log.d(TAG, "✅ Detected: WALKING (POCKET + rhythmic variance)");
             return ActivityType.WALKING;
         }
         
@@ -574,25 +598,27 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
                 // GPS available - variance + (gyro OR speed) for confidence
                 // This allows walking detection even with low gyro if speed confirms it
                 if (hasWalkingSpeed || hasWalkingGyro) {
-                    Log.d(TAG, "Detected: WALKING (GPS) (variance: " + String.format("%.2f", accelVariance) +
-                               ", gyro: " + String.format("%.2f", avgGyro) +
-                               ", speed: " + String.format("%.2f", maxSpeed) + " m/s" +
-                               ", orientation: " + orientation +
-                               ", position: " + position + ")");
+                    Log.d(TAG, "✅ Detected: WALKING (GPS confirmed)");
                     return ActivityType.WALKING;
+                } else {
+                    Log.d(TAG, "⚠️ Walking variance detected but speed/gyro don't confirm");
                 }
             } else {
                 // No GPS - trust variance pattern more!
                 // Walking has very distinctive rhythmic variance (0.4-2.5) from footsteps
                 // Even with minimal gyro (looking at phone while walking), variance shows walking
                 if (hasMinimalGyro) {
-                    Log.d(TAG, "Detected: WALKING (sensors) (variance: " + String.format("%.2f", accelVariance) +
-                               ", gyro: " + String.format("%.2f", avgGyro) +
-                               ", speed: N/A (no GPS)" +
-                               ", orientation: " + orientation +
-                               ", position: " + position + ")");
+                    Log.d(TAG, "✅ Detected: WALKING (sensor-based, no GPS)");
                     return ActivityType.WALKING;
+                } else {
+                    Log.d(TAG, String.format("⚠️ Walking variance detected but gyro too low (%.3f < 0.15)", avgGyro));
                 }
+            }
+        } else {
+            if (!hasWalkingVariance) {
+                Log.d(TAG, "⚠️ Walking NOT detected: Variance out of range");
+            } else if (!orientationSuggestsWalking && !positionSuggestsWalking) {
+                Log.d(TAG, "⚠️ Walking NOT detected: Orientation and position don't suggest walking");
             }
         }
 
