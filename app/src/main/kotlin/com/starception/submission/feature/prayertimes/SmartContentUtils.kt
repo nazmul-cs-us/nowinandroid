@@ -406,7 +406,10 @@ object SmartContentUtils {
     ): NotificationSyncContent? {
         return try {
             val times = prayerTimes ?: return null
-            
+
+            android.util.Log.d("SmartPrediction", "🔔 getNotificationSyncContent called at $currentTime")
+            android.util.Log.d("SmartPrediction", "📅 Prayer times: Fajr=${times.fajr}, Dhuhr=${times.dhuhr}, Asr=${times.asr}, Maghrib=${times.maghrib}, Isha=${times.isha}")
+
             // Find current and next prayer using the same logic as notification service
             val allPrayers = listOf(
                 "Fajr" to times.fajr,
@@ -415,11 +418,13 @@ object SmartContentUtils {
                 "Maghrib" to times.maghrib,
                 "Isha" to times.isha
             )
-            
+
             // Find current prayer (the most recent prayer that has passed)
-            val currentPrayer = allPrayers.findLast { (_, time) -> 
+            val currentPrayer = allPrayers.findLast { (_, time) ->
                 currentTime.isAfter(time)
             }
+
+            android.util.Log.d("SmartPrediction", "🕌 Current prayer (last passed): ${currentPrayer?.first ?: "None"}")
             
             // Find next prayer (the next upcoming prayer)
             val nextPrayerToday = allPrayers.find { (_, time) -> 
@@ -444,18 +449,23 @@ object SmartContentUtils {
                 val (prayerName, prayerTime) = currentPrayer
                 val elapsedDuration = Duration.between(prayerTime, currentTime)
                 val elapsedMinutes = elapsedDuration.toMinutes()
-                
+
+                android.util.Log.d("SmartPrediction", "⏱️ Elapsed since $prayerName: $elapsedMinutes minutes")
+
                 // Format elapsed time exactly like notification service
                 val elapsedText = formatNotificationElapsedTime(elapsedMinutes)
                 val content = "$elapsedText since $prayerName"
-                
+
                 // Calculate prayer phase (exact same logic and format as notification service)
                 val title = when {
                     elapsedMinutes <= 20 -> "Go to Mosque for $prayerName"
                     elapsedMinutes <= 60 -> "Best Time to Pray $prayerName"
                     else -> "Make Time for $prayerName"
                 }
-                
+
+                android.util.Log.d("SmartPrediction", "📝 Generated title: $title")
+                android.util.Log.d("SmartPrediction", "📝 Generated content: $content")
+
                 // Next prayer countdown with "Next •" format to match notification exactly
                 val nextPrayerText = if (nextPrayer != null) {
                     val (nextName, nextTime) = nextPrayer
@@ -471,14 +481,17 @@ object SmartContentUtils {
                     val nextFormatted = formatNotificationTimeRemaining(timeUntilNext)
                     "Next • $nextName in $nextFormatted"
                 } else ""
-                
+
+                android.util.Log.d("SmartPrediction", "📝 Next prayer info: $nextPrayerText")
+
                 return NotificationSyncContent(
                     title = title,
                     content = content,
                     nextPrayerInfo = nextPrayerText
                 )
             }
-            
+
+            android.util.Log.d("SmartPrediction", "❌ No content generated - currentPrayer=${currentPrayer?.first}, nextPrayer=${nextPrayer?.first}")
             return null
         } catch (e: Exception) {
             null
