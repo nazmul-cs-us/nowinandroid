@@ -1157,11 +1157,25 @@ class PrayerSettingsRepository @Inject constructor(
      * Get cached country code from current location settings
      */
     fun getCachedCountry(): String? {
+        Log.i(TAG, "🔍 CACHED COUNTRY DEBUG:")
+
+        // PRIORITY 1: Try to get country from cached prayer settings (auto-detected)
+        val cachedSettings = getCachedPrayerSettings()
+        val autoDetectedCode = cachedSettings?.autoDetectedCountryCode
+
+        if (!autoDetectedCode.isNullOrEmpty()) {
+            Log.i(TAG, "   ✅ PRIORITY 1: Found auto-detected country code in cached settings: $autoDetectedCode")
+            Log.i(TAG, "   - Country name: ${cachedSettings?.autoDetectedCountryName}")
+            Log.i(TAG, "   - Returning country code: $autoDetectedCode")
+            return autoDetectedCode
+        }
+        Log.i(TAG, "   - No auto-detected country code in cached settings")
+
+        // PRIORITY 2: Try to get country from location preferences
         val currentLocation = getLocationPreferences().location
         val countryCode = currentLocation?.countryCode
         val countryName = currentLocation?.country
-        
-        Log.i(TAG, "🔍 CACHED COUNTRY DEBUG:")
+
         Log.i(TAG, "   - Has location: ${currentLocation != null}")
         if (currentLocation != null) {
             Log.i(TAG, "   - Location city: ${currentLocation.city}")
@@ -1171,21 +1185,21 @@ class PrayerSettingsRepository @Inject constructor(
             Log.i(TAG, "   - Location lat/lng: ${currentLocation.latitude}, ${currentLocation.longitude}")
             Log.i(TAG, "   - Location timezone: ${currentLocation.timeZoneOffset}")
         }
-        
+
         // Prefer country code from geocoding API, fallback to country name mapping
         val result = if (!countryCode.isNullOrEmpty()) {
-            Log.i(TAG, "   - Using country code from geocoding: $countryCode")
+            Log.i(TAG, "   ✅ PRIORITY 2: Using country code from location geocoding: $countryCode")
             countryCode
         } else if (!countryName.isNullOrEmpty()) {
             Log.i(TAG, "   - No country code available, trying to map country name: $countryName")
             Log.i(TAG, "   🔧 USING COUNTRY CODE MAPPER FOR AUTO-DETECTION:")
-            
+
             // Use CountryCodeMapper to resolve country name to ISO code
             val mappedCode = com.starception.submission.prayer.service.CountryCodeMapper.resolveCountryCode(
                 null, // no geocoder code
                 countryName // use country name for mapping
             )
-            
+
             if (mappedCode.isNotEmpty()) {
                 Log.i(TAG, "   ✅ MAPPED COUNTRY NAME: '$countryName' → '$mappedCode'")
                 Log.i(TAG, "   🎯 SUCCESS: Auto-detection can proceed with country code '$mappedCode'")
@@ -1196,10 +1210,10 @@ class PrayerSettingsRepository @Inject constructor(
                 null
             }
         } else {
-            Log.w(TAG, "   ❌ No country code or country name available")
+            Log.w(TAG, "   ❌ No country code or country name available from location")
             null
         }
-        
+
         Log.i(TAG, "   - Returning country code: $result")
         return result
     }
@@ -1745,19 +1759,36 @@ class PrayerSettingsRepository @Inject constructor(
         Log.i(TAG, "   🕌 Method: ${cachedSettings.calculationMethod.displayName}")
         Log.i(TAG, "   🤲 Madhhab: ${cachedSettings.asrMadhhab.displayName}")
         
-        // STEP 4: Compare JSON strings (as specified in algorithm)
+        // STEP 4: Compare ONLY calculation-related fields (not location, notifications, etc.)
         Log.i(TAG, "")
-        Log.i(TAG, "⚖️ STEP 4: Compare JSON strings (cached vs auto-detected)")
-        val autoDetectedJson = json.encodeToString(autoDetectedSettings)
-        val cachedJson = json.encodeToString(cachedSettings)
-        
-        Log.i(TAG, "📄 Auto-detected JSON (${autoDetectedJson.length} chars):")
-        Log.i(TAG, "   ${autoDetectedJson.take(200)}${if (autoDetectedJson.length > 200) "..." else ""}")
-        
-        Log.i(TAG, "📄 Cached JSON (${cachedJson.length} chars):")
-        Log.i(TAG, "   ${cachedJson.take(200)}${if (cachedJson.length > 200) "..." else ""}")
-        
-        val areIdentical = autoDetectedJson == cachedJson
+        Log.i(TAG, "⚖️ STEP 4: Compare calculation-related fields (cached vs auto-detected)")
+        Log.i(TAG, "   💡 Comparing: calculationMethod, asrMadhhab, customFajrAngle, customIshaAngle, customIshaDelay, timeOffsets")
+
+        // Compare each calculation-related field
+        val methodMatch = cachedSettings.calculationMethod == autoDetectedSettings.calculationMethod
+        val madhhabMatch = cachedSettings.asrMadhhab == autoDetectedSettings.asrMadhhab
+        val fajrAngleMatch = cachedSettings.customFajrAngle == autoDetectedSettings.customFajrAngle
+        val ishaAngleMatch = cachedSettings.customIshaAngle == autoDetectedSettings.customIshaAngle
+        val ishaDelayMatch = cachedSettings.customIshaDelay == autoDetectedSettings.customIshaDelay
+        val timeOffsetsMatch = cachedSettings.timeOffsets == autoDetectedSettings.timeOffsets
+
+        Log.i(TAG, "📊 Field-by-field comparison:")
+        Log.i(TAG, "   - calculationMethod: ${if (methodMatch) "✅ MATCH" else "❌ DIFFERENT"} (cached=${cachedSettings.calculationMethod.name}, auto=${autoDetectedSettings.calculationMethod.name})")
+        Log.i(TAG, "   - asrMadhhab: ${if (madhhabMatch) "✅ MATCH" else "❌ DIFFERENT"} (cached=${cachedSettings.asrMadhhab.name}, auto=${autoDetectedSettings.asrMadhhab.name})")
+        Log.i(TAG, "   - customFajrAngle: ${if (fajrAngleMatch) "✅ MATCH" else "❌ DIFFERENT"} (cached=${cachedSettings.customFajrAngle}, auto=${autoDetectedSettings.customFajrAngle})")
+        Log.i(TAG, "   - customIshaAngle: ${if (ishaAngleMatch) "✅ MATCH" else "❌ DIFFERENT"} (cached=${cachedSettings.customIshaAngle}, auto=${autoDetectedSettings.customIshaAngle})")
+        Log.i(TAG, "   - customIshaDelay: ${if (ishaDelayMatch) "✅ MATCH" else "❌ DIFFERENT"} (cached=${cachedSettings.customIshaDelay}, auto=${autoDetectedSettings.customIshaDelay})")
+        Log.i(TAG, "   - timeOffsets: ${if (timeOffsetsMatch) "✅ MATCH" else "❌ DIFFERENT"}")
+        if (!timeOffsetsMatch) {
+            Log.i(TAG, "     • fajr: cached=${cachedSettings.timeOffsets.fajr}, auto=${autoDetectedSettings.timeOffsets.fajr}")
+            Log.i(TAG, "     • sunrise: cached=${cachedSettings.timeOffsets.sunrise}, auto=${autoDetectedSettings.timeOffsets.sunrise}")
+            Log.i(TAG, "     • dhuhr: cached=${cachedSettings.timeOffsets.dhuhr}, auto=${autoDetectedSettings.timeOffsets.dhuhr}")
+            Log.i(TAG, "     • asr: cached=${cachedSettings.timeOffsets.asr}, auto=${autoDetectedSettings.timeOffsets.asr}")
+            Log.i(TAG, "     • maghrib: cached=${cachedSettings.timeOffsets.maghrib}, auto=${autoDetectedSettings.timeOffsets.maghrib}")
+            Log.i(TAG, "     • isha: cached=${cachedSettings.timeOffsets.isha}, auto=${autoDetectedSettings.timeOffsets.isha}")
+        }
+
+        val areIdentical = methodMatch && madhhabMatch && fajrAngleMatch && ishaAngleMatch && ishaDelayMatch && timeOffsetsMatch
         val processingTime = System.currentTimeMillis() - startTime
         
         Log.i(TAG, "")
