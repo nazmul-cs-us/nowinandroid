@@ -39,9 +39,11 @@ data class PrayerCalculationSettings(
     
     /**
      * EFFECTIVE ISHA ANGLE: Gets the actual Isha angle to use in calculations
+     * NOTE: 0.0 is treated as null (meaning use delay-based calculation instead)
      */
     fun getEffectiveIshaAngle(): Double? {
-        return customIshaAngle ?: calculationMethod.ishaAngle
+        val angle = customIshaAngle ?: calculationMethod.ishaAngle
+        return if (angle == 0.0) null else angle  // 0.0 means "use delay instead"
     }
     
     /**
