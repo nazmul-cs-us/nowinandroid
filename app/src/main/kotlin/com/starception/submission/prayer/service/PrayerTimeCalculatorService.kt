@@ -295,8 +295,8 @@ class PrayerTimeCalculatorService @Inject constructor(
         // Then apply the user's personal adjustment
         val maghrib = addMinutesToTime(
             addMinutesToTime(
-                astronomicalCalculator.decimalHourToLocalTime(sunset), 
-                settings.calculationMethod.maghribOffset  // Method-specific adjustment
+                astronomicalCalculator.decimalHourToLocalTime(sunset),
+                settings.getEffectiveMaghribOffset()  // Method/country-specific offset (e.g., 4min for Iran)
             ),
             offsets.maghrib  // User personal adjustment
         )
@@ -315,7 +315,7 @@ class PrayerTimeCalculatorService @Inject constructor(
         Log.i(TAG, "  🌅 Sunrise: $sunriseAdjusted" + if (offsets.sunrise != 0) " (${offsets.sunrise}m)" else "")
         Log.i(TAG, "  ☀️ Dhuhr: $dhuhr" + if (offsets.dhuhr != 0) " (${offsets.dhuhr}m)" else "")
         Log.i(TAG, "  🌇 Asr: $asr" + if (offsets.asr != 0) " (${offsets.asr}m)" else "")
-        Log.i(TAG, "  🌆 Maghrib: $maghrib (method: ${settings.calculationMethod.maghribOffset}m)")
+        Log.i(TAG, "  🌆 Maghrib: $maghrib (offset: ${settings.getEffectiveMaghribOffset()}m)" + if (offsets.maghrib != 0) " + user: ${offsets.maghrib}m" else "")
         Log.i(TAG, "  🌙 Isha: $isha" + if (offsets.isha != 0) " (${offsets.isha}m)" else "")
         Log.i(TAG, "")
         
@@ -569,7 +569,13 @@ class PrayerTimeCalculatorService @Inject constructor(
         )
         
         val ishaStart = System.currentTimeMillis()
-        val ishaDecimal = astronomicalCalculator.calculateIsha(location, julianDay, ishaAngle, ishaDelay)
+        val ishaDecimal = astronomicalCalculator.calculateIsha(
+            location,
+            julianDay,
+            ishaAngle,
+            ishaDelay,
+            settings.getEffectiveMaghribOffset()  // Pass maghrib offset for correct Isha delay calculation
+        )
         val ishaDuration = System.currentTimeMillis() - ishaStart
         
         Log.i(TAG, "🔬 ISHA NIGHT PRAYER CALCULATION")

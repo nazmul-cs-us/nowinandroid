@@ -790,7 +790,23 @@ fun PrayerTimesScreen(
         if (isInEditMode) {
             // Show ONLY the circular dial - complete transformation, no extra UI
             var timeAdjustment by remember { mutableStateOf(currentOffset) }
-            
+
+            // CRITICAL LOGGING: Track when timeAdjustment state variable changes
+            LaunchedEffect(timeAdjustment) {
+                android.util.Log.w("PrayerTimesScreen", "⚠️ STATE RESET DETECTED - Prayer: $prayerName")
+                android.util.Log.w("PrayerTimesScreen", "   📊 timeAdjustment state value: $timeAdjustment minutes")
+                android.util.Log.w("PrayerTimesScreen", "   🔍 currentOffset reference: $currentOffset minutes")
+                android.util.Log.w("PrayerTimesScreen", "   🎯 isInEditMode: $isInEditMode")
+                android.util.Log.w("PrayerTimesScreen", "   📍 This shows when parent recomposition changes state")
+            }
+
+            // Track when currentOffset changes (the remember key)
+            LaunchedEffect(currentOffset) {
+                android.util.Log.w("PrayerTimesScreen", "🔄 CURRENT OFFSET CHANGED - Prayer: $prayerName")
+                android.util.Log.w("PrayerTimesScreen", "   📥 New currentOffset: $currentOffset minutes")
+                android.util.Log.w("PrayerTimesScreen", "   ⚙️ This triggers remember {} to reinitialize with new value")
+            }
+
             // Use Box to constrain the circular dial to the original tile space
             Box(
                 modifier = modifier
@@ -820,17 +836,6 @@ fun PrayerTimesScreen(
                     ),
                     modifier = Modifier
                         .fillMaxSize() // Fill container space
-                    .pointerInput(prayerName) {
-                        detectTapGestures(
-                            onLongPress = {
-                                // Exit edit mode on long press without saving
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                // Exit edit mode by clearing the current editing tile
-                                onEditingTileChange(null)
-                                android.util.Log.d("PrayerTimes", "🚪 Exited edit mode via long press without saving")
-                            }
-                        )
-                    }
             ) {
                 // ONLY show the circular dial - complete transformation with no overlapping content
                 com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
@@ -851,38 +856,71 @@ fun PrayerTimesScreen(
                         android.util.Log.d("PrayerTimesScreen", "   📝 Prayer: $prayerName")
                         android.util.Log.d("PrayerTimesScreen", "   ⏱️ Final Adjustment: $finalAdjustment minutes")
                         android.util.Log.d("PrayerTimesScreen", "   💾 Saving to prayer settings...")
-                        
+
                         // Save the adjustment to Prayer settings using repository
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 val repository = com.starception.submission.prayer.repository.PrayerSettingsRepository(screenContext)
                                 repository.updateSinglePrayerOffset(prayerName, finalAdjustment)
                                 android.util.Log.i("PrayerTimesScreen", "✅ SAVE SUCCESS: $prayerName offset saved as $finalAdjustment minutes")
-                                
+
+                                // CRITICAL: Wait for preferences to be fully written to disk
+                                // This ensures the recalculation will read the NEW offset values
+                                delay(100) // 100ms delay to ensure SharedPreferences commit completes
+                                android.util.Log.d("PrayerTimesScreen", "⏸️ Waited 100ms for preferences write to complete")
+
                                 // Update UI on main thread
                                 withContext(Dispatchers.Main) {
                                     // Force immediate refresh using both methods to ensure UI updates
                                     try {
                                         // Method 1: Direct repository reload
                                         val currentSettings = repository.getLoadedCalculationSettings()
+                                        android.util.Log.w("PrayerTimesScreen", "🚨 ABOUT TO UPDATE storedOffsets STATE - This triggers recomposition!")
+                                        android.util.Log.w("PrayerTimesScreen", "   📤 Old storedOffsets: $storedOffsets")
+                                        android.util.Log.w("PrayerTimesScreen", "   📥 New timeOffsets from settings: ${currentSettings.timeOffsets}")
                                         storedOffsets = currentSettings.timeOffsets
+                                        android.util.Log.w("PrayerTimesScreen", "   ✅ storedOffsets UPDATED - This causes InteractivePrayerCard to receive new currentOffset parameter")
                                         android.util.Log.d("PrayerTimesScreen", "🔄 IMMEDIATE OFFSET RELOAD (Method 1):")
                                         android.util.Log.d("PrayerTimesScreen", "   🌞 Dhuhr: ${storedOffsets.dhuhr}")
                                         android.util.Log.d("PrayerTimesScreen", "   🌇 Asr: ${storedOffsets.asr}")
                                         android.util.Log.d("PrayerTimesScreen", "   🌆 Maghrib: ${storedOffsets.maghrib}")
                                         android.util.Log.d("PrayerTimesScreen", "   🌙 Isha: ${storedOffsets.isha}")
-                                        
+
                                         // Method 2: Use the refresh function for consistency
                                         refreshStoredOffsets()
                                         android.util.Log.d("PrayerTimesScreen", "🔄 REFRESH FUNCTION CALLED (Method 2)")
+
+                                        // CRITICAL FIX: Recalculate prayer times with new offsets
+                                        // Clear cache to force fresh calculation with updated offsets
+                                        android.util.Log.d("PrayerTimesScreen", "🔄 RECALCULATING PRAYER TIMES WITH NEW OFFSETS...")
+                                        val entryPoint = EntryPointAccessors.fromApplication(
+                                            screenContext.applicationContext,
+                                            com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                                        )
+                                        val cache = entryPoint.locationCache()
+                                        cache.clearCache()
+                                        android.util.Log.d("PrayerTimesScreen", "   🗑️ Cache cleared")
+
+                                        // Recalculate prayer times in background
+                                        withContext(Dispatchers.IO) {
+                                            val calculator = PrayerTimesCalculator(screenContext)
+                                            val result = calculator.calculateDefaultPrayerTimes()
+
+                                            withContext(Dispatchers.Main) {
+                                                prayerTimes = result.first
+                                                location = result.second
+                                                android.util.Log.d("PrayerTimesScreen", "   ✅ Prayer times recalculated with new $prayerName offset: $finalAdjustment minutes")
+                                                android.util.Log.d("PrayerTimesScreen", "   📊 New times: Fajr=${result.first?.fajr}, Dhuhr=${result.first?.dhuhr}, Asr=${result.first?.asr}, Maghrib=${result.first?.maghrib}, Isha=${result.first?.isha}")
+                                            }
+                                        }
                                     } catch (e: Exception) {
                                         android.util.Log.e("PrayerTimesScreen", "❌ Failed immediate offset reload", e)
                                     }
-                                    
+
                                     // Also trigger the standard refresh mechanism as backup
                                     offsetRefreshTrigger++
                                     android.util.Log.d("PrayerTimesScreen", "🔄 TRIGGERING OFFSET REFRESH: trigger=$offsetRefreshTrigger")
-                                    
+
                                     // Exit edit mode after successful saving
                                     onEditingTileChange(null)
                                     android.util.Log.d("PrayerTimesScreen", "🚪 Exited edit mode - returning to tile view")
@@ -1999,10 +2037,80 @@ fun PrayerTimesScreen(
                         timeAdjustment = adjustment
                     },
                     onSaveAdjustment = { prayerName, finalAdjustment ->
-                        Log.d("PrayerTimes", "🎯 POPUP DIAL SAVE: $prayerName = $finalAdjustment minutes")
-                        // Save the adjustment and close popup
-                        showPrayerDialPopup = false
-                        popupPrayerName = null
+                        android.util.Log.d("PrayerTimesScreen", "🎯 POPUP DIAL SAVE:")
+                        android.util.Log.d("PrayerTimesScreen", "   📝 Prayer: $prayerName")
+                        android.util.Log.d("PrayerTimesScreen", "   ⏱️ Final Adjustment: $finalAdjustment minutes")
+                        android.util.Log.d("PrayerTimesScreen", "   💾 Saving to prayer settings...")
+
+                        // Save the adjustment to Prayer settings using repository
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                val repository = com.starception.submission.prayer.repository.PrayerSettingsRepository(screenContext)
+                                repository.updateSinglePrayerOffset(prayerName, finalAdjustment)
+                                android.util.Log.i("PrayerTimesScreen", "✅ SAVE SUCCESS: $prayerName offset saved as $finalAdjustment minutes")
+
+                                // CRITICAL: Wait for preferences to be fully written to disk
+                                // This ensures the recalculation will read the NEW offset values
+                                delay(100) // 100ms delay to ensure SharedPreferences commit completes
+                                android.util.Log.d("PrayerTimesScreen", "⏸️ Waited 100ms for preferences write to complete")
+
+                                // Update UI on main thread - use SAME repository instance
+                                withContext(Dispatchers.Main) {
+                                    try {
+                                        // IMPORTANT: Use the SAME repository instance that just saved
+                                        val currentSettings = repository.getLoadedCalculationSettings()
+                                        storedOffsets = currentSettings.timeOffsets
+                                        android.util.Log.d("PrayerTimesScreen", "🔄 IMMEDIATE OFFSET RELOAD:")
+                                        android.util.Log.d("PrayerTimesScreen", "   🌞 Dhuhr: ${storedOffsets.dhuhr}")
+                                        android.util.Log.d("PrayerTimesScreen", "   🌇 Asr: ${storedOffsets.asr}")
+                                        android.util.Log.d("PrayerTimesScreen", "   🌆 Maghrib: ${storedOffsets.maghrib}")
+                                        android.util.Log.d("PrayerTimesScreen", "   🌙 Isha: ${storedOffsets.isha}")
+
+                                        // CRITICAL FIX: Recalculate prayer times with new offsets
+                                        // Clear cache to force fresh calculation with updated offsets
+                                        android.util.Log.d("PrayerTimesScreen", "🔄 RECALCULATING PRAYER TIMES WITH NEW OFFSETS...")
+                                        val entryPoint = EntryPointAccessors.fromApplication(
+                                            screenContext.applicationContext,
+                                            com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                                        )
+                                        val cache = entryPoint.locationCache()
+                                        cache.clearCache()
+                                        android.util.Log.d("PrayerTimesScreen", "   🗑️ Cache cleared")
+
+                                        // Recalculate prayer times in background
+                                        withContext(Dispatchers.IO) {
+                                            val calculator = PrayerTimesCalculator(screenContext)
+                                            val result = calculator.calculateDefaultPrayerTimes()
+
+                                            withContext(Dispatchers.Main) {
+                                                prayerTimes = result.first
+                                                location = result.second
+                                                android.util.Log.d("PrayerTimesScreen", "   ✅ Prayer times recalculated with new $prayerName offset: $finalAdjustment minutes")
+                                                android.util.Log.d("PrayerTimesScreen", "   📊 New times: Fajr=${result.first?.fajr}, Dhuhr=${result.first?.dhuhr}, Asr=${result.first?.asr}, Maghrib=${result.first?.maghrib}, Isha=${result.first?.isha}")
+                                            }
+                                        }
+
+                                        // Trigger recomposition
+                                        offsetRefreshTrigger++
+                                        android.util.Log.d("PrayerTimesScreen", "🔄 TRIGGERING RECOMPOSITION: trigger=$offsetRefreshTrigger")
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("PrayerTimesScreen", "❌ Failed immediate offset reload", e)
+                                    }
+
+                                    // Close popup after successful saving
+                                    showPrayerDialPopup = false
+                                    popupPrayerName = null
+                                    android.util.Log.d("PrayerTimesScreen", "🚪 Closed popup - returning to main view")
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("PrayerTimesScreen", "❌ SAVE FAILED: Error saving $prayerName offset", e)
+                                // Still close popup even if save failed
+                                withContext(Dispatchers.Main) {
+                                    showPrayerDialPopup = false
+                                    popupPrayerName = null
+                                }
+                            }
+                        }
                     },
                     onResetAdjustment = {
                         Log.d("PrayerTimes", "🔄 POPUP DIAL RESET for $safePrayerName")

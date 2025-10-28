@@ -1328,11 +1328,13 @@ class PrayerSettingsRepository @Inject constructor(
             // 6. Extract calculation parameters with method defaults, then override if country specifies
             // IMPORTANT: Angles go to root, Offsets go to timeOffsets
 
-            // Step 1: Get calculation method defaults
-            val methodFajrAngle = calculationMethod.fajrAngle
-            val methodIshaAngle = calculationMethod.ishaAngle
-            val methodMaghribOffset = calculationMethod.maghribOffset
-            val methodIshaOffset = calculationMethod.ishaDelay  // This is actually an offset, not an angle
+            // Step 1: Get calculation method defaults from JSON
+            // Load the calculation method details from JSON to get precise values (e.g., maghribOffset: 4.5)
+            val calculationMethodEntry = jsonData["calculationMethods"]?.jsonObject?.get(methodName)?.jsonObject
+            val methodFajrAngle = calculationMethodEntry?.get("fajrAngle")?.jsonPrimitive?.doubleOrNull ?: calculationMethod.fajrAngle
+            val methodIshaAngle = calculationMethodEntry?.get("ishaAngle")?.jsonPrimitive?.doubleOrNull
+            val methodMaghribOffset = calculationMethodEntry?.get("maghribOffset")?.jsonPrimitive?.doubleOrNull?.toInt() ?: calculationMethod.maghribOffset
+            val methodIshaOffset = calculationMethodEntry?.get("ishaOffset")?.jsonPrimitive?.intOrNull ?: calculationMethod.ishaDelay  // This is actually a delay, not an angle
 
             Log.i(TAG, "📐 Calculation Method Defaults:")
             Log.i(TAG, "   - Fajr angle: $methodFajrAngle°")
@@ -1350,15 +1352,19 @@ class PrayerSettingsRepository @Inject constructor(
             val fajrOverridden = countryEntry["customFajrAngle"] != null
             val ishaAngleOverridden = countryEntry["customIshaAngle"] != null
 
-            // Step 3: Extract time offsets (country JSON + method offsets + user adjustments)
+            // Step 3: Extract custom maghrib offset from JSON (if country overrides it)
+            val customMaghribOffset = countryEntry["maghribOffset"]?.jsonPrimitive?.doubleOrNull?.toInt()
+                ?: methodMaghribOffset
+
+            // Step 4: Extract time offsets (user adjustments ONLY - NOT calculation parameters)
             val timeOffsetsJson = countryEntry["timeOffsets"]?.jsonObject
             val countryTimeOffsets = PrayerTimeOffsets(
                 fajr = timeOffsetsJson?.get("fajr")?.jsonPrimitive?.intOrNull ?: 0,
                 sunrise = timeOffsetsJson?.get("sunrise")?.jsonPrimitive?.intOrNull ?: 0,
                 dhuhr = timeOffsetsJson?.get("dhuhr")?.jsonPrimitive?.intOrNull ?: 0,
                 asr = timeOffsetsJson?.get("asr")?.jsonPrimitive?.intOrNull ?: 0,
-                maghrib = timeOffsetsJson?.get("maghrib")?.jsonPrimitive?.intOrNull ?: (methodMaghribOffset),
-                isha = timeOffsetsJson?.get("isha")?.jsonPrimitive?.intOrNull ?: 0  // Only user adjustments, NOT method delay
+                maghrib = timeOffsetsJson?.get("maghrib")?.jsonPrimitive?.intOrNull ?: 0,  // User adjustments ONLY
+                isha = timeOffsetsJson?.get("isha")?.jsonPrimitive?.intOrNull ?: 0  // User adjustments ONLY
             )
 
             // Log calculation angles (show which were overridden by country)
@@ -1393,14 +1399,16 @@ class PrayerSettingsRepository @Inject constructor(
             }
             
             // 8. Create prayer settings with country-specific overrides
-            // IMPORTANT: Angles stored at root, Offsets stored in timeOffsets
+            // IMPORTANT: Calculation parameters (angles, delays, offsets) stored as custom* fields
+            //            User adjustments stored in timeOffsets
             val autoDetectedSettings = PrayerSettings(
                 calculationMethod = calculationMethod,
                 asrMadhhab = asrMadhhab,
                 customFajrAngle = customFajrAngle,
                 customIshaAngle = customIshaAngle,
                 customIshaDelay = methodIshaOffset,  // Use method's ishaDelay (e.g., 90 for Umm al-Qura)
-                // Time offsets include only user adjustments (NOT method delays)
+                customMaghribOffset = customMaghribOffset,  // Use method's/country's maghribOffset (e.g., 4 for Iran)
+                // Time offsets include only user adjustments (NOT method parameters)
                 timeOffsets = countryTimeOffsets,
                 // Set auto-detection metadata for restore button functionality
                 isMethodAutoDetected = true,
@@ -1417,7 +1425,9 @@ class PrayerSettingsRepository @Inject constructor(
             Log.i(TAG, "   🤲 Asr Madhhab: ${autoDetectedSettings.asrMadhhab.name} (${autoDetectedSettings.asrMadhhab.displayName})")
             Log.i(TAG, "   🌅 Fajr Angle: ${autoDetectedSettings.customFajrAngle}° ${if (fajrOverridden) "(country override)" else "(from method)"}")
             Log.i(TAG, "   🌙 Isha Angle: ${autoDetectedSettings.customIshaAngle}° ${if (ishaAngleOverridden) "(country override)" else "(from method)"}")
-            Log.i(TAG, "   ⏰ Time Offsets: Fajr=${autoDetectedSettings.timeOffsets.fajr}, Sunrise=${autoDetectedSettings.timeOffsets.sunrise}, Dhuhr=${autoDetectedSettings.timeOffsets.dhuhr}, Asr=${autoDetectedSettings.timeOffsets.asr}, Maghrib=${autoDetectedSettings.timeOffsets.maghrib} (method), Isha=${autoDetectedSettings.timeOffsets.isha} (method)")
+            Log.i(TAG, "   🌆 Maghrib Offset: ${autoDetectedSettings.customMaghribOffset}min (calculation parameter)")
+            Log.i(TAG, "   ⏰ Isha Delay: ${autoDetectedSettings.customIshaDelay}min (calculation parameter)")
+            Log.i(TAG, "   ⏱️ User Time Offsets: Fajr=${autoDetectedSettings.timeOffsets.fajr}, Sunrise=${autoDetectedSettings.timeOffsets.sunrise}, Dhuhr=${autoDetectedSettings.timeOffsets.dhuhr}, Asr=${autoDetectedSettings.timeOffsets.asr}, Maghrib=${autoDetectedSettings.timeOffsets.maghrib}, Isha=${autoDetectedSettings.timeOffsets.isha}")
             Log.i(TAG, "   🧭 High Latitude Method: ${autoDetectedSettings.highLatitudeAdjustment.name}")
             Log.i(TAG, "   📍 Use GPS: ${autoDetectedSettings.useGpsLocation} (default)")
             Log.i(TAG, "   🌍 Detected for Country: $countryName ($countryCode)")

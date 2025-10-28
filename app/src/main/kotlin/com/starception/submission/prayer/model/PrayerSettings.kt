@@ -26,7 +26,8 @@ data class PrayerCalculationSettings(
     val customFajrAngle: Double? = null,        // Override Fajr sun angle (degrees below horizon)
     val customIshaAngle: Double? = null,        // Override Isha sun angle (degrees below horizon)
     val customIshaDelay: Int? = null,           // Override Isha delay (minutes after Maghrib)
-    
+    val customMaghribOffset: Int? = null,       // Override Maghrib offset (minutes after sunset)
+
     // TIME ADJUSTMENTS - Local custom offsets
     val timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets()  // Per-prayer minute adjustments
 ) {
@@ -60,6 +61,13 @@ data class PrayerCalculationSettings(
      */
     fun getEffectiveIshaDelay(): Int? {
         return customIshaDelay ?: calculationMethod.ishaDelay
+    }
+
+    /**
+     * EFFECTIVE MAGHRIB OFFSET: Gets the actual Maghrib offset to use in calculations
+     */
+    fun getEffectiveMaghribOffset(): Int {
+        return customMaghribOffset ?: calculationMethod.maghribOffset
     }
 }
 
@@ -105,9 +113,10 @@ data class PrayerSettings(
     val customFajrAngle: Double? = null,
     val customIshaAngle: Double? = null,
     val customIshaDelay: Int? = null,
+    val customMaghribOffset: Int? = null,
     val timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
 
-    // Location preferences  
+    // Location preferences
     val location: Location? = null,
     val useGpsLocation: Boolean = true,
     
@@ -152,6 +161,10 @@ data class PrayerSettings(
         return customIshaDelay ?: calculationMethod.ishaDelay
     }
 
+    fun getEffectiveMaghribOffset(): Int {
+        return customMaghribOffset ?: calculationMethod.maghribOffset
+    }
+
     /**
      * Convert to separate preference classes
      */
@@ -164,6 +177,7 @@ data class PrayerSettings(
                 customFajrAngle = customFajrAngle,
                 customIshaAngle = customIshaAngle,
                 customIshaDelay = customIshaDelay,
+                customMaghribOffset = customMaghribOffset,
                 timeOffsets = timeOffsets
             ),
             PrayerLocationPreferences(
