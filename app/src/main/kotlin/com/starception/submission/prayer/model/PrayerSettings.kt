@@ -42,8 +42,17 @@ data class PrayerCalculationSettings(
      * NOTE: 0.0 is treated as null (meaning use delay-based calculation instead)
      */
     fun getEffectiveIshaAngle(): Double? {
+        android.util.Log.i("PrayerSettings", "🔍 getEffectiveIshaAngle() called")
+        android.util.Log.i("PrayerSettings", "   customIshaAngle = $customIshaAngle")
+        android.util.Log.i("PrayerSettings", "   calculationMethod.ishaAngle = ${calculationMethod.ishaAngle}")
+
         val angle = customIshaAngle ?: calculationMethod.ishaAngle
-        return if (angle == 0.0) null else angle  // 0.0 means "use delay instead"
+        android.util.Log.i("PrayerSettings", "   Selected angle (before 0.0 check) = $angle")
+
+        val result = if (angle == 0.0) null else angle
+        android.util.Log.i("PrayerSettings", "   Final result (after 0.0 check) = $result")
+
+        return result  // 0.0 means "use delay instead"
     }
     
     /**
@@ -124,11 +133,21 @@ data class PrayerSettings(
     fun getEffectiveFajrAngle(): Double {
         return customFajrAngle ?: calculationMethod.fajrAngle
     }
-    
+
     fun getEffectiveIshaAngle(): Double? {
-        return customIshaAngle ?: calculationMethod.ishaAngle
+        android.util.Log.i("PrayerSettings_Legacy", "🔍 getEffectiveIshaAngle() called (LEGACY CLASS)")
+        android.util.Log.i("PrayerSettings_Legacy", "   customIshaAngle = $customIshaAngle")
+        android.util.Log.i("PrayerSettings_Legacy", "   calculationMethod.ishaAngle = ${calculationMethod.ishaAngle}")
+
+        val angle = customIshaAngle ?: calculationMethod.ishaAngle
+        android.util.Log.i("PrayerSettings_Legacy", "   Selected angle (before 0.0 check) = $angle")
+
+        val result = if (angle == 0.0) null else angle
+        android.util.Log.i("PrayerSettings_Legacy", "   Final result (after 0.0 check) = $result")
+
+        return result  // 0.0 means "use delay instead"
     }
-    
+
     fun getEffectiveIshaDelay(): Int? {
         return customIshaDelay ?: calculationMethod.ishaDelay
     }
