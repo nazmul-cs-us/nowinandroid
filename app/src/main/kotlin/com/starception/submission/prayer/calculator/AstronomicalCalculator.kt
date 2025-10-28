@@ -646,10 +646,11 @@ class AstronomicalCalculator @Inject constructor() {
      * - Traditional communities: May prefer fixed delay approach
      */
     fun calculateIsha(
-        location: Location, 
-        julianDay: Double, 
+        location: Location,
+        julianDay: Double,
         ishaAngle: Double? = null,
-        ishaDelay: Int? = null
+        ishaDelay: Int? = null,
+        maghribOffset: Int = 0  // Offset in minutes to add to sunset for Maghrib calculation
     ): Double {
         if (!logInputValidation("ISHA", location.latitude, location.longitude, julianDay)) {
             return Double.NaN
@@ -707,22 +708,25 @@ class AstronomicalCalculator @Inject constructor() {
                     "julianDay" to julianDay,
                     "method" to "Delay after Maghrib",
                     "sunset" to "${sunset}h",
-                    "delayMinutes" to "${ishaDelay}min",
-                    "delayHours" to "${ishaDelay / 60.0}h"
+                    "maghribOffset" to "${maghribOffset}min",
+                    "ishaDelay" to "${ishaDelay}min",
+                    "totalDelay" to "${maghribOffset + ishaDelay}min"
                 )
-                
+
                 if (sunset.isNaN()) {
                     Log.w(TAG, "")
                     Log.w(TAG, "⚠️ ISHA DELAY CALCULATION FAILED")
                     Log.w(TAG, "🔍 Cause: Cannot calculate sunset time")
                     Log.w(TAG, "🌍 Common in: Polar regions during extreme seasons")
                     Log.w(TAG, "")
-                    
+
                     logCalculation("ISHA_DELAY_CALCULATION", inputs, "NaN (no sunset)")
                     return@benchmarkCalculation Double.NaN
                 }
-                
-                val result = sunset + ishaDelay / 60.0
+
+                // Isha = Sunset + Maghrib Offset + Isha Delay
+                // Example: Umm al-Qura uses Sunset + 0min (maghrib) + 90min (isha) = Maghrib + 90min
+                val result = sunset + (maghribOffset + ishaDelay) / 60.0
                 
                 logCalculation("ISHA_DELAY_CALCULATION", inputs, "${result}h")
                 

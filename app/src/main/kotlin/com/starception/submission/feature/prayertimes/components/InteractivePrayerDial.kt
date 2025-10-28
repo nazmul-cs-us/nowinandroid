@@ -3,7 +3,13 @@ package com.starception.submission.feature.prayertimes.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,6 +61,14 @@ fun InteractivePrayerDial(
     onSaveAdjustment: (String, Int) -> Unit,
     onResetAdjustment: () -> Unit
 ) {
+    // CRITICAL LOGGING: Track when timeAdjustment parameter changes
+    LaunchedEffect(timeAdjustment) {
+        Log.w("InteractiveDial", "⚠️ PARAMETER CHANGE DETECTED - Prayer: $prayerName")
+        Log.w("InteractiveDial", "   📥 NEW timeAdjustment value: $timeAdjustment minutes")
+        Log.w("InteractiveDial", "   🔍 This indicates parent recomposed with new value")
+        Log.w("InteractiveDial", "   📍 Stack trace: ${Thread.currentThread().stackTrace.take(5).joinToString("\n      ")}")
+    }
+
     val hapticFeedback = LocalHapticFeedback.current
     var lastAngle by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
@@ -62,7 +76,15 @@ fun InteractivePrayerDial(
     var baseAdjustment by remember { mutableStateOf(timeAdjustment) }
     var currentDragAngle by remember { mutableStateOf(0f) }
     var lastHapticAdjustment by remember { mutableStateOf(timeAdjustment) }
-    
+
+    // Track the current adjustment value internally (survives after drag ends)
+    var currentAdjustment by remember { mutableStateOf(timeAdjustment) }
+
+    // Log whenever currentAdjustment changes
+    LaunchedEffect(currentAdjustment) {
+        Log.d("InteractiveDial", "🔄 INTERNAL STATE - Prayer: $prayerName, currentAdjustment: $currentAdjustment minutes")
+    }
+
     // Material 3 expressive animations for enhanced feedback
     val dialScale by animateFloatAsState(
         targetValue = if (isDragging) 1.05f else 1f,
@@ -72,7 +94,7 @@ fun InteractivePrayerDial(
         ),
         label = "dialScale"
     )
-    
+
     val knobScale by animateFloatAsState(
         targetValue = if (isDragging) 1.2f else 1f,
         animationSpec = spring(
@@ -81,7 +103,7 @@ fun InteractivePrayerDial(
         ),
         label = "knobScale"
     )
-    
+
     val progressArcGlow by animateFloatAsState(
         targetValue = if (isDragging) 1.5f else 1f,
         animationSpec = spring(
@@ -90,19 +112,16 @@ fun InteractivePrayerDial(
         ),
         label = "progressArcGlow"
     )
-    
+
     // Get Material 3 theme colors for dark/light mode support
     val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val outlineColor = MaterialTheme.colorScheme.outline
-    
-    // Reset base when timeAdjustment changes externally
-    LaunchedEffect(timeAdjustment) {
-        if (!isDragging) {
-            baseAdjustment = timeAdjustment
-            accumulatedAngle = 0f
-            lastHapticAdjustment = timeAdjustment
-        }
+
+    // Initialize from timeAdjustment only once when component is first created
+    LaunchedEffect(Unit) {
+        currentAdjustment = timeAdjustment
+        baseAdjustment = timeAdjustment
     }
 
     Box(
@@ -122,13 +141,13 @@ fun InteractivePrayerDial(
                     detectDragGestures(
                         onDragStart = { offset ->
                             val center = Offset(size.width / 2f, size.height / 2f)
-                            
+
                             // Start dragging anywhere within the dial area - much more lenient
                             val distanceFromCenter = kotlin.math.sqrt(
-                                (offset.x - center.x) * (offset.x - center.x) + 
+                                (offset.x - center.x) * (offset.x - center.x) +
                                 (offset.y - center.y) * (offset.y - center.y)
                             )
-                            
+
                             // Allow dragging if touch is anywhere within the circular dial
                             val outerRadius = kotlin.math.min(size.width, size.height) * 0.5f
                             if (distanceFromCenter <= outerRadius) {
@@ -138,13 +157,13 @@ fun InteractivePrayerDial(
                                     offset.x - center.x
                                 ) * 180f / PI.toFloat()
                                 accumulatedAngle = 0f // Reset accumulated angle
-                                
+
                                 // Calculate current prayer time angle to start from current position
                                 val adjustedDateTime = java.time.LocalDateTime.of(java.time.LocalDate.now(), originalTime).plusMinutes(timeAdjustment.toLong())
                                 val adjustedTime = adjustedDateTime.toLocalTime()
                                 val hourIn12Format = if (adjustedTime.hour % 12 == 0) 12 else adjustedTime.hour % 12
                                 currentDragAngle = ((hourIn12Format * 60 + adjustedTime.minute) / (12 * 60f)) * 360f - 90f
-                                
+
                                 Log.d("InteractiveDial", "🚀 DRAG START - Prayer: $prayerName")
                                 Log.d("InteractiveDial", "📍 Touch: (${offset.x.toInt()}, ${offset.y.toInt()}), Center: (${center.x.toInt()}, ${center.y.toInt()})")
                                 Log.d("InteractiveDial", "📏 Distance: ${distanceFromCenter.toInt()}dp, Radius: ${outerRadius.toInt()}dp")
@@ -153,10 +172,16 @@ fun InteractivePrayerDial(
                                 Log.d("InteractiveDial", "❌ Touch outside radius - Distance: ${distanceFromCenter.toInt()}, Radius: ${outerRadius.toInt()}")
                             }
                         },
-                        onDragEnd = { 
-                            Log.d("InteractiveDial", "🏁 DRAG END - Prayer: $prayerName, Final adjustment: ${timeAdjustment}m")
+                        onDragEnd = {
+                            Log.d("InteractiveDial", "🏁 DRAG END - Prayer: $prayerName, Final adjustment: ${currentAdjustment}m")
                             Log.d("InteractiveDial", "📊 Final accumulated angle: ${accumulatedAngle}°")
+                            Log.d("InteractiveDial", "💾 AUTO-SAVING adjustment after drag...")
                             isDragging = false
+
+                            // Auto-save after drag ends
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onSaveAdjustment(prayerName, currentAdjustment)
+                            Log.d("InteractiveDial", "✅ SAVE CALLBACK INVOKED with ${currentAdjustment}m")
                         }
                     ) { change, _ ->
                         if (isDragging) {
@@ -165,43 +190,47 @@ fun InteractivePrayerDial(
                                 change.position.y - center.y,
                                 change.position.x - center.x
                             ) * 180f / PI.toFloat()
-                            
+
                             var angleDiff = fingerAngle - lastAngle
                             if (angleDiff > 180f) angleDiff -= 360f
                             if (angleDiff < -180f) angleDiff += 360f
-                            
+
                             // Update current drag angle to follow finger
                             currentDragAngle += angleDiff
                             // Keep angle in 0-360 range
                             if (currentDragAngle < 0f) currentDragAngle += 360f
                             if (currentDragAngle >= 360f) currentDragAngle -= 360f
-                            
+
                             // Use accumulated angle changes to calculate adjustment
                             // Accumulate the angle changes from dragging
                             accumulatedAngle += angleDiff
-                            
+
                             // Convert accumulated angle to minutes: clockwise = positive, anti-clockwise = negative
                             val newAdjustment = baseAdjustment + (accumulatedAngle / 3f).toInt()
-                            
+
                             Log.d("InteractiveDial", "🔄 DRAG UPDATE - Finger: (${change.position.x.toInt()}, ${change.position.y.toInt()})")
                             Log.d("InteractiveDial", "📐 Angles - Finger: ${fingerAngle.toInt()}°, Drag: ${currentDragAngle.toInt()}°, Diff: ${angleDiff.toInt()}°")
                             Log.d("InteractiveDial", "⏱️  Adjustment calc - Base: ${baseAdjustment}m, Accumulated: ${accumulatedAngle.toInt()}°, New: ${newAdjustment}m")
-                            
-                            if (newAdjustment != timeAdjustment) {
-                                Log.d("InteractiveDial", "✅ ADJUSTMENT APPLIED - Old: ${timeAdjustment}m → New: ${newAdjustment}m")
-                                
+
+                            if (newAdjustment != currentAdjustment) {
+                                Log.d("InteractiveDial", "✅ ADJUSTMENT APPLIED - Old: ${currentAdjustment}m → New: ${newAdjustment}m")
+
+                                // Update internal state
+                                currentAdjustment = newAdjustment
+
                                 // Strong haptic feedback for every minute change
                                 if (newAdjustment != lastHapticAdjustment) {
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                     lastHapticAdjustment = newAdjustment
                                     Log.d("InteractiveDial", "💥 STRONG HAPTIC FEEDBACK - Adjustment: ${newAdjustment}m")
                                 }
-                                
+
+                                // Notify parent of the change (for real-time UI update)
                                 onTimeAdjusted(newAdjustment)
                             } else {
                                 Log.d("InteractiveDial", "📍 Same adjustment value: ${newAdjustment}m")
                             }
-                            
+
                             // Always update lastAngle to prevent accumulation issues
                             lastAngle = fingerAngle
                         } else {
@@ -217,11 +246,11 @@ fun InteractivePrayerDial(
             
             // Draw clean circular timer design with theme colors
             drawCleanCircularTimer(
-                center = center, 
-                radius = radius, 
-                timeAdjustment = timeAdjustment, 
-                originalTime = originalTime, 
-                isDragging = isDragging, 
+                center = center,
+                radius = radius,
+                timeAdjustment = currentAdjustment,
+                originalTime = originalTime,
+                isDragging = isDragging,
                 currentDragAngle = currentDragAngle,
                 surfaceColor = surfaceColor,
                 onSurfaceColor = onSurfaceColor,
@@ -260,7 +289,7 @@ fun InteractivePrayerDial(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 // Adjusted time display - enhanced with better typography
-                val adjustedTime = adjustTimeByMinutes(originalTime, timeAdjustment)
+                val adjustedTime = adjustTimeByMinutes(originalTime, currentAdjustment)
                 Text(
                     text = adjustedTime,
                     style = MaterialTheme.typography.displaySmall.copy(
@@ -271,33 +300,33 @@ fun InteractivePrayerDial(
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center
                 )
-                
+
                 Spacer(modifier = Modifier.height(6.dp))
-                
+
                 // Adjustment amount with improved styling (hours and minutes format)
                 val adjustmentText = when {
-                    timeAdjustment > 0 -> {
-                        val hours = timeAdjustment / 60
-                        val minutes = timeAdjustment % 60
+                    currentAdjustment > 0 -> {
+                        val hours = currentAdjustment / 60
+                        val minutes = currentAdjustment % 60
                         when {
                             hours > 0 && minutes > 0 -> "+${hours}h ${minutes}m"
                             hours > 0 -> "+${hours}h"
                             else -> "+${minutes}m"
                         }
                     }
-                    timeAdjustment < 0 -> {
-                        val totalMinutes = kotlin.math.abs(timeAdjustment)
+                    currentAdjustment < 0 -> {
+                        val totalMinutes = kotlin.math.abs(currentAdjustment)
                         val hours = totalMinutes / 60
                         val minutes = totalMinutes % 60
                         when {
                             hours > 0 && minutes > 0 -> "-${hours}h ${minutes}m"
                             hours > 0 -> "-${hours}h"
-                            else -> "${timeAdjustment}m" // Keep negative sign
+                            else -> "${currentAdjustment}m" // Keep negative sign
                         }
                     }
                     else -> "±0m"
                 }
-                
+
                 Text(
                     text = adjustmentText,
                     style = MaterialTheme.typography.labelLarge.copy(
@@ -306,8 +335,8 @@ fun InteractivePrayerDial(
                         letterSpacing = 0.1.sp
                     ),
                     color = when {
-                        timeAdjustment > 0 -> MaterialTheme.colorScheme.primary
-                        timeAdjustment < 0 -> MaterialTheme.colorScheme.error
+                        currentAdjustment > 0 -> MaterialTheme.colorScheme.primary
+                        currentAdjustment < 0 -> MaterialTheme.colorScheme.error
                         else -> MaterialTheme.colorScheme.outline
                     },
                     textAlign = TextAlign.Center
@@ -317,7 +346,7 @@ fun InteractivePrayerDial(
                 
                 // Professional guidance hint - refined
                 Text(
-                    text = "Drag to adjust",
+                    text = "Release to save",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Normal,
                         fontSize = 10.sp,
