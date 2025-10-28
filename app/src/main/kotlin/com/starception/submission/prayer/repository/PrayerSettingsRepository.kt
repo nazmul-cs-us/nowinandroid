@@ -1341,8 +1341,10 @@ class PrayerSettingsRepository @Inject constructor(
             Log.i(TAG, "   - Isha offset: $methodIshaOffset min")
 
             // Step 2: Override ANGLES with country-specific values if present
+            // NOTE: Treat 0.0 as "use delay-based calculation" (null) for Isha
             val customFajrAngle = countryEntry["customFajrAngle"]?.jsonPrimitive?.doubleOrNull ?: methodFajrAngle
-            val customIshaAngle = countryEntry["customIshaAngle"]?.jsonPrimitive?.doubleOrNull ?: methodIshaAngle
+            val customIshaAngle = countryEntry["customIshaAngle"]?.jsonPrimitive?.doubleOrNull?.takeIf { it != 0.0 }
+                ?: methodIshaAngle?.takeIf { it != 0.0 }
 
             // Check if country overrode angle values
             val fajrOverridden = countryEntry["customFajrAngle"] != null
@@ -1356,7 +1358,7 @@ class PrayerSettingsRepository @Inject constructor(
                 dhuhr = timeOffsetsJson?.get("dhuhr")?.jsonPrimitive?.intOrNull ?: 0,
                 asr = timeOffsetsJson?.get("asr")?.jsonPrimitive?.intOrNull ?: 0,
                 maghrib = timeOffsetsJson?.get("maghrib")?.jsonPrimitive?.intOrNull ?: (methodMaghribOffset),
-                isha = timeOffsetsJson?.get("isha")?.jsonPrimitive?.intOrNull ?: (methodIshaOffset ?: 0)
+                isha = timeOffsetsJson?.get("isha")?.jsonPrimitive?.intOrNull ?: 0  // Only user adjustments, NOT method delay
             )
 
             // Log calculation angles (show which were overridden by country)
@@ -1397,8 +1399,8 @@ class PrayerSettingsRepository @Inject constructor(
                 asrMadhhab = asrMadhhab,
                 customFajrAngle = customFajrAngle,
                 customIshaAngle = customIshaAngle,
-                customIshaDelay = null,  // Not used - Isha offset goes to timeOffsets.isha
-                // Time offsets include method offsets (maghrib, isha) + country adjustments
+                customIshaDelay = methodIshaOffset,  // Use method's ishaDelay (e.g., 90 for Umm al-Qura)
+                // Time offsets include only user adjustments (NOT method delays)
                 timeOffsets = countryTimeOffsets,
                 // Set auto-detection metadata for restore button functionality
                 isMethodAutoDetected = true,
@@ -2711,8 +2713,20 @@ class PrayerSettingsRepository @Inject constructor(
      * UPDATE LEGACY COMBINED FLOW: Update the legacy flow when separate preferences change
      */
     private fun updateLegacyCombinedFlow() {
-        _settingsFlow.value = combineToLegacySettings()
-        _settingsFlow.tryEmit(combineToLegacySettings())
+        val combined = combineToLegacySettings()
+
+        Log.i(TAG, "🔄 UPDATE LEGACY COMBINED FLOW:")
+        Log.i(TAG, "   - Method: ${combined.calculationMethod.displayName}")
+        Log.i(TAG, "   - Custom Fajr: ${combined.customFajrAngle}")
+        Log.i(TAG, "   - Custom Isha: ${combined.customIshaAngle}")
+        Log.i(TAG, "   - Fajr Offset: ${combined.timeOffsets.fajr}m")
+        Log.i(TAG, "   - Isha Offset: ${combined.timeOffsets.isha}m")
+
+        _settingsFlow.value = combined
+        val emitted = _settingsFlow.tryEmit(combined)
+
+        Log.i(TAG, "   ✅ Flow updated: value=${_settingsFlow.value != null}, emitted=$emitted")
+        Log.i(TAG, "   📊 Subscriber count: ${_settingsFlow.subscriptionCount.value}")
     }
     
     /**

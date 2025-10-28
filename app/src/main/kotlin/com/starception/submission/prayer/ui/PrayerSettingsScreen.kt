@@ -4,7 +4,10 @@ import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -489,7 +492,9 @@ private fun CustomAnglesSection(
     modifier: Modifier = Modifier
 ) {
     android.util.Log.d("CustomAnglesSection", "📱 UI Debug: customFajrAngle=${settings.customFajrAngle}, customIshaAngle=${settings.customIshaAngle}, customIshaDelay=${settings.customIshaDelay}, areCustomAnglesAutoDetected=${settings.areCustomAnglesAutoDetected}")
-    
+
+    val focusManager = LocalFocusManager.current
+
     // Local state to handle text input properly - only reset when settings change from external source
     var fajrAngleText by remember { mutableStateOf(settings.customFajrAngle?.toString() ?: "") }
     var ishaAngleText by remember { mutableStateOf(settings.customIshaAngle?.toString() ?: "") }
@@ -534,7 +539,14 @@ private fun CustomAnglesSection(
                     }
                 },
                 label = { Text("Fajr Angle (°)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                placeholder = { Text("Auto-saved") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus() }
+                ),
                 modifier = Modifier.weight(1f),
                 isError = fajrAngleText.isNotEmpty() && fajrAngleText.toDoubleOrNull() == null,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -544,7 +556,8 @@ private fun CustomAnglesSection(
                     unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     errorBorderColor = MaterialTheme.colorScheme.error,
                     errorLabelColor = MaterialTheme.colorScheme.error
-                )
+                ),
+                singleLine = true
             )
             
             OutlinedTextField(
@@ -558,7 +571,14 @@ private fun CustomAnglesSection(
                     }
                 },
                 label = { Text("Isha Angle (°)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                placeholder = { Text("Auto-saved") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus() }
+                ),
                 modifier = Modifier.weight(1f),
                 isError = ishaAngleText.isNotEmpty() && ishaAngleText.toDoubleOrNull() == null,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -568,7 +588,8 @@ private fun CustomAnglesSection(
                     unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     errorBorderColor = MaterialTheme.colorScheme.error,
                     errorLabelColor = MaterialTheme.colorScheme.error
-                )
+                ),
+                singleLine = true
             )
         }
         
@@ -583,7 +604,14 @@ private fun CustomAnglesSection(
                 }
             },
             label = { Text("Isha Delay (minutes after Maghrib)") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            placeholder = { Text("Auto-saved") },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { focusManager.clearFocus() }
+            ),
             modifier = Modifier.fillMaxWidth(),
             isError = ishaDelayText.isNotEmpty() && ishaDelayText.toIntOrNull() == null,
             colors = OutlinedTextFieldDefaults.colors(
@@ -593,7 +621,8 @@ private fun CustomAnglesSection(
                 unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 errorBorderColor = MaterialTheme.colorScheme.error,
                 errorLabelColor = MaterialTheme.colorScheme.error
-            )
+            ),
+            singleLine = true
         )
         
     }
@@ -605,6 +634,7 @@ private fun TimeOffsetsSection(
     onOffsetsChanged: (PrayerTimeOffsets) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val focusManager = LocalFocusManager.current
     val prayerNames = listOf("Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha")
     val currentOffsets = listOf(
         offsets.fajr, offsets.sunrise, offsets.dhuhr, 
@@ -682,8 +712,15 @@ private fun TimeOffsetsSection(
                         android.util.Log.v("PrayerSettingsScreen", "✅ $prayerName offset update complete")
                     }
                 },
-                label = { Text("$prayerName Offset") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                label = { Text("$prayerName Offset (minutes)") },
+                placeholder = { Text("Auto-saved") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus() }
+                ),
                 modifier = Modifier.fillMaxWidth(),
                 isError = offsetTexts[index].isNotEmpty() && offsetTexts[index].toIntOrNull() == null,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -693,7 +730,8 @@ private fun TimeOffsetsSection(
                     unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     errorBorderColor = MaterialTheme.colorScheme.error,
                     errorLabelColor = MaterialTheme.colorScheme.error
-                )
+                ),
+                singleLine = true
             )
         }
     }
