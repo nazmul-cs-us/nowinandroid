@@ -419,21 +419,43 @@ object SmartContentUtils {
                 "Isha" to times.isha
             )
 
-            // Find current prayer (the most recent prayer that has passed)
-            val currentPrayer = allPrayers.findLast { (_, time) ->
+            // Find current prayer (the most recent prayer that has passed TODAY)
+            var currentPrayer = allPrayers.findLast { (_, time) ->
                 currentTime.isAfter(time)
             }
 
-            android.util.Log.d("SmartPrediction", "🕌 Current prayer (last passed): ${currentPrayer?.first ?: "None"}")
-            
+            android.util.Log.d("SmartPrediction", "🕌 Current prayer (last passed today): ${currentPrayer?.first ?: "None"}")
+
+            // CROSS-MIDNIGHT FIX: If no prayer has passed today yet (we're before Fajr),
+            // use yesterday's Isha as the current prayer if it's been less than 12 hours
+            if (currentPrayer == null && currentTime.isBefore(times.fajr)) {
+                // We're in the early morning hours between midnight and Fajr
+                // Assume yesterday's Isha was at the same time as today's Isha
+                val yesterdayIsha = times.isha // Same time, but conceptually yesterday
+                val minutesSinceMidnight = Duration.between(LocalTime.MIDNIGHT, currentTime).toMinutes()
+                val minutesFromIshaToMidnight = Duration.between(times.isha, LocalTime.MAX).toMinutes() + 1
+                val totalMinutesSinceYesterdayIsha = minutesFromIshaToMidnight + minutesSinceMidnight
+
+                android.util.Log.d("SmartPrediction", "🌙 Cross-midnight scenario detected")
+                android.util.Log.d("SmartPrediction", "⏰ Minutes since yesterday's Isha: $totalMinutesSinceYesterdayIsha")
+
+                // Only use yesterday's Isha if it's been less than 12 hours (720 minutes)
+                if (totalMinutesSinceYesterdayIsha <= 720) {
+                    currentPrayer = "Isha" to yesterdayIsha
+                    android.util.Log.d("SmartPrediction", "✅ Using yesterday's Isha as current prayer")
+                } else {
+                    android.util.Log.d("SmartPrediction", "⚠️ Too long since Isha, won't show content")
+                }
+            }
+
             // Find next prayer (the next upcoming prayer)
-            val nextPrayerToday = allPrayers.find { (_, time) -> 
+            val nextPrayerToday = allPrayers.find { (_, time) ->
                 currentTime.isBefore(time)
             }
-            
+
             val nextPrayer: Pair<String, LocalTime>?
             val isNextPrayerTomorrow: Boolean
-            
+
             if (nextPrayerToday != null) {
                 // There's a prayer left today
                 nextPrayer = nextPrayerToday
@@ -443,12 +465,21 @@ object SmartContentUtils {
                 nextPrayer = allPrayers.first()  // Fajr
                 isNextPrayerTomorrow = true
             }
-            
+
             // Show content if we have a current prayer (continues tracking until next prayer starts)
             if (currentPrayer != null && nextPrayer != null) {
                 val (prayerName, prayerTime) = currentPrayer
-                val elapsedDuration = Duration.between(prayerTime, currentTime)
-                val elapsedMinutes = elapsedDuration.toMinutes()
+
+                // Calculate elapsed time, handling cross-midnight scenario
+                val elapsedMinutes = if (prayerName == "Isha" && currentTime.isBefore(times.fajr)) {
+                    // Cross-midnight: We're tracking yesterday's Isha
+                    val minutesSinceMidnight = Duration.between(LocalTime.MIDNIGHT, currentTime).toMinutes()
+                    val minutesFromIshaToMidnight = Duration.between(times.isha, LocalTime.MAX).toMinutes() + 1
+                    minutesFromIshaToMidnight + minutesSinceMidnight
+                } else {
+                    // Normal case: prayer is from today
+                    Duration.between(prayerTime, currentTime).toMinutes()
+                }
 
                 android.util.Log.d("SmartPrediction", "⏱️ Elapsed since $prayerName: $elapsedMinutes minutes")
 
