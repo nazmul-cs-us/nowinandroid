@@ -73,13 +73,15 @@ fun QiblaCompass(
     var userLocation by remember { mutableStateOf<android.location.Location?>(null) }
     var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
     var isInitializing by remember { mutableStateOf(true) }
+    var magneticFieldStrength by remember { mutableFloatStateOf(0f) } // For accuracy detection
     
-    // Sensor management
+    // Sensor management - Use TYPE_ORIENTATION for compass, TYPE_MAGNETIC_FIELD for accuracy
     val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
-    val sensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION) }
+    val orientationSensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION) }
+    val magneticSensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) }
     
-    // Sensor listener
-    val sensorListener = remember {
+    // Orientation sensor listener - For compass direction
+    val orientationListener = remember {
         object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent?) {
                 val magneticNorth = Math.round(event!!.values[0]).toFloat()
@@ -90,8 +92,53 @@ fun QiblaCompass(
             }
             
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                if (!isInitializing) {
+                // TYPE_ORIENTATION may not report accuracy reliably, but update if it does
+                if (!isInitializing && accuracy != SensorManager.SENSOR_STATUS_UNRELIABLE) {
                     sensorAccuracy = accuracy
+                }
+            }
+        }
+    }
+    
+    // Magnetic field sensor listener - For accurate sensor strength detection
+    val magneticFieldListener = remember {
+        object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                if (event == null) return
+                
+                // Calculate magnetic field strength: sqrt(x^2 + y^2 + z^2)
+                val x = event.values[0]
+                val y = event.values[1]
+                val z = event.values[2]
+                val strength = sqrt(x * x + y * y + z * z)
+                magneticFieldStrength = strength
+                
+                // Determine accuracy based on magnetic field strength
+                // Typical Earth magnetic field: ~30-60 microteslas (0.03-0.06)
+                // Low strength (<20) or very high (>100) indicates interference
+                if (!isInitializing) {
+                    sensorAccuracy = when {
+                        strength < 20f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too weak
+                        strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too strong (interference)
+                        strength < 30f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM // Weak field
+                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH // Normal range
+                    }
+                }
+            }
+            
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+                // Magnetic field sensor reports accuracy more reliably
+                if (!isInitializing) {
+                    // Combine reported accuracy with strength-based accuracy
+                    val strengthBasedAccuracy = when {
+                        magneticFieldStrength < 20f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                        magneticFieldStrength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                        magneticFieldStrength < 30f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
+                    }
+                    
+                    // Use the worse of the two (more conservative)
+                    sensorAccuracy = minOf(accuracy, strengthBasedAccuracy)
                 }
             }
         }
@@ -153,19 +200,32 @@ fun QiblaCompass(
         label = "compassRotation"
     )
     
-    // Lifecycle management
+    // Lifecycle management - Register both sensors
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    sensorManager.registerListener(
-                        sensorListener, 
-                        sensor, 
-                        SensorManager.SENSOR_DELAY_GAME
-                    )
+                    // Register orientation sensor for compass direction
+                    orientationSensor?.let {
+                        sensorManager.registerListener(
+                            orientationListener, 
+                            it, 
+                            SensorManager.SENSOR_DELAY_GAME
+                        )
+                    }
+                    // Register magnetic field sensor for accuracy detection
+                    magneticSensor?.let {
+                        sensorManager.registerListener(
+                            magneticFieldListener, 
+                            it, 
+                            SensorManager.SENSOR_DELAY_GAME
+                        )
+                    }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    sensorManager.unregisterListener(sensorListener)
+                    // Unregister both sensors
+                    sensorManager.unregisterListener(orientationListener)
+                    sensorManager.unregisterListener(magneticFieldListener)
                 }
                 else -> {}
             }
@@ -175,7 +235,8 @@ fun QiblaCompass(
         
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            sensorManager.unregisterListener(sensorListener)
+            sensorManager.unregisterListener(orientationListener)
+            sensorManager.unregisterListener(magneticFieldListener)
         }
     }
     

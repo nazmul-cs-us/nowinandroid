@@ -1574,7 +1574,7 @@ fun PrayerTimesScreen(
                             prayerName = "Sunrise",
                             currentEditingTile = currentEditingTile,
                             onEditingTileChange = { currentEditingTile = it },
-                            currentOffset = 0, // Sunrise doesn't have adjustments
+                            currentOffset = storedOffsets.sunrise,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
@@ -1586,7 +1586,10 @@ fun PrayerTimesScreen(
                                     scaleY = 0.82f + (sunriseAnimProgress * 0.18f)
                                     alpha = sunriseAnimProgress
                                 },
-                            onShowPopup = { } // Sunrise doesn't have popup
+                            onShowPopup = { prayerName ->
+                                popupPrayerName = prayerName
+                                showPrayerDialPopup = true
+                            }
                         )
                     }
                 }
@@ -1926,6 +1929,8 @@ fun PrayerTimesScreen(
             // State for adjustment in popup
             var timeAdjustment by remember { mutableStateOf(
                 when (popupPrayerName) {
+                    "Fajr" -> storedOffsets.fajr
+                    "Sunrise" -> storedOffsets.sunrise
                     "Dhuhr" -> storedOffsets.dhuhr
                     "Asr" -> storedOffsets.asr
                     "Maghrib" -> storedOffsets.maghrib
