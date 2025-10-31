@@ -101,20 +101,23 @@ class PrayerSettingsRepository @Inject constructor(
     
     // LAZY INITIALIZATION - Prevents main thread blocking during repository creation
     // This ensures app startup remains fast even with large preference files
-    private val prefs: SharedPreferences by lazy { 
+    private val prefs: SharedPreferences by lazy {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
-    
+
+    // INSTANCE TRACKING - For debugging multiple instance issues
+    private val instanceId = System.identityHashCode(this).toString(16)
+
     init {
         // Load preferences from storage on repository creation
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             try {
-                Log.i(TAG, "🚀 PrayerSettingsRepository initialization started")
+                Log.i(TAG, "🚀 PrayerSettingsRepository initialization started [Instance: $instanceId]")
                 loadAllSettings()
                 _settingsLoaded = true
-                Log.i(TAG, "✅ PrayerSettingsRepository initialization completed")
+                Log.i(TAG, "✅ PrayerSettingsRepository initialization completed [Instance: $instanceId]")
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error during repository initialization", e)
+                Log.e(TAG, "❌ Error during repository initialization [Instance: $instanceId]", e)
             }
         }
     }
@@ -440,10 +443,11 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     // REACTIVE DATA FLOW - Separate flows for each preference type
-    private val _calculationSettingsFlow = MutableStateFlow<PrayerCalculationSettings?>(null)
-    private val _locationPreferencesFlow = MutableStateFlow<PrayerLocationPreferences?>(null)
-    private val _notificationPreferencesFlow = MutableStateFlow<PrayerNotificationPreferences?>(null)
-    
+    // Initialize with defaults immediately to avoid null handling issues
+    private val _calculationSettingsFlow = MutableStateFlow(getDefaultCalculationSettings())
+    private val _locationPreferencesFlow = MutableStateFlow(getDefaultLocationPreferences())
+    private val _notificationPreferencesFlow = MutableStateFlow(getDefaultNotificationPreferences())
+
     // LEGACY COMBINED FLOW - For backward compatibility
     private val _settingsFlow = MutableStateFlow<PrayerSettings?>(null)
     
@@ -451,29 +455,10 @@ class PrayerSettingsRepository @Inject constructor(
     private var _settingsLoaded = false
     
     // PUBLIC FLOWS - Expose separate preference types
-    val calculationSettingsFlow: StateFlow<PrayerCalculationSettings> = _calculationSettingsFlow
-        .filterNotNull()
-        .stateIn(
-            scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-            started = SharingStarted.Lazily,
-            initialValue = getDefaultCalculationSettings()
-        )
-    
-    val locationPreferencesFlow: StateFlow<PrayerLocationPreferences> = _locationPreferencesFlow
-        .filterNotNull()
-        .stateIn(
-            scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-            started = SharingStarted.Lazily,
-            initialValue = getDefaultLocationPreferences()
-        )
-    
-    val notificationPreferencesFlow: StateFlow<PrayerNotificationPreferences> = _notificationPreferencesFlow
-        .filterNotNull()
-        .stateIn(
-            scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-            started = SharingStarted.Lazily,
-            initialValue = getDefaultNotificationPreferences()
-        )
+    // Direct exposure using asStateFlow() ensures immediate reactivity without caching issues
+    val calculationSettingsFlow: StateFlow<PrayerCalculationSettings> = _calculationSettingsFlow.asStateFlow()
+    val locationPreferencesFlow: StateFlow<PrayerLocationPreferences> = _locationPreferencesFlow.asStateFlow()
+    val notificationPreferencesFlow: StateFlow<PrayerNotificationPreferences> = _notificationPreferencesFlow.asStateFlow()
     
     // LEGACY COMBINED FLOW - For backward compatibility
     val settingsFlow: StateFlow<PrayerSettings> = _settingsFlow
@@ -552,15 +537,15 @@ class PrayerSettingsRepository @Inject constructor(
      * NEW GETTERS: Get current preferences by type with fast fallback
      */
     fun getCalculationSettings(): PrayerCalculationSettings {
-        return _calculationSettingsFlow.value ?: getDefaultCalculationSettings()
+        return _calculationSettingsFlow.value  // No longer nullable
     }
     
     fun getLocationPreferences(): PrayerLocationPreferences {
-        return _locationPreferencesFlow.value ?: getDefaultLocationPreferences()
+        return _locationPreferencesFlow.value  // No longer nullable
     }
-    
+
     fun getNotificationPreferences(): PrayerNotificationPreferences {
-        return _notificationPreferencesFlow.value ?: getDefaultNotificationPreferences()
+        return _notificationPreferencesFlow.value  // No longer nullable
     }
     
     /**
@@ -1862,10 +1847,10 @@ class PrayerSettingsRepository @Inject constructor(
      */
     fun restoreToAutoDetected(): Boolean {
         Log.i(TAG, "")
-        Log.i(TAG, "🎯 PRAYER SETTINGS ALGORITHM - RESTORE TO AUTO-DETECTED")
+        Log.i(TAG, "🎯 PRAYER SETTINGS ALGORITHM - RESTORE TO AUTO-DETECTED [Instance: $instanceId]")
         Log.i(TAG, "=".repeat(60))
         Log.i(TAG, "🔄 ALGORITHM PHASE: When user clicks Restore")
-        
+
         val startTime = System.currentTimeMillis()
         
         // STEP 1: Get country code
@@ -1921,6 +1906,19 @@ class PrayerSettingsRepository @Inject constructor(
         _locationPreferencesFlow.value = location
         _notificationPreferencesFlow.value = notification
         Log.i(TAG, "✅ All reactive flows updated - UI will receive restored values")
+
+        // VERIFY FLOW EMISSION: Log the exact values emitted
+        Log.i(TAG, "")
+        Log.i(TAG, "🔍 VERIFY FLOW EMISSION: [Instance: $instanceId]")
+        Log.i(TAG, "   📦 _calculationSettingsFlow.value = $calculation")
+        Log.i(TAG, "   🕰️ Offsets in emitted value:")
+        Log.i(TAG, "      - Fajr: ${calculation.timeOffsets.fajr}")
+        Log.i(TAG, "      - Sunrise: ${calculation.timeOffsets.sunrise}")
+        Log.i(TAG, "      - Dhuhr: ${calculation.timeOffsets.dhuhr}")
+        Log.i(TAG, "      - Asr: ${calculation.timeOffsets.asr}")
+        Log.i(TAG, "      - Maghrib: ${calculation.timeOffsets.maghrib}")
+        Log.i(TAG, "      - Isha: ${calculation.timeOffsets.isha}")
+        Log.i(TAG, "   ✅ Flow emission verified")
         
         // STEP 4: Trigger immediate prayer time recalculation
         Log.i(TAG, "")
