@@ -54,10 +54,21 @@ fun PrayerSettingsDialog(
     var isVisible by remember { mutableStateOf(true) }
     var animateContent by remember { mutableStateOf(false) }
     
-    // ALGORITHM IMPLEMENTATION: Initialization 
+    // ALGORITHM IMPLEMENTATION: Initialization
     var settings by remember { mutableStateOf(PrayerSettings()) }
     var isLoading by remember { mutableStateOf(true) }
-    val repository = remember { com.starception.submission.prayer.repository.PrayerSettingsRepository(context) }
+
+    // IMPORTANT: Get repository from Hilt singleton (not by direct instantiation)
+    val repository = remember {
+        val entryPoint = dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+        )
+        val repo = entryPoint.prayerSettingsRepository()
+        val instanceId = System.identityHashCode(repo).toString(16)
+        android.util.Log.d("PrayerSettingsDialog", "📍 REPOSITORY INSTANCE OBTAINED: $instanceId")
+        repo
+    }
     
     // Staggered content animation trigger
     LaunchedEffect(Unit) {

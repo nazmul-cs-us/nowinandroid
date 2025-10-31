@@ -438,14 +438,25 @@ fun PrayerTimesScreen(
             screenContext.applicationContext,
             com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
         )
-        entryPoint.prayerSettingsRepository()
+        val repo = entryPoint.prayerSettingsRepository()
+        val instanceId = System.identityHashCode(repo).toString(16)
+        android.util.Log.d("PrayerTimesScreen", "📍 REPOSITORY INSTANCE OBTAINED: $instanceId")
+        repo
     }
 
     // Observe the reactive flow - this automatically updates when Prayer Settings changes!
     val calculationSettings = repository.calculationSettingsFlow.collectAsState().value
     val storedOffsets = calculationSettings.timeOffsets
 
-    // Log whenever offsets change
+    // Log whenever calculationSettings changes (BEFORE extracting offsets)
+    LaunchedEffect(calculationSettings) {
+        android.util.Log.d("PrayerTimesScreen", "📥 CALCULATION SETTINGS RECEIVED FROM FLOW:")
+        android.util.Log.d("PrayerTimesScreen", "   📦 Full settings object: $calculationSettings")
+        android.util.Log.d("PrayerTimesScreen", "   🕰️ timeOffsets object: ${calculationSettings.timeOffsets}")
+        android.util.Log.d("PrayerTimesScreen", "   ⏰ Timestamp: ${System.currentTimeMillis()}")
+    }
+
+    // Log whenever offsets change (AFTER extracting from settings)
     LaunchedEffect(storedOffsets) {
         android.util.Log.d("PrayerTimesScreen", "🔄 OFFSETS UPDATED FROM FLOW:")
         android.util.Log.d("PrayerTimesScreen", "   🌅 Fajr: ${storedOffsets.fajr}")
@@ -455,6 +466,7 @@ fun PrayerTimesScreen(
         android.util.Log.d("PrayerTimesScreen", "   🌆 Maghrib: ${storedOffsets.maghrib}")
         android.util.Log.d("PrayerTimesScreen", "   🌙 Isha: ${storedOffsets.isha}")
         android.util.Log.d("PrayerTimesScreen", "   📊 Total non-zero offsets: ${listOf(storedOffsets.fajr, storedOffsets.sunrise, storedOffsets.dhuhr, storedOffsets.asr, storedOffsets.maghrib, storedOffsets.isha).count { it != 0 }}")
+        android.util.Log.d("PrayerTimesScreen", "   ⏰ Timestamp: ${System.currentTimeMillis()}")
     }
     
     // LOCATION SERVICE - For Qibla compass functionality

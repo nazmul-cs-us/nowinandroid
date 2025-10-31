@@ -264,45 +264,41 @@ class PrayerTimeCalculatorService @Inject constructor(
             )
         )
         
-        val offsets = settings.timeOffsets
-        
+        // CRITICAL CHANGE: DayPrayerTimes now contains BASE astronomical times ONLY
+        // User offsets are NOT applied here - they will be applied at UI display layer
+        // This ensures:
+        // 1. Clean separation: Calculation layer = base times, UI layer = apply offsets
+        // 2. Interactive dial has correct base reference point
+        // 3. "Restore Auto-Generated" simply sets offsets to 0
+        // 4. No double-offset bugs
+
         // STEP 6: FINAL PRAYER TIME ASSEMBLY
-        // Apply individual user time offsets to each prayer time.
-        // Each prayer can be adjusted independently to match local mosque times or personal preference.
-        
-        // FAJR: Apply user offset to the calculated pre-dawn time
-        val fajr = addMinutesToTime(fajrTime, offsets.fajr)
-        
-        // SUNRISE: Convert astronomical sunrise to LocalTime and apply user offset
+        // Package BASE astronomical times without any user offset adjustments
+
+        // FAJR: Base pre-dawn time (no user offset applied)
+        val fajr = fajrTime
+
+        // SUNRISE: Base astronomical sunrise time (no user offset applied)
         // Note: Sunrise is for reference/sunnah prayers, not one of the 5 obligatory prayers
-        val sunriseAdjusted = addMinutesToTime(
-            astronomicalCalculator.decimalHourToLocalTime(sunrise), 
-            offsets.sunrise
-        )
-        
-        // DHUHR: Use solar noon as base time and apply user offset
+        val sunriseAdjusted = astronomicalCalculator.decimalHourToLocalTime(sunrise)
+
+        // DHUHR: Base solar noon time (no user offset applied)
         // This is when the sun reaches its zenith (highest point in the sky)
-        val dhuhr = addMinutesToTime(
-            astronomicalCalculator.decimalHourToLocalTime(solarNoon), 
-            offsets.dhuhr
-        )
-        
-        // ASR: Apply user offset to the calculated afternoon shadow-based time
-        val asr = addMinutesToTime(asrTime, offsets.asr)
-        
-        // MAGHRIB: Apply both calculation method offset AND user offset
-        // First apply the method-specific offset (e.g., +3 minutes for some methods)
-        // Then apply the user's personal adjustment
+        val dhuhr = astronomicalCalculator.decimalHourToLocalTime(solarNoon)
+
+        // ASR: Base afternoon shadow-based time (no user offset applied)
+        val asr = asrTime
+
+        // MAGHRIB: Base sunset time + method-specific offset ONLY
+        // Method-specific offset (e.g., +3 minutes for some regions) is still applied
+        // User personal offset will be applied at UI layer
         val maghrib = addMinutesToTime(
-            addMinutesToTime(
-                astronomicalCalculator.decimalHourToLocalTime(sunset),
-                settings.getEffectiveMaghribOffset()  // Method/country-specific offset (e.g., 4min for Iran)
-            ),
-            offsets.maghrib  // User personal adjustment
+            astronomicalCalculator.decimalHourToLocalTime(sunset),
+            settings.getEffectiveMaghribOffset()  // Method/country-specific offset (e.g., 4min for Iran)
         )
-        
-        // ISHA: Apply user offset to the calculated night time
-        val isha = addMinutesToTime(ishaTime, offsets.isha)
+
+        // ISHA: Base night time (no user offset applied)
+        val isha = ishaTime
         
         // STEP 6: FINAL VERIFICATION AND LOGGING
         logCalculationPhase(
@@ -310,13 +306,15 @@ class PrayerTimeCalculatorService @Inject constructor(
             "Verifying all prayer times are valid and applying final adjustments"
         )
         
-        Log.i(TAG, "🕰️ FINAL PRAYER TIMES (after all adjustments):")
-        Log.i(TAG, "  🌄 Fajr: $fajr" + if (offsets.fajr != 0) " (${offsets.fajr}m)" else "")
-        Log.i(TAG, "  🌅 Sunrise: $sunriseAdjusted" + if (offsets.sunrise != 0) " (${offsets.sunrise}m)" else "")
-        Log.i(TAG, "  ☀️ Dhuhr: $dhuhr" + if (offsets.dhuhr != 0) " (${offsets.dhuhr}m)" else "")
-        Log.i(TAG, "  🌇 Asr: $asr" + if (offsets.asr != 0) " (${offsets.asr}m)" else "")
-        Log.i(TAG, "  🌆 Maghrib: $maghrib (offset: ${settings.getEffectiveMaghribOffset()}m)" + if (offsets.maghrib != 0) " + user: ${offsets.maghrib}m" else "")
-        Log.i(TAG, "  🌙 Isha: $isha" + if (offsets.isha != 0) " (${offsets.isha}m)" else "")
+        Log.i(TAG, "🕰️ BASE ASTRONOMICAL PRAYER TIMES (no user offsets):")
+        Log.i(TAG, "  🌄 Fajr: $fajr (base time)")
+        Log.i(TAG, "  🌅 Sunrise: $sunriseAdjusted (base time)")
+        Log.i(TAG, "  ☀️ Dhuhr: $dhuhr (base time)")
+        Log.i(TAG, "  🌇 Asr: $asr (base time)")
+        Log.i(TAG, "  🌆 Maghrib: $maghrib (includes method offset: ${settings.getEffectiveMaghribOffset()}m)")
+        Log.i(TAG, "  🌙 Isha: $isha (base time)")
+        Log.i(TAG, "")
+        Log.i(TAG, "ℹ️ NOTE: User offsets will be applied at UI display layer")
         Log.i(TAG, "")
         
         // STEP 7: FINAL VALIDATION
