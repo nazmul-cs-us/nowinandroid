@@ -260,12 +260,12 @@ fun InteractivePrayerDial(
             )
         }
 
-        // Central text container with clean background like reference
+        // Central text container - clean and minimal like reference
         Box(
             modifier = Modifier
-                .size(180.dp)
+                .size(200.dp)
                 .background(
-                    color = Color.Transparent, // Transparent to blend with dial background
+                    color = Color.Transparent,
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -274,98 +274,84 @@ fun InteractivePrayerDial(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Prayer name - improved typography
+                // Prayer name display at the top
                 Text(
                     text = prayerName,
-                    style = MaterialTheme.typography.headlineSmall.copy(
+                    style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 20.sp,
-                        letterSpacing = 0.15.sp
+                        fontSize = 24.sp,
+                        letterSpacing = 0.sp
                     ),
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = Color(0xFF26C6DA), // Teal color to match the theme
                     textAlign = TextAlign.Center
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
-                // Adjusted time display - enhanced with better typography
-                val adjustedTime = adjustTimeByMinutes(originalTime, currentAdjustment)
+
+                // Large time display in 00:00 format like reference
+                val adjustedTime = adjustTimeByMinutesForDisplay(originalTime, currentAdjustment)
                 Text(
                     text = adjustedTime,
-                    style = MaterialTheme.typography.displaySmall.copy(
+                    style = MaterialTheme.typography.displayLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 36.sp,
-                        letterSpacing = (-0.5).sp // Tighter spacing for time display
+                        fontSize = 56.sp,
+                        letterSpacing = (-1.5).sp // Tight spacing for digital clock look
                     ),
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = Color(0xFF37474F), // Dark blue-gray for better contrast
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-                // Adjustment amount with improved styling (hours and minutes format)
-                val adjustmentText = when {
-                    currentAdjustment > 0 -> {
-                        val hours = currentAdjustment / 60
-                        val minutes = currentAdjustment % 60
-                        when {
-                            hours > 0 && minutes > 0 -> "+${hours}h ${minutes}m"
-                            hours > 0 -> "+${hours}h"
-                            else -> "+${minutes}m"
+                // Small pill indicator showing adjustment amount below
+                if (currentAdjustment != 0) {
+                    val adjustmentText = when {
+                        currentAdjustment > 0 -> {
+                            val hours = currentAdjustment / 60
+                            val minutes = currentAdjustment % 60
+                            when {
+                                hours > 0 && minutes > 0 -> "+${hours}h ${minutes}m"
+                                hours > 0 -> "+${hours}h"
+                                else -> "+${minutes}m"
+                            }
                         }
-                    }
-                    currentAdjustment < 0 -> {
-                        val totalMinutes = kotlin.math.abs(currentAdjustment)
-                        val hours = totalMinutes / 60
-                        val minutes = totalMinutes % 60
-                        when {
-                            hours > 0 && minutes > 0 -> "-${hours}h ${minutes}m"
-                            hours > 0 -> "-${hours}h"
-                            else -> "${currentAdjustment}m" // Keep negative sign
+                        currentAdjustment < 0 -> {
+                            val totalMinutes = kotlin.math.abs(currentAdjustment)
+                            val hours = totalMinutes / 60
+                            val minutes = totalMinutes % 60
+                            when {
+                                hours > 0 && minutes > 0 -> "-${hours}h ${minutes}m"
+                                hours > 0 -> "-${hours}h"
+                                else -> "${currentAdjustment}m"
+                            }
                         }
+                        else -> ""
                     }
-                    else -> "±0m"
+
+                    if (adjustmentText.isNotEmpty()) {
+                        Text(
+                            text = adjustmentText,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 11.sp,
+                                letterSpacing = 0.2.sp
+                            ),
+                            color = Color(0xFF26C6DA), // Teal color
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
-
-                Text(
-                    text = adjustmentText,
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 13.sp,
-                        letterSpacing = 0.1.sp
-                    ),
-                    color = when {
-                        currentAdjustment > 0 -> MaterialTheme.colorScheme.primary
-                        currentAdjustment < 0 -> MaterialTheme.colorScheme.error
-                        else -> MaterialTheme.colorScheme.outline
-                    },
-                    textAlign = TextAlign.Center
-                )
-                
-                Spacer(modifier = Modifier.height(10.dp))
-                
-                // Professional guidance hint - refined
-                Text(
-                    text = "Release to save",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 10.sp,
-                        letterSpacing = 1.0.sp
-                    ),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
-                    textAlign = TextAlign.Center
-                )
             }
         }
     }
 }
 
 private fun DrawScope.drawCleanCircularTimer(
-    center: Offset, 
-    radius: Float, 
-    timeAdjustment: Int, 
-    originalTime: LocalTime, 
-    isDragging: Boolean, 
+    center: Offset,
+    radius: Float,
+    timeAdjustment: Int,
+    originalTime: LocalTime,
+    isDragging: Boolean,
     currentDragAngle: Float,
     surfaceColor: Color,
     onSurfaceColor: Color,
@@ -373,80 +359,64 @@ private fun DrawScope.drawCleanCircularTimer(
     knobScale: Float = 1f,
     progressArcGlow: Float = 1f
 ) {
-    // Clean circular design matching the reference image - no document background
-    val timerRadius = radius // Use full radius for pure circular design
-    
-    // Theme-aware colors for dark/light mode support
-    val shadowColor = onSurfaceColor.copy(alpha = 0.08f)
-    val borderColor = outlineColor
-    
-    // Outer shadow for depth (like the reference)
+    // Clean circular design matching the reference image
+    val timerRadius = radius * 1.15f // Slightly larger for better visibility
+
+    // Clean light gray background like reference image
+    val backgroundColor = Color(0xFFECEFF1) // Light blue-gray background
+    val tickGrayColor = Color(0xFFB0BEC5) // Gray for inactive ticks
+    val tickTealColor = Color(0xFF26C6DA) // Bright cyan/teal for progress
+
+    // Subtle outer shadow for depth
     drawCircle(
-        color = shadowColor,
-        radius = timerRadius + 6f,
-        center = Offset(center.x + 1f, center.y + 2f)
+        color = Color.Black.copy(alpha = 0.08f),
+        radius = timerRadius + 8f,
+        center = Offset(center.x + 2f, center.y + 3f)
     )
-    
-    // Main circle background (theme-aware)
+
+    // Main circle background - clean light gray
     drawCircle(
-        color = surfaceColor,
+        color = backgroundColor,
         radius = timerRadius,
         center = center
     )
-    
-    // Subtle inner gradient for depth - using theme-aware colors
-    val innerGradientColors = listOf(
-        surfaceColor.copy(alpha = 1f), // Surface color at top
-        surfaceColor.copy(alpha = 0.9f), // Slightly darker surface
-        surfaceColor.copy(alpha = 0.8f)  // Even darker surface at bottom
-    )
-    
-            drawCircle(
-                brush = Brush.radialGradient(
-            colors = innerGradientColors,
-            center = Offset(center.x, center.y - radius * 0.3f), // Offset upward for lighting effect
-            radius = timerRadius * 0.9f
-        ),
-        radius = timerRadius,
-        center = center
-    )
-    
-    // Subtle border like the reference
+
+    // Very subtle inner shadow for depth
     drawCircle(
-        color = borderColor,
-        radius = timerRadius,
-        center = center,
-        style = Stroke(width = 1.5f)
+        color = Color.Black.copy(alpha = 0.03f),
+        radius = timerRadius - 4f,
+        center = Offset(center.x, center.y + 1f)
     )
-    
-    // Draw outer border with individual tick marks like the reference
-    val outerRadius = timerRadius + 15f // Closer to main circle
-    val tickCount = 120 // Much denser tick marks like reference
+
+    // No border - cleaner look like reference
+
+    // Draw tick marks around the outer edge
+    val tickCount = 120 // Dense tick marks for precision
     
     // Calculate actual prayer time (adjusted) for angle calculation
     val adjustedDateTime = LocalDateTime.of(LocalDate.now(), originalTime).plusMinutes(timeAdjustment.toLong())
     val adjustedTime = adjustedDateTime.toLocalTime()
-    
-    // Convert time to angle (12-hour format for better readability)
+
+    // Convert time to angle (starting from top - 12 o'clock position)
     val hourIn12Format = if (adjustedTime.hour % 12 == 0) 12 else adjustedTime.hour % 12
-    val timeAngle = ((hourIn12Format * 60 + adjustedTime.minute) / (12 * 60f)) * 360f - 90f // Start from 12 o'clock (top)
-    
-    // Draw individual tick marks around the outer circle
+    val timeAngle = ((hourIn12Format * 60 + adjustedTime.minute) / (12 * 60f)) * 360f - 90f
+
+    // Draw individual tick marks around the edge
     for (i in 0 until tickCount) {
-        val markerAngle = i * (360.0 / tickCount) * PI / 180.0 // Evenly spaced
-        
+        val markerAngle = (i * (360.0 / tickCount) - 90.0) * PI / 180.0 // Start from top
+
         // Determine if this tick should be highlighted (teal) based on current progress
         val currentAngle = if (isDragging) currentDragAngle else timeAngle
-        val normalizedCurrentAngle = ((currentAngle % 360 + 360) % 360) // Normalize to 0-360
-        val normalizedTickAngle = (i * (360.0 / tickCount)) // Tick angle in degrees
-        
-        // Check if this tick is within the progress arc (from 0 to current position)
+        val normalizedCurrentAngle = ((currentAngle + 90f) % 360 + 360) % 360 // Normalize relative to top
+        val normalizedTickAngle = ((i * (360.0 / tickCount)) % 360).toFloat()
+
+        // Check if this tick is within the progress arc (clockwise from top)
         val isHighlighted = normalizedTickAngle <= normalizedCurrentAngle
-        
-        // Tick positions - longer and more elegant like reference
-        val tickOuterRadius = outerRadius + 12f  // Much longer extending outward
-        val tickInnerRadius = outerRadius - 3f   // Slightly inward for better connection
-        
+
+        // Tick positions - positioned at the edge like reference
+        val tickInnerRadius = timerRadius - 25f // Inner edge of ticks
+        val tickOuterRadius = timerRadius - 5f  // Outer edge of ticks (just inside the circle)
+
         val tickStart = Offset(
             center.x + tickInnerRadius * cos(markerAngle.toFloat()).toFloat(),
             center.y + tickInnerRadius * sin(markerAngle.toFloat()).toFloat()
@@ -455,112 +425,83 @@ private fun DrawScope.drawCleanCircularTimer(
             center.x + tickOuterRadius * cos(markerAngle.toFloat()).toFloat(),
             center.y + tickOuterRadius * sin(markerAngle.toFloat()).toFloat()
         )
-        
-        // Draw tick mark with appropriate color - much thinner and longer like reference
+
+        // Draw tick mark - thinner like reference
         drawLine(
             color = if (isHighlighted) {
-                // Material 3 expressive glow effect on progress ticks
-                Color(0xFF10B981).copy(alpha = 0.7f + (progressArcGlow * 0.3f))
+                tickTealColor.copy(alpha = 0.85f + (progressArcGlow * 0.15f))
             } else {
-                outlineColor.copy(alpha = 0.6f)
+                tickGrayColor.copy(alpha = 0.4f) // More subtle gray
             },
             start = tickStart,
             end = tickEnd,
-            strokeWidth = if (isHighlighted && progressArcGlow > 1f) {
-                0.8f * progressArcGlow // Thicker strokes during interaction
-            } else {
-                0.8f
-            },
+            strokeWidth = if (isHighlighted) 2.5f else 2f,
             cap = StrokeCap.Round
         )
     }
-    
-    // No inner tick marks needed - using outer border design now
-    
-    // Draw teal pill-shaped indicator positioned inside the dial (like your reference design)
+
+    // Draw small teal indicator pill at the progress position
     val displayAngle = if (isDragging) currentDragAngle else timeAngle
     val indicatorAngle = displayAngle * PI / 180f
-    val indicatorRadius = timerRadius - 30f // Position inside the dial, closer to the center
+    val indicatorRadius = timerRadius - 15f // Position at the edge where ticks are
     
     val indicatorCenter = Offset(
         center.x + indicatorRadius * cos(indicatorAngle.toFloat()).toFloat(),
         center.y + indicatorRadius * sin(indicatorAngle.toFloat()).toFloat()
     )
-    
-    // Material 3 expressive pill-shaped indicator with dynamic scaling
-    val basePillWidth = 40f  
-    val basePillHeight = 16f 
-    val pillWidth = basePillWidth * knobScale  // Animated width for touch feedback
-    val pillHeight = basePillHeight * knobScale // Animated height for touch feedback
-    
-    // Calculate pill orientation (perpendicular to radius)
+
+    // Small teal pill indicator like reference - simple and clean
+    val pillRadius = (8f + (knobScale - 1f) * 4f) // Subtle size change on drag
+
+    // Draw a simple rounded rectangle (pill shape) perpendicular to the radius
     val perpAngle = indicatorAngle + PI / 2
-    
-    // Calculate pill corner positions
-    val halfWidth = pillWidth / 2f
-    val halfHeight = pillHeight / 2f
-    
-    // Create rounded rectangle path for the pill
+    val pillHalfLength = 20f * knobScale
+    val pillHalfWidth = 6f * knobScale
+
+    // Create pill path
     val pillPath = Path().apply {
-        // Calculate the four corners of the pill rectangle
         val corner1 = Offset(
-            indicatorCenter.x - halfWidth * cos(perpAngle.toFloat()) - halfHeight * cos(indicatorAngle.toFloat()),
-            indicatorCenter.y - halfWidth * sin(perpAngle.toFloat()) - halfHeight * sin(indicatorAngle.toFloat())
+            indicatorCenter.x - pillHalfLength * cos(perpAngle.toFloat()) - pillHalfWidth * cos(indicatorAngle.toFloat()),
+            indicatorCenter.y - pillHalfLength * sin(perpAngle.toFloat()) - pillHalfWidth * sin(indicatorAngle.toFloat())
         )
         val corner2 = Offset(
-            indicatorCenter.x + halfWidth * cos(perpAngle.toFloat()) - halfHeight * cos(indicatorAngle.toFloat()),
-            indicatorCenter.y + halfWidth * sin(perpAngle.toFloat()) - halfHeight * sin(indicatorAngle.toFloat())
+            indicatorCenter.x + pillHalfLength * cos(perpAngle.toFloat()) - pillHalfWidth * cos(indicatorAngle.toFloat()),
+            indicatorCenter.y + pillHalfLength * sin(perpAngle.toFloat()) - pillHalfWidth * sin(indicatorAngle.toFloat())
         )
         val corner3 = Offset(
-            indicatorCenter.x + halfWidth * cos(perpAngle.toFloat()) + halfHeight * cos(indicatorAngle.toFloat()),
-            indicatorCenter.y + halfWidth * sin(perpAngle.toFloat()) + halfHeight * sin(indicatorAngle.toFloat())
+            indicatorCenter.x + pillHalfLength * cos(perpAngle.toFloat()) + pillHalfWidth * cos(indicatorAngle.toFloat()),
+            indicatorCenter.y + pillHalfLength * sin(perpAngle.toFloat()) + pillHalfWidth * sin(indicatorAngle.toFloat())
         )
         val corner4 = Offset(
-            indicatorCenter.x - halfWidth * cos(perpAngle.toFloat()) + halfHeight * cos(indicatorAngle.toFloat()),
-            indicatorCenter.y - halfWidth * sin(perpAngle.toFloat()) + halfHeight * sin(indicatorAngle.toFloat())
+            indicatorCenter.x - pillHalfLength * cos(perpAngle.toFloat()) + pillHalfWidth * cos(indicatorAngle.toFloat()),
+            indicatorCenter.y - pillHalfLength * sin(perpAngle.toFloat()) + pillHalfWidth * sin(indicatorAngle.toFloat())
         )
-        
+
         moveTo(corner1.x, corner1.y)
         lineTo(corner2.x, corner2.y)
         lineTo(corner3.x, corner3.y)
         lineTo(corner4.x, corner4.y)
         close()
     }
-    
-    // Draw the Material 3 expressive pill indicator with glow
-    val knobColor = Color(0xFF10B981).copy(
-        alpha = 0.9f + (progressArcGlow * 0.1f) // Enhanced visibility during interaction
-    )
-    
+
+    // Draw the pill body
     drawPath(
         path = pillPath,
-        color = knobColor
+        color = tickTealColor
     )
-    
-    // Add rounded end caps to make it pill-like
-    val capRadius = pillHeight / 2f
-    
-    // Left cap
-    val leftCapCenter = Offset(
-        indicatorCenter.x - halfWidth * cos(perpAngle.toFloat()),
-        indicatorCenter.y - halfWidth * sin(perpAngle.toFloat())
+
+    // Add rounded caps
+    val leftCap = Offset(
+        indicatorCenter.x - pillHalfLength * cos(perpAngle.toFloat()),
+        indicatorCenter.y - pillHalfLength * sin(perpAngle.toFloat())
     )
-    drawCircle(
-        color = knobColor,
-        radius = capRadius,
-        center = leftCapCenter
+    val rightCap = Offset(
+        indicatorCenter.x + pillHalfLength * cos(perpAngle.toFloat()),
+        indicatorCenter.y + pillHalfLength * sin(perpAngle.toFloat())
     )
-    
-    // Right cap with enhanced Material 3 styling
-    val rightCapCenter = Offset(
-        indicatorCenter.x + halfWidth * cos(perpAngle.toFloat()),
-        indicatorCenter.y + halfWidth * sin(perpAngle.toFloat())
-    )
-    drawCircle(
-        color = knobColor,
-        radius = capRadius,
-        center = rightCapCenter
-    )
+
+    drawCircle(color = tickTealColor, radius = pillHalfWidth, center = leftCap)
+    drawCircle(color = tickTealColor, radius = pillHalfWidth, center = rightCap)
 }
 
 private fun DrawScope.drawPNGDocumentBackground(center: Offset, radius: Float) {
@@ -661,10 +602,39 @@ private fun adjustTimeByMinutes(originalTime: LocalTime, minutes: Int): String {
     ).plusMinutes(minutes.toLong())
 
     val adjustedTime = adjustedDateTime.toLocalTime()
-    val hour12 = if (adjustedTime.hour == 0) 12 
-                else if (adjustedTime.hour > 12) adjustedTime.hour - 12 
+    val hour12 = if (adjustedTime.hour == 0) 12
+                else if (adjustedTime.hour > 12) adjustedTime.hour - 12
                 else adjustedTime.hour
     val amPm = if (adjustedTime.hour < 12) "AM" else "PM"
 
     return String.format("%d:%02d %s", hour12, adjustedTime.minute, amPm)
+}
+
+// Format time in 12-hour format with AM/PM
+private fun adjustTimeByMinutesForDisplay(originalTime: LocalTime, minutes: Int): String {
+    val adjustedDateTime = LocalDateTime.of(
+        LocalDate.now(),
+        originalTime
+    ).plusMinutes(minutes.toLong())
+
+    val adjustedTime = adjustedDateTime.toLocalTime()
+
+    // DEBUG: Log the time conversion
+    Log.d("InteractiveDial", "🕐 TIME CONVERSION DEBUG:")
+    Log.d("InteractiveDial", "   📥 Original time: $originalTime (hour=${originalTime.hour}, minute=${originalTime.minute})")
+    Log.d("InteractiveDial", "   ➕ Adjustment: ${minutes}m")
+    Log.d("InteractiveDial", "   ⏰ Adjusted 24h: $adjustedTime (hour=${adjustedTime.hour}, minute=${adjustedTime.minute})")
+
+    // Correct 12-hour conversion logic
+    val hour12 = when {
+        adjustedTime.hour == 0 -> 12  // Midnight (00:00) → 12 AM
+        adjustedTime.hour <= 12 -> adjustedTime.hour  // 1-12 → stay the same
+        else -> adjustedTime.hour - 12  // 13-23 → subtract 12
+    }
+    val amPm = if (adjustedTime.hour < 12) "AM" else "PM"
+
+    val result = String.format("%02d:%02d %s", hour12, adjustedTime.minute, amPm)
+    Log.d("InteractiveDial", "   🎯 Final 12h format: $result")
+
+    return result
 }

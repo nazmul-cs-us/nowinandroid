@@ -78,39 +78,59 @@ fun PrayerSettingsDialog(
             val autoDetectedSettings = cachedCountry?.let { repository.getAutoDetectedSettingsForCountry(it) }
             Log.i("PrayerSettingsDialog", "🤖 Auto-detected settings: ${autoDetectedSettings != null}")
             
-            // 3. Load cached prayer settings from preferences
-            val cachedSettings = repository.getCachedPrayerSettings()
-            Log.i("PrayerSettingsDialog", "💾 Cached settings: ${cachedSettings != null}")
-            
-            // 4. Populate UI fields following priority
-            val initialSettings = when {
-                cachedSettings != null -> {
-                    Log.i("PrayerSettingsDialog", "✅ Using cached prayer settings")
+            // 3. Load CURRENT settings from reactive flow (SINGLE SOURCE OF TRUTH)
+            val currentCalculationSettings = repository.getLoadedCalculationSettings()
+            Log.i("PrayerSettingsDialog", "💾 Current calculation settings loaded from flow")
+            Log.i("PrayerSettingsDialog", "   🌇 Asr offset: ${currentCalculationSettings.timeOffsets.asr}")
+            Log.i("PrayerSettingsDialog", "   🌞 Dhuhr offset: ${currentCalculationSettings.timeOffsets.dhuhr}")
 
-                    // IMPORTANT: Merge auto-detected country info into cached settings for restore button
-                    if (autoDetectedSettings != null && cachedCountry != null) {
-                        Log.i("PrayerSettingsDialog", "   🔄 Merging auto-detected country info into cached settings")
-                        Log.i("PrayerSettingsDialog", "   🌍 Country: ${autoDetectedSettings.autoDetectedCountryName} ($cachedCountry)")
-                        cachedSettings.copy(
-                            autoDetectedCountryName = autoDetectedSettings.autoDetectedCountryName,
-                            autoDetectedCountryCode = autoDetectedSettings.autoDetectedCountryCode
-                        )
-                    } else {
-                        Log.w("PrayerSettingsDialog", "   ⚠️ No auto-detected country info available to merge")
-                        cachedSettings
-                    }
+            // 4. Populate UI fields - use current calculation settings as the source of truth
+            val initialSettings = when {
+                autoDetectedSettings != null && cachedCountry != null -> {
+                    Log.i("PrayerSettingsDialog", "✅ Merging calculation settings with auto-detected country info")
+                    Log.i("PrayerSettingsDialog", "   🌍 Country: ${autoDetectedSettings.autoDetectedCountryName} ($cachedCountry)")
+
+                    // Convert CalculationSettings to PrayerSettings with country info
+                    PrayerSettings(
+                        calculationMethod = currentCalculationSettings.calculationMethod,
+                        asrMadhhab = currentCalculationSettings.asrMadhhab,
+                        highLatitudeAdjustment = currentCalculationSettings.highLatitudeAdjustment,
+                        customFajrAngle = currentCalculationSettings.customFajrAngle,
+                        customIshaAngle = currentCalculationSettings.customIshaAngle,
+                        customIshaDelay = currentCalculationSettings.customIshaDelay,
+                        customMaghribOffset = currentCalculationSettings.customMaghribOffset,
+                        timeOffsets = currentCalculationSettings.timeOffsets,
+                        autoDetectedCountryName = autoDetectedSettings.autoDetectedCountryName,
+                        autoDetectedCountryCode = autoDetectedSettings.autoDetectedCountryCode,
+                        isMethodAutoDetected = autoDetectedSettings.isMethodAutoDetected,
+                        isMadhhabAutoDetected = autoDetectedSettings.isMadhhabAutoDetected,
+                        areCustomAnglesAutoDetected = autoDetectedSettings.areCustomAnglesAutoDetected
+                    )
                 }
                 autoDetectedSettings != null -> {
                     Log.i("PrayerSettingsDialog", "✅ Using auto-detected settings for $cachedCountry")
                     autoDetectedSettings
                 }
                 else -> {
-                    Log.i("PrayerSettingsDialog", "✅ Using default settings")
-                    PrayerSettings()
+                    Log.i("PrayerSettingsDialog", "✅ Using current calculation settings as base")
+                    // Convert CalculationSettings to PrayerSettings
+                    PrayerSettings(
+                        calculationMethod = currentCalculationSettings.calculationMethod,
+                        asrMadhhab = currentCalculationSettings.asrMadhhab,
+                        highLatitudeAdjustment = currentCalculationSettings.highLatitudeAdjustment,
+                        customFajrAngle = currentCalculationSettings.customFajrAngle,
+                        customIshaAngle = currentCalculationSettings.customIshaAngle,
+                        customIshaDelay = currentCalculationSettings.customIshaDelay,
+                        customMaghribOffset = currentCalculationSettings.customMaghribOffset,
+                        timeOffsets = currentCalculationSettings.timeOffsets
+                    )
                 }
             }
-            
+
             settings = initialSettings
+            Log.i("PrayerSettingsDialog", "📊 Initial UI offsets set:")
+            Log.i("PrayerSettingsDialog", "   🌇 Asr: ${initialSettings.timeOffsets.asr}")
+            Log.i("PrayerSettingsDialog", "   🌞 Dhuhr: ${initialSettings.timeOffsets.dhuhr}")
             isLoading = false
             Log.i("PrayerSettingsDialog", "✅ Initialization complete")
         } catch (e: Exception) {

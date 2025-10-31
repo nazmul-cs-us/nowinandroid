@@ -713,16 +713,40 @@ class PrayerSettingsRepository @Inject constructor(
             Log.i(TAG, "     🔄 CHANGED: High latitude adjustment modified")
         }
         
-        // ALGORITHM STEP 1: Update cached_prayer_settings (JSON format)
+        // ALGORITHM STEP 1: Update calculation_settings_json
         Log.i(TAG, "")
-        Log.i(TAG, "💾 ALGORITHM STEP 1: Update cached_prayer_settings in JSON format")
+        Log.i(TAG, "💾 ALGORITHM STEP 1: Update calculation_settings_json")
         val saveStart = System.currentTimeMillis()
         saveCalculationSettings(settings)
         val saveTime = System.currentTimeMillis() - saveStart
         Log.i(TAG, "✅ STEP 1 COMPLETE: Settings saved to preferences (${saveTime}ms)")
         Log.i(TAG, "   📄 Storage: JSON format in SharedPreferences")
         Log.i(TAG, "   🔑 Key: calculation_settings_json")
-        
+
+        // ALGORITHM STEP 1b: Also update cached_prayer_settings for Prayer Settings dialog compatibility
+        Log.i(TAG, "")
+        Log.i(TAG, "💾 ALGORITHM STEP 1b: Update cached_prayer_settings (for Prayer Settings dialog)")
+        val cacheStart = System.currentTimeMillis()
+
+        // Get current cached settings and update only the calculation part
+        val currentCached = getCachedPrayerSettings()
+        if (currentCached != null) {
+            val updatedCached = currentCached.copy(
+                calculationMethod = settings.calculationMethod,
+                asrMadhhab = settings.asrMadhhab,
+                highLatitudeAdjustment = settings.highLatitudeAdjustment,
+                customFajrAngle = settings.customFajrAngle,
+                customIshaAngle = settings.customIshaAngle,
+                customIshaDelay = settings.customIshaDelay,
+                customMaghribOffset = settings.customMaghribOffset,
+                timeOffsets = settings.timeOffsets
+            )
+            saveCachedPrayerSettings(updatedCached)
+            Log.i(TAG, "✅ STEP 1b COMPLETE: Cached settings updated (${System.currentTimeMillis() - cacheStart}ms)")
+        } else {
+            Log.w(TAG, "⚠️ STEP 1b SKIPPED: No cached settings found to update")
+        }
+
         // Update reactive flows
         Log.i(TAG, "")
         Log.i(TAG, "🔄 REACTIVE FLOW UPDATE: Updating in-memory flows for UI")
@@ -1878,15 +1902,22 @@ class PrayerSettingsRepository @Inject constructor(
         Log.i(TAG, "   📄 Storage: JSON format in SharedPreferences")
         Log.i(TAG, "   🔑 Key: current_settings_json")
         
+        // CRITICAL: Save to calculation_settings_json so it persists across app restarts
+        Log.i(TAG, "")
+        Log.i(TAG, "💾 STEP 3b: Save to calculation_settings_json for persistence")
+        val (calculation, location, notification) = autoDetectedSettings.toSeparatePreferences()
+        saveCalculationSettings(calculation)
+        Log.i(TAG, "✅ Calculation settings saved to calculation_settings_json")
+
         // Update reactive flows
         Log.i(TAG, "")
         Log.i(TAG, "🔄 REACTIVE FLOW UPDATE: Update in-memory flows")
         _settingsFlow.value = autoDetectedSettings
         _settingsFlow.tryEmit(autoDetectedSettings)
-        
-        // Update separate preference flows
-        val (calculation, location, notification) = autoDetectedSettings.toSeparatePreferences()
+
+        // Update separate preference flows with already-extracted values
         _calculationSettingsFlow.value = calculation
+        _calculationSettingsFlow.tryEmit(calculation)
         _locationPreferencesFlow.value = location
         _notificationPreferencesFlow.value = notification
         Log.i(TAG, "✅ All reactive flows updated - UI will receive restored values")
