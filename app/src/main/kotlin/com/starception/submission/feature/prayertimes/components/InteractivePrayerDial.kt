@@ -13,13 +13,18 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.animation.core.*
@@ -175,13 +180,11 @@ fun InteractivePrayerDial(
                         onDragEnd = {
                             Log.d("InteractiveDial", "🏁 DRAG END - Prayer: $prayerName, Final adjustment: ${currentAdjustment}m")
                             Log.d("InteractiveDial", "📊 Final accumulated angle: ${accumulatedAngle}°")
-                            Log.d("InteractiveDial", "💾 AUTO-SAVING adjustment after drag...")
+                            Log.d("InteractiveDial", "🔵 Drag ended - Save button will appear for user to confirm")
                             isDragging = false
 
-                            // Auto-save after drag ends
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onSaveAdjustment(prayerName, currentAdjustment)
-                            Log.d("InteractiveDial", "✅ SAVE CALLBACK INVOKED with ${currentAdjustment}m")
+                            // Light haptic feedback to indicate drag ended
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         }
                     ) { change, _ ->
                         if (isDragging) {
@@ -261,13 +264,60 @@ fun InteractivePrayerDial(
         }
 
         // Central text container - clean and minimal like reference
+        var swipeOffset by remember { mutableStateOf(0f) }
+
         Box(
             modifier = Modifier
                 .size(200.dp)
                 .background(
                     color = Color.Transparent,
                     shape = CircleShape
-                ),
+                )
+                .pointerInput(baseAdjustment, currentAdjustment) {
+                    // Detect horizontal swipes in the center (not on the knob)
+                    detectDragGestures(
+                        onDragStart = {
+                            swipeOffset = 0f
+                        },
+                        onDragEnd = {
+                            val hasAdjusted = currentAdjustment != baseAdjustment
+                            if (hasAdjusted) {
+                                if (swipeOffset > 100f) {
+                                    // Swipe right - Save
+                                    Log.d("InteractiveDial", "→ SWIPE RIGHT - SAVE - Prayer: $prayerName, Adjustment: ${currentAdjustment}m, Offset: ${swipeOffset}px")
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onSaveAdjustment(prayerName, currentAdjustment)
+                                } else if (swipeOffset < -100f) {
+                                    // Swipe left - Undo
+                                    Log.d("InteractiveDial", "← SWIPE LEFT - UNDO - Prayer: $prayerName, Offset: ${swipeOffset}px")
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    currentAdjustment = baseAdjustment
+                                    onTimeAdjusted(baseAdjustment)
+                                    onSaveAdjustment(prayerName, baseAdjustment) // Close dial
+                                }
+                            }
+                            swipeOffset = 0f
+                        }
+                    ) { change, dragAmount ->
+                        // Accumulate horizontal movement
+                        swipeOffset += dragAmount.x
+                        change.consume()
+                    }
+                }
+                .pointerInput(baseAdjustment, currentAdjustment) {
+                    // Detect tap to close when no adjustment has been made
+                    detectTapGestures(
+                        onTap = {
+                            val hasAdjusted = currentAdjustment != baseAdjustment
+                            if (!hasAdjusted) {
+                                // No adjustment made - just close the dial
+                                Log.d("InteractiveDial", "👆 TAP TO CLOSE - Prayer: $prayerName, No adjustment made")
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSaveAdjustment(prayerName, baseAdjustment) // Close dial
+                            }
+                        }
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
             Column(
@@ -277,16 +327,16 @@ fun InteractivePrayerDial(
                 // Prayer name display at the top
                 Text(
                     text = prayerName,
-                    style = MaterialTheme.typography.titleLarge.copy(
+                    style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 24.sp,
-                        letterSpacing = 0.sp
+                        fontSize = 18.sp,
+                        letterSpacing = 0.5.sp
                     ),
                     color = Color(0xFF26C6DA), // Teal color to match the theme
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Large time display in 00:00 format like reference
                 val adjustedTime = adjustTimeByMinutesForDisplay(originalTime, currentAdjustment)
@@ -294,17 +344,17 @@ fun InteractivePrayerDial(
                     text = adjustedTime,
                     style = MaterialTheme.typography.displayLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 56.sp,
-                        letterSpacing = (-1.5).sp // Tight spacing for digital clock look
+                        fontSize = 44.sp,
+                        letterSpacing = (-1.sp) // Tight spacing for digital clock look
                     ),
                     color = Color(0xFF37474F), // Dark blue-gray for better contrast
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Small pill indicator showing adjustment amount below
+                // Small indicator showing adjustment amount
                 if (currentAdjustment != 0) {
+                    Spacer(modifier = Modifier.height(6.dp))
+
                     val adjustmentText = when {
                         currentAdjustment > 0 -> {
                             val hours = currentAdjustment / 60
@@ -332,14 +382,82 @@ fun InteractivePrayerDial(
                         Text(
                             text = adjustmentText,
                             style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 11.sp,
-                                letterSpacing = 0.2.sp
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                letterSpacing = 0.5.sp
                             ),
                             color = Color(0xFF26C6DA), // Teal color
                             textAlign = TextAlign.Center
                         )
                     }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Dynamic hint based on whether user has adjusted from base
+                val hasAdjusted = currentAdjustment != baseAdjustment
+
+                if (hasAdjusted) {
+                    // Show swipe instructions when user has made adjustments
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Left arrow - Undo
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "←",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontSize = 20.sp
+                                ),
+                                color = Color(0xFFEF5350).copy(alpha = 0.7f)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Undo",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 10.sp
+                                ),
+                                color = Color(0xFF607D8B).copy(alpha = 0.6f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        // Right arrow - Save
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Save",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 10.sp
+                                ),
+                                color = Color(0xFF607D8B).copy(alpha = 0.6f)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "→",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontSize = 20.sp
+                                ),
+                                color = Color(0xFF26C6DA).copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                } else {
+                    // Show drag hint when no adjustment has been made
+                    Text(
+                        text = "Drag knob to adjust",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 11.sp,
+                            letterSpacing = 0.3.sp
+                        ),
+                        color = Color(0xFF607D8B).copy(alpha = 0.5f), // Subtle gray
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
@@ -362,9 +480,9 @@ private fun DrawScope.drawCleanCircularTimer(
     // Clean circular design matching the reference image
     val timerRadius = radius * 1.15f // Slightly larger for better visibility
 
-    // Clean light gray background like reference image
-    val backgroundColor = Color(0xFFECEFF1) // Light blue-gray background
-    val tickGrayColor = Color(0xFFB0BEC5) // Gray for inactive ticks
+    // Use Material 3 theme colors for consistency
+    val backgroundColor = surfaceColor // Use theme surface color for light/dark mode support
+    val tickGrayColor = outlineColor.copy(alpha = 0.5f) // Use theme outline color for inactive ticks
     val tickTealColor = Color(0xFF26C6DA) // Bright cyan/teal for progress
 
     // Subtle outer shadow for depth
@@ -374,7 +492,7 @@ private fun DrawScope.drawCleanCircularTimer(
         center = Offset(center.x + 2f, center.y + 3f)
     )
 
-    // Main circle background - clean light gray
+    // Main circle background - uses theme surface color
     drawCircle(
         color = backgroundColor,
         radius = timerRadius,
