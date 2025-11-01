@@ -54,9 +54,12 @@ class PrayerNotificationService : Service() {
     
     @Inject
     lateinit var prayerTimeCalculatorService: PrayerTimeCalculatorService
-    
+
     @Inject
     lateinit var prayerSettingsRepository: PrayerSettingsRepository
+
+    @Inject
+    lateinit var locationService: com.starception.submission.prayer.service.EnhancedLocationService
     
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var isServiceRunning = false
@@ -698,15 +701,56 @@ class PrayerNotificationService : Service() {
                 Log.i(TAG, "   - Dhuhr Offset: ${settings.timeOffsets.dhuhr}")
                 Log.i(TAG, "   - Asr Offset: ${settings.timeOffsets.asr}")
                 Log.i(TAG, "   - Auto-detected: ${settings.isMethodAutoDetected}")
-                
-                val location = settings.location
+
+                var location = settings.location
                 if (location == null) {
-                    Log.w(TAG, "No location available")
+                    Log.w(TAG, "⚠️ No location in settings, attempting to fetch...")
+
+                    // Try to fetch location automatically if permission is granted
+                    try {
+                        val fetchedLocation: android.location.Location? = withTimeoutOrNull(2000L) {
+                            locationService.getBestAvailableLocation().getOrNull()
+                        }
+
+                        if (fetchedLocation != null) {
+                            Log.i(TAG, "✅ Location fetched successfully: ${fetchedLocation.latitude}, ${fetchedLocation.longitude}")
+
+                            // Get timezone offset in hours
+                            val timeZone = java.util.TimeZone.getDefault()
+                            val offsetMs = timeZone.getOffset(System.currentTimeMillis())
+                            val offsetHours = offsetMs / (1000.0 * 60 * 60)
+
+                            // Convert to Location model
+                            val locationModel = com.starception.submission.prayer.model.Location(
+                                latitude = fetchedLocation.latitude,
+                                longitude = fetchedLocation.longitude,
+                                timeZoneOffset = offsetHours,
+                                city = "Current Location"
+                            )
+
+                            // Save to settings for future use
+                            prayerSettingsRepository.updateLocationSettings(useGps = true, location = locationModel)
+                            location = locationModel
+
+                            Log.i(TAG, "✅ Location saved to settings for future notifications")
+                        } else {
+                            Log.w(TAG, "❌ Failed to fetch location - permission may not be granted")
+                            return@withContext Sextuple("Prayer Time Tracker", "Location needed", "Grant location permission to see prayer times", "MAKE_TIME", 30, Pair("Current Prayer", LocalTime.now().toString()))
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Error fetching location: ${e.message}", e)
+                        return@withContext Sextuple("Prayer Time Tracker", "Location needed", "Grant location permission to see prayer times", "MAKE_TIME", 30, Pair("Current Prayer", LocalTime.now().toString()))
+                    }
+                }
+
+                // Ensure location is not null before proceeding
+                if (location == null) {
+                    Log.e(TAG, "❌ Location is still null after fetch attempt")
                     return@withContext Sextuple("Prayer Time Tracker", "Location needed", "Grant location permission to see prayer times", "MAKE_TIME", 30, Pair("Current Prayer", LocalTime.now().toString()))
                 }
-                
+
                 Log.d(TAG, "Location: ${location.getDisplayName()}")
-                
+
                 // Quick prayer calculation with aggressive timeout (using injected dependency)
                 val today = LocalDate.now()
                 val calculationStartTime = System.currentTimeMillis()
