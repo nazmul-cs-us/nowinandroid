@@ -112,16 +112,16 @@ fun QiblaCompass(
                 val z = event.values[2]
                 val strength = sqrt(x * x + y * y + z * z)
                 magneticFieldStrength = strength
-                
+
                 // Determine accuracy based on magnetic field strength
-                // Typical Earth magnetic field: ~30-60 microteslas (0.03-0.06)
-                // Low strength (<20) or very high (>100) indicates interference
+                // Typical Earth magnetic field: ~25-65 microteslas
+                // Adjusted thresholds based on real-world measurements
                 if (!isInitializing) {
                     sensorAccuracy = when {
-                        strength < 20f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too weak
+                        strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too weak
                         strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too strong (interference)
-                        strength < 30f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM // Weak field
-                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH // Normal range
+                        strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM // Weak field
+                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH // Normal range (25-100)
                     }
                 }
             }
@@ -131,14 +131,19 @@ fun QiblaCompass(
                 if (!isInitializing) {
                     // Combine reported accuracy with strength-based accuracy
                     val strengthBasedAccuracy = when {
-                        magneticFieldStrength < 20f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                        magneticFieldStrength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
                         magneticFieldStrength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
-                        magneticFieldStrength < 30f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+                        magneticFieldStrength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
                         else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
                     }
-                    
-                    // Use the worse of the two (more conservative)
-                    sensorAccuracy = minOf(accuracy, strengthBasedAccuracy)
+
+                    // Prioritize strength-based accuracy over system-reported accuracy
+                    // System often reports MEDIUM even when field strength is perfectly normal
+                    sensorAccuracy = if (magneticFieldStrength > 0f) {
+                        strengthBasedAccuracy // Trust our calculation
+                    } else {
+                        minOf(accuracy, strengthBasedAccuracy) // Fallback to conservative approach
+                    }
                 }
             }
         }
@@ -243,7 +248,21 @@ fun QiblaCompass(
     // Accuracy color and calibration status
     val accuracyColor = if (isInitializing) Color(0xFF10B981) else getAccuracyColor(sensorAccuracy)
     val needsCalibration = !isInitializing && sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
-    
+
+    // Calculate if user is facing Qibla (within ±15 degrees for better UX)
+    val qiblaAngle = animatedCompassDegree
+    val normalizedAngle = ((qiblaAngle % 360f) + 360f) % 360f
+
+    // Calculate circular angular distance from 0° (handles both sides symmetrically)
+    val angularDistance = minOf(
+        kotlin.math.abs(normalizedAngle),
+        kotlin.math.abs(normalizedAngle - 360f)
+    )
+    val isNearQibla = angularDistance <= 15f
+
+    // Debug logging
+    android.util.Log.d("QiblaCompass", "animatedCompassDegree=$animatedCompassDegree, normalizedAngle=$normalizedAngle, angularDistance=$angularDistance, isNearQibla=$isNearQibla, needsCalibration=$needsCalibration")
+
     // Enhanced UI with better novice user guidance
     Box(
         modifier = modifier.size(size),
@@ -358,24 +377,39 @@ fun QiblaCompass(
                 .rotate(animatedCompassDegree),
             contentAlignment = Alignment.Center
         ) {
-            // Qibla direction arc
+            // Qibla direction arc - color reflects sensor accuracy strength
             CircularProgressIndicator(
                 progress = { 0.15f }, // 15% progress pointing to Qibla (more visible)
                 modifier = Modifier.fillMaxSize(),
-                color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981),
-                strokeWidth = 10.dp,
+                color = if (isNearQibla && !needsCalibration) {
+                    // When aligned with Qibla, ALWAYS show bright green
+                    Color(0xFF00C853) // Bright green - aligned!
+                } else if (needsCalibration) {
+                    Color(0xFFFF4444) // Red when needs calibration
+                } else {
+                    // Use accuracy-based color to show sensor strength
+                    accuracyColor
+                },
+                strokeWidth = if (isNearQibla && !needsCalibration) 12.dp else 10.dp,
                 trackColor = Color.Black.copy(alpha = 0.05f),
                 strokeCap = StrokeCap.Round,
             )
             
-            // Qibla arrow indicator at top of compass
+            // Qibla arrow indicator at top of compass - matches arc color
             Box(
                 modifier = Modifier
                     .offset(y = -(size.value / 2 - 25).dp)
-                    .size(24.dp)
+                    .size(if (isNearQibla && !needsCalibration) 28.dp else 24.dp)
                     .clip(CircleShape)
                     .background(
-                        if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981)
+                        if (isNearQibla && !needsCalibration) {
+                            Color(0xFF00C853) // Bright green when aligned
+                        } else if (needsCalibration) {
+                            Color(0xFFFF4444) // Red when needs calibration
+                        } else {
+                            // Match the arc color for consistency
+                            accuracyColor
+                        }
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -383,7 +417,7 @@ fun QiblaCompass(
                     imageVector = Icons.Filled.Navigation,
                     contentDescription = "Qibla Direction",
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(if (isNearQibla && !needsCalibration) 18.dp else 16.dp)
                         .rotate(-90f), // Point upward
                     tint = Color.White
                 )
@@ -420,16 +454,28 @@ fun QiblaCompass(
                 
                 Spacer(modifier = Modifier.height(4.dp))
                 
-                // Status text
+                // Status text - dynamic based on alignment
                 Text(
-                    text = if (needsCalibration) "Qibla" else "Qibla",
+                    text = if (needsCalibration) {
+                        "Qibla"
+                    } else if (isNearQibla) {
+                        "Aligned ✓"
+                    } else {
+                        "Qibla"
+                    },
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (needsCalibration) Color(0xFFFF4444) else Color(0xFF10B981),
+                    color = if (needsCalibration) {
+                        Color(0xFFFF4444)
+                    } else if (isNearQibla) {
+                        Color(0xFF00C853) // Bright green when aligned
+                    } else {
+                        Color(0xFF10B981)
+                    },
                     textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = if (isNearQibla && !needsCalibration) FontWeight.ExtraBold else FontWeight.Bold,
                     fontSize = if (size >= 140.dp) 14.sp else 11.sp
                 )
-                
+
                 // Calibration status or guidance
                 if (needsCalibration) {
                     Text(
@@ -441,9 +487,20 @@ fun QiblaCompass(
                         fontSize = if (size >= 140.dp) 11.sp else 9.sp,
                         modifier = Modifier.padding(top = 2.dp)
                     )
+                } else if (isNearQibla && size >= 140.dp) {
+                    Text(
+                        text = "Facing Qibla Direction",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF00C853),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 } else if (size >= 140.dp) {
                     Text(
-                        text = "Turn phone until\narrow points up ↑",
+                        text = "Turn phone until\narrow points up ↑\n${angularDistance.toInt()}° off",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Black.copy(alpha = 0.7f),
                         textAlign = TextAlign.Center,

@@ -114,7 +114,8 @@
       "Bash(kill:*)",
       "WebSearch",
       "Read(//Users/smarterai/Documents/GitHub/material-components-android-master/**)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(/tmp/compass_screenshot.png)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

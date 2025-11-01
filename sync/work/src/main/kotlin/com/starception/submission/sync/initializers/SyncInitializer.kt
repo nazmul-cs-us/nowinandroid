@@ -27,9 +27,10 @@ object Sync {
     fun initialize(context: Context) {
         WorkManager.getInstance(context).apply {
             // Run sync on app startup and ensure only one sync worker runs at any time
+            // Use REPLACE to ensure cancelled/failed workers are restarted
             enqueueUniqueWork(
                 SYNC_WORK_NAME,
-                ExistingWorkPolicy.KEEP,
+                ExistingWorkPolicy.REPLACE,
                 SyncWorker.startUpSyncWork(),
             )
         }
