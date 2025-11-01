@@ -341,7 +341,7 @@ fun CompassProgressIndicator(
             
         }
         
-        // Calculate if user is facing Qibla (within ±15 degrees for better UX)
+        // Calculate if user is facing Qibla (with hysteresis to prevent rapid toggling)
         val qiblaAngle = animatedCompassDegree
         val normalizedAngle = ((qiblaAngle % 360f) + 360f) % 360f
 
@@ -350,16 +350,73 @@ fun CompassProgressIndicator(
             kotlin.math.abs(normalizedAngle),
             kotlin.math.abs(normalizedAngle - 360f)
         )
-        val isNearQibla = angularDistance <= 15f
+
+        // Hysteresis: Enter at ±5°, exit at ±7° (prevents rapid toggling at boundary)
+        val wasNearQibla = remember { mutableStateOf(false) }
+        val isNearQibla = if (wasNearQibla.value) {
+            angularDistance <= 7f // Exit threshold (wider)
+        } else {
+            angularDistance <= 5f // Entry threshold (stricter)
+        }
+        wasNearQibla.value = isNearQibla
+
+        // Continuous radar-style haptic feedback while aligned with Qibla
+        val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
+        val currentlyAligned = isNearQibla && !needsCalibration
+
+        // Continuous pulsing haptic feedback every second while aligned (like radar confirmation)
+        LaunchedEffect(currentlyAligned) {
+            if (size >= 260.dp && currentlyAligned) {
+                android.util.Log.d("QiblaAlignment", "🎯 ALIGNED! Starting radar-style haptic loop")
+                while (currentlyAligned) {
+                    // Strong haptic pulse
+                    hapticFeedback.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    android.util.Log.d("QiblaAlignment", "📡 Haptic pulse (radar ping)")
+                    // Wait 1 second before next pulse
+                    kotlinx.coroutines.delay(1000)
+                }
+                android.util.Log.d("QiblaAlignment", "⏸️ Stopped haptic loop (not aligned)")
+            }
+        }
 
         // Debug logging for alignment detection
         android.util.Log.d("QiblaAlignment", "animatedCompassDegree=$animatedCompassDegree, normalizedAngle=$normalizedAngle, angularDistance=$angularDistance, isNearQibla=$isNearQibla, needsCalibration=$needsCalibration")
         
-        // Determine rotation direction needed
-        val needsClockwise = when {
-            normalizedAngle > 180f -> true  // Turn clockwise to get to 0°
-            normalizedAngle <= 180f && normalizedAngle > 10f -> false // Turn counter-clockwise
-            else -> false // Already near Qibla (within ±10°)
+        // Stable rotation direction with time-based debounce to prevent rapid toggling
+        val stableDirection = remember { mutableStateOf<Boolean?>(null) }
+        val lastDirectionChangeTime = remember { mutableStateOf(0L) }
+        val currentTime = System.currentTimeMillis()
+
+        // Determine the raw direction (shortest path)
+        val rawNeedsClockwise = normalizedAngle > 180f
+
+        // Only change direction if:
+        // 1. It's been at least 800ms since last change, OR
+        // 2. We don't have a stable direction yet, OR
+        // 3. The angle is very clear (far from 180°)
+        val needsClockwise = if (stableDirection.value == null) {
+            // First time, set immediately
+            stableDirection.value = rawNeedsClockwise
+            lastDirectionChangeTime.value = currentTime
+            rawNeedsClockwise
+        } else if (stableDirection.value != rawNeedsClockwise) {
+            // Direction wants to change
+            val timeSinceLastChange = currentTime - lastDirectionChangeTime.value
+            val isVeryClearDirection = normalizedAngle < 30f || normalizedAngle > 330f ||
+                                       (normalizedAngle > 150f && normalizedAngle < 210f)
+
+            if (timeSinceLastChange > 800 || isVeryClearDirection) {
+                // Allow the change
+                stableDirection.value = rawNeedsClockwise
+                lastDirectionChangeTime.value = currentTime
+                rawNeedsClockwise
+            } else {
+                // Keep old direction (debounce)
+                stableDirection.value!!
+            }
+        } else {
+            // Direction hasn't changed, keep it
+            rawNeedsClockwise
         }
         
         // Original elegant Qibla direction indicator with enhanced feedback
@@ -382,9 +439,154 @@ fun CompassProgressIndicator(
             strokeCap = StrokeCap.Round,
         )
         
+        // Clear rotation direction indicators with multiple animated arrows
+        if (size >= 260.dp && !isNearQibla && !needsCalibration) {
+            val infiniteTransition = rememberInfiniteTransition(label = "rotation_guide")
+
+            // Animated rotation offset for moving arrows effect
+            val arrowOffset by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 30f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "arrow_offset"
+            )
+
+            // Pulsing alpha for visibility
+            val guideAlpha by infiniteTransition.animateFloat(
+                initialValue = 0.7f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(800, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "guide_alpha"
+            )
+
+            // Draw multiple animated arrows showing clear rotation direction
+            Canvas(
+                modifier = Modifier
+                    .size(size)
+                    .graphicsLayer { alpha = guideAlpha }
+            ) {
+                val center = Offset(this.size.width / 2, this.size.height / 2)
+                val indicatorRadius = (this.size.minDimension / 2) - 32.dp.toPx()
+                val strokeWidth = 3.5.dp.toPx()
+                val arrowSize = 14.dp.toPx()
+
+                if (needsClockwise) {
+                    // Clockwise: Draw arc and multiple arrows on the right side
+                    val baseStartAngle = -45f
+                    val arcSweep = 90f
+
+                    // Draw curved arc
+                    drawArc(
+                        color = Color(0xFF10B981),
+                        startAngle = baseStartAngle,
+                        sweepAngle = arcSweep,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                        topLeft = Offset(center.x - indicatorRadius, center.y - indicatorRadius),
+                        size = Size(indicatorRadius * 2, indicatorRadius * 2)
+                    )
+
+                    // Draw 3 animated arrowheads along the arc for clear direction
+                    for (i in 0..2) {
+                        val arrowAngle = baseStartAngle + (arcSweep * 0.25f * (i + 1)) + (arrowOffset % 30f)
+                        val arrowAngleRad = Math.toRadians(arrowAngle.toDouble()).toFloat()
+                        val arrowX = center.x + indicatorRadius * cos(arrowAngleRad)
+                        val arrowY = center.y + indicatorRadius * sin(arrowAngleRad)
+
+                        // Tangent direction for clockwise motion
+                        val tangentAngle = arrowAngleRad + Math.PI.toFloat() / 2
+
+                        // Draw chevron-style arrow (two lines forming >)
+                        val arrowAngle1 = tangentAngle - Math.toRadians(135.0).toFloat()
+                        val arrowAngle2 = tangentAngle + Math.toRadians(135.0).toFloat()
+
+                        drawLine(
+                            color = Color(0xFF10B981),
+                            start = Offset(
+                                arrowX + arrowSize * cos(arrowAngle1),
+                                arrowY + arrowSize * sin(arrowAngle1)
+                            ),
+                            end = Offset(arrowX, arrowY),
+                            strokeWidth = strokeWidth,
+                            cap = StrokeCap.Round
+                        )
+
+                        drawLine(
+                            color = Color(0xFF10B981),
+                            start = Offset(arrowX, arrowY),
+                            end = Offset(
+                                arrowX + arrowSize * cos(arrowAngle2),
+                                arrowY + arrowSize * sin(arrowAngle2)
+                            ),
+                            strokeWidth = strokeWidth,
+                            cap = StrokeCap.Round
+                        )
+                    }
+                } else {
+                    // Counter-clockwise: Draw arc and multiple arrows on the left side
+                    val baseStartAngle = 225f
+                    val arcSweep = -90f
+
+                    // Draw curved arc
+                    drawArc(
+                        color = Color(0xFF10B981),
+                        startAngle = baseStartAngle,
+                        sweepAngle = arcSweep,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                        topLeft = Offset(center.x - indicatorRadius, center.y - indicatorRadius),
+                        size = Size(indicatorRadius * 2, indicatorRadius * 2)
+                    )
+
+                    // Draw 3 animated arrowheads along the arc for clear direction
+                    for (i in 0..2) {
+                        val arrowAngle = baseStartAngle + (arcSweep * 0.25f * (i + 1)) - (arrowOffset % 30f)
+                        val arrowAngleRad = Math.toRadians(arrowAngle.toDouble()).toFloat()
+                        val arrowX = center.x + indicatorRadius * cos(arrowAngleRad)
+                        val arrowY = center.y + indicatorRadius * sin(arrowAngleRad)
+
+                        // Tangent direction for counter-clockwise motion
+                        val tangentAngle = arrowAngleRad - Math.PI.toFloat() / 2
+
+                        // Draw chevron-style arrow (two lines forming <)
+                        val arrowAngle1 = tangentAngle - Math.toRadians(135.0).toFloat()
+                        val arrowAngle2 = tangentAngle + Math.toRadians(135.0).toFloat()
+
+                        drawLine(
+                            color = Color(0xFF10B981),
+                            start = Offset(
+                                arrowX + arrowSize * cos(arrowAngle1),
+                                arrowY + arrowSize * sin(arrowAngle1)
+                            ),
+                            end = Offset(arrowX, arrowY),
+                            strokeWidth = strokeWidth,
+                            cap = StrokeCap.Round
+                        )
+
+                        drawLine(
+                            color = Color(0xFF10B981),
+                            start = Offset(arrowX, arrowY),
+                            end = Offset(
+                                arrowX + arrowSize * cos(arrowAngle2),
+                                arrowY + arrowSize * sin(arrowAngle2)
+                            ),
+                            strokeWidth = strokeWidth,
+                            cap = StrokeCap.Round
+                        )
+                    }
+                }
+            }
+        }
+
         // Animated rotation guidance - only when not near Qibla and not calibrating
-        if (size >= 120.dp && !isNearQibla && !needsCalibration) {
-            // Animated rotation indicator
+        if (size >= 120.dp && !isNearQibla && !needsCalibration && size < 260.dp) {
+            // Animated rotation indicator (for smaller sizes)
             val infiniteTransition = rememberInfiniteTransition(label = "rotation_guide")
             val rotationIndicatorAlpha by infiniteTransition.animateFloat(
                 initialValue = 0.3f,
@@ -395,7 +597,7 @@ fun CompassProgressIndicator(
                 ),
                 label = "rotation_alpha"
             )
-            
+
             val rotationIndicatorScale by infiniteTransition.animateFloat(
                 initialValue = 0.9f,
                 targetValue = 1.1f,
@@ -488,14 +690,23 @@ fun CompassProgressIndicator(
                     fontSize = if (size >= 280.dp) 16.sp else 12.sp,
                 )
                 
-                // Guidance text for popup - dynamic based on status
+                // Guidance text for popup - dynamic based on status with rotation direction
                 if (size >= 260.dp) {
-                    Text(
-                        text = if (isNearQibla && !needsCalibration) {
+                    // Stable guidance text to prevent overlapping during rapid changes
+                    val guidanceText = remember(isNearQibla, needsCalibration, needsClockwise, angularDistance) {
+                        if (isNearQibla && !needsCalibration) {
                             "✓ Aligned with Qibla"
+                        } else if (needsCalibration) {
+                            "Calibrate compass\nby moving phone\nin figure-8"
                         } else {
-                            "Turn until green arc\npoints up ↑\n${angularDistance.toInt()}° off"
-                        },
+                            // Show rotation direction for minimum path to Qibla
+                            val rotationDirection = if (needsClockwise) "Clockwise" else "Counter-clockwise"
+                            "Turn $rotationDirection\n${angularDistance.toInt()}° to Qibla"
+                        }
+                    }
+
+                    Text(
+                        text = guidanceText,
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isNearQibla && !needsCalibration) {
                             Color(0xFF00C853)

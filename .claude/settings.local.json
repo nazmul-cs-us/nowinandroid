@@ -115,7 +115,8 @@
       "WebSearch",
       "Read(//Users/smarterai/Documents/GitHub/material-components-android-master/**)",
       "Bash(cat:*)",
-      "Bash(/tmp/compass_screenshot.png)"
+      "Bash(/tmp/compass_screenshot.png)",
+      "Bash(/tmp/device_qibla_screen.png)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
