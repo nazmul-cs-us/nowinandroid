@@ -10,8 +10,9 @@
       "name": "United Arab Emirates",
       "calculationMethod": "Umm_al_Qura_University_Makkah",
       "madhhab": "Maliki",
-      "customIshaAngle": 18.3,
-      "timeOffsets":{"fajr":1,"sunrise":-1,"dhuhr":3,"asr":-2,"maghrib":4,"isha":8},
+      "customFajrAngle": 18.2,
+      "customIshaAngle": 18.2,
+      "timeOffsets":{"fajr":-16,"sunrise":-21,"dhuhr":-15,"asr":-17,"maghrib":-14,"isha":-29},
       "coordinates": { "latitude": 23.4241, "longitude": 53.8478 }
     },
     "AF": {
