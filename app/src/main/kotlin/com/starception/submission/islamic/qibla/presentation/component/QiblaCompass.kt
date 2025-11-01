@@ -249,7 +249,7 @@ fun QiblaCompass(
     val accuracyColor = if (isInitializing) Color(0xFF10B981) else getAccuracyColor(sensorAccuracy)
     val needsCalibration = !isInitializing && sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
 
-    // Calculate if user is facing Qibla (within ±15 degrees for better UX)
+    // Calculate if user is facing Qibla (within ±5 degrees for accuracy)
     val qiblaAngle = animatedCompassDegree
     val normalizedAngle = ((qiblaAngle % 360f) + 360f) % 360f
 
@@ -258,7 +258,7 @@ fun QiblaCompass(
         kotlin.math.abs(normalizedAngle),
         kotlin.math.abs(normalizedAngle - 360f)
     )
-    val isNearQibla = angularDistance <= 15f
+    val isNearQibla = angularDistance <= 5f
 
     // Debug logging
     android.util.Log.d("QiblaCompass", "animatedCompassDegree=$animatedCompassDegree, normalizedAngle=$normalizedAngle, angularDistance=$angularDistance, isNearQibla=$isNearQibla, needsCalibration=$needsCalibration")
