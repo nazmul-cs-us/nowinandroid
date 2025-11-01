@@ -133,17 +133,26 @@ fun CompassProgressIndicator(
                 val z = event.values[2]
                 val strength = sqrt(x * x + y * y + z * z)
                 magneticFieldStrength = strength
-                
+
+                // Log magnetic field strength for debugging
+                android.util.Log.d("CompassMagField", "Magnetic field strength: $strength µT (x=$x, y=$y, z=$z)")
+
                 // Determine accuracy based on magnetic field strength
-                // Typical Earth magnetic field: ~30-60 microteslas (0.03-0.06)
-                // Low strength (<20) or very high (>100) indicates interference
+                // Typical Earth magnetic field: ~25-65 microteslas
+                // Adjusted thresholds based on real-world measurements
                 if (!isInitializing) {
                     sensorAccuracy = when {
-                        strength < 20f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too weak
+                        strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too weak
                         strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too strong (interference)
-                        strength < 30f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM // Weak field
-                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH // Normal range
+                        strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM // Weak field
+                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH // Normal range (25-100)
                     }
+                    android.util.Log.d("CompassMagField", "Sensor accuracy: ${when(sensorAccuracy) {
+                        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> "HIGH"
+                        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> "MEDIUM"
+                        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> "LOW"
+                        else -> "UNRELIABLE"
+                    }}")
                 }
             }
             
@@ -152,14 +161,20 @@ fun CompassProgressIndicator(
                 if (!isInitializing) {
                     // Combine reported accuracy with strength-based accuracy
                     val strengthBasedAccuracy = when {
-                        magneticFieldStrength < 20f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                        magneticFieldStrength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
                         magneticFieldStrength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
-                        magneticFieldStrength < 30f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+                        magneticFieldStrength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
                         else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
                     }
-                    
-                    // Use the worse of the two (more conservative)
-                    sensorAccuracy = minOf(accuracy, strengthBasedAccuracy)
+
+                    // Prioritize strength-based accuracy over system-reported accuracy
+                    // System often reports MEDIUM even when field strength is perfectly normal
+                    sensorAccuracy = if (magneticFieldStrength > 0f) {
+                        strengthBasedAccuracy // Trust our calculation
+                    } else {
+                        minOf(accuracy, strengthBasedAccuracy) // Fallback to conservative approach
+                    }
+                    android.util.Log.d("CompassMagField", "onAccuracyChanged: reported=$accuracy, strengthBased=$strengthBasedAccuracy, final=$sensorAccuracy, fieldStrength=$magneticFieldStrength")
                 }
             }
         }
@@ -326,19 +341,25 @@ fun CompassProgressIndicator(
             
         }
         
-        // Calculate if user is facing Qibla (within ±15 degrees)
+        // Calculate if user is facing Qibla (within ±15 degrees for better UX)
         val qiblaAngle = animatedCompassDegree
         val normalizedAngle = ((qiblaAngle % 360f) + 360f) % 360f
-        
-        // FIXED: Calculate if within ±15 degrees of 0° (Qibla direction)
-        // This means: 0° to 15° OR 345° to 360°
-        val isNearQibla = normalizedAngle <= 15f || normalizedAngle >= 345f
+
+        // Calculate circular angular distance from 0° (handles both sides symmetrically)
+        val angularDistance = minOf(
+            kotlin.math.abs(normalizedAngle),
+            kotlin.math.abs(normalizedAngle - 360f)
+        )
+        val isNearQibla = angularDistance <= 15f
+
+        // Debug logging for alignment detection
+        android.util.Log.d("QiblaAlignment", "animatedCompassDegree=$animatedCompassDegree, normalizedAngle=$normalizedAngle, angularDistance=$angularDistance, isNearQibla=$isNearQibla, needsCalibration=$needsCalibration")
         
         // Determine rotation direction needed
         val needsClockwise = when {
             normalizedAngle > 180f -> true  // Turn clockwise to get to 0°
-            normalizedAngle <= 180f && normalizedAngle > 15f -> false // Turn counter-clockwise
-            else -> false // Already near Qibla
+            normalizedAngle <= 180f && normalizedAngle > 10f -> false // Turn counter-clockwise
+            else -> false // Already near Qibla (within ±10°)
         }
         
         // Original elegant Qibla direction indicator with enhanced feedback
@@ -347,12 +368,14 @@ fun CompassProgressIndicator(
             modifier = Modifier
                 .size(size - 16.dp)
                 .rotate(animatedCompassDegree),
-            color = if (needsCalibration) {
-                Color(0xFFFF4444)
-            } else if (isNearQibla) {
-                Color(0xFF00C853) // Brighter green when aligned
+            color = if (isNearQibla && !needsCalibration) {
+                // When aligned with Qibla, ALWAYS show bright green (regardless of sensor accuracy)
+                Color(0xFF00C853) // Bright green - aligned!
+            } else if (needsCalibration) {
+                Color(0xFFFF4444) // Red when needs calibration
             } else {
-                Color(0xFF10B981) // Original green
+                // Use accuracy-based color when not aligned
+                accuracyColor
             },
             strokeWidth = if (isNearQibla) 10.dp else 8.dp, // Slightly thicker when aligned
             trackColor = Color.Black.copy(alpha = 0.1f),
@@ -469,9 +492,9 @@ fun CompassProgressIndicator(
                 if (size >= 260.dp) {
                     Text(
                         text = if (isNearQibla && !needsCalibration) {
-                            "✓ Aligned correctly"
+                            "✓ Aligned with Qibla"
                         } else {
-                            "Turn until green arc\npoints up ↑"
+                            "Turn until green arc\npoints up ↑\n${angularDistance.toInt()}° off"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isNearQibla && !needsCalibration) {
