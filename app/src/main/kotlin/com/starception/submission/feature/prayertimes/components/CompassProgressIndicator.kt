@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.*
@@ -388,7 +390,7 @@ fun CompassProgressIndicator(
         val currentTime = System.currentTimeMillis()
 
         // Determine the raw direction (shortest path)
-        val rawNeedsClockwise = normalizedAngle > 180f
+        val rawNeedsClockwise = normalizedAngle <= 180f
 
         // Only change direction if:
         // 1. It's been at least 800ms since last change, OR
@@ -465,121 +467,51 @@ fun CompassProgressIndicator(
                 label = "guide_alpha"
             )
 
-            // Draw multiple animated arrows showing clear rotation direction
-            Canvas(
+            // Draw simple rotating arrow indicator showing rotation direction
+            Box(
                 modifier = Modifier
                     .size(size)
                     .graphicsLayer { alpha = guideAlpha }
             ) {
-                val center = Offset(this.size.width / 2, this.size.height / 2)
-                val indicatorRadius = (this.size.minDimension / 2) - 32.dp.toPx()
-                val strokeWidth = 3.5.dp.toPx()
-                val arrowSize = 14.dp.toPx()
-
-                if (needsClockwise) {
-                    // Clockwise: Draw arc and multiple arrows on the right side
-                    val baseStartAngle = -45f
-                    val arcSweep = 90f
-
-                    // Draw curved arc
+                val centerAngle = if (needsClockwise) 45f else 225f // Right side for CW, left side for CCW
+                
+                // Simple arc indicator
+                Canvas(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    val radius = (this.size.minDimension / 2) - 32.dp.toPx()
+                    val center = Offset(this.size.width / 2, this.size.height / 2)
+                    
+                    // Draw arc in the appropriate direction
                     drawArc(
                         color = Color(0xFF10B981),
-                        startAngle = baseStartAngle,
-                        sweepAngle = arcSweep,
+                        startAngle = centerAngle - 45f,
+                        sweepAngle = if (needsClockwise) 90f else -90f,
                         useCenter = false,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                        topLeft = Offset(center.x - indicatorRadius, center.y - indicatorRadius),
-                        size = Size(indicatorRadius * 2, indicatorRadius * 2)
+                        style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round),
+                        topLeft = Offset(center.x - radius, center.y - radius),
+                        size = Size(radius * 2, radius * 2)
                     )
-
-                    // Draw 3 animated arrowheads along the arc for clear direction
-                    for (i in 0..2) {
-                        val arrowAngle = baseStartAngle + (arcSweep * 0.25f * (i + 1)) + (arrowOffset % 30f)
-                        val arrowAngleRad = Math.toRadians(arrowAngle.toDouble()).toFloat()
-                        val arrowX = center.x + indicatorRadius * cos(arrowAngleRad)
-                        val arrowY = center.y + indicatorRadius * sin(arrowAngleRad)
-
-                        // Tangent direction for clockwise motion
-                        val tangentAngle = arrowAngleRad + Math.PI.toFloat() / 2
-
-                        // Draw chevron-style arrow (two lines forming >)
-                        val arrowAngle1 = tangentAngle - Math.toRadians(135.0).toFloat()
-                        val arrowAngle2 = tangentAngle + Math.toRadians(135.0).toFloat()
-
-                        drawLine(
-                            color = Color(0xFF10B981),
-                            start = Offset(
-                                arrowX + arrowSize * cos(arrowAngle1),
-                                arrowY + arrowSize * sin(arrowAngle1)
-                            ),
-                            end = Offset(arrowX, arrowY),
-                            strokeWidth = strokeWidth,
-                            cap = StrokeCap.Round
-                        )
-
-                        drawLine(
-                            color = Color(0xFF10B981),
-                            start = Offset(arrowX, arrowY),
-                            end = Offset(
-                                arrowX + arrowSize * cos(arrowAngle2),
-                                arrowY + arrowSize * sin(arrowAngle2)
-                            ),
-                            strokeWidth = strokeWidth,
-                            cap = StrokeCap.Round
-                        )
-                    }
-                } else {
-                    // Counter-clockwise: Draw arc and multiple arrows on the left side
-                    val baseStartAngle = 225f
-                    val arcSweep = -90f
-
-                    // Draw curved arc
-                    drawArc(
-                        color = Color(0xFF10B981),
-                        startAngle = baseStartAngle,
-                        sweepAngle = arcSweep,
-                        useCenter = false,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                        topLeft = Offset(center.x - indicatorRadius, center.y - indicatorRadius),
-                        size = Size(indicatorRadius * 2, indicatorRadius * 2)
+                }
+                
+                // Draw single rotating arrow icon
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .graphicsLayer {
+                            rotationZ = centerAngle + (arrowOffset % 30f)
+                        }
+                ) {
+                    val indicatorRadius = (size.value / 2) - 32
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = "Rotation direction",
+                        modifier = Modifier
+                            .offset(x = indicatorRadius.dp, y = 0.dp)
+                            .size(16.dp)
+                            .rotate(if (needsClockwise) 90f else -90f), // Point in rotation direction
+                        tint = Color(0xFF10B981)
                     )
-
-                    // Draw 3 animated arrowheads along the arc for clear direction
-                    for (i in 0..2) {
-                        val arrowAngle = baseStartAngle + (arcSweep * 0.25f * (i + 1)) - (arrowOffset % 30f)
-                        val arrowAngleRad = Math.toRadians(arrowAngle.toDouble()).toFloat()
-                        val arrowX = center.x + indicatorRadius * cos(arrowAngleRad)
-                        val arrowY = center.y + indicatorRadius * sin(arrowAngleRad)
-
-                        // Tangent direction for counter-clockwise motion
-                        val tangentAngle = arrowAngleRad - Math.PI.toFloat() / 2
-
-                        // Draw chevron-style arrow (two lines forming <)
-                        val arrowAngle1 = tangentAngle - Math.toRadians(135.0).toFloat()
-                        val arrowAngle2 = tangentAngle + Math.toRadians(135.0).toFloat()
-
-                        drawLine(
-                            color = Color(0xFF10B981),
-                            start = Offset(
-                                arrowX + arrowSize * cos(arrowAngle1),
-                                arrowY + arrowSize * sin(arrowAngle1)
-                            ),
-                            end = Offset(arrowX, arrowY),
-                            strokeWidth = strokeWidth,
-                            cap = StrokeCap.Round
-                        )
-
-                        drawLine(
-                            color = Color(0xFF10B981),
-                            start = Offset(arrowX, arrowY),
-                            end = Offset(
-                                arrowX + arrowSize * cos(arrowAngle2),
-                                arrowY + arrowSize * sin(arrowAngle2)
-                            ),
-                            strokeWidth = strokeWidth,
-                            cap = StrokeCap.Round
-                        )
-                    }
                 }
             }
         }
