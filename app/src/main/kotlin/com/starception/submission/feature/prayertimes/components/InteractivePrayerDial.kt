@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
@@ -47,6 +49,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.draw.clip
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -75,6 +80,7 @@ fun InteractivePrayerDial(
     }
 
     val hapticFeedback = LocalHapticFeedback.current
+    val density = LocalDensity.current
     var lastAngle by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
     var accumulatedAngle by remember { mutableStateOf(0f) }
@@ -265,6 +271,21 @@ fun InteractivePrayerDial(
 
         // Central text container - clean and minimal like reference
         var swipeOffset by remember { mutableStateOf(0f) }
+        var isSwiping by remember { mutableStateOf(false) }
+
+        // Animated swipe progress
+        val swipeProgress by animateFloatAsState(
+            targetValue = when {
+                swipeOffset > 0 -> (swipeOffset / 100f).coerceIn(0f, 1f)
+                swipeOffset < 0 -> (kotlin.math.abs(swipeOffset) / 100f).coerceIn(0f, 1f)
+                else -> 0f
+            },
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessHigh
+            ),
+            label = "swipeProgress"
+        )
 
         Box(
             modifier = Modifier
@@ -278,6 +299,7 @@ fun InteractivePrayerDial(
                     detectDragGestures(
                         onDragStart = {
                             swipeOffset = 0f
+                            isSwiping = true
                         },
                         onDragEnd = {
                             val hasAdjusted = currentAdjustment != baseAdjustment
@@ -296,6 +318,7 @@ fun InteractivePrayerDial(
                                     onSaveAdjustment(prayerName, baseAdjustment) // Close dial
                                 }
                             }
+                            isSwiping = false
                             swipeOffset = 0f
                         }
                     ) { change, dragAmount ->
@@ -320,6 +343,46 @@ fun InteractivePrayerDial(
                 },
             contentAlignment = Alignment.Center
         ) {
+            // Swipe indicators - left (undo) and right (save)
+            if (isSwiping && currentAdjustment != baseAdjustment) {
+                // Left swipe indicator (Undo)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .offset(x = (-30).dp)
+                        .graphicsLayer {
+                            alpha = if (swipeOffset < 0) swipeProgress else 0f
+                            scaleX = if (swipeOffset < 0) swipeProgress else 0.5f
+                            scaleY = if (swipeOffset < 0) swipeProgress else 0.5f
+                        }
+                ) {
+                    Text(
+                        text = "↶",
+                        fontSize = 32.sp,
+                        color = Color(0xFFFF9800), // Orange for undo
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Right swipe indicator (Save)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .offset(x = 30.dp)
+                        .graphicsLayer {
+                            alpha = if (swipeOffset > 0) swipeProgress else 0f
+                            scaleX = if (swipeOffset > 0) swipeProgress else 0.5f
+                            scaleY = if (swipeOffset > 0) swipeProgress else 0.5f
+                        }
+                ) {
+                    Text(
+                        text = "✓",
+                        fontSize = 36.sp,
+                        color = Color(0xFF4CAF50), // Green for save
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
@@ -398,66 +461,196 @@ fun InteractivePrayerDial(
                 val hasAdjusted = currentAdjustment != baseAdjustment
 
                 if (hasAdjusted) {
-                    // Show swipe instructions when user has made adjustments
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Left arrow - Undo
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "←",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontSize = 20.sp
+                    // iPhone-style swipe slider for undo/save
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Swipe slider container
+                    Box(
+                        modifier = Modifier
+                            .width(280.dp)
+                            .height(56.dp)
+                            .background(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
+                                        Color(0xFFFF9800).copy(alpha = 0.15f),
+                                        Color(0xFFEEEEEE),
+                                        Color(0xFF4CAF50).copy(alpha = 0.15f)
+                                    )
                                 ),
-                                color = Color(0xFFEF5350).copy(alpha = 0.7f)
+                                shape = RoundedCornerShape(28.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            .border(
+                                width = 1.5.dp,
+                                color = Color(0xFFE0E0E0),
+                                shape = RoundedCornerShape(28.dp)
+                            )
+                    ) {
+                        // Left label - Undo
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(start = 20.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "↶",
+                                fontSize = 20.sp,
+                                color = Color(0xFFFF9800).copy(alpha = 0.7f),
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Undo",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 10.sp
-                                ),
-                                color = Color(0xFF607D8B).copy(alpha = 0.6f)
+                                fontSize = 13.sp,
+                                color = Color(0xFFFF9800).copy(alpha = 0.7f),
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
 
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        // Right arrow - Save
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Right label - Save
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 20.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
                                 text = "Save",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 10.sp
-                                ),
-                                color = Color(0xFF607D8B).copy(alpha = 0.6f)
+                                fontSize = 13.sp,
+                                color = Color(0xFF4CAF50).copy(alpha = 0.7f),
+                                fontWeight = FontWeight.SemiBold
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "→",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontSize = 20.sp
-                                ),
-                                color = Color(0xFF26C6DA).copy(alpha = 0.7f)
+                                text = "✓",
+                                fontSize = 20.sp,
+                                color = Color(0xFF4CAF50).copy(alpha = 0.7f),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // Draggable slider knob (iPhone-style)
+                        var sliderOffset by remember { mutableStateOf(0f) }
+                        val sliderWidth = 280.dp.value * density.density
+                        val knobSize = 48.dp
+
+                        Box(
+                            modifier = Modifier
+                                .offset { IntOffset((sliderOffset * density.density).toInt(), 0) }
+                                .align(Alignment.CenterStart)
+                                .padding(4.dp)
+                                .size(knobSize)
+                                .aspectRatio(1f) // Force perfect circle
+                                .clip(CircleShape) // Clip to circle before background
+                                .background(
+                                    brush = Brush.radialGradient(
+                                        colors = listOf(
+                                            Color(0xFF26C6DA), // Teal center
+                                            Color(0xFF00ACC1)  // Darker teal edge
+                                        )
+                                    )
+                                )
+                                .border(
+                                    width = 3.dp,
+                                    brush = Brush.radialGradient(
+                                        colors = listOf(
+                                            Color.White,
+                                            Color.White.copy(alpha = 0.9f)
+                                        )
+                                    ),
+                                    shape = CircleShape
+                                )
+                                .graphicsLayer {
+                                    shadowElevation = 8.dp.toPx()
+                                    shape = CircleShape
+                                    clip = true
+                                }
+                                .pointerInput(Unit) {
+                                    detectDragGestures(
+                                        onDragStart = {
+                                            sliderOffset = 0f
+                                        },
+                                        onDragEnd = {
+                                            val maxOffset = sliderWidth - knobSize.toPx()
+
+                                            when {
+                                                sliderOffset < -80f -> {
+                                                    // Swiped left - Undo
+                                                    Log.d(
+                                                        "InteractiveDial",
+                                                        "← SLIDE LEFT - UNDO - Prayer: $prayerName"
+                                                    )
+                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    currentAdjustment = baseAdjustment
+                                                    onTimeAdjusted(baseAdjustment)
+                                                    onSaveAdjustment(prayerName, baseAdjustment)
+                                                }
+                                                sliderOffset > 80f -> {
+                                                    // Swiped right - Save
+                                                    Log.d(
+                                                        "InteractiveDial",
+                                                        "→ SLIDE RIGHT - SAVE - Prayer: $prayerName, Adjustment: ${currentAdjustment}m"
+                                                    )
+                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    onSaveAdjustment(prayerName, currentAdjustment)
+                                                }
+                                            }
+                                            // Reset slider
+                                            sliderOffset = 0f
+                                        }
+                                    ) { change, dragAmount ->
+                                        change.consume()
+                                        val maxOffset = sliderWidth - knobSize.toPx()
+                                        sliderOffset =
+                                            (sliderOffset + dragAmount.x / density.density).coerceIn(
+                                                -100f,
+                                                100f
+                                            )
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Chevron arrows showing swipe direction
+                            Text(
+                                text = when {
+                                    sliderOffset < -20f -> "←"
+                                    sliderOffset > 20f -> "→"
+                                    else -> "⇄"
+                                },
+                                fontSize = 22.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 } else {
-                    // Show drag hint when no adjustment has been made
-                    Text(
-                        text = "Drag knob to adjust",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Normal,
-                            fontSize = 11.sp,
-                            letterSpacing = 0.3.sp
-                        ),
-                        color = Color(0xFF607D8B).copy(alpha = 0.5f), // Subtle gray
-                        textAlign = TextAlign.Center
-                    )
+                    // Show hints when no adjustment has been made
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "Drag knob to adjust",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 13.sp,
+                                letterSpacing = 0.3.sp
+                            ),
+                            color = Color(0xFF607D8B).copy(alpha = 0.6f), // Subtle gray
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Tap to close",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 12.sp,
+                                letterSpacing = 0.3.sp
+                            ),
+                            color = Color(0xFF607D8B).copy(alpha = 0.5f), // Slightly more visible
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
