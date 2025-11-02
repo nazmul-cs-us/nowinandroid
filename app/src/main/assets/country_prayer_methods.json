@@ -12,7 +12,7 @@
       "madhhab": "Maliki",
       "customFajrAngle": 18.2,
       "customIshaAngle": 18.2,
-      "timeOffsets":{"fajr":-16,"sunrise":-21,"dhuhr":-15,"asr":-17,"maghrib":-14,"isha":-29},
+      "timeOffsets":{"fajr":-17,"sunrise":-21,"dhuhr":-14,"asr":-16,"maghrib":-13,"isha":-17},
       "coordinates": { "latitude": 23.4241, "longitude": 53.8478 }
     },
     "AF": {
