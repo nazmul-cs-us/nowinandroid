@@ -163,7 +163,7 @@ class PrayerActionReceiver : BroadcastReceiver() {
         // 5. Haptic feedback
         // 6. Sound feedback
         
-        val message = "🕌 $prayerName marked as completed!"
+        val message = "$prayerName marked as completed!"
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         Log.d(TAG, "👍 User feedback shown: $message")
         
