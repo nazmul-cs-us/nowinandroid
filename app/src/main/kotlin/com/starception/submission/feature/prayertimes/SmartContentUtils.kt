@@ -399,24 +399,47 @@ object SmartContentUtils {
      * Get notification-synchronized prayer content
      * Returns the exact same text that appears in prayer time notifications
      * This ensures consistency between the Smart Prediction tile and notifications
+     * 
+     * IMPORTANT: This function uses ADJUSTED prayer times (base + user offsets).
+     * This matches the small tiles display and ensures consistency across the UI.
+     * 
+     * @param prayerTimes BASE prayer times (DayPrayerTimes contains astronomical times only, no offsets)
+     * @param currentTime Current local time
+     * @param timeOffsets User offset adjustments to apply to base times
+     * @return NotificationSyncContent with title, content, and next prayer info
      */
     fun getNotificationSyncContent(
         prayerTimes: DayPrayerTimes?,
-        currentTime: LocalTime
+        currentTime: LocalTime,
+        timeOffsets: com.starception.submission.prayer.model.PrayerTimeOffsets = com.starception.submission.prayer.model.PrayerTimeOffsets()
     ): NotificationSyncContent? {
         return try {
             val times = prayerTimes ?: return null
 
             android.util.Log.d("SmartPrediction", "🔔 getNotificationSyncContent called at $currentTime")
-            android.util.Log.d("SmartPrediction", "📅 Prayer times: Fajr=${times.fajr}, Dhuhr=${times.dhuhr}, Asr=${times.asr}, Maghrib=${times.maghrib}, Isha=${times.isha}")
+            android.util.Log.d("SmartPrediction", "📅 BASE Prayer times: Fajr=${times.fajr}, Dhuhr=${times.dhuhr}, Asr=${times.asr}, Maghrib=${times.maghrib}, Isha=${times.isha}")
+            android.util.Log.d("SmartPrediction", "⏰ User offsets: Fajr=${timeOffsets.fajr}, Dhuhr=${timeOffsets.dhuhr}, Asr=${timeOffsets.asr}, Maghrib=${timeOffsets.maghrib}, Isha=${timeOffsets.isha}")
 
-            // Find current and next prayer using the same logic as notification service
+            // CRITICAL: Apply user offsets to base times to match small tiles display
+            // This ensures smart prediction shows countdowns to adjusted times (base + offset)
+            // which matches what users see in the small prayer tiles
+            // Apply offsets using the utility function from PrayerTimesUtils
+            val adjustedFajr = com.starception.submission.feature.prayertimes.utils.applyOffsetToTime(times.fajr, timeOffsets.fajr)
+            val adjustedDhuhr = com.starception.submission.feature.prayertimes.utils.applyOffsetToTime(times.dhuhr, timeOffsets.dhuhr)
+            val adjustedAsr = com.starception.submission.feature.prayertimes.utils.applyOffsetToTime(times.asr, timeOffsets.asr)
+            val adjustedMaghrib = com.starception.submission.feature.prayertimes.utils.applyOffsetToTime(times.maghrib, timeOffsets.maghrib)
+            val adjustedIsha = com.starception.submission.feature.prayertimes.utils.applyOffsetToTime(times.isha, timeOffsets.isha)
+
+            android.util.Log.d("SmartPrediction", "📅 ADJUSTED Prayer times (base + offset): Fajr=$adjustedFajr, Dhuhr=$adjustedDhuhr, Asr=$adjustedAsr, Maghrib=$adjustedMaghrib, Isha=$adjustedIsha")
+
+            // Find current and next prayer using ADJUSTED times (base + offset)
+            // This ensures smart prediction matches small tiles display
             val allPrayers = listOf(
-                "Fajr" to times.fajr,
-                "Dhuhr" to times.dhuhr,
-                "Asr" to times.asr,
-                "Maghrib" to times.maghrib,
-                "Isha" to times.isha
+                "Fajr" to adjustedFajr,
+                "Dhuhr" to adjustedDhuhr,
+                "Asr" to adjustedAsr,
+                "Maghrib" to adjustedMaghrib,
+                "Isha" to adjustedIsha
             )
 
             // Find current prayer (the most recent prayer that has passed TODAY)

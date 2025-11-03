@@ -136,6 +136,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.filled.BatchPrediction
 import androidx.compose.material.icons.filled.BubbleChart
 import com.starception.submission.prayer.model.DayPrayerTimes
+import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
 import com.starception.submission.prayer.service.EnhancedLocationService
 import java.time.LocalTime
@@ -1002,7 +1003,8 @@ fun SwipeableBigTiles(
     getDailyStatsMessage: () -> String,
     getPrayed: () -> Int = { 0 },
     getCurrentActivity: () -> String,
-    onCompassClick: () -> Unit
+    onCompassClick: () -> Unit,
+    timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets()
 ) {
     // Swipeable Big Tiles - HorizontalPager with 3 tiles and infinite scroll
     val pagerState = rememberPagerState(
@@ -1042,7 +1044,9 @@ fun SwipeableBigTiles(
                     getSmartFooter = getSmartFooter,
                     getCurrentActivity = getCurrentActivity,
                     getPrayed = getPrayed,
-                    prayerTimes = prayerTimes
+                    prayerTimes = prayerTimes,
+                    currentTime = currentTime,
+                    timeOffsets = timeOffsets
                 )
                 2 -> DailyStatsTile(
                     getPrayerProgress = getPrayerProgress,
@@ -1183,8 +1187,9 @@ private fun NextPrayerTile(
                             .padding(end = 4.dp) // Minimal padding for maximum text space
                     ) {
                         // Get notification-synchronized content using the SAME currentTime that updates every minute
-                        val syncContent = remember(prayerTimes, currentTime) {
-                            SmartContentUtils.getNotificationSyncContent(prayerTimes, currentTime)
+                        // Pass timeOffsets to ensure smart prediction uses adjusted times (base + offset)
+                        val syncContent = remember(prayerTimes, currentTime, timeOffsets) {
+                            SmartContentUtils.getNotificationSyncContent(prayerTimes, currentTime, timeOffsets)
                         }
                         
                         if (syncContent != null) {
@@ -1407,7 +1412,9 @@ private fun SmartInfoTile(
     getSmartFooter: () -> String,
     getCurrentActivity: () -> String,
     getPrayed: () -> Int = { 0 },
-    prayerTimes: DayPrayerTimes? = null
+    prayerTimes: DayPrayerTimes? = null,
+    currentTime: LocalTime,
+    timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets()
 ) {
     // State for bubble popup
     var selectedPrayer by remember { mutableStateOf<com.starception.submission.feature.prayertimes.components.PrayerBubbleData?>(null) }

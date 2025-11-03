@@ -11,9 +11,21 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * Apply offset to a base prayer time (duplicated from feature module to avoid circular dependency)
+ */
+private fun applyOffsetToTime(baseTime: LocalTime, offsetMinutes: Int): LocalTime {
+    if (offsetMinutes == 0) return baseTime
+    val adjustedDateTime = LocalDateTime.of(LocalDate.now(), baseTime)
+        .plusMinutes(offsetMinutes.toLong())
+    return adjustedDateTime.toLocalTime()
+}
 
 /**
  * Prayer Notification Service Manager
@@ -149,14 +161,22 @@ class PrayerNotificationServiceManager @Inject constructor(
                 return emptyMap()
             }
             
-            // Convert to map of name -> time string
+            // Convert to map of name -> time string with offset applied
             val prayerTimesMap = mutableMapOf<String, String>()
+            val offsets = settings.timeOffsets
             
-            prayerTimesMap["Fajr"] = dayPrayerTimes.fajr.format(formatter)
-            prayerTimesMap["Dhuhr"] = dayPrayerTimes.dhuhr.format(formatter)
-            prayerTimesMap["Asr"] = dayPrayerTimes.asr.format(formatter)
-            prayerTimesMap["Maghrib"] = dayPrayerTimes.maghrib.format(formatter)
-            prayerTimesMap["Isha"] = dayPrayerTimes.isha.format(formatter)
+            // Apply user offsets to base prayer times before scheduling notifications
+            val fajrAdjusted = applyOffsetToTime(dayPrayerTimes.fajr, offsets.fajr)
+            val dhuhrAdjusted = applyOffsetToTime(dayPrayerTimes.dhuhr, offsets.dhuhr)
+            val asrAdjusted = applyOffsetToTime(dayPrayerTimes.asr, offsets.asr)
+            val maghribAdjusted = applyOffsetToTime(dayPrayerTimes.maghrib, offsets.maghrib)
+            val ishaAdjusted = applyOffsetToTime(dayPrayerTimes.isha, offsets.isha)
+            
+            prayerTimesMap["Fajr"] = fajrAdjusted.format(formatter)
+            prayerTimesMap["Dhuhr"] = dhuhrAdjusted.format(formatter)
+            prayerTimesMap["Asr"] = asrAdjusted.format(formatter)
+            prayerTimesMap["Maghrib"] = maghribAdjusted.format(formatter)
+            prayerTimesMap["Isha"] = ishaAdjusted.format(formatter)
             
             prayerTimesMap
             

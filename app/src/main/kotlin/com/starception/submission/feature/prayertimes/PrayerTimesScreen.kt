@@ -1310,7 +1310,8 @@ fun PrayerTimesScreen(
                         Log.d("PrayerTimes", "Compass clicked, showing popup")
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         showCompassPopup = true 
-                    }
+                    },
+                    timeOffsets = storedOffsets
                 )
                 }
                 

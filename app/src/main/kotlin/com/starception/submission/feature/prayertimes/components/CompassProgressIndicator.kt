@@ -13,7 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.ArrowForward
+
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
 import androidx.compose.ui.draw.clip
@@ -427,13 +427,13 @@ fun CompassProgressIndicator(
             modifier = Modifier
                 .size(size - 16.dp)
                 .rotate(animatedCompassDegree),
-            color = if (isNearQibla && !needsCalibration) {
-                // When aligned with Qibla, ALWAYS show bright green (regardless of sensor accuracy)
-                Color(0xFF00C853) // Bright green - aligned!
+            color = if (isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH) {
+                // When aligned with Qibla AND high accuracy, show bright green
+                Color(0xFF00C853) // Bright green - aligned with high accuracy!
             } else if (needsCalibration) {
                 Color(0xFFFF4444) // Red when needs calibration
             } else {
-                // Use accuracy-based color when not aligned
+                // Use accuracy-based color (orange for medium, green for high when not aligned)
                 accuracyColor
             },
             strokeWidth = if (isNearQibla) 10.dp else 8.dp, // Slightly thicker when aligned
@@ -441,145 +441,32 @@ fun CompassProgressIndicator(
             strokeCap = StrokeCap.Round,
         )
         
-        // Clear rotation direction indicators with multiple animated arrows
-        if (size >= 260.dp && !isNearQibla && !needsCalibration) {
-            val infiniteTransition = rememberInfiniteTransition(label = "rotation_guide")
-
-            // Animated rotation offset for moving arrows effect
-            val arrowOffset by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 30f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1500, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart
-                ),
-                label = "arrow_offset"
-            )
-
-            // Pulsing alpha for visibility
-            val guideAlpha by infiniteTransition.animateFloat(
-                initialValue = 0.7f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(800, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "guide_alpha"
-            )
-
-            // Draw simple rotating arrow indicator showing rotation direction
-            Box(
-                modifier = Modifier
-                    .size(size)
-                    .graphicsLayer { alpha = guideAlpha }
-            ) {
-                val centerAngle = if (needsClockwise) 45f else 225f // Right side for CW, left side for CCW
-                
-                // Simple arc indicator
+        // Minimal, elegant rotation direction hint - subtle dot indicator
+        if (!isNearQibla && !needsCalibration) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 Canvas(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    val radius = (this.size.minDimension / 2) - 32.dp.toPx()
                     val center = Offset(this.size.width / 2, this.size.height / 2)
+                    val radius = (this.size.minDimension / 2) - (if (size >= 260.dp) 28.dp else 12.dp).toPx()
+                    val indicatorAngle = if (needsClockwise) 45f else -45f
+                    val angleRad = Math.toRadians(indicatorAngle.toDouble())
                     
-                    // Draw arc in the appropriate direction
-                    drawArc(
-                        color = Color(0xFF10B981),
-                        startAngle = centerAngle - 45f,
-                        sweepAngle = if (needsClockwise) 90f else -90f,
-                        useCenter = false,
-                        style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round),
-                        topLeft = Offset(center.x - radius, center.y - radius),
-                        size = Size(radius * 2, radius * 2)
-                    )
-                }
-                
-                // Draw single rotating arrow icon
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .graphicsLayer {
-                            rotationZ = centerAngle + (arrowOffset % 30f)
-                        }
-                ) {
-                    val indicatorRadius = (size.value / 2) - 32
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = "Rotation direction",
-                        modifier = Modifier
-                            .offset(x = indicatorRadius.dp, y = 0.dp)
-                            .size(16.dp)
-                            .rotate(if (needsClockwise) 90f else -90f), // Point in rotation direction
-                        tint = Color(0xFF10B981)
-                    )
-                }
-            }
-        }
-
-        // Animated rotation guidance - only when not near Qibla and not calibrating
-        if (size >= 120.dp && !isNearQibla && !needsCalibration && size < 260.dp) {
-            // Animated rotation indicator (for smaller sizes)
-            val infiniteTransition = rememberInfiniteTransition(label = "rotation_guide")
-            val rotationIndicatorAlpha by infiniteTransition.animateFloat(
-                initialValue = 0.3f,
-                targetValue = 0.8f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1000, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "rotation_alpha"
-            )
-
-            val rotationIndicatorScale by infiniteTransition.animateFloat(
-                initialValue = 0.9f,
-                targetValue = 1.1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1000, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "rotation_scale"
-            )
-            
-            // Draw animated arc showing rotation direction
-            Canvas(
-                modifier = Modifier
-                    .size(size - 8.dp)
-                    .graphicsLayer {
-                        alpha = rotationIndicatorAlpha
-                        scaleX = rotationIndicatorScale
-                        scaleY = rotationIndicatorScale
-                    }
-            ) {
-                val center = Offset(this.size.width / 2, this.size.height / 2)
-                val radius = (this.size.minDimension / 2) - 4.dp.toPx()
-                
-                if (needsClockwise) {
-                    // Clockwise rotation arc
-                    drawArc(
-                        color = Color(0xFF2196F3).copy(alpha = 0.6f),
-                        startAngle = -45f,
-                        sweepAngle = 90f,
-                        useCenter = false,
-                        style = Stroke(
-                            width = 3.dp.toPx(),
-                            cap = StrokeCap.Round
+                    val dotX = center.x + (radius * kotlin.math.cos(angleRad).toFloat())
+                    val dotY = center.y + (radius * kotlin.math.sin(angleRad).toFloat())
+                    
+                    // Subtle gradient dot indicator showing rotation direction
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                accuracyColor.copy(alpha = 0.6f),
+                                accuracyColor.copy(alpha = 0.2f)
+                            ),
+                            center = Offset(dotX, dotY),
+                            radius = if (size >= 260.dp) 8.dp.toPx() else 5.dp.toPx()
                         ),
-                        topLeft = Offset(center.x - radius, center.y - radius),
-                        size = Size(radius * 2, radius * 2)
-                    )
-                } else {
-                    // Counter-clockwise rotation arc
-                    drawArc(
-                        color = Color(0xFF2196F3).copy(alpha = 0.6f),
-                        startAngle = 45f,
-                        sweepAngle = -90f,
-                        useCenter = false,
-                        style = Stroke(
-                            width = 3.dp.toPx(),
-                            cap = StrokeCap.Round
-                        ),
-                        topLeft = Offset(center.x - radius, center.y - radius),
-                        size = Size(radius * 2, radius * 2)
+                        radius = if (size >= 260.dp) 8.dp.toPx() else 5.dp.toPx(),
+                        center = Offset(dotX, dotY)
                     )
                 }
             }
@@ -612,10 +499,10 @@ fun CompassProgressIndicator(
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (needsCalibration) {
                         Color(0xFFFF4444)
-                    } else if (isNearQibla) {
-                        Color(0xFF00C853) // Bright green when facing Qibla
+                    } else if (isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH) {
+                        Color(0xFF00C853) // Bright green when facing Qibla with high accuracy
                     } else {
-                        Color(0xFF10B981) // Original green
+                        accuracyColor // Use accuracy-based color (orange for medium, green for high)
                     },
                     textAlign = TextAlign.Center,
                     fontWeight = if (isNearQibla && !needsCalibration) FontWeight.Bold else FontWeight.SemiBold,
@@ -640,8 +527,8 @@ fun CompassProgressIndicator(
                     Text(
                         text = guidanceText,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (isNearQibla && !needsCalibration) {
-                            Color(0xFF00C853)
+                        color = if (isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH) {
+                            Color(0xFF00C853) // Bright green when aligned with high accuracy
                         } else {
                             Color.Black.copy(alpha = 0.6f)
                         },
