@@ -29,6 +29,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.ToneGenerator
 import com.starception.submission.prayer.model.DayPrayerTimes
+import java.time.LocalDateTime
 import com.starception.submission.prayer.model.PrayerTime
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
@@ -42,6 +43,7 @@ import kotlinx.coroutines.flow.*
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.Duration
+import java.time.LocalDate
 import javax.inject.Inject
 import android.graphics.Color
 
@@ -766,15 +768,45 @@ class PrayerNotificationService : Service() {
                 
                 Log.d(TAG, "✓ Prayer times calculated in ${calculationTime}ms")
                 
-                // Get current and next prayer
-                val allPrayers = prayerTimes.getActualPrayers()
+                // Get offsets from settings to apply to base times
+                val offsets = settings.timeOffsets
+                Log.d(TAG, "⏰ Applying user offsets: Fajr=${offsets.fajr}, Dhuhr=${offsets.dhuhr}, Asr=${offsets.asr}, Maghrib=${offsets.maghrib}, Isha=${offsets.isha}")
+                
+                // Apply offsets to base prayer times (to match small tiles and smart prediction)
+                fun applyOffsetToTime(baseTime: LocalTime, offsetMinutes: Int): LocalTime {
+                    if (offsetMinutes == 0) return baseTime
+                    val adjustedDateTime = LocalDateTime.of(LocalDate.now(), baseTime)
+                        .plusMinutes(offsetMinutes.toLong())
+                    return adjustedDateTime.toLocalTime()
+                }
+                
+                fun adjustPrayerTime(prayer: PrayerTime): PrayerTime {
+                    val offset = when (prayer.name.lowercase()) {
+                        "fajr" -> offsets.fajr
+                        "dhuhr" -> offsets.dhuhr
+                        "asr" -> offsets.asr
+                        "maghrib" -> offsets.maghrib
+                        "isha" -> offsets.isha
+                        else -> 0
+                    }
+                    val adjustedTime = applyOffsetToTime(prayer.time, offset)
+                    return prayer.copy(time = adjustedTime)
+                }
+                
+                // Get current and next prayer (base times first)
+                val allPrayersBase = prayerTimes.getActualPrayers()
+                val nextPrayerBase = prayerTimes.getNextPrayer()
+                
+                // Apply offsets to get adjusted times
+                val allPrayers = allPrayersBase.map { adjustPrayerTime(it) }
                 val rawCurrentPrayer = allPrayers.find { it.isCurrently }
-                val nextPrayer = prayerTimes.getNextPrayer()
+                val nextPrayer = nextPrayerBase?.let { adjustPrayerTime(it) }
                 
                 // OVERRIDE DETECTION: Fix incorrect prayer detection for overnight period
+                // Use ADJUSTED times for comparison
                 val now = LocalTime.now()
-                val ishaTime = prayerTimes.isha
-                val fajrTime = prayerTimes.fajr
+                val ishaTime = applyOffsetToTime(prayerTimes.isha, offsets.isha)
+                val fajrTime = applyOffsetToTime(prayerTimes.fajr, offsets.fajr)
                 
                 val currentPrayer = if (rawCurrentPrayer?.name == "Fajr" && now.isBefore(fajrTime)) {
                     Log.w(TAG, "🚨 INCORRECT DETECTION: System thinks Fajr is current at $now but Fajr is at $fajrTime")
@@ -814,7 +846,8 @@ class PrayerNotificationService : Service() {
                     
                     if (nextPrayer?.name == "Fajr") {
                         // We're likely in the overnight period between today's Isha and tomorrow's Fajr
-                        val todayIsha = prayerTimes.isha
+                        // Use ADJUSTED times for consistency
+                        val todayIsha = applyOffsetToTime(prayerTimes.isha, offsets.isha)
                         val now = LocalTime.now()
                         
                         Log.d(TAG, "📊 Cross-day scenario detected:")
