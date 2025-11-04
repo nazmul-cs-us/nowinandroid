@@ -137,8 +137,7 @@ fun InteractivePrayerDial(
 
     Box(
         modifier = modifier
-            .aspectRatio(1f) // Perfect circle
-            .fillMaxSize()
+            .aspectRatio(1f) // Perfect circle - this should constrain the size
             .graphicsLayer {
                 scaleX = dialScale
                 scaleY = dialScale
@@ -147,7 +146,12 @@ fun InteractivePrayerDial(
     ) {
         Canvas(
             modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize() // Use matchParentSize instead of fillMaxSize for better centering
+                .graphicsLayer {
+                    // Ensure proper centering - no translation
+                    translationX = 0f
+                    translationY = 0f
+                }
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { offset ->
@@ -248,8 +252,13 @@ fun InteractivePrayerDial(
                     }
                 }
         ) {
-            val center = this.center
+            // Ensure perfect centering - use exact center of canvas
+            // Use the actual center of the drawScope (which is already centered)
+            val center = Offset(size.width / 2f, size.height / 2f)
             val radius = kotlin.math.min(size.width, size.height) * 0.4f
+            
+            // Double-check that center is truly at the middle
+            // This ensures the dial is perfectly centered regardless of canvas size
             
             // Use Material 3 theme colors passed from Composable
             
@@ -670,39 +679,37 @@ private fun DrawScope.drawCleanCircularTimer(
     knobScale: Float = 1f,
     progressArcGlow: Float = 1f
 ) {
-    // Clean circular design matching the reference image
-    val timerRadius = radius * 1.15f // Slightly larger for better visibility
+    // Design matching the reference image: central dial with outer segmented ring
+    // Ensure perfect centering - use exact center coordinates
+    val exactCenter = Offset(center.x, center.y)
+    val outerRingRadius = radius * 1.15f // Outer ring radius
+    val centralDialRadius = radius * 0.65f // Central dial radius (smaller, inside the ring)
 
-    // Use Material 3 theme colors for consistency
-    val backgroundColor = surfaceColor // Use theme surface color for light/dark mode support
-    val tickGrayColor = outlineColor.copy(alpha = 0.5f) // Use theme outline color for inactive ticks
-    val tickTealColor = Color(0xFF26C6DA) // Bright cyan/teal for progress
+    // Colors matching the reference design
+    val lightGreyBackground = Color(0xFFF5F5F5) // Very light grey/off-white
+    val tealColor = Color(0xFF26C6DA) // Vibrant teal/aqua for all segments (uniform color like reference)
+    val shadowColor = Color.Black.copy(alpha = 0.08f)
+    val highlightColor = Color.White.copy(alpha = 0.3f)
 
-    // Subtle outer shadow for depth
+    // Draw outer shadow for depth (soft shadow beneath the entire dial) - centered
     drawCircle(
-        color = Color.Black.copy(alpha = 0.08f),
-        radius = timerRadius + 8f,
-        center = Offset(center.x + 2f, center.y + 3f)
+        color = shadowColor,
+        radius = outerRingRadius + 6f,
+        center = exactCenter // Shadow centered, not offset
     )
 
-    // Main circle background - uses theme surface color
+    // Draw outer segmented ring background (recessed appearance) - perfectly centered
     drawCircle(
-        color = backgroundColor,
-        radius = timerRadius,
-        center = center
+        color = lightGreyBackground.copy(alpha = 0.5f),
+        radius = outerRingRadius,
+        center = exactCenter
     )
 
-    // Very subtle inner shadow for depth
-    drawCircle(
-        color = Color.Black.copy(alpha = 0.03f),
-        radius = timerRadius - 4f,
-        center = Offset(center.x, center.y + 1f)
-    )
-
-    // No border - cleaner look like reference
-
-    // Draw tick marks around the outer edge
-    val tickCount = 120 // Dense tick marks for precision
+    // Draw segmented outer ring with vertical dashes - all uniform teal color like reference
+    val segmentCount = 120 // Number of segments around the circle
+    val segmentLength = 20f // Length of each segment
+    val segmentWidth = 2.5f // Width of segments (uniform)
+    val segmentGap = 2f // Gap between segments
     
     // Calculate actual prayer time (adjusted) for angle calculation
     val adjustedDateTime = LocalDateTime.of(LocalDate.now(), originalTime).plusMinutes(timeAdjustment.toLong())
@@ -712,107 +719,96 @@ private fun DrawScope.drawCleanCircularTimer(
     val hourIn12Format = if (adjustedTime.hour % 12 == 0) 12 else adjustedTime.hour % 12
     val timeAngle = ((hourIn12Format * 60 + adjustedTime.minute) / (12 * 60f)) * 360f - 90f
 
-    // Draw individual tick marks around the edge
-    for (i in 0 until tickCount) {
-        val markerAngle = (i * (360.0 / tickCount) - 90.0) * PI / 180.0 // Start from top
+    // Draw segmented ring - all segments uniform teal color (matching reference image)
+    // All segments are the same teal color, no distinction between active/inactive
+    for (i in 0 until segmentCount) {
+        val segmentAngle = (i * (360.0 / segmentCount) - 90.0) * PI / 180.0 // Start from top
 
-        // Determine if this tick should be highlighted (teal) based on current progress
-        val currentAngle = if (isDragging) currentDragAngle else timeAngle
-        val normalizedCurrentAngle = ((currentAngle + 90f) % 360 + 360) % 360 // Normalize relative to top
-        val normalizedTickAngle = ((i * (360.0 / tickCount)) % 360).toFloat()
-
-        // Check if this tick is within the progress arc (clockwise from top)
-        val isHighlighted = normalizedTickAngle <= normalizedCurrentAngle
-
-        // Tick positions - positioned at the edge like reference
-        val tickInnerRadius = timerRadius - 25f // Inner edge of ticks
-        val tickOuterRadius = timerRadius - 5f  // Outer edge of ticks (just inside the circle)
-
-        val tickStart = Offset(
-            center.x + tickInnerRadius * cos(markerAngle.toFloat()).toFloat(),
-            center.y + tickInnerRadius * sin(markerAngle.toFloat()).toFloat()
+        // Segment position - vertical dashes at the outer edge with gaps
+        val segmentRadius = outerRingRadius - segmentLength / 2f
+        val segmentStart = Offset(
+            exactCenter.x + segmentRadius * cos(segmentAngle.toFloat()).toFloat(),
+            exactCenter.y + segmentRadius * sin(segmentAngle.toFloat()).toFloat()
         )
-        val tickEnd = Offset(
-            center.x + tickOuterRadius * cos(markerAngle.toFloat()).toFloat(),
-            center.y + tickOuterRadius * sin(markerAngle.toFloat()).toFloat()
+        val segmentEnd = Offset(
+            exactCenter.x + (segmentRadius + segmentLength) * cos(segmentAngle.toFloat()).toFloat(),
+            exactCenter.y + (segmentRadius + segmentLength) * sin(segmentAngle.toFloat()).toFloat()
         )
 
-        // Draw tick mark - thinner like reference
+        // Draw segment - all segments are uniform teal color (matching reference)
         drawLine(
-            color = if (isHighlighted) {
-                tickTealColor.copy(alpha = 0.85f + (progressArcGlow * 0.15f))
-            } else {
-                tickGrayColor.copy(alpha = 0.4f) // More subtle gray
-            },
-            start = tickStart,
-            end = tickEnd,
-            strokeWidth = if (isHighlighted) 2.5f else 2f,
+            color = tealColor.copy(alpha = 0.8f),
+            start = segmentStart,
+            end = segmentEnd,
+            strokeWidth = segmentWidth,
             cap = StrokeCap.Round
         )
     }
 
-    // Draw small teal indicator pill at the progress position
-    val displayAngle = if (isDragging) currentDragAngle else timeAngle
-    val indicatorAngle = displayAngle * PI / 180f
-    val indicatorRadius = timerRadius - 15f // Position at the edge where ticks are
-    
+    // Draw central dial with 3D effect (light grey/off-white with shadows and highlights)
+    // Ensure it's perfectly centered - all elements use exactCenter
+    // Main central dial background (light grey/off-white) - perfectly centered
+    drawCircle(
+        color = lightGreyBackground,
+        radius = centralDialRadius,
+        center = exactCenter
+    )
+
+    // Subtle highlight on top-left for 3D effect
+    val highlightRadius = centralDialRadius * 0.7f
+    val highlightCenter = Offset(exactCenter.x - centralDialRadius * 0.3f, exactCenter.y - centralDialRadius * 0.3f)
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                highlightColor,
+                Color.Transparent
+            ),
+            center = highlightCenter,
+            radius = highlightRadius
+        ),
+        radius = highlightRadius,
+        center = highlightCenter
+    )
+
+    // Subtle shadow on bottom-right for depth
+    val shadowRadius = centralDialRadius * 0.7f
+    val shadowCenter = Offset(exactCenter.x + centralDialRadius * 0.3f, exactCenter.y + centralDialRadius * 0.3f)
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                Color.Transparent,
+                shadowColor.copy(alpha = 0.15f)
+            ),
+            center = shadowCenter,
+            radius = shadowRadius
+        ),
+        radius = shadowRadius,
+        center = shadowCenter
+    )
+
+    // Draw small teal horizontal indicator mark at 12 o'clock position
+    // Position it on the central dial, directly above where the time text will be displayed
+    // This matches the reference design where the indicator is on the central dial itself
+    val indicatorAngle = -90f * PI / 180f // 12 o'clock position
+    val indicatorRadius = centralDialRadius - 20f // Position on the central dial, near the top edge
     val indicatorCenter = Offset(
-        center.x + indicatorRadius * cos(indicatorAngle.toFloat()).toFloat(),
-        center.y + indicatorRadius * sin(indicatorAngle.toFloat()).toFloat()
+        exactCenter.x + indicatorRadius * cos(indicatorAngle.toFloat()).toFloat(),
+        exactCenter.y + indicatorRadius * sin(indicatorAngle.toFloat()).toFloat()
     )
 
-    // Small teal pill indicator like reference - simple and clean
-    val pillRadius = (8f + (knobScale - 1f) * 4f) // Subtle size change on drag
+    // Small horizontal rectangular indicator (teal pill shape) - positioned on central dial at 12 o'clock
+    val indicatorWidth = 24f * knobScale // Small horizontal rectangle
+    val indicatorHeight = 4f * knobScale // Thin horizontal mark
 
-    // Draw a simple rounded rectangle (pill shape) perpendicular to the radius
-    val perpAngle = indicatorAngle + PI / 2
-    val pillHalfLength = 20f * knobScale
-    val pillHalfWidth = 6f * knobScale
-
-    // Create pill path
-    val pillPath = Path().apply {
-        val corner1 = Offset(
-            indicatorCenter.x - pillHalfLength * cos(perpAngle.toFloat()) - pillHalfWidth * cos(indicatorAngle.toFloat()),
-            indicatorCenter.y - pillHalfLength * sin(perpAngle.toFloat()) - pillHalfWidth * sin(indicatorAngle.toFloat())
-        )
-        val corner2 = Offset(
-            indicatorCenter.x + pillHalfLength * cos(perpAngle.toFloat()) - pillHalfWidth * cos(indicatorAngle.toFloat()),
-            indicatorCenter.y + pillHalfLength * sin(perpAngle.toFloat()) - pillHalfWidth * sin(indicatorAngle.toFloat())
-        )
-        val corner3 = Offset(
-            indicatorCenter.x + pillHalfLength * cos(perpAngle.toFloat()) + pillHalfWidth * cos(indicatorAngle.toFloat()),
-            indicatorCenter.y + pillHalfLength * sin(perpAngle.toFloat()) + pillHalfWidth * sin(indicatorAngle.toFloat())
-        )
-        val corner4 = Offset(
-            indicatorCenter.x - pillHalfLength * cos(perpAngle.toFloat()) + pillHalfWidth * cos(indicatorAngle.toFloat()),
-            indicatorCenter.y - pillHalfLength * sin(perpAngle.toFloat()) + pillHalfWidth * sin(indicatorAngle.toFloat())
-        )
-
-        moveTo(corner1.x, corner1.y)
-        lineTo(corner2.x, corner2.y)
-        lineTo(corner3.x, corner3.y)
-        lineTo(corner4.x, corner4.y)
-        close()
-    }
-
-    // Draw the pill body
-    drawPath(
-        path = pillPath,
-        color = tickTealColor
+    drawRoundRect(
+        color = tealColor,
+        topLeft = Offset(
+            indicatorCenter.x - indicatorWidth / 2f,
+            indicatorCenter.y - indicatorHeight / 2f
+        ),
+        size = Size(indicatorWidth, indicatorHeight),
+        cornerRadius = CornerRadius(indicatorHeight / 2f, indicatorHeight / 2f)
     )
-
-    // Add rounded caps
-    val leftCap = Offset(
-        indicatorCenter.x - pillHalfLength * cos(perpAngle.toFloat()),
-        indicatorCenter.y - pillHalfLength * sin(perpAngle.toFloat())
-    )
-    val rightCap = Offset(
-        indicatorCenter.x + pillHalfLength * cos(perpAngle.toFloat()),
-        indicatorCenter.y + pillHalfLength * sin(perpAngle.toFloat())
-    )
-
-    drawCircle(color = tickTealColor, radius = pillHalfWidth, center = leftCap)
-    drawCircle(color = tickTealColor, radius = pillHalfWidth, center = rightCap)
 }
 
 private fun DrawScope.drawPNGDocumentBackground(center: Offset, radius: Float) {
