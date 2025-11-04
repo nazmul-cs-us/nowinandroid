@@ -1035,7 +1035,8 @@ fun SwipeableBigTiles(
                     getPrayerTimeDisplay = getPrayerTimeDisplay,
                     getTimeUntilNextPrayer = getTimeUntilNextPrayer,
                     getTimeSinceCurrentPrayer = getTimeSinceCurrentPrayer,
-                    onCompassClick = onCompassClick
+                    onCompassClick = onCompassClick,
+                    timeOffsets = timeOffsets
                 )
                 1 -> SmartInfoTile(
                     getSmartTitle = getSmartTitle,
@@ -1127,7 +1128,8 @@ private fun NextPrayerTile(
     getPrayerTimeDisplay: (String) -> String,
     getTimeUntilNextPrayer: () -> String,
     getTimeSinceCurrentPrayer: () -> String,
-    onCompassClick: () -> Unit
+    onCompassClick: () -> Unit,
+    timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets()
 ) {
     val view = LocalView.current
     val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
