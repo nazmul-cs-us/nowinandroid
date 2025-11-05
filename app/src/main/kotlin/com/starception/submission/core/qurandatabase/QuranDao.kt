@@ -71,6 +71,18 @@ interface QuranDao {
     suspend fun getAyahsBySurahOnce(surahId: Int): List<AyahEntity>
     
     /**
+     * Get all Ayahs for a specific Surah by surah number (using JOIN)
+     * This is useful when surah_id might differ between databases
+     */
+    @Query("""
+        SELECT ayahs.* FROM ayahs 
+        INNER JOIN surahs ON ayahs.surah_id = surahs.id 
+        WHERE surahs.number = :surahNumber 
+        ORDER BY ayahs.number_in_surah ASC
+    """)
+    suspend fun getAyahsBySurahNumber(surahNumber: Int): List<AyahEntity>
+    
+    /**
      * Get a specific Ayah by its global number
      */
     @Query("SELECT * FROM ayahs WHERE number = :ayahNumber")
@@ -132,7 +144,8 @@ interface QuranDao {
     @Transaction
     suspend fun getSurahWithAyahCount(surahId: Int): Surah? {
         val surahEntity = getSurahById(surahId) ?: return null
-        val ayahCount = getAyahCount(surahId)
+        val entityId = surahEntity.id ?: surahId // Use entity id if available, fallback to parameter
+        val ayahCount = getAyahCount(entityId)
         return surahEntity.toSurah(ayahCount)
     }
     
@@ -143,7 +156,8 @@ interface QuranDao {
     suspend fun getAllSurahsWithCounts(): List<Surah> {
         val surahs = getAllSurahsOnce()
         return surahs.map { surahEntity ->
-            val ayahCount = getAyahCount(surahEntity.id)
+            val surahId = surahEntity.id ?: 0 // Handle nullable id (should never be null in practice)
+            val ayahCount = getAyahCount(surahId)
             surahEntity.toSurah(ayahCount)
         }
     }

@@ -20,7 +20,8 @@ import java.io.FileOutputStream
         HizbEntity::class
     ],
     version = 1,
-    exportSchema = false
+    exportSchema = false,
+    autoMigrations = []
 )
 abstract class QuranDatabase : RoomDatabase() {
     

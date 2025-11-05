@@ -176,11 +176,21 @@ fun InteractivePrayerDial(
                                 ) * 180f / PI.toFloat()
                                 accumulatedAngle = 0f // Reset accumulated angle
 
-                                // Calculate current prayer time angle to start from current position
+                                // Calculate current prayer time angle to initialize from current position
                                 val adjustedDateTime = java.time.LocalDateTime.of(java.time.LocalDate.now(), originalTime).plusMinutes(timeAdjustment.toLong())
                                 val adjustedTime = adjustedDateTime.toLocalTime()
                                 val hourIn12Format = if (adjustedTime.hour % 12 == 0) 12 else adjustedTime.hour % 12
-                                currentDragAngle = ((hourIn12Format * 60 + adjustedTime.minute) / (12 * 60f)) * 360f - 90f
+                                val timeAngle = ((hourIn12Format * 60 + adjustedTime.minute) / (12 * 60f)) * 360f - 90f
+                                
+                                // Start drag angle from finger position for immediate visual feedback
+                                // The knob will snap to finger position when dragging starts
+                                currentDragAngle = lastAngle
+                                
+                                // Calculate initial angle difference to track from the start
+                                var initialAngleDiff = lastAngle - timeAngle
+                                if (initialAngleDiff > 180f) initialAngleDiff -= 360f
+                                if (initialAngleDiff < -180f) initialAngleDiff += 360f
+                                accumulatedAngle = initialAngleDiff
 
                                 Log.d("InteractiveDial", "🚀 DRAG START - Prayer: $prayerName")
                                 Log.d("InteractiveDial", "📍 Touch: (${offset.x.toInt()}, ${offset.y.toInt()}), Center: (${center.x.toInt()}, ${center.y.toInt()})")
@@ -772,27 +782,29 @@ private fun DrawScope.drawCleanCircularTimer(
         )
     }
 
-    // Draw small teal horizontal indicator mark at 12 o'clock position
-    // Position it on the outer ring, directly above where the time text will be displayed
-    val indicatorAngle = -90f * PI / 180f // 12 o'clock position
-    val indicatorRadius = outerRingRadius - 20f // Position on the outer ring, near the inner edge
+    // Draw teal indicator knob - draggable and follows current time/drag angle
+    // Position it on the outer ring based on current time angle
+    val indicatorAngleRad = (currentAngle * PI / 180f).toFloat() // Convert to radians
+    val indicatorRadius = outerRingRadius - 15f // Position on the outer ring, near the inner edge
     val indicatorCenter = Offset(
-        exactCenter.x + indicatorRadius * cos(indicatorAngle.toFloat()).toFloat(),
-        exactCenter.y + indicatorRadius * sin(indicatorAngle.toFloat()).toFloat()
+        exactCenter.x + indicatorRadius * cos(indicatorAngleRad),
+        exactCenter.y + indicatorRadius * sin(indicatorAngleRad)
     )
 
-    // Small horizontal rectangular indicator (teal pill shape) - positioned on central dial at 12 o'clock
-    val indicatorWidth = 24f * knobScale // Small horizontal rectangle
-    val indicatorHeight = 4f * knobScale // Thin horizontal mark
-
-    drawRoundRect(
+    // Draw circular knob indicator (larger and more visible for dragging)
+    val knobIndicatorRadius = if (isDragging) 16f * knobScale else 12f // Larger when dragging
+    drawCircle(
         color = tealColor,
-        topLeft = Offset(
-            indicatorCenter.x - indicatorWidth / 2f,
-            indicatorCenter.y - indicatorHeight / 2f
-        ),
-        size = Size(indicatorWidth, indicatorHeight),
-        cornerRadius = CornerRadius(indicatorHeight / 2f, indicatorHeight / 2f)
+        radius = knobIndicatorRadius,
+        center = indicatorCenter
+    )
+    
+    // Add a subtle white border/ring around the knob for better visibility
+    drawCircle(
+        color = Color.White,
+        radius = knobIndicatorRadius + 2f,
+        center = indicatorCenter,
+        style = Stroke(width = 2f)
     )
     
 }
