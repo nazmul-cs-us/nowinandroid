@@ -67,6 +67,7 @@ fun NiaNavHost(
         bookmarksScreen(
             onTopicClick = navController::navigateToTopic,
             onShowSnackbar = onShowSnackbar,
+            onSurahClick = navController::navigateToSurah,
         )
         searchScreen(
             onBackClick = navController::popBackStack,

@@ -31,8 +31,10 @@ fun NavController.navigateToBookmarks(navOptions: NavOptions) =
 fun NavGraphBuilder.bookmarksScreen(
     onTopicClick: (String) -> Unit,
     onShowSnackbar: suspend (String, String?) -> Boolean,
+    onSurahClick: (Int) -> Unit = {},
+    onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
 ) {
     composable<BookmarksRoute> {
-        BookmarksRoute(onTopicClick, onShowSnackbar)
+        BookmarksRoute(onTopicClick, onShowSnackbar, onSurahClick, onNewsClick)
     }
 }

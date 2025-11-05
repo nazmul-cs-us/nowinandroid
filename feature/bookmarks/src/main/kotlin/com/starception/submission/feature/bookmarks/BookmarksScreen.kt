@@ -79,6 +79,8 @@ import com.starception.submission.core.ui.newsFeed
 internal fun BookmarksRoute(
     onTopicClick: (String) -> Unit,
     onShowSnackbar: suspend (String, String?) -> Boolean,
+    onSurahClick: (Int) -> Unit = {},
+    onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: BookmarksViewModel = hiltViewModel(),
 ) {
@@ -89,6 +91,8 @@ internal fun BookmarksRoute(
         removeFromBookmarks = viewModel::removeFromSavedResources,
         onNewsResourceViewed = { viewModel.setNewsResourceViewed(it, true) },
         onTopicClick = onTopicClick,
+        onSurahClick = onSurahClick,
+        onNewsClick = onNewsClick,
         modifier = modifier,
         shouldDisplayUndoBookmark = viewModel.shouldDisplayUndoBookmark,
         undoBookmarkRemoval = viewModel::undoBookmarkRemoval,
@@ -107,6 +111,8 @@ internal fun BookmarksScreen(
     removeFromBookmarks: (String) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
+    onSurahClick: (Int) -> Unit = {},
+    onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
     shouldDisplayUndoBookmark: Boolean = false,
     undoBookmarkRemoval: () -> Unit = {},
@@ -138,6 +144,8 @@ internal fun BookmarksScreen(
                 removeFromBookmarks,
                 onNewsResourceViewed,
                 onTopicClick,
+                onSurahClick,
+                onNewsClick,
                 modifier,
             )
         } else {
@@ -165,6 +173,8 @@ private fun BookmarksGrid(
     removeFromBookmarks: (String) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
+    onSurahClick: (Int) -> Unit = {},
+    onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val scrollableState = rememberLazyStaggeredGridState()
@@ -188,6 +198,8 @@ private fun BookmarksGrid(
                 onNewsResourcesCheckedChanged = { id, _ -> removeFromBookmarks(id) },
                 onNewsResourceViewed = onNewsResourceViewed,
                 onTopicClick = onTopicClick,
+                onSurahClick = onSurahClick,
+                onNewsClick = onNewsClick,
             )
             item(span = StaggeredGridItemSpan.FullLine) {
                 Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
@@ -274,6 +286,7 @@ private fun BookmarksGridPreview(
             removeFromBookmarks = {},
             onNewsResourceViewed = {},
             onTopicClick = {},
+            onSurahClick = {},
         )
     }
 }

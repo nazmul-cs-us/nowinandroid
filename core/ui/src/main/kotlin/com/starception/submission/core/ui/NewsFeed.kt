@@ -57,6 +57,7 @@ fun LazyStaggeredGridScope.newsFeed(
     onTopicClick: (String) -> Unit,
     onExpandedCardClick: () -> Unit = {},
     onSurahClick: (Int) -> Unit = {},
+    onNewsClick: ((UserNewsResource) -> Unit)? = null,
 ) {
     when (feedState) {
         NewsFeedUiState.Loading -> Unit
@@ -124,6 +125,9 @@ fun LazyStaggeredGridScope.newsFeed(
                         // If it's a Surah, navigate to Surah detail screen
                         if (surahNumber != null) {
                             onSurahClick(surahNumber)
+                        } else if (onNewsClick != null) {
+                            // Use custom news click handler if provided
+                            onNewsClick(userNewsResource)
                         } else {
                             // Otherwise, open in Chrome Custom Tab
                             launchCustomChromeTab(context, Uri.parse(userNewsResource.url), backgroundColor)
