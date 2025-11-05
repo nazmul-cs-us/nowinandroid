@@ -123,7 +123,7 @@ class QuranRepository @Inject constructor(
      */
     fun getAyahsBySurah(surahId: Int): Flow<List<Ayah>> {
         return quranDao.getAyahsBySurah(surahId).map { entities ->
-            entities.map { it.toAyah() }
+            entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
     
@@ -132,7 +132,9 @@ class QuranRepository @Inject constructor(
      */
     suspend fun getAyahsBySurahOnce(surahId: Int): List<Ayah> = withContext(Dispatchers.IO) {
         try {
-            quranDao.getAyahsBySurahOnce(surahId).map { it.toAyah() }
+            val surah = quranDao.getSurahById(surahId)
+            val surahNumber = surah?.number ?: 0
+            quranDao.getAyahsBySurahOnce(surahId).map { it.toAyah(surahNumber) }
         } catch (e: Exception) {
             Log.e(TAG, "Error loading Ayahs for Surah $surahId", e)
             emptyList()
@@ -144,7 +146,12 @@ class QuranRepository @Inject constructor(
      */
     suspend fun getAyahByNumber(ayahNumber: Int): Ayah? = withContext(Dispatchers.IO) {
         try {
-            quranDao.getAyahByNumber(ayahNumber)?.toAyah()
+            val ayah = quranDao.getAyahByNumber(ayahNumber)
+            if (ayah != null) {
+                // Get surah to get its number
+                val surah = quranDao.getSurahById(ayah.surahId)
+                ayah.toAyah(surah?.number ?: 0)
+            } else null
         } catch (e: Exception) {
             Log.e(TAG, "Error loading Ayah $ayahNumber", e)
             null
@@ -156,7 +163,7 @@ class QuranRepository @Inject constructor(
      */
     fun getAyahsByPage(pageNumber: Int): Flow<List<Ayah>> {
         return quranDao.getAyahsByPage(pageNumber).map { entities ->
-            entities.map { it.toAyah() }
+            entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
     
@@ -165,7 +172,7 @@ class QuranRepository @Inject constructor(
      */
     fun getAyahsByJuz(juzNumber: Int): Flow<List<Ayah>> {
         return quranDao.getAyahsByJuz(juzNumber).map { entities ->
-            entities.map { it.toAyah() }
+            entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
     
@@ -174,7 +181,7 @@ class QuranRepository @Inject constructor(
      */
     fun getSajdaAyahs(): Flow<List<Ayah>> {
         return quranDao.getSajdaAyahs().map { entities ->
-            entities.map { it.toAyah() }
+            entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
     
@@ -183,7 +190,7 @@ class QuranRepository @Inject constructor(
      */
     fun searchAyahs(query: String): Flow<List<Ayah>> {
         return quranDao.searchAyahs(query).map { entities ->
-            entities.map { it.toAyah() }
+            entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
     
@@ -192,7 +199,7 @@ class QuranRepository @Inject constructor(
      */
     suspend fun searchAyahsWithLimit(query: String, limit: Int = 50): List<Ayah> = withContext(Dispatchers.IO) {
         try {
-            quranDao.searchAyahsWithLimit(query, limit).map { it.toAyah() }
+            quranDao.searchAyahsWithLimit(query, limit).map { it.toAyah(0) } // surahNumber will be 0 for now
         } catch (e: Exception) {
             Log.e(TAG, "Error searching Ayahs for '$query'", e)
             emptyList()
@@ -233,7 +240,7 @@ class QuranRepository @Inject constructor(
     suspend fun getAyahsPage(page: Int, pageSize: Int = 20): List<Ayah> = withContext(Dispatchers.IO) {
         try {
             val offset = page * pageSize
-            quranDao.getAyahsPage(pageSize, offset).map { it.toAyah() }
+            quranDao.getAyahsPage(pageSize, offset).map { it.toAyah(0) } // surahNumber will be 0 for now
         } catch (e: Exception) {
             Log.e(TAG, "Error loading Ayahs page $page", e)
             emptyList()

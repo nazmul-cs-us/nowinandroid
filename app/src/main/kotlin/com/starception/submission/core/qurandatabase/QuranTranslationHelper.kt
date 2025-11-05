@@ -45,30 +45,32 @@ object QuranTranslationHelper {
         
         Log.d(TAG, "📖 Loading Quran database: $translationCode from $dbAssetPath")
         
-        try {
-            // Create database instance
-            val database = Room.databaseBuilder(
-                context.applicationContext,
-                QuranDatabase::class.java,
-                "quran_${translationCode}_instance"
-            )
-                .createFromAsset(dbAssetPath)
-                .fallbackToDestructiveMigration()
-                .build()
-            
-            Log.d(TAG, "✅ Quran translation database created: $translationCode")
-            
-            // Cache the instance
-            databaseCache[translationCode] = database
-            
-            Log.d(TAG, "✅ Database loaded and cached successfully: $translationCode")
-            return database
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to load database for translation: $translationCode", e)
-            Log.e(TAG, "❌ Database path: $dbAssetPath", e)
-            e.printStackTrace()
-            throw e // Re-throw to let caller handle the error
-        }
+            try {
+                // Create database instance
+                // Entity now matches translation DB schema (nullable columns)
+                // Room can read from Arabic DB (NOT NULL) into nullable entity fields
+                val database = Room.databaseBuilder(
+                    context.applicationContext,
+                    QuranDatabase::class.java,
+                    "quran_${translationCode}_instance"
+                )
+                    .createFromAsset(dbAssetPath)
+                    .fallbackToDestructiveMigration()
+                    .build()
+
+                Log.d(TAG, "✅ Quran translation database created: $translationCode")
+
+                // Cache the instance
+                databaseCache[translationCode] = database
+
+                Log.d(TAG, "✅ Database loaded and cached successfully: $translationCode")
+                return database
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to load database for translation: $translationCode", e)
+                Log.e(TAG, "❌ Database path: $dbAssetPath", e)
+                e.printStackTrace()
+                throw e // Re-throw to let caller handle the error
+            }
     }
     
     /**
@@ -272,7 +274,7 @@ class QuranTranslationRepository(
      */
     fun getAyahsBySurah(surahId: Int): Flow<List<Ayah>> {
         return quranDao.getAyahsBySurah(surahId).map { entities ->
-            entities.map { it.toAyah() }
+            entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
     
@@ -281,7 +283,10 @@ class QuranTranslationRepository(
      */
     suspend fun getAyahsBySurahOnce(surahId: Int): List<Ayah> = withContext(Dispatchers.IO) {
         try {
-            quranDao.getAyahsBySurahOnce(surahId).map { it.toAyah() }
+            // Get surah first to get its number
+            val surah = quranDao.getSurahById(surahId)
+            val surahNumber = surah?.number ?: 0
+            quranDao.getAyahsBySurahOnce(surahId).map { it.toAyah(surahNumber) }
         } catch (e: Exception) {
             Log.e(TAG, "Error loading Ayahs for Surah $surahId", e)
             emptyList()
@@ -294,7 +299,8 @@ class QuranTranslationRepository(
      */
     suspend fun getAyahsBySurahNumber(surahNumber: Int): List<Ayah> = withContext(Dispatchers.IO) {
         try {
-            quranDao.getAyahsBySurahNumber(surahNumber).map { it.toAyah() }
+            // We already have surahNumber, so pass it directly
+            quranDao.getAyahsBySurahNumber(surahNumber).map { it.toAyah(surahNumber) }
         } catch (e: Exception) {
             Log.e(TAG, "Error loading Ayahs for Surah number $surahNumber", e)
             emptyList()
@@ -306,7 +312,12 @@ class QuranTranslationRepository(
      */
     suspend fun getAyahByNumber(ayahNumber: Int): Ayah? = withContext(Dispatchers.IO) {
         try {
-            quranDao.getAyahByNumber(ayahNumber)?.toAyah()
+            val ayah = quranDao.getAyahByNumber(ayahNumber)
+            if (ayah != null) {
+                // Get surah to get its number
+                val surah = quranDao.getSurahById(ayah.surahId)
+                ayah.toAyah(surah?.number ?: 0)
+            } else null
         } catch (e: Exception) {
             Log.e(TAG, "Error loading Ayah $ayahNumber", e)
             null
@@ -318,7 +329,7 @@ class QuranTranslationRepository(
      */
     fun getAyahsByPage(pageNumber: Int): Flow<List<Ayah>> {
         return quranDao.getAyahsByPage(pageNumber).map { entities ->
-            entities.map { it.toAyah() }
+            entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
     
@@ -327,7 +338,7 @@ class QuranTranslationRepository(
      */
     fun getAyahsByJuz(juzNumber: Int): Flow<List<Ayah>> {
         return quranDao.getAyahsByJuz(juzNumber).map { entities ->
-            entities.map { it.toAyah() }
+            entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
     
@@ -336,7 +347,7 @@ class QuranTranslationRepository(
      */
     fun getSajdaAyahs(): Flow<List<Ayah>> {
         return quranDao.getSajdaAyahs().map { entities ->
-            entities.map { it.toAyah() }
+            entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
     
@@ -345,7 +356,7 @@ class QuranTranslationRepository(
      */
     fun searchAyahs(query: String): Flow<List<Ayah>> {
         return quranDao.searchAyahs(query).map { entities ->
-            entities.map { it.toAyah() }
+            entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
     
@@ -354,7 +365,7 @@ class QuranTranslationRepository(
      */
     suspend fun searchAyahsWithLimit(query: String, limit: Int = 50): List<Ayah> = withContext(Dispatchers.IO) {
         try {
-            quranDao.searchAyahsWithLimit(query, limit).map { it.toAyah() }
+            quranDao.searchAyahsWithLimit(query, limit).map { it.toAyah(0) } // surahNumber will be 0 for now
         } catch (e: Exception) {
             Log.e(TAG, "Error searching Ayahs for '$query'", e)
             emptyList()
@@ -395,7 +406,7 @@ class QuranTranslationRepository(
     suspend fun getAyahsPage(page: Int, pageSize: Int = 20): List<Ayah> = withContext(Dispatchers.IO) {
         try {
             val offset = page * pageSize
-            quranDao.getAyahsPage(pageSize, offset).map { it.toAyah() }
+            quranDao.getAyahsPage(pageSize, offset).map { it.toAyah(0) } // surahNumber will be 0 for now
         } catch (e: Exception) {
             Log.e(TAG, "Error loading Ayahs page $page", e)
             emptyList()

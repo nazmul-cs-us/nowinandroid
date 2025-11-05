@@ -3,42 +3,59 @@ package com.starception.submission.core.qurandatabase
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
  * Surah (Chapter) entity for Room database
  */
+/**
+ * Surah (Chapter) entity for Room database
+ * Note: Arabic DB has all columns NOT NULL, no total_verses column, no index
+ * Translation DBs have nullable columns, total_verses column, and idx_surah_number index
+ */
 @Entity(
     tableName = "surahs",
-    indices = [Index(value = ["number"], name = "idx_surah_number")]
+    indices = [
+        // Arabic DB has no index on surahs table
+        // Translation DBs have idx_surah_number
+        // Declare both to handle both schemas (Room will ignore missing indices)
+        Index(value = ["number"], name = "idx_surah_number")
+    ]
 )
 data class SurahEntity(
     @PrimaryKey
     @ColumnInfo(name = "id")
-    val id: Int?, // Nullable to match database schema (even though primary keys should be non-null)
+    val id: Int?, // Nullable in translation DBs, NOT NULL in Arabic (Room can read NOT NULL into nullable)
     
     @ColumnInfo(name = "number")
-    val number: Int,
+    val number: Int, // NOT NULL in all databases
     
     @ColumnInfo(name = "name_ar")
-    val nameArabic: String?,
+    val nameArabic: String?, // Nullable in translation DBs, NOT NULL in Arabic (Room can read NOT NULL into nullable)
     
     @ColumnInfo(name = "name_en")
-    val nameEnglish: String?,
+    val nameEnglish: String?, // Nullable in translation DBs, NOT NULL in Arabic (Room can read NOT NULL into nullable)
     
     @ColumnInfo(name = "name_en_translation")
-    val nameTranslation: String?,
+    val nameTranslation: String?, // Nullable in translation DBs, NOT NULL in Arabic (Room can read NOT NULL into nullable)
     
     @ColumnInfo(name = "type")
-    val revelationType: String?, // "Meccan" or "Medinan"
+    val revelationType: String?, // Nullable in translation DBs, NOT NULL in Arabic (Room can read NOT NULL into nullable)
     
+    // Note: total_verses exists only in translation DBs, not in Arabic
+    // Room will fail validation for Arabic DB if this column is declared
+    // We need to handle this via a custom approach
     @ColumnInfo(name = "total_verses")
-    val totalVerses: Int? = null // This column exists in the database but we calculate it dynamically
+    val totalVerses: Int? = null // This column exists only in translation databases
 )
 
 /**
  * Ayah (Verse) entity for Room database
+ * Note: Arabic database has different schema than translation databases:
+ * - Arabic: All columns NOT NULL, no surah_number column
+ * - Translations: Many columns nullable, has surah_number column
  */
 @Entity(
     tableName = "ayahs",
@@ -47,50 +64,57 @@ data class SurahEntity(
             entity = SurahEntity::class,
             parentColumns = ["id"],
             childColumns = ["surah_id"],
-            onDelete = ForeignKey.NO_ACTION // Database has NO ACTION, not CASCADE
+            onDelete = ForeignKey.NO_ACTION // Translation DBs have NO ACTION
         )
     ],
     indices = [
-        // Database schemas vary - transliteration DB has composite index, others have single column indices
-        // We declare all indices that exist across different databases
-        Index(value = ["surah_id"], name = "idx_ayah_surah_id"),
-        Index(value = ["surah_number", "number_in_surah"], name = "idx_ayah_number"), // Composite index in transliteration/translation DBs
-        Index(value = ["number_in_surah"], name = "index_ayahs_number_in_surah"), // In Arabic DB
-        Index(value = ["number"], name = "index_ayahs_number"), // In Arabic DB
-        Index(value = ["surah_id"], name = "index_ayahs_surah_id") // In Arabic DB
+        // Arabic DB has: index_ayahs_surah_id, index_ayahs_number, index_ayahs_number_in_surah
+        // Translation DBs have: idx_ayah_surah_id, idx_ayah_number (composite), plus index_ayahs_*
+        // Declare all to match both schemas
+        // Note: Composite index on surah_number is only in translation DBs, but we declare it
+        // Room will ignore indices that reference columns that don't exist
+        Index(value = ["surah_id"], name = "index_ayahs_surah_id"), // Arabic DB
+        Index(value = ["number"], name = "index_ayahs_number"), // Arabic DB
+        Index(value = ["number_in_surah"], name = "index_ayahs_number_in_surah"), // Arabic DB
+        Index(value = ["surah_id"], name = "idx_ayah_surah_id"), // Translation DBs
+        // Note: idx_ayah_number is a composite index on surah_number and number_in_surah
+        // This exists only in translation DBs, but Room will ignore it for Arabic DB
+        Index(value = ["surah_number", "number_in_surah"], name = "idx_ayah_number") // Translation DBs (composite)
     ]
 )
 data class AyahEntity(
     @PrimaryKey
     @ColumnInfo(name = "id")
-    val id: Int?, // Nullable to match database schema
+    val id: Int?, // Nullable in translation DBs, NOT NULL in Arabic (Room can read NOT NULL into nullable)
     
     @ColumnInfo(name = "number")
-    val number: Int?, // Overall ayah number (1-6236), nullable to match database
+    val number: Int?, // Nullable in translation DBs, NOT NULL in Arabic (Room can read NOT NULL into nullable)
     
     @ColumnInfo(name = "text")
-    val text: String, // Text content (NOT NULL in database)
+    val text: String, // NOT NULL in all databases
     
     @ColumnInfo(name = "number_in_surah")
-    val numberInSurah: Int, // Ayah number within the surah (NOT NULL in database)
+    val numberInSurah: Int, // NOT NULL in all databases
     
     @ColumnInfo(name = "page")
-    val page: Int?, // Mushaf page number, nullable to match database (default 1)
+    val page: Int?, // Nullable in translation DBs, NOT NULL in Arabic (Room can read NOT NULL into nullable)
     
     @ColumnInfo(name = "surah_id")
-    val surahId: Int, // Surah ID (NOT NULL in database)
+    val surahId: Int, // NOT NULL in all databases
     
+    // Note: surah_number exists in all databases (added to Arabic DB to match translation DBs)
+    // In translation DBs it's NOT NULL, in Arabic DB it's also NOT NULL after adding it
     @ColumnInfo(name = "surah_number")
-    val surahNumber: Int, // Additional column in database - surah number (NOT NULL)
+    val surahNumber: Int, // NOT NULL in all databases
     
     @ColumnInfo(name = "hizb_id")
-    val hizbId: Int?, // Nullable to match database (default 1)
+    val hizbId: Int?, // Nullable in translation DBs, NOT NULL in Arabic (Room can read NOT NULL into nullable)
     
     @ColumnInfo(name = "juz_id")
-    val juzId: Int?, // Nullable to match database (default 1)
+    val juzId: Int?, // Nullable in translation DBs, NOT NULL in Arabic (Room can read NOT NULL into nullable)
     
     @ColumnInfo(name = "sajda")
-    val sajda: Boolean? // Sajda (prostration) required, nullable to match database (default 0)
+    val sajda: Boolean? // Nullable in translation DBs, NOT NULL in Arabic (Room can read NOT NULL into nullable)
 )
 
 /**
@@ -149,7 +173,7 @@ data class Ayah(
 
 // Extension functions for conversion between entity and domain model
 fun SurahEntity.toSurah(ayahCount: Int = 0) = Surah(
-    id = id ?: 0, // Handle nullable id (should never be null in practice)
+    id = id ?: 0, // Handle nullable id
     number = number,
     nameArabic = nameArabic ?: "",
     nameEnglish = nameEnglish ?: "",
@@ -158,16 +182,16 @@ fun SurahEntity.toSurah(ayahCount: Int = 0) = Surah(
     ayahCount = ayahCount
 )
 
-fun AyahEntity.toAyah() = Ayah(
-    id = id ?: 0, // Handle nullable id
-    number = number ?: 0, // Handle nullable number
+fun AyahEntity.toAyah(surahNumberParam: Int = 0) = Ayah(
+    id = id ?: 0, // Handle nullable id (translation DBs)
+    number = number ?: 0, // Handle nullable number (translation DBs)
     text = text,
     numberInSurah = numberInSurah,
-    page = page ?: 1, // Handle nullable page (default 1)
+    page = page ?: 1, // Handle nullable page (translation DBs, default 1)
     surahId = surahId,
-    surahNumber = surahNumber, // Include surah_number from database
-    hizbId = hizbId ?: 1, // Handle nullable hizbId (default 1)
-    juzId = juzId ?: 1, // Handle nullable juzId (default 1)
-    sajda = sajda ?: false // Handle nullable sajda (default false)
+    surahNumber = surahNumber, // NOT NULL in all databases now
+    hizbId = hizbId ?: 1, // Handle nullable hizbId (translation DBs, default 1)
+    juzId = juzId ?: 1, // Handle nullable juzId (translation DBs, default 1)
+    sajda = sajda ?: false // Handle nullable sajda (translation DBs, default false)
 )
 
