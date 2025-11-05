@@ -2,28 +2,41 @@ package com.starception.submission.feature.surah
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -33,6 +46,8 @@ import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.Surah
 import com.starception.submission.core.qurandatabase.QuranTranslationHelper
 import com.starception.submission.core.qurandatabase.QuranTranslationRepository
+import com.starception.submission.feature.quran.QuranPlayerViewModel
+import com.starception.submission.feature.quran.QuranData
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,7 +86,6 @@ class SurahDetailViewModel @Inject constructor(
             try {
                 android.util.Log.d("SurahDetail", "🔍 Loading Surah $surahNumber in translation: $translationCode")
                 
-                // Create repository - this will trigger database initialization
                 val repository = try {
                     getRepository(translationCode)
                 } catch (e: Exception) {
@@ -80,7 +94,6 @@ class SurahDetailViewModel @Inject constructor(
                     return@launch
                 }
                 
-                // Query for surah - this should work for all translation databases
                 val surah = repository.getSurahByNumber(surahNumber)
                 
                 if (surah == null) {
@@ -91,7 +104,6 @@ class SurahDetailViewModel @Inject constructor(
                 
                 android.util.Log.d("SurahDetail", "✅ Surah found: ${surah.nameEnglish} (ID: ${surah.id}, Number: ${surah.number})")
                 
-                // Get ayahs from the translation database using the surah ID
                 val ayahs = repository.getAyahsBySurahOnce(surah.id)
                 
                 android.util.Log.d("SurahDetail", "✅ Loaded ${ayahs.size} Ayahs from $translationCode")
@@ -130,11 +142,38 @@ fun SurahDetailScreen(
     onBackClick: () -> Unit,
     viewModel: SurahDetailViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
+    val playerViewModel = remember { QuranPlayerViewModel(context) }
     val uiState by viewModel.uiState.collectAsState()
     val currentTranslation by viewModel.currentTranslation.collectAsState()
     var showTranslationDialog by remember { mutableStateOf(false) }
-    val availableTranslations = remember { viewModel.getAvailableTranslations() }
+    var showMusicPlayer by remember { mutableStateOf(false) }
     var currentSurahNumber by remember { mutableStateOf(surahNumber) }
+    
+    val scrollState = rememberLazyListState()
+    
+    // Observe player state using LaunchedEffect (since ViewModel uses mutableStateOf)
+    var isPlaying by remember { mutableStateOf(false) }
+    var currentSurahIndex by remember { mutableStateOf(0) }
+    var currentPosition by remember { mutableStateOf(0) }
+    var duration by remember { mutableStateOf(0) }
+    
+    LaunchedEffect(Unit) {
+        while (true) {
+            isPlaying = playerViewModel.isPlaying
+            currentSurahIndex = playerViewModel.currentSurahIndex
+            currentPosition = playerViewModel.currentPosition
+            duration = playerViewModel.duration
+            kotlinx.coroutines.delay(500)
+        }
+    }
+    
+    // Map surah number to index (surah numbers are 1-based, indices are 0-based)
+    val surahIndex = remember(surahNumber) {
+        QuranData.surahs.indexOfFirst { it.number == surahNumber }
+    }
+    
+    val isCurrentSurahPlaying = surahIndex >= 0 && currentSurahIndex == surahIndex
     
     LaunchedEffect(currentSurahNumber) {
         viewModel.loadSurah(currentSurahNumber)
@@ -142,13 +181,10 @@ fun SurahDetailScreen(
     
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { 
                     when (val state = uiState) {
-                        is SurahDetailUiState.Success -> Text(state.surah.nameEnglish)
-                        else -> Text("Loading...")
-                    }
-                },
+                is SurahDetailUiState.Success -> {
+                    LargeTopAppBar(
+                        title = { Text(state.surah.nameEnglish) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
@@ -165,11 +201,31 @@ fun SurahDetailScreen(
                         )
                     }
                 },
+                        colors = TopAppBarDefaults.largeTopAppBarColors(
+                            containerColor = Color.Transparent,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+                    )
+                }
+                else -> {
+                    TopAppBar(
+                        title = { Text("Loading...") },
+                        navigationIcon = {
+                            IconButton(onClick = onBackClick) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
+                        },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             )
+                }
+            }
         }
     ) { paddingValues ->
         when (val state = uiState) {
@@ -200,9 +256,24 @@ fun SurahDetailScreen(
             }
             
             is SurahDetailUiState.Success -> {
-                SurahContent(
+                SurahContentWithMusicPlayer(
                     surah = state.surah,
                     ayahs = state.ayahs,
+                    scrollState = scrollState,
+                    isPlaying = isCurrentSurahPlaying && isPlaying,
+                    currentPosition = currentPosition,
+                    duration = duration,
+                    showMusicPlayer = showMusicPlayer,
+                    onPlayPause = { playerViewModel.togglePlayPause() },
+                    onPrevious = { playerViewModel.playPrevious() },
+                    onNext = { playerViewModel.playNext() },
+                    onSeek = { position -> playerViewModel.seekTo(position) },
+                    onToggleMusicPlayer = { 
+                        showMusicPlayer = !showMusicPlayer
+                        if (!showMusicPlayer && surahIndex >= 0 && !isCurrentSurahPlaying) {
+                            playerViewModel.playSurah(surahIndex)
+                        }
+                    },
                     modifier = Modifier.padding(paddingValues)
                 )
             }
@@ -213,7 +284,7 @@ fun SurahDetailScreen(
     if (showTranslationDialog) {
         TranslationSelectorDialog(
             currentTranslation = currentTranslation,
-            availableTranslations = availableTranslations,
+            availableTranslations = viewModel.getAvailableTranslations(),
             getTranslationName = { viewModel.getTranslationName(it) },
             onTranslationSelected = { translationCode ->
                 viewModel.changeTranslation(translationCode, currentSurahNumber)
@@ -225,200 +296,205 @@ fun SurahDetailScreen(
 }
 
 @Composable
-fun SurahContent(
+fun SurahContentWithMusicPlayer(
     surah: Surah,
     ayahs: List<Ayah>,
+    scrollState: LazyListState,
+    isPlaying: Boolean,
+    currentPosition: Int,
+    duration: Int,
+    showMusicPlayer: Boolean,
+    onPlayPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onSeek: (Int) -> Unit,
+    onToggleMusicPlayer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val listState = rememberLazyListState()
-    
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        state = listState,
-        contentPadding = PaddingValues(bottom = 32.dp),
+        state = scrollState,
+        contentPadding = PaddingValues(bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
-        // Surah Header with Expressive Material 3 Design
+        // Header Section (Album Cover + Info/Music Player)
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                // Gradient background with shadow
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .shadow(
-                            elevation = 8.dp,
-                            shape = RoundedCornerShape(24.dp),
-                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                        ),
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    // Decorative gradient accent
+            SurahHeaderSection(
+                surah = surah,
+                ayahsCount = ayahs.size,
+                isPlaying = isPlaying,
+                currentPosition = currentPosition,
+                duration = duration,
+                showMusicPlayer = showMusicPlayer,
+                onPlayPause = onPlayPause,
+                onPrevious = onPrevious,
+                onNext = onNext,
+                onSeek = onSeek,
+                onToggleMusicPlayer = onToggleMusicPlayer
+            )
+        }
+        
+        // Track List (Ayahs)
+        items(
+            items = ayahs,
+            key = { it.id }
+        ) { ayah ->
+            AyahTrackItem(
+                ayah = ayah,
+                isPlaying = false, // TODO: Track current ayah
+                onClick = { }
+            )
+        }
+    }
+}
+
+@Composable
+fun SurahHeaderSection(
+    surah: Surah,
+    ayahsCount: Int,
+    isPlaying: Boolean,
+    currentPosition: Int,
+    duration: Int,
+    showMusicPlayer: Boolean,
+    onPlayPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onSeek: (Int) -> Unit,
+    onToggleMusicPlayer: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        // Enhanced Album Image with gradient background
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(4.dp)
+                .aspectRatio(1f)
                             .background(
-                                brush = Brush.horizontalGradient(
+                    brush = Brush.verticalGradient(
                                     colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.secondary,
-                                        MaterialTheme.colorScheme.primary
-                                    )
-                                )
-                            )
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
+                            MaterialTheme.colorScheme.secondaryContainer
+                        )
                     )
-                    
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Surah number indicator
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier
-                                .size(64.dp)
-                                .border(3.dp, MaterialTheme.colorScheme.secondary, CircleShape)
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize()
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            // Enhanced Surah number with shadow and border
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .shadow(
+                        elevation = 12.dp,
+                        shape = CircleShape,
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                    )
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .border(
+                        width = 3.dp,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        shape = CircleShape
+                    )
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "${surah.number}",
-                                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.displayLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                             }
                         }
                         
-                        Spacer(modifier = Modifier.height(24.dp))
-                        
-                        // Arabic Name - Prominent
-                        Text(
-                            text = surah.nameArabic,
-                            style = MaterialTheme.typography.displayMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            lineHeight = MaterialTheme.typography.displayMedium.lineHeight * 1.1
-                        )
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        // English transliteration with decorative divider
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // Enhanced Container for Album Info and Music Player
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp) // Slightly taller for better spacing
+        ) {
+            // Enhanced Album Info Container with better design
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !showMusicPlayer,
+                modifier = Modifier.fillMaxSize(),
+                enter = fadeIn(tween(400)) + slideInVertically(
+                    animationSpec = tween(400),
+                    initialOffsetY = { it }
+                ),
+                exit = fadeOut(tween(300)) + slideOutVertically(
+                    animationSpec = tween(300),
+                    targetOffsetY = { -it }
+                )
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxSize(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    shape = RoundedCornerShape(0.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(start = 56.dp, end = 80.dp, top = 16.dp, bottom = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Divider(
-                                modifier = Modifier.width(24.dp),
-                                thickness = 2.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                            )
+                            // Enhanced album title
                             Text(
                                 text = surah.nameEnglish,
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // Enhanced Arabic name
+                            Text(
+                                text = surah.nameArabic,
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            Divider(
-                                modifier = Modifier.width(24.dp),
-                                thickness = 2.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                            )
-                        }
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        // Translation
-                        Text(
-                            text = surah.nameTranslation,
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                        )
-                        
-                        Spacer(modifier = Modifier.height(24.dp))
-                        
-                        // Info badges in row
+                            // Additional info badges
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Verse count badge
                             Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp)),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.5.dp,
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
                                 ) {
                                     Text(
-                                        text = "📖",
-                                        fontSize = 16.sp
-                                    )
-                                    Text(
-                                        text = "${ayahs.size} Verses",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
+                                        text = "$ayahsCount verses",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 }
-                            }
-                            
-                            // Revelation type badge
+                                
                             Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp)),
-                                color = if (surah.revelationType == "Meccan") {
-                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
-                                } else {
-                                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
-                                },
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.5.dp,
-                                    if (surah.revelationType == "Meccan") {
-                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
-                                    } else {
-                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)
-                                    }
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
                                 ) {
-                                    Text(
-                                        text = if (surah.revelationType == "Meccan") "🕌" else "🌙",
-                                        fontSize = 16.sp
-                                    )
                                     Text(
                                         text = surah.revelationType,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (surah.revelationType == "Meccan") {
-                                            MaterialTheme.colorScheme.onTertiaryContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.onSecondaryContainer
-                                        }
+                                        style = MaterialTheme.typography.labelMedium,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
                                     )
                                 }
                             }
@@ -426,86 +502,65 @@ fun SurahContent(
                     }
                 }
             }
-        }
-        
-        // Bismillah (except for Surah 9 and 1)
-        if (surah.number != 9 && surah.number != 1) {
-            item {
-                Box(
+            
+            // Enhanced Music Player Container
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showMusicPlayer,
+                modifier = Modifier.fillMaxSize(),
+                enter = fadeIn(tween(400)) + slideInVertically(
+                    animationSpec = tween(400),
+                    initialOffsetY = { -it }
+                ),
+                exit = fadeOut(tween(300)) + slideOutVertically(
+                    animationSpec = tween(300),
+                    targetOffsetY = { it }
+                )
+            ) {
+                MusicPlayerContainerIntegrated(
+                    surah = surah,
+                    isPlaying = isPlaying,
+                    currentPosition = currentPosition,
+                    duration = duration,
+                    onPlayPause = onPlayPause,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                    onSeek = onSeek,
+                    onClose = onToggleMusicPlayer
+                )
+            }
+            
+            // Enhanced FAB with better positioning and animation
+            androidx.compose.animation.AnimatedVisibility(
+                visible = true,
+                enter = scaleIn(tween(300)) + fadeIn(tween(300)),
+                exit = scaleOut(tween(200)) + fadeOut(tween(200))
+            ) {
+                FloatingActionButton(
+                    onClick = onToggleMusicPlayer,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-16).dp, y = 16.dp)
+                        .size(56.dp),
+                    containerColor = if (showMusicPlayer) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 6.dp,
+                        pressedElevation = 8.dp
+                    )
                 ) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .shadow(
-                                elevation = 4.dp,
-                                shape = RoundedCornerShape(20.dp)
-                            ),
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
-                        border = androidx.compose.foundation.BorderStroke(
-                            2.dp,
-                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            // Decorative Islamic pattern indicator
-                            Box(
-                                modifier = Modifier
-                                    .height(1.dp)
-                                    .width(40.dp)
-                                    .background(
-                                        brush = Brush.horizontalGradient(
-                                            colors = listOf(
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.0f),
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.0f)
-                                            )
-                                        )
-                                    )
-                            )
-                            
-                            Text(
-                                text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-                                style = MaterialTheme.typography.headlineLarge,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                lineHeight = 48.sp
-                            )
-                            
-                            // English transliteration below
-                            Text(
-                                text = "In the name of Allah, the Most Gracious, the Most Merciful",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
-                                fontWeight = FontWeight.Normal
-                            )
-                            
-                            Box(
-                                modifier = Modifier
-                                    .height(1.dp)
-                                    .width(40.dp)
-                                    .background(
-                                        brush = Brush.horizontalGradient(
-                                            colors = listOf(
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.0f),
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.0f)
-                                            )
-                                        )
-                                    )
+                    Icon(
+                        imageVector = if (showMusicPlayer) {
+                            Icons.Default.Close
+                        } else if (isPlaying) {
+                            Icons.Default.Pause
+                        } else {
+                            Icons.Default.PlayArrow
+                        },
+                        contentDescription = if (showMusicPlayer) "Close Player" else if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(24.dp)
                             )
                         }
                     }
@@ -513,136 +568,263 @@ fun SurahContent(
             }
         }
         
-        // Ayahs
-        items(
-            items = ayahs,
-            key = { it.id }
-        ) { ayah ->
-            AyahCard(ayah = ayah)
+@Composable
+fun MusicPlayerContainerIntegrated(
+    surah: Surah,
+    isPlaying: Boolean,
+    currentPosition: Int,
+    duration: Int,
+    onPlayPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onSeek: (Int) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var volume by remember { mutableStateOf(3.5f) }
+    
+    val progressValue = remember(currentPosition, duration) {
+        if (duration > 0) (currentPosition.toFloat() / duration.toFloat()) else 0f
+    }
+    
+    // Format time helper
+    fun formatTime(millis: Int): String {
+        val totalSeconds = millis / 1000
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
+        return String.format("%d:%02d", minutes, seconds)
+    }
+    
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF1A1A1A),
+                        Color.Black
+                    )
+                )
+            )
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Enhanced progress indicator with time display
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, start = 16.dp, end = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                LinearProgressIndicator(
+                    progress = { progressValue },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp),
+                    trackColor = Color.White.copy(alpha = 0.2f),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                // Time labels
+                Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = formatTime(currentPosition),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = formatTime(duration),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.weight(1f))
+            
+            // Enhanced control buttons with better spacing
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Previous button with enhanced styling
+                IconButton(
+                    onClick = onPrevious,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipPrevious,
+                        contentDescription = "Previous",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                // Enhanced play/pause button with larger size
+                FloatingActionButton(
+                    onClick = onPlayPause,
+                    modifier = Modifier.size(64.dp),
+                    containerColor = Color.White,
+                    contentColor = Color.Black,
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 6.dp
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                // Next button with enhanced styling
+                IconButton(
+                    onClick = onNext,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "Next",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.weight(1f))
+            
+            // Enhanced volume controls with better layout
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp, start = 16.dp, end = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { volume = (volume - 0.5f).coerceAtLeast(0f) },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.VolumeDown,
+                            contentDescription = "Volume Down",
+                            tint = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    
+                    Slider(
+                        value = volume / 10f,
+                        onValueChange = { volume = (it * 10f).coerceIn(0f, 10f) },
+                            modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp),
+                        valueRange = 0f..1f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                        )
+                    )
+                    
+                    IconButton(
+                        onClick = { volume = (volume + 0.5f).coerceAtMost(10f) },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.VolumeUp,
+                            contentDescription = "Volume Up",
+                            tint = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                
+                // Surah name display
+                Text(
+                    text = surah.nameEnglish,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
     }
 }
 
 @Composable
-fun AyahCard(ayah: Ayah) {
-    Box(
-        modifier = Modifier
+fun AyahTrackItem(
+    ayah: Ayah,
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(
+        // Playing icon (hidden when not playing)
+        Icon(
+            imageVector = Icons.Default.GraphicEq,
+            contentDescription = "Playing",
             modifier = Modifier
-                .fillMaxWidth()
-                .shadow(
-                    elevation = 2.dp,
-                    shape = RoundedCornerShape(16.dp)
-                ),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
-            )
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-            ) {
-                // Verse number badge with modern styling
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp)),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.5.dp,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                        )
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "•",
-                                    color = MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.labelMedium
-                                )
-                                Text(
-                                    text = "${ayah.numberInSurah}",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Sajda indicator if applicable (top right)
-                    if (ayah.sajda) {
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp)),
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.5.dp,
-                                MaterialTheme.colorScheme.tertiary
-                            )
-                        ) {
-                            Text(
-                                text = "۩ Sajda",
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(20.dp))
-                
-                // Arabic text with beautiful typography
-                Text(
-                    text = ayah.text,
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        lineHeight = 40.sp
-                    ),
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Normal
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Decorative bottom accent
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.0f),
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.0f)
-                                )
-                            )
-                        )
-                )
-            }
-        }
+                .size(24.dp)
+                .alpha(if (isPlaying) 1f else 0f),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        // Ayah number (Track number)
+        Text(
+            text = "${ayah.numberInSurah}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            modifier = Modifier.width(32.dp)
+        )
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        // Ayah text (Track title)
+        Text(
+            text = ayah.text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        // Duration placeholder
+        Text(
+            text = "",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
     }
 }
 
@@ -680,7 +862,7 @@ fun TranslationSelectorDialog(
                             MaterialTheme.colorScheme.surface
                         },
                         border = if (isSelected) {
-                            androidx.compose.foundation.BorderStroke(
+                            BorderStroke(
                                 2.dp,
                                 MaterialTheme.colorScheme.primary
                             )
@@ -723,4 +905,3 @@ fun TranslationSelectorDialog(
         }
     )
 }
-

@@ -73,6 +73,7 @@ fun NiaNavHost(
             onBackClick = navController::popBackStack,
             onInterestsClick = { appState.navigateToTopLevelDestination(INTERESTS) },
             onTopicClick = navController::navigateToTopic,
+            onSurahClick = navController::navigateToSurah,
         )
         interestsListDetailScreen()
         prayerTimesScreen()

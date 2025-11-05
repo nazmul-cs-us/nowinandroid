@@ -100,6 +100,7 @@ internal fun SearchRoute(
     onBackClick: () -> Unit,
     onInterestsClick: () -> Unit,
     onTopicClick: (String) -> Unit,
+    onSurahClick: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
     searchViewModel: SearchViewModel = hiltViewModel(),
 ) {
@@ -120,6 +121,7 @@ internal fun SearchRoute(
         onBackClick = onBackClick,
         onInterestsClick = onInterestsClick,
         onTopicClick = onTopicClick,
+        onSurahClick = onSurahClick,
     )
 }
 
@@ -138,6 +140,7 @@ internal fun SearchScreen(
     onBackClick: () -> Unit = {},
     onInterestsClick: () -> Unit = {},
     onTopicClick: (String) -> Unit = {},
+    onSurahClick: (Int) -> Unit = {},
 ) {
     TrackScreenViewEvent(screenName = "Search")
     Column(modifier = modifier) {
@@ -194,6 +197,7 @@ internal fun SearchScreen(
                         onNewsResourcesCheckedChanged = onNewsResourcesCheckedChanged,
                         onNewsResourceViewed = onNewsResourceViewed,
                         onFollowButtonClick = onFollowButtonClick,
+                        onSurahClick = onSurahClick,
                     )
                 }
             }
@@ -291,6 +295,7 @@ private fun SearchResultBody(
     onNewsResourcesCheckedChanged: (String, Boolean) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
     onFollowButtonClick: (String, Boolean) -> Unit,
+    onSurahClick: (Int) -> Unit = {},
 ) {
     val state = rememberLazyStaggeredGridState()
     Box(
@@ -362,6 +367,7 @@ private fun SearchResultBody(
                     onNewsResourcesCheckedChanged = onNewsResourcesCheckedChanged,
                     onNewsResourceViewed = onNewsResourceViewed,
                     onTopicClick = onTopicClick,
+                    onSurahClick = onSurahClick,
                     onExpandedCardClick = {
                         onSearchTriggered(searchQuery)
                     },
