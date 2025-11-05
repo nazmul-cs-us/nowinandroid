@@ -551,8 +551,9 @@ fun PrayerTimesScreen(
                     withTimeout(3000L) {
                         withContext(Dispatchers.Default) {
                             android.util.Log.d("PullToRefresh", "CALCULATION START: Creating PrayerTimesCalculator and running calculation")
+                            android.util.Log.d("PullToRefresh", "FORCE GPS REFRESH: true - will skip saved location and fetch fresh GPS")
                             val calculator = PrayerTimesCalculator(screenContext)
-                            val result = calculator.calculateDefaultPrayerTimes()
+                            val result = calculator.calculateDefaultPrayerTimes(forceGpsRefresh = true)
 
                             android.util.Log.d("PullToRefresh", "CALCULATION RESULT: Prayer times = ${if (result.first != null) "SUCCESS" else "NULL"}")
                             android.util.Log.d("PullToRefresh", "CALCULATION RESULT: New location = \"${result.second}\"")

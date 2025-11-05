@@ -96,6 +96,10 @@ fun CompassProgressIndicator(
     var isInitializing by remember { mutableStateOf(true) }
     var magneticFieldStrength by remember { mutableFloatStateOf(0f) } // For accuracy detection
     
+    // Throttling for compass updates to prevent flickering
+    var lastCompassUpdateTime by remember { mutableLongStateOf(0L) }
+    val COMPASS_UPDATE_INTERVAL_MS = 50L // Update at most every 50ms (20 updates per second)
+    
     // SENSOR MANAGEMENT - Use TYPE_ORIENTATION for compass, TYPE_MAGNETIC_FIELD for accuracy
     val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
     val orientationSensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION) }
@@ -105,6 +109,13 @@ fun CompassProgressIndicator(
     val orientationListener = remember {
         object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent?) {
+                val currentTime = System.currentTimeMillis()
+                // Throttle updates to prevent flickering
+                if (currentTime - lastCompassUpdateTime < COMPASS_UPDATE_INTERVAL_MS) {
+                    return
+                }
+                lastCompassUpdateTime = currentTime
+                
                 // Get device's magnetic north direction
                 val magneticNorth = Math.round(event!!.values[0]).toFloat()
                 compassDegree = magneticNorth
@@ -236,8 +247,8 @@ fun CompassProgressIndicator(
     val animatedCompassDegree by animateFloatAsState(
         targetValue = currentDegreeState.floatValue,
         animationSpec = tween(
-            durationMillis = 210, // Exact same duration as original
-            easing = LinearEasing
+            durationMillis = 300, // Slightly longer animation for smoother movement
+            easing = androidx.compose.animation.core.FastOutSlowInEasing // Smoother easing
         ),
         label = "compassRotation"
     )
