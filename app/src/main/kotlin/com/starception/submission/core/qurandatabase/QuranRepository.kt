@@ -75,7 +75,8 @@ class QuranRepository @Inject constructor(
             }
             
             Log.d(TAG, "✅ Found Surah: ${entity.nameEnglish} (ID: ${entity.id}, Number: ${entity.number})")
-            val ayahCount = quranDao.getAyahCount(entity.id)
+            val surahId = entity.id ?: 0 // Handle nullable id (should never be null in practice)
+            val ayahCount = quranDao.getAyahCount(surahId)
             Log.d(TAG, "📄 Ayah count: $ayahCount")
             entity.toSurah(ayahCount)
         } catch (e: Exception) {

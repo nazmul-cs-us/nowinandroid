@@ -31,6 +31,7 @@ object QuranTranslationHelper {
     fun getDatabase(context: Context, translationCode: String = "ar"): QuranDatabase {
         // Check if already in cache
         if (databaseCache.containsKey(translationCode)) {
+            Log.d(TAG, "♻️ Using cached database for translation: $translationCode")
             return databaseCache[translationCode]!!
         }
         
@@ -44,23 +45,30 @@ object QuranTranslationHelper {
         
         Log.d(TAG, "📖 Loading Quran database: $translationCode from $dbAssetPath")
         
-        // Create database instance
-        val database = Room.databaseBuilder(
-            context.applicationContext,
-            QuranDatabase::class.java,
-            "quran_${translationCode}_instance"
-        )
-            .createFromAsset(dbAssetPath)
-            .fallbackToDestructiveMigration()
-            .build()
-        
-        Log.d(TAG, "✅ Quran translation database created: $translationCode")
-        
-        // Cache the instance
-        databaseCache[translationCode] = database
-        
-        Log.d(TAG, "✅ Database loaded successfully: $translationCode")
-        return database
+        try {
+            // Create database instance
+            val database = Room.databaseBuilder(
+                context.applicationContext,
+                QuranDatabase::class.java,
+                "quran_${translationCode}_instance"
+            )
+                .createFromAsset(dbAssetPath)
+                .fallbackToDestructiveMigration()
+                .build()
+            
+            Log.d(TAG, "✅ Quran translation database created: $translationCode")
+            
+            // Cache the instance
+            databaseCache[translationCode] = database
+            
+            Log.d(TAG, "✅ Database loaded and cached successfully: $translationCode")
+            return database
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to load database for translation: $translationCode", e)
+            Log.e(TAG, "❌ Database path: $dbAssetPath", e)
+            e.printStackTrace()
+            throw e // Re-throw to let caller handle the error
+        }
     }
     
     /**
@@ -127,11 +135,21 @@ class QuranTranslationRepository(
 ) {
     
     private val database: QuranDatabase by lazy {
-        QuranTranslationHelper.getDatabase(context, translationCode)
+        try {
+            QuranTranslationHelper.getDatabase(context, translationCode)
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to initialize database for translation: $translationCode", e)
+            throw e
+        }
     }
     
     private val quranDao: QuranDao by lazy {
-        database.quranDao()
+        try {
+            database.quranDao()
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to get DAO for translation: $translationCode", e)
+            throw e
+        }
     }
     
     companion object {
@@ -168,13 +186,51 @@ class QuranTranslationRepository(
      */
     suspend fun getSurahByNumber(surahNumber: Int): Surah? = withContext(Dispatchers.IO) {
         try {
-            val entity = quranDao.getSurahByNumber(surahNumber)
-            entity?.let {
-                val ayahCount = quranDao.getAyahCount(it.id)
-                it.toSurah(ayahCount)
+            // Ensure database is initialized before querying
+            // This will trigger lazy initialization if not already done
+            val dao = quranDao
+            
+            Log.d(TAG, "🔍 Querying Surah $surahNumber in translation: $translationCode")
+            
+            // Query for the surah directly
+            val entity = dao.getSurahByNumber(surahNumber)
+            
+            if (entity == null) {
+                Log.w(TAG, "⚠️ Query returned null for Surah $surahNumber in translation: $translationCode")
+                
+                // Debug: Check if database has any surahs
+                val allSurahs = try {
+                    dao.getAllSurahsOnce()
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Failed to get all surahs from database", e)
+                    return@withContext null
+                }
+                
+                Log.d(TAG, "📊 Database has ${allSurahs.size} surahs total")
+                if (allSurahs.isNotEmpty()) {
+                    Log.d(TAG, "📖 First surah: ${allSurahs.first().nameEnglish} (number=${allSurahs.first().number}, id=${allSurahs.first().id})")
+                    Log.d(TAG, "📖 Last surah: ${allSurahs.last().nameEnglish} (number=${allSurahs.last().number}, id=${allSurahs.last().id})")
+                    
+                    // Check if surah number exists in the list
+                    val foundSurah = allSurahs.find { it.number == surahNumber }
+                    if (foundSurah == null) {
+                        Log.w(TAG, "⚠️ Surah number $surahNumber not found in surah list. Available numbers: ${allSurahs.map { it.number }.take(10)}...")
+                    }
+                } else {
+                    Log.e(TAG, "❌ Database appears to be empty - no surahs found!")
+                }
+                
+                return@withContext null
             }
+            
+            Log.d(TAG, "✅ Found Surah: ${entity.nameEnglish} (ID: ${entity.id}, Number: ${entity.number})")
+            val surahId = entity.id ?: 0 // Handle nullable id (should never be null in practice)
+            val ayahCount = dao.getAyahCount(surahId)
+            Log.d(TAG, "📄 Ayah count: $ayahCount")
+            entity.toSurah(ayahCount)
         } catch (e: Exception) {
-            Log.e(TAG, "Error loading Surah $surahNumber", e)
+            Log.e(TAG, "❌ Error loading Surah $surahNumber in translation $translationCode", e)
+            e.printStackTrace()
             null
         }
     }
@@ -228,6 +284,19 @@ class QuranTranslationRepository(
             quranDao.getAyahsBySurahOnce(surahId).map { it.toAyah() }
         } catch (e: Exception) {
             Log.e(TAG, "Error loading Ayahs for Surah $surahId", e)
+            emptyList()
+        }
+    }
+    
+    /**
+     * Get all Ayahs for a specific Surah by surah number (using JOIN)
+     * This is useful when surah_id might differ between databases or when surahs table is missing
+     */
+    suspend fun getAyahsBySurahNumber(surahNumber: Int): List<Ayah> = withContext(Dispatchers.IO) {
+        try {
+            quranDao.getAyahsBySurahNumber(surahNumber).map { it.toAyah() }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading Ayahs for Surah number $surahNumber", e)
             emptyList()
         }
     }

@@ -70,22 +70,36 @@ class SurahDetailViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 android.util.Log.d("SurahDetail", "🔍 Loading Surah $surahNumber in translation: $translationCode")
-                val repository = getRepository(translationCode)
+                
+                // Create repository - this will trigger database initialization
+                val repository = try {
+                    getRepository(translationCode)
+                } catch (e: Exception) {
+                    android.util.Log.e("SurahDetail", "❌ Failed to create repository for translation: $translationCode", e)
+                    _uiState.value = SurahDetailUiState.Error("Failed to load translation database: ${e.message}")
+                    return@launch
+                }
+                
+                // Query for surah - this should work for all translation databases
                 val surah = repository.getSurahByNumber(surahNumber)
                 
-                if (surah != null) {
-                    android.util.Log.d("SurahDetail", "✅ Surah found: ${surah.nameEnglish} (ID: ${surah.id})")
-                    // Use surah.id (database ID) not surahNumber
-                    val ayahs = repository.getAyahsBySurahOnce(surah.id)
-                    android.util.Log.d("SurahDetail", "✅ Loaded ${ayahs.size} Ayahs")
-                    _uiState.value = SurahDetailUiState.Success(surah, ayahs)
-                } else {
-                    android.util.Log.e("SurahDetail", "❌ Surah $surahNumber not found in database")
-                    _uiState.value = SurahDetailUiState.Error("Surah not found")
+                if (surah == null) {
+                    android.util.Log.e("SurahDetail", "❌ Surah $surahNumber not found in translation: $translationCode")
+                    _uiState.value = SurahDetailUiState.Error("Surah not found in $translationCode translation")
+                    return@launch
                 }
+                
+                android.util.Log.d("SurahDetail", "✅ Surah found: ${surah.nameEnglish} (ID: ${surah.id}, Number: ${surah.number})")
+                
+                // Get ayahs from the translation database using the surah ID
+                val ayahs = repository.getAyahsBySurahOnce(surah.id)
+                
+                android.util.Log.d("SurahDetail", "✅ Loaded ${ayahs.size} Ayahs from $translationCode")
+                _uiState.value = SurahDetailUiState.Success(surah, ayahs)
             } catch (e: Exception) {
-                android.util.Log.e("SurahDetail", "❌ Error loading Surah $surahNumber", e)
-                _uiState.value = SurahDetailUiState.Error(e.message ?: "Unknown error")
+                android.util.Log.e("SurahDetail", "❌ Error loading Surah $surahNumber in translation: $translationCode", e)
+                e.printStackTrace()
+                _uiState.value = SurahDetailUiState.Error("Error: ${e.message ?: "Unknown error"}")
             }
         }
     }
