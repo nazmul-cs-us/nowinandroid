@@ -146,11 +146,14 @@ fun InteractivePrayerDial(
     ) {
         Canvas(
             modifier = Modifier
-                .matchParentSize() // Use matchParentSize instead of fillMaxSize for better centering
+                .matchParentSize() // Use matchParentSize to match Box exactly
                 .graphicsLayer {
-                    // Ensure proper centering - no translation
+                    // CRITICAL: Ensure no transformations that could offset center
                     translationX = 0f
                     translationY = 0f
+                    scaleX = 1f
+                    scaleY = 1f
+                    rotationZ = 0f
                 }
                 .pointerInput(Unit) {
                     detectDragGestures(
@@ -252,13 +255,11 @@ fun InteractivePrayerDial(
                     }
                 }
         ) {
-            // Ensure perfect centering - use exact center of canvas
-            // Use the actual center of the drawScope (which is already centered)
-            val center = Offset(size.width / 2f, size.height / 2f)
+            // Ensure perfect centering - use DrawScope's center property (most reliable)
+            // This is the true geometric center of the drawing canvas
+            val center = this.center
             val radius = kotlin.math.min(size.width, size.height) * 0.4f
             
-            // Double-check that center is truly at the middle
-            // This ensures the dial is perfectly centered regardless of canvas size
             
             // Use Material 3 theme colors passed from Composable
             
@@ -680,36 +681,41 @@ private fun DrawScope.drawCleanCircularTimer(
     progressArcGlow: Float = 1f
 ) {
     // Design matching the reference image: central dial with outer segmented ring
-    // Ensure perfect centering - use exact center coordinates
-    val exactCenter = Offset(center.x, center.y)
+    // Ensure perfect centering - use the exact center parameter directly
+    // CRITICAL: Both circles MUST use the exact same center point
+    val exactCenter = center
+    
     val outerRingRadius = radius * 1.15f // Outer ring radius
-    val centralDialRadius = radius * 0.65f // Central dial radius (smaller, inside the ring)
+    val intermediateRingRadius = radius * 0.85f // Intermediate light green ring radius
+    val centralKnobRadius = radius * 0.45f // Central knob radius (darker green, spherical)
 
     // Colors matching the reference design
     val lightGreyBackground = Color(0xFFF5F5F5) // Very light grey/off-white
     val tealColor = Color(0xFF26C6DA) // Vibrant teal/aqua for all segments (uniform color like reference)
-    val shadowColor = Color.Black.copy(alpha = 0.08f)
-    val highlightColor = Color.White.copy(alpha = 0.3f)
 
     // Draw outer shadow for depth (soft shadow beneath the entire dial) - centered
+    // Subtle grey shadow instead of black for a more natural look
     drawCircle(
-        color = shadowColor,
+        color = Color(0xFF000000).copy(alpha = 0.1f), // Subtle shadow with low opacity
         radius = outerRingRadius + 6f,
         center = exactCenter // Shadow centered, not offset
     )
 
     // Draw outer segmented ring background (recessed appearance) - perfectly centered
     drawCircle(
-        color = lightGreyBackground.copy(alpha = 0.5f),
+        color = lightGreyBackground, // Light grey background for the outer ring
         radius = outerRingRadius,
         center = exactCenter
     )
 
-    // Draw segmented outer ring with vertical dashes - all uniform teal color like reference
-    val segmentCount = 120 // Number of segments around the circle
-    val segmentLength = 20f // Length of each segment
-    val segmentWidth = 2.5f // Width of segments (uniform)
-    val segmentGap = 2f // Gap between segments
+    // Draw segmented outer ring with markers ON the track
+    // Markers are drawn on the ring track itself, not extending outward
+    // Matching reference: markers on track, grey or teal colored, uniform size
+    val segmentCount = 120 // Number of markers around the circle
+    val markerLength = 12f // Length of each marker (drawn on the track)
+    val markerWidth = 2.5f // Uniform width for all markers (teal and grey)
+    val trackWidth = 16f // Width of the track/ring where markers are drawn
+    val inactiveGrey = Color(0xFFE0E0E0) // Light grey for inactive markers - fully opaque
     
     // Calculate actual prayer time (adjusted) for angle calculation
     val adjustedDateTime = LocalDateTime.of(LocalDate.now(), originalTime).plusMinutes(timeAdjustment.toLong())
@@ -719,78 +725,146 @@ private fun DrawScope.drawCleanCircularTimer(
     val hourIn12Format = if (adjustedTime.hour % 12 == 0) 12 else adjustedTime.hour % 12
     val timeAngle = ((hourIn12Format * 60 + adjustedTime.minute) / (12 * 60f)) * 360f - 90f
 
-    // Draw segmented ring - all segments uniform teal color (matching reference image)
-    // All segments are the same teal color, no distinction between active/inactive
+    // Draw markers on the track with progress indication
+    // Active markers (teal) from 12 o'clock clockwise, inactive markers (grey) for the rest
+        val currentAngle = if (isDragging) currentDragAngle else timeAngle
+    val normalizedCurrentAngle = ((currentAngle + 90f) % 360 + 360) % 360 // Normalize relative to top (0° = 12 o'clock)
+
     for (i in 0 until segmentCount) {
-        val segmentAngle = (i * (360.0 / segmentCount) - 90.0) * PI / 180.0 // Start from top
+        val markerAngle = (i * (360.0 / segmentCount) - 90.0) * PI / 180.0 // Start from top
+        val normalizedMarkerAngle = ((i * (360.0 / segmentCount)) % 360).toFloat()
 
-        // Segment position - vertical dashes at the outer edge with gaps
-        val segmentRadius = outerRingRadius - segmentLength / 2f
-        val segmentStart = Offset(
-            exactCenter.x + segmentRadius * cos(segmentAngle.toFloat()).toFloat(),
-            exactCenter.y + segmentRadius * sin(segmentAngle.toFloat()).toFloat()
+        // Determine if this marker is active (within progress from 12 o'clock clockwise)
+        // Sharp transition: teal if <= current angle, grey otherwise
+        val isActive = normalizedMarkerAngle <= normalizedCurrentAngle
+
+        // Marker position - drawn ON the track (ring), fully contained within track boundaries
+        // Position markers on the track itself, ensuring they stay within track width
+        val trackInnerRadius = outerRingRadius - trackWidth / 2f
+        val trackOuterRadius = outerRingRadius + trackWidth / 2f
+        
+        // Draw marker as a vertical dash ON the track, fully contained within track boundaries
+        // Marker should be within the track, with some padding from edges
+        val markerPadding = 1f // Small padding to ensure markers stay within track
+        val markerStartRadius = trackInnerRadius + markerPadding
+        val markerEndRadius = trackOuterRadius - markerPadding
+        
+        val markerStart = Offset(
+            exactCenter.x + markerStartRadius * cos(markerAngle.toFloat()).toFloat(),
+            exactCenter.y + markerStartRadius * sin(markerAngle.toFloat()).toFloat()
         )
-        val segmentEnd = Offset(
-            exactCenter.x + (segmentRadius + segmentLength) * cos(segmentAngle.toFloat()).toFloat(),
-            exactCenter.y + (segmentRadius + segmentLength) * sin(segmentAngle.toFloat()).toFloat()
+        val markerEnd = Offset(
+            exactCenter.x + markerEndRadius * cos(markerAngle.toFloat()).toFloat(),
+            exactCenter.y + markerEndRadius * sin(markerAngle.toFloat()).toFloat()
         )
 
-        // Draw segment - all segments are uniform teal color (matching reference)
+        // Draw marker - uniform width for both teal and grey, sharp color transition
+        // Markers are drawn ON the track, not extending beyond it
         drawLine(
-            color = tealColor.copy(alpha = 0.8f),
-            start = segmentStart,
-            end = segmentEnd,
-            strokeWidth = segmentWidth,
+            color = if (isActive) {
+                tealColor // Vibrant teal for active markers - fully opaque
+            } else {
+                inactiveGrey // Light grey for inactive markers - fully opaque
+            },
+            start = markerStart,
+            end = markerEnd,
+            strokeWidth = markerWidth, // Uniform width for all markers
             cap = StrokeCap.Round
         )
     }
 
-    // Draw central dial with 3D effect (light grey/off-white with shadows and highlights)
-    // Ensure it's perfectly centered - all elements use exactCenter
-    // Main central dial background (light grey/off-white) - perfectly centered
+    // Draw intermediate light green semi-transparent ring (between yellow ring and central knob)
+    // This matches the reference design with three layers
+    val lightGreenRing = Color(0xFF81C784).copy(alpha = 0.6f) // Light green, semi-transparent
     drawCircle(
-        color = lightGreyBackground,
-        radius = centralDialRadius,
+        color = lightGreenRing,
+        radius = intermediateRingRadius,
         center = exactCenter
     )
+    
 
-    // Subtle highlight on top-left for 3D effect
-    val highlightRadius = centralDialRadius * 0.7f
-    val highlightCenter = Offset(exactCenter.x - centralDialRadius * 0.3f, exactCenter.y - centralDialRadius * 0.3f)
+    // Draw central knob - darker green spherical element with gradient
+    // This should look like a 3D spherical knob at the center
+    // The knob scales up and becomes brighter when being dragged for better visual feedback
+    val darkGreenKnob = Color(0xFF388E3C) // Darker green for the knob
+    val knobHighlight = Color(0xFF66BB6A) // Lighter green for highlight
+    val knobShadow = Color(0xFF2E7D32) // Darker green for shadow
+    
+    // Apply scale animation to knob when dragging - makes it more prominent
+    val scaledKnobRadius = centralKnobRadius * knobScale
+    
+    // Make knob brighter when dragging for visual feedback
+    val knobBrightness = if (isDragging) 1.2f else 1f
+    val adjustedKnobHighlight = Color(
+        (knobHighlight.red * knobBrightness).coerceIn(0f, 1f),
+        (knobHighlight.green * knobBrightness).coerceIn(0f, 1f),
+        (knobHighlight.blue * knobBrightness).coerceIn(0f, 1f),
+        knobHighlight.alpha
+    )
+    
+    // Draw base knob circle with radial gradient for spherical effect
+    // Gradient from bright center to darker edges for 3D effect
+    // IMPORTANT: First color is at center, last color is at edge
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
-                highlightColor,
+                adjustedKnobHighlight, // Bright center (first color = center)
+                darkGreenKnob,         // Base color in middle
+                darkGreenKnob,         // Keep base color longer to avoid dark center
+                knobShadow             // Darker at edges only
+            ),
+            center = exactCenter,
+            radius = scaledKnobRadius
+        ),
+        radius = scaledKnobRadius,
+        center = exactCenter
+    )
+    
+    // Add a subtle glow ring around knob when dragging
+    if (isDragging) {
+        drawCircle(
+            color = tealColor.copy(alpha = 0.3f),
+            radius = scaledKnobRadius + 8f,
+            center = exactCenter
+        )
+    }
+    
+    // Add additional highlight on top-left for more 3D effect (scaled with knob)
+    val knobHighlightRadius = scaledKnobRadius * 0.6f
+    val knobHighlightCenter = Offset(exactCenter.x - scaledKnobRadius * 0.25f, exactCenter.y - scaledKnobRadius * 0.25f)
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.4f),
                 Color.Transparent
             ),
-            center = highlightCenter,
-            radius = highlightRadius
+            center = knobHighlightCenter,
+            radius = knobHighlightRadius
         ),
-        radius = highlightRadius,
-        center = highlightCenter
+        radius = knobHighlightRadius,
+        center = knobHighlightCenter
     )
-
-    // Subtle shadow on bottom-right for depth
-    val shadowRadius = centralDialRadius * 0.7f
-    val shadowCenter = Offset(exactCenter.x + centralDialRadius * 0.3f, exactCenter.y + centralDialRadius * 0.3f)
+    
+    // Add shadow on bottom-right for depth (scaled with knob)
+    val knobShadowRadius = scaledKnobRadius * 0.6f
+    val knobShadowCenter = Offset(exactCenter.x + scaledKnobRadius * 0.25f, exactCenter.y + scaledKnobRadius * 0.25f)
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
                 Color.Transparent,
-                shadowColor.copy(alpha = 0.15f)
+                Color.Black.copy(alpha = 0.3f)
             ),
-            center = shadowCenter,
-            radius = shadowRadius
+            center = knobShadowCenter,
+            radius = knobShadowRadius
         ),
-        radius = shadowRadius,
-        center = shadowCenter
+        radius = knobShadowRadius,
+        center = knobShadowCenter
     )
 
     // Draw small teal horizontal indicator mark at 12 o'clock position
-    // Position it on the central dial, directly above where the time text will be displayed
-    // This matches the reference design where the indicator is on the central dial itself
+    // Position it on the intermediate ring, directly above where the time text will be displayed
     val indicatorAngle = -90f * PI / 180f // 12 o'clock position
-    val indicatorRadius = centralDialRadius - 20f // Position on the central dial, near the top edge
+    val indicatorRadius = intermediateRingRadius - 15f // Position on the intermediate ring, near the top edge
     val indicatorCenter = Offset(
         exactCenter.x + indicatorRadius * cos(indicatorAngle.toFloat()).toFloat(),
         exactCenter.y + indicatorRadius * sin(indicatorAngle.toFloat()).toFloat()
@@ -809,6 +883,7 @@ private fun DrawScope.drawCleanCircularTimer(
         size = Size(indicatorWidth, indicatorHeight),
         cornerRadius = CornerRadius(indicatorHeight / 2f, indicatorHeight / 2f)
     )
+    
 }
 
 private fun DrawScope.drawPNGDocumentBackground(center: Offset, radius: Float) {

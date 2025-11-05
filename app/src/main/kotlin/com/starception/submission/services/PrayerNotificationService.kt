@@ -722,11 +722,10 @@ class PrayerNotificationService : Service() {
                             val offsetHours = offsetMs / (1000.0 * 60 * 60)
 
                             // Convert to Location model
-                            val locationModel = com.starception.submission.prayer.model.Location(
-                                latitude = fetchedLocation.latitude,
-                                longitude = fetchedLocation.longitude,
-                                timeZoneOffset = offsetHours,
-                                city = "Current Location"
+                            // Get proper location details with city name from geocoding
+                            val detailedLocation = locationService.getLocationDetails(fetchedLocation)
+                            val locationModel = detailedLocation.copy(
+                                timeZoneOffset = offsetHours
                             )
 
                             // Save to settings for future use

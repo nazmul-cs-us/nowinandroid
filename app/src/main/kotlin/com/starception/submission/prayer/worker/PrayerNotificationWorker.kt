@@ -151,8 +151,7 @@ class PrayerNotificationWorker @AssistedInject constructor(
             .setContentText("Starts at $prayerTime")
             .setStyle(NotificationCompat.BigTextStyle()
                 .bigText("$prayerName Prayer in 20 minutes\n\n" +
-                        "Time: $prayerTime\n" +
-                        "Prepare: Wudu • Clean space • Qibla"))
+                        "Time: $prayerTime\n"))
             .setSmallIcon(R.drawable.ic_prayer)
             .setLargeIcon(largeIcon)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

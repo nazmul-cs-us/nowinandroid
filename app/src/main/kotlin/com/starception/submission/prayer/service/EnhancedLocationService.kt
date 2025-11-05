@@ -420,8 +420,23 @@ class EnhancedLocationService @Inject constructor(
                         android.util.Log.i("EnhancedLocationService", "         🛣️ Thoroughfare: '$thoroughfare'")
                         android.util.Log.i("EnhancedLocationService", "         🏛️ Administrative Area: '$administrativeArea'")
                         
+                        // Determine city name - try multiple fields if locality is empty
+                        val cityName = when {
+                            address.locality?.isNotEmpty() == true -> address.locality!!
+                            address.subAdminArea?.isNotEmpty() == true -> address.subAdminArea!!
+                            address.adminArea?.isNotEmpty() == true -> address.adminArea!!
+                            address.featureName?.isNotEmpty() == true -> address.featureName!!
+                            else -> {
+                                // If all city fields are empty, use coordinates as fallback
+                                android.util.Log.w("EnhancedLocationService", "         ⚠️ WARNING: No city name found in address, using coordinates")
+                                "${String.format("%.2f", androidLocation.latitude)}, ${String.format("%.2f", androidLocation.longitude)}"
+                            }
+                        }
+                        
+                        android.util.Log.i("EnhancedLocationService", "      🏙️ FINAL CITY NAME: '$cityName'")
+                        
                         val enrichedLocation = baseLocation.copy(
-                            city = address.locality ?: address.subAdminArea ?: "",
+                            city = cityName,
                             country = address.countryName ?: "",
                             countryCode = resolvedCountryCode,
                             area = area,
@@ -436,12 +451,23 @@ class EnhancedLocationService @Inject constructor(
                 }
             } ?: run {
                 android.util.Log.w("EnhancedLocationService", "   ❌ ENHANCED GEOCODER NOT AVAILABLE")
-                baseLocation
+                // Try to get at least coordinates display instead of empty city
+                baseLocation.copy(
+                    city = "${String.format("%.2f", androidLocation.latitude)}, ${String.format("%.2f", androidLocation.longitude)}"
+                )
+            } ?: run {
+                // If geocoding returned null addresses, use coordinates as city name
+                android.util.Log.w("EnhancedLocationService", "   ⚠️ No addresses returned from geocoding")
+                baseLocation.copy(
+                    city = "${String.format("%.2f", androidLocation.latitude)}, ${String.format("%.2f", androidLocation.longitude)}"
+                )
             }
         } catch (e: Exception) {
             android.util.Log.e("EnhancedLocationService", "   💥 ENHANCED GEOCODING ERROR: ${e.message}")
-            // If geocoding fails, return location with coordinates only
-            baseLocation
+            // If geocoding fails, return location with coordinates as city name
+            baseLocation.copy(
+                city = "${String.format("%.2f", androidLocation.latitude)}, ${String.format("%.2f", androidLocation.longitude)}"
+            )
         }
     }
     
