@@ -77,6 +77,8 @@ class PrayerTimesCalculator(private val context: Context) {
      * 
      * This is the primary method used throughout the app for getting prayer times.
      * 
+     * @param forceGpsRefresh If true, skips saved location and forces fresh GPS fetch (for pull-to-refresh)
+     * 
      * CALCULATION FLOW:
      * 1. Check cache first (instant if available)
      * 2. Get user settings (saved location preference, calculation method)
@@ -101,7 +103,7 @@ class PrayerTimesCalculator(private val context: Context) {
      * - Add new location sources
      * - Change error handling strategy
      */
-    suspend fun calculateDefaultPrayerTimes(): Pair<DayPrayerTimes?, String> {
+    suspend fun calculateDefaultPrayerTimes(forceGpsRefresh: Boolean = false): Pair<DayPrayerTimes?, String> {
         val startTime = System.currentTimeMillis()
         android.util.Log.i(TAG, "")
         android.util.Log.i(TAG, "🌅 COMPREHENSIVE PRAYER TIMES CALCULATION")
@@ -184,6 +186,7 @@ class PrayerTimesCalculator(private val context: Context) {
             
             // NEW IMPROVED PRIORITY ORDER (Prefers cached over Dubai):
             // 1. User's manually saved location (highest priority - user choice)
+            //    SKIPPED during pull-to-refresh (forceGpsRefresh=true) to force fresh GPS
             // 2. Recent cached GPS location (fast - within 30 minutes) 
             // 3. Fresh GPS location with 3-second timeout (prevents elevator hangs)
             // 4. ANY cached location (even if old) - KEEPS USER'S LAST KNOWN LOCATION
@@ -193,10 +196,18 @@ class PrayerTimesCalculator(private val context: Context) {
             // This means if user was previously in New York and disables location,
             // we keep showing New York prayer times instead of switching to Dubai.
             // Only use Dubai if user never enabled location before.
+            
+            // Log if we're forcing GPS refresh (pull-to-refresh)
+            if (forceGpsRefresh) {
+                android.util.Log.d("PrayerCalculation", "🔄 FORCE GPS REFRESH MODE: Skipping saved location to fetch fresh GPS")
+            }
+            
             val location = when {
                 // PRIORITY 1: User's saved location (user manually set their location)
-                // BUT: Skip if it has "Current Location" bug - force GPS refresh
-                userSettings.location != null && !userSettings.location!!.city.contains("Current Location", ignoreCase = true) -> {
+                // BUT: Skip if forceGpsRefresh=true (pull-to-refresh) or if it has "Current Location" bug
+                userSettings.location != null && 
+                !forceGpsRefresh && 
+                !userSettings.location!!.city.contains("Current Location", ignoreCase = true) -> {
                     android.util.Log.d("PrayerCalculation", "✓ PRIORITY 1: Using user's saved location")
                     android.util.Log.d("PrayerCalculation", "  Location: ${userSettings.location!!.getDisplayName()}")
                     android.util.Log.d("PrayerCalculation", "  Coordinates: ${userSettings.location!!.latitude}, ${userSettings.location!!.longitude}")
