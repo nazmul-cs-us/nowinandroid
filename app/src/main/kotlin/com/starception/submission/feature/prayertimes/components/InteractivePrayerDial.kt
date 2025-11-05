@@ -686,8 +686,7 @@ private fun DrawScope.drawCleanCircularTimer(
     val exactCenter = center
     
     val outerRingRadius = radius * 1.15f // Outer ring radius
-    val intermediateRingRadius = radius * 0.85f // Intermediate light green ring radius
-    val centralKnobRadius = radius * 0.45f // Central knob radius (darker green, spherical)
+    val centralKnobRadius = radius * 0.35f // Central knob radius (smaller, no dark center)
 
     // Colors matching the reference design
     val lightGreyBackground = Color(0xFFF5F5F5) // Very light grey/off-white
@@ -773,98 +772,10 @@ private fun DrawScope.drawCleanCircularTimer(
         )
     }
 
-    // Draw intermediate light green semi-transparent ring (between yellow ring and central knob)
-    // This matches the reference design with three layers
-    val lightGreenRing = Color(0xFF81C784).copy(alpha = 0.6f) // Light green, semi-transparent
-    drawCircle(
-        color = lightGreenRing,
-        radius = intermediateRingRadius,
-        center = exactCenter
-    )
-    
-
-    // Draw central knob - darker green spherical element with gradient
-    // This should look like a 3D spherical knob at the center
-    // The knob scales up and becomes brighter when being dragged for better visual feedback
-    val darkGreenKnob = Color(0xFF388E3C) // Darker green for the knob
-    val knobHighlight = Color(0xFF66BB6A) // Lighter green for highlight
-    val knobShadow = Color(0xFF2E7D32) // Darker green for shadow
-    
-    // Apply scale animation to knob when dragging - makes it more prominent
-    val scaledKnobRadius = centralKnobRadius * knobScale
-    
-    // Make knob brighter when dragging for visual feedback
-    val knobBrightness = if (isDragging) 1.2f else 1f
-    val adjustedKnobHighlight = Color(
-        (knobHighlight.red * knobBrightness).coerceIn(0f, 1f),
-        (knobHighlight.green * knobBrightness).coerceIn(0f, 1f),
-        (knobHighlight.blue * knobBrightness).coerceIn(0f, 1f),
-        knobHighlight.alpha
-    )
-    
-    // Draw base knob circle with radial gradient for spherical effect
-    // Gradient from bright center to darker edges for 3D effect
-    // IMPORTANT: First color is at center, last color is at edge
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(
-                adjustedKnobHighlight, // Bright center (first color = center)
-                darkGreenKnob,         // Base color in middle
-                darkGreenKnob,         // Keep base color longer to avoid dark center
-                knobShadow             // Darker at edges only
-            ),
-            center = exactCenter,
-            radius = scaledKnobRadius
-        ),
-        radius = scaledKnobRadius,
-        center = exactCenter
-    )
-    
-    // Add a subtle glow ring around knob when dragging
-    if (isDragging) {
-        drawCircle(
-            color = tealColor.copy(alpha = 0.3f),
-            radius = scaledKnobRadius + 8f,
-            center = exactCenter
-        )
-    }
-    
-    // Add additional highlight on top-left for more 3D effect (scaled with knob)
-    val knobHighlightRadius = scaledKnobRadius * 0.6f
-    val knobHighlightCenter = Offset(exactCenter.x - scaledKnobRadius * 0.25f, exactCenter.y - scaledKnobRadius * 0.25f)
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(
-                Color.White.copy(alpha = 0.4f),
-                Color.Transparent
-            ),
-            center = knobHighlightCenter,
-            radius = knobHighlightRadius
-        ),
-        radius = knobHighlightRadius,
-        center = knobHighlightCenter
-    )
-    
-    // Add shadow on bottom-right for depth (scaled with knob)
-    val knobShadowRadius = scaledKnobRadius * 0.6f
-    val knobShadowCenter = Offset(exactCenter.x + scaledKnobRadius * 0.25f, exactCenter.y + scaledKnobRadius * 0.25f)
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(
-                Color.Transparent,
-                Color.Black.copy(alpha = 0.3f)
-            ),
-            center = knobShadowCenter,
-            radius = knobShadowRadius
-        ),
-        radius = knobShadowRadius,
-        center = knobShadowCenter
-    )
-
     // Draw small teal horizontal indicator mark at 12 o'clock position
-    // Position it on the intermediate ring, directly above where the time text will be displayed
+    // Position it on the outer ring, directly above where the time text will be displayed
     val indicatorAngle = -90f * PI / 180f // 12 o'clock position
-    val indicatorRadius = intermediateRingRadius - 15f // Position on the intermediate ring, near the top edge
+    val indicatorRadius = outerRingRadius - 20f // Position on the outer ring, near the inner edge
     val indicatorCenter = Offset(
         exactCenter.x + indicatorRadius * cos(indicatorAngle.toFloat()).toFloat(),
         exactCenter.y + indicatorRadius * sin(indicatorAngle.toFloat()).toFloat()
