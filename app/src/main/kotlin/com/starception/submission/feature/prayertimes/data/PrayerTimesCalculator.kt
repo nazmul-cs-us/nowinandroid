@@ -195,7 +195,8 @@ class PrayerTimesCalculator(private val context: Context) {
             // Only use Dubai if user never enabled location before.
             val location = when {
                 // PRIORITY 1: User's saved location (user manually set their location)
-                userSettings.location != null -> {
+                // BUT: Skip if it has "Current Location" bug - force GPS refresh
+                userSettings.location != null && !userSettings.location!!.city.contains("Current Location", ignoreCase = true) -> {
                     android.util.Log.d("PrayerCalculation", "✓ PRIORITY 1: Using user's saved location")
                     android.util.Log.d("PrayerCalculation", "  Location: ${userSettings.location!!.getDisplayName()}")
                     android.util.Log.d("PrayerCalculation", "  Coordinates: ${userSettings.location!!.latitude}, ${userSettings.location!!.longitude}")
@@ -205,8 +206,16 @@ class PrayerTimesCalculator(private val context: Context) {
                 }
                 
                 // PRIORITY 2-4: GPS and cached location strategies (if user granted permission)
-                locationService.hasLocationPermission() -> {
-                    android.util.Log.d("PrayerCalculation", "User granted location permission, trying GPS strategies")
+                // This also handles the case where saved location has "Current Location" bug
+                locationService.hasLocationPermission() || (userSettings.location != null && userSettings.location!!.city.contains("Current Location", ignoreCase = true)) -> {
+                    // Check if we're fixing "Current Location" bug
+                    if (userSettings.location != null && userSettings.location!!.city.contains("Current Location", ignoreCase = true)) {
+                        android.util.Log.w("PrayerCalculation", "⚠️  PRIORITY 1 SKIPPED: Saved location has 'Current Location' bug!")
+                        android.util.Log.w("PrayerCalculation", "   Old location: ${userSettings.location!!.getDisplayName()}")
+                        android.util.Log.w("PrayerCalculation", "   Forcing GPS fetch to fix this...")
+                    } else {
+                        android.util.Log.d("PrayerCalculation", "User granted location permission, trying GPS strategies")
+                    }
                     try {
                         // PRIORITY 2: Try recent cached location first (instant, no GPS wait)
                         val cachedLocation = cache.getCachedLocation()
@@ -320,11 +329,25 @@ class PrayerTimesCalculator(private val context: Context) {
             // STEP 6: SAVE LOCATION TO SETTINGS for notification service access
             android.util.Log.d("PrayerCalculation", "STEP 6a: Saving location to settings for notification service")
             try {
-                // Only save location to settings if we got it from GPS (not from user's saved location)
-                val shouldSaveLocation = userSettings.location == null || 
-                    (location != userSettings.location && !location.getDisplayName().contains("Dubai"))
+                // Check if we should save location - save if:
+                // 1. No saved location exists, OR
+                // 2. Location changed (different coordinates), OR
+                // 3. Old location has "Current Location" as city (need to fix it), OR
+                // 4. New location is not Dubai default
+                val oldLocation = userSettings.location
+                val hasCurrentLocationBug = oldLocation?.city?.contains("Current Location", ignoreCase = true) == true
+                val locationChanged = oldLocation == null || 
+                    (oldLocation.latitude != location.latitude || oldLocation.longitude != location.longitude)
+                val isNotDubai = !location.getDisplayName().contains("Dubai")
+                
+                val shouldSaveLocation = oldLocation == null || locationChanged || hasCurrentLocationBug || isNotDubai
                 
                 if (shouldSaveLocation) {
+                    if (hasCurrentLocationBug) {
+                        android.util.Log.w("PrayerCalculation", "🔧 FIXING 'Current Location' BUG: Replacing with proper location")
+                        android.util.Log.w("PrayerCalculation", "   Old: ${oldLocation?.getDisplayName()}")
+                        android.util.Log.w("PrayerCalculation", "   New: ${location.getDisplayName()}")
+                    }
                     android.util.Log.w("PrayerCalculation", "🔥 Saving GPS location to settings: ${location.getDisplayName()}")
                     android.util.Log.w("PrayerCalculation", "🔥 BEFORE COPY - Custom Isha: ${userSettings.customIshaAngle}")
                     val updatedSettings = userSettings.copy(location = location)
