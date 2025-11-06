@@ -15,7 +15,7 @@
   ~ limitations under the License.
 -->
 <resources>
-  <color name="cat_music_player_secondary">@color/design_dark_default_color_primary</color>
+  <color name="cat_music_player_secondary">@android:color/white</color>
   <color name="cat_music_player_on_secondary">@android:color/black</color>
 </resources>
 
