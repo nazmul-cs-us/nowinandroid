@@ -109,10 +109,10 @@ class SurahDetailViewModel @Inject constructor(
                 
                 android.util.Log.d("SurahDetail", "✅ Surah found: ${surah.nameEnglish} (ID: ${surah.id}, Number: ${surah.number})")
                 
-                val ayahs = repository.getAyahsBySurahOnce(surah.id)
+                    val ayahs = repository.getAyahsBySurahOnce(surah.id)
                 
                 android.util.Log.d("SurahDetail", "✅ Loaded ${ayahs.size} Ayahs from $translationCode")
-                _uiState.value = SurahDetailUiState.Success(surah, ayahs)
+                    _uiState.value = SurahDetailUiState.Success(surah, ayahs)
             } catch (e: Exception) {
                 android.util.Log.e("SurahDetail", "❌ Error loading Surah $surahNumber in translation: $translationCode", e)
                 e.printStackTrace()
@@ -184,83 +184,11 @@ fun SurahDetailScreen(
         viewModel.loadSurah(currentSurahNumber)
     }
     
-    Scaffold(
-        containerColor = Color.Transparent, // Make Scaffold background transparent
-        contentWindowInsets = WindowInsets(0, 0, 0, 0), // Remove window insets so content fills screen
-        topBar = {
-                    when (val state = uiState) {
-                is SurahDetailUiState.Success -> {
-                    // Transparent header that overlays the gradient background
-                    LargeTopAppBar(
-                        title = { 
-                            Text(
-                                text = state.surah.nameEnglish,
-                                color = Color.White.copy(alpha = 0.9f) // White text over gradient
-                            ) 
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = onBackClick) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = Color.White // White arrow over gradient
-                                )
-                            }
-                        },
-                        actions = {
-                            // Heart icon (faint outline like in image)
-                            IconButton(onClick = { /* TODO: Add bookmark functionality */ }) {
-                                Icon(
-                                    imageVector = Icons.Default.FavoriteBorder,
-                                    contentDescription = "Bookmark",
-                                    tint = Color.White.copy(alpha = 0.7f) // Faint white outline
-                                )
-                            }
-                            // Three dots menu (hidden in image, but keep for functionality)
-                            IconButton(onClick = { showTranslationDialog = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.MoreVert,
-                                    contentDescription = "More options",
-                                    tint = Color.White.copy(alpha = 0.7f)
-                                )
-                            }
-                        },
-                        colors = TopAppBarDefaults.largeTopAppBarColors(
-                            containerColor = Color.Transparent, // Transparent to show gradient
-                            titleContentColor = Color.White, // White text
-                            navigationIconContentColor = Color.White, // White icons
-                            actionIconContentColor = Color.White // White action icons
-                        ),
-                        scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-                    )
-                }
-                else -> {
-                    TopAppBar(
-                        title = { Text("Loading...") },
-                        navigationIcon = {
-                            IconButton(onClick = onBackClick) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = Color.White // White like reference
-                                )
-                            }
-                        },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            )
-                }
-            }
-        }
-    ) { paddingValues ->
+    // Match XML: CoordinatorLayout equivalent
         when (val state = uiState) {
             is SurahDetailUiState.Loading -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
@@ -269,9 +197,7 @@ fun SurahDetailScreen(
             
             is SurahDetailUiState.Error -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -283,28 +209,31 @@ fun SurahDetailScreen(
             }
             
             is SurahDetailUiState.Success -> {
-                // No padding - gradient should extend to top including under status bar
-                SurahContentWithMusicPlayer(
+            SurahContentWithMusicPlayer(
                     surah = state.surah,
                     ayahs = state.ayahs,
-                    scrollState = scrollState,
-                    isPlaying = isCurrentSurahPlaying && isPlaying,
-                    currentPosition = currentPosition,
-                    duration = duration,
-                    showMusicPlayer = showMusicPlayer,
-                    onPlayPause = { playerViewModel.togglePlayPause() },
-                    onPrevious = { playerViewModel.playPrevious() },
-                    onNext = { playerViewModel.playNext() },
-                    onSeek = { position -> playerViewModel.seekTo(position) },
-                    onToggleMusicPlayer = { 
-                        showMusicPlayer = !showMusicPlayer
-                        if (!showMusicPlayer && surahIndex >= 0 && !isCurrentSurahPlaying) {
-                            playerViewModel.playSurah(surahIndex)
-                        }
+                scrollState = scrollState,
+                isPlaying = isCurrentSurahPlaying && isPlaying,
+                currentPosition = currentPosition,
+                duration = duration,
+                showMusicPlayer = showMusicPlayer,
+                onPlayPause = { playerViewModel.togglePlayPause() },
+                onPrevious = { playerViewModel.playPrevious() },
+                onNext = { playerViewModel.playNext() },
+                onSeek = { position -> playerViewModel.seekTo(position) },
+                onToggleMusicPlayer = { 
+                    showMusicPlayer = !showMusicPlayer
+                    if (!showMusicPlayer && surahIndex >= 0 && !isCurrentSurahPlaying) {
+                        playerViewModel.playSurah(surahIndex)
                     }
-                    // Removed modifier.padding(paddingValues) - gradient should fill entire screen
-                )
-            }
+                },
+                onVolumeChange = { volume ->
+                    playerViewModel.setVolume(volume)
+                },
+                onBackClick = onBackClick,
+                onTranslationClick = { showTranslationDialog = true },
+                onBookmarkClick = { /* TODO */ }
+            )
         }
     }
     
@@ -323,6 +252,7 @@ fun SurahDetailScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SurahContentWithMusicPlayer(
     surah: Surah,
@@ -337,210 +267,232 @@ fun SurahContentWithMusicPlayer(
     onNext: () -> Unit,
     onSeek: (Int) -> Unit,
     onToggleMusicPlayer: () -> Unit,
+    onVolumeChange: ((Float) -> Unit)? = null,
+    onBackClick: () -> Unit,
+    onTranslationClick: () -> Unit,
+    onBookmarkClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
-        // Fixed full-screen header (album image + bottom bar) - stays in place
-        SurahHeaderSection(
-            surah = surah,
-            ayahsCount = ayahs.size,
-            isPlaying = isPlaying,
-            currentPosition = currentPosition,
-            duration = duration,
-            showMusicPlayer = showMusicPlayer,
-            onPlayPause = onPlayPause,
-            onPrevious = onPrevious,
-            onNext = onNext,
-            onSeek = onSeek,
-            onToggleMusicPlayer = onToggleMusicPlayer,
-            modifier = Modifier.fillMaxSize()
-        )
-        
-        // Scrollable track list (RecyclerView equivalent) - scrolls over the image
-        // Matches: RecyclerView with appbar_scrolling_view_behavior
-        LazyColumn(
-            state = scrollState,
-            contentPadding = PaddingValues(
-                top = 200.dp, // Account for TopAppBar height + spacing
-                bottom = 8.dp
-            ),
-            // Add padding for status bar so content doesn't overlap it
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 120.dp) // Account for bottom info bar
-                .windowInsetsPadding(WindowInsets.statusBars),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
-        ) {
-            // Large spacer to push content below the visible image area
-            // This allows scrolling while keeping header visible initially
-            item {
-                val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-                Spacer(modifier = Modifier.height(screenHeight - 120.dp - 200.dp))
-            }
-            
-            // Track List (Ayahs) - appears as you scroll
-            items(
-                items = ayahs,
-                key = { it.id }
-            ) { ayah ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.surface
-                ) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val albumImageHeight = screenWidth // 1:1 aspect ratio (XML: app:layout_constraintDimensionRatio="H,1:1")
+    val containerHeight = 196.dp // XML: android:layout_height="196dp"
+    
+    // Match XML: CoordinatorLayout with scrollBehavior
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            // Match XML: AppBarLayout with CollapsingToolbarLayout
+            LargeTopAppBar(
+                title = { }, // Title handled in collapsing content
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onBookmarkClick) {
+                        Icon(
+                            imageVector = Icons.Default.FavoriteBorder,
+                            contentDescription = "Bookmark",
+                            tint = Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+                    IconButton(onClick = onTranslationClick) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = "Translation",
+                            tint = Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = Color.Transparent,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White,
+                    actionIconContentColor = Color.White
+                ),
+                scrollBehavior = scrollBehavior
+            )
+        }
+    ) { paddingValues ->
+        // Match XML: CoordinatorLayout structure - header content is separate from scrollable content
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Match XML: RecyclerView (song_recycler_view) with appbar_scrolling_view_behavior
+            // XML: android:paddingTop="8dp", app:layout_behavior="@string/appbar_scrolling_view_behavior"
+            LazyColumn(
+                state = scrollState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars),
+                contentPadding = PaddingValues(
+                    top = 8.dp + paddingValues.calculateTopPadding(),
+                    bottom = 8.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                // Spacer to push content below collapsing header
+                item {
+                    Spacer(modifier = Modifier.height(albumImageHeight + containerHeight))
+                }
+                
+                // Match XML: Track list items (ayahs)
+                items(
+                    items = ayahs,
+                    key = { it.id }
+                ) { ayah ->
                     AyahTrackItem(
                         ayah = ayah,
-                        isPlaying = false, // TODO: Track current ayah
+                        isPlaying = false, // TODO: Track current playing ayah
                         onClick = { }
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun SurahHeaderSection(
-    surah: Surah,
-    ayahsCount: Int,
-    isPlaying: Boolean,
-    currentPosition: Int,
-    duration: Int,
-    showMusicPlayer: Boolean,
-    onPlayPause: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onSeek: (Int) -> Unit,
-    onToggleMusicPlayer: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(modifier = modifier.fillMaxSize()) {
-        // Full-screen album image with vibrant gradient - extends behind status bar
-        Box(
-            modifier = Modifier
-                .fillMaxSize() // Fill entire screen including behind status bar
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF00BCD4), // Teal/Cyan at top
-                            Color(0xFF7B1FA2), // Deep Purple
-                            Color(0xFF9C27B0), // Purple
-                            Color(0xFFE91E63), // Magenta/Pink
-                            Color(0xFFFF5722), // Deep Orange
-                            Color(0xFFFF9800), // Orange (bright light source)
-                            Color(0xFFFF6F00) // Darker orange at bottom
-                        )
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            // Optional: Could add surah number or decorative elements here
-            // Keeping it clean like the reference
-        }
-        
-        // Dark bottom bar with surah info (exactly like reference - dark blue-grey)
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .height(120.dp),
-            color = Color(0xFF2C3E50), // Exact dark blue-grey from reference
-            shadowElevation = 0.dp
-        ) {
+            
+            // Match XML: ConstraintLayout content inside CollapsingToolbarLayout
+            // This is the collapsing header content that overlays the scrollable content
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 24.dp, end = 100.dp, top = 20.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.Center
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Album title - large white text (like "Metamorphosis")
-                Text(
-                    text = surah.nameEnglish,
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                // Match XML: ImageView (album_image) - 1:1 aspect ratio
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(albumImageHeight)
+                            .background(
+                            brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                    Color(0xFF00BCD4),
+                                    Color(0xFF7B1FA2),
+                                    Color(0xFF9C27B0),
+                                    Color(0xFFE91E63),
+                                    Color(0xFFFF5722),
+                                    Color(0xFFFF9800),
+                                    Color(0xFFFF6F00)
+                                )
+                            )
+                        )
                 )
                 
-                Spacer(modifier = Modifier.height(6.dp))
-                
-                // Artist name - smaller white text (like "Sandra Adams")
-                Text(
-                    text = surah.nameArabic,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-        
-        // Play button - rounded square overlapping bottom-right (exactly like reference)
-        Surface(
-            onClick = {
-                if (showMusicPlayer) {
-                    onToggleMusicPlayer()
-                } else {
-                    onToggleMusicPlayer()
-                    if (!isPlaying) {
-                        onPlayPause()
+                // Match XML: MaterialCardView (album_info_container) OR ConstraintLayout (music_player_container)
+                // Both 196dp height, same position (layout_constraintTop_toBottomOf="@id/album_image")
+                Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                        .height(containerHeight)
+                ) {
+                    // Album Info Container (XML: album_info_container) - shown when player is hidden
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = !showMusicPlayer,
+                        enter = fadeIn(tween(300)),
+                        exit = fadeOut(tween(300))
+                    ) {
+                        // Match XML: MaterialCardView with cardBackgroundColor="?attr/colorPrimarySurface"
+                        Card(
+                            modifier = Modifier.fillMaxSize(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                            shape = RoundedCornerShape(0.dp) // XML: app:cardCornerRadius="0dp"
+                        ) {
+                            // Match XML: LinearLayout (album_details) with paddingStart="56dp", paddingEnd="16dp"
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(start = 56.dp, end = 16.dp),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                // Match XML: TextView (album_title) - textAppearanceHeadline3
+                                Text(
+                                    text = surah.nameEnglish,
+                                    style = MaterialTheme.typography.headlineLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                // Match XML: TextView (album_artist) - textAppearanceSubtitle1
+                                Text(
+                                    text = surah.nameArabic,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Music Player Container (XML: music_player_container) - shown when player is visible
+                    // XML: android:background="@android:color/black", android:visibility="gone"
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showMusicPlayer,
+                        enter = fadeIn(tween(300)),
+                        exit = fadeOut(tween(300))
+                    ) {
+                        MusicPlayerContainerIntegrated(
+                            surah = surah,
+                            isPlaying = isPlaying,
+                            currentPosition = currentPosition,
+                            duration = duration,
+                            onPlayPause = onPlayPause,
+                            onPrevious = onPrevious,
+                            onNext = onNext,
+                            onSeek = onSeek,
+                            onClose = onToggleMusicPlayer,
+                            onVolumeChange = onVolumeChange,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                 }
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = (-16).dp, y = (-16).dp)
-                .size(64.dp),
-            shape = RoundedCornerShape(16.dp), // Rounded square like reference
-            color = Color(0xFFB0BEC5), // Light blue-grey like reference
-            shadowElevation = 4.dp
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (showMusicPlayer) {
-                        Icons.Default.Close
-                    } else if (isPlaying) {
-                        Icons.Default.Pause
-                    } else {
-                        Icons.Default.PlayArrow
+                
+                // Match XML: FloatingActionButton (fab) - positioned between album_image and album_info_container
+                // XML: app:layout_constraintBottom_toTopOf="@id/album_info_container"
+                //      app:layout_constraintTop_toTopOf="@id/album_info_container"
+                //      app:layout_constraintEnd_toEndOf="parent"
+                //      android:layout_margin="16dp"
+                FloatingActionButton(
+                    onClick = {
+                        if (showMusicPlayer) {
+                            onToggleMusicPlayer()
+                                } else {
+                            onToggleMusicPlayer()
+                            if (!isPlaying) {
+                                onPlayPause()
+                            }
+                        }
                     },
-                    contentDescription = if (showMusicPlayer) "Close" else if (isPlaying) "Pause" else "Play",
-                    tint = Color(0xFF263238), // Dark blue-grey icon like reference
-                    modifier = Modifier.size(32.dp)
-                )
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .offset(y = (-containerHeight.value / 2).dp), // Center vertically on container
+                    containerColor = Color(0xFFB0BEC5), // Match reference color
+                    contentColor = Color(0xFF263238)
+                ) {
+                    Icon(
+                        imageVector = if (showMusicPlayer) {
+                            Icons.Default.Close
+                        } else if (isPlaying) {
+                            Icons.Default.Pause
+                        } else {
+                            Icons.Default.PlayArrow
+                        },
+                        contentDescription = if (showMusicPlayer) "Close" else if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
         
-        // Music Player Container (shown when showMusicPlayer is true)
-        androidx.compose.animation.AnimatedVisibility(
-            visible = showMusicPlayer,
-            modifier = Modifier.fillMaxSize(),
-            enter = fadeIn(tween(400)) + slideInVertically(
-                animationSpec = tween(400),
-                initialOffsetY = { it }
-            ),
-            exit = fadeOut(tween(300)) + slideOutVertically(
-                animationSpec = tween(300),
-                targetOffsetY = { it }
-            )
-        ) {
-            MusicPlayerContainerIntegrated(
-                surah = surah,
-                isPlaying = isPlaying,
-                currentPosition = currentPosition,
-                duration = duration,
-                onPlayPause = onPlayPause,
-                onPrevious = onPrevious,
-                onNext = onNext,
-                onSeek = onSeek,
-                onClose = onToggleMusicPlayer
-            )
-        }
-    }
-}
 @Composable
 fun MusicPlayerContainerIntegrated(
     surah: Surah,
@@ -552,192 +504,175 @@ fun MusicPlayerContainerIntegrated(
     onNext: () -> Unit,
     onSeek: (Int) -> Unit,
     onClose: () -> Unit,
+    onVolumeChange: ((Float) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    var volume by remember { mutableStateOf(3.5f) }
+    var volume by remember { mutableStateOf(0.35f) } // XML: android:value="3.5" out of 0-10, so 0.35f
     
     val progressValue = remember(currentPosition, duration) {
-        if (duration > 0) (currentPosition.toFloat() / duration.toFloat()) else 0f
+        if (duration > 0) (currentPosition.toFloat() / duration.toFloat()) else 0.1f // XML: android:progress="10"
     }
     
-    // Format time helper
-    fun formatTime(millis: Int): String {
-        val totalSeconds = millis / 1000
-        val minutes = totalSeconds / 60
-        val seconds = totalSeconds % 60
-        return String.format("%d:%02d", minutes, seconds)
-    }
-    
+    // Match XML: ConstraintLayout (music_player_container) - 196dp height, black background
+    // XML: android:background="@android:color/black"
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .fillMaxHeight()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF1A1A1A),
-                        Color.Black
-                    )
-                )
-            )
+            .height(196.dp)
+            .background(Color.Black)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Enhanced progress indicator with time display
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, start = 16.dp, end = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                LinearProgressIndicator(
-                    progress = { progressValue },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp),
-                    trackColor = Color.White.copy(alpha = 0.2f),
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                // Time labels
-                Row(
+        // Match XML: LinearProgressIndicator (music_progress_indicator) at top
+        // XML: app:indicatorSize="16dp", app:layout_constraintTop_toTopOf="parent"
+        LinearProgressIndicator(
+            progress = { progressValue },
             modifier = Modifier
                 .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = formatTime(currentPosition),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.7f)
-                    )
-                    Text(
-                        text = formatTime(duration),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.weight(1f))
-            
-            // Enhanced control buttons with better spacing
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                .align(Alignment.TopCenter),
+            trackColor = Color.White.copy(alpha = 0.2f),
+            color = MaterialTheme.colorScheme.primary
+        )
+        
+        // Match XML: MaterialButton (rewind) - positioned below progress indicator, above volume slider
+        // XML: app:layout_constraintBottom_toTopOf="@id/volume_slider"
+        //      app:layout_constraintTop_toBottomOf="@id/music_progress_indicator"
+        //      app:layout_constraintStart_toStartOf="parent"
+        //      android:layout_marginStart="@dimen/cat_music_player_control_button_margin"
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(y = 20.dp) // Position between progress and volume
+        ) {
+            IconButton(
+                onClick = onPrevious,
+                modifier = Modifier.size(56.dp) // XML: @dimen/cat_music_player_button_size
             ) {
-                // Previous button with enhanced styling
-                IconButton(
-                    onClick = onPrevious,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Previous",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                // Enhanced play/pause button with larger size
-                FloatingActionButton(
-                    onClick = onPlayPause,
-                    modifier = Modifier.size(64.dp),
-                    containerColor = Color.White,
-                    contentColor = Color.Black,
-                    elevation = FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 6.dp
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                // Next button with enhanced styling
-                IconButton(
-                    onClick = onNext,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Next",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.SkipPrevious,
+                    contentDescription = "Previous",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
             }
-            
-            Spacer(modifier = Modifier.weight(1f))
-            
-            // Enhanced volume controls with better layout
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp, start = 16.dp, end = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { volume = (volume - 0.5f).coerceAtLeast(0f) },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.VolumeDown,
-                            contentDescription = "Volume Down",
-                            tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    
-                    Slider(
-                        value = volume / 10f,
-                        onValueChange = { volume = (it * 10f).coerceIn(0f, 10f) },
+        }
+        
+        // Match XML: MaterialButton (music_play_button) - center, below progress, above volume
+        // XML: app:layout_constraintBottom_toTopOf="@id/volume_slider"
+        //      app:layout_constraintEnd_toEndOf="parent"
+        //      app:layout_constraintStart_toStartOf="parent"
+        //      app:layout_constraintTop_toBottomOf="@id/music_progress_indicator"
+                        Box(
                             modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp),
-                        valueRange = 0f..1f,
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                        )
-                    )
-                    
-                    IconButton(
-                        onClick = { volume = (volume + 0.5f).coerceAtMost(10f) },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.VolumeUp,
-                            contentDescription = "Volume Up",
-                            tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-                
-                // Surah name display
-                Text(
-                    text = surah.nameEnglish,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.8f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 8.dp)
+                .align(Alignment.Center)
+                .offset(y = 20.dp)
+        ) {
+            FloatingActionButton(
+                onClick = onPlayPause,
+                modifier = Modifier.size(56.dp), // XML: @dimen/cat_music_player_button_size
+                containerColor = Color.White,
+                contentColor = Color.Black
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+        
+        // Match XML: MaterialButton (fast_forward) - end, below progress, above volume
+        // XML: app:layout_constraintBottom_toTopOf="@id/volume_slider"
+        //      app:layout_constraintEnd_toEndOf="parent"
+        //      app:layout_constraintTop_toBottomOf="@id/music_progress_indicator"
+        //      android:layout_marginEnd="@dimen/cat_music_player_control_button_margin"
+        Box(
+                            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(y = 20.dp)
+        ) {
+            IconButton(
+                onClick = onNext,
+                modifier = Modifier.size(56.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SkipNext,
+                    contentDescription = "Next",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+        
+        // Match XML: Volume controls at bottom - ConstraintLayout positioning
+        // XML: volume_down_button, volume_slider, volume_up_button
+        // Volume slider: app:layout_constraintWidth_percent="0.55", app:layout_constraintWidth_min="200dp"
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Match XML: MaterialButton (volume_down_button)
+            // XML: app:layout_constraintEnd_toStartOf="@id/volume_slider"
+            //      app:layout_constraintBottom_toBottomOf="@id/volume_slider"
+            //      app:layout_constraintTop_toTopOf="@id/volume_slider"
+            //      android:layout_marginStart="@dimen/cat_music_player_volume_button_margin"
+            IconButton(
+                onClick = {
+                    volume = (volume - 0.1f).coerceAtLeast(0f)
+                    onVolumeChange?.invoke(volume)
+                },
+                modifier = Modifier.size(48.dp) // XML: @dimen/cat_music_player_button_size
+            ) {
+                Icon(
+                    imageVector = Icons.Default.VolumeDown,
+                    contentDescription = "Volume Down",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            
+            // Match XML: Slider (volume_slider) - 55% width, min 200dp
+            // XML: app:layout_constraintWidth_percent="0.55"
+            //      app:layout_constraintWidth_min="200dp"
+            //      app:thumbRadius="8dp", app:trackHeight="3dp"
+            //      android:value="3.5", android:valueFrom="0", android:valueTo="10"
+            Slider(
+                value = volume * 10f, // Convert 0-1 to 0-10 range
+                onValueChange = { newVolume ->
+                    volume = (newVolume / 10f).coerceIn(0f, 1f)
+                    onVolumeChange?.invoke(volume)
+                },
+                    modifier = Modifier
+                    .widthIn(min = 200.dp)
+                    .weight(0.55f) // Match XML: 55% width
+                    .padding(horizontal = 8.dp),
+                valueRange = 0f..10f, // XML: android:valueTo="10"
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Color.White,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                )
+            )
+            
+            // Match XML: MaterialButton (volume_up_button)
+            // XML: app:layout_constraintStart_toEndOf="@id/volume_slider"
+            //      app:layout_constraintBottom_toBottomOf="@id/volume_slider"
+            //      app:layout_constraintTop_toTopOf="@id/volume_slider"
+            //      android:layout_marginEnd="@dimen/cat_music_player_volume_button_margin"
+            IconButton(
+                onClick = {
+                    volume = (volume + 0.1f).coerceAtMost(1f)
+                    onVolumeChange?.invoke(volume)
+                },
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.VolumeUp,
+                    contentDescription = "Volume Up",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
@@ -756,13 +691,13 @@ fun AyahTrackItem(
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Top // Align to top to allow text wrapping
     ) {
         // Playing icon (hidden when not playing)
         Icon(
             imageVector = Icons.Default.GraphicEq,
             contentDescription = "Playing",
-            modifier = Modifier
+                            modifier = Modifier
                 .size(24.dp)
                 .alpha(if (isPlaying) 1f else 0f),
             tint = MaterialTheme.colorScheme.primary
@@ -771,7 +706,7 @@ fun AyahTrackItem(
         Spacer(modifier = Modifier.width(16.dp))
         
         // Ayah number (Track number)
-        Text(
+                            Text(
             text = "${ayah.numberInSurah}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
@@ -780,23 +715,13 @@ fun AyahTrackItem(
         
         Spacer(modifier = Modifier.width(16.dp))
         
-        // Ayah text (Track title)
-        Text(
-            text = ayah.text,
+        // Ayah text - allow full text to display without truncation
+                Text(
+                    text = ayah.text,
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface,
+            // Removed maxLines restriction - allow text to wrap naturally
             modifier = Modifier.weight(1f)
-        )
-        
-        Spacer(modifier = Modifier.width(16.dp))
-        
-        // Duration placeholder
-        Text(
-            text = "",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
         )
     }
 }
@@ -811,35 +736,56 @@ fun TranslationSelectorDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Language,
+                contentDescription = "Translation",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+        },
         title = {
             Text(
                 text = "Select Translation",
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
         },
         text = {
             LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(vertical = 8.dp)
             ) {
                 items(availableTranslations) { translationCode ->
                     val isSelected = translationCode == currentTranslation
                     Surface(
-                        onClick = { onTranslationSelected(translationCode) },
+                        onClick = {
+                            onTranslationSelected(translationCode)
+                            onDismiss()
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.medium,
+                        shape = RoundedCornerShape(12.dp),
                         color = if (isSelected) {
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
-                            MaterialTheme.colorScheme.surface
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         },
                         border = if (isSelected) {
                             BorderStroke(
                                 2.dp,
                                 MaterialTheme.colorScheme.primary
                             )
-                        } else null
+                        } else {
+                            BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                            )
+                        },
+                        shadowElevation = if (isSelected) 4.dp else 1.dp
                     ) {
                         Row(
                             modifier = Modifier
@@ -848,23 +794,42 @@ fun TranslationSelectorDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Language icon indicator
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = null,
+                                    tint = if (isSelected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                )
                             Text(
                                 text = getTranslationName(translationCode),
                                 style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) {
                                     MaterialTheme.colorScheme.onPrimaryContainer
                                 } else {
                                     MaterialTheme.colorScheme.onSurface
                                 }
                             )
+                            }
                             if (isSelected) {
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
                                     contentDescription = "Selected",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(28.dp)
                                 )
+                            } else {
+                                // Invisible placeholder to maintain alignment
+                                Spacer(modifier = Modifier.size(28.dp))
                             }
                         }
                     }
@@ -873,8 +838,15 @@ fun TranslationSelectorDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text(
+                    "Cancel",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium
+                )
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface
     )
 }

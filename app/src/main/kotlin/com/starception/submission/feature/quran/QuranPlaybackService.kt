@@ -228,6 +228,11 @@ class QuranPlaybackService : Service() {
         mediaPlayer?.seekTo(position)
     }
 
+    fun setVolume(volume: Float) {
+        // Volume range is 0.0f to 1.0f
+        mediaPlayer?.setVolume(volume, volume)
+    }
+
     fun getCurrentSurahIndex(): Int = currentSurahIndex
 
     private fun getAudioFile(index: Int): File {
