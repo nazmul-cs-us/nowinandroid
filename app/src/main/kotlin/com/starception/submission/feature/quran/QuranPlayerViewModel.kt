@@ -168,6 +168,10 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
         _currentPosition.value = position
     }
 
+    fun setVolume(volume: Float) {
+        playbackService?.setVolume(volume)
+    }
+
     fun clearPermissionError() {
         _needsAudioPermission.value = false
         _errorMessage.value = null
