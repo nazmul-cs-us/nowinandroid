@@ -41,6 +41,7 @@ import androidx.transition.TransitionManager;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.OnBackPressedDispatcher;
 import com.google.android.material.appbar.AppBarLayout;
+import com.google.android.material.appbar.CollapsingToolbarLayout;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.transition.MaterialArcMotion;
 import com.google.android.material.transition.MaterialContainerTransform;
@@ -92,6 +93,19 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     AppBarLayout appBarLayout = view.findViewById(R.id.app_bar_layout);
     FloatingActionButton fab = view.findViewById(R.id.fab);
     View musicPlayerContainer = view.findViewById(R.id.music_player_container);
+    
+    // Get CollapsingToolbarLayout (make it final for lambda)
+    final CollapsingToolbarLayout collapsingToolbarLayout;
+    if (appBarLayout != null && appBarLayout.getChildCount() > 0) {
+      View firstChild = appBarLayout.getChildAt(0);
+      if (firstChild instanceof CollapsingToolbarLayout) {
+        collapsingToolbarLayout = (CollapsingToolbarLayout) firstChild;
+      } else {
+        collapsingToolbarLayout = null;
+      }
+    } else {
+      collapsingToolbarLayout = null;
+    }
     
     // Get status bar height directly as fallback
     int statusBarHeight = getStatusBarHeight();
@@ -160,6 +174,19 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
         (appBarLayout1, verticalOffset) -> {
           float verticalOffsetPercentage =
               (float) Math.abs(verticalOffset) / (float) appBarLayout1.getTotalScrollRange();
+          
+          // Update toolbar background based on scroll position
+          if (collapsingToolbarLayout != null) {
+            if (verticalOffsetPercentage > 0.1F) {
+              // Scrolled - show toolbar background
+              toolbar.setBackgroundColor(toolbar.getContext().getResources().getColor(
+                  android.R.color.white, null));
+            } else {
+              // Not scrolled - transparent background
+              toolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            }
+          }
+          
           if (verticalOffsetPercentage > 0.2F && fab.isOrWillBeShown()) {
             fab.hide();
           } else if (verticalOffsetPercentage <= 0.2F
@@ -238,6 +265,19 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     albumImage.setImageResource(album.cover);
     albumTitle.setText(album.title);
     albumArtist.setText(album.artist);
+    
+    // Set collapsing toolbar title to show when collapsed
+    AppBarLayout appBarLayoutForTitle = container.findViewById(R.id.app_bar_layout);
+    if (appBarLayoutForTitle != null && appBarLayoutForTitle.getChildCount() > 0) {
+      View firstChild = appBarLayoutForTitle.getChildAt(0);
+      if (firstChild instanceof CollapsingToolbarLayout) {
+        CollapsingToolbarLayout collapsingToolbarLayout = (CollapsingToolbarLayout) firstChild;
+        collapsingToolbarLayout.setTitle(album.title);
+        collapsingToolbarLayout.setExpandedTitleColor(android.graphics.Color.TRANSPARENT);
+        collapsingToolbarLayout.setCollapsedTitleTextColor(
+            toolbar.getContext().getResources().getColor(android.R.color.black, null));
+      }
+    }
 
     // Set up track list
     songRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
