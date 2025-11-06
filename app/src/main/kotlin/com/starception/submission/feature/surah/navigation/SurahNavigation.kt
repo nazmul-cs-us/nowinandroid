@@ -4,7 +4,10 @@ import android.os.Bundle
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -38,24 +41,13 @@ fun MusicPlayerFragmentScreen(
 
     val fragmentTag = remember(albumId) { "MusicPlayerFragment_$albumId" }
     val containerViewId = remember { android.view.View.generateViewId() }
-
-    DisposableEffect(albumId) {
-        val fragment = fragmentManager.findFragmentByTag(fragmentTag)
-            ?: MusicPlayerAlbumDemoFragment.newInstance(albumId).also {
-                fragmentManager.beginTransaction()
-                    .replace(containerViewId, it, fragmentTag)
-                    .commitNowAllowingStateLoss()
-            }
-
-        onDispose {
-            // Fragment will be removed when the view is disposed
-        }
-    }
+    var containerView by remember { mutableStateOf<android.view.View?>(null) }
 
     AndroidView(
         factory = { ctx ->
             FragmentContainerView(ctx).apply {
                 id = containerViewId
+                containerView = this
                 // Enable window insets propagation to the Fragment
                 ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
                     // Pass insets to child views (the Fragment's root view)
@@ -65,6 +57,63 @@ fun MusicPlayerFragmentScreen(
         },
         modifier = modifier.fillMaxSize()
     )
+
+    // Handle Fragment creation and cleanup
+    DisposableEffect(albumId, containerViewId) {
+        // Always remove existing Fragment first to ensure clean state
+        val existingFragment = fragmentManager.findFragmentByTag(fragmentTag)
+        if (existingFragment != null) {
+            fragmentManager.beginTransaction()
+                .remove(existingFragment)
+                .commitNowAllowingStateLoss()
+            // Wait for removal to complete
+            fragmentManager.executePendingTransactions()
+        }
+        
+        // Create and add new Fragment
+        // Use post to ensure container view is fully initialized
+        containerView?.post {
+            val fragment = MusicPlayerAlbumDemoFragment.newInstance(albumId)
+            try {
+                fragmentManager.beginTransaction()
+                    .replace(containerViewId, fragment, fragmentTag)
+                    .setReorderingAllowed(true)
+                    .commitNowAllowingStateLoss()
+            } catch (e: Exception) {
+                // If commitNow fails, try async commit
+                fragmentManager.beginTransaction()
+                    .replace(containerViewId, fragment, fragmentTag)
+                    .setReorderingAllowed(true)
+                    .commitAllowingStateLoss()
+            }
+        } ?: run {
+            // If container not ready yet, use Handler
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                val fragment = MusicPlayerAlbumDemoFragment.newInstance(albumId)
+                try {
+                    fragmentManager.beginTransaction()
+                        .replace(containerViewId, fragment, fragmentTag)
+                        .setReorderingAllowed(true)
+                        .commitNowAllowingStateLoss()
+                } catch (e: Exception) {
+                    fragmentManager.beginTransaction()
+                        .replace(containerViewId, fragment, fragmentTag)
+                        .setReorderingAllowed(true)
+                        .commitAllowingStateLoss()
+                }
+            }, 50)
+        }
+        
+        onDispose {
+            // Clean up Fragment when composable is disposed
+            val fragment = fragmentManager.findFragmentByTag(fragmentTag)
+            if (fragment != null && fragment.isAdded) {
+                fragmentManager.beginTransaction()
+                    .remove(fragment)
+                    .commitNowAllowingStateLoss()
+            }
+        }
+    }
 }
 
 fun NavGraphBuilder.surahScreen(
