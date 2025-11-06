@@ -16,11 +16,13 @@
 
 package io.material.catalog.musicplayer;
 
-import io.material.catalog.R;
+import com.starception.submission.R;
 
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.view.ContextThemeWrapper;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -33,17 +35,22 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.graphics.Insets;
 import androidx.transition.TransitionManager;
+import androidx.activity.OnBackPressedCallback;
+import androidx.activity.OnBackPressedDispatcher;
 import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.transition.MaterialArcMotion;
 import com.google.android.material.transition.MaterialContainerTransform;
-import dagger.android.support.DaggerFragment;
+import androidx.fragment.app.Fragment;
+import android.util.TypedValue;
 import io.material.catalog.musicplayer.MusicData.Album;
 import io.material.catalog.musicplayer.MusicData.Track;
 
 /** A Fragment that displays an album's details. */
-public class MusicPlayerAlbumDemoFragment extends DaggerFragment {
+public class MusicPlayerAlbumDemoFragment extends Fragment {
 
   public static final String TAG = "MusicPlayerAlbumDemoFragment";
   private static final String ALBUM_ID_KEY = "album_id_key";
@@ -62,7 +69,14 @@ public class MusicPlayerAlbumDemoFragment extends DaggerFragment {
       @NonNull LayoutInflater layoutInflater,
       @Nullable ViewGroup viewGroup,
       @Nullable Bundle bundle) {
-    return layoutInflater.inflate(R.layout.cat_music_player_album_fragment, viewGroup, false);
+    // Wrap the context with Material Components theme for Material Design Components
+    Context context = requireContext();
+    // Use Material Components theme directly from the library
+    // Theme.MaterialComponents.Light.NoActionBar provides all necessary Material Design attributes
+    int materialTheme = com.google.android.material.R.style.Theme_MaterialComponents_Light_NoActionBar;
+    ContextThemeWrapper themedContext = new ContextThemeWrapper(context, materialTheme);
+    LayoutInflater themedInflater = layoutInflater.cloneInContext(themedContext);
+    return themedInflater.inflate(R.layout.cat_music_player_album_fragment, viewGroup, false);
   }
 
   @Override
@@ -78,6 +92,69 @@ public class MusicPlayerAlbumDemoFragment extends DaggerFragment {
     AppBarLayout appBarLayout = view.findViewById(R.id.app_bar_layout);
     FloatingActionButton fab = view.findViewById(R.id.fab);
     View musicPlayerContainer = view.findViewById(R.id.music_player_container);
+    
+    // Get status bar height directly as fallback
+    int statusBarHeight = getStatusBarHeight();
+    
+    // Find the spacer view and set its height
+    View toolbarSpacer = view.findViewById(R.id.toolbar_spacer);
+    
+    // Apply window insets handling
+    ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets) -> {
+      Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+      Insets displayCutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout());
+      int safeTop = Math.max(systemBars.top, displayCutout.top);
+      int safeRight = Math.max(systemBars.right, displayCutout.right);
+      int safeLeft = Math.max(systemBars.left, displayCutout.left);
+      
+      // Use the actual insets if available, otherwise use the status bar height
+      int topInset = safeTop > 0 ? safeTop : statusBarHeight;
+      
+      // Set spacer height to push toolbar below status bar
+      if (toolbarSpacer != null) {
+        ViewGroup.LayoutParams params = toolbarSpacer.getLayoutParams();
+        if (params != null) {
+          params.height = topInset;
+          toolbarSpacer.setLayoutParams(params);
+        }
+      }
+      
+      // Add top padding to AppBarLayout
+      appBarLayout.setPadding(
+          appBarLayout.getPaddingLeft(),
+          topInset,
+          appBarLayout.getPaddingRight(),
+          appBarLayout.getPaddingBottom()
+      );
+      
+      // Set toolbar content insets
+      toolbar.setContentInsetsRelative(safeLeft, safeRight);
+      
+      return insets;
+    });
+    
+    // Also apply insets immediately in case they're already available
+    view.post(() -> {
+      WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(view);
+      if (insets != null) {
+        ViewCompat.dispatchApplyWindowInsets(view, insets);
+      } else {
+        // Fallback: apply status bar height directly
+        if (toolbarSpacer != null) {
+          ViewGroup.LayoutParams params = toolbarSpacer.getLayoutParams();
+          if (params != null && params.height == 0) {
+            params.height = statusBarHeight;
+            toolbarSpacer.setLayoutParams(params);
+          }
+        }
+        appBarLayout.setPadding(
+            appBarLayout.getPaddingLeft(),
+            statusBarHeight,
+            appBarLayout.getPaddingRight(),
+            appBarLayout.getPaddingBottom()
+        );
+      }
+    });
 
     appBarLayout.addOnOffsetChangedListener(
         (appBarLayout1, verticalOffset) -> {
@@ -131,7 +208,31 @@ public class MusicPlayerAlbumDemoFragment extends DaggerFragment {
 
     // Set up toolbar
     ViewCompat.setElevation(toolbar, 0F);
-    toolbar.setNavigationOnClickListener(v -> getActivity().onBackPressed());
+    
+    // Ensure toolbar is clickable and can receive touch events
+    toolbar.setClickable(true);
+    toolbar.setFocusable(true);
+    
+    // Set up navigation click listener with proper touch handling
+    toolbar.setNavigationOnClickListener(v -> {
+      if (getActivity() != null) {
+        OnBackPressedDispatcher dispatcher = requireActivity().getOnBackPressedDispatcher();
+        dispatcher.onBackPressed();
+      }
+    });
+    
+    // Also set a click listener on the navigation icon view directly if possible
+    // This ensures the back button is always touchable
+    toolbar.post(() -> {
+      // Find the navigation icon view and ensure it's clickable
+      for (int i = 0; i < toolbar.getChildCount(); i++) {
+        android.view.View child = toolbar.getChildAt(i);
+        if (child != null) {
+          child.setClickable(true);
+          child.setFocusable(true);
+        }
+      }
+    });
 
     // Set up album info area
     albumImage.setImageResource(album.cover);
@@ -155,6 +256,20 @@ public class MusicPlayerAlbumDemoFragment extends DaggerFragment {
     musicPlayerTransform.setEndView(endView);
     musicPlayerTransform.addTarget(endView);
     return musicPlayerTransform;
+  }
+  
+  private int getStatusBarHeight() {
+    int result = 0;
+    int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+    if (resourceId > 0) {
+      result = getResources().getDimensionPixelSize(resourceId);
+    }
+    // Fallback: use a default value if status bar height can't be determined
+    if (result == 0) {
+      result = (int) TypedValue.applyDimension(
+          TypedValue.COMPLEX_UNIT_DIP, 24, getResources().getDisplayMetrics());
+    }
+    return result;
   }
 
   /** An adapter to hold an albums list of tracks. */

@@ -16,7 +16,7 @@
 
 package io.material.catalog.musicplayer;
 
-import io.material.catalog.R;
+import com.starception.submission.R;
 
 import androidx.recyclerview.widget.DiffUtil.ItemCallback;
 import androidx.annotation.DrawableRes;

@@ -16,6 +16,12 @@
   -->
 
 <resources>
+  <string name="app_name">Now in Android</string>
+  <string name="prayer_times_title">Prayer Times</string>
+  <string name="not_connected">Not connected</string>
+  <string name="live_notification_title">Prayer Time</string>
+  <string name="live_notification_content">%1$s prayer time</string>
+  
   <string name="cat_music_player_album_cover_content_description" description="Content description of album cover [CHAR_LIMIT=NONE]">Album cover</string>
 
   <string name="cat_music_player_progress_indicator_content_description" description="Content description of the progress indicator [CHAR_LIMIT=NONE]">Music progress indicator</string>
