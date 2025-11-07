@@ -111,7 +111,7 @@ private fun SalahTopBar(
         // Title with Islamic greeting
         Column {
             Text(
-                text = "Prayer Times",
+                text = "Home",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface

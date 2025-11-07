@@ -104,5 +104,5 @@ fun MacrobenchmarkScope.setAppTheme(isDark: Boolean) {
     device.findObject(By.text("OK")).click()
 
     // Wait until the top app bar is visible on screen
-    waitForObjectOnTopAppBar(By.text("Now in Android"))
+    waitForObjectOnTopAppBar(By.text("For you"))
 }
