@@ -32,14 +32,14 @@ fun NavController.navigateToSurah(surahNumber: Int, navOptions: NavOptions? = nu
 
 @Composable
 fun MusicPlayerFragmentScreen(
-    albumId: Long = 0L,
+    surahNumber: Int,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val fragmentManager = (context as? FragmentActivity)?.supportFragmentManager
         ?: return
 
-    val fragmentTag = remember(albumId) { "MusicPlayerFragment_$albumId" }
+    val fragmentTag = remember(surahNumber) { "MusicPlayerFragment_$surahNumber" }
     val containerViewId = remember { android.view.View.generateViewId() }
     var containerView by remember { mutableStateOf<android.view.View?>(null) }
 
@@ -59,7 +59,7 @@ fun MusicPlayerFragmentScreen(
     )
 
     // Handle Fragment creation and cleanup
-    DisposableEffect(albumId, containerViewId) {
+    DisposableEffect(surahNumber, containerViewId) {
         // Always remove existing Fragment first to ensure clean state
         val existingFragment = fragmentManager.findFragmentByTag(fragmentTag)
         if (existingFragment != null) {
@@ -73,7 +73,7 @@ fun MusicPlayerFragmentScreen(
         // Create and add new Fragment
         // Use post to ensure container view is fully initialized
         containerView?.post {
-            val fragment = MusicPlayerAlbumDemoFragment.newInstance(albumId)
+            val fragment = MusicPlayerAlbumDemoFragment.newInstance(surahNumber)
             try {
                 fragmentManager.beginTransaction()
                     .replace(containerViewId, fragment, fragmentTag)
@@ -89,7 +89,7 @@ fun MusicPlayerFragmentScreen(
         } ?: run {
             // If container not ready yet, use Handler
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                val fragment = MusicPlayerAlbumDemoFragment.newInstance(albumId)
+                val fragment = MusicPlayerAlbumDemoFragment.newInstance(surahNumber)
                 try {
                     fragmentManager.beginTransaction()
                         .replace(containerViewId, fragment, fragmentTag)
@@ -121,8 +121,7 @@ fun NavGraphBuilder.surahScreen(
 ) {
     composable<SurahRoute> { backStackEntry ->
         val surahRoute = backStackEntry.toRoute<SurahRoute>()
-        // Use albumId 0 for testing (Metamorphosis album)
-        MusicPlayerFragmentScreen(albumId = 0L)
+        MusicPlayerFragmentScreen(surahNumber = surahRoute.surahNumber)
     }
 }
 

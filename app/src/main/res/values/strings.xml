@@ -40,4 +40,5 @@
   <string name="cat_music_player_lib_menu_list_type_title" description="Name of the list type toggle button [CHAR_LIMIT=NONE]">Toggle list type</string>
 
   <string name="cat_music_player_album_duration" description="Duration of the album [CHAR_LIMIT=NONE]">52 mins</string>
+  <string name="quran_audio_permission_required">Audio permission is required to play Quran surah audio from your device storage.</string>
 </resources>
