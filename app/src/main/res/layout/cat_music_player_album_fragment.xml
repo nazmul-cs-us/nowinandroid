@@ -127,11 +127,16 @@
             android:layout_gravity="center"
             android:contentDescription="@string/cat_music_player_progress_indicator_content_description"
             android:indeterminate="false"
-            android:progress="10"
-            app:indicatorSize="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:minHeight="8dp"
+            android:progress="0"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="parent"
+            app:trackHeight="3dp"
+            app:trackCornerRadius="8dp"
+            app:trackThickness="8dp" />
 
           <com.google.android.material.button.MaterialButton
             android:id="@+id/rewind_button"
