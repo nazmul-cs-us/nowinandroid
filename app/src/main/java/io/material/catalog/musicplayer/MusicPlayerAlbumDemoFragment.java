@@ -18,9 +18,11 @@ package io.material.catalog.musicplayer;
 
 import com.starception.submission.R;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.view.ContextThemeWrapper;
 import androidx.recyclerview.widget.ListAdapter;
@@ -55,6 +57,7 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
 
   public static final String TAG = "MusicPlayerAlbumDemoFragment";
   private static final String ALBUM_ID_KEY = "album_id_key";
+  private ValueAnimator toolbarBackgroundAnimator;
 
   public static MusicPlayerAlbumDemoFragment newInstance(long albumId) {
     MusicPlayerAlbumDemoFragment fragment = new MusicPlayerAlbumDemoFragment();
@@ -106,6 +109,9 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     } else {
       collapsingToolbarLayout = null;
     }
+    
+    // Track toolbar background animation state
+    final boolean[] isToolbarBackgroundVisible = {false};
     
     // Get status bar height directly as fallback
     int statusBarHeight = getStatusBarHeight();
@@ -170,21 +176,55 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
       }
     });
 
+    // Initialize toolbar background to transparent
+    toolbar.setBackgroundColor(Color.TRANSPARENT);
+    
     appBarLayout.addOnOffsetChangedListener(
         (appBarLayout1, verticalOffset) -> {
           float verticalOffsetPercentage =
               (float) Math.abs(verticalOffset) / (float) appBarLayout1.getTotalScrollRange();
           
-          // Update toolbar background based on scroll position
-          if (collapsingToolbarLayout != null) {
-            if (verticalOffsetPercentage > 0.1F) {
-              // Scrolled - show toolbar background
-              toolbar.setBackgroundColor(toolbar.getContext().getResources().getColor(
-                  android.R.color.white, null));
-            } else {
-              // Not scrolled - transparent background
-              toolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+          // Update toolbar background based on scroll position with fade animation
+          // Show toolbar background when scrolled ~90% or more
+          boolean shouldShowBackground = verticalOffsetPercentage > 0.9F;
+          
+          if (shouldShowBackground != isToolbarBackgroundVisible[0]) {
+            isToolbarBackgroundVisible[0] = shouldShowBackground;
+            
+            // Animate toolbar background fade in/out
+            int targetAlpha = shouldShowBackground ? 255 : 0;
+            int currentAlpha = 0;
+            
+            // Get current background alpha
+            if (toolbar.getBackground() instanceof ColorDrawable) {
+              currentAlpha = ((ColorDrawable) toolbar.getBackground()).getAlpha();
+            } else if (toolbar.getBackground() != null) {
+              currentAlpha = toolbar.getBackground().getAlpha();
             }
+            
+            // Cancel any existing animation
+            if (toolbarBackgroundAnimator != null && toolbarBackgroundAnimator.isRunning()) {
+              toolbarBackgroundAnimator.cancel();
+            }
+            
+            // Create fade animation
+            toolbarBackgroundAnimator = ValueAnimator.ofInt(currentAlpha, targetAlpha);
+            toolbarBackgroundAnimator.setDuration(200); // 200ms fade duration
+            toolbarBackgroundAnimator.addUpdateListener(animator -> {
+              int alpha = (Integer) animator.getAnimatedValue();
+              // Light grey color (RGB: 245, 245, 245)
+              int lightGreyColor = Color.rgb(245, 245, 245);
+              if (alpha == 0) {
+                // Fully transparent
+                toolbar.setBackgroundColor(Color.TRANSPARENT);
+              } else {
+                // Apply alpha to light grey
+                int colorWithAlpha = Color.argb(alpha, Color.red(lightGreyColor), 
+                    Color.green(lightGreyColor), Color.blue(lightGreyColor));
+                toolbar.setBackgroundColor(colorWithAlpha);
+              }
+            });
+            toolbarBackgroundAnimator.start();
           }
           
           if (verticalOffsetPercentage > 0.2F && fab.isOrWillBeShown()) {

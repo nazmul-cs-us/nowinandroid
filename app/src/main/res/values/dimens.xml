@@ -15,6 +15,7 @@
   ~ limitations under the License.
 -->
 <resources>
+  <dimen name="cat_music_player_toolbar_height">64dp</dimen>
   <dimen name="cat_music_player_album_list_padding_vertical">8dp</dimen>
   <dimen name="cat_music_player_button_size">56dp</dimen>
   <dimen name="cat_music_player_control_button_margin">36dp</dimen>
