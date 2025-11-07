@@ -135,11 +135,13 @@ class QuranPlaybackService : Service() {
                     onPlaybackStateChanged?.invoke(true)
                     updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
                     startProgressUpdates()
+                    onProgressChanged?.invoke(mp.currentPosition, mp.duration)
                 } else {
                     // Stay paused
                     onPlaybackStateChanged?.invoke(false)
                     updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
                 }
+                onProgressChanged?.invoke(0, mp.duration)
                 updateMediaSessionMetadata() // Update with actual duration
                 updateNotification()
             }
@@ -186,6 +188,7 @@ class QuranPlaybackService : Service() {
                 updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
                 updateNotification()
                 stopProgressUpdates()
+                onProgressChanged?.invoke(player.currentPosition, player.duration)
             } else {
                 player.start()
                 onPlaybackStateChanged?.invoke(true)
@@ -196,6 +199,7 @@ class QuranPlaybackService : Service() {
                     updateNotification()
                 }
                 startProgressUpdates()
+                onProgressChanged?.invoke(player.currentPosition, player.duration)
             }
         }
     }
@@ -297,7 +301,17 @@ class QuranPlaybackService : Service() {
             override fun run() {
                 if (mediaPlayer?.isPlaying == true) {
                     updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+                    onProgressChanged?.invoke(
+                        mediaPlayer?.currentPosition ?: 0,
+                        mediaPlayer?.duration ?: 0
+                    )
                     handler.postDelayed(this, 1000) // Update every second
+                } else {
+                    // Still update once while paused to keep UI in sync
+                    onProgressChanged?.invoke(
+                        mediaPlayer?.currentPosition ?: 0,
+                        mediaPlayer?.duration ?: 0
+                    )
                 }
             }
         }
