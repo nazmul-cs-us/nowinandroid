@@ -36,8 +36,10 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.appcompat.widget.Toolbar;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -116,6 +118,8 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
   private int surahNumber = 1;
   private ActivityResultLauncher<String> permissionLauncher;
   private Runnable pendingPermissionAction;
+  private boolean isUserSeeking = false;
+  private int currentDurationMs = 0;
 
   private static final int[] COVER_RESOURCES = {
       R.drawable.album_efe_kurnaz_unsplash,
@@ -397,6 +401,79 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
   }
 
   private void initializePlayerControls() {
+    if (musicProgressIndicator != null) {
+      musicProgressIndicator.setProgressCompat(0, false);
+      musicProgressIndicator.setClickable(true);
+      musicProgressIndicator.setFocusable(true);
+      musicProgressIndicator.setOnTouchListener((view, motionEvent) -> {
+        if (!isAdded()) {
+          return false;
+        }
+
+        switch (motionEvent.getActionMasked()) {
+          case MotionEvent.ACTION_DOWN:
+            if (!hasAudioPermission()) {
+              final int requestedSeekPositionDown = calculateSeekPosition(view, motionEvent.getX());
+              requestAudioPermission(() -> {
+                if (playbackService != null && currentDurationMs > 0) {
+                  playbackService.seekTo(requestedSeekPositionDown);
+                  updateProgress(requestedSeekPositionDown, currentDurationMs);
+                }
+              });
+              return false;
+            }
+            isUserSeeking = true;
+            updateIndicatorForSeek(calculateSeekPosition(view, motionEvent.getX()));
+            ViewParent parent = view.getParent();
+            if (parent != null) {
+              parent.requestDisallowInterceptTouchEvent(true);
+            }
+            return true;
+
+          case MotionEvent.ACTION_MOVE:
+            if (!isUserSeeking) {
+              return false;
+            }
+            updateIndicatorForSeek(calculateSeekPosition(view, motionEvent.getX()));
+            return true;
+
+          case MotionEvent.ACTION_UP:
+          case MotionEvent.ACTION_CANCEL:
+            if (!isUserSeeking) {
+              return false;
+            }
+            int targetPosition = calculateSeekPosition(view, motionEvent.getX());
+            isUserSeeking = false;
+
+            if (!hasAudioPermission()) {
+              requestAudioPermission(() -> {
+                if (playbackService != null && currentDurationMs > 0) {
+                  playbackService.seekTo(targetPosition);
+                  updateProgress(targetPosition, currentDurationMs);
+                }
+              });
+              if (playbackService != null) {
+                updateProgress(playbackService.getCurrentPosition(), playbackService.getDuration());
+              } else {
+                updateProgress(0, currentDurationMs);
+              }
+              return true;
+            }
+
+            if (playbackService != null && currentDurationMs > 0) {
+              playbackService.seekTo(targetPosition);
+              updateProgress(targetPosition, currentDurationMs);
+            } else {
+              updateProgress(0, currentDurationMs);
+            }
+            return true;
+
+          default:
+            return false;
+        }
+      });
+    }
+
     if (playButton != null) {
       playButton.setOnClickListener(v -> togglePlayPause());
     }
@@ -519,16 +596,52 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
   }
 
   private void updateProgress(int positionMs, int durationMs) {
+    currentDurationMs = durationMs;
     if (musicProgressIndicator == null) {
       return;
     }
+
     if (durationMs <= 0) {
-      musicProgressIndicator.setProgressCompat(0, false);
+      if (!isUserSeeking) {
+        musicProgressIndicator.setProgressCompat(0, false);
+      }
+      musicProgressIndicator.setEnabled(false);
       return;
     }
-    int percent = (int) ((positionMs / (float) durationMs) * 100);
+
+    musicProgressIndicator.setEnabled(true);
+
+    if (isUserSeeking) {
+      return;
+    }
+
+    int percent = (int) ((positionMs / (float) durationMs) * 100f);
     percent = Math.max(0, Math.min(100, percent));
     musicProgressIndicator.setProgressCompat(percent, true);
+  }
+
+  private void updateIndicatorForSeek(int positionMs) {
+    if (musicProgressIndicator == null || currentDurationMs <= 0) {
+      return;
+    }
+    int percent = (int) ((positionMs / (float) currentDurationMs) * 100f);
+    percent = Math.max(0, Math.min(100, percent));
+    musicProgressIndicator.setProgressCompat(percent, false);
+  }
+
+  private int calculateSeekPosition(@NonNull View view, float touchX) {
+    if (currentDurationMs <= 0) {
+      return 0;
+    }
+    int availableWidth = view.getWidth() - view.getPaddingLeft() - view.getPaddingRight();
+    if (availableWidth <= 0) {
+      return 0;
+    }
+    float relativeX = touchX - view.getPaddingLeft();
+    float clampedX = Math.max(0f, Math.min(relativeX, availableWidth));
+    float fraction = clampedX / availableWidth;
+    fraction = Math.max(0f, Math.min(fraction, 1f));
+    return (int) (currentDurationMs * fraction);
   }
 
   private void adjustVolume(float delta) {
