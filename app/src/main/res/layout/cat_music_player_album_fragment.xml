@@ -134,6 +134,7 @@
             app:layout_constraintTop_toTopOf="parent" />
 
           <com.google.android.material.button.MaterialButton
+            android:id="@+id/rewind_button"
             android:layout_width="@dimen/cat_music_player_button_size"
             android:layout_height="@dimen/cat_music_player_button_size"
             android:layout_marginStart="@dimen/cat_music_player_control_button_margin"
@@ -156,6 +157,7 @@
             app:layout_constraintTop_toBottomOf="@id/music_progress_indicator" />
 
           <com.google.android.material.button.MaterialButton
+            android:id="@+id/fast_forward_button"
             android:layout_width="@dimen/cat_music_player_button_size"
             android:layout_height="@dimen/cat_music_player_button_size"
             android:layout_marginEnd="@dimen/cat_music_player_control_button_margin"

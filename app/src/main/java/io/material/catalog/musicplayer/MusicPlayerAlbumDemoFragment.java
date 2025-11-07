@@ -19,11 +19,17 @@ package io.material.catalog.musicplayer;
 import com.starception.submission.R;
 
 import android.animation.ValueAnimator;
+import android.content.ComponentName;
 import android.content.Context;
-import android.content.ContextWrapper;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
 import android.view.ContextThemeWrapper;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -34,35 +40,100 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.graphics.Insets;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.transition.TransitionManager;
-import androidx.activity.OnBackPressedCallback;
 import androidx.activity.OnBackPressedDispatcher;
+import android.content.ServiceConnection;
 import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.appbar.CollapsingToolbarLayout;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.android.material.slider.Slider;
 import com.google.android.material.transition.MaterialArcMotion;
 import com.google.android.material.transition.MaterialContainerTransform;
 import androidx.fragment.app.Fragment;
+import android.Manifest;
 import android.util.TypedValue;
-import io.material.catalog.musicplayer.MusicData.Album;
+import dagger.hilt.android.AndroidEntryPoint;
 import io.material.catalog.musicplayer.MusicData.Track;
+import com.starception.submission.core.qurandatabase.Ayah;
+import com.starception.submission.core.qurandatabase.Surah;
+import com.starception.submission.feature.quran.AudioLanguage;
+import com.starception.submission.feature.quran.QuranPlaybackService;
+import com.starception.submission.feature.surah.SurahDetailUiState;
+import com.starception.submission.feature.surah.SurahDetailViewModel;
+import com.starception.submission.feature.surah.SurahDetailViewModelExtensionsKt;
+import java.util.ArrayList;
+import java.util.List;
+import kotlin.Unit;
+import kotlin.jvm.functions.Function1;
+import kotlin.jvm.functions.Function2;
 
 /** A Fragment that displays an album's details. */
+@AndroidEntryPoint
 public class MusicPlayerAlbumDemoFragment extends Fragment {
 
   public static final String TAG = "MusicPlayerAlbumDemoFragment";
-  private static final String ALBUM_ID_KEY = "album_id_key";
+  private static final String SURAH_NUMBER_KEY = "surah_number_key";
   private ValueAnimator toolbarBackgroundAnimator;
+  private SurahDetailViewModel surahDetailViewModel;
+  private QuranPlaybackService playbackService;
+  private boolean isServiceBound = false;
+  private int currentSurahIndex = -1;
+  private Surah currentSurah;
+  private List<Ayah> currentAyahs = new ArrayList<>();
+  private List<Track> currentTracks = new ArrayList<>();
+  private TrackAdapter trackAdapter;
+  private FloatingActionButton fab;
+  private View musicPlayerContainer;
+  private LinearProgressIndicator musicProgressIndicator;
+  private MaterialButton playButton;
+  private MaterialButton rewindButton;
+  private MaterialButton fastForwardButton;
+  private MaterialButton volumeDownButton;
+  private MaterialButton volumeUpButton;
+  private Slider volumeSlider;
+  private Toolbar toolbar;
+  private AppBarLayout appBarLayout;
+  private ImageView albumImage;
+  private TextView albumTitle;
+  private TextView albumArtist;
+  private RecyclerView songRecyclerView;
+  private CollapsingToolbarLayout collapsingToolbarLayout;
+  private final Handler mainHandler = new Handler(Looper.getMainLooper());
+  private int surahNumber = 1;
+  private ActivityResultLauncher<String> permissionLauncher;
+  private Runnable pendingPermissionAction;
 
-  public static MusicPlayerAlbumDemoFragment newInstance(long albumId) {
+  private static final int[] COVER_RESOURCES = {
+      R.drawable.album_efe_kurnaz_unsplash,
+      R.drawable.album_pawel_czerwinski_unsplash,
+      R.drawable.album_jean_philippe_delberghe_unsplash,
+      R.drawable.album_karina_vorozheeva_unsplash,
+      R.drawable.album_amy_shamblen_unsplash,
+      R.drawable.album_pawel_czerwinski_unsplash_2,
+      R.drawable.album_kristopher_roller_unsplash,
+      R.drawable.album_emile_seguin_unsplash,
+      R.drawable.album_ellen_qin_unsplash,
+      R.drawable.album_david_clode_unsplash
+  };
+
+  public static MusicPlayerAlbumDemoFragment newInstance(int surahNumber) {
     MusicPlayerAlbumDemoFragment fragment = new MusicPlayerAlbumDemoFragment();
     Bundle bundle = new Bundle();
-    bundle.putLong(ALBUM_ID_KEY, albumId);
+    bundle.putInt(SURAH_NUMBER_KEY, surahNumber);
     fragment.setArguments(bundle);
     return fragment;
   }
@@ -84,53 +155,122 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
   }
 
   @Override
+  public void onCreate(@Nullable Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    Bundle args = getArguments();
+    if (args != null) {
+      surahNumber = args.getInt(SURAH_NUMBER_KEY, 1);
+    }
+
+    permissionLauncher =
+        registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+          if (granted) {
+            if (pendingPermissionAction != null) {
+              pendingPermissionAction.run();
+              pendingPermissionAction = null;
+            }
+          } else if (isAdded()) {
+            Toast.makeText(
+                    requireContext(),
+                    getString(R.string.quran_audio_permission_required),
+                    Toast.LENGTH_LONG)
+                .show();
+            pendingPermissionAction = null;
+          }
+        });
+  }
+
+  @Override
   public void onViewCreated(@NonNull View view, @Nullable Bundle bundle) {
     ViewGroup container = view.findViewById(R.id.container);
-    Toolbar toolbar = view.findViewById(R.id.toolbar);
-    ImageView albumImage = view.findViewById(R.id.album_image);
-    TextView albumTitle = view.findViewById(R.id.album_title);
-    TextView albumArtist = view.findViewById(R.id.album_artist);
-    RecyclerView songRecyclerView = view.findViewById(R.id.song_recycler_view);
-    setUpAlbumViews(container, toolbar, albumImage, albumTitle, albumArtist, songRecyclerView);
+    toolbar = view.findViewById(R.id.toolbar);
+    albumImage = view.findViewById(R.id.album_image);
+    albumTitle = view.findViewById(R.id.album_title);
+    albumArtist = view.findViewById(R.id.album_artist);
+    songRecyclerView = view.findViewById(R.id.song_recycler_view);
+    appBarLayout = view.findViewById(R.id.app_bar_layout);
+    fab = view.findViewById(R.id.fab);
+    musicPlayerContainer = view.findViewById(R.id.music_player_container);
+    musicProgressIndicator = view.findViewById(R.id.music_progress_indicator);
+    playButton = view.findViewById(R.id.music_play_button);
+    rewindButton = view.findViewById(R.id.rewind_button);
+    fastForwardButton = view.findViewById(R.id.fast_forward_button);
+    volumeDownButton = view.findViewById(R.id.volume_down_button);
+    volumeUpButton = view.findViewById(R.id.volume_up_button);
+    volumeSlider = view.findViewById(R.id.volume_slider);
 
-    AppBarLayout appBarLayout = view.findViewById(R.id.app_bar_layout);
-    FloatingActionButton fab = view.findViewById(R.id.fab);
-    View musicPlayerContainer = view.findViewById(R.id.music_player_container);
-    
-    // Get CollapsingToolbarLayout (make it final for lambda)
-    final CollapsingToolbarLayout collapsingToolbarLayout;
-    if (appBarLayout != null && appBarLayout.getChildCount() > 0) {
-      View firstChild = appBarLayout.getChildAt(0);
-      if (firstChild instanceof CollapsingToolbarLayout) {
-        collapsingToolbarLayout = (CollapsingToolbarLayout) firstChild;
-      } else {
-        collapsingToolbarLayout = null;
-      }
+    trackAdapter = new TrackAdapter();
+    songRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+    songRecyclerView.setAdapter(trackAdapter);
+
+    configureCollapsingToolbar();
+    setUpToolbarNavigation();
+    configureWindowInsets(view);
+    configureToolbarBackgroundAnimation();
+    setUpMusicPlayerTransitions(container);
+    initializePlayerControls();
+    initViewModelObservers();
+
+    surahDetailViewModel.loadSurah(surahNumber);
+  }
+
+  private void configureCollapsingToolbar() {
+    if (appBarLayout == null) {
+      collapsingToolbarLayout = null;
+      return;
+    }
+    View firstChild = appBarLayout.getChildCount() > 0 ? appBarLayout.getChildAt(0) : null;
+    if (firstChild instanceof CollapsingToolbarLayout) {
+      collapsingToolbarLayout = (CollapsingToolbarLayout) firstChild;
     } else {
       collapsingToolbarLayout = null;
     }
-    
-    // Track toolbar background animation state
-    final boolean[] isToolbarBackgroundVisible = {false};
-    
-    // Get status bar height directly as fallback
-    int statusBarHeight = getStatusBarHeight();
-    
-    // Find the spacer view and set its height
-    View toolbarSpacer = view.findViewById(R.id.toolbar_spacer);
-    
-    // Apply window insets handling
-    ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets) -> {
+  }
+
+  private void setUpToolbarNavigation() {
+    if (toolbar == null) {
+      return;
+    }
+
+    ViewCompat.setElevation(toolbar, 0F);
+    toolbar.setClickable(true);
+    toolbar.setFocusable(true);
+    toolbar.setNavigationOnClickListener(v -> {
+      if (isAdded()) {
+        OnBackPressedDispatcher dispatcher = requireActivity().getOnBackPressedDispatcher();
+        dispatcher.onBackPressed();
+      }
+    });
+
+    toolbar.post(() -> {
+      int childCount = toolbar.getChildCount();
+      for (int i = 0; i < childCount; i++) {
+        View child = toolbar.getChildAt(i);
+        if (child != null) {
+          child.setClickable(true);
+          child.setFocusable(true);
+        }
+      }
+    });
+  }
+
+  private void configureWindowInsets(@NonNull View rootView) {
+    if (toolbar == null || appBarLayout == null) {
+      return;
+    }
+
+    final View toolbarSpacer = rootView.findViewById(R.id.toolbar_spacer);
+    final int statusBarHeight = getStatusBarHeight();
+
+    ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
       Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
       Insets displayCutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout());
       int safeTop = Math.max(systemBars.top, displayCutout.top);
       int safeRight = Math.max(systemBars.right, displayCutout.right);
       int safeLeft = Math.max(systemBars.left, displayCutout.left);
-      
-      // Use the actual insets if available, otherwise use the status bar height
+
       int topInset = safeTop > 0 ? safeTop : statusBarHeight;
-      
-      // Set spacer height to push toolbar below status bar
+
       if (toolbarSpacer != null) {
         ViewGroup.LayoutParams params = toolbarSpacer.getLayoutParams();
         if (params != null) {
@@ -138,28 +278,23 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
           toolbarSpacer.setLayoutParams(params);
         }
       }
-      
-      // Add top padding to AppBarLayout
+
       appBarLayout.setPadding(
           appBarLayout.getPaddingLeft(),
           topInset,
           appBarLayout.getPaddingRight(),
           appBarLayout.getPaddingBottom()
       );
-      
-      // Set toolbar content insets
+
       toolbar.setContentInsetsRelative(safeLeft, safeRight);
-      
       return insets;
     });
-    
-    // Also apply insets immediately in case they're already available
-    view.post(() -> {
-      WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(view);
+
+    rootView.post(() -> {
+      WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(rootView);
       if (insets != null) {
-        ViewCompat.dispatchApplyWindowInsets(view, insets);
+        ViewCompat.dispatchApplyWindowInsets(rootView, insets);
       } else {
-        // Fallback: apply status bar height directly
         if (toolbarSpacer != null) {
           ViewGroup.LayoutParams params = toolbarSpacer.getLayoutParams();
           if (params != null && params.height == 0) {
@@ -175,71 +310,76 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
         );
       }
     });
+  }
 
-    // Initialize toolbar background to transparent
+  private void configureToolbarBackgroundAnimation() {
+    if (toolbar == null || appBarLayout == null) {
+      return;
+    }
+
     toolbar.setBackgroundColor(Color.TRANSPARENT);
-    
-    appBarLayout.addOnOffsetChangedListener(
-        (appBarLayout1, verticalOffset) -> {
-          float verticalOffsetPercentage =
-              (float) Math.abs(verticalOffset) / (float) appBarLayout1.getTotalScrollRange();
-          
-          // Update toolbar background based on scroll position with fade animation
-          // Show toolbar background when scrolled ~90% or more
-          boolean shouldShowBackground = verticalOffsetPercentage > 0.9F;
-          
-          if (shouldShowBackground != isToolbarBackgroundVisible[0]) {
-            isToolbarBackgroundVisible[0] = shouldShowBackground;
-            
-            // Animate toolbar background fade in/out
-            int targetAlpha = shouldShowBackground ? 255 : 0;
-            int currentAlpha = 0;
-            
-            // Get current background alpha
-            if (toolbar.getBackground() instanceof ColorDrawable) {
-              currentAlpha = ((ColorDrawable) toolbar.getBackground()).getAlpha();
-            } else if (toolbar.getBackground() != null) {
-              currentAlpha = toolbar.getBackground().getAlpha();
-            }
-            
-            // Cancel any existing animation
-            if (toolbarBackgroundAnimator != null && toolbarBackgroundAnimator.isRunning()) {
-              toolbarBackgroundAnimator.cancel();
-            }
-            
-            // Create fade animation
-            toolbarBackgroundAnimator = ValueAnimator.ofInt(currentAlpha, targetAlpha);
-            toolbarBackgroundAnimator.setDuration(200); // 200ms fade duration
-            toolbarBackgroundAnimator.addUpdateListener(animator -> {
-              int alpha = (Integer) animator.getAnimatedValue();
-              // Light grey color (RGB: 245, 245, 245)
-              int lightGreyColor = Color.rgb(245, 245, 245);
-              if (alpha == 0) {
-                // Fully transparent
-                toolbar.setBackgroundColor(Color.TRANSPARENT);
-              } else {
-                // Apply alpha to light grey
-                int colorWithAlpha = Color.argb(alpha, Color.red(lightGreyColor), 
-                    Color.green(lightGreyColor), Color.blue(lightGreyColor));
-                toolbar.setBackgroundColor(colorWithAlpha);
-              }
-            });
-            toolbarBackgroundAnimator.start();
-          }
-          
-          if (verticalOffsetPercentage > 0.2F && fab.isOrWillBeShown()) {
-            fab.hide();
-          } else if (verticalOffsetPercentage <= 0.2F
-              && fab.isOrWillBeHidden()
-              && musicPlayerContainer.getVisibility() != View.VISIBLE) {
-            fab.show();
+    final boolean[] isToolbarBackgroundVisible = {false};
+
+    appBarLayout.addOnOffsetChangedListener((appBarLayout1, verticalOffset) -> {
+      float verticalOffsetPercentage =
+          (float) Math.abs(verticalOffset) / (float) appBarLayout1.getTotalScrollRange();
+
+      boolean shouldShowBackground = verticalOffsetPercentage > 0.9F;
+
+      if (shouldShowBackground != isToolbarBackgroundVisible[0]) {
+        isToolbarBackgroundVisible[0] = shouldShowBackground;
+
+        int targetAlpha = shouldShowBackground ? 255 : 0;
+        int currentAlpha = 0;
+
+        if (toolbar.getBackground() instanceof ColorDrawable) {
+          currentAlpha = ((ColorDrawable) toolbar.getBackground()).getAlpha();
+        } else if (toolbar.getBackground() != null) {
+          currentAlpha = toolbar.getBackground().getAlpha();
+        }
+
+        if (toolbarBackgroundAnimator != null && toolbarBackgroundAnimator.isRunning()) {
+          toolbarBackgroundAnimator.cancel();
+        }
+
+        toolbarBackgroundAnimator = ValueAnimator.ofInt(currentAlpha, targetAlpha);
+        toolbarBackgroundAnimator.setDuration(200);
+        toolbarBackgroundAnimator.addUpdateListener(animator -> {
+          int alpha = (Integer) animator.getAnimatedValue();
+          int lightGreyColor = Color.rgb(245, 245, 245);
+          if (alpha == 0) {
+            toolbar.setBackgroundColor(Color.TRANSPARENT);
+          } else {
+            int colorWithAlpha = Color.argb(alpha, Color.red(lightGreyColor),
+                Color.green(lightGreyColor), Color.blue(lightGreyColor));
+            toolbar.setBackgroundColor(colorWithAlpha);
           }
         });
+        toolbarBackgroundAnimator.start();
+      }
 
-    // Set up music player transitions
+      if (fab != null && musicPlayerContainer != null) {
+        if (verticalOffsetPercentage > 0.2F && fab.isOrWillBeShown()) {
+          fab.hide();
+        } else if (verticalOffsetPercentage <= 0.2F
+            && fab.isOrWillBeHidden()
+            && musicPlayerContainer.getVisibility() != View.VISIBLE) {
+          fab.show();
+        }
+      }
+    });
+  }
+
+  private void setUpMusicPlayerTransitions(@Nullable ViewGroup container) {
+    if (fab == null || musicPlayerContainer == null || container == null) {
+      return;
+    }
+
     Context context = requireContext();
     MaterialContainerTransform musicPlayerEnterTransform =
         createMusicPlayerTransform(context, /* entering= */ true, fab, musicPlayerContainer);
+    MaterialContainerTransform musicPlayerExitTransform =
+        createMusicPlayerTransform(context, /* entering= */ false, musicPlayerContainer, fab);
 
     fab.setOnClickListener(
         v -> {
@@ -247,9 +387,6 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
           fab.setVisibility(View.GONE);
           musicPlayerContainer.setVisibility(View.VISIBLE);
         });
-
-    MaterialContainerTransform musicPlayerExitTransform =
-        createMusicPlayerTransform(context, /* entering= */ false, musicPlayerContainer, fab);
 
     musicPlayerContainer.setOnClickListener(
         v -> {
@@ -259,71 +396,344 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
         });
   }
 
-  protected void setUpAlbumViews(
-      @NonNull ViewGroup container,
-      @NonNull Toolbar toolbar,
-      @NonNull ImageView albumImage,
-      @NonNull TextView albumTitle,
-      @NonNull TextView albumArtist,
-      @NonNull RecyclerView songRecyclerView) {
-    long albumId = getArguments().getLong(ALBUM_ID_KEY, 0L);
-    Album album = MusicData.getAlbumById(albumId);
+  private void initializePlayerControls() {
+    if (playButton != null) {
+      playButton.setOnClickListener(v -> togglePlayPause());
+    }
 
-    // Set the transition name which matches the list/grid item to be transitioned from for
-    // the shared element transition.
-    ViewCompat.setTransitionName(container, album.title);
+    if (rewindButton != null) {
+      rewindButton.setOnClickListener(v -> playPreviousSurah());
+    }
 
-    // Set up toolbar
-    ViewCompat.setElevation(toolbar, 0F);
-    
-    // Ensure toolbar is clickable and can receive touch events
-    toolbar.setClickable(true);
-    toolbar.setFocusable(true);
-    
-    // Set up navigation click listener with proper touch handling
-    toolbar.setNavigationOnClickListener(v -> {
-      if (getActivity() != null) {
-        OnBackPressedDispatcher dispatcher = requireActivity().getOnBackPressedDispatcher();
-        dispatcher.onBackPressed();
-      }
-    });
-    
-    // Also set a click listener on the navigation icon view directly if possible
-    // This ensures the back button is always touchable
-    toolbar.post(() -> {
-      // Find the navigation icon view and ensure it's clickable
-      for (int i = 0; i < toolbar.getChildCount(); i++) {
-        android.view.View child = toolbar.getChildAt(i);
-        if (child != null) {
-          child.setClickable(true);
-          child.setFocusable(true);
+    if (fastForwardButton != null) {
+      fastForwardButton.setOnClickListener(v -> playNextSurah());
+    }
+
+    if (volumeSlider != null) {
+      volumeSlider.addOnChangeListener((slider, value, fromUser) -> {
+        if (fromUser && playbackService != null) {
+          playbackService.setVolume(value / 10f);
         }
-      }
-    });
+      });
+    }
 
-    // Set up album info area
-    albumImage.setImageResource(album.cover);
-    albumTitle.setText(album.title);
-    albumArtist.setText(album.artist);
-    
-    // Set collapsing toolbar title to show when collapsed
-    AppBarLayout appBarLayoutForTitle = container.findViewById(R.id.app_bar_layout);
-    if (appBarLayoutForTitle != null && appBarLayoutForTitle.getChildCount() > 0) {
-      View firstChild = appBarLayoutForTitle.getChildAt(0);
-      if (firstChild instanceof CollapsingToolbarLayout) {
-        CollapsingToolbarLayout collapsingToolbarLayout = (CollapsingToolbarLayout) firstChild;
-        collapsingToolbarLayout.setTitle(album.title);
-        collapsingToolbarLayout.setExpandedTitleColor(android.graphics.Color.TRANSPARENT);
-        collapsingToolbarLayout.setCollapsedTitleTextColor(
-            toolbar.getContext().getResources().getColor(android.R.color.black, null));
+    if (volumeDownButton != null) {
+      volumeDownButton.setOnClickListener(v -> adjustVolume(-0.5f));
+    }
+
+    if (volumeUpButton != null) {
+      volumeUpButton.setOnClickListener(v -> adjustVolume(0.5f));
+    }
+  }
+
+  private void initViewModelObservers() {
+    surahDetailViewModel = new ViewModelProvider(requireActivity()).get(SurahDetailViewModel.class);
+    LiveData<SurahDetailUiState> uiStateLiveData =
+        SurahDetailViewModelExtensionsKt.uiStateLiveData(surahDetailViewModel);
+    uiStateLiveData.observe(getViewLifecycleOwner(), this::handleUiState);
+  }
+
+  private void handleUiState(@NonNull SurahDetailUiState state) {
+    if (state instanceof SurahDetailUiState.Success) {
+      SurahDetailUiState.Success success = (SurahDetailUiState.Success) state;
+      bindSurahData(success.getSurah(), success.getAyahs());
+    } else if (state instanceof SurahDetailUiState.Error) {
+      SurahDetailUiState.Error error = (SurahDetailUiState.Error) state;
+      if (isAdded()) {
+        Toast.makeText(requireContext(), error.getMessage(), Toast.LENGTH_SHORT).show();
+      }
+    }
+  }
+
+  private void bindSurahData(@NonNull Surah surah, @NonNull List<Ayah> ayahs) {
+    currentSurah = surah;
+    currentAyahs = new ArrayList<>(ayahs);
+    currentSurahIndex = Math.max(0, surah.getNumber() - 1);
+
+    if (getView() != null) {
+      ViewGroup rootContainer = getView().findViewById(R.id.container);
+      if (rootContainer != null) {
+        ViewCompat.setTransitionName(rootContainer, surah.getNameEnglish());
       }
     }
 
-    // Set up track list
-    songRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
-    TrackAdapter adapter = new TrackAdapter();
-    songRecyclerView.setAdapter(adapter);
-    adapter.submitList(album.tracks);
+    if (albumImage != null) {
+      int coverIndex = currentSurahIndex % COVER_RESOURCES.length;
+      albumImage.setImageResource(COVER_RESOURCES[coverIndex]);
+    }
+
+    if (albumTitle != null) {
+      albumTitle.setText(surah.getNameEnglish());
+    }
+
+    if (albumArtist != null) {
+      albumArtist.setText(surah.getNameArabic());
+    }
+
+    if (collapsingToolbarLayout != null) {
+      collapsingToolbarLayout.setTitle(surah.getNameEnglish());
+      collapsingToolbarLayout.setExpandedTitleColor(Color.TRANSPARENT);
+      collapsingToolbarLayout.setCollapsedTitleTextColor(
+          toolbar.getContext().getResources().getColor(android.R.color.black, null));
+    }
+
+    updateTrackList(currentAyahs);
+  }
+
+  private void updateTrackList(@NonNull List<Ayah> ayahs) {
+    List<Track> tracks = new ArrayList<>();
+    for (Ayah ayah : ayahs) {
+      tracks.add(new Track(ayah.getNumberInSurah(), ayah.getText(), "", false));
+    }
+    currentTracks = tracks;
+    if (trackAdapter != null) {
+      trackAdapter.submitList(new ArrayList<>(currentTracks));
+    }
+  }
+
+  private void updatePlayButtonState(boolean isPlaying) {
+    if (playButton != null) {
+      playButton.setIconResource(isPlaying ? R.drawable.ic_pause_white_24dp
+          : R.drawable.ic_play_arrow_white_24dp);
+      playButton.setContentDescription(
+          isPlaying ? getString(R.string.cat_music_player_pause_button_content_description)
+              : getString(R.string.cat_music_player_play_button_content_description));
+    }
+
+    if (fab != null) {
+      fab.setImageResource(isPlaying ? R.drawable.ic_pause_white_24dp
+          : R.drawable.ic_play_arrow_white_24dp);
+    }
+
+    if (!currentTracks.isEmpty()) {
+      for (Track track : currentTracks) {
+        track.playing = false;
+      }
+      if (isPlaying) {
+        currentTracks.get(0).playing = true;
+      }
+      if (trackAdapter != null) {
+        trackAdapter.submitList(new ArrayList<>(currentTracks));
+      }
+    }
+  }
+
+  private void updateProgress(int positionMs, int durationMs) {
+    if (musicProgressIndicator == null) {
+      return;
+    }
+    if (durationMs <= 0) {
+      musicProgressIndicator.setProgressCompat(0, false);
+      return;
+    }
+    int percent = (int) ((positionMs / (float) durationMs) * 100);
+    percent = Math.max(0, Math.min(100, percent));
+    musicProgressIndicator.setProgressCompat(percent, true);
+  }
+
+  private void adjustVolume(float delta) {
+    if (volumeSlider == null) {
+      return;
+    }
+    float newValue = Math.max(0f, Math.min(10f, volumeSlider.getValue() + delta));
+    volumeSlider.setValue(newValue);
+    if (playbackService != null) {
+      playbackService.setVolume(newValue / 10f);
+    }
+  }
+
+  private void togglePlayPause() {
+    if (!hasAudioPermission()) {
+      requestAudioPermission(this::performTogglePlayPause);
+      return;
+    }
+    performTogglePlayPause();
+  }
+
+  private void playNextSurah() {
+    if (!hasAudioPermission()) {
+      requestAudioPermission(this::performPlayNextSurah);
+      return;
+    }
+    performPlayNextSurah();
+  }
+
+  private void playPreviousSurah() {
+    if (!hasAudioPermission()) {
+      requestAudioPermission(this::performPlayPreviousSurah);
+      return;
+    }
+    performPlayPreviousSurah();
+  }
+
+  private void bindPlaybackService() {
+    if (!isAdded() || isServiceBound) {
+      return;
+    }
+    Context appContext = requireContext().getApplicationContext();
+    Intent intent = new Intent(appContext, QuranPlaybackService.class);
+    appContext.startService(intent);
+    appContext.bindService(intent, playbackConnection, Context.BIND_AUTO_CREATE);
+  }
+
+  private void unbindPlaybackService() {
+    if (!isAdded() || !isServiceBound) {
+      return;
+    }
+    Context appContext = requireContext().getApplicationContext();
+    try {
+      appContext.unbindService(playbackConnection);
+    } catch (IllegalArgumentException ignored) {
+      // Service already unbound.
+    }
+    isServiceBound = false;
+    playbackService = null;
+  }
+
+  private void configurePlaybackCallbacks() {
+    if (playbackService == null) {
+      return;
+    }
+
+    playbackService.setOnPlaybackStateChanged(new Function1<Boolean, Unit>() {
+      @Override
+      public Unit invoke(Boolean playing) {
+        mainHandler.post(() -> updatePlayButtonState(playing));
+        return Unit.INSTANCE;
+      }
+    });
+
+    playbackService.setOnSurahChanged(new Function1<Integer, Unit>() {
+      @Override
+      public Unit invoke(Integer index) {
+        mainHandler.post(() -> {
+          currentSurahIndex = index != null ? index : currentSurahIndex;
+          updatePlayButtonState(playbackService != null && playbackService.isPlaying());
+        });
+        return Unit.INSTANCE;
+      }
+    });
+
+    playbackService.setOnProgressChanged(new Function2<Integer, Integer, Unit>() {
+      @Override
+      public Unit invoke(Integer position, Integer duration) {
+        mainHandler.post(() -> updateProgress(
+            position != null ? position : 0,
+            duration != null ? duration : 0));
+        return Unit.INSTANCE;
+      }
+    });
+
+    playbackService.setAudioLanguage(AudioLanguage.ARABIC_ONLY);
+    updatePlayButtonState(playbackService.isPlaying());
+    updateProgress(playbackService.getCurrentPosition(), playbackService.getDuration());
+    if (volumeSlider != null) {
+      volumeSlider.setValue(3.5f);
+    }
+  }
+
+  private void clearPlaybackCallbacks() {
+    if (playbackService != null) {
+      playbackService.setOnPlaybackStateChanged(null);
+      playbackService.setOnSurahChanged(null);
+      playbackService.setOnProgressChanged(null);
+    }
+  }
+
+  private final ServiceConnection playbackConnection = new ServiceConnection() {
+    @Override
+    public void onServiceConnected(ComponentName name, IBinder service) {
+      if (service instanceof QuranPlaybackService.QuranBinder) {
+        QuranPlaybackService.QuranBinder binder =
+            (QuranPlaybackService.QuranBinder) service;
+        playbackService = binder.getService();
+        isServiceBound = true;
+        configurePlaybackCallbacks();
+      }
+    }
+
+    @Override
+    public void onServiceDisconnected(ComponentName name) {
+      clearPlaybackCallbacks();
+      playbackService = null;
+      isServiceBound = false;
+      mainHandler.post(() -> updatePlayButtonState(false));
+    }
+  };
+
+  @Override
+  public void onStart() {
+    super.onStart();
+    bindPlaybackService();
+  }
+
+  @Override
+  public void onStop() {
+    super.onStop();
+    clearPlaybackCallbacks();
+    unbindPlaybackService();
+  }
+
+  private void performTogglePlayPause() {
+    if (playbackService == null) {
+      return;
+    }
+    if (playbackService.isPlaying()) {
+      playbackService.togglePlayPause();
+    } else {
+      if (currentSurahIndex < 0) {
+        currentSurahIndex = Math.max(0, surahNumber - 1);
+      }
+      playbackService.setAudioLanguage(AudioLanguage.ARABIC_ONLY);
+      playbackService.playSurah(currentSurahIndex, true);
+    }
+  }
+
+  private void performPlayNextSurah() {
+    if (playbackService != null) {
+      playbackService.playNext();
+    }
+  }
+
+  private void performPlayPreviousSurah() {
+    if (playbackService != null) {
+      playbackService.playPrevious();
+    }
+  }
+
+  private boolean hasAudioPermission() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+      return true;
+    }
+    if (!isAdded()) {
+      return false;
+    }
+    String permission = getRequiredAudioPermission();
+    return ContextCompat.checkSelfPermission(requireContext(), permission)
+        == PackageManager.PERMISSION_GRANTED;
+  }
+
+  private void requestAudioPermission(@NonNull Runnable onGranted) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+      onGranted.run();
+      return;
+    }
+    if (hasAudioPermission()) {
+      onGranted.run();
+      return;
+    }
+    pendingPermissionAction = onGranted;
+    if (permissionLauncher != null) {
+      permissionLauncher.launch(getRequiredAudioPermission());
+    }
+  }
+
+  private String getRequiredAudioPermission() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      return Manifest.permission.READ_MEDIA_AUDIO;
+    } else {
+      return Manifest.permission.READ_EXTERNAL_STORAGE;
+    }
   }
 
   private static MaterialContainerTransform createMusicPlayerTransform(
