@@ -35,6 +35,12 @@
 
   <string name="cat_music_player_album_menu_favorite_title" description="Content description of the favorite button [CHAR_LIMIT=NONE]">Favorite</string>
   <string name="cat_music_player_album_menu_share_title" description="Content description of the share button [CHAR_LIMIT=NONE]">Share</string>
+  <string name="cat_music_player_album_menu_translation_title">Translation</string>
+  <string name="quran_translation_dialog_title">Select translation</string>
+  <string name="quran_translation_option_arabic_only">Arabic only</string>
+  <string name="quran_translation_option_bengali">Bengali translation</string>
+  <string name="quran_translation_option_english">English translation</string>
+  <string name="quran_translation_applied_toast">Translation set to %1$s</string>
 
   <string name="cat_music_player_lib_menu_sort_title" description="Name of the sort list button [CHAR_LIMIT=NONE]">Sort</string>
   <string name="cat_music_player_lib_menu_list_type_title" description="Name of the list type toggle button [CHAR_LIMIT=NONE]">Toggle list type</string>
