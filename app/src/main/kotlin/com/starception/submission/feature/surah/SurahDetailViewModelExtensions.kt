@@ -6,3 +6,6 @@ import androidx.lifecycle.asLiveData
 fun SurahDetailViewModel.uiStateLiveData(): LiveData<SurahDetailUiState> =
     uiState.asLiveData()
 
+fun SurahDetailViewModel.currentTranslationLiveData(): LiveData<String> =
+    currentTranslation.asLiveData()
+

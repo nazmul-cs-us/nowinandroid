@@ -41,6 +41,7 @@
   <string name="quran_translation_option_bengali">Bengali translation</string>
   <string name="quran_translation_option_english">English translation</string>
   <string name="quran_translation_applied_toast">Translation set to %1$s</string>
+  <string name="quran_translation_audio_not_available">Audio recitation for %1$s is not available; continuing Arabic audio.</string>
 
   <string name="cat_music_player_lib_menu_sort_title" description="Name of the sort list button [CHAR_LIMIT=NONE]">Sort</string>
   <string name="cat_music_player_lib_menu_list_type_title" description="Name of the list type toggle button [CHAR_LIMIT=NONE]">Toggle list type</string>

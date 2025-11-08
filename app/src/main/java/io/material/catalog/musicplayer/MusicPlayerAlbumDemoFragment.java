@@ -80,7 +80,9 @@ import com.starception.submission.feature.surah.SurahDetailUiState;
 import com.starception.submission.feature.surah.SurahDetailViewModel;
 import com.starception.submission.feature.surah.SurahDetailViewModelExtensionsKt;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
@@ -123,6 +125,8 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
   private boolean isUserSeeking = false;
   private int currentDurationMs = 0;
   private AudioLanguage currentAudioLanguage = AudioLanguage.ARABIC_ONLY;
+  private List<String> availableTranslations = new ArrayList<>();
+  private String currentTranslationCode = "ar";
 
   private static final int[] COVER_RESOURCES = {
       R.drawable.album_efe_kurnaz_unsplash,
@@ -520,6 +524,16 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     LiveData<SurahDetailUiState> uiStateLiveData =
         SurahDetailViewModelExtensionsKt.uiStateLiveData(surahDetailViewModel);
     uiStateLiveData.observe(getViewLifecycleOwner(), this::handleUiState);
+
+    availableTranslations = new ArrayList<>(surahDetailViewModel.getAvailableTranslations());
+
+    LiveData<String> translationCodeLiveData =
+        SurahDetailViewModelExtensionsKt.currentTranslationLiveData(surahDetailViewModel);
+    translationCodeLiveData.observe(getViewLifecycleOwner(), code -> {
+      if (code != null && !code.isEmpty()) {
+        currentTranslationCode = code;
+      }
+    });
   }
 
   private void handleUiState(@NonNull SurahDetailUiState state) {
@@ -831,13 +845,21 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
       return;
     }
 
-    final CharSequence[] options = new CharSequence[] {
-        getString(R.string.quran_translation_option_arabic_only),
-        getString(R.string.quran_translation_option_bengali),
-        getString(R.string.quran_translation_option_english)
-    };
+    List<String> translationCodes = !availableTranslations.isEmpty()
+        ? availableTranslations
+        : Arrays.asList("ar", "bn", "en");
 
-    int selectedIndex = audioLanguageToIndex(currentAudioLanguage);
+    CharSequence[] options = new CharSequence[translationCodes.size()];
+    for (int i = 0; i < translationCodes.size(); i++) {
+      String code = translationCodes.get(i);
+      options[i] = getTranslationDisplayName(code);
+    }
+
+    int selectedIndex = translationCodes.indexOf(currentTranslationCode);
+    if (selectedIndex < 0) {
+      selectedIndex = 0;
+    }
+
     ContextThemeWrapper dialogContext =
         new ContextThemeWrapper(requireContext(),
             com.google.android.material.R.style.Theme_MaterialComponents_Light_Dialog_Alert);
@@ -845,27 +867,49 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     new MaterialAlertDialogBuilder(dialogContext)
         .setTitle(R.string.quran_translation_dialog_title)
         .setSingleChoiceItems(options, selectedIndex, (dialog, which) -> {
-          AudioLanguage selectedLanguage = indexToAudioLanguage(which);
+          String selectedCode = translationCodes.get(which);
           dialog.dismiss();
-          handleTranslationSelection(selectedLanguage);
+          handleTranslationSelection(selectedCode);
         })
         .setNegativeButton(android.R.string.cancel, null)
         .show();
   }
 
-  private void handleTranslationSelection(@NonNull AudioLanguage language) {
-    if (language == currentAudioLanguage) {
+  private void handleTranslationSelection(@NonNull String translationCode) {
+    String sanitizedCode = translationCode.isEmpty() ? "ar" : translationCode;
+    String previousCode = currentTranslationCode;
+    currentTranslationCode = sanitizedCode;
+
+    if (surahDetailViewModel != null && !sanitizedCode.equals(previousCode)) {
+      surahDetailViewModel.changeTranslation(sanitizedCode, surahNumber);
+    }
+
+    AudioLanguage mappedLanguage = mapTranslationCodeToAudioLanguage(sanitizedCode);
+    if (mappedLanguage == null) {
+      if (isAdded()) {
+        Toast.makeText(
+            requireContext(),
+            getString(
+                R.string.quran_translation_audio_not_available,
+                getTranslationDisplayName(sanitizedCode)),
+            Toast.LENGTH_SHORT)
+            .show();
+      }
+      return;
+    }
+
+    if (mappedLanguage == currentAudioLanguage) {
       return;
     }
 
     if (!hasAudioPermission()) {
-      requestAudioPermission(() -> applyTranslationLanguage(language));
+      requestAudioPermission(() -> applyAudioLanguage(mappedLanguage));
     } else {
-      applyTranslationLanguage(language);
+      applyAudioLanguage(mappedLanguage);
     }
   }
 
-  private void applyTranslationLanguage(@NonNull AudioLanguage language) {
+  private void applyAudioLanguage(@NonNull AudioLanguage language) {
     currentAudioLanguage = language;
 
     if (playbackService != null) {
@@ -874,7 +918,7 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
       boolean shouldAutoPlay = playbackService.isPlaying();
       playbackService.playSurah(index, shouldAutoPlay);
       if (!shouldAutoPlay) {
-        updateProgress(0, playbackService.getDuration());
+        updateProgress(playbackService.getCurrentPosition(), playbackService.getDuration());
       }
     }
 
@@ -887,27 +931,6 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     }
   }
 
-  private int audioLanguageToIndex(@NonNull AudioLanguage language) {
-    switch (language) {
-      case BENGALI_TRANSLATION:
-        return 1;
-      case ENGLISH_TRANSLATION:
-        return 2;
-      case ARABIC_ONLY:
-      default:
-        return 0;
-    }
-  }
-
-  private AudioLanguage indexToAudioLanguage(int index) {
-    if (index == 1) {
-      return AudioLanguage.BENGALI_TRANSLATION;
-    } else if (index == 2) {
-      return AudioLanguage.ENGLISH_TRANSLATION;
-    }
-    return AudioLanguage.ARABIC_ONLY;
-  }
-
   private String getTranslationLabel(@NonNull AudioLanguage language) {
     switch (language) {
       case BENGALI_TRANSLATION:
@@ -918,6 +941,27 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
       default:
         return getString(R.string.quran_translation_option_arabic_only);
     }
+  }
+
+  @Nullable
+  private AudioLanguage mapTranslationCodeToAudioLanguage(@NonNull String code) {
+    switch (code) {
+      case "ar":
+        return AudioLanguage.ARABIC_ONLY;
+      case "bn":
+        return AudioLanguage.BENGALI_TRANSLATION;
+      case "en":
+        return AudioLanguage.ENGLISH_TRANSLATION;
+      default:
+        return null;
+    }
+  }
+
+  private String getTranslationDisplayName(@NonNull String code) {
+    if (surahDetailViewModel != null) {
+      return surahDetailViewModel.getTranslationName(code);
+    }
+    return code.toUpperCase(Locale.US);
   }
 
   private boolean hasAudioPermission() {
