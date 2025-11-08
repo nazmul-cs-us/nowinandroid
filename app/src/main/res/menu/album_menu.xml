@@ -18,6 +18,13 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
   <item
+      android:id="@+id/item_translation"
+      android:title="@string/cat_music_player_album_menu_translation_title"
+      android:icon="@drawable/ic_translate_white_24dp"
+      app:iconTint="?attr/colorOnSurface"
+      app:showAsAction="ifRoom"/>
+
+  <item
       android:id="@+id/item_favorite"
       android:title="@string/cat_music_player_album_menu_favorite_title"
       android:icon="@drawable/ic_favorite_vd_theme_24px"

@@ -30,6 +30,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.view.MenuItem;
 import android.view.ContextThemeWrapper;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -62,6 +63,7 @@ import com.google.android.material.appbar.CollapsingToolbarLayout;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.slider.Slider;
 import com.google.android.material.transition.MaterialArcMotion;
 import com.google.android.material.transition.MaterialContainerTransform;
@@ -120,6 +122,7 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
   private Runnable pendingPermissionAction;
   private boolean isUserSeeking = false;
   private int currentDurationMs = 0;
+  private AudioLanguage currentAudioLanguage = AudioLanguage.ARABIC_ONLY;
 
   private static final int[] COVER_RESOURCES = {
       R.drawable.album_efe_kurnaz_unsplash,
@@ -245,6 +248,7 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
         dispatcher.onBackPressed();
       }
     });
+    toolbar.setOnMenuItemClickListener(this::onToolbarMenuItemClick);
 
     toolbar.post(() -> {
       int childCount = toolbar.getChildCount();
@@ -256,6 +260,14 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
         }
       }
     });
+  }
+
+  private boolean onToolbarMenuItemClick(@NonNull MenuItem item) {
+    if (item.getItemId() == R.id.item_translation) {
+      showTranslationSelectionDialog();
+      return true;
+    }
+    return false;
   }
 
   private void configureWindowInsets(@NonNull View rootView) {
@@ -737,7 +749,7 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
       }
     });
 
-    playbackService.setAudioLanguage(AudioLanguage.ARABIC_ONLY);
+    playbackService.setAudioLanguage(currentAudioLanguage);
     updatePlayButtonState(playbackService.isPlaying());
     updateProgress(playbackService.getCurrentPosition(), playbackService.getDuration());
     if (volumeSlider != null) {
@@ -797,7 +809,7 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
       if (currentSurahIndex < 0) {
         currentSurahIndex = Math.max(0, surahNumber - 1);
       }
-      playbackService.setAudioLanguage(AudioLanguage.ARABIC_ONLY);
+      playbackService.setAudioLanguage(currentAudioLanguage);
       playbackService.playSurah(currentSurahIndex, true);
     }
   }
@@ -811,6 +823,100 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
   private void performPlayPreviousSurah() {
     if (playbackService != null) {
       playbackService.playPrevious();
+    }
+  }
+
+  private void showTranslationSelectionDialog() {
+    if (!isAdded()) {
+      return;
+    }
+
+    final CharSequence[] options = new CharSequence[] {
+        getString(R.string.quran_translation_option_arabic_only),
+        getString(R.string.quran_translation_option_bengali),
+        getString(R.string.quran_translation_option_english)
+    };
+
+    int selectedIndex = audioLanguageToIndex(currentAudioLanguage);
+    ContextThemeWrapper dialogContext =
+        new ContextThemeWrapper(requireContext(),
+            com.google.android.material.R.style.Theme_MaterialComponents_Light_Dialog_Alert);
+
+    new MaterialAlertDialogBuilder(dialogContext)
+        .setTitle(R.string.quran_translation_dialog_title)
+        .setSingleChoiceItems(options, selectedIndex, (dialog, which) -> {
+          AudioLanguage selectedLanguage = indexToAudioLanguage(which);
+          dialog.dismiss();
+          handleTranslationSelection(selectedLanguage);
+        })
+        .setNegativeButton(android.R.string.cancel, null)
+        .show();
+  }
+
+  private void handleTranslationSelection(@NonNull AudioLanguage language) {
+    if (language == currentAudioLanguage) {
+      return;
+    }
+
+    if (!hasAudioPermission()) {
+      requestAudioPermission(() -> applyTranslationLanguage(language));
+    } else {
+      applyTranslationLanguage(language);
+    }
+  }
+
+  private void applyTranslationLanguage(@NonNull AudioLanguage language) {
+    currentAudioLanguage = language;
+
+    if (playbackService != null) {
+      playbackService.setAudioLanguage(language);
+      int index = currentSurahIndex >= 0 ? currentSurahIndex : Math.max(0, surahNumber - 1);
+      boolean shouldAutoPlay = playbackService.isPlaying();
+      playbackService.playSurah(index, shouldAutoPlay);
+      if (!shouldAutoPlay) {
+        updateProgress(0, playbackService.getDuration());
+      }
+    }
+
+    if (isAdded()) {
+      Toast.makeText(
+          requireContext(),
+          getString(R.string.quran_translation_applied_toast, getTranslationLabel(language)),
+          Toast.LENGTH_SHORT)
+          .show();
+    }
+  }
+
+  private int audioLanguageToIndex(@NonNull AudioLanguage language) {
+    switch (language) {
+      case BENGALI_TRANSLATION:
+        return 1;
+      case ENGLISH_TRANSLATION:
+        return 2;
+      case ARABIC_ONLY:
+      default:
+        return 0;
+    }
+  }
+
+  private AudioLanguage indexToAudioLanguage(int index) {
+    if (index == 1) {
+      return AudioLanguage.BENGALI_TRANSLATION;
+    } else if (index == 2) {
+      return AudioLanguage.ENGLISH_TRANSLATION;
+    }
+    return AudioLanguage.ARABIC_ONLY;
+  }
+
+  private String getTranslationLabel(@NonNull AudioLanguage language) {
+    switch (language) {
+      case BENGALI_TRANSLATION:
+        return getString(R.string.quran_translation_option_bengali);
+      case ENGLISH_TRANSLATION:
+        return getString(R.string.quran_translation_option_english);
+      case ARABIC_ONLY:
+      default:
+        return getString(R.string.quran_translation_option_arabic_only);
     }
   }
 
