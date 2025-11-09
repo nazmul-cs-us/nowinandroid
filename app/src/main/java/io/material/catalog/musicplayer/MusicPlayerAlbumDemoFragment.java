@@ -75,6 +75,7 @@ import io.material.catalog.musicplayer.MusicData.Track;
 import com.starception.submission.core.qurandatabase.Ayah;
 import com.starception.submission.core.qurandatabase.Surah;
 import com.starception.submission.feature.quran.AudioLanguage;
+import com.starception.submission.feature.quran.QuranData;
 import com.starception.submission.feature.quran.QuranPlaybackService;
 import com.starception.submission.feature.surah.SurahDetailUiState;
 import com.starception.submission.feature.surah.SurahDetailViewModel;
@@ -747,6 +748,15 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
       public Unit invoke(Integer index) {
         mainHandler.post(() -> {
           currentSurahIndex = index != null ? index : currentSurahIndex;
+          List<com.starception.submission.feature.quran.Surah> surahList =
+              QuranData.INSTANCE.getSurahs();
+          if (index != null && index >= 0 && index < surahList.size()) {
+            com.starception.submission.feature.quran.Surah surahMeta = surahList.get(index);
+            surahNumber = surahMeta.getNumber();
+            if (surahDetailViewModel != null) {
+              surahDetailViewModel.loadSurah(surahNumber, currentTranslationCode);
+            }
+          }
           updatePlayButtonState(playbackService != null && playbackService.isPlaying());
         });
         return Unit.INSTANCE;
