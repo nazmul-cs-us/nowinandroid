@@ -37,19 +37,36 @@
     </style>
 
     <!-- Material Components theme for View-based layouts -->
-    <style name="Theme.Nia.Material" parent="Theme.MaterialComponents.Light.NoActionBar">
-        <item name="colorPrimary">@android:color/black</item>
-        <item name="colorPrimaryDark">@android:color/black</item>
-        <item name="colorAccent">@android:color/black</item>
-        <item name="colorSurface">@android:color/white</item>
-        <item name="colorOnSurface">@android:color/black</item>
-        <item name="colorOnPrimary">@android:color/white</item>
-        <item name="colorOnSecondary">@android:color/white</item>
-        <item name="colorOnBackground">@android:color/black</item>
+    <style name="Theme.Nia.Material" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">#6750A4</item>
+        <item name="colorPrimaryDark">#4F378B</item>
+        <item name="colorAccent">#6750A4</item>
+        <item name="colorSurface">#FFFBFE</item>
+        <item name="colorOnSurface">#1C1B1F</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorOnBackground">#1C1B1F</item>
+        <item name="colorSecondary">#625B71</item>
+        <item name="colorSecondaryVariant">#625B71</item>
+        <item name="colorOnSecondaryContainer">#1D192B</item>
+        <item name="colorSecondaryContainer">#E8DEF8</item>
+        <item name="colorSurfaceVariant">#E7E0EC</item>
+        <item name="colorOnSurfaceVariant">#49454F</item>
+        <item name="colorPrimaryContainer">#EADDFF</item>
+        <item name="colorOnPrimaryContainer">#21005D</item>
+        <item name="colorSurfaceContainer">#F3EDF7</item>
+        <item name="colorSurfaceContainerHigh">#ECE6F0</item>
+        <item name="colorSurfaceContainerHighest">#E6E0E9</item>
+        <item name="colorSurfaceContainerLow">#F7F2FA</item>
+        <item name="colorSurfaceContainerLowest">#FFFFFF</item>
         <item name="cardViewStyle">@style/Widget.MaterialComponents.CardView</item>
         <item name="cardBackgroundColor">@android:color/white</item>
         <item name="cardCornerRadius">4dp</item>
         <item name="cardElevation">1dp</item>
+        <item name="floatingToolbarStyle">@style/Widget.Material3.FloatingToolbar</item>
+        <item name="floatingToolbarVibrantStyle">@style/Widget.Material3.FloatingToolbar.Vibrant</item>
+        <item name="overflowLinearLayoutStyle">@style/Widget.Material3.OverflowLinearLayout</item>
+        <item name="overflowLinearLayoutPopupMenuStyle">@style/Widget.MaterialComponents.PopupMenu</item>
     </style>
 
 </resources>

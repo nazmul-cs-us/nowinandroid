@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Copyright (C) 2025 The Android Open Source Project
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~      http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+-->
+<resources>
+  <!-- Style for Overflow Linear Layout. -->
+  <style name="Widget.Material3.OverflowLinearLayout" parent="">
+    <item name="overflowButtonIcon">@drawable/ic_overflow_more_24dp</item>
+    <item name="overflowLinearLayoutPopupMenuStyle">?attr/popupMenuStyle</item>
+  </style>
+
+  <!-- Checkbox style for a checkable overflow item within an Overflow Linear Layout. -->
+  <style
+      name="Widget.Material3.OverflowLinearLayout.CheckBox"
+      parent="Widget.MaterialComponents.CompoundButton.CheckBox">
+    <!-- We want the overflow item's checkbox to look/behave like a decorative
+         trailing checkmark icon, not like a normal checkbox. -->
+    <item name="android:button">@null</item>
+    <item name="buttonIconTint">?attr/colorOnSurfaceVariant</item>
+    <item name="buttonIcon">@drawable/m3_overflow_item_checkbox</item>
+    <item name="android:minWidth">24dp</item>
+    <item name="android:minHeight">24dp</item>
+    <item name="android:background">@android:color/transparent</item>
+  </style>
+</resources>

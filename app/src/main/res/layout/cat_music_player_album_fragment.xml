@@ -257,5 +257,93 @@
 
     </com.google.android.material.appbar.CollapsingToolbarLayout>
   </com.google.android.material.appbar.AppBarLayout>
+
+  <com.google.android.material.floatingtoolbar.FloatingToolbarLayout
+    android:id="@+id/music_floating_toolbar"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom|center_horizontal"
+    android:layout_marginStart="20dp"
+    android:layout_marginEnd="20dp"
+    android:layout_marginBottom="20dp"
+    style="?attr/floatingToolbarStyle">
+
+    <com.google.android.material.overflow.OverflowLinearLayout
+      android:id="@+id/music_floating_toolbar_child"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_gravity="center"
+      android:gravity="center"
+      android:paddingStart="12dp"
+      android:paddingEnd="12dp"
+      android:paddingTop="8dp"
+      android:paddingBottom="8dp"
+      android:orientation="horizontal"
+      style="?attr/overflowLinearLayoutStyle">
+
+      <com.google.android.material.button.MaterialButton
+        android:id="@+id/floating_toolbar_previous"
+        style="@style/Widget.MaterialComponents.Button.Icon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/cat_music_player_rewind_button_content_description"
+        app:icon="@drawable/ic_fast_rewind_24dp"
+        app:backgroundTint="?attr/colorSurfaceVariant"
+        app:iconTint="?attr/colorOnSurface" />
+
+      <com.google.android.material.button.MaterialButton
+        android:id="@+id/floating_toolbar_play_pause"
+        style="@style/Widget.MaterialComponents.Button.Icon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/cat_music_player_pause_button_content_description"
+        app:icon="@drawable/ic_play_arrow_white_24dp"
+        app:backgroundTint="?attr/colorPrimaryContainer"
+        app:iconTint="?attr/colorOnPrimaryContainer" />
+
+      <com.google.android.material.button.MaterialButton
+        android:id="@+id/floating_toolbar_next"
+        style="@style/Widget.MaterialComponents.Button.Icon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/cat_music_player_fast_forward_button_content_description"
+        app:icon="@drawable/ic_fast_forward_white_24dp"
+        app:backgroundTint="?attr/colorSurfaceVariant"
+        app:iconTint="?attr/colorOnSurface" />
+
+      <com.google.android.material.button.MaterialButton
+        android:id="@+id/floating_toolbar_translation"
+        style="@style/Widget.MaterialComponents.Button.Icon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/cat_music_player_album_menu_translation_title"
+        app:icon="@drawable/ic_translate_white_24dp"
+        app:backgroundTint="?attr/colorSurfaceVariant"
+        app:iconTint="?attr/colorOnSurface"
+        app:layout_overflowText="@string/cat_music_player_album_menu_translation_title" />
+
+    </com.google.android.material.overflow.OverflowLinearLayout>
+  </com.google.android.material.floatingtoolbar.FloatingToolbarLayout>
+
+  <com.google.android.material.floatingtoolbar.FloatingToolbarLayout
+    android:id="@+id/catalog_floating_toolbar"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom|center"
+    android:layout_margin="16dp"
+    android:visibility="visible"
+    style="?attr/floatingToolbarVibrantStyle"
+    app:layout_behavior="com.google.android.material.behavior.HideViewOnScrollBehavior">
+
+    <com.google.android.material.overflow.OverflowLinearLayout
+      android:id="@+id/catalog_floating_toolbar_child"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_gravity="center"
+      android:orientation="horizontal">
+
+      <include layout="@layout/cat_floating_toolbar_content" />
+    </com.google.android.material.overflow.OverflowLinearLayout>
+  </com.google.android.material.floatingtoolbar.FloatingToolbarLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
