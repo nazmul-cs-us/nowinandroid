@@ -41,16 +41,16 @@
   <!-- Style for Vibrant color variation of the Floating Toolbar. -->
   <style name="Widget.Material3.FloatingToolbar.Vibrant">
     <item name="backgroundTint">?attr/colorPrimaryContainer</item>
-    <item name="materialThemeOverlay">@style/ThemeOverlay.Material3.FloatingToolbar.Vibrant</item>
+    <item name="materialThemeOverlay">@style/ThemeOverlay.Material3.FloatingToolbar</item>
   </style>
 
   <!-- Style for icon buttons within Standard Floating Toolbars. -->
   <style
       name="Widget.Material3.FloatingToolbar.IconButton"
       parent="Widget.MaterialComponents.Button.Icon">
-    <item name="backgroundTint">?attr/colorSurfaceVariant</item>
-    <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
-    <item name="iconTint">?attr/colorOnSurface</item>
+    <item name="backgroundTint">?attr/colorPrimaryContainer</item>
+    <item name="android:textColor">?attr/colorOnPrimaryContainer</item>
+    <item name="iconTint">?attr/colorOnPrimaryContainer</item>
     <item name="shapeAppearance">@style/ShapeAppearance.MaterialComponents.SmallComponent</item>
   </style>
 
@@ -104,27 +104,20 @@
     <item name="borderlessButtonStyle">@style/Widget.Material3.FloatingToolbar.TextButton</item>
   </style>
 
-  <!-- Theme overlay to be set on Vibrant Floating Toolbars. -->
-  <style name="ThemeOverlay.Material3.FloatingToolbar.Vibrant">
-    <item name="materialIconButtonStyle">@style/Widget.Material3.FloatingToolbar.IconButton.Vibrant</item>
-    <item name="materialButtonStyle">@style/Widget.Material3.FloatingToolbar.Button.Vibrant</item>
-    <item name="borderlessButtonStyle">@style/Widget.Material3.FloatingToolbar.TextButton.Vibrant</item>
-  </style>
-
   <style name="ThemeOverlay.CatalogFloatingToolbar" parent="">
-    <item name="colorPrimaryContainer">#EADDFF</item>
-    <item name="colorOnPrimaryContainer">#21005D</item>
-    <item name="colorSurface">#FFFBFE</item>
-    <item name="colorOnSurface">#1C1B1F</item>
-    <item name="colorSurfaceVariant">#E7E0EC</item>
-    <item name="colorOnSurfaceVariant">#49454F</item>
-    <item name="colorSecondaryContainer">#E8DEF8</item>
-    <item name="colorOnSecondaryContainer">#1D192B</item>
-    <item name="colorSurfaceContainer">#F3EDF7</item>
-    <item name="colorSurfaceContainerHigh">#ECE6F0</item>
-    <item name="colorSurfaceContainerHighest">#E6E0E9</item>
-    <item name="colorSurfaceContainerLow">#F7F2FA</item>
-    <item name="colorSurfaceContainerLowest">#FFFFFF</item>
+    <item name="colorPrimaryContainer">#F7F0A8</item>
+    <item name="colorOnPrimaryContainer">#3B2F00</item>
+    <item name="colorSurface">#FFF8CB</item>
+    <item name="colorOnSurface">#3B2F00</item>
+    <item name="colorSurfaceVariant">#E8DFB1</item>
+    <item name="colorOnSurfaceVariant">#4A3D07</item>
+    <item name="colorSecondaryContainer">#FFEBA4</item>
+    <item name="colorOnSecondaryContainer">#3B2F00</item>
+    <item name="colorSurfaceContainer">#FFF6C8</item>
+    <item name="colorSurfaceContainerHigh">#F4EAAE</item>
+    <item name="colorSurfaceContainerHighest">#EEDA8B</item>
+    <item name="colorSurfaceContainerLow">#FBF3C3</item>
+    <item name="colorSurfaceContainerLowest">#FFFDEB</item>
   </style>
 
 </resources>

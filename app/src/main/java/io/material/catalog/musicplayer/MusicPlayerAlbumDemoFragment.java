@@ -113,10 +113,6 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
   private MaterialButton volumeUpButton;
   private Slider volumeSlider;
   private Toolbar toolbar;
-  private MaterialButton floatingToolbarPreviousButton;
-  private MaterialButton floatingToolbarPlayPauseButton;
-  private MaterialButton floatingToolbarNextButton;
-  private MaterialButton floatingToolbarTranslationButton;
   private AppBarLayout appBarLayout;
   private ImageView albumImage;
   private TextView albumTitle;
@@ -213,10 +209,6 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     volumeDownButton = view.findViewById(R.id.volume_down_button);
     volumeUpButton = view.findViewById(R.id.volume_up_button);
     volumeSlider = view.findViewById(R.id.volume_slider);
-    floatingToolbarPreviousButton = view.findViewById(R.id.floating_toolbar_previous);
-    floatingToolbarPlayPauseButton = view.findViewById(R.id.floating_toolbar_play_pause);
-    floatingToolbarNextButton = view.findViewById(R.id.floating_toolbar_next);
-    floatingToolbarTranslationButton = view.findViewById(R.id.floating_toolbar_translation);
 
     trackAdapter = new TrackAdapter();
     songRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -510,22 +502,6 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
       fastForwardButton.setOnClickListener(v -> playNextSurah());
     }
 
-    if (floatingToolbarPreviousButton != null) {
-      floatingToolbarPreviousButton.setOnClickListener(v -> playPreviousSurah());
-    }
-
-    if (floatingToolbarPlayPauseButton != null) {
-      floatingToolbarPlayPauseButton.setOnClickListener(v -> togglePlayPause());
-    }
-
-    if (floatingToolbarNextButton != null) {
-      floatingToolbarNextButton.setOnClickListener(v -> playNextSurah());
-    }
-
-    if (floatingToolbarTranslationButton != null) {
-      floatingToolbarTranslationButton.setOnClickListener(v -> showTranslationSelectionDialog());
-    }
-
     if (volumeSlider != null) {
       volumeSlider.addOnChangeListener((slider, value, fromUser) -> {
         if (fromUser && playbackService != null) {
@@ -624,15 +600,6 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
           : R.drawable.ic_play_arrow_white_24dp);
       playButton.setContentDescription(
           isPlaying ? getString(R.string.cat_music_player_pause_button_content_description)
-              : getString(R.string.cat_music_player_play_button_content_description));
-    }
-
-    if (floatingToolbarPlayPauseButton != null) {
-      floatingToolbarPlayPauseButton.setIconResource(
-          isPlaying ? R.drawable.ic_pause_white_24dp : R.drawable.ic_play_arrow_white_24dp);
-      floatingToolbarPlayPauseButton.setContentDescription(
-          isPlaying
-              ? getString(R.string.cat_music_player_pause_button_content_description)
               : getString(R.string.cat_music_player_play_button_content_description));
     }
 
