@@ -333,7 +333,8 @@
     android:layout_margin="16dp"
     android:visibility="visible"
     style="?attr/floatingToolbarVibrantStyle"
-    app:layout_behavior="com.google.android.material.behavior.HideViewOnScrollBehavior">
+    app:layout_behavior="com.google.android.material.behavior.HideViewOnScrollBehavior"
+    app:materialThemeOverlay="@style/ThemeOverlay.CatalogFloatingToolbar">
 
     <com.google.android.material.overflow.OverflowLinearLayout
       android:id="@+id/catalog_floating_toolbar_child"
