@@ -223,6 +223,9 @@ class MainActivity : FragmentActivity() {
                     is MainActivityUiState.Loading -> true
                 },
             ) {
+                // Update theme color bridge so View-based components can access theme colors
+                com.starception.submission.util.ThemeColorBridge.UpdateColors()
+
                 val appState = rememberNiaAppState(
                     networkMonitor = networkMonitor,
                     userNewsResourceRepository = userNewsResourceRepository,

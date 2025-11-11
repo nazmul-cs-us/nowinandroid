@@ -23,6 +23,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
@@ -128,6 +129,7 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
   private AudioLanguage currentAudioLanguage = AudioLanguage.ARABIC_ONLY;
   private List<String> availableTranslations = new ArrayList<>();
   private String currentTranslationCode = "ar";
+  private Context themedContext;
 
   private static final int[] COVER_RESOURCES = {
       R.drawable.album_efe_kurnaz_unsplash,
@@ -160,7 +162,7 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     Context context = requireContext();
     // Use app Material Components theme that includes floating toolbar customizations
     int materialTheme = R.style.Theme_Nia_Material;
-    ContextThemeWrapper themedContext = new ContextThemeWrapper(context, materialTheme);
+    themedContext = new ContextThemeWrapper(context, materialTheme);
     LayoutInflater themedInflater = layoutInflater.cloneInContext(themedContext);
     return themedInflater.inflate(R.layout.cat_music_player_album_fragment, viewGroup, false);
   }
@@ -214,6 +216,9 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     songRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
     songRecyclerView.setAdapter(trackAdapter);
 
+    // Apply Compose theme colors to View components using ComposeView bridge
+    applyComposeThemeColorsFromMaterialTheme(view);
+
     configureCollapsingToolbar();
     setUpToolbarNavigation();
     configureWindowInsets(view);
@@ -223,6 +228,44 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     initViewModelObservers();
 
     surahDetailViewModel.loadSurah(surahNumber);
+  }
+
+  /**
+   * Apply colors from the current Compose MaterialTheme to View components.
+   * Uses ThemeColorBridge to access the actual theme colors from Compose.
+   */
+  private void applyComposeThemeColorsFromMaterialTheme(@NonNull View rootView) {
+    // Get actual theme colors from the Compose MaterialTheme via the bridge
+    int surfaceColor = com.starception.submission.util.ThemeColorBridge.INSTANCE.getSurfaceColor();
+    int onSurfaceColor = com.starception.submission.util.ThemeColorBridge.INSTANCE.getOnSurfaceColor();
+
+    // Apply to album_info_container
+    View albumInfoContainer = rootView.findViewById(R.id.album_info_container);
+    if (albumInfoContainer != null) {
+      albumInfoContainer.setBackgroundColor(surfaceColor);
+    }
+
+    // Apply to music_player_container
+    if (musicPlayerContainer != null) {
+      musicPlayerContainer.setBackgroundColor(surfaceColor);
+    }
+
+    // Apply to button icons
+    if (playButton != null) {
+      playButton.setIconTint(ColorStateList.valueOf(onSurfaceColor));
+    }
+    if (rewindButton != null) {
+      rewindButton.setIconTint(ColorStateList.valueOf(onSurfaceColor));
+    }
+    if (fastForwardButton != null) {
+      fastForwardButton.setIconTint(ColorStateList.valueOf(onSurfaceColor));
+    }
+    if (volumeDownButton != null) {
+      volumeDownButton.setIconTint(ColorStateList.valueOf(onSurfaceColor));
+    }
+    if (volumeUpButton != null) {
+      volumeUpButton.setIconTint(ColorStateList.valueOf(onSurfaceColor));
+    }
   }
 
   private void configureCollapsingToolbar() {
@@ -340,6 +383,9 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     toolbar.setBackgroundColor(Color.TRANSPARENT);
     final boolean[] isToolbarBackgroundVisible = {false};
 
+    // Get theme colors from the Compose MaterialTheme bridge
+    final int surfaceColor = com.starception.submission.util.ThemeColorBridge.INSTANCE.getSurfaceColor();
+
     appBarLayout.addOnOffsetChangedListener((appBarLayout1, verticalOffset) -> {
       float verticalOffsetPercentage =
           (float) Math.abs(verticalOffset) / (float) appBarLayout1.getTotalScrollRange();
@@ -366,12 +412,11 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
         toolbarBackgroundAnimator.setDuration(200);
         toolbarBackgroundAnimator.addUpdateListener(animator -> {
           int alpha = (Integer) animator.getAnimatedValue();
-          int lightGreyColor = Color.rgb(245, 245, 245);
           if (alpha == 0) {
             toolbar.setBackgroundColor(Color.TRANSPARENT);
           } else {
-            int colorWithAlpha = Color.argb(alpha, Color.red(lightGreyColor),
-                Color.green(lightGreyColor), Color.blue(lightGreyColor));
+            int colorWithAlpha = Color.argb(alpha, Color.red(surfaceColor),
+                Color.green(surfaceColor), Color.blue(surfaceColor));
             toolbar.setBackgroundColor(colorWithAlpha);
           }
         });
@@ -576,8 +621,11 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
     if (collapsingToolbarLayout != null) {
       collapsingToolbarLayout.setTitle(surah.getNameEnglish());
       collapsingToolbarLayout.setExpandedTitleColor(Color.TRANSPARENT);
-      collapsingToolbarLayout.setCollapsedTitleTextColor(
-          toolbar.getContext().getResources().getColor(android.R.color.black, null));
+
+      // Get theme color from the Compose MaterialTheme bridge
+      int onSurfaceColor = com.starception.submission.util.ThemeColorBridge.INSTANCE.getOnSurfaceColor();
+
+      collapsingToolbarLayout.setCollapsedTitleTextColor(onSurfaceColor);
     }
 
     updateTrackList(currentAyahs);
@@ -1032,6 +1080,48 @@ public class MusicPlayerAlbumDemoFragment extends Fragment {
           TypedValue.COMPLEX_UNIT_DIP, 24, getResources().getDisplayMetrics());
     }
     return result;
+  }
+
+  /**
+   * Helper method to resolve Material theme color attributes dynamically.
+   * This is the View-based equivalent of MaterialTheme.colorScheme in Compose.
+   *
+   * Uses Material Components theme attributes:
+   * - com.google.android.material.R.attr.colorSurface → MaterialTheme.colorScheme.surface
+   * - com.google.android.material.R.attr.colorOnSurface → MaterialTheme.colorScheme.onSurface
+   * - com.google.android.material.R.attr.colorPrimary → MaterialTheme.colorScheme.primary
+   * etc.
+   *
+   * @param attr The Material theme attribute (e.g., com.google.android.material.R.attr.colorSurface)
+   * @param defaultColor Fallback color if attribute cannot be resolved
+   * @return The resolved color value from the current theme
+   */
+  private int getThemeColor(int attr, int defaultColor) {
+    // Use themed context if available, otherwise fall back to regular context
+    Context context = themedContext != null ? themedContext : requireContext();
+    return getThemeColorFromContext(context, attr, defaultColor);
+  }
+
+  /**
+   * Helper method to resolve Material theme color attributes from a specific context.
+   * This allows us to read colors from the activity's Compose theme instead of the fragment's XML theme.
+   *
+   * @param context The context to read the theme from
+   * @param attr The Material theme attribute
+   * @param defaultColor Fallback color if attribute cannot be resolved
+   * @return The resolved color value
+   */
+  private int getThemeColorFromContext(Context context, int attr, int defaultColor) {
+    TypedValue typedValue = new TypedValue();
+    if (context.getTheme().resolveAttribute(attr, typedValue, true)) {
+      // If it's a color reference, resolve it
+      if (typedValue.resourceId != 0) {
+        return ContextCompat.getColor(context, typedValue.resourceId);
+      }
+      // If it's a direct color value
+      return typedValue.data;
+    }
+    return defaultColor;
   }
 
   /** An adapter to hold an albums list of tracks. */
