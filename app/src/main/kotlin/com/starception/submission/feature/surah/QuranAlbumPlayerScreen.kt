@@ -7,6 +7,8 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import android.widget.Toast
 import androidx.compose.animation.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -118,6 +120,18 @@ fun QuranAlbumPlayerScreen(
             scrollState.firstVisibleItemScrollOffset > 100
         }
     }
+
+    // Track scroll direction for floating toolbar animation
+    var previousScrollOffset by remember { mutableStateOf(0) }
+    val isScrollingDown = remember {
+        derivedStateOf {
+            val currentOffset = scrollState.firstVisibleItemScrollOffset
+            val scrollingDown = currentOffset > previousScrollOffset
+            previousScrollOffset = currentOffset
+            scrollingDown && currentOffset > 50 // Only hide after scrolling past 50dp
+        }
+    }
+    val showFloatingToolbar = !isScrollingDown.value
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -258,8 +272,9 @@ fun QuranAlbumPlayerScreen(
         )
     }
 
-    // Floating action toolbar on the left side
+    // Floating action toolbar on the left side with scroll-based animation
     FloatingActionToolbar(
+        visible = showFloatingToolbar,
         modifier = Modifier
             .align(Alignment.CenterStart)
             .padding(start = 32.dp)
@@ -689,21 +704,43 @@ private fun AyahTrackItem(
 
 @Composable
 private fun FloatingActionToolbar(
+    visible: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var selectedButton by remember { mutableStateOf<String?>(null) }
 
-    Surface(
+    AnimatedVisibility(
+        visible = visible,
         modifier = modifier,
-        shape = RoundedCornerShape(50), // Make container very rounded/pill-shaped
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 4.dp,
-        shadowElevation = 4.dp
+        enter = slideInHorizontally(
+            initialOffsetX = { -it }, // Slide in from left
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = FastOutSlowInEasing
+            )
+        ) + fadeIn(
+            animationSpec = tween(durationMillis = 300)
+        ),
+        exit = slideOutHorizontally(
+            targetOffsetX = { -it }, // Slide out to left
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = FastOutSlowInEasing
+            )
+        ) + fadeOut(
+            animationSpec = tween(durationMillis = 300)
+        )
     ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        Surface(
+            shape = RoundedCornerShape(50), // Make container very rounded/pill-shaped
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 4.dp,
+            shadowElevation = 4.dp
         ) {
+            Column(
+                modifier = Modifier.padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
             // Bold button
             FloatingToolbarButton(
                 icon = Icons.Default.FormatBold,
@@ -775,6 +812,7 @@ private fun FloatingActionToolbar(
                 selected = selectedButton == "alignRight",
                 onClick = { selectedButton = if (selectedButton == "alignRight") null else "alignRight" }
             )
+            }
         }
     }
 }
