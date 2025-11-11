@@ -273,12 +273,17 @@ fun QuranAlbumPlayerScreen(
     }
 
     // Floating action toolbar on the left side with scroll-based animation
-    FloatingActionToolbar(
-        visible = showFloatingToolbar,
+    Box(
         modifier = Modifier
+            .fillMaxHeight()
             .align(Alignment.CenterStart)
-            .padding(start = 32.dp)
-    )
+            .padding(start = 32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        FloatingActionToolbar(
+            visible = showFloatingToolbar
+        )
+    }
 }
 }
 
