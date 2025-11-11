@@ -277,8 +277,8 @@ fun QuranAlbumPlayerScreen(
         modifier = Modifier
             .fillMaxHeight()
             .align(Alignment.CenterStart)
-            .padding(start = 32.dp),
-        contentAlignment = Alignment.Center
+            .padding(start = 16.dp, top = 80.dp), // Move left and down
+        contentAlignment = Alignment.CenterStart
     ) {
         FloatingActionToolbar(
             visible = showFloatingToolbar
