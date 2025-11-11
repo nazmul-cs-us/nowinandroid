@@ -119,7 +119,8 @@
       "Bash(/tmp/device_qibla_screen.png)",
       "Bash(/tmp/interactive_dial_swipe.png)",
       "Bash(/tmp/iphone_style_slider.png)",
-      "Bash(/tmp/updated_text_sizes.png)"
+      "Bash(/tmp/updated_text_sizes.png)",
+      "Bash(/tmp/quran_player_screen.png)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

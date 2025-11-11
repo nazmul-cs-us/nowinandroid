@@ -16,7 +16,7 @@
   -->
 
 <resources>
-  <string name="app_name">Now in Android</string>
+  <string name="app_name">Submission</string>
   <string name="prayer_times_title">Prayer Times</string>
   <string name="not_connected">Not connected</string>
   <string name="live_notification_title">Prayer Time</string>

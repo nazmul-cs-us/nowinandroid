@@ -113,7 +113,7 @@
           android:id="@+id/music_player_container"
           android:layout_width="match_parent"
           android:layout_height="196dp"
-          android:background="@android:color/black"
+          android:background="?attr/colorSurfaceContainerHigh"
           android:visibility="gone"
           app:layout_constraintEnd_toEndOf="parent"
           app:layout_constraintStart_toStartOf="parent"
@@ -146,6 +146,7 @@
             android:layout_marginLeft="@dimen/cat_music_player_control_button_margin"
             android:contentDescription="@string/cat_music_player_rewind_button_content_description"
             app:icon="@drawable/ic_fast_rewind_24dp"
+            app:iconTint="?attr/colorOnSurface"
             app:layout_constraintBottom_toTopOf="@id/volume_slider"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/music_progress_indicator" />
@@ -156,6 +157,7 @@
             android:layout_height="@dimen/cat_music_player_button_size"
             android:contentDescription="@string/cat_music_player_pause_button_content_description"
             app:icon="@drawable/ic_play_arrow_white_24dp"
+            app:iconTint="?attr/colorOnSurface"
             app:layout_constraintBottom_toTopOf="@id/volume_slider"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -169,6 +171,7 @@
             android:layout_marginRight="@dimen/cat_music_player_control_button_margin"
             android:contentDescription="@string/cat_music_player_fast_forward_button_content_description"
             app:icon="@drawable/ic_fast_forward_white_24dp"
+            app:iconTint="?attr/colorOnSurface"
             app:layout_constraintBottom_toTopOf="@id/volume_slider"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toBottomOf="@id/music_progress_indicator" />
@@ -181,6 +184,7 @@
             android:layout_marginLeft="@dimen/cat_music_player_volume_button_margin"
             android:contentDescription="@string/cat_music_player_volume_down_button_content_description"
             app:icon="@drawable/ic_volume_down_white_24dp"
+            app:iconTint="?attr/colorOnSurface"
             app:layout_constraintBottom_toBottomOf="@id/volume_slider"
             app:layout_constraintEnd_toStartOf="@id/volume_slider"
             app:layout_constraintTop_toTopOf="@id/volume_slider" />
@@ -212,6 +216,7 @@
             android:layout_marginRight="@dimen/cat_music_player_volume_button_margin"
             android:contentDescription="@string/cat_music_player_volume_up_button_content_description"
             app:icon="@drawable/ic_volume_up_white_24dp"
+            app:iconTint="?attr/colorOnSurface"
             app:layout_constraintBottom_toBottomOf="@id/volume_slider"
             app:layout_constraintStart_toEndOf="@id/volume_slider"
             app:layout_constraintTop_toTopOf="@id/volume_slider" />
