@@ -161,6 +161,7 @@ fun QuranAlbumPlayerScreen(
                     isPlaying = isPlaying,
                     currentProgress = currentProgress,
                     currentVolume = currentVolume,
+                    showFab = !showMusicPlayer,
                     onPlayPauseClick = {
                         val service = playbackService
                         if (service != null) {
@@ -186,6 +187,39 @@ fun QuranAlbumPlayerScreen(
                     onAyahClick = { /* TODO */ },
                     modifier = Modifier.padding(paddingValues)
                 )
+
+                // FAB positioned outside LazyColumn to avoid layout interference
+                if (!showMusicPlayer) {
+                    // Calculate FAB position based on screen width (album is square, full width)
+                    val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
+                    // Account for scaffold padding (top padding from paddingValues)
+                    val topPadding = paddingValues.calculateTopPadding()
+
+                    FloatingActionButton(
+                        onClick = {
+                            val service = playbackService
+                            if (service != null) {
+                                if (service.isPlaying()) {
+                                    service.togglePlayPause()
+                                } else {
+                                    showMusicPlayer = true
+                                    service.setAudioLanguage(currentAudioLanguage)
+                                    service.playSurah(surahNumber - 1, true)
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = topPadding + screenWidth - 28.dp, end = 24.dp),
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play"
+                        )
+                    }
+                }
             }
             is SurahDetailUiState.Error -> {
                 Box(
@@ -407,6 +441,7 @@ private fun AlbumPlayerContent(
     isPlaying: Boolean,
     currentProgress: Float,
     currentVolume: Float,
+    showFab: Boolean,
     onPlayPauseClick: () -> Unit,
     onRewindClick: () -> Unit,
     onForwardClick: () -> Unit,
@@ -418,31 +453,9 @@ private fun AlbumPlayerContent(
         state = scrollState,
         modifier = modifier.fillMaxSize()
     ) {
-        // Album Header with play FAB
+        // Album Header
         item {
-            Box {
-                AlbumHeader(surah = surah)
-
-                // Play FAB positioned half on album artwork, half below
-                if (!showMusicPlayer) {
-                    FloatingActionButton(
-                        onClick = {
-                            onPlayPauseClick()
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 24.dp)
-                            .offset(y = 28.dp), // Move down so it's half overlapping
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pause" else "Play"
-                        )
-                    }
-                }
-            }
+            AlbumHeader(surah = surah)
         }
 
         // Music Player Controls (expanded view)
