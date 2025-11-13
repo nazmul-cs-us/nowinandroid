@@ -18,17 +18,22 @@ import javax.inject.Singleton
 class QuranRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    
+
     private val database: QuranDatabase by lazy {
         QuranDatabase.getInstance(context)
     }
-    
+
     private val quranDao: QuranDao by lazy {
         database.quranDao()
     }
-    
+
+    private val preferences by lazy {
+        context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
+    }
+
     companion object {
         private const val TAG = "QuranRepository"
+        private const val PREF_BOOKMARKED_SURAHS = "bookmarked_surahs"
     }
     
     // ============= Surah Operations =============
@@ -256,19 +261,97 @@ class QuranRepository @Inject constructor(
         try {
             val surahCount = quranDao.getAllSurahsOnce().size
             val ayahCount = quranDao.getTotalAyahCount()
-            
+
             val isValid = surahCount == 114 && ayahCount > 6000
-            
+
             Log.d(TAG, "📊 Database status:")
             Log.d(TAG, "   - Surahs: $surahCount (expected: 114)")
             Log.d(TAG, "   - Ayahs: $ayahCount (expected: 6236)")
             Log.d(TAG, "   - Status: ${if (isValid) "✅ Valid" else "❌ Invalid"}")
-            
+
             isValid
         } catch (e: Exception) {
             Log.e(TAG, "❌ Database not initialized", e)
             false
         }
+    }
+
+    // ============= Bookmark Operations =============
+
+    /**
+     * Check if a Surah is bookmarked
+     */
+    fun isSurahBookmarked(surahNumber: Int): Boolean {
+        val bookmarkedSurahs = getBookmarkedSurahs()
+        val isBookmarked = surahNumber in bookmarkedSurahs
+        Log.d("QuranRepository_BOOKMARK", "🔍 CHECK | surah=$surahNumber | bookmarked=$isBookmarked | all_bookmarks=$bookmarkedSurahs")
+        return isBookmarked
+    }
+
+    /**
+     * Toggle bookmark status for a Surah
+     */
+    fun setSurahBookmarked(surahNumber: Int, bookmarked: Boolean) {
+        Log.d("QuranRepository_BOOKMARK", "💾 SET_START | surah=$surahNumber | bookmarked=$bookmarked")
+        val bookmarkedSurahs = getBookmarkedSurahs().toMutableSet()
+        Log.d("QuranRepository_BOOKMARK", "📊 BEFORE_SET | all_bookmarks=$bookmarkedSurahs")
+
+        if (bookmarked) {
+            bookmarkedSurahs.add(surahNumber)
+            Log.d("QuranRepository_BOOKMARK", "➕ ADDED | surah=$surahNumber")
+        } else {
+            bookmarkedSurahs.remove(surahNumber)
+            Log.d("QuranRepository_BOOKMARK", "➖ REMOVED | surah=$surahNumber")
+        }
+
+        Log.d("QuranRepository_BOOKMARK", "📊 AFTER_SET | all_bookmarks=$bookmarkedSurahs")
+        saveBookmarkedSurahs(bookmarkedSurahs)
+
+        // Verify the save worked
+        val verifyBookmarks = getBookmarkedSurahs()
+        val verified = verifyBookmarks.contains(surahNumber) == bookmarked
+        Log.d("QuranRepository_BOOKMARK", "✅ VERIFY | surah=$surahNumber | expected=$bookmarked | actual=${verifyBookmarks.contains(surahNumber)} | success=$verified | all_bookmarks=$verifyBookmarks")
+
+        Log.d(TAG, if (bookmarked) "📌 Bookmarked Surah $surahNumber" else "🔖 Removed bookmark from Surah $surahNumber")
+    }
+
+    /**
+     * Get all bookmarked Surah numbers
+     */
+    fun getBookmarkedSurahs(): Set<Int> {
+        val bookmarksString = preferences.getString(PREF_BOOKMARKED_SURAHS, "") ?: ""
+        val bookmarks = if (bookmarksString.isBlank()) {
+            emptySet()
+        } else {
+            bookmarksString.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+        }
+        Log.d("QuranRepository_BOOKMARK", "📖 GET_ALL | raw_string='$bookmarksString' | count=${bookmarks.size} | bookmarks=$bookmarks")
+        return bookmarks
+    }
+
+    /**
+     * Get all bookmarked Surahs as full Surah objects
+     */
+    suspend fun getBookmarkedSurahsList(): List<Surah> = withContext(Dispatchers.IO) {
+        try {
+            val bookmarkedNumbers = getBookmarkedSurahs()
+            bookmarkedNumbers.mapNotNull { surahNumber ->
+                getSurahByNumber(surahNumber)
+            }.sortedBy { it.number }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading bookmarked Surahs", e)
+            emptyList()
+        }
+    }
+
+    private fun saveBookmarkedSurahs(bookmarkedSurahs: Set<Int>) {
+        val bookmarksString = bookmarkedSurahs.joinToString(",")
+        Log.d("QuranRepository_BOOKMARK", "💾 SAVE | count=${bookmarkedSurahs.size} | bookmarks=$bookmarkedSurahs | string='$bookmarksString'")
+        preferences.edit().putString(
+            PREF_BOOKMARKED_SURAHS,
+            bookmarksString
+        ).apply()
+        Log.d("QuranRepository_BOOKMARK", "💾 SAVE_COMPLETE | key='$PREF_BOOKMARKED_SURAHS'")
     }
 }
 

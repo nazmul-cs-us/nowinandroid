@@ -56,7 +56,7 @@ fun LazyStaggeredGridScope.newsFeed(
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
     onExpandedCardClick: () -> Unit = {},
-    onSurahClick: (Int) -> Unit = {},
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> }, // surahNumber, newsResourceId
     onNewsClick: ((UserNewsResource) -> Unit)? = null,
 ) {
     when (feedState) {
@@ -108,7 +108,7 @@ fun LazyStaggeredGridScope.newsFeed(
                             android.util.Log.d("SurahToolbar", "Download Surah $surahNumber")
                         },
                         onInfo = {
-                            onSurahClick(surahNumber)
+                            onSurahClick(surahNumber, userNewsResource.id)
                         }
                     )
                 }
@@ -124,7 +124,7 @@ fun LazyStaggeredGridScope.newsFeed(
                         
                         // If it's a Surah, navigate to Surah detail screen
                         if (surahNumber != null) {
-                            onSurahClick(surahNumber)
+                            onSurahClick(surahNumber, userNewsResource.id)
                         } else if (onNewsClick != null) {
                             // Use custom news click handler if provided
                             onNewsClick(userNewsResource)

@@ -121,7 +121,11 @@
       "Bash(/tmp/iphone_style_slider.png)",
       "Bash(/tmp/updated_text_sizes.png)",
       "Bash(/tmp/quran_player_screen.png)",
-      "Bash(/tmp/album_player_home.png)"
+      "Bash(/tmp/album_player_home.png)",
+      "Bash(/tmp/bookmark_debug.png)",
+      "Bash(/tmp/app_launched.png)",
+      "Bash(/tmp/current_screen.png)",
+      "Bash(/tmp/home_screen.png)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

@@ -32,7 +32,7 @@ fun NavGraphBuilder.searchScreen(
     onBackClick: () -> Unit,
     onInterestsClick: () -> Unit,
     onTopicClick: (String) -> Unit,
-    onSurahClick: (Int) -> Unit = {},
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
 ) {
     // TODO: Handle back stack for each top-level destination. At the moment each top-level
     // destination may have own search screen's back stack.
