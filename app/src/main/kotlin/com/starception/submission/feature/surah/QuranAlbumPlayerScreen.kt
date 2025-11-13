@@ -11,6 +11,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -151,33 +152,58 @@ fun QuranAlbumPlayerScreen(
         }
     }
 
-    // Track scroll direction for floating toolbar and FAB animation
+    // Track scroll direction for floating toolbar and FAB animation with stable detection
     var previousScrollOffset by remember { mutableStateOf(0) }
-    var isScrollingDownState by remember { mutableStateOf(false) }
+    var previousItemIndex by remember { mutableStateOf(0) }
+    var isFloatingToolbarExpanded by remember { mutableStateOf(true) } // Left-side floating toolbar expanded state
     var showFabVisible by remember { mutableStateOf(true) } // FAB visible by default
 
-    val isScrollingDown = remember {
-        derivedStateOf {
-            val currentOffset = scrollState.firstVisibleItemScrollOffset
-            val scrollingDown = currentOffset > previousScrollOffset
+    // Use LaunchedEffect to track scroll changes with proper thresholds
+    LaunchedEffect(scrollState.firstVisibleItemIndex, scrollState.firstVisibleItemScrollOffset) {
+        val currentItemIndex = scrollState.firstVisibleItemIndex
+        val currentOffset = scrollState.firstVisibleItemScrollOffset
 
-            // Update direction only if scrolled significantly (avoid jitter)
-            if (kotlin.math.abs(currentOffset - previousScrollOffset) > 10) {
-                isScrollingDownState = scrollingDown
+        // Calculate total scroll position for accurate direction detection
+        val currentTotalScroll = (currentItemIndex * 1000) + currentOffset
+        val previousTotalScroll = (previousItemIndex * 1000) + previousScrollOffset
+        val scrollDelta = currentTotalScroll - previousTotalScroll
 
-                // Update FAB visibility based on scroll direction
-                val atTop = scrollState.firstVisibleItemIndex == 0 && scrollState.firstVisibleItemScrollOffset < 100
-                showFabVisible = atTop || !scrollingDown
+        // Only update if scroll delta is significant (prevents jitter during small movements)
+        if (kotlin.math.abs(scrollDelta) > 50) {
+            val isScrollingDown = scrollDelta > 0
+
+            // At top: always show FAB and floating toolbar
+            val atTop = currentItemIndex == 0 && currentOffset < 100
+
+            if (atTop) {
+                showFabVisible = true
+                isFloatingToolbarExpanded = true
+            } else {
+                // Scrolling up → show FAB and expand floating toolbar
+                // Scrolling down → hide FAB and collapse floating toolbar to hint
+                showFabVisible = !isScrollingDown
+                isFloatingToolbarExpanded = !isScrollingDown
             }
 
+            // Update previous scroll position
             previousScrollOffset = currentOffset
-            scrollingDown && currentOffset > 50 // Only hide after scrolling past 50dp
+            previousItemIndex = currentItemIndex
         }
     }
 
-    val showFloatingToolbar = !isScrollingDown.value
-
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                // Tap anywhere to expand floating toolbar if collapsed
+                if (!isFloatingToolbarExpanded) {
+                    isFloatingToolbarExpanded = true
+                }
+            }
+    ) {
         Scaffold(
             topBar = {}
         ) { paddingValues ->
@@ -185,8 +211,7 @@ fun QuranAlbumPlayerScreen(
             is SurahDetailUiState.Loading -> {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                        .fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
@@ -237,14 +262,13 @@ fun QuranAlbumPlayerScreen(
                             }
                         }
                     },
-                    modifier = Modifier.padding(paddingValues)
+                    modifier = Modifier
                 )
             }
             is SurahDetailUiState.Error -> {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                        .fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -256,7 +280,7 @@ fun QuranAlbumPlayerScreen(
         }
     }
 
-    // Overlay toolbar on top of content
+    // Always visible toolbar with collapsing effect based on scroll position
     AlbumPlayerTopBar(
         isCollapsed = isCollapsed.value,
         surahName = when (uiState) {
@@ -330,16 +354,17 @@ fun QuranAlbumPlayerScreen(
         )
     }
 
-    // Floating action toolbar on the left side with scroll-based animation
+    // Floating action toolbar on the left side - sticks to left edge, below top toolbar
     Box(
         modifier = Modifier
-            .fillMaxHeight()
-            .align(Alignment.CenterStart)
-            .padding(start = 16.dp, top = 80.dp), // Move left and down
-        contentAlignment = Alignment.CenterStart
+            .align(Alignment.TopStart)
+            .padding(top = 140.dp) // Position below top toolbar (64dp) + status bar + spacing
     ) {
         FloatingActionToolbar(
-            visible = showFloatingToolbar
+            isExpanded = isFloatingToolbarExpanded,
+            onExpandedChange = { expanded ->
+                isFloatingToolbarExpanded = expanded
+            }
         )
     }
 }
@@ -456,6 +481,7 @@ private fun AlbumPlayerTopBar(
                 )
             }
 
+            // More options menu
             IconButton(onClick = { /* TODO: More */ }) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
@@ -487,6 +513,7 @@ private fun AlbumPlayerContent(
 ) {
     LazyColumn(
         state = scrollState,
+        contentPadding = WindowInsets.statusBars.asPaddingValues(),
         modifier = modifier.fillMaxSize()
     ) {
         // Album Header with FAB
@@ -882,43 +909,90 @@ private fun AyahTrackItem(
 
 @Composable
 private fun FloatingActionToolbar(
-    visible: Boolean = true,
+    isExpanded: Boolean = true,
+    onExpandedChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedButton by remember { mutableStateOf<String?>(null) }
 
-    AnimatedVisibility(
-        visible = visible,
-        modifier = modifier,
-        enter = slideInHorizontally(
-            initialOffsetX = { -it }, // Slide in from left
-            animationSpec = tween(
-                durationMillis = 300,
-                easing = FastOutSlowInEasing
-            )
-        ) + fadeIn(
-            animationSpec = tween(durationMillis = 300)
-        ),
-        exit = slideOutHorizontally(
-            targetOffsetX = { -it }, // Slide out to left
-            animationSpec = tween(
-                durationMillis = 300,
-                easing = FastOutSlowInEasing
-            )
-        ) + fadeOut(
-            animationSpec = tween(durationMillis = 300)
-        )
-    ) {
-        Surface(
-            shape = RoundedCornerShape(50), // Make container very rounded/pill-shaped
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 4.dp,
-            shadowElevation = 4.dp
+    // Use Box with absolute positioning to prevent layout shifts
+    Box(modifier = modifier) {
+        // Collapsed state - Hint indicator flush with left edge
+        AnimatedVisibility(
+            visible = !isExpanded,
+            enter = fadeIn(animationSpec = tween(300)) +
+                    slideInHorizontally(
+                        initialOffsetX = { -it },
+                        animationSpec = tween(300, easing = FastOutSlowInEasing)
+                    ),
+            exit = fadeOut(animationSpec = tween(300)) +
+                   slideOutHorizontally(
+                       targetOffsetX = { -it },
+                       animationSpec = tween(300, easing = FastOutSlowInEasing)
+                   ),
+            modifier = Modifier.align(Alignment.TopStart) // Fix position
         ) {
-            Column(
-                modifier = Modifier.padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Surface(
+                shape = RoundedCornerShape(
+                    topStart = 0.dp,
+                    topEnd = 50.dp,
+                    bottomEnd = 50.dp,
+                    bottomStart = 0.dp
+                ),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                tonalElevation = 4.dp,
+                shadowElevation = 4.dp,
+                modifier = Modifier.clickable { onExpandedChange(true) }
             ) {
+                Row(
+                    modifier = Modifier
+                        .padding(vertical = 16.dp, horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Expand toolbar",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+        // Expanded state - Full toolbar (slightly offset from edge for better look)
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn(animationSpec = tween(300)) +
+                    slideInHorizontally(
+                        initialOffsetX = { -it },
+                        animationSpec = tween(300, easing = FastOutSlowInEasing)
+                    ),
+            exit = fadeOut(animationSpec = tween(300)) +
+                   slideOutHorizontally(
+                       targetOffsetX = { -it },
+                       animationSpec = tween(300, easing = FastOutSlowInEasing)
+                   ),
+            modifier = Modifier
+                .align(Alignment.TopStart) // Fix position
+                .padding(start = 16.dp) // Add some spacing from edge for expanded state
+        ) {
+            Surface(
+                shape = RoundedCornerShape(50), // Make container very rounded/pill-shaped
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 4.dp,
+                shadowElevation = 4.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                // Collapse button at the top
+                FloatingToolbarButton(
+                    icon = Icons.Default.ChevronLeft,
+                    contentDescription = "Collapse toolbar",
+                    selected = false,
+                    onClick = { onExpandedChange(false) }
+                )
             // Bold button
             FloatingToolbarButton(
                 icon = Icons.Default.FormatBold,
@@ -990,6 +1064,7 @@ private fun FloatingActionToolbar(
                 selected = selectedButton == "alignRight",
                 onClick = { selectedButton = if (selectedButton == "alignRight") null else "alignRight" }
             )
+                }
             }
         }
     }
