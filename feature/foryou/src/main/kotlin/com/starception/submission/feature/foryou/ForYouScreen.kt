@@ -107,7 +107,7 @@ import com.starception.submission.core.ui.newsFeed
 @Composable
 internal fun ForYouScreen(
     onTopicClick: (String) -> Unit,
-    onSurahClick: (Int) -> Unit = {},
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     viewModel: ForYouViewModel = hiltViewModel(),
 ) {
@@ -140,7 +140,7 @@ internal fun ForYouScreen(
     deepLinkedUserNewsResource: UserNewsResource?,
     onTopicCheckedChanged: (String, Boolean) -> Unit,
     onTopicClick: (String) -> Unit,
-    onSurahClick: (Int) -> Unit = {},
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDeepLinkOpened: (String) -> Unit,
     saveFollowedTopics: () -> Unit,
     onNewsResourcesCheckedChanged: (String, Boolean) -> Unit,

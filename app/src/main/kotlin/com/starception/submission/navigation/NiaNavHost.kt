@@ -56,7 +56,7 @@ fun NiaNavHost(
     ) {
         forYouSection(
             onTopicClick = navController::navigateToTopic,
-            onSurahClick = navController::navigateToSurah,
+            onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
         ) {
             topicScreen(
                 showBackButton = true,
@@ -67,13 +67,13 @@ fun NiaNavHost(
         bookmarksScreen(
             onTopicClick = navController::navigateToTopic,
             onShowSnackbar = onShowSnackbar,
-            onSurahClick = navController::navigateToSurah,
+            onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
         )
         searchScreen(
             onBackClick = navController::popBackStack,
             onInterestsClick = { appState.navigateToTopLevelDestination(INTERESTS) },
             onTopicClick = navController::navigateToTopic,
-            onSurahClick = navController::navigateToSurah,
+            onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
         )
         interestsListDetailScreen()
         prayerTimesScreen()

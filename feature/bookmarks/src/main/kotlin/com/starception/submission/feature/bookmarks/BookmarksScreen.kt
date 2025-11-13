@@ -79,7 +79,7 @@ import com.starception.submission.core.ui.newsFeed
 internal fun BookmarksRoute(
     onTopicClick: (String) -> Unit,
     onShowSnackbar: suspend (String, String?) -> Boolean,
-    onSurahClick: (Int) -> Unit = {},
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: BookmarksViewModel = hiltViewModel(),
@@ -111,7 +111,7 @@ internal fun BookmarksScreen(
     removeFromBookmarks: (String) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
-    onSurahClick: (Int) -> Unit = {},
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
     shouldDisplayUndoBookmark: Boolean = false,
@@ -173,7 +173,7 @@ private fun BookmarksGrid(
     removeFromBookmarks: (String) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
-    onSurahClick: (Int) -> Unit = {},
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -286,7 +286,7 @@ private fun BookmarksGridPreview(
             removeFromBookmarks = {},
             onNewsResourceViewed = {},
             onTopicClick = {},
-            onSurahClick = {},
+            onSurahClick = { _, _ -> },
         )
     }
 }

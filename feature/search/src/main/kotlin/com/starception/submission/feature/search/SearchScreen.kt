@@ -100,7 +100,7 @@ internal fun SearchRoute(
     onBackClick: () -> Unit,
     onInterestsClick: () -> Unit,
     onTopicClick: (String) -> Unit,
-    onSurahClick: (Int) -> Unit = {},
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     searchViewModel: SearchViewModel = hiltViewModel(),
 ) {
@@ -140,7 +140,7 @@ internal fun SearchScreen(
     onBackClick: () -> Unit = {},
     onInterestsClick: () -> Unit = {},
     onTopicClick: (String) -> Unit = {},
-    onSurahClick: (Int) -> Unit = {},
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
 ) {
     TrackScreenViewEvent(screenName = "Search")
     Column(modifier = modifier) {
@@ -295,7 +295,7 @@ private fun SearchResultBody(
     onNewsResourcesCheckedChanged: (String, Boolean) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
     onFollowButtonClick: (String, Boolean) -> Unit,
-    onSurahClick: (Int) -> Unit = {},
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
 ) {
     val state = rememberLazyStaggeredGridState()
     Box(

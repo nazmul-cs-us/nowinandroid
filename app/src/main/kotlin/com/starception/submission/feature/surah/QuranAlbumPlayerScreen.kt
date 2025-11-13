@@ -39,12 +39,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.starception.submission.R
+import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.core.qurandatabase.Ayah
+import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.core.qurandatabase.Surah
 import com.starception.submission.feature.quran.QuranPlayerViewModel
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.feature.quran.AudioLanguage
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * Quran Album Player Screen - Compose version
@@ -55,8 +63,11 @@ import com.starception.submission.feature.quran.AudioLanguage
 @Composable
 fun QuranAlbumPlayerScreen(
     surahNumber: Int,
+    newsResourceId: String? = null, // News resource ID for bookmark tracking
     onBackClick: () -> Unit,
-    viewModel: SurahDetailViewModel = hiltViewModel()
+    viewModel: SurahDetailViewModel = hiltViewModel(),
+    quranRepository: QuranRepository = hiltViewModel<QuranRepositoryHolder>().repository,
+    userDataRepository: UserDataRepository = hiltViewModel<UserDataRepositoryHolder>().repository
 ) {
     val context = LocalContext.current
     val playerViewModel = remember { QuranPlayerViewModel(context) }
@@ -71,7 +82,22 @@ fun QuranAlbumPlayerScreen(
     var currentVolume by remember { mutableStateOf(0.7f) }
     var showTranslationDialog by remember { mutableStateOf(false) }
     var currentAudioLanguage by remember { mutableStateOf(AudioLanguage.ARABIC_ONLY) }
+
+    // Track bookmark state using UserDataRepository (the correct repository for news bookmarks)
     var isBookmarked by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Sync bookmark state from UserDataRepository if we have a news resource ID
+    LaunchedEffect(newsResourceId) {
+        if (newsResourceId != null) {
+            val userData = userDataRepository.userData.first()
+            val bookmarkState = newsResourceId in userData.bookmarkedNewsResources
+            android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "🔄 SYNC | surah=$surahNumber | newsResourceId=$newsResourceId | bookmarked=$bookmarkState")
+            isBookmarked = bookmarkState
+        } else {
+            android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "⚠️ NO_NEWS_ID | surah=$surahNumber | bookmark disabled")
+        }
+    }
 
     val availableTranslations = remember { viewModel.getAvailableTranslations() }
 
@@ -125,16 +151,30 @@ fun QuranAlbumPlayerScreen(
         }
     }
 
-    // Track scroll direction for floating toolbar animation
+    // Track scroll direction for floating toolbar and FAB animation
     var previousScrollOffset by remember { mutableStateOf(0) }
+    var isScrollingDownState by remember { mutableStateOf(false) }
+    var showFabVisible by remember { mutableStateOf(true) } // FAB visible by default
+
     val isScrollingDown = remember {
         derivedStateOf {
             val currentOffset = scrollState.firstVisibleItemScrollOffset
             val scrollingDown = currentOffset > previousScrollOffset
+
+            // Update direction only if scrolled significantly (avoid jitter)
+            if (kotlin.math.abs(currentOffset - previousScrollOffset) > 10) {
+                isScrollingDownState = scrollingDown
+
+                // Update FAB visibility based on scroll direction
+                val atTop = scrollState.firstVisibleItemIndex == 0 && scrollState.firstVisibleItemScrollOffset < 100
+                showFabVisible = atTop || !scrollingDown
+            }
+
             previousScrollOffset = currentOffset
             scrollingDown && currentOffset > 50 // Only hide after scrolling past 50dp
         }
     }
+
     val showFloatingToolbar = !isScrollingDown.value
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -161,7 +201,7 @@ fun QuranAlbumPlayerScreen(
                     isPlaying = isPlaying,
                     currentProgress = currentProgress,
                     currentVolume = currentVolume,
-                    showFab = !showMusicPlayer,
+                    showFabVisible = showFabVisible,
                     onPlayPauseClick = {
                         val service = playbackService
                         if (service != null) {
@@ -185,41 +225,20 @@ fun QuranAlbumPlayerScreen(
                         playbackService?.setVolume(volume)
                     },
                     onAyahClick = { /* TODO */ },
+                    onFabClick = {
+                        val service = playbackService
+                        if (service != null) {
+                            if (service.isPlaying()) {
+                                service.togglePlayPause()
+                            } else {
+                                showMusicPlayer = true
+                                service.setAudioLanguage(currentAudioLanguage)
+                                service.playSurah(surahNumber - 1, true)
+                            }
+                        }
+                    },
                     modifier = Modifier.padding(paddingValues)
                 )
-
-                // FAB positioned outside LazyColumn to avoid layout interference
-                if (!showMusicPlayer) {
-                    // Calculate FAB position based on screen width (album is square, full width)
-                    val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
-                    // Account for scaffold padding (top padding from paddingValues)
-                    val topPadding = paddingValues.calculateTopPadding()
-
-                    FloatingActionButton(
-                        onClick = {
-                            val service = playbackService
-                            if (service != null) {
-                                if (service.isPlaying()) {
-                                    service.togglePlayPause()
-                                } else {
-                                    showMusicPlayer = true
-                                    service.setAudioLanguage(currentAudioLanguage)
-                                    service.playSurah(surahNumber - 1, true)
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = topPadding + screenWidth - 28.dp, end = 24.dp),
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pause" else "Play"
-                        )
-                    }
-                }
             }
             is SurahDetailUiState.Error -> {
                 Box(
@@ -248,7 +267,23 @@ fun QuranAlbumPlayerScreen(
         isBookmarked = isBookmarked,
         onBackClick = onBackClick,
         onTranslationClick = { showTranslationDialog = true },
-        onBookmarkClick = { isBookmarked = !isBookmarked },
+        onBookmarkClick = {
+            // Only toggle bookmark if we have a valid news resource ID
+            if (newsResourceId != null) {
+                val oldState = isBookmarked
+                val newState = !oldState
+                isBookmarked = newState
+                android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "👆 CLICK | surah=$surahNumber | newsResourceId=$newsResourceId | old_state=$oldState | new_state=$newState")
+
+                // Update bookmark in UserDataRepository (correct repository for news bookmarks)
+                coroutineScope.launch {
+                    userDataRepository.setNewsResourceBookmarked(newsResourceId, newState)
+                    android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "✅ CLICK_COMPLETE | surah=$surahNumber | newsResourceId=$newsResourceId | state=$newState")
+                }
+            } else {
+                android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "⚠️ CLICK_IGNORED | surah=$surahNumber | no newsResourceId")
+            }
+        },
         modifier = Modifier.align(Alignment.TopCenter)
     )
 
@@ -441,21 +476,61 @@ private fun AlbumPlayerContent(
     isPlaying: Boolean,
     currentProgress: Float,
     currentVolume: Float,
-    showFab: Boolean,
+    showFabVisible: Boolean,
     onPlayPauseClick: () -> Unit,
     onRewindClick: () -> Unit,
     onForwardClick: () -> Unit,
     onVolumeChange: (Float) -> Unit,
     onAyahClick: (Ayah) -> Unit,
+    onFabClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
         state = scrollState,
         modifier = modifier.fillMaxSize()
     ) {
-        // Album Header
+        // Album Header with FAB
         item {
-            AlbumHeader(surah = surah)
+            Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                ) {
+                    AlbumHeader(surah = surah)
+
+                    // FAB positioned with half-overlap effect
+                    if (!showMusicPlayer) {
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = showFabVisible,
+                            enter = scaleIn(
+                                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                            ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+                            exit = scaleOut(
+                                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                            ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 24.dp, bottom = 0.dp)
+                        ) {
+                            FloatingActionButton(
+                                onClick = onFabClick,
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ) {
+                                Icon(
+                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (isPlaying) "Pause" else "Play"
+                                )
+                            }
+                        }
+                    }
+                }
+                // Spacer for FAB half-overlap - only when FAB is visible
+                if (!showMusicPlayer && showFabVisible) {
+                    Spacer(modifier = Modifier.height(28.dp))
+                }
+            }
         }
 
         // Music Player Controls (expanded view)
@@ -622,7 +697,7 @@ private fun MusicPlayerControls(
         color = Color.Black
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 24.dp)
+            modifier = Modifier.padding(vertical = 12.dp)
         ) {
             // Progress bar at top
             LinearProgressIndicator(
@@ -634,7 +709,7 @@ private fun MusicPlayerControls(
                 trackColor = Color.Gray.copy(alpha = 0.3f),
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(12.dp))
 
             // Title and Artist
             Column(
@@ -645,19 +720,19 @@ private fun MusicPlayerControls(
             ) {
                 Text(
                     text = surahName,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = surahNameArabic,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.7f)
                 )
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(16.dp))
 
             // Playback controls
             Row(
@@ -670,20 +745,20 @@ private fun MusicPlayerControls(
                 // Previous button
                 IconButton(
                     onClick = onRewindClick,
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
                         tint = Color.White,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                 }
 
                 // Play/Pause button
                 FilledIconButton(
                     onClick = onPlayPauseClick,
-                    modifier = Modifier.size(72.dp),
+                    modifier = Modifier.size(64.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = Color.White,
                         contentColor = Color.Black
@@ -692,25 +767,25 @@ private fun MusicPlayerControls(
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(36.dp)
                     )
                 }
 
                 // Next button
                 IconButton(
                     onClick = onForwardClick,
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next",
                         tint = Color.White,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                 }
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(16.dp))
 
             // Volume controls
             Row(
@@ -718,13 +793,13 @@ private fun MusicPlayerControls(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.VolumeDown,
                     contentDescription = "Volume down",
                     tint = Color.White,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(24.dp)
                 )
 
                 Slider(
@@ -742,7 +817,7 @@ private fun MusicPlayerControls(
                     imageVector = Icons.Default.VolumeUp,
                     contentDescription = "Volume up",
                     tint = Color.White,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
@@ -1034,3 +1109,19 @@ private fun getAudioLanguageDisplayName(language: AudioLanguage): String {
         AudioLanguage.BENGALI_TRANSLATION -> "Bengali"
     }
 }
+
+/**
+ * ViewModel holder for QuranRepository to support Hilt injection in Composables
+ */
+@HiltViewModel
+class QuranRepositoryHolder @Inject constructor(
+    val repository: QuranRepository
+) : ViewModel()
+
+/**
+ * ViewModel holder for UserDataRepository to support Hilt injection in Composables
+ */
+@HiltViewModel
+class UserDataRepositoryHolder @Inject constructor(
+    val repository: UserDataRepository
+) : ViewModel()
