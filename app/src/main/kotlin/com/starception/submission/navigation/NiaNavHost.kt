@@ -20,7 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.starception.submission.feature.bookmarks.navigation.bookmarksScreen
+import com.starception.submission.feature.bookmarks.navigation.bookmarksSection
 import com.starception.submission.feature.foryou.navigation.ForYouBaseRoute
 import com.starception.submission.feature.foryou.navigation.forYouSection
 import com.starception.submission.feature.interests.navigation.navigateToInterests
@@ -63,12 +63,21 @@ fun NiaNavHost(
                 onBackClick = navController::popBackStack,
                 onTopicClick = navController::navigateToTopic,
             )
+            // Surah screen nested within For You section
+            surahScreen(
+                onBackClick = navController::popBackStack
+            )
         }
-        bookmarksScreen(
+        bookmarksSection(
             onTopicClick = navController::navigateToTopic,
             onShowSnackbar = onShowSnackbar,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
-        )
+        ) {
+            // Surah screen nested within Bookmarks section
+            surahScreen(
+                onBackClick = navController::popBackStack
+            )
+        }
         searchScreen(
             onBackClick = navController::popBackStack,
             onInterestsClick = { appState.navigateToTopLevelDestination(INTERESTS) },
@@ -77,8 +86,5 @@ fun NiaNavHost(
         )
         interestsListDetailScreen()
         prayerTimesScreen()
-        surahScreen(
-            onBackClick = navController::popBackStack
-        )
     }
 }
