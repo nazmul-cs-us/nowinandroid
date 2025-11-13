@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -144,11 +145,31 @@ fun QuranAlbumPlayerScreen(
         viewModel.loadSurah(surahNumber)
     }
 
-    // Calculate toolbar collapse state
+    // Calculate toolbar collapse state with smooth transition
+    // Track when AlbumInfoCard (item 1) is scrolling up toward the toolbar
+    val collapseProgress = remember {
+        derivedStateOf {
+            when {
+                scrollState.firstVisibleItemIndex > 1 -> 1f
+                scrollState.firstVisibleItemIndex == 1 -> {
+                    // Smooth transition as item 1 (AlbumInfoCard) scrolls up
+                    val offset = scrollState.firstVisibleItemScrollOffset
+                    (offset / 200f).coerceIn(0f, 1f)
+                }
+                scrollState.firstVisibleItemIndex == 0 -> {
+                    // Check if we're near the end of item 0 (AlbumHeader)
+                    // Assuming AlbumHeader height is around screen width (square)
+                    val offset = scrollState.firstVisibleItemScrollOffset
+                    ((offset - 800) / 200f).coerceIn(0f, 1f)
+                }
+                else -> 0f
+            }
+        }
+    }
+
     val isCollapsed = remember {
         derivedStateOf {
-            scrollState.firstVisibleItemIndex > 0 ||
-            scrollState.firstVisibleItemScrollOffset > 100
+            collapseProgress.value > 0.5f
         }
     }
 
@@ -194,19 +215,23 @@ fun QuranAlbumPlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                // Tap anywhere to expand floating toolbar if collapsed
-                if (!isFloatingToolbarExpanded) {
-                    isFloatingToolbarExpanded = true
-                }
-            }
     ) {
-        Scaffold(
-            topBar = {}
-        ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    // Tap anywhere to expand floating toolbar if collapsed
+                    if (!isFloatingToolbarExpanded) {
+                        isFloatingToolbarExpanded = true
+                    }
+                }
+        ) {
+            Scaffold(
+                topBar = {}
+            ) { paddingValues ->
         when (val state = uiState) {
             is SurahDetailUiState.Loading -> {
                 Box(
@@ -222,6 +247,7 @@ fun QuranAlbumPlayerScreen(
                     surah = state.surah,
                     ayahs = state.ayahs,
                     scrollState = scrollState,
+                    collapseProgress = collapseProgress.value,
                     showMusicPlayer = showMusicPlayer,
                     isPlaying = isPlaying,
                     currentProgress = currentProgress,
@@ -278,102 +304,109 @@ fun QuranAlbumPlayerScreen(
                 }
             }
         }
-    }
+        }
 
-    // Always visible toolbar with collapsing effect based on scroll position
-    AlbumPlayerTopBar(
-        isCollapsed = isCollapsed.value,
-        surahName = when (uiState) {
-            is SurahDetailUiState.Success -> (uiState as SurahDetailUiState.Success).surah.nameEnglish
-            else -> ""
-        },
-        currentTranslation = currentTranslation,
-        isBookmarked = isBookmarked,
-        onBackClick = onBackClick,
-        onTranslationClick = { showTranslationDialog = true },
-        onBookmarkClick = {
-            // Only toggle bookmark if we have a valid news resource ID
-            if (newsResourceId != null) {
-                val oldState = isBookmarked
-                val newState = !oldState
-                isBookmarked = newState
-                android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "👆 CLICK | surah=$surahNumber | newsResourceId=$newsResourceId | old_state=$oldState | new_state=$newState")
-
-                // Update bookmark in UserDataRepository (correct repository for news bookmarks)
-                coroutineScope.launch {
-                    userDataRepository.setNewsResourceBookmarked(newsResourceId, newState)
-                    android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "✅ CLICK_COMPLETE | surah=$surahNumber | newsResourceId=$newsResourceId | state=$newState")
-                }
-            } else {
-                android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "⚠️ CLICK_IGNORED | surah=$surahNumber | no newsResourceId")
-            }
-        },
-        modifier = Modifier.align(Alignment.TopCenter)
-    )
-
-    // Translation selection dialog
-    if (showTranslationDialog) {
-        TranslationSelectionDialog(
-            availableTranslations = availableTranslations,
-            currentTranslation = currentTranslation,
-            onDismiss = { showTranslationDialog = false },
-            onTranslationSelected = { translationCode ->
-                // Change the text display
-                viewModel.changeTranslation(translationCode, surahNumber)
-
-                // Try to map translation to audio language
-                val mappedAudioLanguage = mapTranslationCodeToAudioLanguage(translationCode)
-
-                if (mappedAudioLanguage != null) {
-                    // Translation has audio support
-                    currentAudioLanguage = mappedAudioLanguage
-                    val service = playbackService
-                    if (service != null) {
-                        service.setAudioLanguage(mappedAudioLanguage)
-                        val surahIndex = surahNumber - 1
-                        val shouldAutoPlay = service.isPlaying()
-                        service.playSurah(surahIndex, shouldAutoPlay)
-                    }
-                    Toast.makeText(
-                        context,
-                        "Translation applied with ${getAudioLanguageDisplayName(mappedAudioLanguage)} audio",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } else {
-                    // Translation has no audio support, keep playing Arabic
-                    Toast.makeText(
-                        context,
-                        "Translation applied. Audio not available for ${viewModel.getTranslationName(translationCode)}, playing Arabic audio.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-
-                showTranslationDialog = false
+        // Always visible toolbar with collapsing effect based on scroll position
+        AlbumPlayerTopBar(
+            collapseProgress = collapseProgress.value,
+            isCollapsed = isCollapsed.value,
+            surahName = when (uiState) {
+                is SurahDetailUiState.Success -> (uiState as SurahDetailUiState.Success).surah.nameEnglish
+                else -> ""
             },
-            getTranslationDisplayName = { code -> viewModel.getTranslationName(code) }
-        )
-    }
+            surahNameArabic = when (uiState) {
+                is SurahDetailUiState.Success -> (uiState as SurahDetailUiState.Success).surah.nameArabic
+                else -> ""
+            },
+            currentTranslation = currentTranslation,
+            isBookmarked = isBookmarked,
+            onBackClick = onBackClick,
+            onTranslationClick = { showTranslationDialog = true },
+            onBookmarkClick = {
+                // Only toggle bookmark if we have a valid news resource ID
+                if (newsResourceId != null) {
+                    val oldState = isBookmarked
+                    val newState = !oldState
+                    isBookmarked = newState
+                    android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "👆 CLICK | surah=$surahNumber | newsResourceId=$newsResourceId | old_state=$oldState | new_state=$newState")
 
-    // Floating action toolbar on the left side - sticks to left edge, below top toolbar
-    Box(
-        modifier = Modifier
-            .align(Alignment.TopStart)
-            .padding(top = 140.dp) // Position below top toolbar (64dp) + status bar + spacing
-    ) {
-        FloatingActionToolbar(
-            isExpanded = isFloatingToolbarExpanded,
-            onExpandedChange = { expanded ->
-                isFloatingToolbarExpanded = expanded
-            }
+                    // Update bookmark in UserDataRepository (correct repository for news bookmarks)
+                    coroutineScope.launch {
+                        userDataRepository.setNewsResourceBookmarked(newsResourceId, newState)
+                        android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "✅ CLICK_COMPLETE | surah=$surahNumber | newsResourceId=$newsResourceId | state=$newState")
+                    }
+                } else {
+                    android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "⚠️ CLICK_IGNORED | surah=$surahNumber | no newsResourceId")
+                }
+            },
+            modifier = Modifier.align(Alignment.TopCenter)
         )
+
+        // Translation selection dialog
+        if (showTranslationDialog) {
+            TranslationSelectionDialog(
+                availableTranslations = availableTranslations,
+                currentTranslation = currentTranslation,
+                onDismiss = { showTranslationDialog = false },
+                onTranslationSelected = { translationCode ->
+                    // Change the text display
+                    viewModel.changeTranslation(translationCode, surahNumber)
+
+                    // Try to map translation to audio language
+                    val mappedAudioLanguage = mapTranslationCodeToAudioLanguage(translationCode)
+
+                    if (mappedAudioLanguage != null) {
+                        // Translation has audio support
+                        currentAudioLanguage = mappedAudioLanguage
+                        val service = playbackService
+                        if (service != null) {
+                            service.setAudioLanguage(mappedAudioLanguage)
+                            val surahIndex = surahNumber - 1
+                            val shouldAutoPlay = service.isPlaying()
+                            service.playSurah(surahIndex, shouldAutoPlay)
+                        }
+                        Toast.makeText(
+                            context,
+                            "Translation applied with ${getAudioLanguageDisplayName(mappedAudioLanguage)} audio",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        // Translation has no audio support, keep playing Arabic
+                        Toast.makeText(
+                            context,
+                            "Translation applied. Audio not available for ${viewModel.getTranslationName(translationCode)}, playing Arabic audio.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+
+                    showTranslationDialog = false
+                },
+                getTranslationDisplayName = { code -> viewModel.getTranslationName(code) }
+            )
+        }
+
+        // Floating action toolbar on the left side - positioned at vertical middle
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart) // Position at vertical middle of screen
+        ) {
+            FloatingActionToolbar(
+                isExpanded = isFloatingToolbarExpanded,
+                onExpandedChange = { expanded ->
+                    isFloatingToolbarExpanded = expanded
+                }
+            )
+        }
     }
 }
 }
 
 @Composable
 private fun AlbumPlayerTopBar(
+    collapseProgress: Float,
     isCollapsed: Boolean,
     surahName: String,
+    surahNameArabic: String,
     currentTranslation: String,
     isBookmarked: Boolean,
     onBackClick: () -> Unit,
@@ -433,17 +466,36 @@ private fun AlbumPlayerTopBar(
                 )
             }
 
-            AnimatedVisibility(
-                visible = isCollapsed,
-                enter = fadeIn() + expandHorizontally(),
-                exit = fadeOut() + shrinkHorizontally()
+            // Smooth blending title that appears to rise from AlbumInfoCard
+            Column(
+                modifier = Modifier
+                    .padding(start = 16.dp)
+                    .graphicsLayer {
+                        alpha = collapseProgress
+                        scaleX = 0.9f + (collapseProgress * 0.1f)
+                        scaleY = 0.9f + (collapseProgress * 0.1f)
+                    }
             ) {
-                Text(
-                    text = surahName,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = contentColor,
-                    modifier = Modifier.padding(start = 16.dp)
-                )
+                if (collapseProgress > 0f) {
+                    // Surah name in English - matches AlbumInfoCard styling
+                    Text(
+                        text = surahName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = contentColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    // Surah name in Arabic - matches AlbumInfoCard styling
+                    Text(
+                        text = surahNameArabic,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = contentColor.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             Spacer(Modifier.weight(1f))
@@ -498,6 +550,7 @@ private fun AlbumPlayerContent(
     surah: Surah,
     ayahs: List<Ayah>,
     scrollState: androidx.compose.foundation.lazy.LazyListState,
+    collapseProgress: Float,
     showMusicPlayer: Boolean,
     isPlaying: Boolean,
     currentProgress: Float,
@@ -580,7 +633,10 @@ private fun AlbumPlayerContent(
         // Album Info Card (shown when player is collapsed)
         if (!showMusicPlayer) {
             item {
-                AlbumInfoCard(surah = surah)
+                AlbumInfoCard(
+                    surah = surah,
+                    collapseProgress = collapseProgress
+                )
             }
         }
 
@@ -645,7 +701,10 @@ private fun AlbumHeader(surah: Surah) {
 }
 
 @Composable
-private fun AlbumInfoCard(surah: Surah) {
+private fun AlbumInfoCard(
+    surah: Surah,
+    collapseProgress: Float = 0f
+) {
     // Use MaterialTheme.colorScheme for automatic theme support
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -659,21 +718,27 @@ private fun AlbumInfoCard(surah: Surah) {
                 .padding(24.dp),
             verticalArrangement = Arrangement.Center
         ) {
-            // Surah name in English
+            // Surah name in English - fades out as it blends into toolbar
             Text(
                 text = surah.nameEnglish,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.graphicsLayer {
+                    alpha = 1f - collapseProgress
+                }
             )
 
             Spacer(Modifier.height(8.dp))
 
-            // Surah name in Arabic
+            // Surah name in Arabic - fades out as it blends into toolbar
             Text(
                 text = surah.nameArabic,
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.graphicsLayer {
+                    alpha = 1f - collapseProgress
+                }
             )
 
             Spacer(Modifier.height(16.dp))
@@ -915,23 +980,14 @@ private fun FloatingActionToolbar(
 ) {
     var selectedButton by remember { mutableStateOf<String?>(null) }
 
-    // Use Box with absolute positioning to prevent layout shifts
-    Box(modifier = modifier) {
-        // Collapsed state - Hint indicator flush with left edge
-        AnimatedVisibility(
-            visible = !isExpanded,
-            enter = fadeIn(animationSpec = tween(300)) +
-                    slideInHorizontally(
-                        initialOffsetX = { -it },
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ),
-            exit = fadeOut(animationSpec = tween(300)) +
-                   slideOutHorizontally(
-                       targetOffsetX = { -it },
-                       animationSpec = tween(300, easing = FastOutSlowInEasing)
-                   ),
-            modifier = Modifier.align(Alignment.TopStart) // Fix position
-        ) {
+    // Use Crossfade for smooth transition between hint and expanded states
+    Crossfade(
+        targetState = isExpanded,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        modifier = modifier
+    ) { expanded ->
+        if (!expanded) {
+            // Collapsed state - Hint indicator flush with left edge
             Surface(
                 shape = RoundedCornerShape(
                     topStart = 0.dp,
@@ -957,25 +1013,9 @@ private fun FloatingActionToolbar(
                     )
                 }
             }
-        }
-
-        // Expanded state - Full toolbar (slightly offset from edge for better look)
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = fadeIn(animationSpec = tween(300)) +
-                    slideInHorizontally(
-                        initialOffsetX = { -it },
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ),
-            exit = fadeOut(animationSpec = tween(300)) +
-                   slideOutHorizontally(
-                       targetOffsetX = { -it },
-                       animationSpec = tween(300, easing = FastOutSlowInEasing)
-                   ),
-            modifier = Modifier
-                .align(Alignment.TopStart) // Fix position
-                .padding(start = 16.dp) // Add some spacing from edge for expanded state
-        ) {
+        } else {
+            // Expanded state - Full toolbar (slightly offset from edge for better look)
+            Box(modifier = Modifier.padding(start = 16.dp)) {
             Surface(
                 shape = RoundedCornerShape(50), // Make container very rounded/pill-shaped
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -1065,6 +1105,7 @@ private fun FloatingActionToolbar(
                 onClick = { selectedButton = if (selectedButton == "alignRight") null else "alignRight" }
             )
                 }
+            }
             }
         }
     }
