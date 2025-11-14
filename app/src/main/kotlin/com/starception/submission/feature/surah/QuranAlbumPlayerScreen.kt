@@ -83,7 +83,11 @@ fun QuranAlbumPlayerScreen(
     var currentProgress by remember { mutableStateOf(0f) }
     var currentVolume by remember { mutableStateOf(0.7f) }
     var showTranslationDialog by remember { mutableStateOf(false) }
+    var showFontDialog by remember { mutableStateOf(false) }
     var currentAudioLanguage by remember { mutableStateOf(AudioLanguage.ARABIC_ONLY) }
+
+    val selectedArabicFont by viewModel.selectedArabicFont.collectAsState()
+    val availableArabicFonts = remember { viewModel.getAvailableArabicFonts() }
 
     // Track bookmark state using UserDataRepository (the correct repository for news bookmarks)
     var isBookmarked by remember { mutableStateOf(false) }
@@ -176,7 +180,7 @@ fun QuranAlbumPlayerScreen(
     // Track scroll direction for floating toolbar and FAB animation with stable detection
     var previousScrollOffset by remember { mutableStateOf(0) }
     var previousItemIndex by remember { mutableStateOf(0) }
-    var isFloatingToolbarExpanded by remember { mutableStateOf(true) } // Left-side floating toolbar expanded state
+    var isFloatingToolbarExpanded by remember { mutableStateOf(false) } // Left-side floating toolbar starts collapsed (hint only)
     var showFabVisible by remember { mutableStateOf(true) } // FAB visible by default
 
     // Use LaunchedEffect to track scroll changes with proper thresholds
@@ -193,17 +197,21 @@ fun QuranAlbumPlayerScreen(
         if (kotlin.math.abs(scrollDelta) > 50) {
             val isScrollingDown = scrollDelta > 0
 
-            // At top: always show FAB and floating toolbar
+            // At top: always show FAB
             val atTop = currentItemIndex == 0 && currentOffset < 100
 
             if (atTop) {
                 showFabVisible = true
-                isFloatingToolbarExpanded = true
+                // Don't auto-expand floating toolbar - user must click hint manually
             } else {
-                // Scrolling up → show FAB and expand floating toolbar
-                // Scrolling down → hide FAB and collapse floating toolbar to hint
+                // Scrolling up → show FAB, and collapse floating toolbar if it's currently expanded
+                // Scrolling down → hide FAB, but don't change floating toolbar state
                 showFabVisible = !isScrollingDown
-                isFloatingToolbarExpanded = !isScrollingDown
+
+                // Only collapse floating toolbar when scrolling up AND it's currently expanded
+                if (!isScrollingDown && isFloatingToolbarExpanded) {
+                    isFloatingToolbarExpanded = false
+                }
             }
 
             // Update previous scroll position
@@ -253,6 +261,7 @@ fun QuranAlbumPlayerScreen(
                     currentProgress = currentProgress,
                     currentVolume = currentVolume,
                     showFabVisible = showFabVisible,
+                    selectedArabicFont = selectedArabicFont,
                     onPlayPauseClick = {
                         val service = playbackService
                         if (service != null) {
@@ -322,6 +331,7 @@ fun QuranAlbumPlayerScreen(
             isBookmarked = isBookmarked,
             onBackClick = onBackClick,
             onTranslationClick = { showTranslationDialog = true },
+            onFontClick = { showFontDialog = true },
             onBookmarkClick = {
                 // Only toggle bookmark if we have a valid news resource ID
                 if (newsResourceId != null) {
@@ -385,6 +395,25 @@ fun QuranAlbumPlayerScreen(
             )
         }
 
+        // Font selection dialog
+        if (showFontDialog) {
+            FontSelectionDialog(
+                availableFonts = availableArabicFonts,
+                currentFont = selectedArabicFont,
+                onDismiss = { showFontDialog = false },
+                onFontSelected = { fontName ->
+                    viewModel.changeArabicFont(fontName)
+                    Toast.makeText(
+                        context,
+                        "Arabic font changed to ${viewModel.getArabicFontDisplayName(fontName)}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    showFontDialog = false
+                },
+                getFontDisplayName = { font -> viewModel.getArabicFontDisplayName(font) }
+            )
+        }
+
         // Floating action toolbar on the left side - positioned at vertical middle
         Box(
             modifier = Modifier
@@ -411,6 +440,7 @@ private fun AlbumPlayerTopBar(
     isBookmarked: Boolean,
     onBackClick: () -> Unit,
     onTranslationClick: () -> Unit = {},
+    onFontClick: () -> Unit = {},
     onBookmarkClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -525,6 +555,15 @@ private fun AlbumPlayerTopBar(
                 }
             }
 
+            // Font selection button
+            IconButton(onClick = onFontClick) {
+                Icon(
+                    imageVector = Icons.Default.FontDownload,
+                    contentDescription = "Arabic Font",
+                    tint = contentColor
+                )
+            }
+
             IconButton(onClick = onBookmarkClick) {
                 Icon(
                     imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
@@ -556,6 +595,7 @@ private fun AlbumPlayerContent(
     currentProgress: Float,
     currentVolume: Float,
     showFabVisible: Boolean,
+    selectedArabicFont: String,
     onPlayPauseClick: () -> Unit,
     onRewindClick: () -> Unit,
     onForwardClick: () -> Unit,
@@ -647,6 +687,7 @@ private fun AlbumPlayerContent(
         ) { ayah ->
             AyahTrackItem(
                 ayah = ayah,
+                arabicFont = selectedArabicFont,
                 onClick = { onAyahClick(ayah) }
             )
         }
@@ -919,6 +960,7 @@ private fun MusicPlayerControls(
 @Composable
 private fun AyahTrackItem(
     ayah: Ayah,
+    arabicFont: String = "default",
     onClick: () -> Unit
 ) {
     // Use MaterialTheme.colorScheme for automatic theme support
@@ -953,13 +995,13 @@ private fun AyahTrackItem(
                 }
             }
 
-            // Ayah text
+            // Ayah text (no truncation - shows full text including both Arabic and translation)
+            // Apply selected Arabic font style
+            val textStyle = getArabicFontStyle(arabicFont)
             Text(
                 text = ayah.text,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyLarge.merge(textStyle),
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -972,6 +1014,48 @@ private fun AyahTrackItem(
     )
 }
 
+// Helper function to get text style for different Arabic fonts
+@Composable
+private fun getArabicFontStyle(fontName: String): androidx.compose.ui.text.TextStyle {
+    return when (fontName) {
+        "pdms_saleem" -> androidx.compose.ui.text.TextStyle(
+            fontFamily = QuranFonts.PDMSSaleem,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = 0.5.sp,
+            lineHeight = 36.sp
+        )
+        "noor_e_hidayat" -> androidx.compose.ui.text.TextStyle(
+            fontFamily = QuranFonts.NoorEHidayat,
+            fontSize = 21.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = 0.4.sp,
+            lineHeight = 34.sp
+        )
+        "thabit" -> androidx.compose.ui.text.TextStyle(
+            fontFamily = QuranFonts.Thabit,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = 0.3.sp,
+            lineHeight = 33.sp
+        )
+        "uthmani_script" -> androidx.compose.ui.text.TextStyle(
+            fontFamily = QuranFonts.UthmanicScript,
+            fontSize = 23.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = 0.6.sp,
+            lineHeight = 37.sp
+        )
+        else -> androidx.compose.ui.text.TextStyle(
+            fontFamily = QuranFonts.PDMSSaleem,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = 0.5.sp,
+            lineHeight = 36.sp
+        )
+    }
+}
+
 @Composable
 private fun FloatingActionToolbar(
     isExpanded: Boolean = true,
@@ -980,13 +1064,13 @@ private fun FloatingActionToolbar(
 ) {
     var selectedButton by remember { mutableStateOf<String?>(null) }
 
-    // Use Crossfade for smooth transition between hint and expanded states
-    Crossfade(
-        targetState = isExpanded,
-        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-        modifier = modifier
-    ) { expanded ->
-        if (!expanded) {
+    // Use Box with consistent positioning to prevent movement
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.CenterStart
+    ) {
+        // Render only the active state to avoid touch interception issues
+        if (!isExpanded) {
             // Collapsed state - Hint indicator flush with left edge
             Surface(
                 shape = RoundedCornerShape(
@@ -1014,7 +1098,7 @@ private fun FloatingActionToolbar(
                 }
             }
         } else {
-            // Expanded state - Full toolbar (slightly offset from edge for better look)
+            // Expanded state - offset from edge for better look
             Box(modifier = Modifier.padding(start = 16.dp)) {
             Surface(
                 shape = RoundedCornerShape(50), // Make container very rounded/pill-shaped
@@ -1194,6 +1278,56 @@ private fun TranslationSelectionDialog(
                         Spacer(Modifier.width(16.dp))
                         Text(
                             text = getTranslationDisplayName(translationCode),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun FontSelectionDialog(
+    availableFonts: List<String>,
+    currentFont: String,
+    onDismiss: () -> Unit,
+    onFontSelected: (String) -> Unit,
+    getFontDisplayName: (String) -> String
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Arabic Font") },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+            ) {
+                items(
+                    items = availableFonts,
+                    key = { it }
+                ) { fontName ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onFontSelected(fontName) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = fontName == currentFont,
+                            onClick = { onFontSelected(fontName) }
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Text(
+                            text = getFontDisplayName(fontName),
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
