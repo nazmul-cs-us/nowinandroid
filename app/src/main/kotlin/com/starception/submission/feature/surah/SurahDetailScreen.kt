@@ -81,6 +81,21 @@ class SurahDetailViewModel @Inject constructor(
     )
     val selectedArabicFont: StateFlow<String> = _selectedArabicFont.asStateFlow()
 
+    private val _arabicFontSize = MutableStateFlow(
+        prefs.getFloat("arabic_font_size", 22f)
+    )
+    val arabicFontSize: StateFlow<Float> = _arabicFontSize.asStateFlow()
+
+    private val _currentVolume = MutableStateFlow(
+        prefs.getFloat("audio_volume", 0.7f)
+    )
+    val currentVolume: StateFlow<Float> = _currentVolume.asStateFlow()
+
+    private val _currentAudioLanguage = MutableStateFlow(
+        prefs.getString("audio_language", "ARABIC_ONLY") ?: "ARABIC_ONLY"
+    )
+    val currentAudioLanguage: StateFlow<String> = _currentAudioLanguage.asStateFlow()
+
     private val translations = QuranTranslationHelper.getAvailableTranslations()
 
     fun getRepository(translationCode: String): QuranTranslationRepository {
@@ -160,6 +175,27 @@ class SurahDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _selectedArabicFont.value = fontName
             prefs.edit().putString("arabic_font", fontName).apply()
+        }
+    }
+
+    fun changeArabicFontSize(fontSize: Float) {
+        viewModelScope.launch {
+            _arabicFontSize.value = fontSize
+            prefs.edit().putFloat("arabic_font_size", fontSize).apply()
+        }
+    }
+
+    fun changeVolume(volume: Float) {
+        viewModelScope.launch {
+            _currentVolume.value = volume
+            prefs.edit().putFloat("audio_volume", volume).apply()
+        }
+    }
+
+    fun changeAudioLanguage(languageCode: String) {
+        viewModelScope.launch {
+            _currentAudioLanguage.value = languageCode
+            prefs.edit().putString("audio_language", languageCode).apply()
         }
     }
 

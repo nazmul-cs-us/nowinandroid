@@ -10,6 +10,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -81,18 +82,33 @@ fun QuranAlbumPlayerScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var playbackService by remember { mutableStateOf<QuranPlaybackService?>(null) }
     var currentProgress by remember { mutableStateOf(0f) }
-    var currentVolume by remember { mutableStateOf(0.7f) }
+
+    // Load volume from ViewModel (persisted in SharedPreferences)
+    val currentVolume by viewModel.currentVolume.collectAsState()
+
     var showTranslationDialog by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
-    var currentAudioLanguage by remember { mutableStateOf(AudioLanguage.ARABIC_ONLY) }
+
+    // Load audio language from ViewModel (persisted in SharedPreferences)
+    val savedAudioLanguage by viewModel.currentAudioLanguage.collectAsState()
+    var currentAudioLanguage by remember {
+        mutableStateOf(
+            when (savedAudioLanguage) {
+                "ARABIC_ONLY" -> AudioLanguage.ARABIC_ONLY
+                "ENGLISH_TRANSLATION" -> AudioLanguage.ENGLISH_TRANSLATION
+                "BENGALI_TRANSLATION" -> AudioLanguage.BENGALI_TRANSLATION
+                else -> AudioLanguage.ARABIC_ONLY
+            }
+        )
+    }
 
     val selectedArabicFont by viewModel.selectedArabicFont.collectAsState()
     val availableArabicFonts = remember { viewModel.getAvailableArabicFonts() }
 
-    // Font size state - default 22.sp
-    var arabicFontSize by remember { mutableStateOf(22f) }
+    // Font size state - loaded from ViewModel (which reads from SharedPreferences)
+    val arabicFontSize by viewModel.arabicFontSize.collectAsState()
     val minFontSize = 14f
-    val maxFontSize = 40f
+    val maxFontSize = 60f  // Increased from 40f to 60f for much larger text
 
     // Track bookmark state using UserDataRepository (the correct repository for news bookmarks)
     var isBookmarked by remember { mutableStateOf(false) }
@@ -287,7 +303,7 @@ fun QuranAlbumPlayerScreen(
                         playbackService?.playNext()
                     },
                     onVolumeChange = { volume ->
-                        currentVolume = volume
+                        viewModel.changeVolume(volume)
                         playbackService?.setVolume(volume)
                     },
                     onAyahClick = { /* TODO */ },
@@ -374,6 +390,7 @@ fun QuranAlbumPlayerScreen(
                     if (mappedAudioLanguage != null) {
                         // Translation has audio support
                         currentAudioLanguage = mappedAudioLanguage
+                        viewModel.changeAudioLanguage(mappedAudioLanguage.name)
                         val service = playbackService
                         if (service != null) {
                             service.setAudioLanguage(mappedAudioLanguage)
@@ -433,12 +450,12 @@ fun QuranAlbumPlayerScreen(
                 currentFontSize = arabicFontSize,
                 onIncreaseFontSize = {
                     if (arabicFontSize < maxFontSize) {
-                        arabicFontSize += 2f
+                        viewModel.changeArabicFontSize(arabicFontSize + 2f)
                     }
                 },
                 onDecreaseFontSize = {
                     if (arabicFontSize > minFontSize) {
-                        arabicFontSize -= 2f
+                        viewModel.changeArabicFontSize(arabicFontSize - 2f)
                     }
                 }
             )
@@ -572,13 +589,25 @@ private fun AlbumPlayerTopBar(
                 }
             }
 
-            // Font selection button
-            IconButton(onClick = onFontClick) {
-                Icon(
-                    imageVector = Icons.Default.FontDownload,
-                    contentDescription = "Arabic Font",
-                    tint = contentColor
-                )
+            // Font selection button with icon in rounded box
+            Surface(
+                onClick = onFontClick,
+                modifier = Modifier.size(40.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = contentColor.copy(alpha = 0.12f),
+                contentColor = contentColor
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FontDownload,
+                        contentDescription = "Font selection",
+                        tint = contentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
             IconButton(onClick = onBookmarkClick) {
@@ -1116,6 +1145,7 @@ private fun FloatingActionToolbar(
     modifier: Modifier = Modifier
 ) {
     var selectedButton by remember { mutableStateOf<String?>(null) }
+    var showMoreMenu by remember { mutableStateOf(false) }
 
     // Use Box with consistent positioning to prevent movement
     Box(
@@ -1173,16 +1203,16 @@ private fun FloatingActionToolbar(
 
             // Increase font size button
             FloatingToolbarButton(
-                icon = Icons.Default.Add,
+                icon = Icons.Default.TextIncrease,
                 contentDescription = "Increase font size",
                 selected = false,
                 onClick = onIncreaseFontSize,
-                enabled = currentFontSize < 40f
+                enabled = currentFontSize < 60f
             )
 
             // Decrease font size button
             FloatingToolbarButton(
-                icon = Icons.Default.Remove,
+                icon = Icons.Default.TextDecrease,
                 contentDescription = "Decrease font size",
                 selected = false,
                 onClick = onDecreaseFontSize,
@@ -1237,29 +1267,61 @@ private fun FloatingActionToolbar(
                 onClick = { selectedButton = if (selectedButton == "strikethrough") null else "strikethrough" }
             )
 
-            // Left align button
-            FloatingToolbarButton(
-                icon = Icons.Default.FormatAlignLeft,
-                contentDescription = "Align Left",
-                selected = selectedButton == "alignLeft",
-                onClick = { selectedButton = if (selectedButton == "alignLeft") null else "alignLeft" }
-            )
+            // More menu button (hamburger) with dropdown
+            Box {
+                FloatingToolbarButton(
+                    icon = Icons.Default.MoreVert,
+                    contentDescription = "More options",
+                    selected = showMoreMenu,
+                    onClick = { showMoreMenu = !showMoreMenu }
+                )
 
-            // Center align button
-            FloatingToolbarButton(
-                icon = Icons.Default.FormatAlignCenter,
-                contentDescription = "Align Center",
-                selected = selectedButton == "alignCenter",
-                onClick = { selectedButton = if (selectedButton == "alignCenter") null else "alignCenter" }
-            )
-
-            // Right align button
-            FloatingToolbarButton(
-                icon = Icons.Default.FormatAlignRight,
-                contentDescription = "Align Right",
-                selected = selectedButton == "alignRight",
-                onClick = { selectedButton = if (selectedButton == "alignRight") null else "alignRight" }
-            )
+                // More menu dropdown - anchored to the hamburger button
+                DropdownMenu(
+                    expanded = showMoreMenu,
+                    onDismissRequest = { showMoreMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Align Left") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.FormatAlignLeft,
+                                contentDescription = "Align Left"
+                            )
+                        },
+                        onClick = {
+                            selectedButton = if (selectedButton == "alignLeft") null else "alignLeft"
+                            showMoreMenu = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Align Center") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.FormatAlignCenter,
+                                contentDescription = "Align Center"
+                            )
+                        },
+                        onClick = {
+                            selectedButton = if (selectedButton == "alignCenter") null else "alignCenter"
+                            showMoreMenu = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Align Right") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.FormatAlignRight,
+                                contentDescription = "Align Right"
+                            )
+                        },
+                        onClick = {
+                            selectedButton = if (selectedButton == "alignRight") null else "alignRight"
+                            showMoreMenu = false
+                        }
+                    )
+                }
+            }
                 }
             }
             }
