@@ -76,6 +76,15 @@ object QuranFonts {
     )
 
     /**
+     * IndoPak Script - Traditional Indo-Pakistani Quran style
+     * Uses Noto Nastaliq Urdu (Google Fonts)
+     * Classic Nastaliq calligraphic style used in Indo-Pak Quran prints
+     */
+    val IndoPakScript = FontFamily(
+        Font(R.font.indopak_quran, FontWeight.Normal)
+    )
+
+    /**
      * Poppins - Modern UI font for English text
      * Used for UI elements, buttons, and English translations
      */

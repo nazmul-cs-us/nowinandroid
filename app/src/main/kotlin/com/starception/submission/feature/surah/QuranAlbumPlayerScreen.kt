@@ -89,6 +89,11 @@ fun QuranAlbumPlayerScreen(
     val selectedArabicFont by viewModel.selectedArabicFont.collectAsState()
     val availableArabicFonts = remember { viewModel.getAvailableArabicFonts() }
 
+    // Font size state - default 22.sp
+    var arabicFontSize by remember { mutableStateOf(22f) }
+    val minFontSize = 14f
+    val maxFontSize = 40f
+
     // Track bookmark state using UserDataRepository (the correct repository for news bookmarks)
     var isBookmarked by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -262,6 +267,7 @@ fun QuranAlbumPlayerScreen(
                     currentVolume = currentVolume,
                     showFabVisible = showFabVisible,
                     selectedArabicFont = selectedArabicFont,
+                    arabicFontSize = arabicFontSize,
                     onPlayPauseClick = {
                         val service = playbackService
                         if (service != null) {
@@ -423,6 +429,17 @@ fun QuranAlbumPlayerScreen(
                 isExpanded = isFloatingToolbarExpanded,
                 onExpandedChange = { expanded ->
                     isFloatingToolbarExpanded = expanded
+                },
+                currentFontSize = arabicFontSize,
+                onIncreaseFontSize = {
+                    if (arabicFontSize < maxFontSize) {
+                        arabicFontSize += 2f
+                    }
+                },
+                onDecreaseFontSize = {
+                    if (arabicFontSize > minFontSize) {
+                        arabicFontSize -= 2f
+                    }
                 }
             )
         }
@@ -596,6 +613,7 @@ private fun AlbumPlayerContent(
     currentVolume: Float,
     showFabVisible: Boolean,
     selectedArabicFont: String,
+    arabicFontSize: Float,
     onPlayPauseClick: () -> Unit,
     onRewindClick: () -> Unit,
     onForwardClick: () -> Unit,
@@ -688,6 +706,7 @@ private fun AlbumPlayerContent(
             AyahTrackItem(
                 ayah = ayah,
                 arabicFont = selectedArabicFont,
+                arabicFontSize = arabicFontSize,
                 onClick = { onAyahClick(ayah) }
             )
         }
@@ -961,6 +980,7 @@ private fun MusicPlayerControls(
 private fun AyahTrackItem(
     ayah: Ayah,
     arabicFont: String = "default",
+    arabicFontSize: Float = 22f,
     onClick: () -> Unit
 ) {
     // Use MaterialTheme.colorScheme for automatic theme support
@@ -996,14 +1016,36 @@ private fun AyahTrackItem(
             }
 
             // Ayah text (no truncation - shows full text including both Arabic and translation)
-            // Apply selected Arabic font style
-            val textStyle = getArabicFontStyle(arabicFont)
-            Text(
-                text = ayah.text,
-                style = MaterialTheme.typography.bodyLarge.merge(textStyle),
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
+            // Split Arabic and translation text for separate styling
+            val parts = ayah.text.split("\n\n")
+            val arabicText = parts.getOrNull(0) ?: ayah.text
+            val translationText = parts.getOrNull(1)
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Arabic text with user-selected font and size
+                val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
+                Text(
+                    text = arabicText,
+                    style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                // Translation text with smaller size (70% of Arabic size)
+                if (translationText != null && translationText.isNotBlank()) {
+                    val translationFontSize = arabicFontSize * 0.7f
+                    Text(
+                        text = translationText,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = translationFontSize.sp,
+                            lineHeight = (translationFontSize * 1.5f).sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 
@@ -1016,42 +1058,50 @@ private fun AyahTrackItem(
 
 // Helper function to get text style for different Arabic fonts
 @Composable
-private fun getArabicFontStyle(fontName: String): androidx.compose.ui.text.TextStyle {
+private fun getArabicFontStyle(fontName: String, fontSize: Float = 22f): androidx.compose.ui.text.TextStyle {
+    val lineHeightMultiplier = 1.6f // Line height is 1.6x font size
     return when (fontName) {
         "pdms_saleem" -> androidx.compose.ui.text.TextStyle(
             fontFamily = QuranFonts.PDMSSaleem,
-            fontSize = 22.sp,
+            fontSize = fontSize.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.5.sp,
-            lineHeight = 36.sp
+            lineHeight = (fontSize * lineHeightMultiplier).sp
         )
         "noor_e_hidayat" -> androidx.compose.ui.text.TextStyle(
             fontFamily = QuranFonts.NoorEHidayat,
-            fontSize = 21.sp,
+            fontSize = fontSize.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.4.sp,
-            lineHeight = 34.sp
+            lineHeight = (fontSize * lineHeightMultiplier).sp
         )
         "thabit" -> androidx.compose.ui.text.TextStyle(
             fontFamily = QuranFonts.Thabit,
-            fontSize = 20.sp,
+            fontSize = fontSize.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.3.sp,
-            lineHeight = 33.sp
+            lineHeight = (fontSize * lineHeightMultiplier).sp
         )
         "uthmani_script" -> androidx.compose.ui.text.TextStyle(
             fontFamily = QuranFonts.UthmanicScript,
-            fontSize = 23.sp,
+            fontSize = fontSize.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.6.sp,
-            lineHeight = 37.sp
+            lineHeight = (fontSize * lineHeightMultiplier).sp
+        )
+        "indopak_script" -> androidx.compose.ui.text.TextStyle(
+            fontFamily = QuranFonts.IndoPakScript,
+            fontSize = fontSize.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = 0.7.sp,
+            lineHeight = (fontSize * lineHeightMultiplier).sp
         )
         else -> androidx.compose.ui.text.TextStyle(
             fontFamily = QuranFonts.PDMSSaleem,
-            fontSize = 22.sp,
+            fontSize = fontSize.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.5.sp,
-            lineHeight = 36.sp
+            lineHeight = (fontSize * lineHeightMultiplier).sp
         )
     }
 }
@@ -1060,6 +1110,9 @@ private fun getArabicFontStyle(fontName: String): androidx.compose.ui.text.TextS
 private fun FloatingActionToolbar(
     isExpanded: Boolean = true,
     onExpandedChange: (Boolean) -> Unit = {},
+    currentFontSize: Float = 22f,
+    onIncreaseFontSize: () -> Unit = {},
+    onDecreaseFontSize: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedButton by remember { mutableStateOf<String?>(null) }
@@ -1117,6 +1170,25 @@ private fun FloatingActionToolbar(
                     selected = false,
                     onClick = { onExpandedChange(false) }
                 )
+
+            // Increase font size button
+            FloatingToolbarButton(
+                icon = Icons.Default.Add,
+                contentDescription = "Increase font size",
+                selected = false,
+                onClick = onIncreaseFontSize,
+                enabled = currentFontSize < 40f
+            )
+
+            // Decrease font size button
+            FloatingToolbarButton(
+                icon = Icons.Default.Remove,
+                contentDescription = "Decrease font size",
+                selected = false,
+                onClick = onDecreaseFontSize,
+                enabled = currentFontSize > 14f
+            )
+
             // Bold button
             FloatingToolbarButton(
                 icon = Icons.Default.FormatBold,
@@ -1201,17 +1273,21 @@ private fun FloatingToolbarButton(
     contentDescription: String,
     selected: Boolean = false,
     onClick: () -> Unit = {},
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     if (selected) {
         // Darker filled circular button when selected
         FilledIconButton(
             onClick = onClick,
+            enabled = enabled,
             modifier = modifier.size(48.dp),
             shape = CircleShape, // Make selected button circular
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                contentColor = MaterialTheme.colorScheme.surface
+                contentColor = MaterialTheme.colorScheme.surface,
+                disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                disabledContentColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
             )
         ) {
             Icon(
@@ -1224,12 +1300,14 @@ private fun FloatingToolbarButton(
         // Plain icon button when not selected
         IconButton(
             onClick = onClick,
+            enabled = enabled,
             modifier = modifier.size(48.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
+                      else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                 modifier = Modifier.size(20.dp)
             )
         }

@@ -171,7 +171,8 @@ class SurahDetailViewModel @Inject constructor(
         "pdms_saleem",
         "noor_e_hidayat",
         "thabit",
-        "uthmani_script"
+        "uthmani_script",
+        "indopak_script"
     )
 
     fun getArabicFontDisplayName(font: String): String = when (font) {
@@ -179,6 +180,7 @@ class SurahDetailViewModel @Inject constructor(
         "noor_e_hidayat" -> "Noor-e-Hidayat"
         "thabit" -> "Thabit"
         "uthmani_script" -> "Uthmani Script"
+        "indopak_script" -> "IndoPak Script"
         else -> "PDMS Saleem"
     }
 }
