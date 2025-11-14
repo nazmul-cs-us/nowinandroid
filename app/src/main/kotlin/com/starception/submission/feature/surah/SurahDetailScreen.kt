@@ -65,32 +65,37 @@ import javax.inject.Inject
 class SurahDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
-    
+
     private val prefs: SharedPreferences = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
-    
+
     private val _uiState = MutableStateFlow<SurahDetailUiState>(SurahDetailUiState.Loading)
     val uiState: StateFlow<SurahDetailUiState> = _uiState.asStateFlow()
-    
+
     private val _currentTranslation = MutableStateFlow(
         prefs.getString("quran_translation", "ar") ?: "ar"
     )
     val currentTranslation: StateFlow<String> = _currentTranslation.asStateFlow()
-    
+
+    private val _selectedArabicFont = MutableStateFlow(
+        prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+    )
+    val selectedArabicFont: StateFlow<String> = _selectedArabicFont.asStateFlow()
+
     private val translations = QuranTranslationHelper.getAvailableTranslations()
-    
+
     fun getRepository(translationCode: String): QuranTranslationRepository {
         return QuranTranslationRepository(context, translationCode)
     }
-    
+
     fun loadSurah(surahNumber: Int) {
         loadSurah(surahNumber, _currentTranslation.value)
     }
-    
+
     fun loadSurah(surahNumber: Int, translationCode: String) {
         viewModelScope.launch {
             try {
                 android.util.Log.d("SurahDetail", "🔍 Loading Surah $surahNumber in translation: $translationCode")
-                
+
                 val repository = try {
                     getRepository(translationCode)
                 } catch (e: Exception) {
@@ -98,21 +103,43 @@ class SurahDetailViewModel @Inject constructor(
                     _uiState.value = SurahDetailUiState.Error("Failed to load translation database: ${e.message}")
                     return@launch
                 }
-                
+
                 val surah = repository.getSurahByNumber(surahNumber)
-                
+
                 if (surah == null) {
                     android.util.Log.e("SurahDetail", "❌ Surah $surahNumber not found in translation: $translationCode")
                     _uiState.value = SurahDetailUiState.Error("Surah not found in $translationCode translation")
                     return@launch
                 }
-                
+
                 android.util.Log.d("SurahDetail", "✅ Surah found: ${surah.nameEnglish} (ID: ${surah.id}, Number: ${surah.number})")
-                
-                    val ayahs = repository.getAyahsBySurahOnce(surah.id)
-                
+
+                // If non-Arabic translation is selected, load both Arabic and translation
+                val ayahs = if (translationCode != "ar") {
+                    android.util.Log.d("SurahDetail", "📖 Loading dual language: Arabic + $translationCode")
+
+                    // Load Arabic ayahs
+                    val arabicRepository = getRepository("ar")
+                    val arabicAyahs = arabicRepository.getAyahsBySurahOnce(surah.id)
+
+                    // Load translation ayahs
+                    val translationAyahs = repository.getAyahsBySurahOnce(surah.id)
+
+                    // Combine them - each Ayah will show both Arabic and translation
+                    arabicAyahs.mapIndexed { index, arabicAyah ->
+                        val translationText = translationAyahs.getOrNull(index)?.text ?: ""
+                        // Create a combined ayah with both texts separated by newlines
+                        arabicAyah.copy(
+                            text = "${arabicAyah.text}\n\n$translationText"
+                        )
+                    }
+                } else {
+                    // Arabic only
+                    repository.getAyahsBySurahOnce(surah.id)
+                }
+
                 android.util.Log.d("SurahDetail", "✅ Loaded ${ayahs.size} Ayahs from $translationCode")
-                    _uiState.value = SurahDetailUiState.Success(surah, ayahs)
+                _uiState.value = SurahDetailUiState.Success(surah, ayahs)
             } catch (e: Exception) {
                 android.util.Log.e("SurahDetail", "❌ Error loading Surah $surahNumber in translation: $translationCode", e)
                 e.printStackTrace()
@@ -120,7 +147,7 @@ class SurahDetailViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun changeTranslation(translationCode: String, surahNumber: Int) {
         viewModelScope.launch {
             _currentTranslation.value = translationCode
@@ -128,10 +155,32 @@ class SurahDetailViewModel @Inject constructor(
             loadSurah(surahNumber, translationCode)
         }
     }
-    
+
+    fun changeArabicFont(fontName: String) {
+        viewModelScope.launch {
+            _selectedArabicFont.value = fontName
+            prefs.edit().putString("arabic_font", fontName).apply()
+        }
+    }
+
     fun getAvailableTranslations(): List<String> = translations
-    
+
     fun getTranslationName(code: String): String = QuranTranslationHelper.getTranslationName(code)
+
+    fun getAvailableArabicFonts(): List<String> = listOf(
+        "pdms_saleem",
+        "noor_e_hidayat",
+        "thabit",
+        "uthmani_script"
+    )
+
+    fun getArabicFontDisplayName(font: String): String = when (font) {
+        "pdms_saleem" -> "PDMS Saleem"
+        "noor_e_hidayat" -> "Noor-e-Hidayat"
+        "thabit" -> "Thabit"
+        "uthmani_script" -> "Uthmani Script"
+        else -> "PDMS Saleem"
+    }
 }
 
 sealed interface SurahDetailUiState {
@@ -718,7 +767,11 @@ fun AyahTrackItem(
         // Ayah text - allow full text to display without truncation
                 Text(
                     text = ayah.text,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontFamily = QuranFonts.Amiri,
+                fontSize = 20.sp,
+                lineHeight = 32.sp
+            ),
                     color = MaterialTheme.colorScheme.onSurface,
             // Removed maxLines restriction - allow text to wrap naturally
             modifier = Modifier.weight(1f)

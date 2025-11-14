@@ -125,7 +125,8 @@
       "Bash(/tmp/bookmark_debug.png)",
       "Bash(/tmp/app_launched.png)",
       "Bash(/tmp/current_screen.png)",
-      "Bash(/tmp/home_screen.png)"
+      "Bash(/tmp/home_screen.png)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
