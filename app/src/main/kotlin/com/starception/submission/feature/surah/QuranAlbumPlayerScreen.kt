@@ -119,6 +119,9 @@ fun QuranAlbumPlayerScreen(
     val minFontSize = 14f
     val maxFontSize = 60f  // Increased from 40f to 60f for much larger text
 
+    // Translation visibility toggle state
+    var showTranslationInText by remember { mutableStateOf(true) }
+
     // Track bookmark state using UserDataRepository (the correct repository for news bookmarks)
     var isBookmarked by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -254,22 +257,9 @@ fun QuranAlbumPlayerScreen(
         modifier = Modifier
             .fillMaxSize()
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    // Tap anywhere to expand floating toolbar if collapsed
-                    if (!isFloatingToolbarExpanded) {
-                        isFloatingToolbarExpanded = true
-                    }
-                }
-        ) {
-            Scaffold(
-                topBar = {}
-            ) { paddingValues ->
+        Scaffold(
+            topBar = {}
+        ) { paddingValues ->
         when (val state = uiState) {
             is SurahDetailUiState.Loading -> {
                 Box(
@@ -293,6 +283,8 @@ fun QuranAlbumPlayerScreen(
                     showFabVisible = showFabVisible,
                     selectedArabicFont = selectedArabicFont,
                     arabicFontSize = arabicFontSize,
+                    showTranslationInText = showTranslationInText,
+                    onToggleTranslation = { showTranslationInText = !showTranslationInText },
                     onPlayPauseClick = {
                         val service = playbackService
                         if (service != null) {
@@ -344,7 +336,7 @@ fun QuranAlbumPlayerScreen(
                 }
             }
         }
-        }
+    }
 
         // Always visible toolbar with collapsing effect based on scroll position
         AlbumPlayerTopBar(
@@ -488,12 +480,13 @@ fun QuranAlbumPlayerScreen(
                     onSideSwap = {
                         // Swap between left and right sides
                         isOnRightSide = !isOnRightSide
-                    }
+                    },
+                    showTranslation = showTranslationInText,
+                    onToggleTranslation = { showTranslationInText = !showTranslationInText }
                 )
             }
         }
     }
-}
 }
 
 @Composable
@@ -675,6 +668,8 @@ private fun AlbumPlayerContent(
     showFabVisible: Boolean,
     selectedArabicFont: String,
     arabicFontSize: Float,
+    showTranslationInText: Boolean,
+    onToggleTranslation: () -> Unit,
     onPlayPauseClick: () -> Unit,
     onRewindClick: () -> Unit,
     onForwardClick: () -> Unit,
@@ -781,6 +776,7 @@ private fun AlbumPlayerContent(
                 ayah = ayah,
                 arabicFont = selectedArabicFont,
                 arabicFontSize = arabicFontSize,
+                showTranslation = showTranslationInText,
                 onClick = { onAyahClick(ayah) }
             )
         }
@@ -1070,6 +1066,7 @@ private fun AyahTrackItem(
     ayah: Ayah,
     arabicFont: String = "default",
     arabicFontSize: Float = 22f,
+    showTranslation: Boolean = true,
     onClick: () -> Unit
 ) {
     // Use MaterialTheme.colorScheme for automatic theme support
@@ -1123,7 +1120,7 @@ private fun AyahTrackItem(
                 )
 
                 // Translation text with 2:1 ratio (translation is 1/2 of Arabic size)
-                if (translationText != null && translationText.isNotBlank()) {
+                if (showTranslation && translationText != null && translationText.isNotBlank()) {
                     val translationFontSize = arabicFontSize * 0.5f  // 2:1 ratio (50%)
                     Text(
                         text = translationText,
@@ -1205,10 +1202,10 @@ private fun FloatingActionToolbar(
     isOnRightSide: Boolean = false,
     onDrag: (Offset) -> Unit = {},
     onSideSwap: () -> Unit = {},
+    showTranslation: Boolean = true,
+    onToggleTranslation: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var selectedButton by remember { mutableStateOf<String?>(null) }
-    var showMoreMenu by remember { mutableStateOf(false) }
 
     // Use Box with consistent positioning to prevent movement
     Box(
@@ -1272,135 +1269,39 @@ private fun FloatingActionToolbar(
                     modifier = Modifier.padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                // Collapse button at the top
-                FloatingToolbarButton(
-                    icon = Icons.Default.ChevronLeft,
-                    contentDescription = "Collapse toolbar",
-                    selected = false,
-                    onClick = { onExpandedChange(false) }
-                )
-
-            // Increase font size button
-            FloatingToolbarButton(
-                icon = Icons.Default.TextIncrease,
-                contentDescription = "Increase font size",
-                selected = false,
-                onClick = onIncreaseFontSize,
-                enabled = currentFontSize < 60f
-            )
-
-            // Decrease font size button
-            FloatingToolbarButton(
-                icon = Icons.Default.TextDecrease,
-                contentDescription = "Decrease font size",
-                selected = false,
-                onClick = onDecreaseFontSize,
-                enabled = currentFontSize > 14f
-            )
-
-            // Bold button
-            FloatingToolbarButton(
-                icon = Icons.Default.FormatBold,
-                contentDescription = "Bold",
-                selected = selectedButton == "bold",
-                onClick = { selectedButton = if (selectedButton == "bold") null else "bold" }
-            )
-
-            // Italic button
-            FloatingToolbarButton(
-                icon = Icons.Default.FormatItalic,
-                contentDescription = "Italic",
-                selected = selectedButton == "italic",
-                onClick = { selectedButton = if (selectedButton == "italic") null else "italic" }
-            )
-
-            // Underline button
-            FloatingToolbarButton(
-                icon = Icons.Default.FormatUnderlined,
-                contentDescription = "Underline",
-                selected = selectedButton == "underline",
-                onClick = { selectedButton = if (selectedButton == "underline") null else "underline" }
-            )
-
-            // Text color button
-            FloatingToolbarButton(
-                icon = Icons.Default.FormatColorText,
-                contentDescription = "Text Color",
-                selected = selectedButton == "textColor",
-                onClick = { selectedButton = if (selectedButton == "textColor") null else "textColor" }
-            )
-
-            // Fill color button
-            FloatingToolbarButton(
-                icon = Icons.Default.FormatColorFill,
-                contentDescription = "Fill Color",
-                selected = selectedButton == "fillColor",
-                onClick = { selectedButton = if (selectedButton == "fillColor") null else "fillColor" }
-            )
-
-            // Strikethrough button
-            FloatingToolbarButton(
-                icon = Icons.Default.FormatStrikethrough,
-                contentDescription = "Strikethrough",
-                selected = selectedButton == "strikethrough",
-                onClick = { selectedButton = if (selectedButton == "strikethrough") null else "strikethrough" }
-            )
-
-            // More menu button (hamburger) with dropdown
-            Box {
-                FloatingToolbarButton(
-                    icon = Icons.Default.MoreVert,
-                    contentDescription = "More options",
-                    selected = showMoreMenu,
-                    onClick = { showMoreMenu = !showMoreMenu }
-                )
-
-                // More menu dropdown - anchored to the hamburger button
-                DropdownMenu(
-                    expanded = showMoreMenu,
-                    onDismissRequest = { showMoreMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Align Left") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.FormatAlignLeft,
-                                contentDescription = "Align Left"
-                            )
-                        },
-                        onClick = {
-                            selectedButton = if (selectedButton == "alignLeft") null else "alignLeft"
-                            showMoreMenu = false
-                        }
+                    // Collapse button at the top
+                    FloatingToolbarButton(
+                        icon = Icons.Default.ChevronLeft,
+                        contentDescription = "Collapse toolbar",
+                        selected = false,
+                        onClick = { onExpandedChange(false) }
                     )
-                    DropdownMenuItem(
-                        text = { Text("Align Center") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.FormatAlignCenter,
-                                contentDescription = "Align Center"
-                            )
-                        },
-                        onClick = {
-                            selectedButton = if (selectedButton == "alignCenter") null else "alignCenter"
-                            showMoreMenu = false
-                        }
+
+                    // Increase font size button
+                    FloatingToolbarButton(
+                        icon = Icons.Default.TextIncrease,
+                        contentDescription = "Increase font size",
+                        selected = false,
+                        onClick = onIncreaseFontSize,
+                        enabled = currentFontSize < 60f
                     )
-                    DropdownMenuItem(
-                        text = { Text("Align Right") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.FormatAlignRight,
-                                contentDescription = "Align Right"
-                            )
-                        },
-                        onClick = {
-                            selectedButton = if (selectedButton == "alignRight") null else "alignRight"
-                            showMoreMenu = false
-                        }
+
+                    // Decrease font size button
+                    FloatingToolbarButton(
+                        icon = Icons.Default.TextDecrease,
+                        contentDescription = "Decrease font size",
+                        selected = false,
+                        onClick = onDecreaseFontSize,
+                        enabled = currentFontSize > 14f
                     )
-                }
-            }
+
+                    // Toggle translation visibility
+                    FloatingToolbarButton(
+                        icon = if (showTranslation) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (showTranslation) "Hide translation" else "Show translation",
+                        selected = showTranslation,
+                        onClick = onToggleTranslation
+                    )
                 }
             }
             }
