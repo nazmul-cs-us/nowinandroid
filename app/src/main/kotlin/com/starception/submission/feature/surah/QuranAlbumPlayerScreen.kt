@@ -119,8 +119,11 @@ fun QuranAlbumPlayerScreen(
     val minFontSize = 14f
     val maxFontSize = 60f  // Increased from 40f to 60f for much larger text
 
-    // Translation visibility toggle state
-    var showTranslationInText by remember { mutableStateOf(true) }
+    // Translation visibility toggle state - loaded from ViewModel (persisted in SharedPreferences)
+    val showTranslationInText by viewModel.showTranslation.collectAsState()
+
+    // Text alignment state - loaded from ViewModel (persisted in SharedPreferences)
+    val textAlignment by viewModel.textAlignment.collectAsState()
 
     // Track bookmark state using UserDataRepository (the correct repository for news bookmarks)
     var isBookmarked by remember { mutableStateOf(false) }
@@ -283,8 +286,18 @@ fun QuranAlbumPlayerScreen(
                     showFabVisible = showFabVisible,
                     selectedArabicFont = selectedArabicFont,
                     arabicFontSize = arabicFontSize,
+                    textAlignment = textAlignment,
                     showTranslationInText = showTranslationInText,
-                    onToggleTranslation = { showTranslationInText = !showTranslationInText },
+                    onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) },
+                    onCycleAlignment = {
+                        // Cycle through: start -> center -> end -> start
+                        val nextAlignment = when (textAlignment) {
+                            "start" -> "center"
+                            "center" -> "end"
+                            else -> "start"
+                        }
+                        viewModel.changeTextAlignment(nextAlignment)
+                    },
                     onPlayPauseClick = {
                         val service = playbackService
                         if (service != null) {
@@ -481,8 +494,12 @@ fun QuranAlbumPlayerScreen(
                         // Swap between left and right sides
                         isOnRightSide = !isOnRightSide
                     },
+                    textAlignment = textAlignment,
+                    onSetAlignment = { alignment ->
+                        viewModel.changeTextAlignment(alignment)
+                    },
                     showTranslation = showTranslationInText,
-                    onToggleTranslation = { showTranslationInText = !showTranslationInText }
+                    onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) }
                 )
             }
         }
@@ -668,8 +685,10 @@ private fun AlbumPlayerContent(
     showFabVisible: Boolean,
     selectedArabicFont: String,
     arabicFontSize: Float,
+    textAlignment: String,
     showTranslationInText: Boolean,
     onToggleTranslation: () -> Unit,
+    onCycleAlignment: () -> Unit,
     onPlayPauseClick: () -> Unit,
     onRewindClick: () -> Unit,
     onForwardClick: () -> Unit,
@@ -776,6 +795,7 @@ private fun AlbumPlayerContent(
                 ayah = ayah,
                 arabicFont = selectedArabicFont,
                 arabicFontSize = arabicFontSize,
+                textAlignment = textAlignment,
                 showTranslation = showTranslationInText,
                 onClick = { onAyahClick(ayah) }
             )
@@ -1066,6 +1086,7 @@ private fun AyahTrackItem(
     ayah: Ayah,
     arabicFont: String = "default",
     arabicFontSize: Float = 22f,
+    textAlignment: String = "start",
     showTranslation: Boolean = true,
     onClick: () -> Unit
 ) {
@@ -1107,16 +1128,32 @@ private fun AyahTrackItem(
             val arabicText = parts.getOrNull(0) ?: ayah.text
             val translationText = parts.getOrNull(1)
 
+            // Convert alignment string to both TextAlign and Alignment enum
+            val textAlign = when (textAlignment) {
+                "center" -> androidx.compose.ui.text.style.TextAlign.Center
+                "end" -> androidx.compose.ui.text.style.TextAlign.End
+                else -> androidx.compose.ui.text.style.TextAlign.Start
+            }
+
+            val horizontalAlignment = when (textAlignment) {
+                "center" -> Alignment.CenterHorizontally
+                "end" -> Alignment.End
+                else -> Alignment.Start
+            }
+
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = horizontalAlignment
             ) {
                 // Arabic text with user-selected font and size
                 val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
                 Text(
                     text = arabicText,
                     style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle),
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = textAlign,
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 // Translation text with 2:1 ratio (translation is 1/2 of Arabic size)
@@ -1128,7 +1165,9 @@ private fun AyahTrackItem(
                             fontSize = translationFontSize.sp,
                             lineHeight = (translationFontSize * 1.5f).sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = textAlign,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -1202,6 +1241,8 @@ private fun FloatingActionToolbar(
     isOnRightSide: Boolean = false,
     onDrag: (Offset) -> Unit = {},
     onSideSwap: () -> Unit = {},
+    textAlignment: String = "start",
+    onSetAlignment: (String) -> Unit = {},
     showTranslation: Boolean = true,
     onToggleTranslation: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -1293,6 +1334,28 @@ private fun FloatingActionToolbar(
                         selected = false,
                         onClick = onDecreaseFontSize,
                         enabled = currentFontSize > 14f
+                    )
+
+                    // Text alignment buttons - show all three options
+                    FloatingToolbarButton(
+                        icon = Icons.Default.FormatAlignLeft,
+                        contentDescription = "Align text to start",
+                        selected = textAlignment == "start",
+                        onClick = { onSetAlignment("start") }
+                    )
+
+                    FloatingToolbarButton(
+                        icon = Icons.Default.FormatAlignCenter,
+                        contentDescription = "Align text to center",
+                        selected = textAlignment == "center",
+                        onClick = { onSetAlignment("center") }
+                    )
+
+                    FloatingToolbarButton(
+                        icon = Icons.Default.FormatAlignRight,
+                        contentDescription = "Align text to end",
+                        selected = textAlignment == "end",
+                        onClick = { onSetAlignment("end") }
                     )
 
                     // Toggle translation visibility

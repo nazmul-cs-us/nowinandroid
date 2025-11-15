@@ -96,6 +96,16 @@ class SurahDetailViewModel @Inject constructor(
     )
     val currentAudioLanguage: StateFlow<String> = _currentAudioLanguage.asStateFlow()
 
+    private val _showTranslation = MutableStateFlow(
+        prefs.getBoolean("show_translation", true)
+    )
+    val showTranslation: StateFlow<Boolean> = _showTranslation.asStateFlow()
+
+    private val _textAlignment = MutableStateFlow(
+        prefs.getString("text_alignment", "start") ?: "start"
+    )
+    val textAlignment: StateFlow<String> = _textAlignment.asStateFlow()
+
     private val translations = QuranTranslationHelper.getAvailableTranslations()
 
     fun getRepository(translationCode: String): QuranTranslationRepository {
@@ -196,6 +206,20 @@ class SurahDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _currentAudioLanguage.value = languageCode
             prefs.edit().putString("audio_language", languageCode).apply()
+        }
+    }
+
+    fun changeShowTranslation(show: Boolean) {
+        viewModelScope.launch {
+            _showTranslation.value = show
+            prefs.edit().putBoolean("show_translation", show).apply()
+        }
+    }
+
+    fun changeTextAlignment(alignment: String) {
+        viewModelScope.launch {
+            _textAlignment.value = alignment
+            prefs.edit().putString("text_alignment", alignment).apply()
         }
     }
 
