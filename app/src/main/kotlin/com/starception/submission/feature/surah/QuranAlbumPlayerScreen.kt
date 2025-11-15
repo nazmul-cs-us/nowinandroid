@@ -12,8 +12,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -31,6 +35,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -46,6 +52,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.R
 import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
+import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
+import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
 import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.core.qurandatabase.Surah
@@ -437,28 +446,51 @@ fun QuranAlbumPlayerScreen(
             )
         }
 
-        // Floating action toolbar on the left side - positioned at vertical middle
+        // Floating action toolbar - draggable hint icon (vertical only, sticks to edges)
+        var toolbarOffsetY by remember { mutableStateOf(0f) }
+        var isOnRightSide by remember { mutableStateOf(false) }
+
         Box(
             modifier = Modifier
-                .align(Alignment.CenterStart) // Position at vertical middle of screen
+                .fillMaxSize()
         ) {
-            FloatingActionToolbar(
-                isExpanded = isFloatingToolbarExpanded,
-                onExpandedChange = { expanded ->
-                    isFloatingToolbarExpanded = expanded
-                },
-                currentFontSize = arabicFontSize,
-                onIncreaseFontSize = {
-                    if (arabicFontSize < maxFontSize) {
-                        viewModel.changeArabicFontSize(arabicFontSize + 2f)
+            Box(
+                modifier = Modifier
+                    .align(if (isOnRightSide) Alignment.CenterEnd else Alignment.CenterStart)
+                    .offset {
+                        androidx.compose.ui.unit.IntOffset(
+                            0,
+                            toolbarOffsetY.toInt()
+                        )
                     }
-                },
-                onDecreaseFontSize = {
-                    if (arabicFontSize > minFontSize) {
-                        viewModel.changeArabicFontSize(arabicFontSize - 2f)
+            ) {
+                FloatingActionToolbar(
+                    isExpanded = isFloatingToolbarExpanded,
+                    onExpandedChange = { expanded ->
+                        isFloatingToolbarExpanded = expanded
+                    },
+                    currentFontSize = arabicFontSize,
+                    onIncreaseFontSize = {
+                        if (arabicFontSize < maxFontSize) {
+                            viewModel.changeArabicFontSize(arabicFontSize + 2f)
+                        }
+                    },
+                    onDecreaseFontSize = {
+                        if (arabicFontSize > minFontSize) {
+                            viewModel.changeArabicFontSize(arabicFontSize - 2f)
+                        }
+                    },
+                    isOnRightSide = isOnRightSide,
+                    onDrag = { dragAmount ->
+                        // Only allow vertical movement
+                        toolbarOffsetY += dragAmount.y
+                    },
+                    onSideSwap = {
+                        // Swap between left and right sides
+                        isOnRightSide = !isOnRightSide
                     }
-                }
-            )
+                )
+            }
         }
     }
 }
@@ -651,11 +683,24 @@ private fun AlbumPlayerContent(
     onFabClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(
-        state = scrollState,
-        contentPadding = WindowInsets.statusBars.asPaddingValues(),
-        modifier = modifier.fillMaxSize()
-    ) {
+    // Calculate total items for scrollbar state
+    val totalItems = remember(ayahs, showMusicPlayer) {
+        1 + // AlbumHeader
+        (if (showMusicPlayer) 1 else 0) + // MusicPlayerControls
+        (if (!showMusicPlayer) 1 else 0) + // AlbumInfoCard
+        ayahs.size // Ayah items
+    }
+
+    val scrollbarState = scrollState.scrollbarState(
+        itemsAvailable = totalItems,
+    )
+
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            state = scrollState,
+            contentPadding = WindowInsets.statusBars.asPaddingValues(),
+            modifier = Modifier.fillMaxSize()
+        ) {
         // Album Header with FAB
         item {
             Column {
@@ -739,6 +784,21 @@ private fun AlbumPlayerContent(
                 onClick = { onAyahClick(ayah) }
             )
         }
+    }
+
+        // Draggable scrollbar - matches ForYou tab and other pages
+        scrollState.DraggableScrollbar(
+            modifier = Modifier
+                .fillMaxHeight()
+                .windowInsetsPadding(WindowInsets.systemBars)
+                .padding(horizontal = 2.dp)
+                .align(Alignment.CenterEnd),
+            state = scrollbarState,
+            orientation = Orientation.Vertical,
+            onThumbMoved = scrollState.rememberDraggableScroller(
+                itemsAvailable = totalItems,
+            ),
+        )
     }
 }
 
@@ -1062,9 +1122,9 @@ private fun AyahTrackItem(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                // Translation text with smaller size (70% of Arabic size)
+                // Translation text with 2:1 ratio (translation is 1/2 of Arabic size)
                 if (translationText != null && translationText.isNotBlank()) {
-                    val translationFontSize = arabicFontSize * 0.7f
+                    val translationFontSize = arabicFontSize * 0.5f  // 2:1 ratio (50%)
                     Text(
                         text = translationText,
                         style = MaterialTheme.typography.bodyMedium.copy(
@@ -1142,6 +1202,9 @@ private fun FloatingActionToolbar(
     currentFontSize: Float = 22f,
     onIncreaseFontSize: () -> Unit = {},
     onDecreaseFontSize: () -> Unit = {},
+    isOnRightSide: Boolean = false,
+    onDrag: (Offset) -> Unit = {},
+    onSideSwap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedButton by remember { mutableStateOf<String?>(null) }
@@ -1150,22 +1213,38 @@ private fun FloatingActionToolbar(
     // Use Box with consistent positioning to prevent movement
     Box(
         modifier = modifier,
-        contentAlignment = Alignment.CenterStart
+        contentAlignment = if (isOnRightSide) Alignment.CenterEnd else Alignment.CenterStart
     ) {
         // Render only the active state to avoid touch interception issues
         if (!isExpanded) {
-            // Collapsed state - Hint indicator flush with left edge
+            // Collapsed state - Hint indicator flush with edge (draggable vertically, double-tap to swap sides)
             Surface(
-                shape = RoundedCornerShape(
-                    topStart = 0.dp,
-                    topEnd = 50.dp,
-                    bottomEnd = 50.dp,
-                    bottomStart = 0.dp
-                ),
+                shape = if (isOnRightSide) {
+                    RoundedCornerShape(
+                        topStart = 50.dp,
+                        topEnd = 0.dp,
+                        bottomEnd = 0.dp,
+                        bottomStart = 50.dp
+                    )
+                } else {
+                    RoundedCornerShape(
+                        topStart = 0.dp,
+                        topEnd = 50.dp,
+                        bottomEnd = 50.dp,
+                        bottomStart = 0.dp
+                    )
+                },
                 color = MaterialTheme.colorScheme.primaryContainer,
                 tonalElevation = 4.dp,
                 shadowElevation = 4.dp,
-                modifier = Modifier.clickable { onExpandedChange(true) }
+                modifier = Modifier
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            onDrag(dragAmount)
+                        }
+                    }
+                    .clickable { onExpandedChange(true) }
             ) {
                 Row(
                     modifier = Modifier
@@ -1173,7 +1252,7 @@ private fun FloatingActionToolbar(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ChevronRight,
+                        imageVector = if (isOnRightSide) Icons.Default.ChevronLeft else Icons.Default.ChevronRight,
                         contentDescription = "Expand toolbar",
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(20.dp)
