@@ -740,48 +740,20 @@ fun PrayerTimesScreen(
             label = "expressiveTileScale"
         )
         
-        // Material 3 expressive transformation with enhanced visual feedback
-        val alpha by animateFloatAsState(
-            targetValue = 1f,
-            animationSpec = expressiveAnimationSpec,
-            label = "expressiveTileAlpha"
-        )
-        
-        // Enhanced pop effect with overshoot for more expressive feedback
-        val transformScale by animateFloatAsState(
-            targetValue = if (isInEditMode) 1.08f else 1f, // More pronounced scale for edit mode
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessHigh, // Higher stiffness for snappy response
-                visibilityThreshold = 0.005f
-            ),
-            label = "expressiveTransformScale"
-        )
-        
-        // Subtle rotation for transformation feedback (Material 3 playful motion)
-        val transformRotation by animateFloatAsState(
-            targetValue = if (isInEditMode) 2f else 0f, // Slight rotation for visual emphasis
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            ),
-            label = "expressiveTransformRotation"
-        )
-        
         // Debug logging
         android.util.Log.d("PrayerCard", "🔄 Rendering InteractivePrayerCard for $prayerName, isInEditMode=$isInEditMode, scale=$scale")
         
         if (isInEditMode) {
             // Show ONLY the circular dial - complete transformation, no extra UI
-            var timeAdjustment by remember { mutableStateOf(currentOffset) }
+            // CRITICAL FIX: Initialize from currentOffset and track independently
+            var timeAdjustment by remember(prayerName) { mutableStateOf(currentOffset) }
 
             // CRITICAL LOGGING: Track when timeAdjustment state variable changes
             LaunchedEffect(timeAdjustment) {
-                android.util.Log.w("PrayerTimesScreen", "⚠️ STATE RESET DETECTED - Prayer: $prayerName")
+                android.util.Log.w("PrayerTimesScreen", "⚠️ STATE CHANGE - Prayer: $prayerName")
                 android.util.Log.w("PrayerTimesScreen", "   📊 timeAdjustment state value: $timeAdjustment minutes")
                 android.util.Log.w("PrayerTimesScreen", "   🔍 currentOffset reference: $currentOffset minutes")
                 android.util.Log.w("PrayerTimesScreen", "   🎯 isInEditMode: $isInEditMode")
-                android.util.Log.w("PrayerTimesScreen", "   📍 This shows when parent recomposition changes state")
             }
 
             // Track when currentOffset changes (the remember key)
@@ -796,12 +768,9 @@ fun PrayerTimesScreen(
                 modifier = modifier
                     .aspectRatio(1f) // Force square container for perfect circle
                     .graphicsLayer(
-                        scaleX = scale * transformScale,
-                        scaleY = scale * transformScale,
-                        alpha = alpha,
-                        rotationZ = transformRotation
-                    )
-                    .animateContentSize(animationSpec = sizeAnimationSpec),
+                        scaleX = scale,
+                        scaleY = scale
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 ElevatedCard(
@@ -908,12 +877,9 @@ fun PrayerTimesScreen(
                 ),
                 modifier = modifier
                     .graphicsLayer(
-                        scaleX = scale * transformScale,
-                        scaleY = scale * transformScale,
-                        alpha = alpha,
-                        rotationZ = transformRotation
+                        scaleX = scale,
+                        scaleY = scale
                     )
-                    .animateContentSize(animationSpec = sizeAnimationSpec)
                     .pointerInput(prayerName) {
                         detectTapGestures(
                             onLongPress = {
