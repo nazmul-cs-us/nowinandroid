@@ -715,46 +715,47 @@ private fun AlbumPlayerContent(
             contentPadding = WindowInsets.statusBars.asPaddingValues(),
             modifier = Modifier.fillMaxSize()
         ) {
-        // Album Header with FAB
-        item {
-            Column {
+        // Album Header with FAB and Info Card combined for proper FAB overlap
+        if (!showMusicPlayer) {
+            item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .wrapContentHeight()
                 ) {
-                    AlbumHeader(surah = surah)
+                    Column {
+                        AlbumHeader(surah = surah)
+                        AlbumInfoCard(
+                            surah = surah,
+                            collapseProgress = collapseProgress
+                        )
+                    }
 
-                    // FAB positioned with half-overlap effect
-                    if (!showMusicPlayer) {
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = showFabVisible,
-                            enter = scaleIn(
-                                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-                            ) + fadeIn(animationSpec = tween(durationMillis = 300)),
-                            exit = scaleOut(
-                                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-                            ) + fadeOut(animationSpec = tween(durationMillis = 300)),
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(end = 24.dp, bottom = 0.dp)
+                    // FAB positioned with more overlap on the info card
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showFabVisible,
+                        enter = scaleIn(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+                        exit = scaleOut(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(y = (-168.dp)) // Position FAB lower with more overlap on info card (75% on info card, 25% on artwork)
+                            .padding(end = 24.dp)
+                    ) {
+                        FloatingActionButton(
+                            onClick = onFabClick,
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         ) {
-                            FloatingActionButton(
-                                onClick = onFabClick,
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ) {
-                                Icon(
-                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isPlaying) "Pause" else "Play"
-                                )
-                            }
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Pause" else "Play"
+                            )
                         }
                     }
-                }
-                // Spacer for FAB half-overlap - only when FAB is visible
-                if (!showMusicPlayer && showFabVisible) {
-                    Spacer(modifier = Modifier.height(28.dp))
                 }
             }
         }
@@ -762,27 +763,26 @@ private fun AlbumPlayerContent(
         // Music Player Controls (expanded view)
         if (showMusicPlayer) {
             item {
-                MusicPlayerControls(
-                    isPlaying = isPlaying,
-                    currentProgress = currentProgress,
-                    currentVolume = currentVolume,
-                    surahName = surah.nameEnglish,
-                    surahNameArabic = surah.nameArabic,
-                    onPlayPauseClick = onPlayPauseClick,
-                    onRewindClick = onRewindClick,
-                    onForwardClick = onForwardClick,
-                    onVolumeChange = onVolumeChange
-                )
-            }
-        }
-
-        // Album Info Card (shown when player is collapsed)
-        if (!showMusicPlayer) {
-            item {
-                AlbumInfoCard(
-                    surah = surah,
-                    collapseProgress = collapseProgress
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                ) {
+                    Column {
+                        AlbumHeader(surah = surah)
+                        MusicPlayerControls(
+                            isPlaying = isPlaying,
+                            currentProgress = currentProgress,
+                            currentVolume = currentVolume,
+                            surahName = surah.nameEnglish,
+                            surahNameArabic = surah.nameArabic,
+                            onPlayPauseClick = onPlayPauseClick,
+                            onRewindClick = onRewindClick,
+                            onForwardClick = onForwardClick,
+                            onVolumeChange = onVolumeChange
+                        )
+                    }
+                }
             }
         }
 
