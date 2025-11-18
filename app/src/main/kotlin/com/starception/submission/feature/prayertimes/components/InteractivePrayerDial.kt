@@ -690,123 +690,154 @@ private fun DrawScope.drawCleanCircularTimer(
     knobScale: Float = 1f,
     progressArcGlow: Float = 1f
 ) {
-    // Design matching the reference image: central dial with outer segmented ring
-    // Ensure perfect centering - use the exact center parameter directly
-    // CRITICAL: Both circles MUST use the exact same center point
+    // PNG File Icon aesthetic with folded corner and rounded document shape
     val exactCenter = center
-    
-    val outerRingRadius = radius * 1.15f // Outer ring radius
-    val centralKnobRadius = radius * 0.35f // Central knob radius (smaller, no dark center)
+    val documentSize = radius * 2.2f // Document/card size
+    val cornerRadius = 24f // Rounded corners for the document
+    val foldSize = documentSize * 0.15f // Size of the folded corner
 
-    // Colors matching the reference design
-    val lightGreyBackground = Color(0xFFF5F5F5) // Very light grey/off-white
-    val tealColor = Color(0xFF26C6DA) // Vibrant teal/aqua for all segments (uniform color like reference)
+    // PNG file icon colors
+    val documentWhite = Color(0xFFF8F8F8) // Soft white like paper
+    val documentShadow = Color(0xFF000000).copy(alpha = 0.12f)
+    val foldGray = Color(0xFFE0E0E0) // Light gray for folded corner
+    val tealColor = Color(0xFF26C6DA) // Teal for progress indicators
 
-    // Draw outer shadow for depth (soft shadow beneath the entire dial) - centered
-    // Subtle grey shadow instead of black for a more natural look
-    drawCircle(
-        color = Color(0xFF000000).copy(alpha = 0.1f), // Subtle shadow with low opacity
-        radius = outerRingRadius + 6f,
-        center = exactCenter // Shadow centered, not offset
-    )
-
-    // Draw outer segmented ring background (recessed appearance) - perfectly centered
-    drawCircle(
-        color = lightGreyBackground, // Light grey background for the outer ring
-        radius = outerRingRadius,
-        center = exactCenter
-    )
-
-    // Draw segmented outer ring with markers ON the track
-    // Markers are drawn on the ring track itself, not extending outward
-    // Matching reference: markers on track, grey or teal colored, uniform size
-    val segmentCount = 120 // Number of markers around the circle
-    val markerLength = 12f // Length of each marker (drawn on the track)
-    val markerWidth = 2.5f // Uniform width for all markers (teal and grey)
-    val trackWidth = 16f // Width of the track/ring where markers are drawn
-    val inactiveGrey = Color(0xFFE0E0E0) // Light grey for inactive markers - fully opaque
-    
     // Calculate actual prayer time (adjusted) for angle calculation
     val adjustedDateTime = LocalDateTime.of(LocalDate.now(), originalTime).plusMinutes(timeAdjustment.toLong())
     val adjustedTime = adjustedDateTime.toLocalTime()
-
-    // Convert time to angle (starting from top - 12 o'clock position)
     val hourIn12Format = if (adjustedTime.hour % 12 == 0) 12 else adjustedTime.hour % 12
     val timeAngle = ((hourIn12Format * 60 + adjustedTime.minute) / (12 * 60f)) * 360f - 90f
+    val currentAngle = if (isDragging) currentDragAngle else timeAngle
+    val normalizedCurrentAngle = ((currentAngle + 90f) % 360 + 360) % 360
 
-    // Draw markers on the track with progress indication
-    // Active markers (teal) from 12 o'clock clockwise, inactive markers (grey) for the rest
-        val currentAngle = if (isDragging) currentDragAngle else timeAngle
-    val normalizedCurrentAngle = ((currentAngle + 90f) % 360 + 360) % 360 // Normalize relative to top (0° = 12 o'clock)
+    // Draw document shadow (soft drop shadow beneath the entire card)
+    val shadowPath = Path().apply {
+        val left = exactCenter.x - documentSize / 2 + 3f
+        val top = exactCenter.y - documentSize / 2 + 4f
+        val right = left + documentSize
+        val bottom = top + documentSize
 
-    for (i in 0 until segmentCount) {
-        val markerAngle = (i * (360.0 / segmentCount) - 90.0) * PI / 180.0 // Start from top
-        val normalizedMarkerAngle = ((i * (360.0 / segmentCount)) % 360).toFloat()
+        moveTo(left + cornerRadius, top)
+        lineTo(right - foldSize - cornerRadius, top)
+        lineTo(right - foldSize, top)
+        lineTo(right, top + foldSize)
+        lineTo(right, bottom - cornerRadius)
+        quadraticTo(right, bottom, right - cornerRadius, bottom)
+        lineTo(left + cornerRadius, bottom)
+        quadraticTo(left, bottom, left, bottom - cornerRadius)
+        lineTo(left, top + cornerRadius)
+        quadraticTo(left, top, left + cornerRadius, top)
+        close()
+    }
+    drawPath(path = shadowPath, color = documentShadow)
 
-        // Determine if this marker is active (within progress from 12 o'clock clockwise)
-        // Sharp transition: teal if <= current angle, grey otherwise
-        val isActive = normalizedMarkerAngle <= normalizedCurrentAngle
+    // Draw main document body (white background with rounded corners)
+    val documentPath = Path().apply {
+        val left = exactCenter.x - documentSize / 2
+        val top = exactCenter.y - documentSize / 2
+        val right = left + documentSize
+        val bottom = top + documentSize
 
-        // Marker position - drawn ON the track (ring), fully contained within track boundaries
-        // Position markers on the track itself, ensuring they stay within track width
-        val trackInnerRadius = outerRingRadius - trackWidth / 2f
-        val trackOuterRadius = outerRingRadius + trackWidth / 2f
-        
-        // Draw marker as a vertical dash ON the track, fully contained within track boundaries
-        // Marker should be within the track, with some padding from edges
-        val markerPadding = 1f // Small padding to ensure markers stay within track
-        val markerStartRadius = trackInnerRadius + markerPadding
-        val markerEndRadius = trackOuterRadius - markerPadding
-        
-        val markerStart = Offset(
-            exactCenter.x + markerStartRadius * cos(markerAngle.toFloat()).toFloat(),
-            exactCenter.y + markerStartRadius * sin(markerAngle.toFloat()).toFloat()
-        )
-        val markerEnd = Offset(
-            exactCenter.x + markerEndRadius * cos(markerAngle.toFloat()).toFloat(),
-            exactCenter.y + markerEndRadius * sin(markerAngle.toFloat()).toFloat()
-        )
+        // Start from top-left, move clockwise
+        moveTo(left + cornerRadius, top)
 
-        // Draw marker - uniform width for both teal and grey, sharp color transition
-        // Markers are drawn ON the track, not extending beyond it
+        // Top edge to folded corner
+        lineTo(right - foldSize - cornerRadius, top)
+
+        // Folded corner diagonal
+        lineTo(right - foldSize, top)
+        lineTo(right, top + foldSize)
+
+        // Right edge
+        lineTo(right, bottom - cornerRadius)
+
+        // Bottom-right rounded corner
+        quadraticTo(right, bottom, right - cornerRadius, bottom)
+
+        // Bottom edge
+        lineTo(left + cornerRadius, bottom)
+
+        // Bottom-left rounded corner
+        quadraticTo(left, bottom, left, bottom - cornerRadius)
+
+        // Left edge
+        lineTo(left, top + cornerRadius)
+
+        // Top-left rounded corner
+        quadraticTo(left, top, left + cornerRadius, top)
+        close()
+    }
+    drawPath(path = documentPath, color = documentWhite)
+
+    // Draw folded corner detail (darker triangle)
+    val foldPath = Path().apply {
+        val right = exactCenter.x + documentSize / 2
+        val top = exactCenter.y - documentSize / 2
+
+        moveTo(right - foldSize, top)
+        lineTo(right, top + foldSize)
+        lineTo(right - foldSize, top + foldSize)
+        close()
+    }
+    drawPath(path = foldPath, color = foldGray)
+
+    // Draw teal tick marks around the circular track (like PNG file icon reference)
+    val trackRadius = radius * 0.95f
+    val tickCount = 120 // 120 tick marks for precise minute adjustments
+    val tickLength = 8f // Length of each tick mark
+    val tickWidth = 2f // Width of tick marks
+
+    for (i in 0 until tickCount) {
+        val angle = (i * (360.0 / tickCount) - 90.0).toFloat()
+        val angleRad = (angle * PI / 180f).toFloat()
+        val normalizedTickAngle = ((i * (360.0 / tickCount)) % 360).toFloat()
+        val isActive = normalizedTickAngle <= normalizedCurrentAngle
+
+        // Calculate tick mark positions (from inner to outer radius)
+        val innerRadius = trackRadius - tickLength / 2
+        val outerRadius = trackRadius + tickLength / 2
+
+        val startX = exactCenter.x + innerRadius * cos(angleRad)
+        val startY = exactCenter.y + innerRadius * sin(angleRad)
+        val endX = exactCenter.x + outerRadius * cos(angleRad)
+        val endY = exactCenter.y + outerRadius * sin(angleRad)
+
+        // Teal color for active ticks, light gray for inactive
+        val tickColor = if (isActive) {
+            tealColor // Teal for progress
+        } else {
+            Color(0xFFE0E0E0) // Light gray for inactive
+        }
+
         drawLine(
-            color = if (isActive) {
-                tealColor // Vibrant teal for active markers - fully opaque
-            } else {
-                inactiveGrey // Light grey for inactive markers - fully opaque
-            },
-            start = markerStart,
-            end = markerEnd,
-            strokeWidth = markerWidth, // Uniform width for all markers
+            color = tickColor,
+            start = Offset(startX, startY),
+            end = Offset(endX, endY),
+            strokeWidth = tickWidth,
             cap = StrokeCap.Round
         )
     }
 
-    // Draw teal indicator knob - draggable and follows current time/drag angle
-    // Position it on the outer ring based on current time angle
-    val indicatorAngleRad = (currentAngle * PI / 180f).toFloat() // Convert to radians
-    val indicatorRadius = outerRingRadius - 15f // Position on the outer ring, near the inner edge
-    val indicatorCenter = Offset(
+    // Draw draggable knob indicator
+    val indicatorAngleRad = (currentAngle * PI / 180f).toFloat()
+    val indicatorRadius = trackRadius
+    val knobCenter = Offset(
         exactCenter.x + indicatorRadius * cos(indicatorAngleRad),
         exactCenter.y + indicatorRadius * sin(indicatorAngleRad)
     )
 
-    // Draw circular knob indicator (larger and more visible for dragging)
-    val knobIndicatorRadius = if (isDragging) 16f * knobScale else 12f // Larger when dragging
+    val knobSize = if (isDragging) 16f * knobScale else 12f
     drawCircle(
         color = tealColor,
-        radius = knobIndicatorRadius,
-        center = indicatorCenter
+        radius = knobSize,
+        center = knobCenter
     )
-    
-    // Add a subtle white border/ring around the knob for better visibility
     drawCircle(
         color = Color.White,
-        radius = knobIndicatorRadius + 2f,
-        center = indicatorCenter,
-        style = Stroke(width = 2f)
+        radius = knobSize + 2f,
+        center = knobCenter,
+        style = Stroke(width = 2.5f)
     )
-    
 }
 
 private fun DrawScope.drawPNGDocumentBackground(center: Offset, radius: Float) {

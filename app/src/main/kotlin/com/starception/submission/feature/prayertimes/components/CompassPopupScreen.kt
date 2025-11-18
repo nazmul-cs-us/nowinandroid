@@ -48,30 +48,53 @@ import com.starception.submission.prayer.service.EnhancedLocationService
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+
+// UI Constants
+private const val DRAG_THRESHOLD_DP = 60
+private const val EXIT_ANIMATION_DELAY_MS = 250L
+private const val COMPASS_SIZE_DP = 260
+private const val HANDLE_WIDTH_DP = 60
+private const val HANDLE_HEIGHT_DP = 6
+private const val DRAG_AREA_WIDTH_DP = 80
+private const val DRAG_AREA_HEIGHT_DP = 20
+
+/**
+ * Helper function to dismiss popup with smooth exit animation
+ */
+private fun dismissWithAnimation(
+    setVisible: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    coroutineScope: CoroutineScope
+) {
+    setVisible(false) // Trigger exit animation
+    coroutineScope.launch {
+        delay(EXIT_ANIMATION_DELAY_MS)
+        onDismiss()
+    }
+}
 
 /**
  * Full-screen compass popup with calibration guidance
- * 
+ *
  * Shows the compass in large size with Islamic theming and sensor calibration instructions.
  * Automatically appears when sensor accuracy is poor or when user taps the compass tile.
- * 
+ *
  * ## Features:
  * - **Large Compass Display**: 280dp compass for better visibility and interaction
  * - **Calibration Guidance**: Step-by-step instructions for improving sensor accuracy
  * - **Islamic Theming**: Traditional green colors with Kaaba emoji
  * - **Real-time Feedback**: Visual indicators showing sensor status improvements
  * - **Prayer Integration**: Shows current prayer time countdown within the compass
- * - **Pull-to-Close Gesture**: Drag down 100dp to close the popup naturally
- * 
+ * - **Pull-to-Close Gesture**: Drag down 60dp to close the popup naturally
+ *
  * @param progress Current prayer time progress (0-1)
- * @param timeText Time remaining until next prayer
  * @param locationService Enhanced location service for GPS and Qibla calculations
  * @param onDismiss Callback when user closes the popup
  */
 @Composable
 fun CompassPopupScreen(
     progress: Float,
-    timeText: String,
     locationService: EnhancedLocationService?,
     onDismiss: () -> Unit
 ) {
@@ -79,7 +102,7 @@ fun CompassPopupScreen(
     val hapticFeedback = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     var dragState by remember { mutableFloatStateOf(0f) }
-    val dragThreshold = with(density) { 60.dp.toPx() } // Reduced threshold for easier closing
+    val dragThreshold = with(density) { DRAG_THRESHOLD_DP.dp.toPx() }
     
     // Material 3 expressive entrance animations
     var isVisible by remember { mutableStateOf(false) }
@@ -220,12 +243,11 @@ fun CompassPopupScreen(
                     onClick = {
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         Log.d("CompassPopup", "Close button clicked!")
-                        isVisible = false // Trigger exit animation
-                        // Delay actual dismiss to allow exit animation
-                        coroutineScope.launch {
-                            delay(250) // Match background fade duration
-                            onDismiss()
-                        }
+                        dismissWithAnimation(
+                            setVisible = { isVisible = it },
+                            onDismiss = onDismiss,
+                            coroutineScope = coroutineScope
+                        )
                         Log.d("CompassPopup", "Exit animation started")
                     },
                     modifier = Modifier
@@ -270,32 +292,32 @@ fun CompassPopupScreen(
                         // More prominent pull-down handle indicator with drag gesture
                         Box(
                             modifier = Modifier
-                                .width(80.dp) // Wider drag area
-                                .height(20.dp) // Taller drag area 
+                                .width(DRAG_AREA_WIDTH_DP.dp)
+                                .height(DRAG_AREA_HEIGHT_DP.dp)
                                 .pointerInput(Unit) {
                                     detectVerticalDragGestures(
                                         onDragEnd = {
                                             // If user dragged down far enough, close with animation
                                             if (dragState > dragThreshold) {
                                                 Log.d("CompassPopup", "Pull-down gesture detected (${dragState}px > ${dragThreshold}px), closing popup")
-                                                isVisible = false // Trigger exit animation
-                                                // Delay actual dismiss to allow exit animation
-                                                coroutineScope.launch {
-                                                    delay(250) // Match background fade duration
-                                                    onDismiss()
-                                                }
+                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                dismissWithAnimation(
+                                                    setVisible = { isVisible = it },
+                                                    onDismiss = onDismiss,
+                                                    coroutineScope = coroutineScope
+                                                )
                                             }
                                             // Reset drag state
                                             dragState = 0f
                                         }
                                     ) { _, dragAmount ->
-                                        // Only track downward drags (positive Y direction)
+                                        // Track drags with gradual decay for upward movements
                                         if (dragAmount > 0) {
                                             dragState = maxOf(0f, dragState + dragAmount)
                                             Log.d("CompassPopup", "Drag down: ${dragAmount}px, total: ${dragState}px")
                                         } else {
-                                            // Reset if user drags upward
-                                            dragState = 0f
+                                            // Gradual decay for upward drags (feels more natural)
+                                            dragState = maxOf(0f, dragState + dragAmount * 0.5f)
                                         }
                                     }
                                 },
@@ -304,10 +326,10 @@ fun CompassPopupScreen(
                             // Visual handle bar with animation feedback
                             Box(
                                 modifier = Modifier
-                                    .width(60.dp)
-                                    .height(6.dp)
+                                    .width(HANDLE_WIDTH_DP.dp)
+                                    .height(HANDLE_HEIGHT_DP.dp)
                                     .scale(handleScale) // Animated scale feedback
-                                    .clip(RoundedCornerShape(3.dp))
+                                    .clip(RoundedCornerShape((HANDLE_HEIGHT_DP / 2).dp))
                                     .background(
                                         Color.White.copy(
                                             alpha = 0.8f + (dragProgress * 0.2f) // Brightens during drag
@@ -370,7 +392,7 @@ fun CompassPopupScreen(
                 ) {
                     CompassProgressIndicator(
                         progress = progress,
-                        size = 260.dp,
+                        size = COMPASS_SIZE_DP.dp,
                         locationService = locationService,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )

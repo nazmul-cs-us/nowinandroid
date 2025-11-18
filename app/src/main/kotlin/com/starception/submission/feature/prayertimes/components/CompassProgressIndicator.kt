@@ -364,12 +364,12 @@ fun CompassProgressIndicator(
             kotlin.math.abs(normalizedAngle - 360f)
         )
 
-        // Hysteresis: Enter at ±5°, exit at ±7° (prevents rapid toggling at boundary)
+        // Exit threshold at ±15° (user requested - exit when beyond 15 degrees)
         val wasNearQibla = remember { mutableStateOf(false) }
         val isNearQibla = if (wasNearQibla.value) {
-            angularDistance <= 7f // Exit threshold (wider)
+            angularDistance <= 15f // Exit threshold (exit when beyond 15°)
         } else {
-            angularDistance <= 5f // Entry threshold (stricter)
+            angularDistance <= 12f // Entry threshold (stricter to enter, prevents rapid toggling)
         }
         wasNearQibla.value = isNearQibla
 
