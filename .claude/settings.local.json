@@ -126,7 +126,16 @@
       "Bash(/tmp/app_launched.png)",
       "Bash(/tmp/current_screen.png)",
       "Bash(/tmp/home_screen.png)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(/tmp/current_fab.png)",
+      "Bash(/tmp/fab_bottom_aligned.png)",
+      "Bash(/tmp/current_screen_check.png)",
+      "Bash(/tmp/fab_200dp.png)",
+      "Bash(/tmp/phone_screen.png)",
+      "Bash(/tmp/fab_228dp.png)",
+      "Bash(/tmp/fab_224dp_device.png)",
+      "Bash(perl -pe:*)",
+      "Bash(/tmp/device_screenshot.png)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
