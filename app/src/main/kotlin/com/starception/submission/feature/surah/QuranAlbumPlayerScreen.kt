@@ -333,6 +333,7 @@ fun QuranAlbumPlayerScreen(
                             }
                         }
                     },
+                    onCollapseMusicPlayer = { showMusicPlayer = false },
                     modifier = Modifier
                 )
             }
@@ -695,6 +696,7 @@ private fun AlbumPlayerContent(
     onVolumeChange: (Float) -> Unit,
     onAyahClick: (Ayah) -> Unit,
     onFabClick: () -> Unit,
+    onCollapseMusicPlayer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Calculate total items for scrollbar state
@@ -715,71 +717,105 @@ private fun AlbumPlayerContent(
             contentPadding = WindowInsets.statusBars.asPaddingValues(),
             modifier = Modifier.fillMaxSize()
         ) {
-        // Album Header with FAB and Info Card combined for proper FAB overlap
-        if (!showMusicPlayer) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                ) {
-                    Column {
-                        AlbumHeader(surah = surah)
-                        AlbumInfoCard(
-                            surah = surah,
-                            collapseProgress = collapseProgress
-                        )
-                    }
+        // Album Header with either FAB+Info Card OR Music Player Controls
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+            ) {
+                Column {
+                    AlbumHeader(surah = surah)
 
-                    // FAB positioned with more overlap on the info card
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = showFabVisible,
-                        enter = scaleIn(
-                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-                        ) + fadeIn(animationSpec = tween(durationMillis = 300)),
-                        exit = scaleOut(
-                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-                        ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+                    // Fixed-height container to prevent FAB position jump during transitions
+                    Box(
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .offset(y = (-168.dp)) // Position FAB lower with more overlap on info card (75% on info card, 25% on artwork)
-                            .padding(end = 24.dp)
+                            .fillMaxWidth()
+                            .height(196.dp) // Fixed height matches original AlbumInfoCard
                     ) {
-                        FloatingActionButton(
-                            onClick = onFabClick,
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ) {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Pause" else "Play"
-                            )
+                        // Professional animated transition between AlbumInfoCard and MusicPlayerControls
+                        // Using AnimatedContent for smooth fade + slide transitions
+                        androidx.compose.animation.AnimatedContent(
+                            targetState = showMusicPlayer,
+                            transitionSpec = {
+                                if (targetState) {
+                                    // Expanding to Music Player: slide up + fade in
+                                    slideInVertically(
+                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                        initialOffsetY = { it / 3 }
+                                    ) + fadeIn(
+                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                    ) togetherWith slideOutVertically(
+                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                        targetOffsetY = { -it / 3 }
+                                    ) + fadeOut(
+                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                    )
+                                } else {
+                                    // Collapsing to Info Card: slide down + fade in
+                                    slideInVertically(
+                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                        initialOffsetY = { -it / 3 }
+                                    ) + fadeIn(
+                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                    ) togetherWith slideOutVertically(
+                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                        targetOffsetY = { it / 3 }
+                                    ) + fadeOut(
+                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                    )
+                                }
+                            },
+                            label = "Player Controls Transition",
+                            modifier = Modifier.fillMaxSize()
+                        ) { showPlayer ->
+                            if (showPlayer) {
+                                // Music Player Controls
+                                MusicPlayerControls(
+                                    isPlaying = isPlaying,
+                                    currentProgress = currentProgress,
+                                    currentVolume = currentVolume,
+                                    surahName = surah.nameEnglish,
+                                    surahNameArabic = surah.nameArabic,
+                                    onPlayPauseClick = onPlayPauseClick,
+                                    onRewindClick = onRewindClick,
+                                    onForwardClick = onForwardClick,
+                                    onVolumeChange = onVolumeChange,
+                                    onCollapse = onCollapseMusicPlayer
+                                )
+                            } else {
+                                // Album Info Card
+                                AlbumInfoCard(
+                                    surah = surah,
+                                    collapseProgress = collapseProgress
+                                )
+                            }
                         }
                     }
                 }
-            }
-        }
 
-        // Music Player Controls (expanded view)
-        if (showMusicPlayer) {
-            item {
-                Box(
+                // FAB positioned with more overlap on the info card
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showFabVisible,
+                    enter = scaleIn(
+                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+                    exit = scaleOut(
+                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                    ) + fadeOut(animationSpec = tween(durationMillis = 300)),
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
+                        .align(Alignment.BottomEnd)
+                        .offset(y = (-168.dp)) // Position FAB lower with more overlap on info card (75% on info card, 25% on artwork)
+                        .padding(end = 24.dp)
                 ) {
-                    Column {
-                        AlbumHeader(surah = surah)
-                        MusicPlayerControls(
-                            isPlaying = isPlaying,
-                            currentProgress = currentProgress,
-                            currentVolume = currentVolume,
-                            surahName = surah.nameEnglish,
-                            surahNameArabic = surah.nameArabic,
-                            onPlayPauseClick = onPlayPauseClick,
-                            onRewindClick = onRewindClick,
-                            onForwardClick = onForwardClick,
-                            onVolumeChange = onVolumeChange
+                    FloatingActionButton(
+                        onClick = onFabClick,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play"
                         )
                     }
                 }
@@ -875,7 +911,7 @@ private fun AlbumInfoCard(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier
             .fillMaxWidth()
-            .height(196.dp)
+            .fillMaxHeight() // Fill parent Box container (196dp)
     ) {
         Column(
             modifier = Modifier
@@ -946,11 +982,22 @@ private fun MusicPlayerControls(
     onRewindClick: () -> Unit,
     onForwardClick: () -> Unit,
     onVolumeChange: (Float) -> Unit,
+    onCollapse: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Dark player controls matching reference design
+    // Tap anywhere to collapse back to AlbumInfoCard with FAB
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .fillMaxHeight() // Fill parent Box container (196dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                // Tap anywhere collapses to AlbumInfoCard
+                onCollapse()
+            },
         color = Color.Black
     ) {
         Column(
