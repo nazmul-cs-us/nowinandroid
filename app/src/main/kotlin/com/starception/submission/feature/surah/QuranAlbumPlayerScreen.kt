@@ -92,6 +92,9 @@ fun QuranAlbumPlayerScreen(
     var playbackService by remember { mutableStateOf<QuranPlaybackService?>(null) }
     var currentProgress by remember { mutableStateOf(0f) }
 
+    // Track current playing surah number for updating AlbumInfoCard when next/previous is pressed
+    var currentPlayingSurahNumber by remember { mutableStateOf(surahNumber) }
+
     // Load volume from ViewModel (persisted in SharedPreferences)
     val currentVolume by viewModel.currentVolume.collectAsState()
 
@@ -158,6 +161,13 @@ fun QuranAlbumPlayerScreen(
                     if (duration > 0) {
                         currentProgress = position.toFloat() / duration.toFloat()
                     }
+                }
+
+                // Update current playing surah number when next/previous is pressed
+                playbackService?.onSurahChanged = { surahIndex ->
+                    val newSurahNumber = surahIndex + 1 // Convert 0-based index to 1-based surah number
+                    android.util.Log.d("QuranAlbumPlayer", "🔄 SURAH_CHANGED | index=$surahIndex | surahNumber=$newSurahNumber")
+                    currentPlayingSurahNumber = newSurahNumber
                 }
 
                 playbackService?.setAudioLanguage(currentAudioLanguage)
@@ -283,6 +293,7 @@ fun QuranAlbumPlayerScreen(
                     isPlaying = isPlaying,
                     currentProgress = currentProgress,
                     currentVolume = currentVolume,
+                    currentPlayingSurahNumber = currentPlayingSurahNumber,
                     showFabVisible = showFabVisible,
                     selectedArabicFont = selectedArabicFont,
                     arabicFontSize = arabicFontSize,
@@ -683,6 +694,7 @@ private fun AlbumPlayerContent(
     isPlaying: Boolean,
     currentProgress: Float,
     currentVolume: Float,
+    currentPlayingSurahNumber: Int,
     showFabVisible: Boolean,
     selectedArabicFont: String,
     arabicFontSize: Float,
@@ -699,6 +711,23 @@ private fun AlbumPlayerContent(
     onCollapseMusicPlayer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    // Track the currently playing surah - load from repository when surah number changes
+    var currentPlayingSurah by remember { mutableStateOf<Surah?>(null) }
+    val quranRepository = hiltViewModel<QuranRepositoryHolder>().repository
+
+    LaunchedEffect(currentPlayingSurahNumber) {
+        // Fetch the new surah when the playing surah number changes
+        android.util.Log.d("QuranAlbumPlayer", "📥 FETCHING_SURAH | current=$currentPlayingSurahNumber | original=${surah.number}")
+        if (currentPlayingSurahNumber != surah.number) {
+            val fetchedSurah = quranRepository.getSurahByNumber(currentPlayingSurahNumber)
+            android.util.Log.d("QuranAlbumPlayer", "✅ FETCHED | surah=${fetchedSurah?.nameEnglish} | number=${fetchedSurah?.number}")
+            currentPlayingSurah = fetchedSurah
+        } else {
+            android.util.Log.d("QuranAlbumPlayer", "↩️ USING_ORIGINAL | surah=${surah.nameEnglish}")
+            currentPlayingSurah = null // Use the original surah
+        }
+    }
+
     // Calculate total items for scrollbar state
     val totalItems = remember(ayahs, showMusicPlayer) {
         1 + // AlbumHeader
@@ -770,13 +799,14 @@ private fun AlbumPlayerContent(
                             modifier = Modifier.fillMaxSize()
                         ) { showPlayer ->
                             if (showPlayer) {
-                                // Music Player Controls
+                                // Music Player Controls - show current playing surah name
+                                val displaySurah = currentPlayingSurah ?: surah
                                 MusicPlayerControls(
                                     isPlaying = isPlaying,
                                     currentProgress = currentProgress,
                                     currentVolume = currentVolume,
-                                    surahName = surah.nameEnglish,
-                                    surahNameArabic = surah.nameArabic,
+                                    surahName = displaySurah.nameEnglish,
+                                    surahNameArabic = displaySurah.nameArabic,
                                     onPlayPauseClick = onPlayPauseClick,
                                     onRewindClick = onRewindClick,
                                     onForwardClick = onForwardClick,
@@ -784,9 +814,9 @@ private fun AlbumPlayerContent(
                                     onCollapse = onCollapseMusicPlayer
                                 )
                             } else {
-                                // Album Info Card
+                                // Album Info Card - show current playing surah info
                                 AlbumInfoCard(
-                                    surah = surah,
+                                    surah = currentPlayingSurah ?: surah,
                                     collapseProgress = collapseProgress
                                 )
                             }
@@ -795,6 +825,7 @@ private fun AlbumPlayerContent(
                 }
 
                 // FAB positioned with more overlap on the info card
+                // Shows minimize icon when player controls are visible, play/pause when info card is showing
                 androidx.compose.animation.AnimatedVisibility(
                     visible = showFabVisible,
                     enter = scaleIn(
@@ -809,13 +840,29 @@ private fun AlbumPlayerContent(
                         .padding(end = 24.dp)
                 ) {
                     FloatingActionButton(
-                        onClick = onFabClick,
+                        onClick = {
+                            if (showMusicPlayer) {
+                                // When player controls are showing, minimize/collapse the player
+                                onCollapseMusicPlayer()
+                            } else {
+                                // When info card is showing, control play/pause
+                                onFabClick()
+                            }
+                        },
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     ) {
                         Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pause" else "Play"
+                            imageVector = when {
+                                showMusicPlayer -> Icons.Default.CallReceived // Minimize icon (arrow into box) when player controls are visible
+                                isPlaying -> Icons.Default.Pause // Pause when playing
+                                else -> Icons.Default.PlayArrow // Play when paused
+                            },
+                            contentDescription = when {
+                                showMusicPlayer -> "Minimize player"
+                                isPlaying -> "Pause"
+                                else -> "Play"
+                            }
                         )
                     }
                 }
@@ -944,7 +991,7 @@ private fun AlbumInfoCard(
 
             Spacer(Modifier.height(16.dp))
 
-            // Surah info
+            // Surah info chips
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -1038,53 +1085,50 @@ private fun MusicPlayerControls(
 
             Spacer(Modifier.height(16.dp))
 
-            // Playback controls
+            // Playback controls - minimal style matching reference
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                    .padding(horizontal = 48.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Previous button
+                // Previous button - simple icon
                 IconButton(
                     onClick = onRewindClick,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
                         tint = Color.White,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
 
-                // Play/Pause button
-                FilledIconButton(
+                // Play/Pause button - simple triangle/pause icon
+                IconButton(
                     onClick = onPlayPauseClick,
-                    modifier = Modifier.size(64.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black
-                    )
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(36.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(40.dp)
                     )
                 }
 
-                // Next button
+                // Next button - simple icon
                 IconButton(
                     onClick = onForwardClick,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next",
                         tint = Color.White,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }

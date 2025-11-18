@@ -1862,11 +1862,10 @@ fun PrayerTimesScreen(
                     } else 0.7f
                 } ?: 0.7f
             } ?: 0.7f,
-            timeText = PrayerTimeHelpers.getTimeUntilNextPrayer(currentTime, prayerTimes),
             locationService = locationService,
-            onDismiss = { 
+            onDismiss = {
                 Log.d("PrayerTimes", "onDismiss called, hiding compass popup")
-                showCompassPopup = false 
+                showCompassPopup = false
             }
         )
     }
