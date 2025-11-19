@@ -355,9 +355,6 @@ object GoogleSampleNotificationManager {
         val bestTimeColor = Color.valueOf(255f / 255f, 193f / 255f, 7f / 255f, 1f).toArgb()        // Amber for Best Time
         val makeTimeColor = Color.valueOf(244f / 255f, 67f / 255f, 54f / 255f, 1f).toArgb()        // Red for Make Time
         
-        // Use Go to mosque icon for tracker across all phases
-        val trackerIcon = IconCompat.createWithResource(appContext, R.drawable.ic_go_to_mosque_pin)
-        
         // Android 16 Progress-Centric: Fixed segment colors for prayer urgency progression
         // Each segment always has its designated color: Green → Yellow → Red
         val segments = listOf(
@@ -365,20 +362,19 @@ object GoogleSampleNotificationManager {
             ProgressStyle.Segment(40).setColor(yellowSegmentColor),   // Segment 2: Best Time (Yellow)
             ProgressStyle.Segment(40).setColor(redSegmentColor)       // Segment 3: Make Time (Red)
         )
-        
+
         // Android 16 Progress-Centric: Create meaningful progress points with proper milestone colors
-        // Tracker icon will automatically position at the exact progress point
+        // Tracker will automatically position at the exact progress point (no icon)
         val progressStyle = NotificationCompat.ProgressStyle()
             .setProgressPoints(
                 listOf(
                     ProgressStyle.Point(20).setColor(mosquePhaseColor),   // Go to Mosque milestone (0-20%)
-                    ProgressStyle.Point(60).setColor(bestTimeColor),     // Best Time milestone (20-60%) 
+                    ProgressStyle.Point(60).setColor(bestTimeColor),     // Best Time milestone (20-60%)
                     ProgressStyle.Point(100).setColor(makeTimeColor)     // Make Time milestone (60-100%)
                 )
             )
             .setProgressSegments(segments)  // Dynamic segment coloring
-            .setProgressTrackerIcon(trackerIcon)  // Go to mosque location pin icon
-            .setProgress(progress)  // Tracker positioned at exact progress point
+            .setProgress(progress)  // Tracker positioned at exact progress point (no icon)
         
         val phaseName = when (newPhase) {
             0 -> "Go to Mosque"
