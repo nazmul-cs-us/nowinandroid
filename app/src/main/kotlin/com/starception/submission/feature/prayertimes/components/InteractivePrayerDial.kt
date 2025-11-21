@@ -585,13 +585,13 @@ fun InteractivePrayerDial(
                         }
                     }
 
-                    // Show current adjustment value below swipe area
+                    // Always show current adjustment value to prevent UI blink when scrolling
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = when {
                             currentAdjustment > 0 -> "+$currentAdjustment minutes"
                             currentAdjustment < 0 -> "$currentAdjustment minutes"
-                            else -> "No change"
+                            else -> "0 minutes"  // Show 0 explicitly to prevent flicker
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF607D8B).copy(alpha = 0.7f),
