@@ -3,9 +3,11 @@ package com.starception.submission.feature.prayertimes.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -84,12 +86,31 @@ fun InteractivePrayerDial(
     var lastAngle by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
     var accumulatedAngle by remember { mutableStateOf(0f) }
+
+    // CRITICAL: Store the ORIGINAL offset when dial opens - this is what we reset to
+    val originalOffset by remember { mutableStateOf(timeAdjustment) }
+
     var baseAdjustment by remember { mutableStateOf(timeAdjustment) }
     var currentDragAngle by remember { mutableStateOf(0f) }
     var lastHapticAdjustment by remember { mutableStateOf(timeAdjustment) }
 
     // Track the current adjustment value internally (survives after drag ends)
     var currentAdjustment by remember { mutableStateOf(timeAdjustment) }
+
+    // Swipe gesture states
+    var swipeOffset by remember { mutableStateOf(0f) }
+    var isSwipingHorizontally by remember { mutableStateOf(false) }
+    val swipeThreshold = 150f // How far to swipe to trigger action
+
+    // Animated swipe offset for smooth visual feedback
+    val animatedSwipeOffset by animateFloatAsState(
+        targetValue = swipeOffset,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
+        ),
+        label = "swipeOffset"
+    )
 
     // Log whenever currentAdjustment changes
     LaunchedEffect(currentAdjustment) {
@@ -133,6 +154,8 @@ fun InteractivePrayerDial(
     LaunchedEffect(Unit) {
         currentAdjustment = timeAdjustment
         baseAdjustment = timeAdjustment
+        // originalOffset is already initialized from timeAdjustment via remember
+        Log.d("InteractiveDial", "📌 DIAL OPENED - Prayer: $prayerName, Original offset: $originalOffset minutes")
     }
 
     Box(
@@ -289,24 +312,7 @@ fun InteractivePrayerDial(
             )
         }
 
-        // Central text container - clean and minimal like reference
-        var swipeOffset by remember { mutableStateOf(0f) }
-        var isSwiping by remember { mutableStateOf(false) }
-
-        // Animated swipe progress
-        val swipeProgress by animateFloatAsState(
-            targetValue = when {
-                swipeOffset > 0 -> (swipeOffset / 100f).coerceIn(0f, 1f)
-                swipeOffset < 0 -> (kotlin.math.abs(swipeOffset) / 100f).coerceIn(0f, 1f)
-                else -> 0f
-            },
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessHigh
-            ),
-            label = "swipeProgress"
-        )
-
+        // Central text container - clean and minimal
         Box(
             modifier = Modifier
                 .size(200.dp)
@@ -314,39 +320,6 @@ fun InteractivePrayerDial(
                     color = Color.Transparent,
                     shape = CircleShape
                 )
-                .pointerInput(baseAdjustment, currentAdjustment) {
-                    // Detect horizontal swipes in the center (not on the knob)
-                    detectDragGestures(
-                        onDragStart = {
-                            swipeOffset = 0f
-                            isSwiping = true
-                        },
-                        onDragEnd = {
-                            val hasAdjusted = currentAdjustment != baseAdjustment
-                            if (hasAdjusted) {
-                                if (swipeOffset > 100f) {
-                                    // Swipe right - Save
-                                    Log.d("InteractiveDial", "→ SWIPE RIGHT - SAVE - Prayer: $prayerName, Adjustment: ${currentAdjustment}m, Offset: ${swipeOffset}px")
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onSaveAdjustment(prayerName, currentAdjustment)
-                                } else if (swipeOffset < -100f) {
-                                    // Swipe left - Undo
-                                    Log.d("InteractiveDial", "← SWIPE LEFT - UNDO - Prayer: $prayerName, Offset: ${swipeOffset}px")
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    currentAdjustment = baseAdjustment
-                                    onTimeAdjusted(baseAdjustment)
-                                    onSaveAdjustment(prayerName, baseAdjustment) // Close dial
-                                }
-                            }
-                            isSwiping = false
-                            swipeOffset = 0f
-                        }
-                    ) { change, dragAmount ->
-                        // Accumulate horizontal movement
-                        swipeOffset += dragAmount.x
-                        change.consume()
-                    }
-                }
                 .pointerInput(baseAdjustment, currentAdjustment) {
                     // Detect tap to close when no adjustment has been made
                     detectTapGestures(
@@ -363,46 +336,6 @@ fun InteractivePrayerDial(
                 },
             contentAlignment = Alignment.Center
         ) {
-            // Swipe indicators - left (undo) and right (save)
-            if (isSwiping && currentAdjustment != baseAdjustment) {
-                // Left swipe indicator (Undo)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .offset(x = (-30).dp)
-                        .graphicsLayer {
-                            alpha = if (swipeOffset < 0) swipeProgress else 0f
-                            scaleX = if (swipeOffset < 0) swipeProgress else 0.5f
-                            scaleY = if (swipeOffset < 0) swipeProgress else 0.5f
-                        }
-                ) {
-                    Text(
-                        text = "↶",
-                        fontSize = 32.sp,
-                        color = Color(0xFFFF9800), // Orange for undo
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                // Right swipe indicator (Save)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .offset(x = 30.dp)
-                        .graphicsLayer {
-                            alpha = if (swipeOffset > 0) swipeProgress else 0f
-                            scaleX = if (swipeOffset > 0) swipeProgress else 0.5f
-                            scaleY = if (swipeOffset > 0) swipeProgress else 0.5f
-                        }
-                ) {
-                    Text(
-                        text = "✓",
-                        fontSize = 36.sp,
-                        color = Color(0xFF4CAF50), // Green for save
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
@@ -481,168 +414,189 @@ fun InteractivePrayerDial(
                 val hasAdjusted = currentAdjustment != baseAdjustment
 
                 if (hasAdjusted) {
-                    // iPhone-style swipe slider for undo/save
-                    Spacer(modifier = Modifier.height(8.dp))
+                    // Swipe gesture UI for save/undo actions
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                    // Swipe slider container
-                    Box(
-                        modifier = Modifier
-                            .width(280.dp)
-                            .height(56.dp)
-                            .background(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color(0xFFFF9800).copy(alpha = 0.15f),
-                                        Color(0xFFEEEEEE),
-                                        Color(0xFF4CAF50).copy(alpha = 0.15f)
-                                    )
-                                ),
-                                shape = RoundedCornerShape(28.dp)
-                            )
-                            .border(
-                                width = 1.5.dp,
-                                color = Color(0xFFE0E0E0),
-                                shape = RoundedCornerShape(28.dp)
-                            )
+                    // Column layout to stack elements vertically
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        // Left label - Undo
+                        // Row for Reset and Save labels at the top
                         Row(
                             modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .padding(start = 20.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .fillMaxWidth()
+                                .padding(horizontal = 40.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "↶",
-                                fontSize = 20.sp,
-                                color = Color(0xFFFF9800).copy(alpha = 0.7f),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Undo",
-                                fontSize = 13.sp,
-                                color = Color(0xFFFF9800).copy(alpha = 0.7f),
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            // Left side - Reset indicator
+                            Row(
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.graphicsLayer {
+                                    alpha = if (animatedSwipeOffset < 0) {
+                                        (kotlin.math.abs(animatedSwipeOffset) / swipeThreshold).coerceIn(0.3f, 1f)
+                                    } else 0.2f
+                                    val scale = if (animatedSwipeOffset < -swipeThreshold) 1.15f else 0.9f
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
+                            ) {
+                                Text(
+                                    text = "↶",
+                                    fontSize = 18.sp,
+                                    color = Color(0xFFFF9800),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Reset",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFFF9800),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+
+                            // Right side - Save indicator
+                            Row(
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.graphicsLayer {
+                                    alpha = if (animatedSwipeOffset > 0) {
+                                        (animatedSwipeOffset / swipeThreshold).coerceIn(0.3f, 1f)
+                                    } else 0.2f
+                                    val scale = if (animatedSwipeOffset > swipeThreshold) 1.15f else 0.9f
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
+                            ) {
+                                Text(
+                                    text = "Save",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF4CAF50),
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "✓",
+                                    fontSize = 18.sp,
+                                    color = Color(0xFF4CAF50),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
 
-                        // Right label - Save
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = 20.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Save",
-                                fontSize = 13.sp,
-                                color = Color(0xFF4CAF50).copy(alpha = 0.7f),
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "✓",
-                                fontSize = 20.sp,
-                                color = Color(0xFF4CAF50).copy(alpha = 0.7f),
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                        // Draggable slider knob (iPhone-style)
-                        var sliderOffset by remember { mutableStateOf(0f) }
-                        val sliderWidth = 280.dp.value * density.density
-                        val knobSize = 48.dp
-
+                        // Swipeable area below the labels
                         Box(
                             modifier = Modifier
-                                .offset { IntOffset((sliderOffset * density.density).toInt(), 0) }
-                                .align(Alignment.CenterStart)
-                                .padding(4.dp)
-                                .size(knobSize)
-                                .aspectRatio(1f) // Force perfect circle
-                                .clip(CircleShape) // Clip to circle before background
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .padding(horizontal = 40.dp)
+                                .clip(RoundedCornerShape(22.dp))
                                 .background(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            Color(0xFF26C6DA), // Teal center
-                                            Color(0xFF00ACC1)  // Darker teal edge
-                                        )
-                                    )
+                                    Color(0xFF607D8B).copy(alpha = 0.08f)
                                 )
-                                .border(
-                                    width = 3.dp,
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            Color.White,
-                                            Color.White.copy(alpha = 0.9f)
-                                        )
-                                    ),
-                                    shape = CircleShape
-                                )
-                                .graphicsLayer {
-                                    shadowElevation = 8.dp.toPx()
-                                    shape = CircleShape
-                                    clip = true
-                                }
-                                .pointerInput(Unit) {
-                                    detectDragGestures(
+                                .pointerInput(currentAdjustment) {
+                                    detectHorizontalDragGestures(
                                         onDragStart = {
-                                            sliderOffset = 0f
+                                            isSwipingHorizontally = true
+                                            swipeOffset = 0f
                                         },
                                         onDragEnd = {
-                                            val maxOffset = sliderWidth - knobSize.toPx()
-
+                                            // Check if swipe reached threshold
                                             when {
-                                                sliderOffset < -80f -> {
-                                                    // Swiped left - Undo
-                                                    Log.d(
-                                                        "InteractiveDial",
-                                                        "← SLIDE LEFT - UNDO - Prayer: $prayerName"
-                                                    )
-                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    currentAdjustment = baseAdjustment
-                                                    onTimeAdjusted(baseAdjustment)
-                                                    onSaveAdjustment(prayerName, baseAdjustment)
+                                                swipeOffset < -swipeThreshold -> {
+                                                    // Swipe left - Undo/Reset to ORIGINAL value when dial was opened
+                                                    Log.d("InteractiveDial", "↶ SWIPE LEFT - RESET - Prayer: $prayerName")
+                                                    Log.d("InteractiveDial", "   Resetting to original offset: $originalOffset minutes")
+                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    currentAdjustment = originalOffset
+                                                    onTimeAdjusted(originalOffset)
+                                                    baseAdjustment = originalOffset
+                                                    accumulatedAngle = 0f
                                                 }
-                                                sliderOffset > 80f -> {
-                                                    // Swiped right - Save
-                                                    Log.d(
-                                                        "InteractiveDial",
-                                                        "→ SLIDE RIGHT - SAVE - Prayer: $prayerName, Adjustment: ${currentAdjustment}m"
-                                                    )
+                                                swipeOffset > swipeThreshold -> {
+                                                    // Swipe right - Save
+                                                    Log.d("InteractiveDial", "✓ SWIPE RIGHT - SAVE - Prayer: $prayerName, Adjustment: ${currentAdjustment}m")
                                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     onSaveAdjustment(prayerName, currentAdjustment)
                                                 }
                                             }
-                                            // Reset slider
-                                            sliderOffset = 0f
+                                            // Reset swipe state
+                                            isSwipingHorizontally = false
+                                            swipeOffset = 0f
                                         }
                                     ) { change, dragAmount ->
-                                        change.consume()
-                                        val maxOffset = sliderWidth - knobSize.toPx()
-                                        sliderOffset =
-                                            (sliderOffset + dragAmount.x / density.density).coerceIn(
-                                                -100f,
-                                                100f
-                                            )
+                                        // Update swipe offset within bounds
+                                        swipeOffset = (swipeOffset + dragAmount).coerceIn(-180f, 180f)
+
+                                        // Haptic feedback at threshold points
+                                        if (kotlin.math.abs(swipeOffset) >= swipeThreshold &&
+                                            kotlin.math.abs(swipeOffset - dragAmount) < swipeThreshold) {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
                                     }
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            // Chevron arrows showing swipe direction
-                            Text(
-                                text = when {
-                                    sliderOffset < -20f -> "←"
-                                    sliderOffset > 20f -> "→"
-                                    else -> "⇄"
-                                },
-                                fontSize = 22.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
+                            // Swipeable pill indicator
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 80.dp, height = 36.dp)
+                                    .offset(x = (animatedSwipeOffset / 4f).dp) // Move with swipe but slower
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(
+                                        when {
+                                            animatedSwipeOffset < -swipeThreshold -> Color(0xFFFF9800) // Orange for reset
+                                            animatedSwipeOffset > swipeThreshold -> Color(0xFF4CAF50) // Green for save
+                                            else -> Color.White
+                                        }
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = when {
+                                            animatedSwipeOffset < -swipeThreshold -> Color(0xFFFF9800)
+                                            animatedSwipeOffset > swipeThreshold -> Color(0xFF4CAF50)
+                                            else -> Color(0xFF607D8B).copy(alpha = 0.2f)
+                                        },
+                                        shape = RoundedCornerShape(18.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = when {
+                                        animatedSwipeOffset < -swipeThreshold -> "Reset"
+                                        animatedSwipeOffset > swipeThreshold -> "Save"
+                                        animatedSwipeOffset < -20 -> "←"
+                                        animatedSwipeOffset > 20 -> "→"
+                                        else -> "Swipe"
+                                    },
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = when {
+                                        animatedSwipeOffset < -swipeThreshold -> Color.White
+                                        animatedSwipeOffset > swipeThreshold -> Color.White
+                                        else -> Color(0xFF37474F)
+                                    }
+                                )
+                            }
                         }
                     }
+
+                    // Show current adjustment value below swipe area
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = when {
+                            currentAdjustment > 0 -> "+$currentAdjustment minutes"
+                            currentAdjustment < 0 -> "$currentAdjustment minutes"
+                            else -> "No change"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF607D8B).copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
                 } else {
                     // Show hints when no adjustment has been made
                     Column(
@@ -785,26 +739,32 @@ private fun DrawScope.drawCleanCircularTimer(
     // Draw teal indicator knob - draggable and follows current time/drag angle
     // Position it on the outer ring based on current time angle
     val indicatorAngleRad = (currentAngle * PI / 180f).toFloat() // Convert to radians
-    val indicatorRadius = outerRingRadius - 15f // Position on the outer ring, near the inner edge
+
+    // FIX: Position knob properly within the track, not overlapping the center
+    // Place it exactly in the middle of the track (between inner and outer edges)
+    val indicatorRadius = outerRingRadius - trackWidth/2f // Center of the track
+
     val indicatorCenter = Offset(
         exactCenter.x + indicatorRadius * cos(indicatorAngleRad),
         exactCenter.y + indicatorRadius * sin(indicatorAngleRad)
     )
 
     // Draw circular knob indicator (larger and more visible for dragging)
-    val knobIndicatorRadius = if (isDragging) 16f * knobScale else 12f // Larger when dragging
-    drawCircle(
-        color = tealColor,
-        radius = knobIndicatorRadius,
-        center = indicatorCenter
-    )
-    
-    // Add a subtle white border/ring around the knob for better visibility
+    val knobIndicatorRadius = if (isDragging) 14f * knobScale else 10f // Slightly smaller to fit within track
+
+    // Add a subtle white border/ring around the knob for better visibility (draw first)
     drawCircle(
         color = Color.White,
         radius = knobIndicatorRadius + 2f,
         center = indicatorCenter,
         style = Stroke(width = 2f)
+    )
+
+    // Draw the knob itself
+    drawCircle(
+        color = tealColor,
+        radius = knobIndicatorRadius,
+        center = indicatorCenter
     )
     
 }

@@ -147,7 +147,10 @@
       "Bash(/tmp/fixed2.kt)",
       "Bash(/tmp/current_long_press.png)",
       "Bash(/tmp/long_press_result.png)",
-      "Bash(tr -cd '{}')"
+      "Bash(tr -cd '{}')",
+      "Bash(/tmp/swipe_ui_screenshot.png)",
+      "Bash(/tmp/swipe_ui_alignment.png)",
+      "Bash(/tmp/swipe_ui_fixed.png)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
