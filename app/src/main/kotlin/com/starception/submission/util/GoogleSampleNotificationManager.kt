@@ -24,6 +24,9 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat.ProgressStyle
 import android.graphics.Color
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -53,8 +56,20 @@ object GoogleSampleNotificationManager {
     @RequiresApi(Build.VERSION_CODES.O)
     fun initialize(context: Context, notifManager: NotificationManager) {
         notificationManager = notifManager
-        val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, IMPORTANCE_DEFAULT)
         appContext = context
+
+        // Create audio attributes for notification sound
+        val audioAttributes = AudioAttributes.Builder()
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .build()
+
+        // Get the URI for the adhan sound
+        val adhanSoundUri = Uri.parse("android.resource://${context.packageName}/${R.raw.short_adhan}")
+
+        val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, IMPORTANCE_DEFAULT).apply {
+            setSound(adhanSoundUri, audioAttributes)
+        }
         notificationManager.createNotificationChannel(channel)
     }
 
@@ -424,7 +439,15 @@ object GoogleSampleNotificationManager {
         if (shouldAlert) {
             // Phase change or first notification: Allow normal alert behavior (sound/vibration)
             android.util.Log.d("GoogleSampleNotificationManager", "🔔 Phase change detected - allowing alerts (sound/vibration)")
-            // Don't set silent - let the notification use normal channel settings for alerts
+
+            // Play Adhan sound when entering "Go to Mosque" phase (prayer time has arrived)
+            if (newPhase == 0 && (isPhaseChange || isFirstNotification)) {
+                playAdhanSound()
+            }
+
+            // Set custom sound URI for the notification
+            val adhanSoundUri = Uri.parse("android.resource://${appContext.packageName}/${R.raw.short_adhan}")
+            notificationBuilder.setSound(adhanSoundUri)
         } else {
             // Progress update within same phase: Make completely silent
             android.util.Log.d("GoogleSampleNotificationManager", "🔕 Progress update - setting notification as SILENT (no sound/vibration)")
@@ -508,5 +531,40 @@ object GoogleSampleNotificationManager {
     fun dismissNotification() {
         notificationManager.cancel(NOTIFICATION_ID)
         android.util.Log.d("GoogleSampleNotificationManager", "🗑️ Prayer notification dismissed")
+    }
+
+    /**
+     * Plays the Adhan sound using MediaPlayer
+     * This is called when prayer time arrives (entering "Go to Mosque" phase)
+     */
+    private fun playAdhanSound() {
+        try {
+            val adhanUri = Uri.parse("android.resource://${appContext.packageName}/${R.raw.short_adhan}")
+            val mediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .build()
+                )
+                setDataSource(appContext, adhanUri)
+                prepareAsync()
+                setOnPreparedListener { mp ->
+                    mp.start()
+                    android.util.Log.d("GoogleSampleNotificationManager", "🔊 Playing Adhan sound for prayer notification")
+                }
+                setOnCompletionListener { mp ->
+                    mp.release()
+                    android.util.Log.d("GoogleSampleNotificationManager", "✅ Adhan sound playback completed")
+                }
+                setOnErrorListener { mp, what, extra ->
+                    android.util.Log.e("GoogleSampleNotificationManager", "❌ Error playing Adhan: what=$what, extra=$extra")
+                    mp.release()
+                    false
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("GoogleSampleNotificationManager", "❌ Failed to play Adhan sound", e)
+        }
     }
 }

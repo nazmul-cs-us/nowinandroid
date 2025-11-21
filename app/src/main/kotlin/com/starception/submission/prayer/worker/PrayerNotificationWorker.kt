@@ -12,6 +12,9 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.net.Uri
 import com.starception.submission.R
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTime
@@ -98,16 +101,26 @@ class PrayerNotificationWorker @AssistedInject constructor(
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Create audio attributes for notification sound
+            val audioAttributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .build()
+
+            // Get the URI for the adhan sound
+            val adhanSoundUri = Uri.parse("android.resource://${applicationContext.packageName}/${R.raw.short_adhan}")
+
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Notifications for prayer times and reminders"
+                description = "Notifications for prayer times with Adhan sound"
                 enableLights(true)
                 enableVibration(true)
+                setSound(adhanSoundUri, audioAttributes)
             }
-            
+
             val notificationManager = applicationContext
                 .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
@@ -115,9 +128,15 @@ class PrayerNotificationWorker @AssistedInject constructor(
     }
 
     private fun showPrayerTimeNotification(prayerName: String, prayerTime: String) {
+        // Play Adhan sound
+        playAdhanSound()
+
         // Create large icon from app launcher icon
         val largeIcon = ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
-        
+
+        // Get the URI for the adhan sound
+        val adhanSoundUri = Uri.parse("android.resource://${applicationContext.packageName}/${R.raw.short_adhan}")
+
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setContentTitle("$prayerName Prayer")
             .setContentText("It's time for $prayerName • $prayerTime")
@@ -132,14 +151,45 @@ class PrayerNotificationWorker @AssistedInject constructor(
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
             .setOngoing(false)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setSound(adhanSoundUri) // Set custom sound for the notification
             .build()
 
         val notificationManager = applicationContext
             .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, notification)
-        
-        Log.d(TAG, "📱 Posted prayer time notification: $prayerName at $prayerTime")
+
+        Log.d(TAG, "📱 Posted prayer time notification with Adhan: $prayerName at $prayerTime")
+    }
+
+    private fun playAdhanSound() {
+        try {
+            val adhanUri = Uri.parse("android.resource://${applicationContext.packageName}/${R.raw.short_adhan}")
+            val mediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .build()
+                )
+                setDataSource(applicationContext, adhanUri)
+                prepareAsync()
+                setOnPreparedListener { mp ->
+                    mp.start()
+                    Log.d(TAG, "🔊 Playing Adhan sound")
+                }
+                setOnCompletionListener { mp ->
+                    mp.release()
+                    Log.d(TAG, "✅ Adhan sound playback completed")
+                }
+                setOnErrorListener { mp, what, extra ->
+                    Log.e(TAG, "❌ Error playing Adhan: what=$what, extra=$extra")
+                    mp.release()
+                    false
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to play Adhan sound", e)
+        }
     }
 
     private fun showPrayerReminderNotification(prayerName: String, prayerTime: String) {
