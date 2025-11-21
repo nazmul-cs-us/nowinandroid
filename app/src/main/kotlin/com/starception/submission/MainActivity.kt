@@ -286,7 +286,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        
+
         // NON-BLOCKING: Access JankStats lazily in background
         lifecycleScope.launch {
             try {
@@ -296,7 +296,7 @@ class MainActivity : FragmentActivity() {
                 Log.w("MainActivity", "Failed to enable JankStats", e)
             }
         }
-        
+
         // SAFE: Start prayer service after delay to prevent ANR
         lifecycleScope.launch {
             delay(3000) // Wait 3 seconds for app to be stable
@@ -308,7 +308,7 @@ class MainActivity : FragmentActivity() {
                 // Don't crash if service fails - just continue without notifications
             }
         }
-        
+
         Log.d("MainActivity", "NON-BLOCKING onResume completed")
     }
 

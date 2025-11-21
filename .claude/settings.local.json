@@ -138,7 +138,16 @@
       "Bash(/tmp/device_screenshot.png)",
       "Bash(/tmp/device_prayer_dial.png)",
       "Bash(/tmp/teal_tick_marks_dial.png)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(/tmp/enhanced_prayer_dial.png)",
+      "Bash(/tmp/part1.txt)",
+      "Bash(/tmp/part2.txt)",
+      "Bash(/tmp/fixed.kt)",
+      "Bash(/tmp/interactive_card.txt)",
+      "Bash(/tmp/fixed2.kt)",
+      "Bash(/tmp/current_long_press.png)",
+      "Bash(/tmp/long_press_result.png)",
+      "Bash(tr -cd '{}')"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

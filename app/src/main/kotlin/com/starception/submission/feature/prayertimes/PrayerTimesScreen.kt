@@ -427,9 +427,8 @@ fun PrayerTimesScreen(
     var showCompassPopup by remember { mutableStateOf(false) }
     
     // INTERACTIVE PRAYER DIAL POPUP STATE
-    var showPrayerDialPopup by remember { mutableStateOf(false) }
-    var popupPrayerName by remember { mutableStateOf<String?>(null) }
-    
+    var popupDialState by remember { mutableStateOf<String?>(null) }  // null means closed, non-null means open with that prayer name
+
     val hapticFeedback = LocalHapticFeedback.current
 
     // OBSERVE PRAYER OFFSETS FROM REPOSITORY FLOW - Automatically updates when settings change!
@@ -885,9 +884,9 @@ fun PrayerTimesScreen(
                             onLongPress = {
                                 android.util.Log.d("PrayerCard", "🔥 LONG PRESS detected on $prayerName card!")
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                // Show popup instead of in-place editing
+                                // Call onShowPopup directly (transitioning flag prevents double triggers)
                                 onShowPopup(prayerName)
-                                android.util.Log.d("PrayerCard", "✅ Showing popup for $prayerName")
+                                android.util.Log.d("PrayerCard", "✅ Called onShowPopup for $prayerName")
                             },
                             onTap = {
                                 android.util.Log.d("PrayerCard", "👆 Regular tap detected on $prayerName card")
@@ -1402,8 +1401,9 @@ fun PrayerTimesScreen(
                             .height(tileHeight)
                             .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
-                            popupPrayerName = prayerName
-                            showPrayerDialPopup = true
+                            android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                            popupDialState = prayerName  // Direct state update
+                            android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                         }
                     )
                     
@@ -1418,8 +1418,9 @@ fun PrayerTimesScreen(
                             .height(tileHeight)
                             .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
-                            popupPrayerName = prayerName
-                            showPrayerDialPopup = true
+                            android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                            popupDialState = prayerName  // Direct state update
+                            android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                         }
                     )
                 }
@@ -1449,8 +1450,9 @@ fun PrayerTimesScreen(
                             .height(tileHeight)
                             .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
-                            popupPrayerName = prayerName
-                            showPrayerDialPopup = true
+                            android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                            popupDialState = prayerName  // Direct state update
+                            android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                         }
                     )
                     
@@ -1465,8 +1467,9 @@ fun PrayerTimesScreen(
                             .height(tileHeight)
                             .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), // Extra bottom space for elevation shadows
                         onShowPopup = { prayerName ->
-                            popupPrayerName = prayerName
-                            showPrayerDialPopup = true
+                            android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                            popupDialState = prayerName  // Direct state update
+                            android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                         }
                     )
                 }
@@ -1532,8 +1535,9 @@ fun PrayerTimesScreen(
                                     alpha = fajrAnimProgress
                                 },
                             onShowPopup = { prayerName ->
-                                popupPrayerName = prayerName
-                                showPrayerDialPopup = true
+                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                popupDialState = prayerName  // Direct state update
+                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                             }
                         )
                         
@@ -1555,8 +1559,9 @@ fun PrayerTimesScreen(
                                     alpha = sunriseAnimProgress
                                 },
                             onShowPopup = { prayerName ->
-                                popupPrayerName = prayerName
-                                showPrayerDialPopup = true
+                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                popupDialState = prayerName  // Direct state update
+                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                             }
                         )
                     }
@@ -1836,40 +1841,17 @@ fun PrayerTimesScreen(
         )
     }
     
-    // INTERACTIVE PRAYER DIAL POPUP - Material 3 expressive overlay with entrance animation
-    // Store current prayer name to prevent null access during exit animation
-    val currentPopupPrayerName = remember(popupPrayerName) { popupPrayerName }
-    
-    AnimatedVisibility(
-        visible = showPrayerDialPopup && popupPrayerName != null,
-        enter = fadeIn(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            )
-        ) + scaleIn(
-            initialScale = 0.8f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            )
-        ),
-        exit = fadeOut(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessHigh
-            )
-        ) + scaleOut(
-            targetScale = 0.85f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessHigh
-            )
-        )
-    ) {
-        // Use safe prayer name that won't be null during exit animation
-        val safePrayerName = currentPopupPrayerName ?: "Dhuhr"
-        Log.d("PrayerTimes", "showPrayerDialPopup is true, rendering InteractivePrayerDial overlay for $safePrayerName")
+    // INTERACTIVE PRAYER DIAL POPUP - Material 3 expressive overlay
+    // Debug logging for popup state
+    LaunchedEffect(popupDialState) {
+        android.util.Log.w("PrayerDialPopup", "🎯 popupDialState changed to: $popupDialState")
+        android.util.Log.w("PrayerDialPopup", "   Visible = ${popupDialState != null}")
+    }
+
+    if (popupDialState != null) {
+        // Use popup state directly - it won't be null inside AnimatedVisibility when visible
+        val safePrayerName = popupDialState ?: "Dhuhr"
+        Log.d("PrayerTimes", "Popup dial is active, rendering InteractivePrayerDial overlay for $safePrayerName")
         
         // Full screen overlay with Material 3 expressive backdrop
         Box(
@@ -1889,13 +1871,12 @@ fun PrayerTimesScreen(
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         // Tap anywhere to close
                         Log.d("PrayerTimes", "Background tapped, closing popup")
-                        showPrayerDialPopup = false
-                        popupPrayerName = null
+                        popupDialState = null  // Single state update for clean dismissal
                     }
             )
             // State for adjustment in popup
             var timeAdjustment by remember { mutableStateOf(
-                when (popupPrayerName) {
+                when (popupDialState) {
                     "Fajr" -> storedOffsets.fajr
                     "Sunrise" -> storedOffsets.sunrise
                     "Dhuhr" -> storedOffsets.dhuhr
@@ -1918,8 +1899,7 @@ fun PrayerTimesScreen(
                     onClick = {
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         Log.d("PrayerTimes", "✖️ Close button clicked")
-                        showPrayerDialPopup = false
-                        popupPrayerName = null
+                        popupDialState = null  // Single state update for clean dismissal
                     },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -1990,16 +1970,14 @@ fun PrayerTimesScreen(
                                     android.util.Log.d("PrayerTimesScreen", "   🔄 Flow-based recomposition will trigger automatically")
 
                                     // Close popup after successful saving
-                                    showPrayerDialPopup = false
-                                    popupPrayerName = null
+                                    popupDialState = null  // Single state update for clean dismissal
                                     android.util.Log.d("PrayerTimesScreen", "🚪 Closed popup - returning to main view")
                                 }
                             } catch (e: Exception) {
                                 android.util.Log.e("PrayerTimesScreen", "❌ SAVE FAILED: Error saving $prayerName offset", e)
                                 // Still close popup even if save failed
                                 withContext(Dispatchers.Main) {
-                                    showPrayerDialPopup = false
-                                    popupPrayerName = null
+                                    popupDialState = null  // Single state update for clean dismissal
                                 }
                             }
                         }
@@ -2012,9 +1990,9 @@ fun PrayerTimesScreen(
                 )
             }
         }
-        } // End of wobbly content Box
-        } // End of Column
-    } // End of WobblePullToRefresh
+    } // Close if (popupDialState != null)
+    } // Missing brace 1
+    } // Missing brace 2
 }
 
 /**

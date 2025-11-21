@@ -915,31 +915,3 @@ private fun adjustTimeByMinutes(originalTime: LocalTime, minutes: Int): String {
     return String.format("%d:%02d %s", hour12, adjustedTime.minute, amPm)
 }
 
-// Format time in 12-hour format with AM/PM
-private fun adjustTimeByMinutesForDisplay(originalTime: LocalTime, minutes: Int): String {
-    val adjustedDateTime = LocalDateTime.of(
-        LocalDate.now(),
-        originalTime
-    ).plusMinutes(minutes.toLong())
-
-    val adjustedTime = adjustedDateTime.toLocalTime()
-
-    // DEBUG: Log the time conversion
-    Log.d("InteractiveDial", "🕐 TIME CONVERSION DEBUG:")
-    Log.d("InteractiveDial", "   📥 Original time: $originalTime (hour=${originalTime.hour}, minute=${originalTime.minute})")
-    Log.d("InteractiveDial", "   ➕ Adjustment: ${minutes}m")
-    Log.d("InteractiveDial", "   ⏰ Adjusted 24h: $adjustedTime (hour=${adjustedTime.hour}, minute=${adjustedTime.minute})")
-
-    // Correct 12-hour conversion logic
-    val hour12 = when {
-        adjustedTime.hour == 0 -> 12  // Midnight (00:00) → 12 AM
-        adjustedTime.hour <= 12 -> adjustedTime.hour  // 1-12 → stay the same
-        else -> adjustedTime.hour - 12  // 13-23 → subtract 12
-    }
-    val amPm = if (adjustedTime.hour < 12) "AM" else "PM"
-
-    val result = String.format("%02d:%02d %s", hour12, adjustedTime.minute, amPm)
-    Log.d("InteractiveDial", "   🎯 Final 12h format: $result")
-
-    return result
-}
