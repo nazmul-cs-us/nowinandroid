@@ -137,7 +137,8 @@
       "Bash(perl -pe:*)",
       "Bash(/tmp/device_screenshot.png)",
       "Bash(/tmp/device_prayer_dial.png)",
-      "Bash(/tmp/teal_tick_marks_dial.png)"
+      "Bash(/tmp/teal_tick_marks_dial.png)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

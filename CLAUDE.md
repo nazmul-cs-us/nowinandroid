@@ -31,6 +31,162 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `./gradlew check` - Run all verification tasks (tests, lint, etc.)
 - `./gradlew assembleRelease -PenableComposeCompilerMetrics=true` - Generate Compose compiler metrics
 
+## Project Overview
+
+### Project Identity
+- **Original Project**: Forked from Google's Now in Android (NiA) sample app
+- **Current Name**: Starception Submission
+- **Base Package**: `com.starception.submission`
+- **Purpose**: Android app combining news reader functionality with comprehensive Islamic prayer times calculator
+- **Architecture**: Clean Architecture with MVVM, fully modularized following Google's official guidance
+- **Total Modules**: 25+ modules (16 core, 6 feature, 2 sync, plus supporting modules)
+
+## Comprehensive Codebase Structure
+
+### Root Level Organization
+```
+nowinandroid/
+├── app/                      # Main application module (36,441+ lines)
+├── build-logic/              # Gradle convention plugins
+│   └── convention/           # Build configuration plugins
+├── core/                     # 16 core modules
+├── feature/                  # 6 feature modules
+├── sync/                     # Sync modules
+├── benchmarks/              # Performance benchmarking
+├── docs/                    # 19+ technical documentation files
+├── gradle/                  # Gradle wrapper and dependencies
+├── lint/                    # Custom lint rules
+├── tools/                   # Development tools
+└── [config files]           # Root configuration files
+```
+
+### Module Breakdown
+
+#### Core Modules (/core - 16 modules)
+```
+core/
+├── analytics/          # Analytics tracking & Firebase integration
+├── common/             # Shared utilities and extensions
+├── data/               # Repository implementations & data layer logic
+├── data-test/          # Test doubles for data layer
+├── database/           # Room database and DAOs
+├── datastore/          # Proto DataStore for user preferences
+├── datastore-proto/    # Protocol buffer definitions
+├── datastore-test/     # Test utilities for DataStore
+├── designsystem/       # Material 3 design system & theming
+├── domain/             # Use cases and business logic
+├── model/              # Data models and entities
+├── network/            # Network API & Retrofit configuration
+├── notifications/      # Push notification handling
+├── screenshot-testing/ # Screenshot test infrastructure (Roborazzi)
+├── testing/            # Shared test utilities
+└── ui/                 # Reusable UI components
+```
+
+#### Feature Modules (/feature - 6 modules)
+```
+feature/
+├── foryou/      # Personalized content feed (original NiA)
+├── interests/   # Topic/interest selection management
+├── bookmarks/   # Saved articles functionality
+├── search/      # Content search functionality
+├── settings/    # App settings and preferences
+└── topic/       # Individual topic detail screens
+```
+
+#### Sync Modules (/sync)
+```
+sync/
+├── work/        # WorkManager integration for background sync
+└── sync-test/   # Sync testing utilities
+```
+
+### App Module Package Organization
+
+The app module contains app-specific features not yet modularized:
+
+```
+app/src/main/kotlin/com/starception/submission/
+├── ui/                    # Main UI components
+│   └── interests2pane/    # Two-pane interests UI
+├── di/                    # Dependency injection (Hilt)
+├── core/                  # Core app utilities
+│   └── qurandatabase/     # Quran database management
+├── navigation/            # Navigation & top-level destinations
+├── automotive/            # Android Auto/Automotive support
+├── feature/               # App-specific features
+│   ├── prayertimes/       # Prayer Times UI Layer
+│   │   ├── components/    # UI components (InteractivePrayerDial, etc.)
+│   │   ├── navigation/    # Prayer times navigation
+│   │   ├── utils/         # Display utilities
+│   │   ├── animations/    # Prayer animations
+│   │   └── data/          # Prayer time calculations
+│   ├── quran/             # Quran player and data
+│   └── surah/             # Surah display
+├── prayer/                # Core Prayer System (Clean Architecture)
+│   ├── model/             # Prayer data models
+│   ├── calculator/        # Astronomical calculations
+│   ├── repository/        # Settings persistence & auto-detection
+│   ├── service/           # Location & calculation services
+│   ├── viewmodel/         # State management
+│   ├── ui/                # Prayer settings UI
+│   ├── scheduler/         # Notification scheduling
+│   ├── receiver/          # Broadcast receivers
+│   ├── worker/            # Background workers
+│   ├── cache/             # Location caching
+│   └── util/              # Prayer utilities
+├── islamic/               # Islamic features (Clean Architecture)
+│   ├── salah/             # Salah (prayer) feature
+│   │   ├── domain/        # Business logic layer
+│   │   └── presentation/  # UI layer
+│   ├── qibla/             # Qibla compass feature
+│   └── shared/            # Shared Islamic utilities
+└── services/              # Background services & notifications
+```
+
+### Asset Organization
+```
+app/src/main/assets/
+├── country_prayer_methods.json  # 80+ countries prayer calculation methods
+├── databases/                   # Quran translation databases
+│   ├── quran.db                # Main Arabic text (7.2MB)
+│   ├── quran_english.db        # English translation
+│   ├── quran_bengali.db        # Bengali translation
+│   └── [10+ translation DBs]    # Multiple language translations
+└── [other assets]
+```
+
+### Build Configuration
+
+#### Build Logic Convention Plugins
+```
+build-logic/convention/
+├── AndroidCompose.kt        # Compose configuration
+├── KotlinAndroid.kt         # Kotlin Android setup
+├── NiaBuildType.kt          # Build types (Debug, Release)
+├── NiaFlavor.kt             # Product flavors (Demo, Prod)
+├── Jacoco.kt                # Code coverage
+└── GradleManagedDevices.kt  # Test device management
+```
+
+#### Build Variants
+- **Flavors**: demo (local data), prod (backend server)
+- **Build Types**: debug, release
+- **Combinations**: demoDebug, demoRelease, prodDebug, prodRelease
+
+### Technology Stack
+- **Language**: Kotlin 2.0.21
+- **UI**: Jetpack Compose (100% declarative) with Compose BOM 2025.02.00
+- **Design**: Material 3 Design System
+- **DI**: Hilt 2.56
+- **Database**: Room 2.7.2
+- **Preferences**: Proto DataStore
+- **Networking**: Retrofit
+- **Testing**: JUnit4, Espresso, Roborazzi
+- **Background**: WorkManager
+- **Min SDK**: 24
+- **Target SDK**: 35
+
 ## Architecture
 
 This is a fully modularized Android app following official Android architecture guidance with three layers:
@@ -386,3 +542,104 @@ PrayerSettings_PREF_VERIFY: ❌ FAILED | key='invalid_key' | expected_type=Strin
 - **User Behavior Tracking**: Understand which settings are modified most frequently
 - **Integration Testing**: Verify preference operations in automated testing scenarios
 - **Production Monitoring**: Track preference operation success rates and performance
+
+## Unique Features & Enhancements
+
+### Major Enhancements from Original NiA
+
+#### 1. Complete Islamic Prayer Times System
+- **25+ Calculation Methods**: Comprehensive support for worldwide Islamic calculation methods
+- **Auto-Detection**: Country-based automatic configuration using 80+ country database
+- **Interactive Adjustments**: PNG file icon aesthetic circular timer for precise time adjustments
+- **Astronomical Calculations**: High-precision prayer time calculations with solar position algorithms
+- **Real-time Updates**: Live prayer status tracking (Current/Next/Upcoming)
+- **Background Services**: Notification scheduling with prayer alerts
+
+#### 2. Quran Integration System
+- **12 Translation Databases**: Arabic + 11 language translations (English, Bengali, Spanish, French, etc.)
+- **Quran Player**: Full audio player with bookmark support
+- **Surah Navigation**: Easy navigation through all 114 Surahs
+- **Transliteration Support**: Romanized text for non-Arabic readers
+
+#### 3. Islamic Features Architecture
+- **Salah Dashboard**: Comprehensive prayer management dashboard
+- **Qibla Compass**: Direction finder with Material 3 theming
+- **Smart Content**: AI-powered Islamic content suggestions
+- **Swipeable Tiles**: Interactive prayer time tiles with gestures
+
+#### 4. Enhanced Location Services
+- **Smart Timeouts**: 3-second timeout to prevent UI blocking
+- **Location Caching**: Efficient location data caching
+- **Country Detection**: Automatic country detection for prayer methods
+- **Fallback Mechanisms**: Multiple fallback strategies for location failures
+
+#### 5. Advanced Notification System
+- **Prayer Notifications**: Timely alerts for all prayer times
+- **Background Workers**: Reliable notification delivery using WorkManager
+- **Boot Receivers**: Notifications persist after device restart
+- **Custom Sounds**: Support for custom notification sounds
+
+### File & Directory Count Summary
+- **Total Kotlin Files**: 500+ files
+- **Total Lines of Code**: ~50,000+ lines (app module: 36,441)
+- **Documentation Files**: 19+ comprehensive guides
+- **Build Configurations**: 30+ Gradle files
+- **Asset Databases**: 12 Quran translation databases
+- **Module Count**: 25+ modules
+
+### Development Scripts & Tools
+```
+scripts/
+├── build_android_release.sh      # Release build automation
+├── capture_location_logs.sh      # Location debugging
+├── convert_quran_sql_to_db.py    # Database conversion
+├── generate_quran_news.py        # Quran news generation
+└── generateModuleGraphs.sh       # Module dependency graphs
+```
+
+### Documentation Files
+```
+docs/
+├── PRAYER_TIMES_TECHNICAL_GUIDE.md
+├── PRAYER_CALCULATION_METHODOLOGY.md
+├── INTERACTIVE_PRAYER_DIAL_GUIDE.md
+├── AUTO_DETECTION_LOGGING_GUIDE.md
+├── QURAN_DATABASE_GUIDE.md
+├── NOTIFICATION_SYSTEM_VERIFICATION.md
+├── LOCATION_SERVICE_TESTING.md
+├── PRAYER_SETTINGS_PERSISTENCE.md
+├── COMPASS_POPUP_IMPLEMENTATION.md
+├── SMART_CONTENT_ARCHITECTURE.md
+├── MATERIAL3_DESIGN_IMPLEMENTATION.md
+├── PERMISSION_MANAGEMENT_GUIDE.md
+├── BACKGROUND_SERVICES_GUIDE.md
+├── TESTING_STRATEGY.md
+├── MODULE_ARCHITECTURE_GUIDE.md
+├── BUILD_CONFIGURATION_GUIDE.md
+├── DEPENDENCY_MANAGEMENT.md
+├── PERFORMANCE_OPTIMIZATION.md
+└── RELEASE_PROCESS.md
+```
+
+## Key Differences from Original Now in Android
+
+### Architectural Additions
+1. **Islamic Domain Layer**: Complete domain layer for Islamic features
+2. **Prayer Calculation Engine**: Astronomical calculation algorithms
+3. **Multi-Database Support**: SQLite databases for Quran translations
+4. **Enhanced Services**: Location, notification, and calculation services
+5. **Country Database**: JSON-based country prayer method configurations
+
+### UI/UX Enhancements
+1. **Interactive Dials**: Circular timer UI with drag gestures
+2. **Swipeable Components**: Gesture-based prayer tile interactions
+3. **Popup Windows**: Compass and prayer bubble popups
+4. **Material 3 Extensions**: Custom shapes and animations
+5. **Haptic Feedback**: Enhanced tactile responses
+
+### Technical Improvements
+1. **Comprehensive Logging**: Structured emoji-based logging system
+2. **Performance Monitoring**: Built-in performance tracking
+3. **Error Recovery**: Robust fallback mechanisms
+4. **State Persistence**: Enhanced preference management
+5. **Testing Infrastructure**: Extended test coverage for Islamic features
