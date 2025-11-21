@@ -55,12 +55,14 @@ class PrayerNotificationWorker @AssistedInject constructor(
         private const val NOTIFICATION_ID = 2001
         private const val CHANNEL_ID = "prayer_scheduled_notifications"
         private const val CHANNEL_NAME = "Scheduled Prayer Notifications"
-        
+        private const val REMINDER_CHANNEL_ID = "prayer_reminder_notifications"
+        private const val REMINDER_CHANNEL_NAME = "Prayer Reminders"
+
         // Input data keys
         const val PRAYER_NAME_KEY = "prayer_name"
         const val PRAYER_TIME_KEY = "prayer_time"
         const val NOTIFICATION_TYPE_KEY = "notification_type"
-        
+
         // Notification types
         const val TYPE_PRAYER_TIME = "prayer_time"
         const val TYPE_REMINDER = "reminder"
@@ -101,7 +103,10 @@ class PrayerNotificationWorker @AssistedInject constructor(
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Create audio attributes for notification sound
+            val notificationManager = applicationContext
+                .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // Channel 1: Prayer Time Notifications with Adhan sound
             val audioAttributes = AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
@@ -110,20 +115,32 @@ class PrayerNotificationWorker @AssistedInject constructor(
             // Get the URI for the adhan sound
             val adhanSoundUri = Uri.parse("android.resource://${applicationContext.packageName}/${R.raw.short_adhan}")
 
-            val channel = NotificationChannel(
+            val prayerChannel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Notifications for prayer times with Adhan sound"
+                description = "Prayer time notifications with Adhan sound"
                 enableLights(true)
                 enableVibration(true)
-                setSound(adhanSoundUri, audioAttributes)
+                setSound(adhanSoundUri, audioAttributes)  // Adhan sound for prayer time
             }
 
-            val notificationManager = applicationContext
-                .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+            // Channel 2: Reminder Notifications (no Adhan, just vibration)
+            val reminderChannel = NotificationChannel(
+                REMINDER_CHANNEL_ID,
+                REMINDER_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "20-minute reminders before prayer times"
+                enableLights(true)
+                enableVibration(true)
+                setSound(null, null)  // No sound for reminders
+            }
+
+            // Create both channels
+            notificationManager.createNotificationChannel(prayerChannel)
+            notificationManager.createNotificationChannel(reminderChannel)
         }
     }
 
@@ -195,8 +212,8 @@ class PrayerNotificationWorker @AssistedInject constructor(
     private fun showPrayerReminderNotification(prayerName: String, prayerTime: String) {
         // Create large icon from app launcher icon
         val largeIcon = ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
-        
-        val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+
+        val notification = NotificationCompat.Builder(applicationContext, REMINDER_CHANNEL_ID)  // Use reminder channel
             .setContentTitle("$prayerName in 20 min")
             .setContentText("Starts at $prayerTime")
             .setStyle(NotificationCompat.BigTextStyle()
@@ -208,7 +225,7 @@ class PrayerNotificationWorker @AssistedInject constructor(
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setOngoing(false)
-            .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
+            // No need to set defaults - channel handles vibration, no sound
             .build()
 
         val notificationManager = applicationContext
