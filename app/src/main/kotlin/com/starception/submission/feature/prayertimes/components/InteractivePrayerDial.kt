@@ -367,46 +367,42 @@ fun InteractivePrayerDial(
                     textAlign = TextAlign.Center
                 )
 
-                // Small indicator showing adjustment amount
-                if (currentAdjustment != 0) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                // Small indicator showing adjustment amount - always visible
+                Spacer(modifier = Modifier.height(6.dp))
 
-                    val adjustmentText = when {
-                        currentAdjustment > 0 -> {
-                            val hours = currentAdjustment / 60
-                            val minutes = currentAdjustment % 60
-                            when {
-                                hours > 0 && minutes > 0 -> "+${hours}h ${minutes}m"
-                                hours > 0 -> "+${hours}h"
-                                else -> "+${minutes}m"
-                            }
+                val adjustmentText = when {
+                    currentAdjustment > 0 -> {
+                        val hours = currentAdjustment / 60
+                        val minutes = currentAdjustment % 60
+                        when {
+                            hours > 0 && minutes > 0 -> "+${hours}h ${minutes}m"
+                            hours > 0 -> "+${hours}h"
+                            else -> "+${minutes}m"
                         }
-                        currentAdjustment < 0 -> {
-                            val totalMinutes = kotlin.math.abs(currentAdjustment)
-                            val hours = totalMinutes / 60
-                            val minutes = totalMinutes % 60
-                            when {
-                                hours > 0 && minutes > 0 -> "-${hours}h ${minutes}m"
-                                hours > 0 -> "-${hours}h"
-                                else -> "${currentAdjustment}m"
-                            }
+                    }
+                    currentAdjustment < 0 -> {
+                        val totalMinutes = kotlin.math.abs(currentAdjustment)
+                        val hours = totalMinutes / 60
+                        val minutes = totalMinutes % 60
+                        when {
+                            hours > 0 && minutes > 0 -> "-${hours}h ${minutes}m"
+                            hours > 0 -> "-${hours}h"
+                            else -> "${currentAdjustment}m"
                         }
-                        else -> ""
                     }
-
-                    if (adjustmentText.isNotEmpty()) {
-                        Text(
-                            text = adjustmentText,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                letterSpacing = 0.5.sp
-                            ),
-                            color = Color(0xFF26C6DA), // Teal color
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    else -> "0m"  // Show 0m when there's no adjustment
                 }
+
+                Text(
+                    text = adjustmentText,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        letterSpacing = 0.5.sp
+                    ),
+                    color = Color(0xFF26C6DA), // Teal color
+                    textAlign = TextAlign.Center
+                )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -414,90 +410,90 @@ fun InteractivePrayerDial(
                 val hasAdjusted = currentAdjustment != baseAdjustment
 
                 if (hasAdjusted) {
-                    // Swipe gesture UI for save/undo actions
-                    Spacer(modifier = Modifier.height(24.dp))
+                    // iPhone lock screen style swipe UI
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Column layout to stack elements vertically
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth()
+                    // Swipeable area with integrated Reset and Save
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp)
+                            .padding(horizontal = 20.dp)
                     ) {
-                        // Row for Reset and Save labels at the top
-                        Row(
+                        // Background track
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 40.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // Left side - Reset indicator
-                            Row(
-                                horizontalArrangement = Arrangement.Start,
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.graphicsLayer {
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(30.dp))
+                                .background(
+                                    Color(0xFF37474F).copy(alpha = 0.12f)
+                                )
+                        )
+
+                        // Reset text on the left
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(start = 20.dp)
+                                .graphicsLayer {
                                     alpha = if (animatedSwipeOffset < 0) {
-                                        (kotlin.math.abs(animatedSwipeOffset) / swipeThreshold).coerceIn(0.3f, 1f)
-                                    } else 0.2f
-                                    val scale = if (animatedSwipeOffset < -swipeThreshold) 1.15f else 0.9f
-                                    scaleX = scale
-                                    scaleY = scale
+                                        (kotlin.math.abs(animatedSwipeOffset) / swipeThreshold).coerceIn(0.4f, 1f)
+                                    } else 0.3f
                                 }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     text = "↶",
-                                    fontSize = 18.sp,
+                                    fontSize = 20.sp,
                                     color = Color(0xFFFF9800),
                                     fontWeight = FontWeight.Bold
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "Reset",
-                                    fontSize = 12.sp,
+                                    fontSize = 14.sp,
                                     color = Color(0xFFFF9800),
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
+                        }
 
-                            // Right side - Save indicator
-                            Row(
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.graphicsLayer {
+                        // Save text on the right
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 20.dp)
+                                .graphicsLayer {
                                     alpha = if (animatedSwipeOffset > 0) {
-                                        (animatedSwipeOffset / swipeThreshold).coerceIn(0.3f, 1f)
-                                    } else 0.2f
-                                    val scale = if (animatedSwipeOffset > swipeThreshold) 1.15f else 0.9f
-                                    scaleX = scale
-                                    scaleY = scale
+                                        (animatedSwipeOffset / swipeThreshold).coerceIn(0.4f, 1f)
+                                    } else 0.3f
                                 }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     text = "Save",
-                                    fontSize = 12.sp,
+                                    fontSize = 14.sp,
                                     color = Color(0xFF4CAF50),
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.SemiBold
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "✓",
-                                    fontSize = 18.sp,
+                                    fontSize = 20.sp,
                                     color = Color(0xFF4CAF50),
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Swipeable area below the labels
+                        // Swipeable pill with gesture detection
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp)
-                                .padding(horizontal = 40.dp)
-                                .clip(RoundedCornerShape(22.dp))
-                                .background(
-                                    Color(0xFF607D8B).copy(alpha = 0.08f)
-                                )
+                                .fillMaxSize()
                                 .pointerInput(currentAdjustment) {
                                     detectHorizontalDragGestures(
                                         onDragStart = {
@@ -541,12 +537,12 @@ fun InteractivePrayerDial(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            // Swipeable pill indicator
+                            // Swipeable pill indicator - iPhone style
                             Box(
                                 modifier = Modifier
-                                    .size(width = 80.dp, height = 36.dp)
-                                    .offset(x = (animatedSwipeOffset / 4f).dp) // Move with swipe but slower
-                                    .clip(RoundedCornerShape(18.dp))
+                                    .size(width = 120.dp, height = 52.dp)
+                                    .offset(x = (animatedSwipeOffset / 3f).dp) // Move with swipe
+                                    .clip(RoundedCornerShape(26.dp))
                                     .background(
                                         when {
                                             animatedSwipeOffset < -swipeThreshold -> Color(0xFFFF9800) // Orange for reset
@@ -557,11 +553,11 @@ fun InteractivePrayerDial(
                                     .border(
                                         width = 1.dp,
                                         color = when {
-                                            animatedSwipeOffset < -swipeThreshold -> Color(0xFFFF9800)
-                                            animatedSwipeOffset > swipeThreshold -> Color(0xFF4CAF50)
+                                            animatedSwipeOffset < -swipeThreshold -> Color(0xFFFF9800).copy(alpha = 0.6f)
+                                            animatedSwipeOffset > swipeThreshold -> Color(0xFF4CAF50).copy(alpha = 0.6f)
                                             else -> Color(0xFF607D8B).copy(alpha = 0.2f)
                                         },
-                                        shape = RoundedCornerShape(18.dp)
+                                        shape = RoundedCornerShape(26.dp)
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -573,7 +569,7 @@ fun InteractivePrayerDial(
                                         animatedSwipeOffset > 20 -> "→"
                                         else -> "Swipe"
                                     },
-                                    fontSize = 11.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = when {
                                         animatedSwipeOffset < -swipeThreshold -> Color.White
@@ -584,19 +580,6 @@ fun InteractivePrayerDial(
                             }
                         }
                     }
-
-                    // Always show current adjustment value to prevent UI blink when scrolling
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = when {
-                            currentAdjustment > 0 -> "+$currentAdjustment minutes"
-                            currentAdjustment < 0 -> "$currentAdjustment minutes"
-                            else -> "0 minutes"  // Show 0 explicitly to prevent flicker
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF607D8B).copy(alpha = 0.7f),
-                        textAlign = TextAlign.Center
-                    )
                 } else {
                     // Show hints when no adjustment has been made
                     Column(
