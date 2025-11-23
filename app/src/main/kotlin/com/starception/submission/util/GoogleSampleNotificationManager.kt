@@ -48,10 +48,15 @@ object GoogleSampleNotificationManager {
     
     // Track current prayer phase to detect phase changes
     private var currentPhase: Int = -1 // -1 = not set, 0 = Go to Mosque, 1 = Best Time, 2 = Make Time
-    
+
     // Track current prayer information for action buttons
     private var currentPrayerName: String = ""
     private var currentPrayerTime: String = ""
+
+    // Track the last prayer we played Adhan for to avoid duplicate Adhan on app restart
+    private var lastAdhanPrayerName: String = ""
+    private var lastAdhanPrayerTime: String = ""
+    private var lastAdhanPlayedTime: Long = 0L  // System time when we last played Adhan
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun initialize(context: Context, notifManager: NotificationManager) {
@@ -440,12 +445,46 @@ object GoogleSampleNotificationManager {
             // Phase change or first notification: Allow normal alert behavior (sound/vibration)
             android.util.Log.d("GoogleSampleNotificationManager", "🔔 Phase change detected - allowing alerts (sound/vibration)")
 
-            // Play Adhan sound when entering "Go to Mosque" phase (prayer time has arrived)
-            if (newPhase == 0 && (isPhaseChange || isFirstNotification)) {
+            // Play Adhan sound ONLY when prayer time has just arrived (not when service starts)
+            // We need to check:
+            // 1. We're at the beginning of prayer time (progress 0-5%)
+            // 2. This is a NEW prayer (not the same one we already played Adhan for)
+            // 3. We're entering phase 0 (Go to Mosque)
+
+            val isNearPrayerTime = progress in 0..5  // Within first 5% of prayer window
+            val isNewPrayer = (currentPrayerName != lastAdhanPrayerName || currentPrayerTime != lastAdhanPrayerTime)
+            val timeSinceLastAdhan = System.currentTimeMillis() - lastAdhanPlayedTime
+            val isEnoughTimePassedSinceLastAdhan = timeSinceLastAdhan > 60_000  // At least 1 minute since last Adhan
+
+            // Only play Adhan if:
+            // - We're near the prayer time (0-5% progress)
+            // - This is a new prayer (different from last one)
+            // - We're in phase 0 (Go to Mosque)
+            // - It's been at least 1 minute since last Adhan (prevents spam)
+            val shouldPlayAdhan = isNearPrayerTime && isNewPrayer && newPhase == 0 && isEnoughTimePassedSinceLastAdhan
+
+            if (shouldPlayAdhan) {
+                android.util.Log.d("GoogleSampleNotificationManager",
+                    "📢 ADHAN TIME: New prayer '${currentPrayerName}' at ${currentPrayerTime} (progress: ${progress}%) - playing Adhan")
                 playAdhanSound()
+
+                // Remember this prayer so we don't play Adhan again for it
+                lastAdhanPrayerName = currentPrayerName
+                lastAdhanPrayerTime = currentPrayerTime
+                lastAdhanPlayedTime = System.currentTimeMillis()
+            } else if (newPhase == 0) {
+                // Log why we're not playing Adhan
+                val reason = when {
+                    !isNearPrayerTime -> "Already past prayer time (progress: ${progress}%)"
+                    !isNewPrayer -> "Already played Adhan for ${currentPrayerName} at ${currentPrayerTime}"
+                    !isEnoughTimePassedSinceLastAdhan -> "Too soon since last Adhan (${timeSinceLastAdhan/1000}s ago)"
+                    else -> "Unknown reason"
+                }
+                android.util.Log.d("GoogleSampleNotificationManager",
+                    "⏭️ Skipping Adhan: $reason")
             }
 
-            // Set custom sound URI for the notification
+            // Set custom sound URI for the notification (but only play if conditions met above)
             val adhanSoundUri = Uri.parse("android.resource://${appContext.packageName}/${R.raw.short_adhan}")
             notificationBuilder.setSound(adhanSoundUri)
         } else {

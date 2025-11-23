@@ -27,9 +27,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.runtime.*
 import androidx.compose.animation.core.*
 import androidx.compose.ui.Alignment
@@ -417,77 +421,55 @@ fun InteractivePrayerDial(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(60.dp)
-                            .padding(horizontal = 20.dp)
+                            .height(64.dp)
+                            .padding(horizontal = 8.dp)
                     ) {
                         // Background track
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clip(RoundedCornerShape(30.dp))
+                                .clip(RoundedCornerShape(32.dp))
                                 .background(
-                                    Color(0xFF37474F).copy(alpha = 0.12f)
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                                 )
                         )
 
-                        // Reset text on the left
+                        // Reset icon on the left
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
-                                .padding(start = 20.dp)
+                                .padding(start = 10.dp)
                                 .graphicsLayer {
                                     alpha = if (animatedSwipeOffset < 0) {
-                                        (kotlin.math.abs(animatedSwipeOffset) / swipeThreshold).coerceIn(0.4f, 1f)
-                                    } else 0.3f
+                                        (kotlin.math.abs(animatedSwipeOffset) / swipeThreshold).coerceIn(0.8f, 1f)
+                                    } else 0.7f
                                 }
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "↶",
-                                    fontSize = 20.sp,
-                                    color = Color(0xFFFF9800),
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Reset",
-                                    fontSize = 14.sp,
-                                    color = Color(0xFFFF9800),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = "Reset",
+                                modifier = Modifier.size(28.dp),
+                                tint = Color(0xFFFF9800)
+                            )
                         }
 
-                        // Save text on the right
+                        // Save icon on the right
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
-                                .padding(end = 20.dp)
+                                .padding(end = 10.dp)
                                 .graphicsLayer {
                                     alpha = if (animatedSwipeOffset > 0) {
-                                        (animatedSwipeOffset / swipeThreshold).coerceIn(0.4f, 1f)
-                                    } else 0.3f
+                                        (animatedSwipeOffset / swipeThreshold).coerceIn(0.8f, 1f)
+                                    } else 0.7f
                                 }
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Save",
-                                    fontSize = 14.sp,
-                                    color = Color(0xFF4CAF50),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "✓",
-                                    fontSize = 20.sp,
-                                    color = Color(0xFF4CAF50),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Outlined.Save,
+                                contentDescription = "Save",
+                                modifier = Modifier.size(28.dp),
+                                tint = Color(0xFF4CAF50)
+                            )
                         }
 
                         // Swipeable pill with gesture detection
@@ -540,9 +522,9 @@ fun InteractivePrayerDial(
                             // Swipeable pill indicator - iPhone style
                             Box(
                                 modifier = Modifier
-                                    .size(width = 120.dp, height = 52.dp)
+                                    .size(width = 110.dp, height = 54.dp)
                                     .offset(x = (animatedSwipeOffset / 3f).dp) // Move with swipe
-                                    .clip(RoundedCornerShape(26.dp))
+                                    .clip(RoundedCornerShape(27.dp))
                                     .background(
                                         when {
                                             animatedSwipeOffset < -swipeThreshold -> Color(0xFFFF9800) // Orange for reset
@@ -557,7 +539,7 @@ fun InteractivePrayerDial(
                                             animatedSwipeOffset > swipeThreshold -> Color(0xFF4CAF50).copy(alpha = 0.6f)
                                             else -> Color(0xFF607D8B).copy(alpha = 0.2f)
                                         },
-                                        shape = RoundedCornerShape(26.dp)
+                                        shape = RoundedCornerShape(27.dp)
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
