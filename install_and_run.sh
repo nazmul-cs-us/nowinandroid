@@ -9,8 +9,9 @@ echo "🔨 Building and installing app..."
 if [ $? -eq 0 ]; then
     echo "✅ App installed successfully"
     echo "🚀 Launching app on device..."
-    adb shell am start -n com.starception.submission.demo.debug/com.starception.submission.MainActivity
-    echo "📱 App should now be opening on your device"
+    # Using monkey command for more reliable app launch
+    adb shell monkey -p com.starception.submission.demo.debug -c android.intent.category.LAUNCHER 1
+    echo "📱 App is now open on your device"
 else
     echo "❌ Build or installation failed"
     exit 1
