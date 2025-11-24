@@ -38,30 +38,53 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.logging.Level
 import java.util.logging.Logger
+import android.content.SharedPreferences
 
 object GoogleSampleNotificationManager {
     private lateinit var notificationManager: NotificationManager
     private lateinit var appContext: Context
+    private lateinit var prefs: SharedPreferences
+
     const val CHANNEL_ID = "google_live_updates_channel_id"
     private const val CHANNEL_NAME = "Google Live Updates Test"
     private const val NOTIFICATION_ID = 9999
-    
-    // Track current prayer phase to detect phase changes
+
+    // SharedPreferences keys for persistent storage
+    private const val PREFS_NAME = "adhan_tracker_prefs"
+    private const val KEY_LAST_ADHAN_PRAYER_NAME = "last_adhan_prayer_name"
+    private const val KEY_LAST_ADHAN_PRAYER_TIME = "last_adhan_prayer_time"
+    private const val KEY_LAST_ADHAN_PLAYED_TIME = "last_adhan_played_time"
+
+    // Track current prayer phase to detect phase changes (memory only - ok to reset)
     private var currentPhase: Int = -1 // -1 = not set, 0 = Go to Mosque, 1 = Best Time, 2 = Make Time
 
-    // Track current prayer information for action buttons
+    // Track current prayer information for action buttons (memory only - ok to reset)
     private var currentPrayerName: String = ""
     private var currentPrayerTime: String = ""
 
-    // Track the last prayer we played Adhan for to avoid duplicate Adhan on app restart
-    private var lastAdhanPrayerName: String = ""
-    private var lastAdhanPrayerTime: String = ""
-    private var lastAdhanPlayedTime: Long = 0L  // System time when we last played Adhan
+    // Track app startup time to prevent Adhan during first few minutes after app launch
+    private var appInitializedTime: Long = 0L
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun initialize(context: Context, notifManager: NotificationManager) {
         notificationManager = notifManager
         appContext = context
+
+        // Initialize SharedPreferences for persistent storage
+        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        // Record app initialization time
+        appInitializedTime = System.currentTimeMillis()
+
+        // Log the last Adhan info from persistent storage
+        val lastPrayerName = prefs.getString(KEY_LAST_ADHAN_PRAYER_NAME, "") ?: ""
+        val lastPrayerTime = prefs.getString(KEY_LAST_ADHAN_PRAYER_TIME, "") ?: ""
+        val lastPlayedTime = prefs.getLong(KEY_LAST_ADHAN_PLAYED_TIME, 0L)
+
+        android.util.Log.d("GoogleSampleNotificationManager",
+            "🚀 App initialized - Adhan disabled for 30 seconds")
+        android.util.Log.d("GoogleSampleNotificationManager",
+            "📱 Last Adhan from storage: Prayer='$lastPrayerName' Time='$lastPrayerTime' PlayedAt=${if (lastPlayedTime > 0) java.time.Instant.ofEpochMilli(lastPlayedTime) else "Never"}")
 
         // Create audio attributes for notification sound
         val audioAttributes = AudioAttributes.Builder()
@@ -452,29 +475,68 @@ object GoogleSampleNotificationManager {
             // 3. We're entering phase 0 (Go to Mosque)
 
             val isNearPrayerTime = progress in 0..5  // Within first 5% of prayer window
+
+            // Read last Adhan info from persistent storage
+            val lastAdhanPrayerName = prefs.getString(KEY_LAST_ADHAN_PRAYER_NAME, "") ?: ""
+            val lastAdhanPrayerTime = prefs.getString(KEY_LAST_ADHAN_PRAYER_TIME, "") ?: ""
+            val lastAdhanPlayedTime = prefs.getLong(KEY_LAST_ADHAN_PLAYED_TIME, 0L)
+
             val isNewPrayer = (currentPrayerName != lastAdhanPrayerName || currentPrayerTime != lastAdhanPrayerTime)
             val timeSinceLastAdhan = System.currentTimeMillis() - lastAdhanPlayedTime
             val isEnoughTimePassedSinceLastAdhan = timeSinceLastAdhan > 60_000  // At least 1 minute since last Adhan
 
-            // Only play Adhan if:
-            // - We're near the prayer time (0-5% progress)
-            // - This is a new prayer (different from last one)
-            // - We're in phase 0 (Go to Mosque)
+            // CRITICAL: Don't play Adhan within 2 minutes of app startup - PERIOD!
+            val timeSinceAppStart = System.currentTimeMillis() - appInitializedTime
+            val isAppRunningLongEnough = timeSinceAppStart > 120_000  // App must be running for at least 2 minutes
+
+            // ABSOLUTE BLOCK: Never play Adhan in the first 2 minutes, no matter what
+            val isStartupProtectionActive = timeSinceAppStart < 120_000
+            if (isStartupProtectionActive) {
+                android.util.Log.d("GoogleSampleNotificationManager",
+                    "🚫 ADHAN BLOCKED: App startup protection active (${timeSinceAppStart/1000}s < 120s)")
+            }
+
+            // IMPORTANT: Never play Adhan on the very first notification after app start
+            // This prevents Adhan when opening the app during prayer time
+            val isVeryFirstNotification = isFirstNotification && timeSinceAppStart < 5000  // First notification within 5 seconds
+
+            // Only play Adhan if ALL conditions are met:
+            // - NOT in startup protection period (first 2 minutes)
+            // - NOT the first notification (prevents startup Adhan)
+            // - App has been running for at least 2 minutes (prevents startup Adhan)
+            // - We're near the actual prayer time (0-5% progress means prayer just started)
+            // - This is a new prayer (different from last one we played Adhan for)
+            // - We're in phase 0 (Go to Mosque phase)
             // - It's been at least 1 minute since last Adhan (prevents spam)
-            val shouldPlayAdhan = isNearPrayerTime && isNewPrayer && newPhase == 0 && isEnoughTimePassedSinceLastAdhan
+            val shouldPlayAdhan = !isStartupProtectionActive &&
+                                  !isVeryFirstNotification &&
+                                  isAppRunningLongEnough &&
+                                  isNearPrayerTime &&
+                                  isNewPrayer &&
+                                  newPhase == 0 &&
+                                  isEnoughTimePassedSinceLastAdhan
 
             if (shouldPlayAdhan) {
                 android.util.Log.d("GoogleSampleNotificationManager",
                     "📢 ADHAN TIME: New prayer '${currentPrayerName}' at ${currentPrayerTime} (progress: ${progress}%) - playing Adhan")
                 playAdhanSound()
 
-                // Remember this prayer so we don't play Adhan again for it
-                lastAdhanPrayerName = currentPrayerName
-                lastAdhanPrayerTime = currentPrayerTime
-                lastAdhanPlayedTime = System.currentTimeMillis()
+                // Save this prayer to persistent storage so we don't play Adhan again for it even after app restart
+                val currentTime = System.currentTimeMillis()
+                prefs.edit().apply {
+                    putString(KEY_LAST_ADHAN_PRAYER_NAME, currentPrayerName)
+                    putString(KEY_LAST_ADHAN_PRAYER_TIME, currentPrayerTime)
+                    putLong(KEY_LAST_ADHAN_PLAYED_TIME, currentTime)
+                    apply()
+                }
+                android.util.Log.d("GoogleSampleNotificationManager",
+                    "💾 Saved to persistent storage: Prayer='${currentPrayerName}' Time='${currentPrayerTime}'")
             } else if (newPhase == 0) {
                 // Log why we're not playing Adhan
                 val reason = when {
+                    isStartupProtectionActive -> "🚫 STARTUP PROTECTION: App running for ${timeSinceAppStart/1000}s (need 120s)"
+                    isVeryFirstNotification -> "First notification after app start - NEVER play Adhan on startup"
+                    !isAppRunningLongEnough -> "App just started (${timeSinceAppStart/1000}s ago) - waiting 120s before allowing Adhan"
                     !isNearPrayerTime -> "Already past prayer time (progress: ${progress}%)"
                     !isNewPrayer -> "Already played Adhan for ${currentPrayerName} at ${currentPrayerTime}"
                     !isEnoughTimePassedSinceLastAdhan -> "Too soon since last Adhan (${timeSinceLastAdhan/1000}s ago)"
@@ -484,9 +546,11 @@ object GoogleSampleNotificationManager {
                     "⏭️ Skipping Adhan: $reason")
             }
 
-            // Set custom sound URI for the notification (but only play if conditions met above)
-            val adhanSoundUri = Uri.parse("android.resource://${appContext.packageName}/${R.raw.short_adhan}")
-            notificationBuilder.setSound(adhanSoundUri)
+            // DISABLED: Notification sound to prevent double Adhan
+            // The playAdhanSound() method above already plays the Adhan when conditions are met
+            // Having both causes double playback
+            // val adhanSoundUri = Uri.parse("android.resource://${appContext.packageName}/${R.raw.short_adhan}")
+            // notificationBuilder.setSound(adhanSoundUri)
         } else {
             // Progress update within same phase: Make completely silent
             android.util.Log.d("GoogleSampleNotificationManager", "🔕 Progress update - setting notification as SILENT (no sound/vibration)")
@@ -570,6 +634,41 @@ object GoogleSampleNotificationManager {
     fun dismissNotification() {
         notificationManager.cancel(NOTIFICATION_ID)
         android.util.Log.d("GoogleSampleNotificationManager", "🗑️ Prayer notification dismissed")
+    }
+
+    /**
+     * Clear the stored Adhan history (useful for testing or resetting)
+     * This allows the Adhan to play again for the current prayer
+     */
+    fun clearAdhanHistory() {
+        if (::prefs.isInitialized) {
+            prefs.edit().apply {
+                remove(KEY_LAST_ADHAN_PRAYER_NAME)
+                remove(KEY_LAST_ADHAN_PRAYER_TIME)
+                remove(KEY_LAST_ADHAN_PLAYED_TIME)
+                apply()
+            }
+            android.util.Log.d("GoogleSampleNotificationManager",
+                "🗑️ Cleared Adhan history from persistent storage")
+        }
+    }
+
+    /**
+     * Get info about the last played Adhan for debugging
+     */
+    fun getLastAdhanInfo(): String {
+        if (!::prefs.isInitialized) return "Preferences not initialized"
+
+        val lastPrayerName = prefs.getString(KEY_LAST_ADHAN_PRAYER_NAME, "None") ?: "None"
+        val lastPrayerTime = prefs.getString(KEY_LAST_ADHAN_PRAYER_TIME, "Never") ?: "Never"
+        val lastPlayedTime = prefs.getLong(KEY_LAST_ADHAN_PLAYED_TIME, 0L)
+
+        return if (lastPlayedTime > 0) {
+            val timeAgo = (System.currentTimeMillis() - lastPlayedTime) / 1000 / 60  // minutes
+            "Last Adhan: $lastPrayerName at $lastPrayerTime (${timeAgo}m ago)"
+        } else {
+            "No Adhan played yet"
+        }
     }
 
     /**
