@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Installation
 - `./gradlew installDemoDebug` - Install demo debug APK on connected device
 - `./gradlew installDemoDebug && adb shell monkey -p com.starception.submission.demo.debug -c android.intent.category.LAUNCHER 1` - Install and auto-launch app
+- `./install_and_run.sh` - Build, install and auto-launch app (recommended)
 - `adb -s 4B221FDAP002T6 install -r app/build/outputs/apk/demo/debug/app-demo-debug.apk` - Install APK on Pixel 9 Pro device
 - `adb devices` - List connected Android devices
 

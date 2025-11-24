@@ -150,7 +150,8 @@
       "Bash(tr -cd '{}')",
       "Bash(/tmp/swipe_ui_screenshot.png)",
       "Bash(/tmp/swipe_ui_alignment.png)",
-      "Bash(/tmp/swipe_ui_fixed.png)"
+      "Bash(/tmp/swipe_ui_fixed.png)",
+      "WebFetch(domain:medium.com)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

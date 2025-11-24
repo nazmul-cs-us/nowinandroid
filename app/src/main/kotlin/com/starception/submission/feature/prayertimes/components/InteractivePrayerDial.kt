@@ -316,6 +316,8 @@ fun InteractivePrayerDial(
             )
         }
 
+        // Removed Apple Lock Screen style buttons - will be integrated into swipeable area
+
         // Central text container - clean and minimal
         Box(
             modifier = Modifier
@@ -413,61 +415,151 @@ fun InteractivePrayerDial(
                 // Dynamic hint based on whether user has adjusted from base
                 val hasAdjusted = currentAdjustment != baseAdjustment
 
-                if (hasAdjusted) {
-                    // iPhone lock screen style swipe UI
+                if (hasAdjusted) { // Enhanced swipe UI with circular icons
+                    // iPhone lock screen style swipe UI with circular buttons
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Swipeable area with integrated Reset and Save
+                    // Swipeable area with integrated circular Reset and Save buttons
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(64.dp)
                             .padding(horizontal = 8.dp)
                     ) {
-                        // Background track
+                        // iOS Frosted Glass Background Track
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(RoundedCornerShape(32.dp))
+                                // Multi-layer glass effect
                                 .background(
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                    // Base layer - semi-transparent with blur effect simulation
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
+                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                                        )
+                                    )
                                 )
                         )
 
-                        // Reset icon on the left
+                        // Glass border overlay for depth
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(32.dp))
+                                .border(
+                                    BorderStroke(
+                                        width = 1.dp,
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.White.copy(alpha = 0.5f),
+                                                Color.White.copy(alpha = 0.2f),
+                                                Color.White.copy(alpha = 0.3f)
+                                            )
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(32.dp)
+                                )
+                        )
+
+                        // Inner glass shimmer effect
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(1.dp)
+                                .clip(RoundedCornerShape(31.dp))
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(
+                                            Color.White.copy(alpha = 0.2f),
+                                            Color.Transparent
+                                        ),
+                                        radius = 200f,
+                                        center = Offset(0.3f, 0.3f)
+                                    )
+                                )
+                        )
+
+                        // Circular Reset Button on the left
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
-                                .padding(start = 10.dp)
+                                .padding(start = 6.dp)
+                                .size(52.dp)
                                 .graphicsLayer {
                                     alpha = if (animatedSwipeOffset < 0) {
-                                        (kotlin.math.abs(animatedSwipeOffset) / swipeThreshold).coerceIn(0.8f, 1f)
-                                    } else 0.7f
+                                        (kotlin.math.abs(animatedSwipeOffset) / swipeThreshold).coerceIn(0.7f, 1f)
+                                    } else 0.5f
+                                    scaleX = if (animatedSwipeOffset < -swipeThreshold * 0.8f) 1.1f else 1f
+                                    scaleY = if (animatedSwipeOffset < -swipeThreshold * 0.8f) 1.1f else 1f
                                 }
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                        ),
+                                        radius = 80f
+                                    ),
+                                    shape = CircleShape
+                                )
+                                .border(
+                                    BorderStroke(
+                                        width = 0.5.dp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                                    ),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Refresh,
                                 contentDescription = "Reset",
-                                modifier = Modifier.size(28.dp),
+                                modifier = Modifier.size(26.dp),
                                 tint = Color(0xFFFF9800)
                             )
                         }
 
-                        // Save icon on the right
+                        // Circular Save Button on the right
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
-                                .padding(end = 10.dp)
+                                .padding(end = 6.dp)
+                                .size(52.dp)
                                 .graphicsLayer {
                                     alpha = if (animatedSwipeOffset > 0) {
-                                        (animatedSwipeOffset / swipeThreshold).coerceIn(0.8f, 1f)
-                                    } else 0.7f
+                                        (animatedSwipeOffset / swipeThreshold).coerceIn(0.7f, 1f)
+                                    } else 0.5f
+                                    scaleX = if (animatedSwipeOffset > swipeThreshold * 0.8f) 1.1f else 1f
+                                    scaleY = if (animatedSwipeOffset > swipeThreshold * 0.8f) 1.1f else 1f
                                 }
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                        ),
+                                        radius = 80f
+                                    ),
+                                    shape = CircleShape
+                                )
+                                .border(
+                                    BorderStroke(
+                                        width = 0.5.dp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                                    ),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Save,
                                 contentDescription = "Save",
-                                modifier = Modifier.size(28.dp),
+                                modifier = Modifier.size(26.dp),
                                 tint = Color(0xFF4CAF50)
                             )
                         }
@@ -519,30 +611,84 @@ fun InteractivePrayerDial(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            // Swipeable pill indicator - iPhone style
+                            // Swipeable pill indicator - iPhone style with frosted glass effect
+                            // Constrain movement to avoid overlapping buttons
+                            val maxOffset = 35f // Limit movement to prevent overlap
+                            val constrainedOffset = (animatedSwipeOffset / 3f).coerceIn(-maxOffset, maxOffset)
+
+                            // iOS Frosted Glass Pill with proper layering
                             Box(
                                 modifier = Modifier
-                                    .size(width = 110.dp, height = 54.dp)
-                                    .offset(x = (animatedSwipeOffset / 3f).dp) // Move with swipe
-                                    .clip(RoundedCornerShape(27.dp))
-                                    .background(
-                                        when {
-                                            animatedSwipeOffset < -swipeThreshold -> Color(0xFFFF9800) // Orange for reset
-                                            animatedSwipeOffset > swipeThreshold -> Color(0xFF4CAF50) // Green for save
-                                            else -> Color.White
-                                        }
-                                    )
-                                    .border(
-                                        width = 1.dp,
-                                        color = when {
-                                            animatedSwipeOffset < -swipeThreshold -> Color(0xFFFF9800).copy(alpha = 0.6f)
-                                            animatedSwipeOffset > swipeThreshold -> Color(0xFF4CAF50).copy(alpha = 0.6f)
-                                            else -> Color(0xFF607D8B).copy(alpha = 0.2f)
-                                        },
-                                        shape = RoundedCornerShape(27.dp)
-                                    ),
+                                    .size(width = 90.dp, height = 50.dp)
+                                    .offset(x = constrainedOffset.dp)
+                                    .clip(RoundedCornerShape(25.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
+                                // Layer 1: Base glass background
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .background(
+                                            when {
+                                                animatedSwipeOffset < -swipeThreshold ->
+                                                    Color(0xFFFF9800).copy(alpha = 0.3f) // Orange tint
+                                                animatedSwipeOffset > swipeThreshold ->
+                                                    Color(0xFF4CAF50).copy(alpha = 0.3f) // Green tint
+                                                else ->
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.5f) // Neutral
+                                            }
+                                        )
+                                )
+
+                                // Layer 2: Blur effect simulation with gradient
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color.White.copy(alpha = 0.4f),
+                                                    Color.White.copy(alpha = 0.2f),
+                                                    Color.White.copy(alpha = 0.25f)
+                                                )
+                                            )
+                                        )
+                                )
+
+                                // Layer 3: Glass shine effect
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                colors = listOf(
+                                                    Color.Transparent,
+                                                    Color.White.copy(alpha = 0.1f),
+                                                    Color.Transparent
+                                                )
+                                            )
+                                        )
+                                )
+
+                                // Layer 4: Border for definition
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .border(
+                                            BorderStroke(
+                                                width = 0.8.dp,
+                                                brush = Brush.verticalGradient(
+                                                    colors = listOf(
+                                                        Color.White.copy(alpha = 0.6f),
+                                                        Color.White.copy(alpha = 0.2f)
+                                                    )
+                                                )
+                                            ),
+                                            shape = RoundedCornerShape(25.dp)
+                                        )
+                                )
+
+                                // Text content on top of all glass layers
                                 Text(
                                     text = when {
                                         animatedSwipeOffset < -swipeThreshold -> "Reset"
@@ -551,12 +697,16 @@ fun InteractivePrayerDial(
                                         animatedSwipeOffset > 20 -> "→"
                                         else -> "Swipe"
                                     },
-                                    fontSize = 15.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = when {
-                                        animatedSwipeOffset < -swipeThreshold -> Color.White
-                                        animatedSwipeOffset > swipeThreshold -> Color.White
-                                        else -> Color(0xFF37474F)
+                                        animatedSwipeOffset < -swipeThreshold -> Color.White.copy(alpha = 0.95f)
+                                        animatedSwipeOffset > swipeThreshold -> Color.White.copy(alpha = 0.95f)
+                                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                    },
+                                    modifier = Modifier.graphicsLayer {
+                                        // Add subtle shadow for text readability
+                                        shadowElevation = 2f
                                     }
                                 )
                             }
