@@ -491,7 +491,7 @@ fun SurahContentWithMusicPlayer(
                             )
                         )
                 )
-                
+
                 // Match XML: MaterialCardView (album_info_container) OR ConstraintLayout (music_player_container)
                 // Both 196dp height, same position (layout_constraintTop_toBottomOf="@id/album_image")
                 Box(
@@ -541,7 +541,7 @@ fun SurahContentWithMusicPlayer(
                             }
                         }
                     }
-                    
+
                     // Music Player Container (XML: music_player_container) - shown when player is visible
                     // XML: android:background="@android:color/black", android:visibility="gone"
                     androidx.compose.animation.AnimatedVisibility(
@@ -564,46 +564,42 @@ fun SurahContentWithMusicPlayer(
                         )
                     }
                 }
-                
-                // Match XML: FloatingActionButton (fab) - positioned between album_image and album_info_container
-                // XML: app:layout_constraintBottom_toTopOf="@id/album_info_container"
-                //      app:layout_constraintTop_toTopOf="@id/album_info_container"
-                //      app:layout_constraintEnd_toEndOf="parent"
-                //      android:layout_margin="16dp"
-                FloatingActionButton(
-                    onClick = {
-                        if (showMusicPlayer) {
-                            onToggleMusicPlayer()
-                                } else {
-                            onToggleMusicPlayer()
-                            if (!isPlaying) {
-                                onPlayPause()
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .offset(y = (-containerHeight.value / 2).dp), // Center vertically on container
-                    containerColor = Color(0xFFB0BEC5), // Match reference color
-                    contentColor = Color(0xFF263238)
-                ) {
-                    Icon(
-                        imageVector = if (showMusicPlayer) {
-                            Icons.Default.Close
-                        } else if (isPlaying) {
-                            Icons.Default.Pause
-                        } else {
-                            Icons.Default.PlayArrow
-                        },
-                        contentDescription = if (showMusicPlayer) "Close" else if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(24.dp)
-                            )
+            }
+
+            // FAB positioned absolutely over the entire layout
+            FloatingActionButton(
+                onClick = {
+                    if (showMusicPlayer) {
+                        onToggleMusicPlayer()
+                            } else {
+                        onToggleMusicPlayer()
+                        if (!isPlaying) {
+                            onPlayPause()
                         }
                     }
-                }
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-24).dp, y = (albumImageHeight.value - 28).dp), // Position at bottom of album image with offset from edge
+                containerColor = Color(0xFFB0BEC5), // Match reference color
+                contentColor = Color(0xFF263238)
+            ) {
+                Icon(
+                    imageVector = if (showMusicPlayer) {
+                        Icons.Default.Close
+                    } else if (isPlaying) {
+                        Icons.Default.Pause
+                    } else {
+                        Icons.Default.PlayArrow
+                    },
+                    contentDescription = if (showMusicPlayer) "Close" else if (isPlaying) "Pause" else "Play",
+                    modifier = Modifier.size(24.dp)
+                        )
+                    }
             }
         }
-        
+    }
+
 @Composable
 fun MusicPlayerContainerIntegrated(
     surah: Surah,

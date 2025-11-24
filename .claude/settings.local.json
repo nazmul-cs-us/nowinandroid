@@ -151,7 +151,15 @@
       "Bash(/tmp/swipe_ui_screenshot.png)",
       "Bash(/tmp/swipe_ui_alignment.png)",
       "Bash(/tmp/swipe_ui_fixed.png)",
-      "WebFetch(domain:medium.com)"
+      "WebFetch(domain:medium.com)",
+      "Bash(/tmp/fab_fixed.png)",
+      "Bash(/tmp/for_you_tab.png)",
+      "Bash(/tmp/fab_final.png)",
+      "Bash(/tmp/fab_final_check.png)",
+      "Bash(/tmp/fab_closer.png)",
+      "Bash(/tmp/fab_fixed_position.png)",
+      "Bash(/tmp/fab_actually_fixed.png)",
+      "Bash(/tmp/surah_detail_fab.png)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
