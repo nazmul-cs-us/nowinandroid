@@ -566,7 +566,25 @@ fun SurahContentWithMusicPlayer(
                 }
             }
 
-            // FAB positioned absolutely over the entire layout
+            // Left FAB - Hint/Info button
+            FloatingActionButton(
+                onClick = {
+                    // TODO: Add hint/info functionality
+                },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = 24.dp, y = (albumImageHeight - 28.dp)), // Position at bottom of album image with offset from edge
+                containerColor = Color(0xFFB0BEC5), // Match reference color
+                contentColor = Color(0xFF263238)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Info",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            // Right FAB - Play/Pause button
             FloatingActionButton(
                 onClick = {
                     if (showMusicPlayer) {
@@ -580,7 +598,7 @@ fun SurahContentWithMusicPlayer(
                 },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = (-24).dp, y = (albumImageHeight.value - 28).dp), // Position at bottom of album image with offset from edge
+                    .offset(x = (-24).dp, y = (albumImageHeight - 28.dp)), // Position at bottom of album image with offset from edge
                 containerColor = Color(0xFFB0BEC5), // Match reference color
                 contentColor = Color(0xFF263238)
             ) {

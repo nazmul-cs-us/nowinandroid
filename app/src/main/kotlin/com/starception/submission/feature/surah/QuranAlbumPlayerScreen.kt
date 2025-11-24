@@ -42,6 +42,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -464,6 +466,13 @@ fun QuranAlbumPlayerScreen(
         }
 
         // Floating action toolbar - draggable hint icon (vertical only, sticks to edges)
+        val configuration = LocalConfiguration.current
+        val density = LocalDensity.current
+        val screenWidth = configuration.screenWidthDp.dp
+        val albumHeaderHeight = screenWidth // AlbumHeader is square (aspectRatio 1f)
+        val baseVerticalOffset = albumHeaderHeight + 40.dp // Position closer to bottom of album image
+        val baseVerticalOffsetPx = with(density) { baseVerticalOffset.toPx() }
+
         var toolbarOffsetY by remember { mutableStateOf(0f) }
         var isOnRightSide by remember { mutableStateOf(false) }
 
@@ -473,11 +482,11 @@ fun QuranAlbumPlayerScreen(
         ) {
             Box(
                 modifier = Modifier
-                    .align(if (isOnRightSide) Alignment.CenterEnd else Alignment.CenterStart)
+                    .align(if (isOnRightSide) Alignment.TopEnd else Alignment.TopStart)
                     .offset {
                         androidx.compose.ui.unit.IntOffset(
                             0,
-                            toolbarOffsetY.toInt()
+                            (baseVerticalOffsetPx + toolbarOffsetY).toInt()
                         )
                     }
             ) {
@@ -1342,7 +1351,7 @@ private fun FloatingActionToolbar(
     // Use Box with consistent positioning to prevent movement
     Box(
         modifier = modifier,
-        contentAlignment = if (isOnRightSide) Alignment.CenterEnd else Alignment.CenterStart
+        contentAlignment = if (isOnRightSide) Alignment.TopEnd else Alignment.TopStart
     ) {
         // Render only the active state to avoid touch interception issues
         if (!isExpanded) {
