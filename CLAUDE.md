@@ -54,7 +54,7 @@ nowinandroid/
 ├── feature/                  # 6 feature modules
 ├── sync/                     # Sync modules
 ├── benchmarks/              # Performance benchmarking
-├── docs/                    # 19+ technical documentation files
+├── docs/                    # 14 technical documentation files
 ├── gradle/                  # Gradle wrapper and dependencies
 ├── lint/                    # Custom lint rules
 ├── tools/                   # Development tools
@@ -289,6 +289,15 @@ The app uses `com.starception.submission` as the base package (originally forked
 - `docs/PRAYER_TIMES_TECHNICAL_GUIDE.md` - Comprehensive technical guide for the prayer times system
 - `docs/PRAYER_CALCULATION_METHODOLOGY.md` - Detailed explanation of Islamic prayer time calculations
 - `docs/INTERACTIVE_PRAYER_DIAL_GUIDE.md` - Complete technical guide for interactive prayer time adjustment feature
+- `docs/PRAYER_TIMES_DEBUG_LOGGING_GUIDE.md` - Debug logging and troubleshooting guide
+- `docs/AUTO_DETECTION_LOGGING_GUIDE.md` - Auto-detection system logging guide
+- `docs/NOTIFICATION_SYSTEM_VERIFICATION.md` - Notification system verification and testing
+- `docs/QURAN_DATABASE_GUIDE.md` - Quran database architecture and management
+- `docs/COMPASS_INTEGRATION_GUIDE.md` - Qibla compass integration and implementation
+- `docs/RELIABLE_PRAYER_NOTIFICATIONS_GUIDE.md` - Reliable notification delivery system
+- `docs/TIME_SIMULATION_TESTING_GUIDE.md` - Time simulation for testing prayer calculations
+- `docs/ACTIVITY_DETECTION_TECHNICAL_GUIDE.md` - Activity detection and tracking
+- `docs/ANR_PREVENTION_GUIDE.md` - Application Not Responding prevention strategies
 - `README.md` - Updated with detailed prayer time features and capabilities
 
 ## UI Design System
@@ -301,18 +310,21 @@ All cards in the app follow a consistent design pattern:
 - **External margins**: `16.dp` on all sides for screen-level content
 - **Click handling**: Cards should have `onClick` functionality where applicable
 
-### Recent Updates
-- Enhanced Prayer Times feature with comprehensive architecture (August 2025)
+### Recent Updates (as of November 2025)
+- Enhanced Prayer Times feature with comprehensive architecture
 - Implemented Material 3 expressive design with asymmetrical shapes and layered backgrounds
 - Added real-time prayer status tracking (Current/Next/Upcoming prayers)
 - Integrated enhanced location services with permission management
 - Added comprehensive notification system with prayer alerts
-- Updated dependency versions to latest stable releases (Kotlin 2.1.10, Compose BOM 2025.02.00)
+- Updated dependency versions to latest stable releases (Kotlin 2.0.21, Compose BOM 2025.02.00)
 - Improved build configuration with optimized Gradle settings
+- Added interactive prayer time adjustment with PNG file icon aesthetic
+- Enhanced Qibla compass with improved gestures and theming
+- Implemented comprehensive debugging and logging systems
 
-## Prayer Times Recent UI Improvements (September 2025)
+## Prayer Times UI Improvements
 
-### Interactive Prayer Time Adjustment (September 2025)
+### Interactive Prayer Time Adjustment
 - **Professional PNG File Icon Circular Timer**: Complete redesign with clean, document-style aesthetic for prayer time adjustments
   - **PNG File Icon Design**: Clean white background with subtle shadows, folded corner effects, and professional document styling
   - **Live Dragging Feedback**: Real-time progress arc and knob movement following finger during drag interactions
@@ -581,9 +593,9 @@ PrayerSettings_PREF_VERIFY: ❌ FAILED | key='invalid_key' | expected_type=Strin
 - **Custom Sounds**: Support for custom notification sounds
 
 ### File & Directory Count Summary
-- **Total Kotlin Files**: 500+ files
+- **Total Kotlin Files**: 402 files
 - **Total Lines of Code**: ~50,000+ lines (app module: 36,441)
-- **Documentation Files**: 19+ comprehensive guides
+- **Documentation Files**: 14 comprehensive guides
 - **Build Configurations**: 30+ Gradle files
 - **Asset Databases**: 12 Quran translation databases
 - **Module Count**: 25+ modules
@@ -601,25 +613,20 @@ scripts/
 ### Documentation Files
 ```
 docs/
-├── PRAYER_TIMES_TECHNICAL_GUIDE.md
-├── PRAYER_CALCULATION_METHODOLOGY.md
-├── INTERACTIVE_PRAYER_DIAL_GUIDE.md
-├── AUTO_DETECTION_LOGGING_GUIDE.md
-├── QURAN_DATABASE_GUIDE.md
-├── NOTIFICATION_SYSTEM_VERIFICATION.md
-├── LOCATION_SERVICE_TESTING.md
-├── PRAYER_SETTINGS_PERSISTENCE.md
-├── COMPASS_POPUP_IMPLEMENTATION.md
-├── SMART_CONTENT_ARCHITECTURE.md
-├── MATERIAL3_DESIGN_IMPLEMENTATION.md
-├── PERMISSION_MANAGEMENT_GUIDE.md
-├── BACKGROUND_SERVICES_GUIDE.md
-├── TESTING_STRATEGY.md
-├── MODULE_ARCHITECTURE_GUIDE.md
-├── BUILD_CONFIGURATION_GUIDE.md
-├── DEPENDENCY_MANAGEMENT.md
-├── PERFORMANCE_OPTIMIZATION.md
-└── RELEASE_PROCESS.md
+├── ACTIVITY_DETECTION_TECHNICAL_GUIDE.md      # Activity detection and tracking
+├── ANR_PREVENTION_GUIDE.md                     # Application Not Responding prevention
+├── AUTO_DETECTION_LOGGING_GUIDE.md             # Auto-detection logging system
+├── ArchitectureLearningJourney.md              # Official Android architecture guide
+├── COMPASS_INTEGRATION_GUIDE.md                # Qibla compass implementation
+├── INTERACTIVE_PRAYER_DIAL_GUIDE.md            # Interactive prayer time adjustment
+├── ModularizationLearningJourney.md            # Modularization best practices
+├── NOTIFICATION_SYSTEM_VERIFICATION.md         # Notification testing and verification
+├── PRAYER_CALCULATION_METHODOLOGY.md           # Islamic prayer time calculations
+├── PRAYER_TIMES_DEBUG_LOGGING_GUIDE.md         # Debug logging for prayer times
+├── PRAYER_TIMES_TECHNICAL_GUIDE.md             # Comprehensive prayer system guide
+├── QURAN_DATABASE_GUIDE.md                     # Quran database architecture
+├── RELIABLE_PRAYER_NOTIFICATIONS_GUIDE.md      # Reliable notification delivery
+└── TIME_SIMULATION_TESTING_GUIDE.md            # Time simulation for testing
 ```
 
 ## Key Differences from Original Now in Android
