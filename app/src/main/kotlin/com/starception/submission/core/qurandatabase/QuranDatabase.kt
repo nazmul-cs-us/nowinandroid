@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import java.io.File
 import java.io.FileOutputStream
@@ -17,9 +18,10 @@ import java.io.FileOutputStream
         SurahEntity::class,
         AyahEntity::class,
         JuzEntity::class,
-        HizbEntity::class
+        HizbEntity::class,
+        FavouriteAyahEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
     autoMigrations = []
 )
@@ -29,10 +31,37 @@ abstract class QuranDatabase : RoomDatabase() {
     
     companion object {
         private const val DATABASE_NAME = "quran.db"
-        
+
         @Volatile
         private var INSTANCE: QuranDatabase? = null
-        
+
+        /**
+         * Migration from version 1 to 2: Add favourite_ayahs table
+         */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                android.util.Log.d("QuranDatabase", "🔄 Migrating database from version 1 to 2...")
+
+                // Create favourite_ayahs table
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS favourite_ayahs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        surah_number INTEGER NOT NULL,
+                        ayah_number INTEGER NOT NULL,
+                        created_at INTEGER NOT NULL
+                    )
+                """.trimIndent())
+
+                // Create unique index on surah_number and ayah_number
+                database.execSQL("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_favourite_unique
+                    ON favourite_ayahs (surah_number, ayah_number)
+                """.trimIndent())
+
+                android.util.Log.d("QuranDatabase", "✅ Migration completed: favourite_ayahs table created")
+            }
+        }
+
         /**
          * Get the singleton instance of QuranDatabase
          */
@@ -44,14 +73,14 @@ abstract class QuranDatabase : RoomDatabase() {
                     DATABASE_NAME
                 )
                     .createFromAsset("databases/$DATABASE_NAME") // Load from assets
-                    .fallbackToDestructiveMigration() // For development
+                    .addMigrations(MIGRATION_1_2) // Add migration instead of destructive migration
                     .setJournalMode(JournalMode.TRUNCATE) // Simplify for pre-packaged DB
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
                             android.util.Log.d("QuranDatabase", "✅ Quran database created successfully")
                         }
-                        
+
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
                             android.util.Log.d("QuranDatabase", "📖 Quran database opened")

@@ -807,11 +807,21 @@ private fun AlbumPlayerContent(
     // Track the currently playing surah - load from repository when surah number changes
     var currentPlayingSurah by remember { mutableStateOf<Surah?>(null) }
     val quranRepository = hiltViewModel<QuranRepositoryHolder>().repository
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     // Bottom sheet state for ayah options
     var selectedAyahForOptions by remember { mutableStateOf<Int?>(null) }
     val sheetState = rememberModalBottomSheetState()
     var showBottomSheet by remember { mutableStateOf(false) }
+
+    // Track favourite ayahs - loaded from repository (persisted in database)
+    var favouriteAyahs by remember { mutableStateOf(setOf<Int>()) }
+
+    // Load favourite ayahs for this surah from repository
+    LaunchedEffect(surah.number) {
+        favouriteAyahs = quranRepository.getFavouriteAyahsForSurah(surah.number)
+        android.util.Log.d("QuranAlbumPlayer_FAVOURITE", "📥 LOADED | surah=${surah.number} | count=${favouriteAyahs.size} | ayahs=$favouriteAyahs")
+    }
 
     LaunchedEffect(currentPlayingSurahNumber) {
         // Fetch the new surah when the playing surah number changes
@@ -990,10 +1000,31 @@ private fun AlbumPlayerContent(
                 arabicFontSize = arabicFontSize,
                 textAlignment = textAlignment,
                 showTranslation = showTranslationInText,
+                isFavourite = ayah.numberInSurah in favouriteAyahs,
                 onClick = { onAyahClick(ayah) },
                 onLongPress = {
                     selectedAyahForOptions = ayah.numberInSurah
                     showBottomSheet = true
+                },
+                onDoubleTap = {
+                    val ayahNumber = ayah.numberInSurah
+                    val isFavourite = ayahNumber in favouriteAyahs
+                    val newFavouriteStatus = !isFavourite
+
+                    // Update database
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                        quranRepository.setAyahFavourite(surah.number, ayahNumber, newFavouriteStatus)
+
+                        // Update UI state
+                        favouriteAyahs = if (newFavouriteStatus) {
+                            favouriteAyahs + ayahNumber
+                        } else {
+                            favouriteAyahs - ayahNumber
+                        }
+
+                        val action = if (newFavouriteStatus) "added to" else "removed from"
+                        android.widget.Toast.makeText(context, "Ayah $ayahNumber $action favourites", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 }
             )
         }
@@ -1226,14 +1257,31 @@ private fun AlbumPlayerContent(
                     )
 
                     BottomSheetOption(
-                        icon = Icons.Default.BookmarkBorder,
-                        title = "Bookmark",
-                        description = "Save for later reading",
+                        icon = if (selectedAyahForOptions in favouriteAyahs) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        title = if (selectedAyahForOptions in favouriteAyahs) "Remove Favourite" else "Add Favourite",
+                        description = if (selectedAyahForOptions in favouriteAyahs) "Remove from favourites" else "Mark as favourite",
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         onClick = {
-                            // TODO: Implement bookmark ayah
-                            android.widget.Toast.makeText(context, "Bookmark ayah ${selectedAyahForOptions}", android.widget.Toast.LENGTH_SHORT).show()
+                            selectedAyahForOptions?.let { ayahNumber ->
+                                val isFavourite = ayahNumber in favouriteAyahs
+                                val newFavouriteStatus = !isFavourite
+
+                                // Update database
+                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                    quranRepository.setAyahFavourite(surah.number, ayahNumber, newFavouriteStatus)
+
+                                    // Update UI state
+                                    favouriteAyahs = if (newFavouriteStatus) {
+                                        favouriteAyahs + ayahNumber
+                                    } else {
+                                        favouriteAyahs - ayahNumber
+                                    }
+
+                                    val action = if (newFavouriteStatus) "added to" else "removed from"
+                                    android.widget.Toast.makeText(context, "Ayah $ayahNumber $action favourites", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
                             showBottomSheet = false
                         }
                     )
@@ -1705,8 +1753,10 @@ private fun AyahTrackItem(
     arabicFontSize: Float = 22f,
     textAlignment: String = "start",
     showTranslation: Boolean = true,
+    isFavourite: Boolean = false,
     onClick: () -> Unit,
-    onLongPress: () -> Unit = {}
+    onLongPress: () -> Unit = {},
+    onDoubleTap: () -> Unit = {}
 ) {
     // Use MaterialTheme.colorScheme for automatic theme support
     Surface(
@@ -1715,7 +1765,8 @@ private fun AyahTrackItem(
             .fillMaxWidth()
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = onLongPress
+                onLongClick = onLongPress,
+                onDoubleClick = onDoubleTap
             )
     ) {
         Row(
@@ -1725,22 +1776,47 @@ private fun AyahTrackItem(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Track number
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(40.dp)
-            ) {
+            // Track number or heart icon if favourited
+            if (isFavourite) {
+                // Show heart icon with ayah number inside for favourited ayahs
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.size(40.dp)
                 ) {
+                    // Heart icon background
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = "Favourite",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    // Ayah number overlaid on heart
                     Text(
                         text = ayah.numberInSurah.toString(),
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = Color.White,
+                        modifier = Modifier.padding(bottom = 2.dp) // Slight adjustment for visual centering
                     )
+                }
+            } else {
+                // Show circular badge with number for non-favourited ayahs
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Text(
+                            text = ayah.numberInSurah.toString(),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
             }
 

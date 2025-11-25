@@ -195,3 +195,27 @@ fun AyahEntity.toAyah(surahNumberParam: Int = 0) = Ayah(
     sajda = sajda ?: false // Handle nullable sajda (translation DBs, default false)
 )
 
+/**
+ * Favourite Ayah entity for storing user's favourite ayahs
+ */
+@Entity(
+    tableName = "favourite_ayahs",
+    indices = [
+        Index(value = ["surah_number", "ayah_number"], unique = true, name = "idx_favourite_unique")
+    ]
+)
+data class FavouriteAyahEntity(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Int = 0,
+
+    @ColumnInfo(name = "surah_number")
+    val surahNumber: Int,
+
+    @ColumnInfo(name = "ayah_number")
+    val ayahNumber: Int,
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long = System.currentTimeMillis()
+)
+
