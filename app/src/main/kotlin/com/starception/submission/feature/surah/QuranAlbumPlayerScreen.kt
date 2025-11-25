@@ -12,6 +12,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -102,6 +103,13 @@ fun QuranAlbumPlayerScreen(
 
     var showTranslationDialog by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
+
+    // Enhanced database features
+    val wordStudyData by viewModel.wordStudyData.collectAsState()
+    val tafseerData by viewModel.tafseerData.collectAsState()
+    val selectedTafseerBook by viewModel.selectedTafseerBook.collectAsState()
+    var showWordStudyDialog by remember { mutableStateOf(false) }
+    var showTafseerDialog by remember { mutableStateOf(false) }
 
     // Load audio language from ViewModel (persisted in SharedPreferences)
     val savedAudioLanguage by viewModel.currentAudioLanguage.collectAsState()
@@ -347,6 +355,14 @@ fun QuranAlbumPlayerScreen(
                         }
                     },
                     onCollapseMusicPlayer = { showMusicPlayer = false },
+                    onWordStudyClick = { ayahNumber ->
+                        viewModel.loadWordStudy(surahNumber, ayahNumber)
+                        showWordStudyDialog = true
+                    },
+                    onTafseerClick = { ayahNumber ->
+                        viewModel.loadTafseer(surahNumber, ayahNumber)
+                        showTafseerDialog = true
+                    },
                     modifier = Modifier
                 )
             }
@@ -524,6 +540,30 @@ fun QuranAlbumPlayerScreen(
                 )
             }
         }
+
+        // Word Study dialog
+        if (showWordStudyDialog && wordStudyData != null) {
+            com.starception.submission.feature.surah.WordStudyDialog(
+                wordStudyData = wordStudyData!!,
+                onDismiss = {
+                    showWordStudyDialog = false
+                    viewModel.clearWordStudy()
+                }
+            )
+        }
+
+        // Tafseer dialog
+        if (showTafseerDialog && tafseerData != null) {
+            com.starception.submission.feature.surah.TafseerDialog(
+                tafseerData = tafseerData!!,
+                selectedTafseerBook = selectedTafseerBook,
+                onTafseerBookSelected = { book -> viewModel.selectTafseerBook(book) },
+                onDismiss = {
+                    showTafseerDialog = false
+                    viewModel.clearTafseer()
+                }
+            )
+        }
     }
 }
 
@@ -693,6 +733,7 @@ private fun AlbumPlayerTopBar(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AlbumPlayerContent(
     surah: Surah,
@@ -718,11 +759,18 @@ private fun AlbumPlayerContent(
     onAyahClick: (Ayah) -> Unit,
     onFabClick: () -> Unit,
     onCollapseMusicPlayer: () -> Unit = {},
+    onWordStudyClick: (Int) -> Unit = {},
+    onTafseerClick: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Track the currently playing surah - load from repository when surah number changes
     var currentPlayingSurah by remember { mutableStateOf<Surah?>(null) }
     val quranRepository = hiltViewModel<QuranRepositoryHolder>().repository
+
+    // Bottom sheet state for ayah options
+    var selectedAyahForOptions by remember { mutableStateOf<Int?>(null) }
+    val sheetState = rememberModalBottomSheetState()
+    var showBottomSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(currentPlayingSurahNumber) {
         // Fetch the new surah when the playing surah number changes
@@ -889,7 +937,11 @@ private fun AlbumPlayerContent(
                 arabicFontSize = arabicFontSize,
                 textAlignment = textAlignment,
                 showTranslation = showTranslationInText,
-                onClick = { onAyahClick(ayah) }
+                onClick = { onAyahClick(ayah) },
+                onLongPress = {
+                    selectedAyahForOptions = ayah.numberInSurah
+                    showBottomSheet = true
+                }
             )
         }
     }
@@ -907,6 +959,125 @@ private fun AlbumPlayerContent(
                 itemsAvailable = totalItems,
             ),
         )
+
+    // Professional Bottom Sheet for Ayah options
+    if (showBottomSheet && selectedAyahForOptions != null) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showBottomSheet = false
+                selectedAyahForOptions = null
+            },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 32.dp)
+            ) {
+                // Header
+                Text(
+                    text = "Ayah ${selectedAyahForOptions}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // Word Study option
+                Surface(
+                    onClick = {
+                        onWordStudyClick(selectedAyahForOptions!!)
+                        showBottomSheet = false
+                    },
+                    color = Color.Transparent,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Book,
+                                    contentDescription = "Word Study",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Word Study",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "View Arabic word meanings",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Tafseer option
+                Surface(
+                    onClick = {
+                        onTafseerClick(selectedAyahForOptions!!)
+                        showBottomSheet = false
+                    },
+                    color = Color.Transparent,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.MenuBook,
+                                    contentDescription = "Tafseer",
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Tafseer",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "Read interpretations from 3 scholars",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
     }
 }
 
@@ -1188,13 +1359,18 @@ private fun AyahTrackItem(
     arabicFontSize: Float = 22f,
     textAlignment: String = "start",
     showTranslation: Boolean = true,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongPress: () -> Unit = {}
 ) {
     // Use MaterialTheme.colorScheme for automatic theme support
     Surface(
-        onClick = onClick,
         color = Color.Transparent,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongPress
+            )
     ) {
         Row(
             modifier = Modifier

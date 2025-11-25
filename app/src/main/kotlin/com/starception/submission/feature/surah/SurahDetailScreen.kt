@@ -39,11 +39,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -63,7 +68,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SurahDetailViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val quranEnhancedRepository: com.starception.submission.core.qurandatabase.QuranEnhancedRepository
 ) : ViewModel() {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
@@ -242,6 +248,43 @@ class SurahDetailViewModel @Inject constructor(
         "uthmani_script" -> "Uthmani Script"
         "indopak_script" -> "IndoPak Script"
         else -> "PDMS Saleem"
+    }
+
+    // ============= Enhanced Database Features (Word Study & Tafseer) =============
+
+    private val _wordStudyData = MutableStateFlow<com.starception.submission.core.qurandatabase.AyahMeaningsItem?>(null)
+    val wordStudyData: StateFlow<com.starception.submission.core.qurandatabase.AyahMeaningsItem?> = _wordStudyData.asStateFlow()
+
+    private val _tafseerData = MutableStateFlow<com.starception.submission.core.qurandatabase.QuranAyahTafseer?>(null)
+    val tafseerData: StateFlow<com.starception.submission.core.qurandatabase.QuranAyahTafseer?> = _tafseerData.asStateFlow()
+
+    private val _selectedTafseerBook = MutableStateFlow("saadi")
+    val selectedTafseerBook: StateFlow<String> = _selectedTafseerBook.asStateFlow()
+
+    fun loadWordStudy(surahNumber: Int, ayahNumber: Int) {
+        viewModelScope.launch {
+            val meanings = quranEnhancedRepository.getAyahMeanings(surahNumber, ayahNumber)
+            _wordStudyData.value = meanings
+        }
+    }
+
+    fun loadTafseer(surahNumber: Int, ayahNumber: Int) {
+        viewModelScope.launch {
+            val tafseer = quranEnhancedRepository.getTafseerForAyah(surahNumber, ayahNumber)
+            _tafseerData.value = tafseer
+        }
+    }
+
+    fun selectTafseerBook(book: String) {
+        _selectedTafseerBook.value = book
+    }
+
+    fun clearWordStudy() {
+        _wordStudyData.value = null
+    }
+
+    fun clearTafseer() {
+        _tafseerData.value = null
     }
 }
 
@@ -978,4 +1021,383 @@ fun TranslationSelectorDialog(
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         textContentColor = MaterialTheme.colorScheme.onSurface
     )
+}
+
+// ============= Enhanced Database Dialog Composables =============
+
+/**
+ * Word Study Dialog
+ * Displays Arabic word meanings and explanations for an Ayah
+ */
+@Composable
+fun WordStudyDialog(
+    wordStudyData: com.starception.submission.core.qurandatabase.AyahMeaningsItem,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Book,
+                contentDescription = "Word Study",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Word Study - Ayah ${wordStudyData.ayahNumber}",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Arabic text
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Text(
+                            text = wordStudyData.ayahText,
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontFamily = QuranFonts.Amiri,
+                                fontSize = 24.sp,
+                                lineHeight = 40.sp
+                            ),
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
+
+                // Word meanings
+                if (wordStudyData.meanings.isNotEmpty()) {
+                    item {
+                        Column {
+                            Text(
+                                text = "Word Meanings",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                )
+                            ) {
+                                Text(
+                                    text = wordStudyData.meanings,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontFamily = QuranFonts.Amiri,
+                                        fontSize = 18.sp,
+                                        lineHeight = 30.sp
+                                    ),
+                                    textAlign = TextAlign.End,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", fontWeight = FontWeight.Medium)
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
+    )
+}
+
+/**
+ * Tafseer Dialog
+ * Displays interpretations from 3 Tafseer books with tabbed navigation
+ * Features:
+ * - Full-screen professional design (95% x 90%)
+ * - Three tabs: As-Sa'di, Al-Moyassar, Al-Baghawi
+ * - Smooth swipe navigation with HorizontalPager
+ * - Arabic labels under each tab
+ * - Automatically removes Bismillah from ayah 1 (except Al-Fatiha)
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun TafseerDialog(
+    tafseerData: com.starception.submission.core.qurandatabase.QuranAyahTafseer,
+    selectedTafseerBook: String,
+    onTafseerBookSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedTabIndex by remember {
+        mutableStateOf(
+            when (selectedTafseerBook) {
+                "saadi" -> 0
+                "moysar" -> 1
+                "baghawi" -> 2
+                else -> 0
+            }
+        )
+    }
+
+    // Sync tab selection with book selection
+    LaunchedEffect(selectedTabIndex) {
+        val book = when (selectedTabIndex) {
+            0 -> "saadi"
+            1 -> "moysar"
+            2 -> "baghawi"
+            else -> "saadi"
+        }
+        onTafseerBookSelected(book)
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.MenuBook,
+                                contentDescription = "Tafseer",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Tafseer",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = "${tafseerData.surahNameArabic} - آية ${tafseerData.ayahNumber}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = QuranFonts.Amiri
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close"
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+
+                // Arabic Ayah
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Text(
+                        text = tafseerData.ayahText,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontFamily = QuranFonts.Amiri,
+                            fontSize = 26.sp,
+                            lineHeight = 44.sp
+                        ),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(20.dp)
+                    )
+                }
+
+                // Tabs
+                PrimaryTabRow(
+                    selectedTabIndex = selectedTabIndex,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                ) {
+                    Tab(
+                        selected = selectedTabIndex == 0,
+                        onClick = { selectedTabIndex = 0 },
+                        text = {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            ) {
+                                Text(
+                                    "As-Sa'di",
+                                    fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal
+                                )
+                                Text(
+                                    "معاصر",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = QuranFonts.Amiri
+                                )
+                            }
+                        }
+                    )
+                    Tab(
+                        selected = selectedTabIndex == 1,
+                        onClick = { selectedTabIndex = 1 },
+                        text = {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            ) {
+                                Text(
+                                    "Al-Moyassar",
+                                    fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal
+                                )
+                                Text(
+                                    "مُبسّط",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = QuranFonts.Amiri
+                                )
+                            }
+                        }
+                    )
+                    Tab(
+                        selected = selectedTabIndex == 2,
+                        onClick = { selectedTabIndex = 2 },
+                        text = {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            ) {
+                                Text(
+                                    "Al-Baghawi",
+                                    fontWeight = if (selectedTabIndex == 2) FontWeight.Bold else FontWeight.Normal
+                                )
+                                Text(
+                                    "كلاسيكي",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = QuranFonts.Amiri
+                                )
+                            }
+                        }
+                    )
+                }
+
+                // Content with pager
+                val pagerState = rememberPagerState(
+                    initialPage = selectedTabIndex,
+                    pageCount = { 3 }
+                )
+
+                LaunchedEffect(selectedTabIndex) {
+                    pagerState.animateScrollToPage(selectedTabIndex)
+                }
+
+                LaunchedEffect(pagerState.currentPage) {
+                    selectedTabIndex = pagerState.currentPage
+                }
+
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    val tafseerText = when (page) {
+                        0 -> tafseerData.tafseerSaadi
+                        1 -> tafseerData.tafseerMoysar
+                        2 -> tafseerData.tafseerBaghawi
+                        else -> ""
+                    }
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        if (tafseerText.isNotEmpty()) {
+                            item {
+                                Card(
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                    )
+                                ) {
+                                    Text(
+                                        text = tafseerText,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontFamily = QuranFonts.Amiri,
+                                            fontSize = 19.sp,
+                                            lineHeight = 36.sp
+                                        ),
+                                        textAlign = TextAlign.Justify,
+                                        modifier = Modifier.padding(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (tafseerData.ayahMeanings.isNotEmpty()) {
+                            item {
+                                Card(
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                                    )
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Lightbulb,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(20.dp),
+                                                tint = MaterialTheme.colorScheme.onTertiaryContainer
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                "معاني الكلمات",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = QuranFonts.Amiri
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            text = tafseerData.ayahMeanings,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontFamily = QuranFonts.Amiri,
+                                                fontSize = 17.sp,
+                                                lineHeight = 30.sp
+                                            ),
+                                            textAlign = TextAlign.Justify
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
