@@ -111,6 +111,9 @@ fun QuranAlbumPlayerScreen(
     var showWordStudyDialog by remember { mutableStateOf(false) }
     var showTafseerDialog by remember { mutableStateOf(false) }
 
+    // Bismillah display state from ViewModel (based on database content)
+    val showBismillahRow by viewModel.showBismillahRow.collectAsState()
+
     // Load audio language from ViewModel (persisted in SharedPreferences)
     val savedAudioLanguage by viewModel.currentAudioLanguage.collectAsState()
     var currentAudioLanguage by remember {
@@ -309,6 +312,7 @@ fun QuranAlbumPlayerScreen(
                     arabicFontSize = arabicFontSize,
                     textAlignment = textAlignment,
                     showTranslationInText = showTranslationInText,
+                    showBismillahRow = showBismillahRow,
                     onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) },
                     onCycleAlignment = {
                         // Cycle through: start -> center -> end -> start
@@ -750,6 +754,7 @@ private fun AlbumPlayerContent(
     arabicFontSize: Float,
     textAlignment: String,
     showTranslationInText: Boolean,
+    showBismillahRow: Boolean,
     onToggleTranslation: () -> Unit,
     onCycleAlignment: () -> Unit,
     onPlayPauseClick: () -> Unit,
@@ -923,6 +928,18 @@ private fun AlbumPlayerContent(
                         )
                     }
                 }
+            }
+        }
+
+        // Bismillah row - shown only if first ayah contains Bismillah in database
+        // This is determined by checking the actual ayah text in the database
+        if (showBismillahRow) {
+            item(key = "bismillah") {
+                BismillahRow(
+                    arabicFont = selectedArabicFont,
+                    arabicFontSize = arabicFontSize,
+                    textAlignment = textAlignment
+                )
             }
         }
 
@@ -1350,6 +1367,60 @@ private fun MusicPlayerControls(
             }
         }
     }
+}
+
+@Composable
+private fun BismillahRow(
+    arabicFont: String = "default",
+    arabicFontSize: Float = 22f,
+    textAlignment: String = "start",
+    modifier: Modifier = Modifier
+) {
+    // Bismillah text in Arabic
+    val bismillahText = "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ"
+
+    // Convert alignment string to TextAlign enum
+    val textAlign = when (textAlignment) {
+        "center" -> androidx.compose.ui.text.style.TextAlign.Center
+        "end" -> androidx.compose.ui.text.style.TextAlign.End
+        else -> androidx.compose.ui.text.style.TextAlign.Start
+    }
+
+    val horizontalAlignment = when (textAlignment) {
+        "center" -> Alignment.CenterHorizontally
+        "end" -> Alignment.End
+        else -> Alignment.Start
+    }
+
+    Surface(
+        color = Color.Transparent,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalAlignment = horizontalAlignment
+        ) {
+            // Bismillah text with user-selected font and size - keep in single line
+            val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
+            Text(
+                text = bismillahText,
+                style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle),
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = textAlign,
+                maxLines = 1,
+                overflow = TextOverflow.Visible,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    // Divider
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    )
 }
 
 @Composable
