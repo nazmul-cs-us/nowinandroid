@@ -178,7 +178,9 @@
       "Bash(/tmp/back_screen.png)",
       "Bash(/tmp/album_player_check.png)",
       "Bash(/tmp/quran_opened.png)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(tr:*)",
+      "Bash(wait)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

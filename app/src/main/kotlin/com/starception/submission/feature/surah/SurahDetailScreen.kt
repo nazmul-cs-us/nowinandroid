@@ -1141,91 +1141,143 @@ fun WordStudyDialog(
     wordStudyData: com.starception.submission.core.qurandatabase.AyahMeaningsItem,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Book,
-                contentDescription = "Word Study",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.85f),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
             )
-        },
-        title = {
-            Text(
-                text = "Word Study - Ayah ${wordStudyData.ayahNumber}",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Arabic text
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    ) {
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Book,
+                                contentDescription = "Word Study",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Word Study",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                         Text(
-                            text = wordStudyData.ayahText,
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontFamily = QuranFonts.Amiri,
-                                fontSize = 24.sp,
-                                lineHeight = 40.sp
-                            ),
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.padding(16.dp)
+                            text = "Ayah ${wordStudyData.ayahNumber}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = QuranFonts.Amiri
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close"
                         )
                     }
                 }
 
-                // Word meanings
-                if (wordStudyData.meanings.isNotEmpty()) {
+                HorizontalDivider()
+
+                // Content with scrollable column
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    // Arabic text card
                     item {
-                        Column {
-                            Text(
-                                text = "Word Meanings",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                                )
+                        ) {
+                            Text(
+                                text = wordStudyData.ayahText,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontFamily = QuranFonts.Amiri,
+                                    fontSize = 26.sp,
+                                    lineHeight = 44.sp
+                                ),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(20.dp)
+                            )
+                        }
+                    }
+
+                    // Word meanings section
+                    if (wordStudyData.meanings.isNotEmpty()) {
+                        item {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Text(
-                                    text = wordStudyData.meanings,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontFamily = QuranFonts.Amiri,
-                                        fontSize = 18.sp,
-                                        lineHeight = 30.sp
-                                    ),
-                                    textAlign = TextAlign.End,
-                                    modifier = Modifier.padding(16.dp)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lightbulb,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Text(
+                                        text = "Word Meanings",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                                    )
+                                ) {
+                                    Text(
+                                        text = wordStudyData.meanings,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontFamily = QuranFonts.Amiri,
+                                            fontSize = 19.sp,
+                                            lineHeight = 36.sp
+                                        ),
+                                        textAlign = TextAlign.Justify,
+                                        modifier = Modifier.padding(20.dp)
+                                    )
+                                }
                             }
                         }
                     }
+
+                    // Add spacing at bottom for comfortable scrolling
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close", fontWeight = FontWeight.Medium)
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.surface
-    )
+        }
+    }
 }
 
 /**
