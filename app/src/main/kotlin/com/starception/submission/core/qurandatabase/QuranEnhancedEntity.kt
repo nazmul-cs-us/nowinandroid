@@ -322,3 +322,35 @@ fun QuranEnhancedEntity.toQuranAyahPage() = QuranAyahPage(
     lineStart = lineStart,
     lineEnd = lineEnd
 )
+
+/**
+ * Generate audio URL for a specific ayah
+ * Uses EveryAyah.com API with Alafasy recitation
+ *
+ * @param surahNumber Surah number (1-114)
+ * @param ayahNumber Ayah number within the surah
+ * @param reciter Reciter folder name (default: Alafasy_128kbps)
+ * @return Complete audio URL for the ayah
+ *
+ * Example: Surah 1, Ayah 1 → https://everyayah.com/data/Alafasy_128kbps/001001.mp3
+ */
+fun getAyahAudioUrl(
+    surahNumber: Int,
+    ayahNumber: Int,
+    reciter: String = "Alafasy_128kbps"
+): String {
+    val surahFormatted = String.format("%03d", surahNumber)
+    val ayahFormatted = String.format("%03d", ayahNumber)
+    return "https://everyayah.com/data/$reciter/$surahFormatted$ayahFormatted.mp3"
+}
+
+/**
+ * Available reciters on EveryAyah.com
+ */
+object QuranReciters {
+    const val ALAFASY_128 = "Alafasy_128kbps"
+    const val ALAFASY_64 = "Alafasy_64kbps"
+    const val HUSARY_128 = "Husary_128kbps"
+    const val MINSHAWI_MURATTAL = "Minshawi_Murattal_128kbps"
+    const val ABDULBASIT_MURATTAL = "Abdul_Basit_Murattal_192kbps"
+}

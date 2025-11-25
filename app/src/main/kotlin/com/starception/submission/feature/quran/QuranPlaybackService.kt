@@ -237,6 +237,49 @@ class QuranPlaybackService : Service() {
         mediaPlayer?.setVolume(volume, volume)
     }
 
+    /**
+     * Play a specific ayah by URL
+     * Uses online audio from EveryAyah.com API
+     *
+     * @param audioUrl Complete URL to the ayah audio file
+     * @param surahName Name of the surah for display
+     * @param ayahNumber Ayah number for display
+     * @param shouldAutoPlay Whether to start playing immediately
+     */
+    fun playAyahByUrl(
+        audioUrl: String,
+        surahName: String,
+        ayahNumber: Int,
+        shouldAutoPlay: Boolean = true
+    ) {
+        try {
+            // Save the current playing state
+            wasPlayingBeforeChange = shouldAutoPlay
+
+            Log.d("QuranService", "Playing ayah from URL: $audioUrl")
+
+            mediaPlayer?.apply {
+                reset()
+                setDataSource(audioUrl)
+                prepareAsync()
+            }
+
+            // Update metadata for notification
+            mediaSession?.setMetadata(
+                MediaMetadataCompat.Builder()
+                    .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "$surahName - Ayah $ayahNumber")
+                    .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "القرآن الكريم")
+                    .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Quran")
+                    .build()
+            )
+
+            startForeground(NOTIFICATION_ID, createNotification())
+
+        } catch (e: Exception) {
+            Log.e("QuranService", "Failed to play ayah from URL: $audioUrl", e)
+        }
+    }
+
     fun getCurrentSurahIndex(): Int = currentSurahIndex
 
     private fun getAudioFile(index: Int): File {

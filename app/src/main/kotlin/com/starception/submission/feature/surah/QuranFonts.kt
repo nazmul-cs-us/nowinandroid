@@ -77,8 +77,10 @@ object QuranFonts {
 
     /**
      * IndoPak Script - Traditional Indo-Pakistani Quran style
-     * Uses Noto Nastaliq Urdu (Google Fonts)
-     * Classic Nastaliq calligraphic style used in Indo-Pak Quran prints
+     * Uses Naskh-Nastaleeq-IndoPak-QWBW (Islamic Studies Font)
+     * Authentic Indo-Pakistani Mushaf style combining Naskh and Nastaliq scripts
+     * Professional Quranic font optimized for word-by-word (QWBW) layouts
+     * Source: https://islamicstudies.info/quran/arabic/fonts/
      */
     val IndoPakScript = FontFamily(
         Font(R.font.indopak_quran, FontWeight.Normal)
