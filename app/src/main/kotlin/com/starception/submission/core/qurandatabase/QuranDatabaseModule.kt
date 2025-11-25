@@ -10,13 +10,14 @@ import javax.inject.Singleton
 
 /**
  * Hilt module for Quran database dependency injection
+ * Provides both standard and enhanced Quran databases
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object QuranDatabaseModule {
-    
+
     /**
-     * Provide QuranDatabase instance
+     * Provide QuranDatabase instance (standard database with translations)
      */
     @Provides
     @Singleton
@@ -25,7 +26,7 @@ object QuranDatabaseModule {
     ): QuranDatabase {
         return QuranDatabase.getInstance(context)
     }
-    
+
     /**
      * Provide QuranDao instance
      */
@@ -34,9 +35,29 @@ object QuranDatabaseModule {
     fun provideQuranDao(database: QuranDatabase): QuranDao {
         return database.quranDao()
     }
-    
+
     /**
-     * Provide QuranRepository instance
+     * Provide QuranEnhancedDatabase instance (comprehensive Arabic database with Tafseer)
+     */
+    @Provides
+    @Singleton
+    fun provideQuranEnhancedDatabase(
+        @ApplicationContext context: Context
+    ): QuranEnhancedDatabase {
+        return QuranEnhancedDatabase.getInstance(context)
+    }
+
+    /**
+     * Provide QuranEnhancedDao instance
+     */
+    @Provides
+    @Singleton
+    fun provideQuranEnhancedDao(database: QuranEnhancedDatabase): QuranEnhancedDao {
+        return database.quranEnhancedDao()
+    }
+
+    /**
+     * Provide QuranRepository instance (standard database)
      */
     @Provides
     @Singleton
@@ -44,6 +65,29 @@ object QuranDatabaseModule {
         @ApplicationContext context: Context
     ): QuranRepository {
         return QuranRepository(context)
+    }
+
+    /**
+     * Provide QuranEnhancedRepository instance (enhanced database with Tafseer)
+     */
+    @Provides
+    @Singleton
+    fun provideQuranEnhancedRepository(
+        quranEnhancedDao: QuranEnhancedDao
+    ): QuranEnhancedRepository {
+        return QuranEnhancedRepository(quranEnhancedDao)
+    }
+
+    /**
+     * Provide UnifiedQuranRepository instance (both databases)
+     */
+    @Provides
+    @Singleton
+    fun provideUnifiedQuranRepository(
+        quranDao: QuranDao,
+        quranEnhancedDao: QuranEnhancedDao
+    ): UnifiedQuranRepository {
+        return UnifiedQuranRepository(quranDao, quranEnhancedDao)
     }
 }
 
