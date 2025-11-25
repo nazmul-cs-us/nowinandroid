@@ -34,6 +34,7 @@ class QuranRepository @Inject constructor(
     companion object {
         private const val TAG = "QuranRepository"
         private const val PREF_BOOKMARKED_SURAHS = "bookmarked_surahs"
+        private const val PREF_FAVOURITE_AYAHS = "favourite_ayahs"
     }
     
     // ============= Surah Operations =============
@@ -352,6 +353,88 @@ class QuranRepository @Inject constructor(
             bookmarksString
         ).apply()
         Log.d("QuranRepository_BOOKMARK", "💾 SAVE_COMPLETE | key='$PREF_BOOKMARKED_SURAHS'")
+    }
+
+    // ============= Favourite Ayah Operations (Database) =============
+
+    /**
+     * Check if an Ayah is marked as favourite
+     * @param surahNumber The surah number (1-114)
+     * @param ayahNumber The ayah number within the surah
+     */
+    suspend fun isAyahFavourite(surahNumber: Int, ayahNumber: Int): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val isFavourite = quranDao.isAyahFavourite(surahNumber, ayahNumber)
+            Log.d("QuranRepository_FAVOURITE", "🔍 CHECK | surah=$surahNumber | ayah=$ayahNumber | favourite=$isFavourite")
+            isFavourite
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking favourite status for ayah $surahNumber:$ayahNumber", e)
+            false
+        }
+    }
+
+    /**
+     * Set favourite status for an Ayah
+     * @param surahNumber The surah number (1-114)
+     * @param ayahNumber The ayah number within the surah
+     * @param favourite True to mark as favourite, false to remove
+     */
+    suspend fun setAyahFavourite(surahNumber: Int, ayahNumber: Int, favourite: Boolean) = withContext(Dispatchers.IO) {
+        try {
+            Log.d("QuranRepository_FAVOURITE", "💾 SET_START | surah=$surahNumber | ayah=$ayahNumber | favourite=$favourite")
+
+            if (favourite) {
+                val entity = FavouriteAyahEntity(
+                    surahNumber = surahNumber,
+                    ayahNumber = ayahNumber
+                )
+                quranDao.insertFavouriteAyah(entity)
+                Log.d("QuranRepository_FAVOURITE", "➕ ADDED | surah=$surahNumber | ayah=$ayahNumber")
+            } else {
+                quranDao.deleteFavouriteAyah(surahNumber, ayahNumber)
+                Log.d("QuranRepository_FAVOURITE", "➖ REMOVED | surah=$surahNumber | ayah=$ayahNumber")
+            }
+
+            // Verify the operation
+            val verifyFavourite = quranDao.isAyahFavourite(surahNumber, ayahNumber)
+            val verified = verifyFavourite == favourite
+            Log.d("QuranRepository_FAVOURITE", "✅ VERIFY | surah=$surahNumber | ayah=$ayahNumber | expected=$favourite | actual=$verifyFavourite | success=$verified")
+
+            Log.d(TAG, if (favourite) "💖 Favourited Ayah $surahNumber:$ayahNumber" else "🤍 Removed favourite from Ayah $surahNumber:$ayahNumber")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting favourite status for ayah $surahNumber:$ayahNumber", e)
+        }
+    }
+
+    /**
+     * Get favourite ayah numbers for a specific surah
+     * @param surahNumber The surah number (1-114)
+     * @return Set of ayah numbers that are favourited in this surah
+     */
+    suspend fun getFavouriteAyahsForSurah(surahNumber: Int): Set<Int> = withContext(Dispatchers.IO) {
+        try {
+            val favourites = quranDao.getFavouriteAyahsForSurah(surahNumber)
+            val ayahNumbers = favourites.map { it.ayahNumber }.toSet()
+            Log.d("QuranRepository_FAVOURITE", "📖 GET_FOR_SURAH | surah=$surahNumber | count=${ayahNumbers.size} | ayahs=$ayahNumbers")
+            ayahNumbers
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting favourite ayahs for surah $surahNumber", e)
+            emptySet()
+        }
+    }
+
+    /**
+     * Get all favourite ayahs
+     */
+    suspend fun getAllFavouriteAyahs(): List<FavouriteAyahEntity> = withContext(Dispatchers.IO) {
+        try {
+            val favourites = quranDao.getAllFavouriteAyahs()
+            Log.d("QuranRepository_FAVOURITE", "📖 GET_ALL | count=${favourites.size}")
+            favourites
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting all favourite ayahs", e)
+            emptyList()
+        }
     }
 }
 

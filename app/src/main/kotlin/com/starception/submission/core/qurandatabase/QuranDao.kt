@@ -1,6 +1,8 @@
 package com.starception.submission.core.qurandatabase
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
@@ -173,5 +175,37 @@ interface QuranDao {
      */
     @Query("SELECT * FROM ayahs ORDER BY number ASC LIMIT :limit OFFSET :offset")
     suspend fun getAyahsPage(limit: Int, offset: Int): List<AyahEntity>
+
+    // ============= Favourite Ayah Operations =============
+
+    /**
+     * Insert a favourite ayah
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFavouriteAyah(favourite: FavouriteAyahEntity)
+
+    /**
+     * Delete a favourite ayah
+     */
+    @Query("DELETE FROM favourite_ayahs WHERE surah_number = :surahNumber AND ayah_number = :ayahNumber")
+    suspend fun deleteFavouriteAyah(surahNumber: Int, ayahNumber: Int)
+
+    /**
+     * Check if an ayah is favourited
+     */
+    @Query("SELECT EXISTS(SELECT 1 FROM favourite_ayahs WHERE surah_number = :surahNumber AND ayah_number = :ayahNumber LIMIT 1)")
+    suspend fun isAyahFavourite(surahNumber: Int, ayahNumber: Int): Boolean
+
+    /**
+     * Get all favourite ayahs
+     */
+    @Query("SELECT * FROM favourite_ayahs ORDER BY created_at DESC")
+    suspend fun getAllFavouriteAyahs(): List<FavouriteAyahEntity>
+
+    /**
+     * Get favourite ayahs for a specific surah
+     */
+    @Query("SELECT * FROM favourite_ayahs WHERE surah_number = :surahNumber ORDER BY ayah_number ASC")
+    suspend fun getFavouriteAyahsForSurah(surahNumber: Int): List<FavouriteAyahEntity>
 }
 
