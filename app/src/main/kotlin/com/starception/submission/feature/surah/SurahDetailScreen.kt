@@ -77,6 +77,9 @@ class SurahDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<SurahDetailUiState>(SurahDetailUiState.Loading)
     val uiState: StateFlow<SurahDetailUiState> = _uiState.asStateFlow()
 
+    private val _showBismillahRow = MutableStateFlow(false)
+    val showBismillahRow: StateFlow<Boolean> = _showBismillahRow.asStateFlow()
+
     private val _currentTranslation = MutableStateFlow(
         prefs.getString("quran_translation", "ar") ?: "ar"
     )
@@ -122,6 +125,72 @@ class SurahDetailViewModel @Inject constructor(
         loadSurah(surahNumber, _currentTranslation.value)
     }
 
+    /**
+     * Helper function to check if Bismillah exists in the ayah text
+     */
+    private fun hasBismillah(ayahText: String): Boolean {
+        val bismillahRegex = Regex(
+            "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*ا[ٱ]*لل[َّ]*ه[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ْۡ]*م[َٰ]*ن[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
+            RegexOption.IGNORE_CASE
+        )
+
+        if (bismillahRegex.containsMatchIn(ayahText)) {
+            return true
+        }
+
+        val bismillahPatterns = listOf(
+            "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ",
+            "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+            "بسم الله الرحمن الرحيم",
+            "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"
+        )
+
+        return bismillahPatterns.any { ayahText.trim().startsWith(it) }
+    }
+
+    /**
+     * Helper function to remove Bismillah from ayah text
+     */
+    private fun removeBismillahIfNeeded(ayahText: String, surahNumber: Int, ayahNumberInSurah: Int): String {
+        // Only process first ayah of surahs 2-8 and 10-114
+        if (ayahNumberInSurah != 1 || surahNumber == 1 || surahNumber == 9) {
+            return ayahText
+        }
+
+        // Use regex to match any Bismillah pattern with flexible diacritics and spacing
+        // Pattern matches: بسم الله الرحمن الرحيم (with any combination of diacritics)
+        val bismillahRegex = Regex(
+            "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*ا[ٱ]*لل[َّ]*ه[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ْۡ]*م[َٰ]*ن[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
+            RegexOption.IGNORE_CASE
+        )
+
+        var cleanedText = ayahText
+
+        // Try regex first (most flexible)
+        cleanedText = bismillahRegex.replace(cleanedText, "").trim()
+
+        // If regex didn't match (ayah text unchanged), try exact pattern matching
+        if (cleanedText == ayahText) {
+            val bismillahPatterns = listOf(
+                "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ",  // With Quranic diacritics
+                "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",  // Standard diacritics
+                "بسم الله الرحمن الرحيم",                  // Without diacritics
+                "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"   // Another variant
+            )
+
+            for (pattern in bismillahPatterns) {
+                if (cleanedText.startsWith(pattern)) {
+                    cleanedText = cleanedText.removePrefix(pattern).trim()
+                    break
+                }
+            }
+        }
+
+        android.util.Log.d("SurahDetail", "🔄 Bismillah removal | Surah $surahNumber | Original length: ${ayahText.length} | Cleaned length: ${cleanedText.length}")
+
+        return cleanedText
+    }
+
     fun loadSurah(surahNumber: Int, translationCode: String) {
         viewModelScope.launch {
             try {
@@ -145,6 +214,25 @@ class SurahDetailViewModel @Inject constructor(
 
                 android.util.Log.d("SurahDetail", "✅ Surah found: ${surah.nameEnglish} (ID: ${surah.id}, Number: ${surah.number})")
 
+                // Load ayahs first to check for Bismillah in first ayah
+                val rawAyahs = if (translationCode != "ar") {
+                    val arabicRepository = getRepository("ar")
+                    arabicRepository.getAyahsBySurahOnce(surah.id)
+                } else {
+                    repository.getAyahsBySurahOnce(surah.id)
+                }
+
+                // Check if first ayah has Bismillah (only for surahs 2-8, 10-114)
+                val shouldShowBismillah = if (surahNumber != 1 && surahNumber != 9 && rawAyahs.isNotEmpty()) {
+                    hasBismillah(rawAyahs.first().text)
+                } else {
+                    false
+                }
+
+                // Update state to show/hide Bismillah row
+                _showBismillahRow.value = shouldShowBismillah
+                android.util.Log.d("SurahDetail", "🔍 Bismillah check | Surah $surahNumber | Show Bismillah: $shouldShowBismillah")
+
                 // If non-Arabic translation is selected, load both Arabic and translation
                 val ayahs = if (translationCode != "ar") {
                     android.util.Log.d("SurahDetail", "📖 Loading dual language: Arabic + $translationCode")
@@ -157,16 +245,35 @@ class SurahDetailViewModel @Inject constructor(
                     val translationAyahs = repository.getAyahsBySurahOnce(surah.id)
 
                     // Combine them - each Ayah will show both Arabic and translation
+                    // Remove Bismillah from first ayah if needed
                     arabicAyahs.mapIndexed { index, arabicAyah ->
                         val translationText = translationAyahs.getOrNull(index)?.text ?: ""
+                        val cleanedArabicText = removeBismillahIfNeeded(
+                            arabicAyah.text,
+                            surahNumber,
+                            arabicAyah.numberInSurah
+                        )
+                        val cleanedTranslationText = removeBismillahIfNeeded(
+                            translationText,
+                            surahNumber,
+                            arabicAyah.numberInSurah
+                        )
                         // Create a combined ayah with both texts separated by newlines
                         arabicAyah.copy(
-                            text = "${arabicAyah.text}\n\n$translationText"
+                            text = "$cleanedArabicText\n\n$cleanedTranslationText"
                         )
                     }
                 } else {
-                    // Arabic only
-                    repository.getAyahsBySurahOnce(surah.id)
+                    // Arabic only - remove Bismillah from first ayah if needed
+                    repository.getAyahsBySurahOnce(surah.id).map { ayah ->
+                        ayah.copy(
+                            text = removeBismillahIfNeeded(
+                                ayah.text,
+                                surahNumber,
+                                ayah.numberInSurah
+                            )
+                        )
+                    }
                 }
 
                 android.util.Log.d("SurahDetail", "✅ Loaded ${ayahs.size} Ayahs from $translationCode")

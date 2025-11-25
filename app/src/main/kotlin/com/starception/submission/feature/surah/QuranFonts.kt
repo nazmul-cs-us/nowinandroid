@@ -48,13 +48,13 @@ object QuranFonts {
     )
 
     /**
-     * Uthmanic Script - Classical Quranic manuscript style
-     * Uses Scheherazade (SIL Open Font License)
-     * Authentic traditional calligraphic style with complete diacritical marks
+     * Uthmanic Script - Authentic Quranic manuscript style
+     * Uses Amiri Quran (SIL Open Font License)
+     * Official font designed by Khaled Hosny specifically for Quranic text
+     * Matches the traditional Mushaf Uthmani style used in most printed Qurans
      */
     val UthmanicScript = FontFamily(
-        Font(R.font.uthmanic_quran_regular, FontWeight.Normal),
-        Font(R.font.uthmanic_quran_bold, FontWeight.Bold)
+        Font(R.font.amiri_quran, FontWeight.Normal)
     )
 
     /**
