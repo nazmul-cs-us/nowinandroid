@@ -1292,7 +1292,7 @@ private fun BottomSheetOption(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Enhanced Material 3 card-based option with elevation and haptic feedback
+    // Enhanced Material 3 card-based option with subtle pressed state
     Card(
         onClick = onClick,
         modifier = modifier
@@ -1304,8 +1304,8 @@ private fun BottomSheetOption(
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 0.dp,
-            pressedElevation = 4.dp,
-            hoveredElevation = 2.dp
+            pressedElevation = 0.dp,
+            hoveredElevation = 0.dp
         )
     ) {
         Row(
@@ -1325,38 +1325,20 @@ private fun BottomSheetOption(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Enhanced icon container with gradient background
-            Card(
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = containerColor
-                ),
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = 2.dp
-                ),
-                modifier = Modifier.size(56.dp)
+            // Enhanced icon container with solid background (no gradient to avoid pressed state issues)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(containerColor)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    containerColor,
-                                    containerColor.copy(alpha = 0.8f)
-                                ),
-                                radius = 100f
-                            )
-                        )
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = title,
-                        tint = contentColor,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = contentColor,
+                    modifier = Modifier.size(26.dp)
+                )
             }
 
             // Text content with enhanced typography
