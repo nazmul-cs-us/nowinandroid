@@ -1055,162 +1055,54 @@ private fun AlbumPlayerContent(
                 selectedAyahForOptions = null
             },
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-            tonalElevation = 2.dp,
-            dragHandle = {
-                // Enhanced drag handle with gradient background
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Box(
-                        modifier = Modifier
-                            .width(48.dp)
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(100.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)
-                                    )
-                                )
-                            )
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-            }
+            containerColor = Color.Transparent,
+            tonalElevation = 0.dp,
+            dragHandle = null
         ) {
-            Column(
+            // Wrap everything in a Box with padding to create margins from screen edges
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 40.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
             ) {
-                // Enhanced header with ayah preview card
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(16.dp),
+                    tonalElevation = 0.dp
                 ) {
-                    // Title and close button row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Ayah ${selectedAyahForOptions}",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(3.dp)
-                                        .height(16.dp)
-                                        .background(
-                                            MaterialTheme.colorScheme.primary,
-                                            RoundedCornerShape(100.dp)
-                                        )
-                                )
-                                Text(
-                                    text = surah.nameEnglish,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                        // Close button with surface container
-                        FilledTonalIconButton(
-                            onClick = {
-                                showBottomSheet = false
-                                selectedAyahForOptions = null
-                            },
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Ayah preview card with elevated design
-                    selectedAyah?.let { ayah ->
-                        val parts = ayah.text.split("\n\n")
-                        val arabicText = parts.getOrNull(0) ?: ayah.text
-
-                        Card(
+                        // Drag handle inside the surface
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                            ),
-                            elevation = CardDefaults.cardElevation(
-                                defaultElevation = 0.dp,
-                                pressedElevation = 2.dp
-                            )
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
+                            Spacer(modifier = Modifier.height(8.dp))
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                                                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
-                                            )
-                                        )
-                                    )
-                                    .padding(20.dp)
-                            ) {
-                                Text(
-                                    text = arabicText,
-                                    style = MaterialTheme.typography.bodyLarge.merge(
-                                        getArabicFontStyle(selectedArabicFont, 18f)
-                                    ),
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
+                                    .width(40.dp)
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
                         }
-                    }
-                }
 
-                // Quick Actions Section
+                        // Content with padding
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 16.dp)
+                        ) {
+                // Actions list
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Quick Actions",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                        letterSpacing = 1.sp
-                    )
-
                     BottomSheetOption(
                         icon = Icons.Default.PlayArrow,
                         title = "Play Ayah",
-                        description = "Listen to Alafasy recitation",
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        description = "",
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Transparent,
                         onClick = {
                             selectedAyahForOptions?.let { ayahNumber ->
                                 onPlayAyahClick(ayahNumber)
@@ -1220,48 +1112,11 @@ private fun AlbumPlayerContent(
                     )
 
                     BottomSheetOption(
-                        icon = Icons.Default.ContentCopy,
-                        title = "Copy Ayah",
-                        description = "Copy Arabic text and translation",
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        onClick = {
-                            selectedAyah?.let { ayah ->
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("Ayah", ayah.text)
-                                clipboard.setPrimaryClip(clip)
-                                android.widget.Toast.makeText(context, "Ayah copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                            showBottomSheet = false
-                        }
-                    )
-
-                    BottomSheetOption(
-                        icon = Icons.Default.Share,
-                        title = "Share Ayah",
-                        description = "Share via messaging apps",
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                        onClick = {
-                            selectedAyah?.let { ayah ->
-                                val shareText = "${surah.nameEnglish} ${selectedAyahForOptions}\n\n${ayah.text}"
-                                val shareIntent = android.content.Intent().apply {
-                                    action = android.content.Intent.ACTION_SEND
-                                    type = "text/plain"
-                                    putExtra(android.content.Intent.EXTRA_TEXT, shareText)
-                                }
-                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Ayah"))
-                            }
-                            showBottomSheet = false
-                        }
-                    )
-
-                    BottomSheetOption(
                         icon = if (selectedAyahForOptions in favouriteAyahs) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         title = if (selectedAyahForOptions in favouriteAyahs) "Remove Favourite" else "Add Favourite",
-                        description = if (selectedAyahForOptions in favouriteAyahs) "Remove from favourites" else "Mark as favourite",
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        description = "",
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Transparent,
                         onClick = {
                             selectedAyahForOptions?.let { ayahNumber ->
                                 val isFavourite = ayahNumber in favouriteAyahs
@@ -1285,27 +1140,50 @@ private fun AlbumPlayerContent(
                             showBottomSheet = false
                         }
                     )
-                }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    BottomSheetOption(
+                        icon = Icons.Default.ContentCopy,
+                        title = "Copy",
+                        description = "",
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Transparent,
+                        onClick = {
+                            selectedAyah?.let { ayah ->
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                val clip = android.content.ClipData.newPlainText("Ayah", ayah.text)
+                                clipboard.setPrimaryClip(clip)
+                                android.widget.Toast.makeText(context, "Ayah copied", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                            showBottomSheet = false
+                        }
+                    )
 
-                // Study & Learn Section
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Study & Learn",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                        letterSpacing = 1.sp
+                    BottomSheetOption(
+                        icon = Icons.Default.Share,
+                        title = "Share",
+                        description = "",
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Transparent,
+                        onClick = {
+                            selectedAyah?.let { ayah ->
+                                val shareText = "${surah.nameEnglish} ${selectedAyahForOptions}\n\n${ayah.text}"
+                                val shareIntent = android.content.Intent().apply {
+                                    action = android.content.Intent.ACTION_SEND
+                                    type = "text/plain"
+                                    putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Ayah"))
+                            }
+                            showBottomSheet = false
+                        }
                     )
 
                     BottomSheetOption(
                         icon = Icons.Default.MenuBook,
                         title = "Tafseer",
-                        description = "Read interpretations from 3 scholars",
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        description = "",
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Transparent,
                         onClick = {
                             onTafseerClick(selectedAyahForOptions!!)
                             showBottomSheet = false
@@ -1315,14 +1193,17 @@ private fun AlbumPlayerContent(
                     BottomSheetOption(
                         icon = Icons.Default.Book,
                         title = "Word Study",
-                        description = "View Arabic word meanings",
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.8f),
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                        description = "",
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Transparent,
                         onClick = {
                             onWordStudyClick(selectedAyahForOptions!!)
                             showBottomSheet = false
                         }
                     )
+                }
+                        }
+                    }
                 }
             }
         }
@@ -1340,82 +1221,32 @@ private fun BottomSheetOption(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Enhanced Material 3 card-based option with subtle pressed state
-    Card(
+    // YouTube-style clean list item
+    Surface(
         onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f)
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 0.dp,
-            pressedElevation = 0.dp,
-            hoveredElevation = 0.dp
-        )
+        modifier = modifier.fillMaxWidth(),
+        color = Color.Transparent
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            containerColor.copy(alpha = 0.05f),
-                            Color.Transparent
-                        ),
-                        startX = 0f,
-                        endX = 600f
-                    )
-                )
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Enhanced icon container with solid background (no gradient to avoid pressed state issues)
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(containerColor)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = contentColor,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
-
-            // Text content with enhanced typography
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    letterSpacing = 0.15.sp
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = 0.25.sp,
-                    lineHeight = 16.sp
-                )
-            }
-
-            // Chevron indicator for better affordance
+            // Simple icon (no background container)
             Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(20.dp)
+                imageVector = icon,
+                contentDescription = title,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp)
+            )
+
+            // Text only (no description)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
