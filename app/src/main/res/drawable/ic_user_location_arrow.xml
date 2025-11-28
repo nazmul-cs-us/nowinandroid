@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Outer light blue ring (pulse effect) - Google Maps style -->
+    <path
+        android:fillColor="#4285F4"
+        android:fillAlpha="0.2"
+        android:pathData="M24,8 C15.2,8 8,15.2 8,24 C8,32.8 15.2,40 24,40 C32.8,40 40,32.8 40,24 C40,15.2 32.8,8 24,8 Z"/>
+
+    <!-- Inner white circle (border) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,14 C18.5,14 14,18.5 14,24 C14,29.5 18.5,34 24,34 C29.5,34 34,29.5 34,24 C34,18.5 29.5,14 24,14 Z"/>
+
+    <!-- Center blue dot -->
+    <path
+        android:fillColor="#4285F4"
+        android:pathData="M24,16 C19.6,16 16,19.6 16,24 C16,28.4 19.6,32 24,32 C28.4,32 32,28.4 32,24 C32,19.6 28.4,16 24,16 Z"/>
+</vector>

@@ -138,6 +138,7 @@ import androidx.compose.material.icons.filled.BubbleChart
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
+import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import com.starception.submission.prayer.service.EnhancedLocationService
 import java.time.LocalTime
 import java.time.LocalDate
@@ -1023,7 +1024,7 @@ fun SwipeableBigTiles(
             pageSpacing = 16.dp,
             contentPadding = PaddingValues(horizontal = 8.dp)
         ) { page ->
-            val actualPage = page % 3 // Map infinite pages to our 3 actual tiles
+            val actualPage = page % 4 // Map infinite pages to our 4 actual tiles
             when (actualPage) {
                 0 -> NextPrayerTile(
                     prayerTimes = prayerTimes,
@@ -1055,6 +1056,9 @@ fun SwipeableBigTiles(
                     getDailyStatsMessage = getDailyStatsMessage,
                     getPrayed = getPrayed
                 )
+                3 -> QiblaGlobeTile(
+                    prayerTimes = prayerTimes
+                )
             }
         }
         
@@ -1066,20 +1070,20 @@ fun SwipeableBigTiles(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            repeat(3) { index ->
-                val isSelected = (pagerState.currentPage % 3) == index
+            repeat(4) { index ->
+                val isSelected = (pagerState.currentPage % 4) == index
                 Box(
                     modifier = Modifier
                         .size(if (isSelected) 12.dp else 8.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isSelected) 
-                                MaterialTheme.colorScheme.primary 
-                            else 
+                            if (isSelected)
+                                MaterialTheme.colorScheme.primary
+                            else
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                         )
                 )
-                if (index < 2) {
+                if (index < 3) {
                     Spacer(modifier = Modifier.width(8.dp))
                 }
             }
@@ -1335,14 +1339,14 @@ private fun NextPrayerTile(
                     
                     Box(
                         modifier = Modifier
-                            .size(100.dp) // Reduced size to give more space for text
+                            .size(120.dp)
                             .graphicsLayer {
                                 scaleX = compassScale
                                 scaleY = compassScale
                             }
                             .pointerInput(Unit) {
                                 detectTapGestures(
-                                    onPress = { 
+                                    onPress = {
                                         isPressed = true
                                         tryAwaitRelease()
                                         isPressed = false
@@ -1360,7 +1364,7 @@ private fun NextPrayerTile(
                         CompassProgressIndicator(
                             progress = 0.7f,
                             modifier = Modifier.fillMaxSize(),
-                            size = 100.dp,
+                            size = 120.dp,
                             locationService = locationService
                         )
                     }
@@ -1761,6 +1765,58 @@ private fun SmartInfoTile(
             prayerData = prayerData,
             onDismiss = { selectedPrayer = null }
         )
+    }
+}
+
+/**
+ * Qibla Globe Tile - 3D Earth showing direction from user location to Makkah
+ *
+ * Displays a NASA WorldWind 3D globe with:
+ * - User's current location marker
+ * - Kaaba location in Makkah
+ * - Great circle path showing Qibla direction
+ */
+@Composable
+private fun QiblaGlobeTile(
+    prayerTimes: DayPrayerTimes?
+) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 2.dp
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            prayerTimes?.location?.let { locationData ->
+                QiblaGlobeView(
+                    userLatitude = locationData.latitude,
+                    userLongitude = locationData.longitude,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } ?: run {
+                // Fallback when no location data - show loading or default
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(24.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 3.dp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Loading Qibla Globe...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
     }
 }
 

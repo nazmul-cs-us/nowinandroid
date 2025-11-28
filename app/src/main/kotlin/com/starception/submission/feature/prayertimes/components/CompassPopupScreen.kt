@@ -45,6 +45,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import kotlin.math.*
 import com.starception.submission.prayer.service.EnhancedLocationService
+import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

@@ -40,6 +40,10 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
+        // JitPack for GitHub-based libraries like WorldWind Android
+        maven {
+            url = uri("https://jitpack.io")
+        }
     }
 }
 rootProject.name = "Submission"

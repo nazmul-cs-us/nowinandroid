@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="64dp"
+    android:viewportWidth="48"
+    android:viewportHeight="64">
+
+    <!-- Shadow for depth -->
+    <path
+        android:fillColor="#20000000"
+        android:pathData="M24,60 C28,60 34,56 34,52 C34,48 24,40 24,40 C24,40 14,48 14,52 C14,56 20,60 24,60 Z"/>
+
+    <!-- Pin body - teardrop shape -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M24,8 C16.3,8 10,14.3 10,22 C10,32 24,46 24,46 C24,46 38,32 38,22 C38,14.3 31.7,8 24,8 Z"/>
+
+    <!-- Inner circle background for Kaaba icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,14 C19.6,14 16,17.6 16,22 C16,26.4 19.6,30 24,30 C28.4,30 32,26.4 32,22 C32,17.6 28.4,14 24,14 Z"/>
+
+    <!-- Kaaba building - simple dark square -->
+    <path
+        android:fillColor="#2D2D2D"
+        android:pathData="M20,26 L20,18 L28,18 L28,26 Z"/>
+
+    <!-- Gold horizontal band (kiswa) -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M20,21 L28,21 L28,22.5 L20,22.5 Z"/>
+
+    <!-- Small gold door at bottom -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M22.5,23 L22.5,26 L24.5,26 L24.5,23 Z"/>
+</vector>
