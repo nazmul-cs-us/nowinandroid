@@ -197,12 +197,12 @@ fun QiblaGlobeView(
                     // Apply magnetic declination correction: magnetic north + declination = true north
                     val newHeading = azimuthDegrees + magneticDeclination
 
-                    // Only update heading if change is significant (more than 3 degrees)
-                    // This prevents jittery updates from sensor noise
+                    // Only update heading if change is significant (more than 1.5 degrees)
+                    // Threshold lowered for smoother, more professional movement
                     val headingDiff = kotlin.math.abs(newHeading - lastUpdatedHeading)
                     val normalizedHeadingDiff = if (headingDiff > 180f) 360f - headingDiff else headingDiff
 
-                    if (normalizedHeadingDiff > 3f) {
+                    if (normalizedHeadingDiff > 1.5f) {
                         // Update the heading state (used for overlay calculations)
                         deviceHeading = newHeading
                         lastUpdatedHeading = newHeading
@@ -223,14 +223,8 @@ fun QiblaGlobeView(
                         }
                     }
 
-                    // Disabled automatic globe rotation to prevent jarring updates
-                    // Globe can be rotated manually using touch gestures
-                    // val currentTime = System.currentTimeMillis()
-                    // if (!isUserInteracting && (currentTime - lastInteractionTime) > 2000) {
-                    //     worldWindowRef?.let { ww ->
-                    //         updateGlobeViewForOptimalMarkerVisibility(ww, deviceHeading, userLatitude, userLongitude, makkahLatitude, makkahLongitude)
-                    //     }
-                    // }
+                    // Globe rotation disabled - markers flip when camera heading changes
+                    // The blue heading wedge provides sufficient visual feedback for user rotation
                 }
             }
 
@@ -613,9 +607,9 @@ private fun createHeadingIndicator(userLat: Double, userLon: Double, heading: Fl
     conePositions.add(userPos)  // Close the polygon
 
     val coneAttributes = ShapeAttributes().apply {
-        interiorColor = WwColor(0.26f, 0.54f, 0.98f, 0.25f)  // More subtle, lighter blue
-        outlineColor = WwColor(0.26f, 0.54f, 0.98f, 0.5f)  // Lighter blue outline
-        outlineWidth = 2f  // Thinner outline for subtlety
+        interiorColor = WwColor(0.26f, 0.54f, 0.98f, 0.35f)  // Slightly more visible
+        outlineColor = WwColor(0.26f, 0.54f, 0.98f, 0.65f)  // Stronger outline for definition
+        outlineWidth = 2.5f  // Slightly thicker for better visibility
     }
     val polygon = Polygon(conePositions, coneAttributes).apply {
         altitudeMode = WorldWind.ABSOLUTE
