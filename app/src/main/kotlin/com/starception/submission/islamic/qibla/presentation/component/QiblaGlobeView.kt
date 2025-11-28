@@ -196,14 +196,17 @@ fun QiblaGlobeView(
 
                     // Apply magnetic declination correction: magnetic north + declination = true north
                     val newHeading = azimuthDegrees + magneticDeclination
-                    deviceHeading = newHeading
 
-                    // Only update heading indicator if change is significant (more than 3 degrees)
+                    // Only update heading if change is significant (more than 3 degrees)
                     // This prevents jittery updates from sensor noise
                     val headingDiff = kotlin.math.abs(newHeading - lastUpdatedHeading)
                     val normalizedHeadingDiff = if (headingDiff > 180f) 360f - headingDiff else headingDiff
 
                     if (normalizedHeadingDiff > 3f) {
+                        // Update the heading state (used for overlay calculations)
+                        deviceHeading = newHeading
+                        lastUpdatedHeading = newHeading
+
                         qiblaLayerRef?.let { layer ->
                             // Remove old heading indicator
                             headingIndicator?.let { oldCone ->
@@ -214,7 +217,6 @@ fun QiblaGlobeView(
                             val newCone = createHeadingIndicator(userLatitude, userLongitude, newHeading)
                             layer.addRenderable(newCone)
                             headingIndicator = newCone
-                            lastUpdatedHeading = newHeading
 
                             // Request redraw to show updated indicator
                             worldWindowRef?.requestRedraw()
