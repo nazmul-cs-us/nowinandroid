@@ -125,6 +125,12 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
 
+    // NASA WorldWind for 3D globe visualization via JitPack
+    implementation("com.github.NASAWorldWind:WorldWindAndroid:v0.8.0")
+
+    // AndroidLiquidGlass library for glassmorphism effects
+    implementation("io.github.kyant0:backdrop:1.0.0")
+
     ksp(libs.hilt.compiler)
     ksp(libs.hilt.ext.compiler)
     ksp(libs.room.compiler)

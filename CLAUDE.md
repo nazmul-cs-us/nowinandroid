@@ -141,6 +141,9 @@ app/src/main/kotlin/com/starception/submission/
 │   │   ├── domain/        # Business logic layer
 │   │   └── presentation/  # UI layer
 │   ├── qibla/             # Qibla compass feature
+│   │   ├── domain/        # Qibla calculation logic
+│   │   └── presentation/  # Qibla UI layer
+│   │       └── component/ # QiblaGlobeView.kt (3D globe with WorldWind)
 │   └── shared/            # Shared Islamic utilities
 └── services/              # Background services & notifications
 ```
@@ -155,6 +158,16 @@ app/src/main/assets/
 │   ├── quran_bengali.db        # Bengali translation
 │   └── [10+ translation DBs]    # Multiple language translations
 └── [other assets]
+```
+
+### Drawable Resources
+```
+app/src/main/res/drawable/
+├── ic_kaaba_marker.xml           # Custom Kaaba icon for 3D globe
+│                                 # Green circle with Kaaba building, gold band, shadow
+├── ic_user_location_arrow.xml    # Custom user location icon for 3D globe
+│                                 # Blue circle with directional arrow and red compass point
+└── [other drawables]             # Material icons and app graphics
 ```
 
 ### Build Configuration
@@ -183,6 +196,7 @@ build-logic/convention/
 - **Database**: Room 2.7.2
 - **Preferences**: Proto DataStore
 - **Networking**: Retrofit
+- **3D Visualization**: NASA WorldWind Android v0.8.0 (3D globe for Qibla direction)
 - **Testing**: JUnit4, Espresso, Roborazzi
 - **Background**: WorkManager
 - **Min SDK**: 24
@@ -377,6 +391,97 @@ All cards in the app follow a consistent design pattern:
   - Replaced hardcoded black background with `MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)`
   - Updated all text colors to use theme-aware color schemes (`MaterialTheme.colorScheme.onSurface`)
   - Enables proper light/dark mode support and maintains design consistency
+
+### NASA WorldWind 3D Globe Integration (Latest - November 2025)
+
+#### Overview
+Integrated NASA WorldWind Android library to visualize Qibla direction on a 3D globe showing the great circle path from user location to the Kaaba in Makkah. The globe is displayed as the 4th swipeable tile in the main dashboard.
+
+#### Key Features
+- **3D Earth Visualization**: Full 3D globe using NASA's Blue Marble satellite imagery
+- **Great Circle Path**: Shows shortest path from user location to Kaaba with bright green line
+- **Custom Markers**:
+  - User location: Blue circular icon with white directional arrow (compass-style)
+  - Kaaba location: Green circular icon with Kaaba building and gold band
+- **Dynamic Compass Rotation**: Globe rotates in real-time based on device orientation (magnetic + accelerometer sensors)
+- **Touch Gestures**: Full support for pan, zoom, and rotate with intelligent compass pause during interaction
+- **Smart Camera Positioning**: Auto-calculates optimal view based on tile dimensions and distance between locations
+- **Lifecycle Management**: Proper OpenGL surface lifecycle handling (onResume/onPause)
+
+#### Technical Implementation
+
+**Dependencies Added:**
+- Library: `com.github.NASAWorldWind:WorldWindAndroid:v0.8.0` (via JitPack)
+- Location: `settings.gradle.kts` + `app/build.gradle.kts`
+
+**Core Files:**
+1. **QiblaGlobeView.kt** (`app/src/main/kotlin/com/starception/submission/islamic/qibla/presentation/component/`)
+   - Main globe component with sensor integration
+   - Touch-tracking controller for gesture handling
+   - Compass sensor listener (MAGNETIC_FIELD + ACCELEROMETER)
+   - Dynamic camera heading updates based on device orientation
+   - 2-second timeout after user touch before compass resumes control
+
+2. **Custom Icons** (`app/src/main/res/drawable/`)
+   - `ic_kaaba_marker.xml` - Green circle with Kaaba building, gold band, and shadow
+   - `ic_user_location_arrow.xml` - Blue circle with directional arrow and red compass point
+
+3. **SwipeableBigTiles.kt** (Modified)
+   - Extended HorizontalPager from 3 to 4 tiles
+   - Added QiblaGlobeTile as 4th page
+   - Integrated with existing prayer times data flow
+
+#### Key Implementation Details
+
+**Touch Gesture Conflict Resolution:**
+```kotlin
+// TouchTrackingController detects user interaction
+private class TouchTrackingController(
+    private val onTouchStart: () -> Unit,
+    private val onTouchEnd: () -> Unit
+) : BasicWorldWindowController()
+
+// Compass updates only when user not touching (2-second timeout)
+if (!isUserInteracting && (currentTime - lastInteractionTime) > 2000) {
+    worldWindowRef?.let { ww ->
+        updateGlobeCameraHeading(ww, deviceHeading, userLat, userLon, makkahLat, makkahLon)
+    }
+}
+```
+
+**Camera Positioning Algorithm:**
+- Calculates great circle distance between user and Kaaba
+- Uses field-of-view (45°) and tile aspect ratio for optimal range calculation
+- Ensures minimum range (1.5x Earth radius) for proper curvature visibility
+- Positions camera at midpoint with tilt angle for perspective
+
+**Custom Marker Loading:**
+- Converts vector drawable XML to Bitmap for WorldWind compatibility
+- Uses PlacemarkAttributes with ImageSource.fromBitmap()
+- Configurable imageScale for different marker sizes
+
+#### Critical Requirements
+- **Internet Connection**: Required for downloading NASA Blue Marble satellite imagery on first load
+- **Essential Layers**: BackgroundLayer + BlueMarbleLandsatLayer (without these, globe renders black)
+- **Lifecycle**: Must call worldWindow.onResume()/onPause() with lifecycle events
+- **Sensors**: Both MAGNETIC_FIELD and ACCELEROMETER sensors needed for compass heading
+
+#### Integration Points
+- Location data flows from prayer times system (DayPrayerTimes.location)
+- Displayed in 4th position of swipeable big tiles
+- Uses existing Material 3 theming for overlays and UI elements
+- Compass heading displayed in overlay card
+
+#### Known Behavior
+- Globe starts with optimized view showing both user location and Kaaba
+- Compass rotation updates in real-time as device rotates
+- Touch gestures pause compass for 2 seconds after release
+- Green path shows true great circle route (may look curved due to sphere projection)
+- Markers scale appropriately with zoom level
+
+#### Files Modified/Created
+- **Created**: `QiblaGlobeView.kt`, `ic_kaaba_marker.xml`, `ic_user_location_arrow.xml`
+- **Modified**: `SwipeableBigTiles.kt`, `settings.gradle.kts`, `app/build.gradle.kts`
 
 ### Smart Content Optimization
 - **Text Display Improvements**: Resolved text truncation issues in Smart Prediction tiles
@@ -577,6 +682,7 @@ PrayerSettings_PREF_VERIFY: ❌ FAILED | key='invalid_key' | expected_type=Strin
 #### 3. Islamic Features Architecture
 - **Salah Dashboard**: Comprehensive prayer management dashboard
 - **Qibla Compass**: Direction finder with Material 3 theming
+- **3D Globe Visualization**: NASA WorldWind 3D globe showing great circle path from user to Kaaba with custom markers and compass-based rotation
 - **Smart Content**: AI-powered Islamic content suggestions
 - **Swipeable Tiles**: Interactive prayer time tiles with gestures
 

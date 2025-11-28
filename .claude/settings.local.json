@@ -180,7 +180,10 @@
       "Bash(/tmp/quran_opened.png)",
       "Bash(sqlite3:*)",
       "Bash(tr:*)",
-      "Bash(wait)"
+      "Bash(wait)",
+      "WebFetch(domain:kyant.gitbook.io)",
+      "WebFetch(domain:mvnrepository.com)",
+      "WebFetch(domain:central.sonatype.com)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

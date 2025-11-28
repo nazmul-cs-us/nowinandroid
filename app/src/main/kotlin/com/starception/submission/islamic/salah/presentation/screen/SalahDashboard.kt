@@ -24,10 +24,12 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.islamic.qibla.presentation.component.QiblaCompass
+import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTime
 import com.starception.submission.prayer.service.EnhancedLocationService
 import com.starception.submission.prayer.viewmodel.PrayerTimesViewModel
+import kotlinx.coroutines.launch
 
 /**
  * Islamic Salah (Prayer) Dashboard Screen
@@ -187,12 +189,19 @@ private fun SalahContent(
                 locationService = locationService
             )
         }
-        
+
+        // 3D Globe showing Qibla direction to Makkah
+        item {
+            QiblaGlobeCard(
+                locationService = locationService
+            )
+        }
+
         // Prayer times list
         item {
             PrayerTimesSection(prayers = actualPrayers)
         }
-        
+
         // Location info
         item {
             LocationCard(location = dayPrayerTimes.location)
@@ -481,6 +490,50 @@ private fun SalahErrorState(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Retry")
             }
+        }
+    }
+}
+
+/**
+ * Qibla Globe Card - 3D visualization of Qibla direction
+ */
+@Composable
+private fun QiblaGlobeCard(
+    locationService: EnhancedLocationService?
+) {
+    var userLocation by remember { mutableStateOf<android.location.Location?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Get user's current location
+    LaunchedEffect(locationService) {
+        locationService?.let { service ->
+            coroutineScope.launch {
+                service.getBestAvailableLocation().fold(
+                    onSuccess = { location ->
+                        userLocation = location
+                    },
+                    onFailure = {
+                        // Handle error - location unavailable
+                    }
+                )
+            }
+        }
+    }
+
+    // Only show globe if we have user location
+    if (userLocation != null) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+        ) {
+            QiblaGlobeView(
+                userLatitude = userLocation!!.latitude,
+                userLongitude = userLocation!!.longitude,
+                modifier = Modifier.padding(16.dp)
+            )
         }
     }
 }

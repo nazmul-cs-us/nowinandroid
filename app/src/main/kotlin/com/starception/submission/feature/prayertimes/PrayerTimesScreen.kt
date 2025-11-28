@@ -146,7 +146,9 @@ import com.starception.submission.feature.prayertimes.components.CompassPopupScr
 import com.starception.submission.feature.prayertimes.getPrayerNameInLocalLanguage
 import dagger.hilt.android.EntryPointAccessors
 import com.starception.submission.prayer.service.CountryCodeMapper
+import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException

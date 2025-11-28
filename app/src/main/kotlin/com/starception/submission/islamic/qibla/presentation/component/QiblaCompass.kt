@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.hardware.GeomagneticField
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -74,6 +75,7 @@ fun QiblaCompass(
     var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
     var isInitializing by remember { mutableStateOf(true) }
     var magneticFieldStrength by remember { mutableFloatStateOf(0f) } // For accuracy detection
+    var magneticDeclination by remember { mutableFloatStateOf(0f) } // Magnetic declination correction
     
     // Throttling for compass updates to prevent flickering
     var lastCompassUpdateTime by remember { mutableLongStateOf(0L) }
@@ -179,9 +181,20 @@ fun QiblaCompass(
                             lat1 = location.latitude,
                             lon1 = location.longitude
                         ).toFloat()
+
+                        // Calculate magnetic declination for this location
+                        // This corrects magnetic north to true north
+                        val geoField = GeomagneticField(
+                            location.latitude.toFloat(),
+                            location.longitude.toFloat(),
+                            location.altitude.toFloat(),
+                            System.currentTimeMillis()
+                        )
+                        magneticDeclination = geoField.declination
                     },
                     onFailure = {
                         qiblaDirection = 0f
+                        magneticDeclination = 0f
                     }
                 )
             }
@@ -189,7 +202,9 @@ fun QiblaCompass(
     }
     
     // Qibla compass animation - needle points to Qibla direction
-    val targetDegree = -(compassDegree - qiblaDirection)
+    // Apply magnetic declination correction: magnetic north + declination = true north
+    val trueNorth = compassDegree + magneticDeclination
+    val targetDegree = -(trueNorth - qiblaDirection)
     val currentDegreeState = remember { mutableFloatStateOf(targetDegree) }
     
     // Calculate shortest rotation path
