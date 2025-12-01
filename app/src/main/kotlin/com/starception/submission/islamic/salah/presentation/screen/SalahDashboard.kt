@@ -408,7 +408,7 @@ private fun LocationCard(location: com.starception.submission.prayer.model.Locat
                     text = location.getDisplayName(),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
