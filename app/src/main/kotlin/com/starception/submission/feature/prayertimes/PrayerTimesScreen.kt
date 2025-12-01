@@ -1342,7 +1342,7 @@ fun PrayerTimesScreen(
                 
                 // Material 3 expressive tile height animation with spring physics
                 val tileHeight by animateDpAsState(
-                    targetValue = if (showAllPrayers) 115.dp else 134.dp,
+                    targetValue = if (showAllPrayers) 115.dp else 140.dp,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessLow,
@@ -1723,13 +1723,13 @@ fun PrayerTimesScreen(
                 }
 
                 // Spacer between Show Less/Show All button and location card (4dp to match spacing above for symmetry)
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(-6.dp))
 
                 // Location info using Material 3 design - aligned with big tiles
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp),
+                        .padding(horizontal = 4.dp),
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
