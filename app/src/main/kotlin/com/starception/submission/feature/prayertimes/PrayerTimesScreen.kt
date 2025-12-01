@@ -1409,9 +1409,20 @@ fun PrayerTimesScreen(
                                 result.add(allPrayersList[index].first)
                             }
                         } else {
-                            // All prayers have passed today - start from Fajr (tomorrow)
-                            // Return all 6 prayers in default order (representing tomorrow)
-                            result.addAll(allPrayersList.map { it.first })
+                            // All prayers have passed - find the current prayer period (last prayer that passed)
+                            val currentPrayerIndex = allPrayersList
+                                .indexOfLast { it.second.isBefore(currentTime) || it.second == currentTime }
+
+                            if (currentPrayerIndex != -1) {
+                                // Start from current prayer period, then wrap to tomorrow's prayers
+                                for (i in 0 until 6) {
+                                    val index = (currentPrayerIndex + i) % allPrayersList.size
+                                    result.add(allPrayersList[index].first)
+                                }
+                            } else {
+                                // Fallback: show in default order
+                                result.addAll(allPrayersList.map { it.first })
+                            }
                         }
                     }
 
