@@ -1379,17 +1379,13 @@ fun PrayerTimesScreen(
                     label = "sunriseCardAnimation"
                 )
                 
-                // Dynamically order adjustable prayers based on current/next prayer
-                // Only show adjustable prayers (Dhuhr, Asr, Maghrib, Isha) - exclude Fajr and Sunrise
-                val adjustablePrayers = listOf("Dhuhr", "Asr", "Maghrib", "Isha")
-                val additionalPrayers = listOf("Fajr", "Sunrise")
-
-                // Get dynamically ordered prayers based on current time
+                // Get next 6 prayers in circular chronological order
+                // All 6 items (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha) are included
+                // Shows next 4 when collapsed, next 6 when expanded
                 val orderedPrayers = remember(currentTime, prayerTimes) {
                     val result = mutableListOf<String>()
 
-                    // First, find which prayer period we're currently in
-                    // A prayer period is from its start time until the next prayer
+                    // Define all 6 prayers in chronological order
                     val allPrayersList = prayerTimes?.let { times ->
                         listOf(
                             "Fajr" to times.fajr,
@@ -1401,31 +1397,25 @@ fun PrayerTimesScreen(
                         )
                     } ?: emptyList()
 
-                    // Find the last prayer that has passed (this is our current prayer period)
-                    val currentPrayerPeriod = allPrayersList
-                        .filter { it.second.isBefore(currentTime) || it.second == currentTime }
-                        .maxByOrNull { it.second }
+                    if (allPrayersList.isNotEmpty()) {
+                        // Find the index of the next prayer (first prayer after current time)
+                        val nextPrayerIndex = allPrayersList.indexOfFirst { it.second.isAfter(currentTime) }
 
-                    // Add current prayer period first if it's adjustable
-                    if (currentPrayerPeriod != null && currentPrayerPeriod.first in adjustablePrayers) {
-                        result.add(currentPrayerPeriod.first)
+                        if (nextPrayerIndex != -1) {
+                            // Found a prayer later today - start from there
+                            // Return next 6 prayers in circular order
+                            for (i in 0 until 6) {
+                                val index = (nextPrayerIndex + i) % allPrayersList.size
+                                result.add(allPrayersList[index].first)
+                            }
+                        } else {
+                            // All prayers have passed today - start from Fajr (tomorrow)
+                            // Return all 6 prayers in default order (representing tomorrow)
+                            result.addAll(allPrayersList.map { it.first })
+                        }
                     }
 
-                    // Then add upcoming prayers
-                    val upcomingPrayers = PrayerTimeHelpers.getNext4Prayers(currentTime, prayerTimes)
-                        .map { it.first } // Get prayer names
-                        .filter { it in adjustablePrayers } // Only adjustable prayers
-                        .filter { it !in result } // Don't duplicate current prayer
-
-                    result.addAll(upcomingPrayers)
-
-                    // If less than 4, fill with remaining adjustable prayers in default order
-                    if (result.size < 4) {
-                        val remaining = adjustablePrayers.filter { it !in result }
-                        result.addAll(remaining)
-                    }
-
-                    result.take(4)
+                    result
                 }
 
                 // First row: First 2 prayers from ordered list (most relevant) with wobble
@@ -1601,53 +1591,73 @@ fun PrayerTimesScreen(
                             ),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Fajr with staggered entrance animation
-                        InteractivePrayerCard(
-                            prayerName = "Fajr",
-                            currentEditingTile = currentEditingTile,
-                            onEditingTileChange = { currentEditingTile = it },
-                            currentOffset = storedOffsets.fajr,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
-                                .graphicsLayer {
-                                    // Material 3 expressive card entrance with bounce and scale
-                                    translationY = (1f - fajrAnimProgress) * 24f
-                                    scaleX = 0.85f + (fajrAnimProgress * 0.15f)
-                                    scaleY = 0.85f + (fajrAnimProgress * 0.15f)
-                                    alpha = fajrAnimProgress
+                        // Fifth prayer with staggered entrance animation
+                        if (orderedPrayers.size > 4) {
+                            InteractivePrayerCard(
+                                prayerName = orderedPrayers[4],
+                                currentEditingTile = currentEditingTile,
+                                onEditingTileChange = { currentEditingTile = it },
+                                currentOffset = when (orderedPrayers[4]) {
+                                    "Fajr" -> storedOffsets.fajr
+                                    "Sunrise" -> storedOffsets.sunrise
+                                    "Dhuhr" -> storedOffsets.dhuhr
+                                    "Asr" -> storedOffsets.asr
+                                    "Maghrib" -> storedOffsets.maghrib
+                                    "Isha" -> storedOffsets.isha
+                                    else -> 0
                                 },
-                            onShowPopup = { prayerName ->
-                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                                popupDialState = prayerName  // Direct state update
-                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                            }
-                        )
-                        
-                        // Sunrise with staggered entrance animation
-                        InteractivePrayerCard(
-                            prayerName = "Sunrise",
-                            currentEditingTile = currentEditingTile,
-                            onEditingTileChange = { currentEditingTile = it },
-                            currentOffset = storedOffsets.sunrise,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
-                                .graphicsLayer {
-                                    // Material 3 expressive card entrance with staggered timing
-                                    translationY = (1f - sunriseAnimProgress) * 32f
-                                    scaleX = 0.82f + (sunriseAnimProgress * 0.18f)
-                                    scaleY = 0.82f + (sunriseAnimProgress * 0.18f)
-                                    alpha = sunriseAnimProgress
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(tileHeight)
+                                    .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
+                                    .graphicsLayer {
+                                        // Material 3 expressive card entrance with bounce and scale
+                                        translationY = (1f - fajrAnimProgress) * 24f
+                                        scaleX = 0.85f + (fajrAnimProgress * 0.15f)
+                                        scaleY = 0.85f + (fajrAnimProgress * 0.15f)
+                                        alpha = fajrAnimProgress
+                                    },
+                                onShowPopup = { prayerName ->
+                                    android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                    popupDialState = prayerName
+                                    android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                                }
+                            )
+                        }
+
+                        // Sixth prayer with staggered entrance animation
+                        if (orderedPrayers.size > 5) {
+                            InteractivePrayerCard(
+                                prayerName = orderedPrayers[5],
+                                currentEditingTile = currentEditingTile,
+                                onEditingTileChange = { currentEditingTile = it },
+                                currentOffset = when (orderedPrayers[5]) {
+                                    "Fajr" -> storedOffsets.fajr
+                                    "Sunrise" -> storedOffsets.sunrise
+                                    "Dhuhr" -> storedOffsets.dhuhr
+                                    "Asr" -> storedOffsets.asr
+                                    "Maghrib" -> storedOffsets.maghrib
+                                    "Isha" -> storedOffsets.isha
+                                    else -> 0
                                 },
-                            onShowPopup = { prayerName ->
-                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                                popupDialState = prayerName  // Direct state update
-                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                            }
-                        )
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(tileHeight)
+                                    .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
+                                    .graphicsLayer {
+                                        // Material 3 expressive card entrance with staggered timing
+                                        translationY = (1f - sunriseAnimProgress) * 32f
+                                        scaleX = 0.82f + (sunriseAnimProgress * 0.18f)
+                                        scaleY = 0.82f + (sunriseAnimProgress * 0.18f)
+                                        alpha = sunriseAnimProgress
+                                    },
+                                onShowPopup = { prayerName ->
+                                    android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                    popupDialState = prayerName
+                                    android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                                }
+                            )
+                        }
                     }
                 }
                 
