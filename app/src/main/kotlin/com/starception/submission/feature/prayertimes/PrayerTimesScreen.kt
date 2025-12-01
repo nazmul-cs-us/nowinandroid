@@ -1282,7 +1282,10 @@ fun PrayerTimesScreen(
                     timeOffsets = storedOffsets
                 )
                 }
-                
+
+                // Spacer between swipeable tiles and adjust prayer times info card
+                Spacer(modifier = Modifier.height(10.dp))
+
                 // Instruction banner for prayer time adjustment with wobble
                 Card(
                     modifier = Modifier
@@ -1330,13 +1333,16 @@ fun PrayerTimesScreen(
                         }
                     }
                 }
-                
+
+                // Spacer between info card and prayer tiles (reduced from 8dp to 6dp)
+                Spacer(modifier = Modifier.height(6.dp))
+
                 // Expandable prayer layout - smart default view with expand option
                 var showAllPrayers by remember { mutableStateOf(false) }
                 
                 // Material 3 expressive tile height animation with spring physics
                 val tileHeight by animateDpAsState(
-                    targetValue = if (showAllPrayers) 120.dp else 145.dp,
+                    targetValue = if (showAllPrayers) 115.dp else 131.dp,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessLow,
@@ -1705,10 +1711,10 @@ fun PrayerTimesScreen(
                         )
                     }
                 }
-                
-                
-                // Removed spacer to eliminate excessive gap
-                
+
+                // Spacer between Show Less/Show All button and location card (4dp to match spacing above for symmetry)
+                Spacer(modifier = Modifier.height(4.dp))
+
                 // Location info using Material 3 design - aligned with big tiles
                 Surface(
                     modifier = Modifier
@@ -1735,7 +1741,7 @@ fun PrayerTimesScreen(
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             textAlign = TextAlign.Start,
-                            maxLines = 2,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         ).also {
