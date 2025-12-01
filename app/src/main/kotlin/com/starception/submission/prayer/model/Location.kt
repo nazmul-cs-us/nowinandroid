@@ -69,16 +69,16 @@ data class Location(
     
     /**
      * DISPLAY NAME FORMATTER: Creates user-friendly location names with detailed area information
-     * 
+     *
      * This provides readable location names for UI display, with smart fallbacks and area details.
-     * 
+     *
      * DISPLAY PRIORITY:
      * 1. "Area, City, Country (CC)" (e.g., "Downtown Dubai, Dubai, UAE (AE)") - Best case with area
      * 2. "City, Country (CC)" (e.g., "Dubai, UAE (AE)") - Standard case without area
      * 3. "City, Country" (e.g., "Dubai, UAE") - Without country code
      * 4. City with area fallbacks - Various combinations
      * 5. Coordinates (e.g., "25.2048, 55.2708") - Final fallback
-     * 
+     *
      * EDIT THIS TO:
      * - Change display format (add postal code, more area details)
      * - Modify coordinate precision
@@ -88,49 +88,49 @@ data class Location(
     fun getDisplayName(): String {
         return when {
             // BEST CASE: Area, city, country, and country code available
-            area.isNotEmpty() && city.isNotEmpty() && country.isNotEmpty() && countryCode.isNotEmpty() -> 
+            area.isNotEmpty() && city.isNotEmpty() && country.isNotEmpty() && countryCode.isNotEmpty() ->
                 "$area, $city, $country ($countryCode)"
-            
+
             // GOOD CASE: SubLocality instead of area
-            area.isEmpty() && subLocality.isNotEmpty() && city.isNotEmpty() && country.isNotEmpty() && countryCode.isNotEmpty() -> 
+            area.isEmpty() && subLocality.isNotEmpty() && city.isNotEmpty() && country.isNotEmpty() && countryCode.isNotEmpty() ->
                 "$subLocality, $city, $country ($countryCode)"
-            
+
             // STANDARD CASE: City, country, and country code (no area)
-            city.isNotEmpty() && country.isNotEmpty() && countryCode.isNotEmpty() -> 
+            city.isNotEmpty() && country.isNotEmpty() && countryCode.isNotEmpty() ->
                 "$city, $country ($countryCode)"
-            
+
             // AREA WITH CITY: Area and city without country code
-            area.isNotEmpty() && city.isNotEmpty() && country.isNotEmpty() -> 
+            area.isNotEmpty() && city.isNotEmpty() && country.isNotEmpty() ->
                 "$area, $city, $country"
-            
+
             // SUBLOCALITY WITH CITY: SubLocality and city without country code
-            area.isEmpty() && subLocality.isNotEmpty() && city.isNotEmpty() && country.isNotEmpty() -> 
+            area.isEmpty() && subLocality.isNotEmpty() && city.isNotEmpty() && country.isNotEmpty() ->
                 "$subLocality, $city, $country"
-            
+
             // GOOD CASE: City and country without country code
             city.isNotEmpty() && country.isNotEmpty() -> "$city, $country"
-            
+
             // AREA ONLY WITH CITY: Just area and city
             area.isNotEmpty() && city.isNotEmpty() -> "$area, $city"
-            
+
             // SUBLOCALITY ONLY WITH CITY: Just subLocality and city
             area.isEmpty() && subLocality.isNotEmpty() && city.isNotEmpty() -> "$subLocality, $city"
-            
+
             // FALLBACK 1: City only
             city.isNotEmpty() -> city
-            
+
             // FALLBACK 2: Country with country code
             country.isNotEmpty() && countryCode.isNotEmpty() -> "$country ($countryCode)"
-            
+
             // FALLBACK 3: Country only
             country.isNotEmpty() -> country
-            
+
             // FALLBACK 4: Area only (if somehow we have area but no city)
             area.isNotEmpty() -> area
-            
+
             // FALLBACK 5: SubLocality only
             subLocality.isNotEmpty() -> subLocality
-            
+
             // FINAL FALLBACK: Show coordinates (4 decimal places = ~11 meter accuracy)
             else -> "${String.format("%.4f", latitude)}, ${String.format("%.4f", longitude)}"
         }
