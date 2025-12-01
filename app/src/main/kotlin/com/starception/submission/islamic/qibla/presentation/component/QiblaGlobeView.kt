@@ -54,6 +54,7 @@ import gov.nasa.worldwind.geom.LookAt
 import gov.nasa.worldwind.geom.Position
 import gov.nasa.worldwind.gesture.GestureRecognizer
 import gov.nasa.worldwind.layer.BackgroundLayer
+import gov.nasa.worldwind.layer.BlueMarbleLayer
 import gov.nasa.worldwind.layer.BlueMarbleLandsatLayer
 import gov.nasa.worldwind.layer.RenderableLayer
 import gov.nasa.worldwind.render.Color as WwColor
@@ -453,6 +454,9 @@ private fun createWorldWindow(
 
     // Add base layers for Earth imagery (CRITICAL - without these, globe is black!)
     worldWindow.layers.addLayer(BackgroundLayer())
+
+    // Use BlueMarbleLandsatLayer for better texture stability
+    // Note: This may have slightly less uniform ocean color but renders more consistently
     worldWindow.layers.addLayer(BlueMarbleLandsatLayer())
 
     // Add renderable layer for path and markers
