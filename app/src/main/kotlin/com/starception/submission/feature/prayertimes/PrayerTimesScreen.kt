@@ -830,6 +830,19 @@ fun PrayerTimesScreen(
                                 delay(100) // 100ms delay to ensure SharedPreferences commit completes
                                 android.util.Log.d("PrayerTimesScreen", "⏸️ Waited 100ms for preferences write to complete")
 
+                                // CRITICAL: Update scheduled notifications with new prayer time
+                                try {
+                                    val appContext = screenContext.applicationContext
+                                    val serviceManager = dagger.hilt.android.EntryPointAccessors.fromApplication(
+                                        appContext,
+                                        com.starception.submission.prayer.service.PrayerNotificationServiceManagerEntryPoint::class.java
+                                    ).prayerNotificationServiceManager()
+                                    serviceManager.updatePrayerNotifications()
+                                    android.util.Log.i("PrayerTimesScreen", "🔔 NOTIFICATIONS UPDATED: Rescheduled with new $prayerName time")
+                                } catch (e: Exception) {
+                                    android.util.Log.e("PrayerTimesScreen", "❌ Failed to update notifications", e)
+                                }
+
                                 // Update UI on main thread
                                 withContext(Dispatchers.Main) {
                                     // NO MANUAL UPDATE NEEDED - The repository flow automatically updates storedOffsets!
@@ -2067,6 +2080,19 @@ fun PrayerTimesScreen(
                                 // This ensures the recalculation will read the NEW offset values
                                 delay(100) // 100ms delay to ensure SharedPreferences commit completes
                                 android.util.Log.d("PrayerTimesScreen", "⏸️ Waited 100ms for preferences write to complete")
+
+                                // CRITICAL: Update scheduled notifications with new prayer time
+                                try {
+                                    val appContext = screenContext.applicationContext
+                                    val serviceManager = dagger.hilt.android.EntryPointAccessors.fromApplication(
+                                        appContext,
+                                        com.starception.submission.prayer.service.PrayerNotificationServiceManagerEntryPoint::class.java
+                                    ).prayerNotificationServiceManager()
+                                    serviceManager.updatePrayerNotifications()
+                                    android.util.Log.i("PrayerTimesScreen", "🔔 NOTIFICATIONS UPDATED: Rescheduled with new $prayerName time")
+                                } catch (e: Exception) {
+                                    android.util.Log.e("PrayerTimesScreen", "❌ Failed to update notifications", e)
+                                }
 
                                 // Update UI on main thread
                                 withContext(Dispatchers.Main) {
