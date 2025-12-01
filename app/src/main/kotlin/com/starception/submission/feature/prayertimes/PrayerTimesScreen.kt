@@ -1373,11 +1373,56 @@ fun PrayerTimesScreen(
                     label = "sunriseCardAnimation"
                 )
                 
-                // Always show current and next 3 prayers (4 total) by default
-                val defaultPrayers = listOf("Dhuhr", "Asr", "Maghrib", "Isha")
+                // Dynamically order adjustable prayers based on current/next prayer
+                // Only show adjustable prayers (Dhuhr, Asr, Maghrib, Isha) - exclude Fajr and Sunrise
+                val adjustablePrayers = listOf("Dhuhr", "Asr", "Maghrib", "Isha")
                 val additionalPrayers = listOf("Fajr", "Sunrise")
-                
-                // First row: Most relevant prayers (default view) with wobble
+
+                // Get dynamically ordered prayers based on current time
+                val orderedPrayers = remember(currentTime, prayerTimes) {
+                    val result = mutableListOf<String>()
+
+                    // First, find which prayer period we're currently in
+                    // A prayer period is from its start time until the next prayer
+                    val allPrayersList = prayerTimes?.let { times ->
+                        listOf(
+                            "Fajr" to times.fajr,
+                            "Sunrise" to times.sunrise,
+                            "Dhuhr" to times.dhuhr,
+                            "Asr" to times.asr,
+                            "Maghrib" to times.maghrib,
+                            "Isha" to times.isha
+                        )
+                    } ?: emptyList()
+
+                    // Find the last prayer that has passed (this is our current prayer period)
+                    val currentPrayerPeriod = allPrayersList
+                        .filter { it.second.isBefore(currentTime) || it.second == currentTime }
+                        .maxByOrNull { it.second }
+
+                    // Add current prayer period first if it's adjustable
+                    if (currentPrayerPeriod != null && currentPrayerPeriod.first in adjustablePrayers) {
+                        result.add(currentPrayerPeriod.first)
+                    }
+
+                    // Then add upcoming prayers
+                    val upcomingPrayers = PrayerTimeHelpers.getNext4Prayers(currentTime, prayerTimes)
+                        .map { it.first } // Get prayer names
+                        .filter { it in adjustablePrayers } // Only adjustable prayers
+                        .filter { it !in result } // Don't duplicate current prayer
+
+                    result.addAll(upcomingPrayers)
+
+                    // If less than 4, fill with remaining adjustable prayers in default order
+                    if (result.size < 4) {
+                        val remaining = adjustablePrayers.filter { it !in result }
+                        result.addAll(remaining)
+                    }
+
+                    result.take(4)
+                }
+
+                // First row: First 2 prayers from ordered list (most relevant) with wobble
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1389,45 +1434,60 @@ fun PrayerTimesScreen(
                             scaleX = 1f + (wobbleState.wobbleIntensity * 0.02f)
                             scaleY = 1f + (wobbleState.wobbleIntensity * 0.03f)
                         },
-                        //.background(Color.Red.copy(alpha = 0.2f)), // DEBUG: Red background for first row
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Dhuhr
-                    InteractivePrayerCard(
-                        prayerName = "Dhuhr",
-                        currentEditingTile = currentEditingTile,
-                        onEditingTileChange = { currentEditingTile = it },
-                        currentOffset = storedOffsets.dhuhr,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(tileHeight)
-                            .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), // Extra bottom space for elevation shadows
-                        onShowPopup = { prayerName ->
-                            android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                            popupDialState = prayerName  // Direct state update
-                            android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                        }
-                    )
-                    
-                    // Asr
-                    InteractivePrayerCard(
-                        prayerName = "Asr",
-                        currentEditingTile = currentEditingTile,
-                        onEditingTileChange = { currentEditingTile = it },
-                        currentOffset = storedOffsets.asr,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(tileHeight)
-                            .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), // Extra bottom space for elevation shadows
-                        onShowPopup = { prayerName ->
-                            android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                            popupDialState = prayerName  // Direct state update
-                            android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                        }
-                    )
+                    // First prayer tile
+                    if (orderedPrayers.isNotEmpty()) {
+                        InteractivePrayerCard(
+                            prayerName = orderedPrayers[0],
+                            currentEditingTile = currentEditingTile,
+                            onEditingTileChange = { currentEditingTile = it },
+                            currentOffset = when (orderedPrayers[0]) {
+                                "Dhuhr" -> storedOffsets.dhuhr
+                                "Asr" -> storedOffsets.asr
+                                "Maghrib" -> storedOffsets.maghrib
+                                "Isha" -> storedOffsets.isha
+                                else -> 0
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(tileHeight)
+                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                            onShowPopup = { prayerName ->
+                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                popupDialState = prayerName
+                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                            }
+                        )
+                    }
+
+                    // Second prayer tile
+                    if (orderedPrayers.size > 1) {
+                        InteractivePrayerCard(
+                            prayerName = orderedPrayers[1],
+                            currentEditingTile = currentEditingTile,
+                            onEditingTileChange = { currentEditingTile = it },
+                            currentOffset = when (orderedPrayers[1]) {
+                                "Dhuhr" -> storedOffsets.dhuhr
+                                "Asr" -> storedOffsets.asr
+                                "Maghrib" -> storedOffsets.maghrib
+                                "Isha" -> storedOffsets.isha
+                                else -> 0
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(tileHeight)
+                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                            onShowPopup = { prayerName ->
+                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                popupDialState = prayerName
+                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                            }
+                        )
+                    }
                 }
-                
-                // Second row: Remaining main prayers with wobble
+
+                // Second row: Remaining 2 prayers from ordered list with wobble
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1441,39 +1501,55 @@ fun PrayerTimesScreen(
                         },
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Maghrib
-                    InteractivePrayerCard(
-                        prayerName = "Maghrib",
-                        currentEditingTile = currentEditingTile,
-                        onEditingTileChange = { currentEditingTile = it },
-                        currentOffset = storedOffsets.maghrib,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(tileHeight)
-                            .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), // Extra bottom space for elevation shadows
-                        onShowPopup = { prayerName ->
-                            android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                            popupDialState = prayerName  // Direct state update
-                            android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                        }
-                    )
-                    
-                    // Isha
-                    InteractivePrayerCard(
-                        prayerName = "Isha",
-                        currentEditingTile = currentEditingTile,
-                        onEditingTileChange = { currentEditingTile = it },
-                        currentOffset = storedOffsets.isha,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(tileHeight)
-                            .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp), // Extra bottom space for elevation shadows
-                        onShowPopup = { prayerName ->
-                            android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                            popupDialState = prayerName  // Direct state update
-                            android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                        }
-                    )
+                    // Third prayer tile
+                    if (orderedPrayers.size > 2) {
+                        InteractivePrayerCard(
+                            prayerName = orderedPrayers[2],
+                            currentEditingTile = currentEditingTile,
+                            onEditingTileChange = { currentEditingTile = it },
+                            currentOffset = when (orderedPrayers[2]) {
+                                "Dhuhr" -> storedOffsets.dhuhr
+                                "Asr" -> storedOffsets.asr
+                                "Maghrib" -> storedOffsets.maghrib
+                                "Isha" -> storedOffsets.isha
+                                else -> 0
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(tileHeight)
+                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                            onShowPopup = { prayerName ->
+                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                popupDialState = prayerName
+                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                            }
+                        )
+                    }
+
+                    // Fourth prayer tile
+                    if (orderedPrayers.size > 3) {
+                        InteractivePrayerCard(
+                            prayerName = orderedPrayers[3],
+                            currentEditingTile = currentEditingTile,
+                            onEditingTileChange = { currentEditingTile = it },
+                            currentOffset = when (orderedPrayers[3]) {
+                                "Dhuhr" -> storedOffsets.dhuhr
+                                "Asr" -> storedOffsets.asr
+                                "Maghrib" -> storedOffsets.maghrib
+                                "Isha" -> storedOffsets.isha
+                                else -> 0
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(tileHeight)
+                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                            onShowPopup = { prayerName ->
+                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                popupDialState = prayerName
+                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                            }
+                        )
+                    }
                 }
                 
                 // Material 3 expressive expandable section with spring-based animations
