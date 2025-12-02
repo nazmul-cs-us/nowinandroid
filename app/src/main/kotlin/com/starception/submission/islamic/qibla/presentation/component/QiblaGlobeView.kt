@@ -115,11 +115,13 @@ fun QiblaGlobeView(
     val makkahLatitude = 21.4225
     val makkahLongitude = 39.8262
 
-    // Calculate tile dimensions for optimal camera fit
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
-    val tileWidthPx = with(density) { 400.dp.toPx() }  // Approximate tile width
-    val tileHeightPx = with(density) { 200.dp.toPx() }  // Tile height from SwipeableBigTiles
+
+    // Use BoxWithConstraints to get actual tile dimensions for proper centering
+    BoxWithConstraints(modifier = modifier) {
+        val tileWidthPx = with(density) { maxWidth.toPx() }
+        val tileHeightPx = with(density) { maxHeight.toPx() }
 
     // Compass sensor state for dynamic rotation
     var deviceHeading by remember { mutableFloatStateOf(0f) }
@@ -431,6 +433,7 @@ fun QiblaGlobeView(
             }
         }
     }
+    }  // End BoxWithConstraints
 }
 
 /**
@@ -492,55 +495,78 @@ private fun createWorldWindow(
     // 3. Add Kaaba Placemark with 🕋 emoji icon
     val kaabaAttributes = PlacemarkAttributes().apply {
         imageSource = ImageSource.fromBitmap(kaabaBitmap)
-        imageScale = 0.55  // Smaller, more subtle
+        imageScale = 0.4  // Smaller, more subtle marker
     }
     val kaabaPlacemark = Placemark(kaabaPos, kaabaAttributes).apply {
         altitudeMode = WorldWind.ABSOLUTE  // Use absolute altitude
     }
     qiblaLayer.addRenderable(kaabaPlacemark)
 
-    // Setup camera view optimized for tile dimensions
+    // Setup camera view optimized for tile dimensions - Google Maps style
     val globe = worldWindow.globe
 
     // Calculate great circle heading and distance
     val heading = userPos.greatCircleAzimuth(kaabaPos)
     val distanceRadians = userPos.greatCircleDistance(kaabaPos)
     val distanceMeters = distanceRadians * globe.equatorialRadius
+    val earthRadius = globe.equatorialRadius
 
-    // Look at midpoint between user and Kaaba
-    val midLat = (userLat + makkahLat) / 2
-    val midLon = (userLon + makkahLon) / 2
-
-    // Calculate optimal range based on:
-    // 1. Distance between points
-    // 2. Tile aspect ratio (width/height)
-    // 3. Desired padding/margin
+    // Center camera on user's location (Kaaba will be positioned in the direction of heading)
     val aspectRatio = viewWidth.toDouble() / viewHeight.toDouble()
 
-    // Field of view is approximately 45 degrees, so we need range such that
-    // the visible area covers both points with margin
-    val visibleRegionSize = distanceMeters * 2.0  // Show region 2x the path distance
-    val fieldOfViewRadians = Math.toRadians(45.0)
+    // Base range calculation: zoom out to show user centered with Kaaba visible
+    // User at center, Kaaba positioned down in the view direction
+    val baseRange = when {
+        distanceMeters < earthRadius * 0.3 -> {
+            // Very short distance: zoom in to show detail
+            distanceMeters * 4.5
+        }
+        distanceMeters < earthRadius * 0.5 -> {
+            // Short-medium distance (like Dubai-Makkah): show user centered
+            distanceMeters * 4.0
+        }
+        distanceMeters < earthRadius * 1.0 -> {
+            // Medium distance: balanced view with curvature
+            distanceMeters * 3.2
+        }
+        else -> {
+            // Long distance: zoom out to show full arc
+            distanceMeters * 2.5
+        }
+    }
 
-    // Calculate range: distance = 2 * range * tan(fov/2)
-    // Therefore: range = distance / (2 * tan(fov/2))
-    val range = visibleRegionSize / (2.0 * Math.tan(fieldOfViewRadians / 2.0))
+    // Adjust for aspect ratio - wider tiles can show more horizontally
+    val aspectCorrectedRange = if (aspectRatio > 1.0) {
+        baseRange * (0.9 / Math.sqrt(aspectRatio))  // Slight zoom in for wide tiles
+    } else {
+        baseRange * Math.sqrt(1.1 / aspectRatio)  // Zoom out more for tall tiles
+    }
 
-    // Apply aspect ratio correction - if wider, we can zoom in more
-    val correctedRange = range / Math.sqrt(aspectRatio)
+    // Ensure we're far enough to see Earth curvature with user centered
+    val minRange = earthRadius * 2.0  // Minimum distance for centered user view
+    val maxRange = earthRadius * 5.0  // Maximum distance to keep detail visible
+    val finalRange = aspectCorrectedRange.coerceIn(minRange, maxRange)
 
-    // Ensure minimum range to see Earth curvature nicely
-    val earthRadius = globe.equatorialRadius
-    val finalRange = correctedRange.coerceAtLeast(earthRadius * 1.5)
+    // Optimal tilt angle - lower values = more overhead view (user centered, Kaaba below)
+    val tilt = when {
+        distanceMeters < earthRadius * 0.3 -> 25.0  // More overhead for very close points
+        distanceMeters < earthRadius * 0.5 -> 30.0  // Overhead angle - user centered, Kaaba visible below
+        distanceMeters < earthRadius * 1.0 -> 35.0  // Medium tilt for medium distance
+        else -> 40.0  // Shallower overhead for far points
+    }
+
+    // To truly center the user marker in the view with tilt, we need to raise the look-at altitude
+    // This compensates for the camera angle - higher altitude brings the marker to screen center
+    val centeringAltitude = finalRange * 0.15  // 15% of range works well for typical tilt angles
 
     val lookAt = LookAt().apply {
         set(
-            midLat, midLon, 0.0,  // Look at midpoint on ground
+            userLat, userLon, centeringAltitude,  // Raised altitude to center user marker in view
             WorldWind.ABSOLUTE,
-            finalRange * 0.5,  // Zoom in closer for better separation (was 0.75)
-            heading,     // Fixed view oriented toward Kaaba
-            60.0,        // Higher tilt for better overhead view of both markers
-            0.0          // No roll
+            finalRange,           // Optimized range for user-centered view
+            heading,              // Orient view toward Kaaba direction
+            tilt,                 // Dynamic tilt for user-centered perspective
+            0.0                   // No roll
         )
     }
 
@@ -585,7 +611,8 @@ private fun updateGlobeViewForOptimalMarkerVisibility(
  * Google Maps style - small, subtle wedge
  */
 private fun createHeadingIndicator(userLat: Double, userLon: Double, heading: Float): Polygon {
-    val userPos = Position.fromDegrees(userLat, userLon, 200000.0)
+    // Use altitude 0 for all positions since we'll clamp to ground
+    val userPos = Position.fromDegrees(userLat, userLon, 0.0)
 
     // Create a small viewing wedge like Google Maps - narrower angle, shorter distance
     val coneAngle = 15.0  // 30-degree total spread (narrower than before)
@@ -599,9 +626,10 @@ private fun createHeadingIndicator(userLat: Double, userLon: Double, heading: Fl
     val centerLoc = userPos.greatCircleLocation(heading.toDouble(), coneDistance, gov.nasa.worldwind.geom.Location())
     val rightLoc = userPos.greatCircleLocation(rightAzimuth, coneDistance, gov.nasa.worldwind.geom.Location())
 
-    val leftPos = Position.fromDegrees(leftLoc.latitude, leftLoc.longitude, 200000.0)
-    val centerPos = Position.fromDegrees(centerLoc.latitude, centerLoc.longitude, 200000.0)
-    val rightPos = Position.fromDegrees(rightLoc.latitude, rightLoc.longitude, 200000.0)
+    // Use altitude 0 and let CLAMP_TO_GROUND handle surface positioning
+    val leftPos = Position.fromDegrees(leftLoc.latitude, leftLoc.longitude, 0.0)
+    val centerPos = Position.fromDegrees(centerLoc.latitude, centerLoc.longitude, 0.0)
+    val rightPos = Position.fromDegrees(rightLoc.latitude, rightLoc.longitude, 0.0)
 
     val conePositions = ArrayList<Position>()
     conePositions.add(userPos)
@@ -611,12 +639,13 @@ private fun createHeadingIndicator(userLat: Double, userLon: Double, heading: Fl
     conePositions.add(userPos)  // Close the polygon
 
     val coneAttributes = ShapeAttributes().apply {
-        interiorColor = WwColor(0.26f, 0.54f, 0.98f, 0.35f)  // Slightly more visible
-        outlineColor = WwColor(0.26f, 0.54f, 0.98f, 0.65f)  // Stronger outline for definition
-        outlineWidth = 2.5f  // Slightly thicker for better visibility
+        // Google Maps style: Bright vibrant blue with professional opacity
+        interiorColor = WwColor(0.26f, 0.52f, 0.96f, 0.45f)  // Google blue with subtle fill
+        outlineColor = WwColor(0.26f, 0.52f, 0.96f, 0.75f)  // Professional blue outline
+        outlineWidth = 3.0f  // Clean, professional thickness
     }
     val polygon = Polygon(conePositions, coneAttributes).apply {
-        altitudeMode = WorldWind.ABSOLUTE
+        altitudeMode = WorldWind.CLAMP_TO_GROUND  // Fixed: Clamp to surface to prevent distortion during rotation
     }
     return polygon
 }
