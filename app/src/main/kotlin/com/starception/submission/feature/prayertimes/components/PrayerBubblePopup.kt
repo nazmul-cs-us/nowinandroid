@@ -1,24 +1,22 @@
 /**
- * PRAYER BUBBLE POPUP COMPONENT
+ * PRAYER POPUP COMPONENT - iOS-Inspired Design
  *
- * This file contains the 3D bubble popup component that appears when touching prayer indicators
- * in the Smart Tracking tile. It provides an immersive, glassmorphic popup with prayer details
- * and status information.
+ * Clean, minimal popup with blur effects and simple animations.
+ * Inspired by iOS modal sheets and alert dialogs.
  *
  * WHAT IT DOES:
- * - Creates a 3D animated bubble with glassmorphic design
- * - Shows prayer name, time, and completion status
- * - Provides smooth entrance/exit animations
- * - Displays decorative elements and prayer information
+ * - Displays prayer information in a clean card design
+ * - Shows countdown to prayer time or elapsed time
+ * - Allows marking/unmarking prayers as prayed
+ * - Provides smooth iOS-style animations
  *
  * FEATURES:
- * - Glassmorphic bubble with blur and transparency effects
- * - 3D depth with shadow and elevation
- * - Smooth spring animations for entrance/exit
- * - Arabic and English prayer names
- * - Prayer completion status with visual indicators
- * - Touch outside to dismiss functionality
- * - Material 3 color scheme integration
+ * - iOS-inspired design with blur effects
+ * - Clean, minimal layout with generous spacing
+ * - Real-time countdown/elapsed time display
+ * - Simple toggle button for prayer status
+ * - Smooth spring-based animations
+ * - Touch outside to dismiss
  */
 package com.starception.submission.feature.prayertimes.components
 
@@ -39,54 +37,94 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.zIndex
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
+import java.time.LocalTime
+import java.time.Duration
 
 /**
- * Prayer data class for bubble popup
+ * Prayer data class for popup
  */
 data class PrayerBubbleData(
     val name: String,
     val arabicName: String,
     val time: String,
     val isPrayed: Boolean,
-    val initial: String
+    val initial: String,
+    val prayerTime: LocalTime? = null  // Actual prayer time for countdown
 )
 
 /**
- * Main 3D Bubble Popup Composable
+ * Main iOS-Inspired Popup Composable
  *
  * @param prayerData Prayer information to display
  * @param onDismiss Callback when popup is dismissed
+ * @param onTogglePrayer Callback when prayer status is toggled
  */
 @Composable
 fun PrayerBubblePopup(
     prayerData: PrayerBubbleData,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onTogglePrayer: ((String, Boolean) -> Unit)? = null
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Animation states - start visible immediately for better UX
+    // Animation states
     var isVisible by remember { mutableStateOf(true) }
+
+    // Local prayer status state for reactive UI updates
+    var isPrayed by remember { mutableStateOf(prayerData.isPrayed) }
+
+    // Live countdown state - updates every second
+    var countdownText by remember { mutableStateOf("") }
+    var isUpcoming by remember { mutableStateOf(true) }
+
+    // Update countdown every second
+    LaunchedEffect(prayerData.prayerTime) {
+        while (true) {
+            prayerData.prayerTime?.let { prayerTime ->
+                val now = LocalTime.now()
+                val duration = Duration.between(now, prayerTime)
+
+                if (duration.isNegative) {
+                    // Prayer time has passed
+                    val elapsed = duration.abs()
+                    val hours = elapsed.toHours()
+                    val minutes = elapsed.toMinutes() % 60
+
+                    isUpcoming = false
+                    countdownText = when {
+                        hours > 0 -> "${hours}h ${minutes}m ago"
+                        minutes > 0 -> "${minutes}m ago"
+                        else -> "Just now"
+                    }
+                } else {
+                    // Prayer time is upcoming
+                    val hours = duration.toHours()
+                    val minutes = duration.toMinutes() % 60
+
+                    isUpcoming = true
+                    countdownText = when {
+                        hours > 0 -> "in ${hours}h ${minutes}m"
+                        minutes > 0 -> "in ${minutes}m"
+                        else -> "Now"
+                    }
+                }
+            }
+            delay(1000) // Update every second
+        }
+    }
 
     // Trigger entrance animation and haptic feedback
     LaunchedEffect(Unit) {
@@ -97,40 +135,28 @@ fun PrayerBubblePopup(
     val handleDismiss: () -> Unit = {
         isVisible = false
         coroutineScope.launch {
-            delay(300)
+            delay(200)
             onDismiss()
         }
     }
 
-    // Animated values for entrance/exit
+    // iOS-style entrance/exit animations
     val scale by animateFloatAsState(
-        targetValue = if (isVisible) 1f else 0.3f,
+        targetValue = if (isVisible) 1f else 0.9f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = Spring.StiffnessMediumLow
         ),
-        label = "bubbleScale"
+        label = "popupScale"
     )
 
     val alpha by animateFloatAsState(
         targetValue = if (isVisible) 1f else 0f,
-        animationSpec = tween(durationMillis = 300),
-        label = "bubbleAlpha"
+        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+        label = "popupAlpha"
     )
 
-    // 3D rotation effect
-    val infiniteTransition = rememberInfiniteTransition(label = "rotation")
-    val rotationY by infiniteTransition.animateFloat(
-        initialValue = -2f,
-        targetValue = 2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "rotationY"
-    )
-
-    // Dialog with glassmorphic background
+    // iOS-style Dialog
     Dialog(
         onDismissRequest = handleDismiss,
         properties = DialogProperties(
@@ -139,11 +165,6 @@ fun PrayerBubblePopup(
             usePlatformDefaultWidth = false
         )
     ) {
-        // Add logging
-        LaunchedEffect(Unit) {
-            android.util.Log.d("PrayerBubble", "Dialog is being displayed, scale=$scale, alpha=$alpha, isVisible=$isVisible")
-        }
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -152,21 +173,26 @@ fun PrayerBubblePopup(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
                 ) {
-                    android.util.Log.d("PrayerBubble", "Background clicked, dismissing")
                     handleDismiss()
                 },
             contentAlignment = Alignment.Center
         ) {
-
-            // 3D Bubble Card
-            Bubble3DCard(
+            // iOS-style Card with Blur Effect
+            IOSPrayerCard(
                 prayerData = prayerData,
+                isPrayed = isPrayed,
+                countdownText = countdownText,
+                isUpcoming = isUpcoming,
                 scale = scale,
                 alpha = alpha,
-                rotationY = rotationY,
                 onDismiss = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     handleDismiss()
+                },
+                onTogglePrayer = { newStatus ->
+                    isPrayed = newStatus
+                    onTogglePrayer?.invoke(prayerData.name, newStatus)
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 }
             )
         }
@@ -174,334 +200,242 @@ fun PrayerBubblePopup(
 }
 
 /**
- * 3D Bubble Card with glassmorphic design
+ * iOS-style Prayer Card with clean, minimal design
  */
 @Composable
-private fun Bubble3DCard(
+private fun IOSPrayerCard(
     prayerData: PrayerBubbleData,
+    isPrayed: Boolean,
+    countdownText: String,
+    isUpcoming: Boolean,
     scale: Float,
     alpha: Float,
-    rotationY: Float,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onTogglePrayer: (Boolean) -> Unit
 ) {
-    // Add logging
-    LaunchedEffect(Unit) {
-        android.util.Log.d("PrayerBubble", "Bubble3DCard rendered: ${prayerData.name}, scale=$scale, alpha=$alpha")
-    }
-
-    Box(
+    Surface(
         modifier = Modifier
-            .width(320.dp)
-            .height(450.dp)
+            .width(340.dp)
+            .wrapContentHeight()
             .scale(scale)
             .alpha(alpha)
-            .graphicsLayer {
-                this.rotationY = rotationY
-                shadowElevation = 24.dp.toPx()
-            }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() }
             ) {
                 // Prevent click propagation to background
-            }
+            },
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        shadowElevation = 1.dp
     ) {
-        // Balloon-shaped surface with much larger, more visible tail
-        Surface(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .balloonShape(
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                    tailWidth = 80f,
-                    tailHeight = 60f
-                ),
-            color = Color.Transparent,
-            shadowElevation = 0.dp
-        ) {}
-        Box {
-            // Gradient background overlay
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Close button - iOS style (top right X)
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
-                                Color.Transparent
-                            ),
-                            center = Offset(0.5f, 0.3f),
-                            radius = 800f
-                        )
-                    )
-            )
-
-            // Content (account for balloon tail at bottom - larger tail needs more padding)
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 80.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Close button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 8.dp, y = (-8).dp)
+                        .size(32.dp)
                 ) {
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                shape = CircleShape
-                            )
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Prayer initial circle - simple and clean
+            Box(
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier.size(80.dp),
+                    shape = CircleShape,
+                    color = if (isPrayed) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    }
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        Text(
+                            text = prayerData.initial,
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isPrayed) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
                         )
                     }
                 }
 
-                // Prayer initial in large circle
-                Box(
-                    modifier = Modifier
-                        .size(140.dp)
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = if (prayerData.isPrayed) {
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    )
-                                } else {
-                                    listOf(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        MaterialTheme.colorScheme.surface
-                                    )
-                                },
-                                start = Offset(0f, 0f),
-                                end = Offset(100f, 100f)
-                            ),
-                            shape = CircleShape
-                        )
-                        .graphicsLayer {
-                            shadowElevation = 12.dp.toPx()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = prayerData.initial,
-                            style = MaterialTheme.typography.displayLarge,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 64.sp,
-                            color = if (prayerData.isPrayed) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            }
-                        )
+                // Simple checkmark badge if prayed
+                if (isPrayed) {
+                    val badgeScale by animateFloatAsState(
+                        targetValue = 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "badgeScale"
+                    )
 
-                        // Check mark if prayed
-                        if (prayerData.isPrayed) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(24.dp)
+                            .scale(badgeScale),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Check,
-                                contentDescription = "Completed",
+                                contentDescription = "Prayed",
                                 tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
                 }
+            }
 
-                // Prayer information
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Prayer name - clean typography
+            Text(
+                text = prayerData.name,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Arabic name - subtle
+            Text(
+                text = prayerData.arabicName,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Prayer time - simple container
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ) {
                 Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.padding(vertical = 16.dp)
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Prayer name in English
                     Text(
-                        text = prayerData.name,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
+                        text = prayerData.time,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    // Prayer name in Arabic
-                    Text(
-                        text = prayerData.arabicName,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 28.sp
-                    )
-
-                    // Divider
-                    HorizontalDivider(
-                        modifier = Modifier
-                            .width(120.dp)
-                            .padding(vertical = 8.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                        thickness = 2.dp
-                    )
-
-                    // Prayer time
-                    Text(
-                        text = prayerData.time,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    // Status badge
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = if (prayerData.isPrayed) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        },
-                        modifier = Modifier.padding(top = 8.dp)
-                    ) {
+                    if (countdownText.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (prayerData.isPrayed) "Completed ✓" else "Pending",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = if (prayerData.isPrayed) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                            text = countdownText,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Simple divider
+            Divider(
+                modifier = Modifier.fillMaxWidth(),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Action buttons - iOS style
+            if (isPrayed) {
+                // Text button for unmark action
+                TextButton(
+                    onClick = { onTogglePrayer(false) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Mark as Not Prayed",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            } else {
+                // Filled button for mark action
+                Button(
+                    onClick = { onTogglePrayer(true) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 0.dp,
+                        pressedElevation = 0.dp
+                    )
+                ) {
+                    Text(
+                        text = "Mark as Prayed",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Status message - subtle
+            Text(
+                text = if (isPrayed) {
+                    "Prayer marked as complete"
+                } else {
+                    "Track your daily prayers"
+                },
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
+            )
         }
     }
-}
-
-/**
- * Balloon shape modifier - creates a speech balloon with tail at bottom
- * Inspired by skydoves/Balloon library design
- */
-fun Modifier.balloonShape(
-    color: Color,
-    tailWidth: Float = 50f,
-    tailHeight: Float = 35f
-) = this.drawBehind {
-    val width = size.width
-    val height = size.height - tailHeight
-    val cornerRadius = 40.dp.toPx()
-
-    // Create complete balloon path
-    val balloonPath = Path().apply {
-        // Start from left side, going clockwise
-
-        // Top-left corner
-        moveTo(cornerRadius, 0f)
-
-        // Top edge
-        lineTo(width - cornerRadius, 0f)
-
-        // Top-right corner (arc)
-        arcTo(
-            rect = androidx.compose.ui.geometry.Rect(
-                width - cornerRadius * 2, 0f,
-                width, cornerRadius * 2
-            ),
-            startAngleDegrees = -90f,
-            sweepAngleDegrees = 90f,
-            forceMoveTo = false
-        )
-
-        // Right edge
-        lineTo(width, height - cornerRadius)
-
-        // Bottom-right corner (arc)
-        arcTo(
-            rect = androidx.compose.ui.geometry.Rect(
-                width - cornerRadius * 2, height - cornerRadius * 2,
-                width, height
-            ),
-            startAngleDegrees = 0f,
-            sweepAngleDegrees = 90f,
-            forceMoveTo = false
-        )
-
-        // Bottom edge to tail start
-        lineTo(width / 2 + tailWidth / 2, height)
-
-        // Balloon tail (smooth curve pointing down)
-        quadraticBezierTo(
-            width / 2 + tailWidth / 4, height + tailHeight / 2,
-            width / 2, height + tailHeight
-        )
-        quadraticBezierTo(
-            width / 2 - tailWidth / 4, height + tailHeight / 2,
-            width / 2 - tailWidth / 2, height
-        )
-
-        // Continue bottom edge
-        lineTo(cornerRadius, height)
-
-        // Bottom-left corner (arc)
-        arcTo(
-            rect = androidx.compose.ui.geometry.Rect(
-                0f, height - cornerRadius * 2,
-                cornerRadius * 2, height
-            ),
-            startAngleDegrees = 90f,
-            sweepAngleDegrees = 90f,
-            forceMoveTo = false
-        )
-
-        // Left edge
-        lineTo(0f, cornerRadius)
-
-        // Top-left corner (arc)
-        arcTo(
-            rect = androidx.compose.ui.geometry.Rect(
-                0f, 0f,
-                cornerRadius * 2, cornerRadius * 2
-            ),
-            startAngleDegrees = 180f,
-            sweepAngleDegrees = 90f,
-            forceMoveTo = false
-        )
-
-        close()
-    }
-
-    // Draw shadow for depth
-    drawPath(
-        path = balloonPath,
-        color = Color.Black.copy(alpha = 0.15f),
-        style = androidx.compose.ui.graphics.drawscope.Fill,
-        alpha = 1f
-    )
-
-    // Draw main balloon fill
-    drawPath(
-        path = balloonPath,
-        color = color,
-        style = androidx.compose.ui.graphics.drawscope.Fill
-    )
-
-    // Draw balloon border/stroke for classic speech balloon look
-    drawPath(
-        path = balloonPath,
-        color = Color.Gray.copy(alpha = 0.3f),
-        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f)
-    )
 }
 
 /**
