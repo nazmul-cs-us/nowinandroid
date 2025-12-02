@@ -86,19 +86,14 @@ object GoogleSampleNotificationManager {
         android.util.Log.d("GoogleSampleNotificationManager",
             "📱 Last Adhan from storage: Prayer='$lastPrayerName' Time='$lastPrayerTime' PlayedAt=${if (lastPlayedTime > 0) java.time.Instant.ofEpochMilli(lastPlayedTime) else "Never"}")
 
-        // Create audio attributes for notification sound
-        val audioAttributes = AudioAttributes.Builder()
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-            .build()
-
-        // Get the URI for the adhan sound
-        val adhanSoundUri = Uri.parse("android.resource://${context.packageName}/${R.raw.short_adhan}")
-
+        // CRITICAL FIX: Remove notification channel sound - only use MediaPlayer for Adhan
+        // Setting channel sound causes unwanted adhan playback during startup
+        // We'll play adhan explicitly via MediaPlayer when conditions are met
         val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, IMPORTANCE_DEFAULT).apply {
-            setSound(adhanSoundUri, audioAttributes)
+            setSound(null, null)  // No default sound - we control adhan via MediaPlayer
         }
         notificationManager.createNotificationChannel(channel)
+        android.util.Log.d("GoogleSampleNotificationManager", "📢 Notification channel created WITHOUT sound - adhan controlled via MediaPlayer only")
     }
 
     private enum class OrderState(val delay: Long) {
@@ -545,6 +540,12 @@ object GoogleSampleNotificationManager {
                 android.util.Log.d("GoogleSampleNotificationManager",
                     "⏭️ Skipping Adhan: $reason")
             }
+
+            // CRITICAL FIX: Always silence notification channel sound to prevent unwanted adhan playback
+            // We only use MediaPlayer (playAdhanSound()) for adhan - never the notification channel sound
+            // This prevents the channel's default sound from playing during startup or when adhan shouldn't play
+            notificationBuilder.setSilent(true)
+            android.util.Log.d("GoogleSampleNotificationManager", "🔇 Notification channel sound silenced - only MediaPlayer used for Adhan")
 
             // DISABLED: Notification sound to prevent double Adhan
             // The playAdhanSound() method above already plays the Adhan when conditions are met
