@@ -131,8 +131,8 @@ data class Location(
             // FALLBACK 5: SubLocality only
             subLocality.isNotEmpty() -> subLocality
 
-            // FINAL FALLBACK: Show coordinates (4 decimal places = ~11 meter accuracy)
-            else -> "${String.format("%.4f", latitude)}, ${String.format("%.4f", longitude)}"
+            // FINAL FALLBACK: Show coordinates (6 decimal places = ~0.11 meter accuracy, matches GPS precision)
+            else -> "${String.format("%.6f", latitude)}, ${String.format("%.6f", longitude)}"
         }
     }
 }

@@ -365,7 +365,7 @@ class EnhancedLocationService @Inject constructor(
         )
         
         android.util.Log.i("EnhancedLocationService", "   📦 Base location: ${baseLocation.getDisplayName()}")
-        
+
         return try {
             geocoder?.let { gc ->
                 android.util.Log.i("EnhancedLocationService", "   ✅ ENHANCED GEOCODER AVAILABLE: Starting reverse geocoding...")
