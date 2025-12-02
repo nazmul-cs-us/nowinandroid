@@ -48,22 +48,59 @@ object PrayerTracker {
             Log.e(TAG, "PrayerTracker not initialized!")
             return
         }
-        
+
         val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
         val key = "$KEY_PRAYED_PRAYERS_PREFIX$today"
-        
+
         // Get existing prayed prayers for today
         val prayedPrayers = getPrayedPrayersForDate(today).toMutableSet()
-        
+
         // Add the new prayer
         prayedPrayers.add(prayerName)
-        
+
         // Save back to preferences
         prefs.edit()
             .putStringSet(key, prayedPrayers)
             .apply()
-        
+
         Log.i(TAG, "✅ Marked $prayerName as prayed for $today. Total prayed: ${prayedPrayers.size}")
+    }
+
+    /**
+     * Unmark a prayer as prayed for today (toggle off)
+     */
+    fun unmarkPrayerAsPrayed(prayerName: String) {
+        if (!::prefs.isInitialized) {
+            Log.e(TAG, "PrayerTracker not initialized!")
+            return
+        }
+
+        val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val key = "$KEY_PRAYED_PRAYERS_PREFIX$today"
+
+        // Get existing prayed prayers for today
+        val prayedPrayers = getPrayedPrayersForDate(today).toMutableSet()
+
+        // Remove the prayer
+        prayedPrayers.remove(prayerName)
+
+        // Save back to preferences
+        prefs.edit()
+            .putStringSet(key, prayedPrayers)
+            .apply()
+
+        Log.i(TAG, "❌ Unmarked $prayerName as prayed for $today. Total prayed: ${prayedPrayers.size}")
+    }
+
+    /**
+     * Toggle prayer status for today (mark if not marked, unmark if marked)
+     */
+    fun togglePrayerStatus(prayerName: String) {
+        if (isPrayerMarkedToday(prayerName)) {
+            unmarkPrayerAsPrayed(prayerName)
+        } else {
+            markPrayerAsPrayed(prayerName)
+        }
     }
     
     /**

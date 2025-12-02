@@ -1534,7 +1534,8 @@ private fun SmartInfoTile(
                                                     arabicName = com.starception.submission.feature.prayertimes.components.getArabicPrayerName(prayerName),
                                                     time = prayerTime.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a")),
                                                     isPrayed = isPrayed,
-                                                    initial = initial
+                                                    initial = initial,
+                                                    prayerTime = prayerTime  // Pass actual prayer time for countdown
                                                 )
                                                 android.util.Log.d("PrayerBubble", "Bubble data created, showing popup")
                                                 view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -1763,7 +1764,15 @@ private fun SmartInfoTile(
     selectedPrayer?.let { prayerData ->
         com.starception.submission.feature.prayertimes.components.PrayerBubblePopup(
             prayerData = prayerData,
-            onDismiss = { selectedPrayer = null }
+            onDismiss = { selectedPrayer = null },
+            onTogglePrayer = { prayerName, newStatus ->
+                // Toggle prayer status using PrayerTracker
+                com.starception.submission.util.PrayerTracker.togglePrayerStatus(prayerName)
+                android.util.Log.i("SmartTracking", "Prayer $prayerName ${if (newStatus) "marked" else "unmarked"} from balloon popup")
+
+                // Update the selected prayer data to reflect the new status
+                selectedPrayer = prayerData.copy(isPrayed = newStatus)
+            }
         )
     }
 }
