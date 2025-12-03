@@ -86,9 +86,12 @@ object GoogleSampleNotificationManager {
         android.util.Log.d("GoogleSampleNotificationManager",
             "📱 Last Adhan from storage: Prayer='$lastPrayerName' Time='$lastPrayerTime' PlayedAt=${if (lastPlayedTime > 0) java.time.Instant.ofEpochMilli(lastPlayedTime) else "Never"}")
 
-        // CRITICAL FIX: Remove notification channel sound - only use MediaPlayer for Adhan
-        // Setting channel sound causes unwanted adhan playback during startup
-        // We'll play adhan explicitly via MediaPlayer when conditions are met
+        // CRITICAL FIX: Delete old channel and recreate without sound
+        // Notification channels are cached, so we must delete the old one first
+        notificationManager.deleteNotificationChannel(CHANNEL_ID)
+        android.util.Log.d("GoogleSampleNotificationManager", "🗑️ Deleted old notification channel")
+
+        // Create new channel WITHOUT sound - only use MediaPlayer for Adhan
         val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, IMPORTANCE_DEFAULT).apply {
             setSound(null, null)  // No default sound - we control adhan via MediaPlayer
         }

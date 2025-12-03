@@ -529,19 +529,13 @@ private fun QiblaGlobeCard(
 
     // Only show globe if we have user location
     if (userLocation != null) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-            )
-        ) {
-            QiblaGlobeView(
-                userLatitude = userLocation!!.latitude,
-                userLongitude = userLocation!!.longitude,
-                modifier = Modifier.padding(16.dp)
-            )
-        }
+        QiblaGlobeView(
+            userLatitude = userLocation!!.latitude,
+            userLongitude = userLocation!!.longitude,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)  // Match the height we want for the tile
+        )
     }
 }
 
