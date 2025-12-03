@@ -123,6 +123,8 @@ fun QiblaGlobeView(
         val tileWidthPx = with(density) { maxWidth.toPx() }
         val tileHeightPx = with(density) { maxHeight.toPx() }
 
+        android.util.Log.d("QiblaGlobeView", "📐 Tile dimensions: width=${tileWidthPx}px (${maxWidth}), height=${tileHeightPx}px (${maxHeight})")
+
     // Compass sensor state for dynamic rotation
     var deviceHeading by remember { mutableFloatStateOf(0f) }
     var lastUpdatedHeading by remember { mutableFloatStateOf(0f) }  // Track last heading used for update
@@ -249,8 +251,7 @@ fun QiblaGlobeView(
 
     Box(
         modifier = modifier
-            .fillMaxWidth()
-            .height(400.dp)
+            .fillMaxSize()  // Fill both width and height from parent constraints
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
@@ -306,6 +307,10 @@ fun QiblaGlobeView(
             modifier = Modifier
                 .fillMaxSize()
                 .layerBackdrop(backdrop),
+            update = { worldWindow ->
+                // Force a layout pass to ensure WorldWindow viewport matches dimensions
+                worldWindow.requestLayout()
+            },
             onRelease = { worldWindow ->
                 // Clean up when view is removed
                 worldWindow.onPause()
@@ -452,6 +457,10 @@ private fun createWorldWindow(
 ): Triple<WorldWindow, RenderableLayer, Polygon> {
     val worldWindow = WorldWindow(context)
 
+    // Explicitly set layout parameters to ensure proper viewport sizing
+    worldWindow.layoutParams = android.view.ViewGroup.LayoutParams(viewWidth, viewHeight)
+    android.util.Log.d("QiblaGlobeView", "🌍 WorldWindow created with explicit size: ${viewWidth}x${viewHeight}")
+
     // Set up touch-tracking controller for pan/zoom with compass pause
     worldWindow.worldWindowController = TouchTrackingController(onTouchStart, onTouchEnd)
 
@@ -513,6 +522,7 @@ private fun createWorldWindow(
 
     // Center camera on user's location (Kaaba will be positioned in the direction of heading)
     val aspectRatio = viewWidth.toDouble() / viewHeight.toDouble()
+    android.util.Log.d("QiblaGlobeView", "📷 Camera setup: viewWidth=$viewWidth, viewHeight=$viewHeight, aspectRatio=$aspectRatio")
 
     // Base range calculation: zoom out to show user centered with Kaaba visible
     // User at center, Kaaba positioned down in the view direction
@@ -542,26 +552,35 @@ private fun createWorldWindow(
         baseRange * Math.sqrt(1.1 / aspectRatio)  // Zoom out more for tall tiles
     }
 
-    // Ensure we're far enough to see Earth curvature with user centered
-    val minRange = earthRadius * 2.0  // Minimum distance for centered user view
-    val maxRange = earthRadius * 5.0  // Maximum distance to keep detail visible
+    // Zoom out more to see better separation between user and Kaaba markers
+    // This helps show the directional relationship more clearly
+    val minRange = earthRadius * 3.5  // Increased zoom out for better marker separation
+    val maxRange = earthRadius * 6.0  // Allow more zoom out
     val finalRange = aspectCorrectedRange.coerceIn(minRange, maxRange)
 
-    // Optimal tilt angle - lower values = more overhead view (user centered, Kaaba below)
+    // High tilt angle for side view - user marker in center of visible globe
+    // Higher tilt = more horizontal/side view, lower tilt = more overhead view
     val tilt = when {
-        distanceMeters < earthRadius * 0.3 -> 25.0  // More overhead for very close points
-        distanceMeters < earthRadius * 0.5 -> 30.0  // Overhead angle - user centered, Kaaba visible below
-        distanceMeters < earthRadius * 1.0 -> 35.0  // Medium tilt for medium distance
-        else -> 40.0  // Shallower overhead for far points
+        distanceMeters < earthRadius * 0.3 -> 50.0  // Side view for close points
+        distanceMeters < earthRadius * 0.5 -> 55.0  // Side view - user in center of globe
+        distanceMeters < earthRadius * 1.0 -> 60.0  // More angled for medium distance
+        else -> 65.0  // Horizontal side view for far points
     }
 
-    // To truly center the user marker in the view with tilt, we need to raise the look-at altitude
-    // This compensates for the camera angle - higher altitude brings the marker to screen center
-    val centeringAltitude = finalRange * 0.15  // 15% of range works well for typical tilt angles
+    // Zero centering altitude - look directly at user's location
+    val centeringAltitude = 0.0  // Look directly at user position
+
+    // EXPERIMENTAL: Offset longitude to center the globe horizontally
+    // WorldWindow appears to render the globe off-center to the left
+    // This is a workaround to shift the camera view to compensate
+    val longitudeOffset = 20.0  // Shift camera east to move globe right in viewport
+
+    // Offset latitude to center the globe sphere vertically in the tile
+    val latitudeOffset = 5.0  // Look slightly south to center globe in tile
 
     val lookAt = LookAt().apply {
         set(
-            userLat, userLon, centeringAltitude,  // Raised altitude to center user marker in view
+            userLat - latitudeOffset, userLon + longitudeOffset, centeringAltitude,  // Offset both lat and lon
             WorldWind.ABSOLUTE,
             finalRange,           // Optimized range for user-centered view
             heading,              // Orient view toward Kaaba direction
@@ -569,6 +588,8 @@ private fun createWorldWindow(
             0.0                   // No roll
         )
     }
+
+    android.util.Log.d("QiblaGlobeView", "🎯 Camera positioned at: lat=$userLat, lon=${userLon + longitudeOffset} (offset=$longitudeOffset°)")
 
     worldWindow.navigator.setAsLookAt(globe, lookAt)
 
