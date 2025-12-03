@@ -576,7 +576,7 @@ private fun createWorldWindow(
     val longitudeOffset = 20.0  // Shift camera east to move globe right in viewport
 
     // Offset latitude to center the globe sphere vertically in the tile
-    val latitudeOffset = 5.0  // Look slightly south to center globe in tile
+    val latitudeOffset = 25.0  // Look south to move globe center to vertical middle of tile
 
     val lookAt = LookAt().apply {
         set(

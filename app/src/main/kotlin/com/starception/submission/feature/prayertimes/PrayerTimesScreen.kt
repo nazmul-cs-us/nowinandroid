@@ -1411,31 +1411,19 @@ fun PrayerTimesScreen(
                     } ?: emptyList()
 
                     if (allPrayersList.isNotEmpty()) {
-                        // Find the index of the next prayer (first prayer after current time)
-                        val nextPrayerIndex = allPrayersList.indexOfFirst { it.second.isAfter(currentTime) }
+                        // Find the current prayer (last prayer that has passed)
+                        val currentPrayerIndex = allPrayersList
+                            .indexOfLast { it.second.isBefore(currentTime) || it.second == currentTime }
 
-                        if (nextPrayerIndex != -1) {
-                            // Found a prayer later today - start from there
-                            // Return next 6 prayers in circular order
+                        if (currentPrayerIndex != -1) {
+                            // Found current prayer - start from there and show next 6 prayers in circular order
                             for (i in 0 until 6) {
-                                val index = (nextPrayerIndex + i) % allPrayersList.size
+                                val index = (currentPrayerIndex + i) % allPrayersList.size
                                 result.add(allPrayersList[index].first)
                             }
                         } else {
-                            // All prayers have passed - find the current prayer period (last prayer that passed)
-                            val currentPrayerIndex = allPrayersList
-                                .indexOfLast { it.second.isBefore(currentTime) || it.second == currentTime }
-
-                            if (currentPrayerIndex != -1) {
-                                // Start from current prayer period, then wrap to tomorrow's prayers
-                                for (i in 0 until 6) {
-                                    val index = (currentPrayerIndex + i) % allPrayersList.size
-                                    result.add(allPrayersList[index].first)
-                                }
-                            } else {
-                                // Fallback: show in default order
-                                result.addAll(allPrayersList.map { it.first })
-                            }
+                            // No prayer has passed yet (very early morning before Fajr) - start from Fajr
+                            result.addAll(allPrayersList.map { it.first })
                         }
                     }
 
@@ -1749,16 +1737,17 @@ fun PrayerTimesScreen(
                 // Spacer between Show Less/Show All button and location card (4dp to match spacing above for symmetry)
                 Spacer(modifier = Modifier.height(-6.dp))
 
-                // Location info using Material 3 design - aligned with big tiles
+                // Location info using Material 3 Expressive Design - symmetric rounded shape
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shadowElevation = 2.dp
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                         horizontalArrangement = Arrangement.Start,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1768,19 +1757,19 @@ fun PrayerTimesScreen(
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Spacer(modifier = Modifier.width(12.dp))
 
                         Text(
                             text = getLocationWithCountryCode(location, prayerTimes?.location),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             textAlign = TextAlign.Start,
+                            fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
-                        ).also {
-                            android.util.Log.d("LocationText", "📍 LOCATION DISPLAY: '$location' (length=${location.length})")
-                        }
+                        )
                     }
                 }
             }
@@ -2130,115 +2119,103 @@ fun PrayerTimesScreen(
 }
 
 /**
- * Helper function to get location text with country information
- * Uses CountryCodeMapper to add country code or full country name based on available space
+ * Helper function to get location text with smart priority based on available space
+ *
+ * PRIORITY SYSTEM (tries formats in order until one fits):
+ * 1. "Area, City (CC)" - Most detailed (e.g., "Al Thanyah First, Dubai (AE)")
+ * 2. "City (CC)" - Standard (e.g., "Dubai (AE)")
+ * 3. "City" - Minimal (e.g., "Dubai")
+ * 4. Fallback to coordinates
+ *
+ * MAX LENGTH: 35 characters for single-line display without ellipsis
  */
 private fun getLocationWithCountryCode(
     locationString: String,
     locationData: com.starception.submission.prayer.model.Location?
 ): String {
-    android.util.Log.d("LocationDisplay", "🏷️ FORMATTING LOCATION DISPLAY:")
+    android.util.Log.d("LocationDisplay", "🏷️ SMART LOCATION PRIORITY:")
     android.util.Log.d("LocationDisplay", "   Input: '$locationString'")
-    android.util.Log.d("LocationDisplay", "   Location Data: ${locationData?.let { "${it.city}, ${it.country} (${it.countryCode})" } ?: "null"}")
-    
-    if (locationString.isBlank()) {
-        android.util.Log.d("LocationDisplay", "   ❌ Location string is blank - returning loading message")
-        return "Loading location..."
+    android.util.Log.d("LocationDisplay", "   Data: ${locationData?.let { "area='${it.area}', city='${it.city}', country='${it.country}', code='${it.countryCode}'" } ?: "null"}")
+
+    // Handle no data
+    if (locationData == null) {
+        return locationString.ifBlank { "Loading location..." }
     }
-    
-    // Clean up the location string by removing redundant country information
-    val cleanLocationString = locationString
-        .replace(Regex(",\\s*(UAE|United Arab Emirates)\\s*\\([A-Z]{2}\\)"), "") // Remove country name with code
-        .replace(Regex(",\\s*(UAE|United Arab Emirates)"), "") // Remove country name only
-        .replace(Regex("\\s*\\([A-Z]{2}\\)"), "") // Remove country code in parentheses
-        .replace(Regex("\\s+"), " ") // Normalize whitespace
-        .trim()
-    
-    android.util.Log.d("LocationDisplay", "   🧹 Cleaned location: '$cleanLocationString'")
-    
-    // If we have location data with country information, enhance the display
-    if (locationData != null) {
-        val countryCode = when {
-            // Use existing country code if available
-            locationData.countryCode.isNotEmpty() -> {
-                android.util.Log.d("LocationDisplay", "   ✅ Using existing country code: ${locationData.countryCode}")
-                locationData.countryCode
-            }
-            
-            // Try to map country name to code using CountryCodeMapper
-            locationData.country.isNotEmpty() -> {
-                android.util.Log.d("LocationDisplay", "   🔍 Mapping country name '${locationData.country}' to code")
-                CountryCodeMapper.getCountryCode(locationData.country) ?: ""
-            }
-            
-            else -> {
-                android.util.Log.d("LocationDisplay", "   ⚠️ No country information available")
-                ""
-            }
+
+    val maxLength = 60  // Increased limit to fit full location with country name
+
+    // Extract available fields
+    val area = locationData.area.takeIf { it.isNotEmpty() }
+    val subLocality = locationData.subLocality.takeIf { it.isNotEmpty() }
+    val city = locationData.city.takeIf { it.isNotEmpty() }
+    val country = locationData.country.takeIf { it.isNotEmpty() }
+    val countryCode = locationData.countryCode.takeIf { it.isNotEmpty() }
+
+    // PRIORITY 1: Area + City + Country + Country Code (most detailed)
+    if (area != null && city != null && country != null && countryCode != null) {
+        val format1 = "$area, $city, $country ($countryCode)"
+        if (format1.length <= maxLength) {
+            android.util.Log.i("LocationDisplay", "   ✅ P1: '$format1' (${format1.length} chars)")
+            return format1
         }
-        
-        if (countryCode.isNotEmpty()) {
-            // Get full country name from country code
-            val fullCountryName = CountryCodeMapper.getFullCountryName(countryCode)
-            
-            android.util.Log.d("LocationDisplay", "   🌍 COUNTRY INFO:")
-            android.util.Log.d("LocationDisplay", "      Country Code: '$countryCode'")
-            android.util.Log.d("LocationDisplay", "      Full Country Name: '$fullCountryName'")
-            
-            if (fullCountryName != null) {
-                // Calculate available space for the format: "City, Full Country Name (CODE)"
-                val baseLocationLength = cleanLocationString.length
-                val totalAvailableSpace = 45 // Increased estimate for location display
-                val fullFormatLength = baseLocationLength + 2 + fullCountryName.length + 3 + countryCode.length + 1 // " , " + name + " (" + code + ")"
-                val codeOnlyFormatLength = baseLocationLength + 3 + countryCode.length + 1 // " (" + code + ")"
-                
-                android.util.Log.d("LocationDisplay", "   📏 SPACE CALCULATION:")
-                android.util.Log.d("LocationDisplay", "      Base location length: $baseLocationLength")
-                android.util.Log.d("LocationDisplay", "      Total available space: $totalAvailableSpace")
-                android.util.Log.d("LocationDisplay", "      Full format length: $fullFormatLength")
-                android.util.Log.d("LocationDisplay", "      Code only format length: $codeOnlyFormatLength")
-                
-                val finalResult = when {
-                    // Format: "Dubai, United Arab Emirates (AE)" - preferred format when space allows
-                    fullFormatLength <= totalAvailableSpace -> {
-                        val result = "$cleanLocationString, $fullCountryName ($countryCode)"
-                        android.util.Log.i("LocationDisplay", "   ✅ Using full format: '$result' (${result.length} chars)")
-                        result
-                    }
-                    
-                    // Format: "Dubai (AE)" - fallback when full name doesn't fit
-                    codeOnlyFormatLength <= totalAvailableSpace -> {
-                        val result = "$cleanLocationString ($countryCode)"
-                        android.util.Log.i("LocationDisplay", "   ✅ Using code only format: '$result' (${result.length} chars)")
-                        result
-                    }
-                    
-                    // Format: "Dubai" - fallback when even code doesn't fit
-                    else -> {
-                        android.util.Log.w("LocationDisplay", "   ⚠️ No space for country info - showing location only: '$cleanLocationString'")
-                        cleanLocationString
-                    }
-                }
-                
-                android.util.Log.i("LocationDisplay", "   🎯 FINAL RESULT: '$finalResult' (${finalResult.length} chars)")
-                return finalResult
-            } else {
-                // Fallback to code only if we can't get full country name
-                val baseLocationLength = cleanLocationString.length
-                val codeOnlyFormatLength = baseLocationLength + 3 + countryCode.length + 1 // " (" + code + ")"
-                
-                if (codeOnlyFormatLength <= 45) {
-                    val result = "$cleanLocationString ($countryCode)"
-                    android.util.Log.i("LocationDisplay", "   ✅ Using code fallback: '$result' (${result.length} chars)")
-                    return result
-                }
-            }
-        }
+        android.util.Log.d("LocationDisplay", "   ❌ P1 too long: $format1 (${format1.length} chars)")
     }
-    
-    // Fallback to cleaned location string
-    android.util.Log.d("LocationDisplay", "   📋 Using fallback: cleaned location string")
-    return cleanLocationString
+
+    // PRIORITY 2: Area + City + Country Code (without full country name)
+    if (area != null && city != null && countryCode != null) {
+        val format2 = "$area, $city ($countryCode)"
+        if (format2.length <= maxLength) {
+            android.util.Log.i("LocationDisplay", "   ✅ P2: '$format2' (${format2.length} chars)")
+            return format2
+        }
+        android.util.Log.d("LocationDisplay", "   ❌ P2 too long: $format2 (${format2.length} chars)")
+    }
+
+    // PRIORITY 3: SubLocality + City + Country Code (alternative to area)
+    if (subLocality != null && city != null && countryCode != null) {
+        val format3 = "$subLocality, $city ($countryCode)"
+        if (format3.length <= maxLength) {
+            android.util.Log.i("LocationDisplay", "   ✅ P3: '$format3' (${format3.length} chars)")
+            return format3
+        }
+        android.util.Log.d("LocationDisplay", "   ❌ P3 too long: $format3 (${format3.length} chars)")
+    }
+
+    // PRIORITY 4: City + Country Code (standard format)
+    if (city != null && countryCode != null) {
+        val format4 = "$city ($countryCode)"
+        if (format4.length <= maxLength) {
+            android.util.Log.i("LocationDisplay", "   ✅ P4: '$format4' (${format4.length} chars)")
+            return format4
+        }
+        android.util.Log.d("LocationDisplay", "   ❌ P4 too long: $format4 (${format4.length} chars)")
+    }
+
+    // PRIORITY 5: Area + City (no country code)
+    if (area != null && city != null) {
+        val result = "$area, $city"
+        android.util.Log.i("LocationDisplay", "   ✅ P5: '$result' (${result.length} chars)")
+        return result
+    }
+
+    // PRIORITY 6: City only
+    if (city != null) {
+        android.util.Log.i("LocationDisplay", "   ✅ P6: '$city' (${city.length} chars)")
+        return city
+    }
+
+    // PRIORITY 7: Area only (rare case)
+    if (area != null) {
+        android.util.Log.i("LocationDisplay", "   ✅ P7: '$area' (${area.length} chars)")
+        return area
+    }
+
+    // FINAL FALLBACK: Coordinates
+    val fallback = locationString.ifBlank {
+        "${String.format("%.4f", locationData.latitude)}, ${String.format("%.4f", locationData.longitude)}"
+    }
+    android.util.Log.w("LocationDisplay", "   ⚠️ Fallback: '$fallback'")
+    return fallback
 }
 
 
