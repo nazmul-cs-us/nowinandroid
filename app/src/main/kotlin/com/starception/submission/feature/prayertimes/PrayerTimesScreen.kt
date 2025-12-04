@@ -148,7 +148,7 @@ import dagger.hilt.android.EntryPointAccessors
 import com.starception.submission.prayer.service.CountryCodeMapper
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import kotlinx.coroutines.Dispatchers
-import com.starception.submission.feature.surah.QuranFonts
+import com.starception.submission.core.designsystem.theme.QuranFonts
 import kotlinx.coroutines.launch
 import android.content.SharedPreferences
 import androidx.core.content.ContextCompat
