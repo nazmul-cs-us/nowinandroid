@@ -55,6 +55,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.R
 import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
 import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState

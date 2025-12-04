@@ -58,6 +58,7 @@ import com.starception.submission.core.qurandatabase.QuranTranslationHelper
 import com.starception.submission.core.qurandatabase.QuranTranslationRepository
 import com.starception.submission.feature.quran.QuranPlayerViewModel
 import com.starception.submission.feature.quran.QuranData
+import com.starception.submission.core.designsystem.theme.QuranFonts
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow

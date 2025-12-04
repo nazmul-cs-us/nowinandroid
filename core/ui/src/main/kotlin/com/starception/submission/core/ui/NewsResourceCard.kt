@@ -19,6 +19,7 @@ package com.starception.submission.core.ui
 import android.content.ClipData
 import android.os.Build.VERSION
 import android.os.Build.VERSION_CODES
+import com.starception.submission.core.designsystem.theme.QuranFonts
 import android.view.View
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -227,7 +228,44 @@ fun NewsResourceTitle(
     newsResourceTitle: String,
     modifier: Modifier = Modifier,
 ) {
-    Text(newsResourceTitle, style = MaterialTheme.typography.headlineSmall, modifier = modifier)
+    // Check if title contains Arabic text (Unicode range 0600-06FF)
+    val containsArabic = newsResourceTitle.any { it in '\u0600'..'\u06FF' }
+
+    // Get selected Arabic font from SharedPreferences if title contains Arabic
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val arabicFontFamily = if (containsArabic) {
+        val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
+        val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+        getArabicFontFamilyForSelection(selectedFont)
+    } else {
+        null
+    }
+
+    Text(
+        text = newsResourceTitle,
+        style = if (containsArabic && arabicFontFamily != null) {
+            MaterialTheme.typography.headlineSmall.copy(
+                fontFamily = arabicFontFamily,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+            )
+        } else {
+            MaterialTheme.typography.headlineSmall
+        },
+        modifier = modifier
+    )
+}
+
+// Helper function to get Arabic font family
+@Composable
+private fun getArabicFontFamilyForSelection(selectedFont: String): androidx.compose.ui.text.font.FontFamily {
+    return when (selectedFont) {
+        "pdms_saleem" -> QuranFonts.PDMSSaleem
+        "noor_e_hidayat" -> QuranFonts.NoorEHidayat
+        "thabit" -> QuranFonts.Thabit
+        "uthmani_script" -> QuranFonts.UthmanicScript
+        "indopak_script" -> QuranFonts.IndoPakScript
+        else -> QuranFonts.PDMSSaleem
+    }
 }
 
 @Composable
