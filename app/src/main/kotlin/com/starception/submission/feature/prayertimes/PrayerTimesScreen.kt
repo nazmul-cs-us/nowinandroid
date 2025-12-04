@@ -1695,7 +1695,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp)
+                        .padding(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 0.dp)
                         .animateContentSize(
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -1735,7 +1735,7 @@ fun PrayerTimesScreen(
                 }
 
                 // Spacer between Show Less/Show All button and location card (4dp to match spacing above for symmetry)
-                Spacer(modifier = Modifier.height(-6.dp))
+                Spacer(modifier = Modifier.height(0.dp))
 
                 // Location info using Material 3 Expressive Design - symmetric rounded shape
                 Surface(

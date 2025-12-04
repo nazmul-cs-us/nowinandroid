@@ -20,15 +20,29 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.LineHeightStyle.Alignment
 import androidx.compose.ui.text.style.LineHeightStyle.Trim
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.designsystem.R
 
-// Custom Ubuntu-inspired font family using system fonts with specific characteristics
-// Ubuntu is known for its rounded, humanist characteristics and good readability
-// Using Roboto Light as base which has similar characteristics to Ubuntu
-private val ubuntuInspiredFontFamily = FontFamily.SansSerif
+// Roboto Serif font family from Google Fonts
+private val provider = GoogleFont.Provider(
+    providerAuthority = "com.google.android.gms.fonts",
+    providerPackage = "com.google.android.gms",
+    certificates = R.array.com_google_android_gms_fonts_certs
+)
+
+private val robotoSerifFontName = GoogleFont("Roboto Serif")
+
+private val ubuntuInspiredFontFamily = FontFamily(
+    Font(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Light),
+    Font(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Normal),
+    Font(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Medium),
+    Font(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Bold),
+)
 
 /**
  * Now in Android typography with Ubuntu font.

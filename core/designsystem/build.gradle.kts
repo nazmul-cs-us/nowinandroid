@@ -38,6 +38,7 @@ dependencies {
     api(libs.androidx.compose.material3.navigationSuite)
     api(libs.androidx.compose.runtime)
     api(libs.androidx.compose.ui.util)
+    api(libs.androidx.compose.ui.text.google.fonts)
 
     implementation(libs.coil.kt.compose)
 
