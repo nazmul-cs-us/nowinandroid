@@ -148,7 +148,10 @@ import dagger.hilt.android.EntryPointAccessors
 import com.starception.submission.prayer.service.CountryCodeMapper
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import kotlinx.coroutines.Dispatchers
+import com.starception.submission.feature.surah.QuranFonts
 import kotlinx.coroutines.launch
+import android.content.SharedPreferences
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
@@ -235,6 +238,23 @@ import java.time.Duration
  * - Track calculation timeouts and error handling
  */
 
+/**
+ * Helper function to get the Arabic font family based on user selection
+ */
+@Composable
+private fun getSelectedArabicFontFamily(context: Context): androidx.compose.ui.text.font.FontFamily {
+    val prefs = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
+    val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+
+    return when (selectedFont) {
+        "pdms_saleem" -> QuranFonts.PDMSSaleem
+        "noor_e_hidayat" -> QuranFonts.NoorEHidayat
+        "thabit" -> QuranFonts.Thabit
+        "uthmani_script" -> QuranFonts.UthmanicScript
+        "indopak_script" -> QuranFonts.IndoPakScript
+        else -> QuranFonts.PDMSSaleem
+    }
+}
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -938,7 +958,11 @@ fun PrayerTimesScreen(
                             )
                             Text(
                                 text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = getSelectedArabicFontFamily(screenContext),
+                                    fontSize = 20.sp,
+                                    letterSpacing = 0.5.sp
+                                ),
                                 color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                                     "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
                                     "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)

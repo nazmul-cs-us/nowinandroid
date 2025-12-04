@@ -443,11 +443,11 @@ private fun IOSPrayerCard(
  */
 fun getArabicPrayerName(prayerName: String): String {
     return when (prayerName) {
-        "Fajr" -> "الفجر"
-        "Dhuhr" -> "الظهر"
-        "Asr" -> "العصر"
-        "Maghrib" -> "المغرب"
-        "Isha" -> "العشاء"
+        "Fajr" -> "ٱلْفَجْر"
+        "Dhuhr" -> "ٱلظُّهْر"
+        "Asr" -> "ٱلْعَصْر"
+        "Maghrib" -> "ٱلْمَغْرِب"
+        "Isha" -> "ٱلْعِشَاء"
         else -> prayerName
     }
 }
