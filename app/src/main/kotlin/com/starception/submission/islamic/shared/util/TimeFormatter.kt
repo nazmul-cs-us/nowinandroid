@@ -111,11 +111,11 @@ object TimeFormatter {
      */
     fun getIslamicGreeting(currentTime: LocalTime = LocalTime.now()): String {
         return when (currentTime.hour) {
-            in 0..5 -> "السلام عليكم" // As-salamu alaykum (Peace be upon you)
-            in 6..11 -> "صباح الخير" // Sabah al-khayr (Good morning)
-            in 12..16 -> "مساء الخير" // Masa' al-khayr (Good afternoon) 
-            in 17..20 -> "مساء الخير" // Masa' al-khayr (Good evening)
-            else -> "السلام عليكم" // As-salamu alaykum (Peace be upon you)
+            in 0..5 -> "ٱلسَّلَامُ عَلَيْكُمْ" // As-salamu alaykum (Peace be upon you)
+            in 6..11 -> "صَبَاحُ ٱلْخَيْر" // Sabah al-khayr (Good morning)
+            in 12..16 -> "مَسَاءُ ٱلْخَيْر" // Masa' al-khayr (Good afternoon)
+            in 17..20 -> "مَسَاءُ ٱلْخَيْر" // Masa' al-khayr (Good evening)
+            else -> "ٱلسَّلَامُ عَلَيْكُمْ" // As-salamu alaykum (Peace be upon you)
         }
     }
 }

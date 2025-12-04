@@ -243,17 +243,13 @@ import java.time.Duration
  */
 @Composable
 private fun getSelectedArabicFontFamily(context: Context): androidx.compose.ui.text.font.FontFamily {
+    // Read directly from SharedPreferences with observable state
     val prefs = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
+
+    // Re-read every time this composable recomposes
     val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
 
-    return when (selectedFont) {
-        "pdms_saleem" -> QuranFonts.PDMSSaleem
-        "noor_e_hidayat" -> QuranFonts.NoorEHidayat
-        "thabit" -> QuranFonts.Thabit
-        "uthmani_script" -> QuranFonts.UthmanicScript
-        "indopak_script" -> QuranFonts.IndoPakScript
-        else -> QuranFonts.PDMSSaleem
-    }
+    return com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedFont)
 }
 
 @OptIn(ExperimentalPermissionsApi::class)

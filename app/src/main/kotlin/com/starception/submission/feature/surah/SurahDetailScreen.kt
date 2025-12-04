@@ -534,6 +534,7 @@ fun SurahContentWithMusicPlayer(
     onBookmarkClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val albumImageHeight = screenWidth // 1:1 aspect ratio (XML: app:layout_constraintDimensionRatio="H,1:1")
@@ -683,7 +684,12 @@ fun SurahContentWithMusicPlayer(
                                 // Match XML: TextView (album_artist) - textAppearanceSubtitle1
                                 Text(
                                     text = surah.nameArabic,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(
+                                            context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
+                                                .getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+                                        )
+                                    ),
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -1139,6 +1145,7 @@ fun TranslationSelectorDialog(
 @Composable
 fun WordStudyDialog(
     wordStudyData: com.starception.submission.core.qurandatabase.AyahMeaningsItem,
+    selectedArabicFont: String = "pdms_saleem",
     onDismiss: () -> Unit
 ) {
     Dialog(
@@ -1182,7 +1189,7 @@ fun WordStudyDialog(
                             text = "Ayah ${wordStudyData.ayahNumber}",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontFamily = QuranFonts.Amiri
+                            fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedArabicFont)
                         )
                     }
                     IconButton(onClick = onDismiss) {
@@ -1214,9 +1221,10 @@ fun WordStudyDialog(
                             Text(
                                 text = wordStudyData.ayahText,
                                 style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontFamily = QuranFonts.Amiri,
+                                    fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedArabicFont),
                                     fontSize = 26.sp,
-                                    lineHeight = 44.sp
+                                    lineHeight = 44.sp,
+                                    fontWeight = FontWeight.Normal
                                 ),
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(20.dp)
@@ -1258,9 +1266,10 @@ fun WordStudyDialog(
                                     Text(
                                         text = wordStudyData.meanings,
                                         style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontFamily = QuranFonts.Amiri,
+                                            fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedArabicFont),
                                             fontSize = 19.sp,
-                                            lineHeight = 36.sp
+                                            lineHeight = 36.sp,
+                                            fontWeight = FontWeight.Normal
                                         ),
                                         textAlign = TextAlign.Justify,
                                         modifier = Modifier.padding(20.dp)
@@ -1295,6 +1304,7 @@ fun WordStudyDialog(
 fun TafseerDialog(
     tafseerData: com.starception.submission.core.qurandatabase.QuranAyahTafseer,
     selectedTafseerBook: String,
+    selectedArabicFont: String = "pdms_saleem",
     onTafseerBookSelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1358,10 +1368,10 @@ fun TafseerDialog(
                             )
                         }
                         Text(
-                            text = "${tafseerData.surahNameArabic} - آية ${tafseerData.ayahNumber}",
+                            text = "${tafseerData.surahNameArabic} - آيَة ${tafseerData.ayahNumber}",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontFamily = QuranFonts.Amiri
+                            fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedArabicFont)
                         )
                     }
                     IconButton(onClick = onDismiss) {
@@ -1387,9 +1397,10 @@ fun TafseerDialog(
                     Text(
                         text = tafseerData.ayahText,
                         style = MaterialTheme.typography.headlineMedium.copy(
-                            fontFamily = QuranFonts.Amiri,
+                            fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedArabicFont),
                             fontSize = 26.sp,
-                            lineHeight = 44.sp
+                            lineHeight = 44.sp,
+                            fontWeight = FontWeight.Normal
                         ),
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(20.dp)
@@ -1416,7 +1427,7 @@ fun TafseerDialog(
                                 Text(
                                     "معاصر",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = QuranFonts.Amiri
+                                    fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedArabicFont)
                                 )
                             }
                         }
@@ -1436,7 +1447,7 @@ fun TafseerDialog(
                                 Text(
                                     "مُبسّط",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = QuranFonts.Amiri
+                                    fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedArabicFont)
                                 )
                             }
                         }
@@ -1456,7 +1467,7 @@ fun TafseerDialog(
                                 Text(
                                     "كلاسيكي",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = QuranFonts.Amiri
+                                    fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedArabicFont)
                                 )
                             }
                         }
@@ -1505,9 +1516,10 @@ fun TafseerDialog(
                                     Text(
                                         text = tafseerText,
                                         style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontFamily = QuranFonts.Amiri,
+                                            fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedArabicFont),
                                             fontSize = 19.sp,
-                                            lineHeight = 36.sp
+                                            lineHeight = 36.sp,
+                                            fontWeight = FontWeight.Normal
                                         ),
                                         textAlign = TextAlign.Justify,
                                         modifier = Modifier.padding(20.dp)
@@ -1536,17 +1548,18 @@ fun TafseerDialog(
                                             Text(
                                                 "معاني الكلمات",
                                                 style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                fontFamily = QuranFonts.Amiri
+                                                fontWeight = FontWeight.Normal,
+                                                fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedArabicFont)
                                             )
                                         }
                                         Spacer(modifier = Modifier.height(12.dp))
                                         Text(
                                             text = tafseerData.ayahMeanings,
                                             style = MaterialTheme.typography.bodyMedium.copy(
-                                                fontFamily = QuranFonts.Amiri,
+                                                fontFamily = com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedArabicFont),
                                                 fontSize = 17.sp,
-                                                lineHeight = 30.sp
+                                                lineHeight = 30.sp,
+                                                fontWeight = FontWeight.Normal
                                             ),
                                             textAlign = TextAlign.Justify
                                         )
