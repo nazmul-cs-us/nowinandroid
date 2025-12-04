@@ -70,6 +70,25 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
+ * Helper function to convert font name to FontFamily
+ */
+internal fun getArabicFontFamilyForSelection(selectedFont: String): androidx.compose.ui.text.font.FontFamily {
+    val fontFamily = when (selectedFont) {
+        "pdms_saleem" -> QuranFonts.PDMSSaleem
+        "noor_e_hidayat" -> QuranFonts.NoorEHidayat
+        "thabit" -> QuranFonts.Thabit
+        "uthmani_script" -> QuranFonts.UthmanicScript
+        "indopak_script" -> QuranFonts.IndoPakScript
+        else -> {
+            android.util.Log.w("FontSelection", "⚠️ Unknown font: $selectedFont, using default PDMSSaleem")
+            QuranFonts.PDMSSaleem
+        }
+    }
+    android.util.Log.d("FontSelection", "🔤 Mapping '$selectedFont' -> ${fontFamily::class.simpleName}")
+    return fontFamily
+}
+
+/**
  * Quran Album Player Screen - Compose version
  * Replicates the album-style design from MusicPlayerAlbumDemoFragment
  * but uses MaterialTheme.colorScheme directly for automatic theme support
@@ -129,6 +148,11 @@ fun QuranAlbumPlayerScreen(
 
     val selectedArabicFont by viewModel.selectedArabicFont.collectAsState()
     val availableArabicFonts = remember { viewModel.getAvailableArabicFonts() }
+
+    // Debug: Log when font selection changes
+    LaunchedEffect(selectedArabicFont) {
+        android.util.Log.d("QuranAlbumPlayer_FONT", "🎨 MAIN SCREEN - Font changed to: $selectedArabicFont")
+    }
 
     // Font size state - loaded from ViewModel (which reads from SharedPreferences)
     val arabicFontSize by viewModel.arabicFontSize.collectAsState()
@@ -434,6 +458,7 @@ fun QuranAlbumPlayerScreen(
             },
             currentTranslation = currentTranslation,
             isBookmarked = isBookmarked,
+            selectedArabicFont = selectedArabicFont,
             onBackClick = onBackClick,
             onTranslationClick = { showTranslationDialog = true },
             onFontClick = { showFontDialog = true },
@@ -584,6 +609,7 @@ fun QuranAlbumPlayerScreen(
         if (showWordStudyDialog && wordStudyData != null) {
             com.starception.submission.feature.surah.WordStudyDialog(
                 wordStudyData = wordStudyData!!,
+                selectedArabicFont = selectedArabicFont,
                 onDismiss = {
                     showWordStudyDialog = false
                     viewModel.clearWordStudy()
@@ -596,6 +622,7 @@ fun QuranAlbumPlayerScreen(
             com.starception.submission.feature.surah.TafseerDialog(
                 tafseerData = tafseerData!!,
                 selectedTafseerBook = selectedTafseerBook,
+                selectedArabicFont = selectedArabicFont,
                 onTafseerBookSelected = { book -> viewModel.selectTafseerBook(book) },
                 onDismiss = {
                     showTafseerDialog = false
@@ -614,6 +641,7 @@ private fun AlbumPlayerTopBar(
     surahNameArabic: String,
     currentTranslation: String,
     isBookmarked: Boolean,
+    selectedArabicFont: String,
     onBackClick: () -> Unit,
     onTranslationClick: () -> Unit = {},
     onFontClick: () -> Unit = {},
@@ -696,7 +724,10 @@ private fun AlbumPlayerTopBar(
                     // Surah name in Arabic - matches AlbumInfoCard styling
                     Text(
                         text = surahNameArabic,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                            fontWeight = FontWeight.Normal
+                        ),
                         color = contentColor.copy(alpha = 0.7f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -915,6 +946,7 @@ private fun AlbumPlayerContent(
                                     currentVolume = currentVolume,
                                     surahName = displaySurah.nameEnglish,
                                     surahNameArabic = displaySurah.nameArabic,
+                                    selectedArabicFont = selectedArabicFont,
                                     onPlayPauseClick = onPlayPauseClick,
                                     onRewindClick = onRewindClick,
                                     onForwardClick = onForwardClick,
@@ -925,6 +957,7 @@ private fun AlbumPlayerContent(
                                 // Album Info Card - show current playing surah info
                                 AlbumInfoCard(
                                     surah = currentPlayingSurah ?: surah,
+                                    selectedArabicFont = selectedArabicFont,
                                     collapseProgress = collapseProgress
                                 )
                             }
@@ -1302,8 +1335,14 @@ private fun AlbumHeader(surah: Surah) {
 @Composable
 private fun AlbumInfoCard(
     surah: Surah,
+    selectedArabicFont: String,
     collapseProgress: Float = 0f
 ) {
+    // Debug logging to track font changes
+    LaunchedEffect(selectedArabicFont) {
+        android.util.Log.d("AlbumInfoCard_FONT", "🎨 Font changed to: $selectedArabicFont for surah: ${surah.nameArabic}")
+    }
+
     // Use MaterialTheme.colorScheme for automatic theme support
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -1333,7 +1372,10 @@ private fun AlbumInfoCard(
             // Surah name in Arabic - fades out as it blends into toolbar
             Text(
                 text = surah.nameArabic,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                    fontWeight = FontWeight.Normal
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.graphicsLayer {
                     alpha = 1f - collapseProgress
@@ -1376,6 +1418,7 @@ private fun MusicPlayerControls(
     currentVolume: Float,
     surahName: String,
     surahNameArabic: String,
+    selectedArabicFont: String,
     onPlayPauseClick: () -> Unit,
     onRewindClick: () -> Unit,
     onForwardClick: () -> Unit,
@@ -1429,7 +1472,10 @@ private fun MusicPlayerControls(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = surahNameArabic,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                        fontWeight = FontWeight.Normal
+                    ),
                     color = Color.White.copy(alpha = 0.7f)
                 )
             }

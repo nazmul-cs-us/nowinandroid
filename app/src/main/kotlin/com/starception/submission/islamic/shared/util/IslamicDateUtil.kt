@@ -51,14 +51,14 @@ object IslamicDateUtil {
      */
     fun getArabicDayName(date: LocalDate): String {
         return when (date.dayOfWeek.value) {
-            1 -> "الاثنين"    // Monday - Al-Ithnayn
-            2 -> "الثلاثاء"   // Tuesday - Ath-Thulatha
-            3 -> "الأربعاء"  // Wednesday - Al-Arba'a
-            4 -> "الخميس"    // Thursday - Al-Khamees
-            5 -> "الجمعة"    // Friday - Al-Jumu'ah (most important day)
-            6 -> "السبت"     // Saturday - As-Sabt
-            7 -> "الأحد"     // Sunday - Al-Ahad
-            else -> "يوم"    // Day
+            1 -> "ٱلْإِثْنَيْن"    // Monday - Al-Ithnayn
+            2 -> "ٱلثُّلَاثَاء"   // Tuesday - Ath-Thulatha
+            3 -> "ٱلْأَرْبِعَاء"  // Wednesday - Al-Arba'a
+            4 -> "ٱلْخَمِيس"    // Thursday - Al-Khamees
+            5 -> "ٱلْجُمُعَة"    // Friday - Al-Jumu'ah (most important day)
+            6 -> "ٱلسَّبْت"     // Saturday - As-Sabt
+            7 -> "ٱلْأَحَد"     // Sunday - Al-Ahad
+            else -> "يَوْم"    // Day
         }
     }
     
@@ -70,19 +70,19 @@ object IslamicDateUtil {
      */
     fun getIslamicMonthName(monthNumber: Int): String {
         return when (monthNumber) {
-            1 -> "محرم"           // Muharram
-            2 -> "صفر"           // Safar
-            3 -> "ربيع الأول"     // Rabi' al-Awwal
-            4 -> "ربيع الثاني"    // Rabi' al-Thani
-            5 -> "جمادى الأولى"   // Jumada al-Ula
-            6 -> "جمادى الثانية"  // Jumada al-Thani
-            7 -> "رجب"          // Rajab
-            8 -> "شعبان"        // Sha'ban
-            9 -> "رمضان"        // Ramadan (holy month)
-            10 -> "شوال"        // Shawwal
-            11 -> "ذو القعدة"    // Dhu al-Qi'dah
-            12 -> "ذو الحجة"     // Dhu al-Hijjah (pilgrimage month)
-            else -> "شهر"       // Month
+            1 -> "مُحَرَّم"           // Muharram
+            2 -> "صَفَر"           // Safar
+            3 -> "رَبِيعُ ٱلْأَوَّل"     // Rabi' al-Awwal
+            4 -> "رَبِيعُ ٱلثَّانِي"    // Rabi' al-Thani
+            5 -> "جُمَادَى ٱلْأُولَى"   // Jumada al-Ula
+            6 -> "جُمَادَى ٱلثَّانِيَة"  // Jumada al-Thani
+            7 -> "رَجَب"          // Rajab
+            8 -> "شَعْبَان"        // Sha'ban
+            9 -> "رَمَضَان"        // Ramadan (holy month)
+            10 -> "شَوَّال"        // Shawwal
+            11 -> "ذُو ٱلْقَعْدَة"    // Dhu al-Qi'dah
+            12 -> "ذُو ٱلْحِجَّة"     // Dhu al-Hijjah (pilgrimage month)
+            else -> "شَهْر"       // Month
         }
     }
     
@@ -105,9 +105,9 @@ object IslamicDateUtil {
     fun getIslamicDaySignificance(date: LocalDate): String? {
         // This is a simplified check - in reality, Islamic dates follow lunar calendar
         return when {
-            isJumuahDay(date) -> "يوم الجمعة المبارك" // Blessed Friday
-            date.dayOfMonth == 1 -> "بداية الشهر" // Beginning of month
-            date.dayOfMonth in 10..12 -> "أيام البيض" // White days (recommended fasting)
+            isJumuahDay(date) -> "يَوْمُ ٱلْجُمُعَةِ ٱلْمُبَارَك" // Blessed Friday
+            date.dayOfMonth == 1 -> "بِدَايَةُ ٱلشَّهْر" // Beginning of month
+            date.dayOfMonth in 10..12 -> "أَيَّامُ ٱلْبِيض" // White days (recommended fasting)
             else -> null
         }
     }
@@ -147,10 +147,10 @@ object IslamicDateUtil {
     fun getPrayerDaySummary(date: LocalDateTime): String {
         val day = getArabicDayName(date.toLocalDate())
         val significance = getIslamicDaySignificance(date.toLocalDate())
-        
+
         return when {
             significance != null -> "$day • $significance"
-            isJumuahDay(date.toLocalDate()) -> "$day • جمعة مباركة" // Blessed Friday
+            isJumuahDay(date.toLocalDate()) -> "$day • جُمُعَة مُبَارَكَة" // Blessed Friday
             else -> day
         }
     }

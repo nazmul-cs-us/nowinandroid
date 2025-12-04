@@ -268,7 +268,7 @@ class QuranPlaybackService : Service() {
             mediaSession?.setMetadata(
                 MediaMetadataCompat.Builder()
                     .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "$surahName - Ayah $ayahNumber")
-                    .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "القرآن الكريم")
+                    .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "ٱلْقُرْآنُ ٱلْكَرِيم")
                     .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Quran")
                     .build()
             )
@@ -312,7 +312,7 @@ class QuranPlaybackService : Service() {
         mediaSession?.setMetadata(
             MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, surah.nameEnglish)
-                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "القرآن الكريم")
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "ٱلْقُرْآنُ ٱلْكَرِيم")
                 .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Quran - ${surah.nameArabic}")
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, getDuration().toLong())
                 .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, appIcon)
@@ -398,7 +398,7 @@ class QuranPlaybackService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(surah.nameEnglish)
-            .setContentText("${surah.nameArabic} - القرآن الكريم")
+            .setContentText("${surah.nameArabic} - ٱلْقُرْآنُ ٱلْكَرِيم")
             .setSubText("Quran Player")
             .setSmallIcon(R.drawable.transparent_greyscaled)
             .setContentIntent(contentPendingIntent)
