@@ -544,12 +544,12 @@ private fun QiblaGlobeCard(
  */
 private fun getArabicName(prayerName: String): String {
     return when (prayerName) {
-        "Fajr" -> "الفجر"
-        "Sunrise" -> "الشروق"
-        "Dhuhr" -> "الظهر"
-        "Asr" -> "العصر"
-        "Maghrib" -> "المغرب"
-        "Isha" -> "العشاء"
+        "Fajr" -> "ٱلْفَجْر"
+        "Sunrise" -> "ٱلشُّرُوق"
+        "Dhuhr" -> "ٱلظُّهْر"
+        "Asr" -> "ٱلْعَصْر"
+        "Maghrib" -> "ٱلْمَغْرِب"
+        "Isha" -> "ٱلْعِشَاء"
         else -> prayerName
     }
 }

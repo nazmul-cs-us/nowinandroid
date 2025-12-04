@@ -30,12 +30,12 @@ fun getPrayerNameInLocalLanguage(englishName: String, countryCode: String?): Str
         // Arabic-speaking countries
         "AE", "SA", "EG", "JO", "LB", "SY", "IQ", "KW", "QA", "BH", "OM", "YE", "LY", "TN", "DZ", "MA", "SD" -> {
             when (englishName) {
-                "Fajr" -> "الفجر"
-                "Sunrise" -> "الشروق" 
-                "Dhuhr" -> "الظهر"
-                "Asr" -> "العصر"
-                "Maghrib" -> "المغرب"
-                "Isha" -> "العشاء"
+                "Fajr" -> "ٱلْفَجْر"
+                "Sunrise" -> "ٱلشُّرُوق"
+                "Dhuhr" -> "ٱلظُّهْر"
+                "Asr" -> "ٱلْعَصْر"
+                "Maghrib" -> "ٱلْمَغْرِب"
+                "Isha" -> "ٱلْعِشَاء"
                 else -> ""
             }
         }
@@ -102,12 +102,12 @@ fun getPrayerNameInLocalLanguage(englishName: String, countryCode: String?): Str
         // Default to Arabic for other Muslim-majority countries or if country is unknown
         else -> {
             when (englishName) {
-                "Fajr" -> "الفجر"
-                "Sunrise" -> "الشروق"
-                "Dhuhr" -> "الظهر"
-                "Asr" -> "العصر"
-                "Maghrib" -> "المغرب"
-                "Isha" -> "العشاء"
+                "Fajr" -> "ٱلْفَجْر"
+                "Sunrise" -> "ٱلشُّرُوق"
+                "Dhuhr" -> "ٱلظُّهْر"
+                "Asr" -> "ٱلْعَصْر"
+                "Maghrib" -> "ٱلْمَغْرِب"
+                "Isha" -> "ٱلْعِشَاء"
                 else -> ""
             }
         }

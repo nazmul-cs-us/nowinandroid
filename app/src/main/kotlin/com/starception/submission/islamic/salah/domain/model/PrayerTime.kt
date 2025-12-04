@@ -11,11 +11,11 @@ import java.time.LocalTime
  * ## Islamic Prayer Context
  * 
  * The five daily obligatory prayers (Salah):
- * - **Fajr** (الفجر): Dawn prayer - before sunrise
- * - **Dhuhr** (الظهر): Noon prayer - after sun's zenith  
- * - **Asr** (العصر): Afternoon prayer - based on shadow length
- * - **Maghrib** (المغرب): Sunset prayer - just after sunset
- * - **Isha** (العشاء): Night prayer - after twilight ends
+ * - **Fajr** (ٱلْفَجْر): Dawn prayer - before sunrise
+ * - **Dhuhr** (ٱلظُّهْر): Noon prayer - after sun's zenith
+ * - **Asr** (ٱلْعَصْر): Afternoon prayer - based on shadow length
+ * - **Maghrib** (ٱلْمَغْرِب): Sunset prayer - just after sunset
+ * - **Isha** (ٱلْعِشَاء): Night prayer - after twilight ends
  * 
  * @param name Prayer name (Fajr, Dhuhr, Asr, Maghrib, Isha)
  * @param arabicName Arabic name of the prayer
@@ -44,12 +44,12 @@ object PrayerNames {
     const val MAGHRIB = "Maghrib"
     const val ISHA = "Isha"
     
-    const val FAJR_ARABIC = "الفجر"
-    const val SUNRISE_ARABIC = "الشروق"
-    const val DHUHR_ARABIC = "الظهر"
-    const val ASR_ARABIC = "العصر"
-    const val MAGHRIB_ARABIC = "المغرب"
-    const val ISHA_ARABIC = "العشاء"
+    const val FAJR_ARABIC = "ٱلْفَجْر"
+    const val SUNRISE_ARABIC = "ٱلشُّرُوق"
+    const val DHUHR_ARABIC = "ٱلظُّهْر"
+    const val ASR_ARABIC = "ٱلْعَصْر"
+    const val MAGHRIB_ARABIC = "ٱلْمَغْرِب"
+    const val ISHA_ARABIC = "ٱلْعِشَاء"
     
     /**
      * Get Arabic name for prayer
