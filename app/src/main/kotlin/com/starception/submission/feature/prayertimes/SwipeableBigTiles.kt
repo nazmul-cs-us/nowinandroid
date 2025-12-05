@@ -182,6 +182,7 @@ import android.os.Build
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.starception.submission.core.designsystem.theme.QuranFonts
 
 
 
@@ -1970,6 +1971,19 @@ private fun DailyStatsTile(
                 }
             }
 
+            // Get selected Arabic font from SharedPreferences
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
+            val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+            val arabicFontFamily = when (selectedFont) {
+                "pdms_saleem" -> QuranFonts.PDMSSaleem
+                "noor_e_hidayat" -> QuranFonts.NoorEHidayat
+                "thabit" -> QuranFonts.Thabit
+                "uthmani_script" -> QuranFonts.UthmanicScript
+                "indopak_script" -> QuranFonts.IndoPakScript
+                else -> QuranFonts.PDMSSaleem
+            }
+
             // LIST VIEW - Show scrollable Surah list with Material 3 expressive design
         Column(
             modifier = Modifier
@@ -2125,10 +2139,12 @@ private fun DailyStatsTile(
 
                                 // Surah names - compact and professional
                                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
+                                    Text(
                                         text = surah.nameArabic,
-                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontFamily = arabicFontFamily,
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                                        ),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -2162,6 +2178,19 @@ private fun DailyStatsTile(
                 }
             }
         } else {
+            // Get selected Arabic font from SharedPreferences for player view
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
+            val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+            val arabicFontFamily = when (selectedFont) {
+                "pdms_saleem" -> QuranFonts.PDMSSaleem
+                "noor_e_hidayat" -> QuranFonts.NoorEHidayat
+                "thabit" -> QuranFonts.Thabit
+                "uthmani_script" -> QuranFonts.UthmanicScript
+                "indopak_script" -> QuranFonts.IndoPakScript
+                else -> QuranFonts.PDMSSaleem
+            }
+
             // PLAYER VIEW - Ultra-compact design optimized for 200dp height tile
             Column(
                 modifier = Modifier
@@ -2269,9 +2298,11 @@ private fun DailyStatsTile(
                         Column {
                             Text(
                                 text = QuranData.surahs[viewModel.currentSurahIndex].nameArabic,
-                                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = arabicFontFamily,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                                ),
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
                                 maxLines = 1
                             )
                             Text(
