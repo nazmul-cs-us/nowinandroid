@@ -386,6 +386,22 @@ private fun PrayerTimeRow(prayer: PrayerTime) {
  */
 @Composable
 private fun LocationCard(location: com.starception.submission.prayer.model.Location) {
+    // Get location display name
+    val locationName = location.getDisplayName()
+
+    // Check if location name contains Arabic text (Unicode range 0600-06FF)
+    val containsArabic = locationName.any { it in '\u0600'..'\u06FF' }
+
+    // Get selected Arabic font from SharedPreferences if location name contains Arabic
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val arabicFontFamily = if (containsArabic) {
+        val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
+        val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+        getArabicFontFamilyForLocationCard(selectedFont)
+    } else {
+        null
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp)
@@ -400,14 +416,22 @@ private fun LocationCard(location: com.starception.submission.prayer.model.Locat
                 contentDescription = "Location",
                 tint = MaterialTheme.colorScheme.primary
             )
-            
+
             Column(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = location.getDisplayName(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
+                    text = locationName,
+                    style = if (containsArabic && arabicFontFamily != null) {
+                        MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = arabicFontFamily,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                        )
+                    } else {
+                        MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -420,6 +444,18 @@ private fun LocationCard(location: com.starception.submission.prayer.model.Locat
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun getArabicFontFamilyForLocationCard(selectedFont: String): androidx.compose.ui.text.font.FontFamily {
+    return when (selectedFont) {
+        "pdms_saleem" -> com.starception.submission.core.designsystem.theme.QuranFonts.PDMSSaleem
+        "noor_e_hidayat" -> com.starception.submission.core.designsystem.theme.QuranFonts.NoorEHidayat
+        "thabit" -> com.starception.submission.core.designsystem.theme.QuranFonts.Thabit
+        "uthmani_script" -> com.starception.submission.core.designsystem.theme.QuranFonts.UthmanicScript
+        "indopak_script" -> com.starception.submission.core.designsystem.theme.QuranFonts.IndoPakScript
+        else -> com.starception.submission.core.designsystem.theme.QuranFonts.PDMSSaleem
     }
 }
 

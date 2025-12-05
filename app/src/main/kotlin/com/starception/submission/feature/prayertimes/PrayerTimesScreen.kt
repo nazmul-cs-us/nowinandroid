@@ -1780,12 +1780,43 @@ fun PrayerTimesScreen(
 
                         Spacer(modifier = Modifier.width(12.dp))
 
+                        // Get location text
+                        val locationText = getLocationWithCountryCode(location, prayerTimes?.location)
+
+                        // Check if location text contains Arabic (Unicode range 0600-06FF)
+                        val containsArabic = locationText.any { it in '\u0600'..'\u06FF' }
+
+                        // Get selected Arabic font if location contains Arabic
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val arabicFontFamily = if (containsArabic) {
+                            val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
+                            val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+                            when (selectedFont) {
+                                "pdms_saleem" -> QuranFonts.PDMSSaleem
+                                "noor_e_hidayat" -> QuranFonts.NoorEHidayat
+                                "thabit" -> QuranFonts.Thabit
+                                "uthmani_script" -> QuranFonts.UthmanicScript
+                                "indopak_script" -> QuranFonts.IndoPakScript
+                                else -> QuranFonts.PDMSSaleem
+                            }
+                        } else {
+                            null
+                        }
+
                         Text(
-                            text = getLocationWithCountryCode(location, prayerTimes?.location),
-                            style = MaterialTheme.typography.bodyLarge,
+                            text = locationText,
+                            style = if (containsArabic && arabicFontFamily != null) {
+                                MaterialTheme.typography.bodyLarge.copy(
+                                    fontFamily = arabicFontFamily,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                                )
+                            } else {
+                                MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = FontWeight.Medium
+                                )
+                            },
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             textAlign = TextAlign.Start,
-                            fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
