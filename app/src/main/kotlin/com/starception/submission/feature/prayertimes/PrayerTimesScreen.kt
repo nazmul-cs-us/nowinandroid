@@ -956,7 +956,7 @@ fun PrayerTimesScreen(
                                 text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontFamily = getSelectedArabicFontFamily(screenContext),
-                                    fontSize = 20.sp,
+                                    fontSize = 17.sp,
                                     letterSpacing = 0.5.sp
                                 ),
                                 color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
@@ -1022,12 +1022,12 @@ fun PrayerTimesScreen(
                                         "Next" -> MaterialTheme.colorScheme.primary
                                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                                     }
-                                    
+
                                     // Main prayer time in bold - show adjusted time
                                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = baseColor)) {
                                         append(adjustedTime)
                                     }
-                                    
+
                                     // Always show offset indicator (including zero values for clarity)
                                     append(" ")
                                     withStyle(style = SpanStyle(
@@ -1038,7 +1038,7 @@ fun PrayerTimesScreen(
                                         append(if (currentOffset > 0) "+${currentOffset}m" else if (currentOffset < 0) "${currentOffset}m" else "±0m")
                                     }
                                 },
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.headlineSmall.copy(fontSize = 22.sp),
                                 overflow = TextOverflow.Ellipsis,
                                 maxLines = 1,
                                 modifier = Modifier.padding(bottom = 8.dp) // Add specific bottom padding after English prayer time
@@ -1375,7 +1375,7 @@ fun PrayerTimesScreen(
                 
                 // Material 3 expressive tile height animation with spring physics
                 val tileHeight by animateDpAsState(
-                    targetValue = if (showAllPrayers) 115.dp else 140.dp,
+                    targetValue = if (showAllPrayers) 122.dp else 140.dp,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessLow,
