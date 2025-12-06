@@ -85,7 +85,7 @@ data class PrayerLocationPreferences(
 
 /**
  * NOTIFICATION PREFERENCES: How to alert user for prayer times
- * 
+ *
  * This stores notification-specific settings for prayer alerts.
  */
 @Serializable
@@ -93,8 +93,32 @@ data class PrayerLocationPreferences(
 data class PrayerNotificationPreferences(
     val notificationsEnabled: Boolean = true,   // Master notification toggle
     val notificationSound: String = "default",  // Notification sound selection
-    val vibrationEnabled: Boolean = true        // Vibration for notifications
-)
+    val vibrationEnabled: Boolean = true,       // Vibration for notifications
+
+    // PER-PRAYER NOTIFICATION TOGGLES - Individual control for each prayer
+    val fajrNotificationEnabled: Boolean = true,    // Fajr notification toggle
+    val dhuhrNotificationEnabled: Boolean = true,   // Dhuhr notification toggle
+    val asrNotificationEnabled: Boolean = true,     // Asr notification toggle
+    val maghribNotificationEnabled: Boolean = true, // Maghrib notification toggle
+    val ishaNotificationEnabled: Boolean = true     // Isha notification toggle
+) {
+    /**
+     * Check if notifications are enabled for a specific prayer
+     * Considers both master toggle and individual prayer toggle
+     */
+    fun isNotificationEnabledForPrayer(prayerName: String): Boolean {
+        if (!notificationsEnabled) return false // Master toggle off = no notifications
+
+        return when (prayerName.lowercase()) {
+            "fajr" -> fajrNotificationEnabled
+            "dhuhr" -> dhuhrNotificationEnabled
+            "asr" -> asrNotificationEnabled
+            "maghrib" -> maghribNotificationEnabled
+            "isha" -> ishaNotificationEnabled
+            else -> false // Unknown prayer = no notification
+        }
+    }
+}
 
 /**
  * LEGACY PRAYER SETTINGS: Composite model for backward compatibility
