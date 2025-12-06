@@ -783,18 +783,46 @@ class PrayerSettingsRepository @Inject constructor(
     
     fun updateNotificationPreferences(preferences: PrayerNotificationPreferences, forceCommit: Boolean = false) {
         Log.i(TAG, "📝 NOTIFICATION PREFERENCES UPDATE - Starting process")
-        
+
         saveNotificationPreferences(preferences)
         _notificationPreferencesFlow.value = preferences
         _notificationPreferencesFlow.tryEmit(preferences)
         updateLegacyCombinedFlow()
-        
+
         Log.i(TAG, "✅ NOTIFICATION PREFERENCES UPDATE COMPLETE")
     }
-    
+
+    /**
+     * TOGGLE PER-PRAYER NOTIFICATION - Enable/disable notifications for individual prayers
+     *
+     * This allows users to control notifications for each prayer independently.
+     *
+     * @param prayerName Name of the prayer (Fajr, Dhuhr, Asr, Maghrib, Isha)
+     * @param enabled Whether to enable or disable notification for this prayer
+     */
+    fun togglePrayerNotification(prayerName: String, enabled: Boolean) {
+        Log.i(TAG, "🔔 TOGGLE PRAYER NOTIFICATION: $prayerName -> $enabled")
+
+        val currentPrefs = _notificationPreferencesFlow.value
+        val updatedPrefs = when (prayerName.lowercase()) {
+            "fajr" -> currentPrefs.copy(fajrNotificationEnabled = enabled)
+            "dhuhr" -> currentPrefs.copy(dhuhrNotificationEnabled = enabled)
+            "asr" -> currentPrefs.copy(asrNotificationEnabled = enabled)
+            "maghrib" -> currentPrefs.copy(maghribNotificationEnabled = enabled)
+            "isha" -> currentPrefs.copy(ishaNotificationEnabled = enabled)
+            else -> {
+                Log.w(TAG, "⚠️ Unknown prayer name: $prayerName")
+                return
+            }
+        }
+
+        updateNotificationPreferences(updatedPrefs)
+        Log.i(TAG, "✅ $prayerName notification ${if (enabled) "enabled" else "disabled"}")
+    }
+
     /**
      * LEGACY UPDATE SETTINGS - For backward compatibility
-     * 
+     *
      * @deprecated Use updateCalculationSettings(), updateLocationPreferences(), and updateNotificationPreferences() instead
      */
     @Deprecated("Use separate preference update methods instead")

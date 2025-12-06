@@ -37,7 +37,7 @@ object PrayerNotificationScheduler {
     
     /**
      * Schedule a prayer time notification
-     * 
+     *
      * @param context Application context
      * @param prayerName Name of the prayer (Fajr, Dhuhr, etc.)
      * @param prayerTime Time in h:mm a format (12-hour with AM/PM)
@@ -51,7 +51,14 @@ object PrayerNotificationScheduler {
     ) {
         try {
             Log.d(TAG, "📅 Scheduling prayer notification: $prayerName at $prayerTime")
-            
+
+            // Check if notifications are enabled for this specific prayer
+            val notificationsEnabled = isNotificationEnabledForPrayer(context, prayerName)
+            if (!notificationsEnabled) {
+                Log.d(TAG, "🔕 Notifications disabled for $prayerName - skipping scheduling")
+                return
+            }
+
             val prayerDateTime = parsePrayerTime(prayerTime)
             if (prayerDateTime == null) {
                 Log.e(TAG, "❌ Failed to parse prayer time: $prayerTime")
@@ -347,5 +354,36 @@ object PrayerNotificationScheduler {
         }
         val typeCode = if (type == "main") 0 else 1
         return ALARM_REQUEST_CODE_PREFIX + (prayerCode * 10) + typeCode
+    }
+
+    /**
+     * Check if notifications are enabled for a specific prayer
+     * Reads from notification preferences JSON in SharedPreferences
+     */
+    private fun isNotificationEnabledForPrayer(context: Context, prayerName: String): Boolean {
+        try {
+            val prefs = context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
+            val notificationPrefsJson = prefs.getString("notification_preferences_json", null)
+
+            if (notificationPrefsJson == null) {
+                // No preferences saved yet - default to enabled
+                Log.d(TAG, "📱 No notification preferences found - defaulting to enabled for $prayerName")
+                return true
+            }
+
+            // Parse JSON to check notification settings
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            val notificationPrefs = json.decodeFromString<com.starception.submission.prayer.model.PrayerNotificationPreferences>(notificationPrefsJson)
+
+            // Use the model's helper method to check if notification is enabled
+            val isEnabled = notificationPrefs.isNotificationEnabledForPrayer(prayerName)
+            Log.d(TAG, "🔔 Notification for $prayerName: ${if (isEnabled) "ENABLED" else "DISABLED"}")
+            return isEnabled
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error reading notification preferences for $prayerName", e)
+            // Default to enabled on error
+            return true
+        }
     }
 }

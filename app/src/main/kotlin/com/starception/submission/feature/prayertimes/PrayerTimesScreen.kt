@@ -55,6 +55,10 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -465,6 +469,9 @@ fun PrayerTimesScreen(
     val calculationSettings = repository.calculationSettingsFlow.collectAsState().value
     val storedOffsets = calculationSettings.timeOffsets
 
+    // Observe notification preferences for per-prayer notification toggles
+    val notificationPreferences = repository.notificationPreferencesFlow.collectAsState().value
+
     // Log whenever calculationSettings changes (BEFORE extracting offsets)
     LaunchedEffect(calculationSettings) {
         android.util.Log.d("PrayerTimesScreen", "📥 CALCULATION SETTINGS RECEIVED FROM FLOW:")
@@ -484,6 +491,17 @@ fun PrayerTimesScreen(
         android.util.Log.d("PrayerTimesScreen", "   🌙 Isha: ${storedOffsets.isha}")
         android.util.Log.d("PrayerTimesScreen", "   📊 Total non-zero offsets: ${listOf(storedOffsets.fajr, storedOffsets.sunrise, storedOffsets.dhuhr, storedOffsets.asr, storedOffsets.maghrib, storedOffsets.isha).count { it != 0 }}")
         android.util.Log.d("PrayerTimesScreen", "   ⏰ Timestamp: ${System.currentTimeMillis()}")
+    }
+
+    // Log whenever notification preferences change
+    LaunchedEffect(notificationPreferences) {
+        android.util.Log.d("PrayerTimesScreen", "🔔 NOTIFICATION PREFERENCES UPDATED FROM FLOW:")
+        android.util.Log.d("PrayerTimesScreen", "   📱 Master toggle: ${notificationPreferences.notificationsEnabled}")
+        android.util.Log.d("PrayerTimesScreen", "   🌅 Fajr: ${notificationPreferences.fajrNotificationEnabled}")
+        android.util.Log.d("PrayerTimesScreen", "   🌞 Dhuhr: ${notificationPreferences.dhuhrNotificationEnabled}")
+        android.util.Log.d("PrayerTimesScreen", "   🌇 Asr: ${notificationPreferences.asrNotificationEnabled}")
+        android.util.Log.d("PrayerTimesScreen", "   🌆 Maghrib: ${notificationPreferences.maghribNotificationEnabled}")
+        android.util.Log.d("PrayerTimesScreen", "   🌙 Isha: ${notificationPreferences.ishaNotificationEnabled}")
     }
     
     // LOCATION SERVICE - For Qibla compass functionality
@@ -727,6 +745,8 @@ fun PrayerTimesScreen(
         currentEditingTile: String?,
         onEditingTileChange: (String?) -> Unit,
         currentOffset: Int = 0,
+        notificationEnabled: Boolean = true,
+        onNotificationToggle: (Boolean) -> Unit = {},
         modifier: Modifier = Modifier,
         onShowPopup: (String) -> Unit = {}
     ) {
@@ -910,47 +930,85 @@ fun PrayerTimesScreen(
                         scaleX = scale,
                         scaleY = scale
                     )
-                    .pointerInput(prayerName) {
-                        detectTapGestures(
-                            onLongPress = {
-                                android.util.Log.d("PrayerCard", "🔥 LONG PRESS detected on $prayerName card!")
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                // Call onShowPopup directly (transitioning flag prevents double triggers)
-                                onShowPopup(prayerName)
-                                android.util.Log.d("PrayerCard", "✅ Called onShowPopup for $prayerName")
-                            },
-                            onTap = {
-                                android.util.Log.d("PrayerCard", "👆 Regular tap detected on $prayerName card")
-                            }
-                        )
-                    }
             ) {
+                // Layered Box structure: background layer for long-press, foreground layer for content
                 Box(
                     modifier = Modifier.fillMaxSize()
                 ) {
+                    // Background layer - invisible but handles long-press gestures
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(prayerName) {
+                                detectTapGestures(
+                                    onLongPress = {
+                                        android.util.Log.d("PrayerCard", "🔥 LONG PRESS detected on $prayerName card!")
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onShowPopup(prayerName)
+                                        android.util.Log.d("PrayerCard", "✅ Called onShowPopup for $prayerName")
+                                    },
+                                    onTap = {
+                                        android.util.Log.d("PrayerCard", "👆 Regular tap detected on $prayerName card")
+                                    }
+                                )
+                            }
+                    )
+
+                    // Foreground layer - actual content with IconButton that gets click priority
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // Top section: Prayer names
+                        // Top section: Prayer names with notification bell
                         Column(
                             horizontalAlignment = Alignment.Start,
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Text(
-                                text = prayerName,
-                                style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
-                                color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = FontWeight.SemiBold,
-                                overflow = TextOverflow.Ellipsis,
-                                maxLines = 1
-                            )
+                            // Prayer name with notification bell icon
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = prayerName,
+                                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                                    color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    fontWeight = FontWeight.SemiBold,
+                                    overflow = TextOverflow.Ellipsis,
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                // Notification bell toggle icon (only for main 5 prayers)
+                                if (prayerName != "Sunrise") {
+                                    IconButton(
+                                        onClick = {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onNotificationToggle(!notificationEnabled)
+                                            android.util.Log.d("PrayerCard", "🔔 Notification toggled for $prayerName: ${!notificationEnabled}")
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (notificationEnabled) Icons.Filled.Notifications else Icons.Filled.NotificationsOff,
+                                            contentDescription = if (notificationEnabled) "Notifications enabled" else "Notifications disabled",
+                                            tint = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                                "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                                "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }.copy(alpha = if (notificationEnabled) 1f else 0.5f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
                             Text(
                                 text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
                                 style = MaterialTheme.typography.bodyLarge.copy(
@@ -1001,7 +1059,21 @@ fun PrayerTimesScreen(
                             Row(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.Bottom,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .pointerInput(prayerName) {
+                                        detectTapGestures(
+                                            onLongPress = {
+                                                android.util.Log.d("PrayerCard", "🔥 LONG PRESS detected on $prayerName time area!")
+                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                onShowPopup(prayerName)
+                                                android.util.Log.d("PrayerCard", "✅ Called onShowPopup for $prayerName")
+                                            },
+                                            onTap = {
+                                                android.util.Log.d("PrayerCard", "👆 Regular tap on $prayerName time area")
+                                            }
+                                        )
+                                    }
                             ) {
                                 val baseColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                                     "Current" -> MaterialTheme.colorScheme.tertiary
@@ -1471,11 +1543,23 @@ fun PrayerTimesScreen(
                             currentEditingTile = currentEditingTile,
                             onEditingTileChange = { currentEditingTile = it },
                             currentOffset = when (orderedPrayers[0]) {
+                                "Fajr" -> storedOffsets.fajr
                                 "Dhuhr" -> storedOffsets.dhuhr
                                 "Asr" -> storedOffsets.asr
                                 "Maghrib" -> storedOffsets.maghrib
                                 "Isha" -> storedOffsets.isha
                                 else -> 0
+                            },
+                            notificationEnabled = when (orderedPrayers[0]) {
+                                "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                "Asr" -> notificationPreferences.asrNotificationEnabled
+                                "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                else -> true
+                            },
+                            onNotificationToggle = { enabled ->
+                                repository.togglePrayerNotification(orderedPrayers[0], enabled)
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -1496,11 +1580,23 @@ fun PrayerTimesScreen(
                             currentEditingTile = currentEditingTile,
                             onEditingTileChange = { currentEditingTile = it },
                             currentOffset = when (orderedPrayers[1]) {
+                                "Fajr" -> storedOffsets.fajr
                                 "Dhuhr" -> storedOffsets.dhuhr
                                 "Asr" -> storedOffsets.asr
                                 "Maghrib" -> storedOffsets.maghrib
                                 "Isha" -> storedOffsets.isha
                                 else -> 0
+                            },
+                            notificationEnabled = when (orderedPrayers[1]) {
+                                "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                "Asr" -> notificationPreferences.asrNotificationEnabled
+                                "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                else -> true
+                            },
+                            onNotificationToggle = { enabled ->
+                                repository.togglePrayerNotification(orderedPrayers[1], enabled)
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -1536,11 +1632,23 @@ fun PrayerTimesScreen(
                             currentEditingTile = currentEditingTile,
                             onEditingTileChange = { currentEditingTile = it },
                             currentOffset = when (orderedPrayers[2]) {
+                                "Fajr" -> storedOffsets.fajr
                                 "Dhuhr" -> storedOffsets.dhuhr
                                 "Asr" -> storedOffsets.asr
                                 "Maghrib" -> storedOffsets.maghrib
                                 "Isha" -> storedOffsets.isha
                                 else -> 0
+                            },
+                            notificationEnabled = when (orderedPrayers[2]) {
+                                "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                "Asr" -> notificationPreferences.asrNotificationEnabled
+                                "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                else -> true
+                            },
+                            onNotificationToggle = { enabled ->
+                                repository.togglePrayerNotification(orderedPrayers[2], enabled)
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -1561,11 +1669,23 @@ fun PrayerTimesScreen(
                             currentEditingTile = currentEditingTile,
                             onEditingTileChange = { currentEditingTile = it },
                             currentOffset = when (orderedPrayers[3]) {
+                                "Fajr" -> storedOffsets.fajr
                                 "Dhuhr" -> storedOffsets.dhuhr
                                 "Asr" -> storedOffsets.asr
                                 "Maghrib" -> storedOffsets.maghrib
                                 "Isha" -> storedOffsets.isha
                                 else -> 0
+                            },
+                            notificationEnabled = when (orderedPrayers[3]) {
+                                "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                "Asr" -> notificationPreferences.asrNotificationEnabled
+                                "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                else -> true
+                            },
+                            onNotificationToggle = { enabled ->
+                                repository.togglePrayerNotification(orderedPrayers[3], enabled)
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -1638,6 +1758,17 @@ fun PrayerTimesScreen(
                                     "Isha" -> storedOffsets.isha
                                     else -> 0
                                 },
+                                notificationEnabled = when (orderedPrayers[4]) {
+                                    "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                    "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                    "Asr" -> notificationPreferences.asrNotificationEnabled
+                                    "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                    "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                    else -> true
+                                },
+                                onNotificationToggle = { enabled ->
+                                    repository.togglePrayerNotification(orderedPrayers[4], enabled)
+                                },
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(tileHeight)
@@ -1671,6 +1802,17 @@ fun PrayerTimesScreen(
                                     "Maghrib" -> storedOffsets.maghrib
                                     "Isha" -> storedOffsets.isha
                                     else -> 0
+                                },
+                                notificationEnabled = when (orderedPrayers[5]) {
+                                    "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                    "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                    "Asr" -> notificationPreferences.asrNotificationEnabled
+                                    "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                    "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                    else -> true
+                                },
+                                onNotificationToggle = { enabled ->
+                                    repository.togglePrayerNotification(orderedPrayers[5], enabled)
                                 },
                                 modifier = Modifier
                                     .weight(1f)
