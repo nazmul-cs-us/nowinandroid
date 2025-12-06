@@ -931,38 +931,37 @@ fun PrayerTimesScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 12.dp)
-                            .padding(vertical = 6.dp),
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         // Top section: Prayer names
                         Column(
                             horizontalAlignment = Alignment.Start,
-                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Text(
                                 text = prayerName,
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
                                 color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                                     "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
                                     "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
                                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                                 },
-                                fontWeight = FontWeight.Medium,
+                                fontWeight = FontWeight.SemiBold,
                                 overflow = TextOverflow.Ellipsis,
                                 maxLines = 1
                             )
                             Text(
                                 text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
-                                style = MaterialTheme.typography.bodyMedium.copy(
+                                style = MaterialTheme.typography.bodyLarge.copy(
                                     fontFamily = getSelectedArabicFontFamily(screenContext),
-                                    fontSize = 15.sp,
-                                    letterSpacing = 0.3.sp
+                                    fontSize = 16.sp,
+                                    letterSpacing = 0.4.sp
                                 ),
                                 color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
+                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
                                 },
                                 fontWeight = FontWeight.Normal,
                                 overflow = TextOverflow.Ellipsis,
@@ -970,7 +969,9 @@ fun PrayerTimesScreen(
                             )
                         }
 
-                        // Bottom section: Time display only
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        // Bottom section: Time display with separated AM/PM
                         Column(
                             horizontalAlignment = Alignment.End,
                             verticalArrangement = Arrangement.spacedBy(0.dp)
@@ -985,44 +986,63 @@ fun PrayerTimesScreen(
                                 "Isha" -> prayerTimes?.isha
                                 else -> null
                             }
-                            val adjustedTime = originalTime?.let { time ->
+
+                            val (timeOnly, amPm) = originalTime?.let { time ->
                                 val adjustedDateTime = java.time.LocalDateTime.of(java.time.LocalDate.now(), time).plusMinutes(currentOffset.toLong())
                                 val adjusted = adjustedDateTime.toLocalTime()
                                 val hour12 = if (adjusted.hour == 0) 12
                                             else if (adjusted.hour > 12) adjusted.hour - 12
                                             else adjusted.hour
-                                val amPm = if (adjusted.hour < 12) "AM" else "PM"
-                                String.format("%d:%02d %s", hour12, adjusted.minute, amPm)
-                            } ?: ""
+                                val period = if (adjusted.hour < 12) "AM" else "PM"
+                                Pair(String.format("%d:%02d", hour12, adjusted.minute), period)
+                            } ?: Pair("", "")
 
-                            // Time display with offset
-                            Text(
-                                text = buildAnnotatedString {
-                                    val baseColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                        "Current" -> MaterialTheme.colorScheme.tertiary
-                                        "Next" -> MaterialTheme.colorScheme.primary
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
+                            // Time display with separated AM/PM and offset
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Bottom,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                val baseColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                                    "Current" -> MaterialTheme.colorScheme.tertiary
+                                    "Next" -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                }
 
-                                    // Main prayer time
-                                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = baseColor)) {
-                                        append(adjustedTime)
-                                    }
+                                // Left side: Time + AM/PM grouped together
+                                Row(
+                                    horizontalArrangement = Arrangement.Start,
+                                    verticalAlignment = Alignment.Bottom
+                                ) {
+                                    // Time (hour:minute)
+                                    Text(
+                                        text = timeOnly,
+                                        style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
+                                        color = baseColor,
+                                        fontWeight = FontWeight.Bold
+                                    )
 
-                                    // Offset indicator
-                                    append(" ")
-                                    withStyle(style = SpanStyle(
-                                        fontWeight = FontWeight.Normal,
-                                        color = if (currentOffset != 0) baseColor.copy(alpha = 0.8f) else baseColor.copy(alpha = 0.5f),
-                                        fontSize = 11.sp
-                                    )) {
-                                        append(if (currentOffset > 0) "+${currentOffset}m" else if (currentOffset < 0) "${currentOffset}m" else "±0m")
-                                    }
-                                },
-                                style = MaterialTheme.typography.headlineSmall.copy(fontSize = 20.sp),
-                                overflow = TextOverflow.Ellipsis,
-                                maxLines = 1
-                            )
+                                    Spacer(modifier = Modifier.width(4.dp))
+
+                                    // AM/PM (smaller)
+                                    Text(
+                                        text = amPm,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                                        color = baseColor.copy(alpha = 0.85f),
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(bottom = 2.dp)
+                                    )
+                                }
+
+                                // Right side: Offset indicator
+                                Text(
+                                    text = if (currentOffset > 0) "+${currentOffset}m" else if (currentOffset < 0) "${currentOffset}m" else "±0m",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                                    color = if (currentOffset != 0) baseColor.copy(alpha = 0.85f) else baseColor.copy(alpha = 0.6f),
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(bottom = 2.dp)
+                                )
+                            }
                         }
                 }
                 
@@ -1355,7 +1375,7 @@ fun PrayerTimesScreen(
                 
                 // Material 3 expressive tile height animation with spring physics
                 val tileHeight by animateDpAsState(
-                    targetValue = if (showAllPrayers) 118.dp else 140.dp,
+                    targetValue = if (showAllPrayers) 122.dp else 140.dp,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessLow,
