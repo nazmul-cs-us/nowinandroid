@@ -932,7 +932,7 @@ fun PrayerTimesScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 12.dp)
-                            .padding(vertical = 1.dp),
+                            .padding(vertical = 6.dp),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         // Top section: Prayer names
@@ -942,7 +942,7 @@ fun PrayerTimesScreen(
                         ) {
                             Text(
                                 text = prayerName,
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleMedium,
                                 color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                                     "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
                                     "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
@@ -956,8 +956,8 @@ fun PrayerTimesScreen(
                                 text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontFamily = getSelectedArabicFontFamily(screenContext),
-                                    fontSize = 17.sp,
-                                    letterSpacing = 0.5.sp
+                                    fontSize = 15.sp,
+                                    letterSpacing = 0.3.sp
                                 ),
                                 color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                                     "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
@@ -969,13 +969,13 @@ fun PrayerTimesScreen(
                                 maxLines = 1
                             )
                         }
-                        
-                        // Bottom section: Times with proper spacing and bottom padding
+
+                        // Bottom section: Time display only
                         Column(
                             horizontalAlignment = Alignment.End,
-                            verticalArrangement = Arrangement.spacedBy(-2.dp)
+                            verticalArrangement = Arrangement.spacedBy(0.dp)
                         ) {
-                            // Arabic numerals time (smaller, at top) - show adjusted time
+                            // Calculate adjusted time
                             val originalTime = when (prayerName) {
                                 "Fajr" -> prayerTimes?.fajr
                                 "Sunrise" -> prayerTimes?.sunrise
@@ -988,33 +988,14 @@ fun PrayerTimesScreen(
                             val adjustedTime = originalTime?.let { time ->
                                 val adjustedDateTime = java.time.LocalDateTime.of(java.time.LocalDate.now(), time).plusMinutes(currentOffset.toLong())
                                 val adjusted = adjustedDateTime.toLocalTime()
-                                val hour12 = if (adjusted.hour == 0) 12 
-                                            else if (adjusted.hour > 12) adjusted.hour - 12 
+                                val hour12 = if (adjusted.hour == 0) 12
+                                            else if (adjusted.hour > 12) adjusted.hour - 12
                                             else adjusted.hour
                                 val amPm = if (adjusted.hour < 12) "AM" else "PM"
-                                val result = String.format("%d:%02d %s", hour12, adjusted.minute, amPm)
-                                android.util.Log.d("PrayerCard", "🕐 TIME CALCULATION for $prayerName:")
-                                android.util.Log.d("PrayerCard", "   📅 Original time: $time")
-                                android.util.Log.d("PrayerCard", "   ⏱️ Current offset: $currentOffset minutes")
-                                android.util.Log.d("PrayerCard", "   🔄 Adjusted time: $result")
-                                result
+                                String.format("%d:%02d %s", hour12, adjusted.minute, amPm)
                             } ?: ""
-                            val arabicTime = convertToArabicNumerals(adjustedTime)
-                            
-                            Text(
-                                text = arabicTime,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
-                                    "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                },
-                                fontWeight = FontWeight.Normal,
-                                overflow = TextOverflow.Ellipsis,
-                                maxLines = 1
-                            )
-                            
-                            // English time (main display) with bottom padding - show adjusted time
+
+                            // Time display with offset
                             Text(
                                 text = buildAnnotatedString {
                                     val baseColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
@@ -1023,25 +1004,24 @@ fun PrayerTimesScreen(
                                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                                     }
 
-                                    // Main prayer time in bold - show adjusted time
+                                    // Main prayer time
                                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = baseColor)) {
                                         append(adjustedTime)
                                     }
 
-                                    // Always show offset indicator (including zero values for clarity)
+                                    // Offset indicator
                                     append(" ")
                                     withStyle(style = SpanStyle(
-                                        fontWeight = FontWeight.Medium,
-                                        color = if (currentOffset != 0) baseColor.copy(alpha = 0.9f) else baseColor.copy(alpha = 0.5f),
-                                        fontSize = MaterialTheme.typography.bodySmall.fontSize
+                                        fontWeight = FontWeight.Normal,
+                                        color = if (currentOffset != 0) baseColor.copy(alpha = 0.8f) else baseColor.copy(alpha = 0.5f),
+                                        fontSize = 11.sp
                                     )) {
                                         append(if (currentOffset > 0) "+${currentOffset}m" else if (currentOffset < 0) "${currentOffset}m" else "±0m")
                                     }
                                 },
-                                style = MaterialTheme.typography.headlineSmall.copy(fontSize = 22.sp),
+                                style = MaterialTheme.typography.headlineSmall.copy(fontSize = 20.sp),
                                 overflow = TextOverflow.Ellipsis,
-                                maxLines = 1,
-                                modifier = Modifier.padding(bottom = 8.dp) // Add specific bottom padding after English prayer time
+                                maxLines = 1
                             )
                         }
                 }
@@ -1375,7 +1355,7 @@ fun PrayerTimesScreen(
                 
                 // Material 3 expressive tile height animation with spring physics
                 val tileHeight by animateDpAsState(
-                    targetValue = if (showAllPrayers) 122.dp else 140.dp,
+                    targetValue = if (showAllPrayers) 118.dp else 140.dp,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessLow,
