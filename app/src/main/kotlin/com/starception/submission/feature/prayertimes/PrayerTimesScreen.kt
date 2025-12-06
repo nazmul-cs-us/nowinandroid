@@ -1375,7 +1375,7 @@ fun PrayerTimesScreen(
                 
                 // Material 3 expressive tile height animation with spring physics
                 val tileHeight by animateDpAsState(
-                    targetValue = if (showAllPrayers) 122.dp else 140.dp,
+                    targetValue = if (showAllPrayers) 120.dp else 140.dp,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessLow,
