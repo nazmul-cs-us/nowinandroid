@@ -66,7 +66,13 @@ object ActivityTracker {
     // Dua cooldown tracking
     private var lastDuaPlayTime: Long = 0L
     private var lastDrivingTime: Long = 0L
-    
+
+    // Gap tolerance tracking - continue countdown if driving resumes within 5 minutes
+    private var drivingStopTime: Long = 0L  // When driving stopped
+    private var accumulatedDrivingTime: Long = 0L  // Accumulated driving time in ms
+    private var drivingStartTime: Long = 0L  // When current driving session started
+    private const val GAP_TOLERANCE_MILLIS = 5 * 60 * 1000L  // 5 minutes gap tolerance
+
     // Handler for delayed dua playback
     private val duaHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var pendingDuaRunnable: Runnable? = null
@@ -153,7 +159,9 @@ object ActivityTracker {
     
     /**
      * Update the current activity (called from ActivityDetectionService callback)
-     * IMPROVED: Smart cooldown for travel dua to prevent replaying at traffic lights
+     * IMPROVED: Smart gap tolerance for travel dua
+     * - If driving stops and resumes within 5 minutes, continue countdown
+     * - Accumulated driving time is tracked across brief gaps
      */
     fun updateActivity(activity: String) {
         val currentTime = System.currentTimeMillis()
@@ -161,43 +169,74 @@ object ActivityTracker {
         previousActivity = _currentActivity.value
         _currentActivity.value = activity
 
-        // Play driving audio when transitioning to driving (WITH DELAY)
-        // IMPROVED LOGIC: Only play if either:
-        // 1. We weren't driving recently (> 5 minutes ago)
-        // 2. OR we were driving recently BUT were in a different activity for > 5 minutes
+        // ========== DRIVING STARTED ==========
         if (activity == "Driving" && oldActivity != "Driving") {
             val timeSinceLastDua = currentTime - lastDuaPlayTime
-            val timeSinceLastDriving = currentTime - lastDrivingTime
-            
-            // Case 1: First time driving or long time since last driving session
-            if (timeSinceLastDua >= ActivityDetectionConfig.DUA_COOLDOWN_MILLIS) {
-                // Schedule dua playback with delay to give user time to settle in
-                scheduleDrivingDuaWithDelay()
-                lastDuaPlayTime = currentTime
+            val gapSinceLastDriving = currentTime - drivingStopTime
+
+            // Check if dua cooldown has passed (5 minutes since last dua played)
+            if (timeSinceLastDua < ActivityDetectionConfig.DUA_COOLDOWN_MILLIS) {
+                Log.d("ActivityTracker", "🚗 Dua cooldown active - ${(ActivityDetectionConfig.DUA_COOLDOWN_MILLIS - timeSinceLastDua) / 1000}s remaining")
                 lastDrivingTime = currentTime
-                Log.d("ActivityTracker", "🚗 Driving started - scheduling travel dua in ${ActivityDetectionConfig.DUA_PLAYBACK_DELAY_SECONDS}s (must stay driving)")
+                return
             }
-            // Case 2: We were driving recently, stopped briefly (e.g., traffic light), now driving again
-            else if (timeSinceLastDriving < ActivityDetectionConfig.DUA_COOLDOWN_MILLIS) {
-                // Within cooldown threshold - don't replay dua
-                lastDrivingTime = currentTime // Update last driving time
-                Log.d("ActivityTracker", "🚗 Driving resumed within ${(ActivityDetectionConfig.DUA_COOLDOWN_MILLIS - timeSinceLastDua) / 1000}s cooldown - skipping dua")
+
+            // Check if this is a resume within gap tolerance (e.g., after traffic light)
+            if (drivingStopTime > 0 && gapSinceLastDriving < GAP_TOLERANCE_MILLIS && accumulatedDrivingTime > 0) {
+                // RESUME: Continue countdown with accumulated time
+                val remainingTime = ActivityDetectionConfig.DUA_PLAYBACK_DELAY_MILLIS - accumulatedDrivingTime
+                if (remainingTime > 0) {
+                    Log.i("ActivityTracker", "🚦 Driving resumed within ${gapSinceLastDriving / 1000}s gap - continuing countdown")
+                    Log.i("ActivityTracker", "   Accumulated: ${accumulatedDrivingTime / 1000}s, Remaining: ${remainingTime / 1000}s")
+                    drivingStartTime = currentTime
+                    scheduleDrivingDuaWithRemainingTime(remainingTime)
+                } else {
+                    // Already accumulated enough time, play dua now
+                    Log.i("ActivityTracker", "🎵 Accumulated ${accumulatedDrivingTime / 1000}s driving - playing travel dua now!")
+                    playDrivingAudio()
+                    resetDrivingAccumulation()
+                }
+            } else {
+                // FRESH START: New driving session (gap > 5 minutes or first time)
+                Log.i("ActivityTracker", "🚗 New driving session started - scheduling travel dua in ${ActivityDetectionConfig.DUA_PLAYBACK_DELAY_SECONDS}s")
+                if (gapSinceLastDriving >= GAP_TOLERANCE_MILLIS && drivingStopTime > 0) {
+                    Log.d("ActivityTracker", "   Gap was ${gapSinceLastDriving / 1000}s (> 5min) - resetting accumulation")
+                }
+                resetDrivingAccumulation()
+                drivingStartTime = currentTime
+                scheduleDrivingDuaWithDelay()
             }
-            // Case 3: Long time since driving but short time since last dua (edge case)
-            else {
-                Log.d("ActivityTracker", "🚗 Driving started but dua cooldown active for ${(ActivityDetectionConfig.DUA_COOLDOWN_MILLIS - timeSinceLastDua) / 1000}s more")
-            }
+
+            lastDrivingTime = currentTime
         }
-        
-        // Cancel pending dua if user stops driving before delay expires
+
+        // ========== DRIVING STOPPED ==========
         if (activity != "Driving" && oldActivity == "Driving") {
+            // Calculate how long we were driving in this session
+            val sessionDrivingTime = currentTime - drivingStartTime
+            accumulatedDrivingTime += sessionDrivingTime
+            drivingStopTime = currentTime
+
+            Log.i("ActivityTracker", "🛑 Driving stopped after ${sessionDrivingTime / 1000}s")
+            Log.i("ActivityTracker", "   Total accumulated: ${accumulatedDrivingTime / 1000}s / ${ActivityDetectionConfig.DUA_PLAYBACK_DELAY_SECONDS}s needed")
+
+            // Cancel pending dua - we'll reschedule with remaining time if driving resumes
             cancelPendingDua()
         }
-        
-        // Track when we're driving to detect brief stops
+
+        // Track driving time
         if (activity == "Driving") {
             lastDrivingTime = currentTime
         }
+    }
+
+    /**
+     * Reset driving time accumulation (for fresh start)
+     */
+    private fun resetDrivingAccumulation() {
+        accumulatedDrivingTime = 0L
+        drivingStopTime = 0L
+        drivingStartTime = 0L
     }
     
     /**
@@ -357,27 +396,40 @@ object ActivityTracker {
     }
 
     /**
-     * Schedule driving dua with delay - user must stay in driving mode
+     * Schedule driving dua with full delay - user must stay in driving mode
      */
     private fun scheduleDrivingDuaWithDelay() {
+        scheduleDrivingDuaWithRemainingTime(ActivityDetectionConfig.DUA_PLAYBACK_DELAY_MILLIS)
+    }
+
+    /**
+     * Schedule driving dua with remaining time - for resuming after brief stop
+     */
+    private fun scheduleDrivingDuaWithRemainingTime(remainingTimeMillis: Long) {
         // Cancel any existing pending dua
         cancelPendingDua()
-        
+
+        val scheduledTime = System.currentTimeMillis()
+        val delaySeconds = remainingTimeMillis / 1000
+
         // Create new runnable
         pendingDuaRunnable = Runnable {
+            val actualDelay = (System.currentTimeMillis() - scheduledTime) / 1000
             // Verify user is still driving before playing
             if (_currentActivity.value == "Driving") {
+                val totalDrivingTime = (accumulatedDrivingTime + (System.currentTimeMillis() - drivingStartTime)) / 1000
+                Log.i("ActivityTracker", "✅ Total driving time: ${totalDrivingTime}s - playing travel dua now!")
                 playDrivingAudio()
-                Log.d("ActivityTracker", "🎵 Playing travel dua - user stayed driving for ${ActivityDetectionConfig.DUA_PLAYBACK_DELAY_SECONDS}s")
+                resetDrivingAccumulation()  // Reset after playing
             } else {
-                Log.d("ActivityTracker", "⏭️ Skipping travel dua - user no longer driving (current: ${_currentActivity.value})")
+                Log.w("ActivityTracker", "⏭️ Skipping travel dua - user stopped driving after ${actualDelay}s (current: ${_currentActivity.value})")
             }
             pendingDuaRunnable = null
         }
-        
-        // Schedule for delay
-        duaHandler.postDelayed(pendingDuaRunnable!!, ActivityDetectionConfig.DUA_PLAYBACK_DELAY_MILLIS)
-        Log.d("ActivityTracker", "⏰ Travel dua scheduled - will play in ${ActivityDetectionConfig.DUA_PLAYBACK_DELAY_SECONDS}s if user stays driving")
+
+        // Schedule for remaining time
+        duaHandler.postDelayed(pendingDuaRunnable!!, remainingTimeMillis)
+        Log.i("ActivityTracker", "⏰ Travel dua scheduled - will play in ${delaySeconds}s if user stays driving")
     }
     
     /**
@@ -410,7 +462,11 @@ object ActivityTracker {
                         Log.d("ActivityTracker", "🎵 Travel dua audio completed")
                     }
                     mediaPlayer?.start()
-                    Log.d("ActivityTracker", "🎵 Playing travel dua audio")
+
+                    // Set cooldown timestamp ONLY when dua actually plays
+                    // This ensures if user stops driving before dua plays, they can retry
+                    lastDuaPlayTime = System.currentTimeMillis()
+                    Log.d("ActivityTracker", "🎵 Playing travel dua audio (cooldown started: ${ActivityDetectionConfig.DUA_COOLDOWN_MINUTES}min)")
                 } else {
                     Log.e("ActivityTracker", "Failed to find travel_dua.wav in resources")
                 }
