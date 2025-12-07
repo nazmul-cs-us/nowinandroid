@@ -414,7 +414,12 @@ fun SurahDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val currentTranslation by viewModel.currentTranslation.collectAsState()
     var showTranslationDialog by remember { mutableStateOf(false) }
+    var showFontDialog by remember { mutableStateOf(false) }
     var showMusicPlayer by remember { mutableStateOf(false) }
+
+    // Font settings from ViewModel
+    val selectedArabicFont by viewModel.selectedArabicFont.collectAsState()
+    val availableArabicFonts = remember { viewModel.getAvailableArabicFonts() }
     var currentSurahNumber by remember { mutableStateOf(surahNumber) }
     
     val scrollState = rememberLazyListState()
@@ -492,8 +497,11 @@ fun SurahDetailScreen(
                 onVolumeChange = { volume ->
                     playerViewModel.setVolume(volume)
                 },
+                currentTranslation = currentTranslation,
+                selectedArabicFont = selectedArabicFont,
                 onBackClick = onBackClick,
                 onTranslationClick = { showTranslationDialog = true },
+                onFontClick = { showFontDialog = true },
                 onBookmarkClick = { /* TODO */ }
             )
         }
@@ -510,6 +518,20 @@ fun SurahDetailScreen(
                 showTranslationDialog = false
             },
             onDismiss = { showTranslationDialog = false }
+        )
+    }
+
+    // Font selection dialog
+    if (showFontDialog) {
+        FontSelectorDialog(
+            currentFont = selectedArabicFont,
+            availableFonts = availableArabicFonts,
+            getFontName = { viewModel.getArabicFontDisplayName(it) },
+            onFontSelected = { fontName ->
+                viewModel.changeArabicFont(fontName)
+                showFontDialog = false
+            },
+            onDismiss = { showFontDialog = false }
         )
     }
 }
@@ -530,8 +552,11 @@ fun SurahContentWithMusicPlayer(
     onSeek: (Int) -> Unit,
     onToggleMusicPlayer: () -> Unit,
     onVolumeChange: ((Float) -> Unit)? = null,
+    currentTranslation: String = "ar",
+    selectedArabicFont: String = "pdms_saleem",
     onBackClick: () -> Unit,
     onTranslationClick: () -> Unit,
+    onFontClick: () -> Unit = {},
     onBookmarkClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -561,17 +586,70 @@ fun SurahContentWithMusicPlayer(
                     }
                 },
                 actions = {
+                    // Get short translation code for display
+                    val translationDisplay = when (currentTranslation) {
+                        "ar" -> "AR"
+                        "transliteration" -> "TR"
+                        "bn" -> "BN"
+                        "zh" -> "ZH"
+                        "en" -> "EN"
+                        "es" -> "ES"
+                        "fr" -> "FR"
+                        "id" -> "ID"
+                        "ru" -> "RU"
+                        "sv" -> "SV"
+                        "tr" -> "TR"
+                        "ur" -> "UR"
+                        else -> "??"
+                    }
+
+                    // Translation button with indicator
+                    IconButton(onClick = onTranslationClick) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Translate,
+                                contentDescription = "Translation",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = translationDisplay,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // Font selection button with icon in rounded box
+                    Surface(
+                        onClick = onFontClick,
+                        modifier = Modifier.size(40.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color.White.copy(alpha = 0.12f),
+                        contentColor = Color.White
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FontDownload,
+                                contentDescription = "Font selection",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Bookmark button
                     IconButton(onClick = onBookmarkClick) {
                         Icon(
                             imageVector = Icons.Default.FavoriteBorder,
                             contentDescription = "Bookmark",
-                            tint = Color.White.copy(alpha = 0.7f)
-                        )
-                    }
-                    IconButton(onClick = onTranslationClick) {
-                        Icon(
-                            imageVector = Icons.Default.Language,
-                            contentDescription = "Translation",
                             tint = Color.White.copy(alpha = 0.7f)
                         )
                     }
@@ -1105,6 +1183,145 @@ fun TranslationSelectorDialog(
                                     MaterialTheme.colorScheme.onSurface
                                 }
                             )
+                            }
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "Selected",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            } else {
+                                // Invisible placeholder to maintain alignment
+                                Spacer(modifier = Modifier.size(28.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    "Cancel",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface
+    )
+}
+
+@Composable
+fun FontSelectorDialog(
+    currentFont: String,
+    availableFonts: List<String>,
+    getFontName: (String) -> String,
+    onFontSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.FontDownload,
+                contentDescription = "Font",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Select Arabic Font",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) {
+                items(availableFonts) { fontName ->
+                    val isSelected = fontName == currentFont
+                    Surface(
+                        onClick = {
+                            onFontSelected(fontName)
+                            onDismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        },
+                        border = if (isSelected) {
+                            BorderStroke(
+                                2.dp,
+                                MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                            )
+                        },
+                        shadowElevation = if (isSelected) 4.dp else 1.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Font icon indicator
+                                Icon(
+                                    imageVector = Icons.Default.TextFormat,
+                                    contentDescription = null,
+                                    tint = if (isSelected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = getFontName(fontName),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        }
+                                    )
+                                    // Preview Arabic text with the font
+                                    Text(
+                                        text = "بِسْمِ اللَّهِ",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontFamily = getArabicFontFamilyForSelection(fontName)
+                                        ),
+                                        color = if (isSelected) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        }
+                                    )
+                                }
                             }
                             if (isSelected) {
                                 Icon(

@@ -161,6 +161,9 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Celebration
+import androidx.compose.material.icons.filled.PanTool
+import androidx.compose.material.icons.filled.DesktopWindows
+import androidx.compose.material.icons.filled.Checkroom
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -1704,17 +1707,26 @@ private fun SmartInfoTile(
                                     )
                                     .padding(horizontal = 10.dp, vertical = 4.dp)
                             ) {
-                                Icon(
-                                    imageVector = when (phonePosition) {
-                                        "HAND" -> Icons.Default.Star
-                                        "POCKET" -> Icons.Default.VolumeOff
-                                        "DESK" -> Icons.Default.Schedule
-                                        else -> Icons.Default.BubbleChart
-                                    },
-                                    contentDescription = "Phone Position",
-                                    tint = MaterialTheme.colorScheme.tertiary,
-                                    modifier = Modifier.size(14.dp)
-                                )
+                                // Use custom drawable for HAND, Material icons for others
+                                if (phonePosition == "HAND") {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.mobile_hand_24),
+                                        contentDescription = "Phone Position",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = when (phonePosition) {
+                                            "POCKET" -> Icons.Default.Checkroom
+                                            "DESK" -> Icons.Default.DesktopWindows
+                                            else -> Icons.Default.BubbleChart
+                                        },
+                                        contentDescription = "Phone Position",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = when (phonePosition) {
