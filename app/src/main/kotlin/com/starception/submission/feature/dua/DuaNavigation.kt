@@ -14,7 +14,7 @@ import java.net.URLEncoder
  * @param title The title of the dua
  * @param content The content of the dua (URL encoded)
  * @param quranReference Optional Quran reference (e.g., "2:127")
- * @param duaNumber The dua number (1-40 for Rabbana duas)
+ * @param duaNumber The dua number (1-40 for Quranic duas)
  */
 @Serializable
 data class DuaDetailRoute(

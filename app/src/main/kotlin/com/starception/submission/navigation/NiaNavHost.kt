@@ -60,7 +60,7 @@ fun NiaNavHost(
             onTopicClick = navController::navigateToTopic,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
             onDuaClick = { userNewsResource ->
-                // Extract dua number from title (e.g., "Rabbana Dua #1" -> 1)
+                // Extract dua number from title (e.g., "Quranic Dua #1" -> 1)
                 val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
                     ?.groupValues?.get(1)?.toIntOrNull() ?: 1
                 navController.navigateToDuaDetail(
@@ -93,7 +93,7 @@ fun NiaNavHost(
             onShowSnackbar = onShowSnackbar,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
             onDuaClick = { userNewsResource ->
-                // Extract dua number from title (e.g., "Rabbana Dua #1" -> 1)
+                // Extract dua number from title (e.g., "Quranic Dua #1" -> 1)
                 val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
                     ?.groupValues?.get(1)?.toIntOrNull() ?: 1
                 navController.navigateToDuaDetail(
