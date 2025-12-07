@@ -72,7 +72,11 @@ fun LazyStaggeredGridScope.newsFeed(
                 val backgroundColor = MaterialTheme.colorScheme.background.toArgb()
 
                 // Check if this is a Surah news item
-                val surahNumber = extractSurahNumber(userNewsResource.url)
+                val surahNumber = extractSurahNumber(
+                    title = userNewsResource.title,
+                    url = userNewsResource.url,
+                    type = userNewsResource.type
+                )
 
                 // State for floating toolbar
                 var showFloatingToolbar by remember { mutableStateOf(false) }
@@ -128,8 +132,8 @@ fun LazyStaggeredGridScope.newsFeed(
                         } else if (onNewsClick != null) {
                             // Use custom news click handler if provided
                             onNewsClick(userNewsResource)
-                        } else {
-                            // Otherwise, open in Chrome Custom Tab
+                        } else if (userNewsResource.url.isNotBlank()) {
+                            // Otherwise, open in Chrome Custom Tab (only if URL is not empty)
                             launchCustomChromeTab(context, Uri.parse(userNewsResource.url), backgroundColor)
                         }
 
@@ -165,14 +169,23 @@ fun LazyStaggeredGridScope.newsFeed(
 }
 
 /**
- * Extract Surah number from quran.com URL
- * Returns null if not a Surah URL
- * Example: "https://quran.com/1" -> 1
+ * Extract Surah number from title or URL
+ * Returns null if not a Surah
+ * Example title: "Surah 1: Al-Faatiha" -> 1
+ * Example URL: "https://quran.com/1" -> 1
  */
-fun extractSurahNumber(url: String): Int? {
+fun extractSurahNumber(title: String, url: String, type: String): Int? {
+    // First check if it's a Quran type
+    if (type.contains("Quran", ignoreCase = true)) {
+        // Try to extract from title pattern "Surah N:"
+        val titleRegex = Regex("Surah\\s+(\\d+):")
+        titleRegex.find(title)?.groupValues?.get(1)?.toIntOrNull()?.let { return it }
+    }
+
+    // Fallback: try URL pattern
     return try {
-        val regex = Regex("https?://quran\\.com/(\\d+)$")
-        regex.find(url)?.groupValues?.get(1)?.toIntOrNull()
+        val urlRegex = Regex("https?://quran\\.com/(\\d+)$")
+        urlRegex.find(url)?.groupValues?.get(1)?.toIntOrNull()
     } catch (e: Exception) {
         null
     }
