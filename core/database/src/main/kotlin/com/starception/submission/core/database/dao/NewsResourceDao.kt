@@ -55,7 +55,7 @@ interface NewsResourceDao {
                         )
                     ELSE 1
                 END
-            ORDER BY publish_date DESC
+            ORDER BY CAST(id AS INTEGER) ASC
     """,
     )
     fun getNewsResources(
@@ -86,7 +86,7 @@ interface NewsResourceDao {
                         )
                     ELSE 1
                 END
-            ORDER BY publish_date DESC
+            ORDER BY CAST(id AS INTEGER) ASC
     """,
     )
     fun getNewsResourceIds(
