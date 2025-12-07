@@ -135,6 +135,9 @@ import androidx.compose.animation.core.*
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.filled.BatchPrediction
 import androidx.compose.material.icons.filled.BubbleChart
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
@@ -1013,7 +1016,42 @@ fun SwipeableBigTiles(
         pageCount = { Int.MAX_VALUE }, // Enable infinite scrolling
         initialPage = Int.MAX_VALUE / 2 // Start in the middle for smooth infinite scroll
     )
-    
+
+    // Activity Recognition Permission for Smart Tracking tile
+    val context = LocalContext.current
+    var hasActivityPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACTIVITY_RECOGNITION
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true // Pre-Android 10 doesn't need this permission
+            }
+        )
+    }
+
+    val activityPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasActivityPermission = isGranted
+        if (isGranted) {
+            android.util.Log.i("SmartTracking", "✅ Activity Recognition permission granted")
+        } else {
+            android.util.Log.w("SmartTracking", "❌ Activity Recognition permission denied")
+        }
+    }
+
+    // Request Activity Recognition permission when user swipes to Smart Tracking tile (page 1)
+    LaunchedEffect(pagerState.currentPage) {
+        val actualPage = pagerState.currentPage % 4
+        if (actualPage == 1 && !hasActivityPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            android.util.Log.i("SmartTracking", "📱 Requesting Activity Recognition permission for Smart Tracking tile")
+            activityPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        }
+    }
+
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
