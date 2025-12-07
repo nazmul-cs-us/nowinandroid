@@ -1676,8 +1676,8 @@ private fun SmartInfoTile(
                             AnimatedFlipText(
                                 text = currentActivity,
                                 style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontSize = 28.sp,
-                                    letterSpacing = (-0.5).sp
+                                    fontSize = 22.sp,
+                                    letterSpacing = (-0.3).sp
                                 ),
                                 color = if (needsPermissions) {
                                     MaterialTheme.colorScheme.error
@@ -1685,7 +1685,7 @@ private fun SmartInfoTile(
                                     MaterialTheme.colorScheme.secondary
                                 },
                                 fontWeight = FontWeight.Bold,
-                                maxLines = 2
+                                maxLines = 1
                             )
                             
                             // Phone Position Display (NEW - based on research paper)
@@ -1731,22 +1731,19 @@ private fun SmartInfoTile(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            
-                            // Label
-                            Text(
-                                text = if (needsPermissions) "Tap to grant permissions" else "Current Activity",
-                                style = MaterialTheme.typography.labelLarge.copy(
-                                    fontSize = 13.sp,
-                                    letterSpacing = 0.5.sp
-                                ),
-                                color = if (needsPermissions) {
-                                    MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
-                                } else {
-                                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-                                },
-                                fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Center
-                            )
+
+                            // Label - only show when permissions needed
+                            if (needsPermissions) {
+                                Text(
+                                    text = "Tap to grant permissions",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontSize = 11.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
