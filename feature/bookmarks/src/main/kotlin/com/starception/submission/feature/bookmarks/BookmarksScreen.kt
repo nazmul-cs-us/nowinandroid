@@ -80,6 +80,7 @@ internal fun BookmarksRoute(
     onTopicClick: (String) -> Unit,
     onShowSnackbar: suspend (String, String?) -> Boolean,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: BookmarksViewModel = hiltViewModel(),
@@ -92,6 +93,7 @@ internal fun BookmarksRoute(
         onNewsResourceViewed = { viewModel.setNewsResourceViewed(it, true) },
         onTopicClick = onTopicClick,
         onSurahClick = onSurahClick,
+        onDuaClick = onDuaClick,
         onNewsClick = onNewsClick,
         modifier = modifier,
         shouldDisplayUndoBookmark = viewModel.shouldDisplayUndoBookmark,
@@ -112,6 +114,7 @@ internal fun BookmarksScreen(
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
     shouldDisplayUndoBookmark: Boolean = false,
@@ -145,6 +148,7 @@ internal fun BookmarksScreen(
                 onNewsResourceViewed,
                 onTopicClick,
                 onSurahClick,
+                onDuaClick,
                 onNewsClick,
                 modifier,
             )
@@ -174,6 +178,7 @@ private fun BookmarksGrid(
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -199,6 +204,7 @@ private fun BookmarksGrid(
                 onNewsResourceViewed = onNewsResourceViewed,
                 onTopicClick = onTopicClick,
                 onSurahClick = onSurahClick,
+                onDuaClick = onDuaClick,
                 onNewsClick = onNewsClick,
             )
             item(span = StaggeredGridItemSpan.FullLine) {

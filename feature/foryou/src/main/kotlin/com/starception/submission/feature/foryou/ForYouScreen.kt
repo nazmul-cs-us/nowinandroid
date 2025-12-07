@@ -108,6 +108,7 @@ import com.starception.submission.core.ui.newsFeed
 internal fun ForYouScreen(
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     modifier: Modifier = Modifier,
     viewModel: ForYouViewModel = hiltViewModel(),
 ) {
@@ -125,6 +126,7 @@ internal fun ForYouScreen(
         onDeepLinkOpened = viewModel::onDeepLinkOpened,
         onTopicClick = onTopicClick,
         onSurahClick = onSurahClick,
+        onDuaClick = onDuaClick,
         saveFollowedTopics = viewModel::dismissOnboarding,
         onNewsResourcesCheckedChanged = viewModel::updateNewsResourceSaved,
         onNewsResourceViewed = { viewModel.setNewsResourceViewed(it, true) },
@@ -141,6 +143,7 @@ internal fun ForYouScreen(
     onTopicCheckedChanged: (String, Boolean) -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onDeepLinkOpened: (String) -> Unit,
     saveFollowedTopics: () -> Unit,
     onNewsResourcesCheckedChanged: (String, Boolean) -> Unit,
@@ -198,6 +201,7 @@ internal fun ForYouScreen(
                 onNewsResourceViewed = onNewsResourceViewed,
                 onTopicClick = onTopicClick,
                 onSurahClick = onSurahClick,
+                onDuaClick = onDuaClick,
             )
 
             item(span = StaggeredGridItemSpan.FullLine, contentType = "bottomSpacing") {

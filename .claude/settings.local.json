@@ -203,7 +203,10 @@
       "WebFetch(domain:www.clearquran.com)",
       "WebFetch(domain:www.islamicstudies.info)",
       "WebFetch(domain:understand-quran.com)",
-      "WebFetch(domain:www.quransummary.com)"
+      "WebFetch(domain:www.quransummary.com)",
+      "WebFetch(domain:quranwbw.com)",
+      "WebFetch(domain:www.duas.org)",
+      "WebFetch(domain:koran.center)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
