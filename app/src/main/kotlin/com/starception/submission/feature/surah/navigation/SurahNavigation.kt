@@ -11,11 +11,17 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SurahRoute(
     val surahNumber: Int,
-    val newsResourceId: String? = null // Optional: only present when opened from news feed
+    val newsResourceId: String? = null, // Optional: only present when opened from news feed
+    val scrollToAyah: Int = 0 // Optional: scroll to specific ayah number (0 = no scroll)
 )
 
-fun NavController.navigateToSurah(surahNumber: Int, newsResourceId: String? = null, navOptions: NavOptions? = null) {
-    navigate(route = SurahRoute(surahNumber, newsResourceId), navOptions)
+fun NavController.navigateToSurah(
+    surahNumber: Int,
+    newsResourceId: String? = null,
+    scrollToAyah: Int = 0,
+    navOptions: NavOptions? = null
+) {
+    navigate(route = SurahRoute(surahNumber, newsResourceId, scrollToAyah), navOptions)
 }
 
 fun NavGraphBuilder.surahScreen(
@@ -27,6 +33,7 @@ fun NavGraphBuilder.surahScreen(
         QuranAlbumPlayerScreen(
             surahNumber = surahRoute.surahNumber,
             newsResourceId = surahRoute.newsResourceId,
+            scrollToAyah = surahRoute.scrollToAyah,
             onBackClick = onBackClick
         )
     }

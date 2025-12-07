@@ -38,11 +38,13 @@ fun NavController.navigateToForYou(navOptions: NavOptions) = navigate(route = Fo
  *
  *  @param onTopicClick - Called when a topic is clicked, contains the ID of the topic
  *  @param onSurahClick - Called when a Surah news item is clicked, contains the Surah number and news resource ID
+ *  @param onDuaClick - Called when a Dua news item is clicked, contains the UserNewsResource
  *  @param topicDestination - Destination for topic content
  */
 fun NavGraphBuilder.forYouSection(
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (com.starception.submission.core.model.data.UserNewsResource) -> Unit = { _ -> },
     topicDestination: NavGraphBuilder.() -> Unit,
 ) {
     navigation<ForYouBaseRoute>(startDestination = ForYouRoute) {
@@ -62,7 +64,8 @@ fun NavGraphBuilder.forYouSection(
         ) {
             ForYouScreen(
                 onTopicClick = onTopicClick,
-                onSurahClick = onSurahClick
+                onSurahClick = onSurahClick,
+                onDuaClick = onDuaClick
             )
         }
         topicDestination()

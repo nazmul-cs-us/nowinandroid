@@ -21,6 +21,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.feature.bookmarks.BookmarksRoute
 import kotlinx.serialization.Serializable
 
@@ -38,6 +39,7 @@ fun NavController.navigateToBookmarks(navOptions: NavOptions) =
  * @param onTopicClick - Called when a topic is clicked, contains the ID of the topic
  * @param onShowSnackbar - Shows snackbar for undo bookmark removal
  * @param onSurahClick - Called when a Surah news item is clicked, contains the Surah number and news resource ID
+ * @param onDuaClick - Called when a Dua news item is clicked, contains the UserNewsResource
  * @param onNewsClick - Called when a news item is clicked
  * @param surahDestination - Destination for surah content
  */
@@ -45,12 +47,13 @@ fun NavGraphBuilder.bookmarksSection(
     onTopicClick: (String) -> Unit,
     onShowSnackbar: suspend (String, String?) -> Boolean,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     surahDestination: NavGraphBuilder.() -> Unit,
 ) {
     navigation<BookmarksBaseRoute>(startDestination = BookmarksRoute) {
         composable<BookmarksRoute> {
-            BookmarksRoute(onTopicClick, onShowSnackbar, onSurahClick, onNewsClick)
+            BookmarksRoute(onTopicClick, onShowSnackbar, onSurahClick, onDuaClick, onNewsClick)
         }
         surahDestination()
     }
@@ -61,9 +64,10 @@ fun NavGraphBuilder.bookmarksScreen(
     onTopicClick: (String) -> Unit,
     onShowSnackbar: suspend (String, String?) -> Boolean,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
 ) {
     composable<BookmarksRoute> {
-        BookmarksRoute(onTopicClick, onShowSnackbar, onSurahClick, onNewsClick)
+        BookmarksRoute(onTopicClick, onShowSnackbar, onSurahClick, onDuaClick, onNewsClick)
     }
 }

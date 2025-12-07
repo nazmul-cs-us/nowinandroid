@@ -57,6 +57,7 @@ fun LazyStaggeredGridScope.newsFeed(
     onTopicClick: (String) -> Unit,
     onExpandedCardClick: () -> Unit = {},
     onSurahClick: (Int, String?) -> Unit = { _, _ -> }, // surahNumber, newsResourceId
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> }, // Dua news resource
     onNewsClick: ((UserNewsResource) -> Unit)? = null,
 ) {
     when (feedState) {
@@ -117,6 +118,9 @@ fun LazyStaggeredGridScope.newsFeed(
                     )
                 }
 
+                // Check if this is a Dua item
+                val isDuaItem = userNewsResource.type.contains("Dua", ignoreCase = true)
+
                 NewsResourceCardExpanded(
                     userNewsResource = userNewsResource,
                     isBookmarked = userNewsResource.isSaved,
@@ -125,10 +129,13 @@ fun LazyStaggeredGridScope.newsFeed(
                         analyticsHelper.logNewsResourceOpened(
                             newsResourceId = userNewsResource.id,
                         )
-                        
+
                         // If it's a Surah, navigate to Surah detail screen
                         if (surahNumber != null) {
                             onSurahClick(surahNumber, userNewsResource.id)
+                        } else if (isDuaItem) {
+                            // Navigate to Dua detail screen
+                            onDuaClick(userNewsResource)
                         } else if (onNewsClick != null) {
                             // Use custom news click handler if provided
                             onNewsClick(userNewsResource)

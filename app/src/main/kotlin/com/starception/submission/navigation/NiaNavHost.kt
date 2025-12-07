@@ -31,6 +31,8 @@ import com.starception.submission.feature.prayertimes.navigation.prayerTimesScre
 import com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute
 import com.starception.submission.feature.surah.navigation.navigateToSurah
 import com.starception.submission.feature.surah.navigation.surahScreen
+import com.starception.submission.feature.dua.duaDetailScreen
+import com.starception.submission.feature.dua.navigateToDuaDetail
 import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.ui.NiaAppState
 import com.starception.submission.ui.interests2pane.interestsListDetailScreen
@@ -57,6 +59,17 @@ fun NiaNavHost(
         forYouSection(
             onTopicClick = navController::navigateToTopic,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
+            onDuaClick = { userNewsResource ->
+                // Extract dua number from title (e.g., "Rabbana Dua #1" -> 1)
+                val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
+                    ?.groupValues?.get(1)?.toIntOrNull() ?: 1
+                navController.navigateToDuaDetail(
+                    title = userNewsResource.title,
+                    content = userNewsResource.content,
+                    quranReference = null,
+                    duaNumber = duaNumber
+                )
+            },
         ) {
             topicScreen(
                 showBackButton = true,
@@ -67,15 +80,40 @@ fun NiaNavHost(
             surahScreen(
                 onBackClick = navController::popBackStack
             )
+            // Dua detail screen nested within For You section
+            duaDetailScreen(
+                onBackClick = navController::popBackStack,
+                onNavigateToSurah = { surahNumber, ayahNumber ->
+                    navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber)
+                }
+            )
         }
         bookmarksSection(
             onTopicClick = navController::navigateToTopic,
             onShowSnackbar = onShowSnackbar,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
+            onDuaClick = { userNewsResource ->
+                // Extract dua number from title (e.g., "Rabbana Dua #1" -> 1)
+                val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
+                    ?.groupValues?.get(1)?.toIntOrNull() ?: 1
+                navController.navigateToDuaDetail(
+                    title = userNewsResource.title,
+                    content = userNewsResource.content,
+                    quranReference = null,
+                    duaNumber = duaNumber
+                )
+            },
         ) {
             // Surah screen nested within Bookmarks section
             surahScreen(
                 onBackClick = navController::popBackStack
+            )
+            // Dua detail screen nested within Bookmarks section
+            duaDetailScreen(
+                onBackClick = navController::popBackStack,
+                onNavigateToSurah = { surahNumber, ayahNumber ->
+                    navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber)
+                }
             )
         }
         searchScreen(

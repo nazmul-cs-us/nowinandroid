@@ -99,6 +99,7 @@ internal fun getArabicFontFamilyForSelection(selectedFont: String): androidx.com
 fun QuranAlbumPlayerScreen(
     surahNumber: Int,
     newsResourceId: String? = null, // News resource ID for bookmark tracking
+    scrollToAyah: Int = 0, // Optional: scroll to specific ayah number (0 = no scroll)
     onBackClick: () -> Unit,
     viewModel: SurahDetailViewModel = hiltViewModel(),
     quranRepository: QuranRepository = hiltViewModel<QuranRepositoryHolder>().repository,
@@ -231,6 +232,26 @@ fun QuranAlbumPlayerScreen(
     // Load the surah
     LaunchedEffect(surahNumber) {
         viewModel.loadSurah(surahNumber)
+    }
+
+    // Scroll to specific ayah when content is loaded (if scrollToAyah > 0)
+    LaunchedEffect(uiState, scrollToAyah, showBismillahRow) {
+        if (scrollToAyah > 0 && uiState is SurahDetailUiState.Success) {
+            val state = uiState as SurahDetailUiState.Success
+            // Calculate the index in LazyColumn:
+            // Index 0: AlbumHeader + InfoCard/Controls container
+            // Index 1 (optional): Bismillah row (if showBismillahRow is true)
+            // Index 2+: Ayah items (starting from ayah 1)
+            val bismillahOffset = if (showBismillahRow) 1 else 0
+            val ayahIndex = 1 + bismillahOffset + (scrollToAyah - 1)
+
+            // Ensure index is valid
+            val totalItems = 1 + bismillahOffset + state.ayahs.size
+            if (ayahIndex in 0 until totalItems) {
+                android.util.Log.d("QuranAlbumPlayer", "📜 Scrolling to Ayah $scrollToAyah at index $ayahIndex")
+                scrollState.animateScrollToItem(ayahIndex)
+            }
+        }
     }
 
     // Calculate toolbar collapse state with smooth transition
