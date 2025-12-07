@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +26,22 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.FontDownload
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.TextFormat
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -142,6 +159,93 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
      */
     fun getTranslationName(code: String): String {
         return QuranTranslationHelper.getTranslationName(code)
+    }
+
+    /**
+     * Get list of available translations
+     */
+    fun getAvailableTranslations(): List<String> {
+        return QuranTranslationHelper.getAvailableTranslations()
+    }
+
+    /**
+     * Change the current translation
+     */
+    fun changeTranslation(code: String) {
+        prefs.edit().putString("quran_translation", code).apply()
+        _selectedTranslation.value = code
+        reloadDuasWithTranslation(code)
+    }
+
+    /**
+     * Get list of available Arabic fonts
+     */
+    fun getAvailableArabicFonts(): List<String> {
+        return listOf(
+            "pdms_saleem",
+            "noor_e_hidayat",
+            "thabit",
+            "uthmani_script",
+            "indopak_script",
+            "amiri",
+            "scheherazade"
+        )
+    }
+
+    /**
+     * Get display name for a font
+     */
+    fun getArabicFontDisplayName(fontName: String): String {
+        return when (fontName) {
+            "pdms_saleem" -> "PDMS Saleem"
+            "noor_e_hidayat" -> "Noor e Hidayat"
+            "thabit" -> "Thabit"
+            "uthmani_script" -> "Uthmani Script"
+            "indopak_script" -> "IndoPak Script"
+            "amiri" -> "Amiri"
+            "scheherazade" -> "Scheherazade"
+            else -> fontName
+        }
+    }
+
+    /**
+     * Change the Arabic font
+     */
+    fun changeArabicFont(fontName: String) {
+        prefs.edit().putString("arabic_font", fontName).apply()
+        _selectedArabicFont.value = fontName
+    }
+
+    // Bookmark management for Duas
+    private val bookmarkedDuas: MutableSet<String> = mutableSetOf()
+
+    init {
+        // Load bookmarked duas from SharedPreferences
+        val savedBookmarks = prefs.getStringSet("bookmarked_duas", emptySet()) ?: emptySet()
+        bookmarkedDuas.addAll(savedBookmarks)
+    }
+
+    /**
+     * Check if a dua is bookmarked
+     */
+    fun isDuaBookmarked(duaId: String): Boolean {
+        return duaId in bookmarkedDuas
+    }
+
+    /**
+     * Toggle bookmark state for a dua
+     */
+    fun toggleDuaBookmark(duaId: String): Boolean {
+        val newState = if (duaId in bookmarkedDuas) {
+            bookmarkedDuas.remove(duaId)
+            false
+        } else {
+            bookmarkedDuas.add(duaId)
+            true
+        }
+        // Persist to SharedPreferences
+        prefs.edit().putStringSet("bookmarked_duas", bookmarkedDuas.toSet()).apply()
+        return newState
     }
 
     /**
@@ -373,9 +477,35 @@ fun DuaDetailScreen(
     val arabicFontFamily = getArabicFontFamilyForDua(selectedFont)
     val scope = rememberCoroutineScope()
 
-    // Get translation display name
+    // Dialog states
+    var showTranslationDialog by remember { mutableStateOf(false) }
+    var showFontDialog by remember { mutableStateOf(false) }
+
+    // Bookmark state - will be updated when page changes
+    var isBookmarked by remember { mutableStateOf(false) }
+
+    // Available options
+    val availableTranslations = remember { viewModel.getAvailableTranslations() }
+    val availableFonts = remember { viewModel.getAvailableArabicFonts() }
+
+    // Get translation display name and short code
     val translationDisplayName = remember(selectedTranslation) {
         viewModel.getTranslationName(selectedTranslation)
+    }
+    val translationCode = when (selectedTranslation) {
+        "ar" -> "AR"
+        "transliteration" -> "TR"
+        "bn" -> "BN"
+        "zh" -> "ZH"
+        "en" -> "EN"
+        "es" -> "ES"
+        "fr" -> "FR"
+        "id" -> "ID"
+        "ru" -> "RU"
+        "sv" -> "SV"
+        "tr" -> "TR"
+        "ur" -> "UR"
+        else -> "??"
     }
 
     // Load all duas from ViewModel
@@ -416,6 +546,16 @@ fun DuaDetailScreen(
     val hasPrevious = currentPage > 0
     val hasNext = currentPage < totalDuas - 1
 
+    // Get current dua ID for bookmark tracking
+    val currentDuaId = remember(currentPage, duasList) {
+        duasList.getOrNull(currentPage)?.id ?: "dua_$currentPage"
+    }
+
+    // Update bookmark state when page changes
+    LaunchedEffect(currentDuaId) {
+        isBookmarked = viewModel.isDuaBookmarked(currentDuaId)
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surface
@@ -435,18 +575,82 @@ fun DuaDetailScreen(
                             brush = Brush.linearGradient(colors = DuaGradientColors)
                         )
                 ) {
-                    // Back button
-                    IconButton(
-                        onClick = onBackClick,
+                    // Top toolbar row
+                    Row(
                         modifier = Modifier
-                            .padding(4.dp)
-                            .align(Alignment.TopStart)
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                            .align(Alignment.TopCenter),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White
-                        )
+                        // Back button
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White
+                            )
+                        }
+
+                        // Right side toolbar buttons
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Translation button with indicator
+                            IconButton(onClick = { showTranslationDialog = true }) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Translate,
+                                        contentDescription = "Translation",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Text(
+                                        text = translationCode,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            // Font selection button with icon in rounded box
+                            Surface(
+                                onClick = { showFontDialog = true },
+                                modifier = Modifier.size(40.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color.White.copy(alpha = 0.15f),
+                                contentColor = Color.White
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.FontDownload,
+                                        contentDescription = "Font selection",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+
+                            // Bookmark button
+                            IconButton(onClick = {
+                                isBookmarked = viewModel.toggleDuaBookmark(currentDuaId)
+                            }) {
+                                Icon(
+                                    imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                    contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
+                                    tint = Color.White
+                                )
+                            }
+                        }
                     }
 
                     // Header content
@@ -635,6 +839,34 @@ fun DuaDetailScreen(
                 }
             }
         }
+    }
+
+    // Translation selection dialog
+    if (showTranslationDialog) {
+        DuaTranslationSelectorDialog(
+            currentTranslation = selectedTranslation,
+            availableTranslations = availableTranslations,
+            getTranslationName = { viewModel.getTranslationName(it) },
+            onTranslationSelected = { translationCode ->
+                viewModel.changeTranslation(translationCode)
+                showTranslationDialog = false
+            },
+            onDismiss = { showTranslationDialog = false }
+        )
+    }
+
+    // Font selection dialog
+    if (showFontDialog) {
+        DuaFontSelectorDialog(
+            currentFont = selectedFont,
+            availableFonts = availableFonts,
+            getFontName = { viewModel.getArabicFontDisplayName(it) },
+            onFontSelected = { fontName ->
+                viewModel.changeArabicFont(fontName)
+                showFontDialog = false
+            },
+            onDismiss = { showFontDialog = false }
+        )
     }
 }
 
@@ -978,4 +1210,111 @@ private fun SingleDuaContent(
             }
         }
     }
+}
+
+/**
+ * Translation selector dialog for Dua screen - matches QuranAlbumPlayerScreen style
+ */
+@Composable
+fun DuaTranslationSelectorDialog(
+    currentTranslation: String,
+    availableTranslations: List<String>,
+    getTranslationName: (String) -> String,
+    onTranslationSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    // Filter out any translations with empty or blank display names
+    val validTranslations = remember(availableTranslations) {
+        availableTranslations.filter { code ->
+            getTranslationName(code).isNotBlank()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Translation") },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp)
+            ) {
+                items(validTranslations) { translationCode ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onTranslationSelected(translationCode) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = translationCode == currentTranslation,
+                            onClick = { onTranslationSelected(translationCode) }
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Text(
+                            text = getTranslationName(translationCode),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+/**
+ * Font selector dialog for Dua screen - matches QuranAlbumPlayerScreen style
+ */
+@Composable
+fun DuaFontSelectorDialog(
+    currentFont: String,
+    availableFonts: List<String>,
+    getFontName: (String) -> String,
+    onFontSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Arabic Font") },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+            ) {
+                items(availableFonts) { fontName ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onFontSelected(fontName) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = fontName == currentFont,
+                            onClick = { onFontSelected(fontName) }
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Text(
+                            text = getFontName(fontName),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

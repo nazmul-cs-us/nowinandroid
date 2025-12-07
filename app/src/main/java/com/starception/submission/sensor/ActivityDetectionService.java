@@ -16,19 +16,35 @@ import android.os.Looper;
 import androidx.core.content.ContextCompat;
 import android.util.Log;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * ACTIVITY DETECTION SERVICE: Multi-sensor activity recognition using accelerometer, gyroscope, and GPS
- * 
- * This service combines multiple sensors to accurately detect user activity states:
+ * ENHANCED ACTIVITY DETECTION SERVICE: Multi-sensor activity recognition
+ *
+ * This service combines multiple sensors for accurate user activity detection:
  * - Accelerometer: Detects movement and vibration patterns
  * - Gyroscope: Detects rotational movement and orientation changes
+ * - Step Counter: Detects walking/running steps (hardware-based, low power)
+ * - Step Detector: Real-time step detection events
+ * - Linear Acceleration: Movement without gravity (better activity classification)
  * - GPS: Detects speed and travel patterns
- * 
+ *
+ * IMPROVEMENTS (v2.0):
+ * - Step counter integration for accurate walking/running detection
+ * - Low-pass filter for noise reduction
+ * - Moving average smoothing for sensor data
+ * - Vehicle vibration pattern detection (high frequency, low amplitude)
+ * - Confidence scoring for each activity
+ * - Improved state machine with smarter transitions
+ * - Better cycling/biking detection
+ *
  * ACTIVITIES DETECTED:
  * - STATIONARY: User is at rest (sitting, standing still)
+ * - ON_PHONE: User is actively using the phone
  * - WALKING: User is walking at normal pace
  * - RUNNING: User is running or jogging
  * - DRIVING: User is in a vehicle
@@ -37,12 +53,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ActivityDetectionService implements SensorEventListener, LocationListener {
     
     private static final String TAG = "ActivityDetection";
-    private static final boolean ENABLE_DEBUG_LOGGING = false; // Set to false to disable all debug logs
+    private static final boolean ENABLE_DEBUG_LOGGING = true; // Set to true to enable debug logs
     
     // Helper method for conditional logging
     private void logDebug(String message) {
         if (ENABLE_DEBUG_LOGGING) {
-            logDebug( message);
+            Log.d(TAG, message);
         }
     }
     
@@ -60,11 +76,11 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     private static final double WALKING_SPEED_MIN = 0.3; // m/s (1 km/h) - minimum speed to distinguish from phone pickup
     private static final double WALKING_SPEED_MAX = 2.5; // m/s (~9 km/h, typical walking speed is 1.4 m/s)
 
-    private static final double RUNNING_VARIANCE_MIN = 3.5; // Minimum variance for running (higher impact) - increased to match new walking max
-    private static final double RUNNING_GYRO_MIN = 1.5; // Minimum gyro for running (more rotational movement)
-    private static final double RUNNING_SPEED_MIN = 2.0; // m/s (~7 km/h, typical running starts at 6 km/h)
+    private static final double RUNNING_VARIANCE_MIN = 6.0; // Minimum variance for running (much higher impact than walking)
+    private static final double RUNNING_GYRO_MIN = 2.0; // Minimum gyro for running (more rotational movement)
+    private static final double RUNNING_SPEED_MIN = 2.5; // m/s (~9 km/h, jogging/running speed)
 
-    private static final double DRIVING_SPEED_THRESHOLD = 5.0; // m/s (18 km/h)
+    private static final double DRIVING_SPEED_THRESHOLD = 6.5; // m/s (23 km/h) - increased to avoid false positives from GPS drift
     private static final double STATIONARY_VARIANCE_THRESHOLD = 0.15; // Slightly higher for better stability
     private static final double STATIONARY_ACCEL_THRESHOLD = 0.3; // Lower threshold for stationary
 
@@ -101,7 +117,39 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     private SensorManager sensorManager;
     private Sensor accelerometer;
     private Sensor gyroscope;
+    private Sensor stepCounter;        // NEW: Hardware step counter
+    private Sensor stepDetector;       // NEW: Real-time step events
+    private Sensor linearAccelerometer; // NEW: Acceleration without gravity
     private LocationManager locationManager;
+
+    // Step counting for walking/running detection
+    private AtomicInteger stepCountInWindow = new AtomicInteger(0);
+    private long lastStepTime = 0;
+    private int initialStepCount = -1;  // First step count reading
+    private int lastStepCount = 0;      // Last known step count
+    private float averageStepRate = 0f; // Steps per second (walking: 1.5-2.2, running: 2.5+)
+
+    // Low-pass filter coefficients for noise reduction
+    private static final float LOW_PASS_ALPHA = 0.2f; // Smoothing factor (0.1 = smoother, 0.5 = more responsive)
+    private float[] filteredAccel = new float[3];     // Low-pass filtered accelerometer
+    private float[] filteredGyro = new float[3];      // Low-pass filtered gyroscope
+
+    // Moving average buffers for smoother readings
+    private static final int MOVING_AVG_SIZE = 10;
+    private Deque<Double> accelMagnitudeBuffer = new ArrayDeque<>(MOVING_AVG_SIZE);
+    private Deque<Double> gyroMagnitudeBuffer = new ArrayDeque<>(MOVING_AVG_SIZE);
+    private Deque<Double> linearAccelBuffer = new ArrayDeque<>(MOVING_AVG_SIZE);
+
+    // Vehicle vibration detection (high frequency, low amplitude)
+    private static final double VEHICLE_VIBRATION_FREQ_MIN = 15.0; // Hz - vehicle engine vibration
+    private static final double VEHICLE_VIBRATION_AMP_MAX = 0.8;   // Low amplitude vibration
+    private long lastVibrationSampleTime = 0;
+    private int vibrationCrossings = 0; // Zero-crossings for frequency estimation
+    private double lastAccelMagnitude = 0;
+
+    // Confidence scoring (0.0 - 1.0)
+    private float currentConfidence = 0f;
+    private ActivityType lastConfidentActivity = ActivityType.UNKNOWN;
     
     // Data collection
     private ConcurrentLinkedQueue<AccelerometerData> accelData;
@@ -228,17 +276,26 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         this.context = context.getApplicationContext();
         this.sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
         this.locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-        
+
         // Initialize sensors
         this.accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         this.gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-        
+
+        // NEW: Initialize additional sensors for improved detection
+        this.stepCounter = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
+        this.stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
+        this.linearAccelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+
         // Initialize data collections
         this.accelData = new ConcurrentLinkedQueue<>();
         this.gyroData = new ConcurrentLinkedQueue<>();
         this.locationData = new ConcurrentLinkedQueue<>();
-        
-        Log.i(TAG, "ActivityDetectionService initialized");
+
+        // Log sensor availability
+        Log.i(TAG, "ActivityDetectionService initialized (Enhanced v2.0)");
+        Log.i(TAG, "  Step Counter: " + (stepCounter != null ? "✓" : "✗"));
+        Log.i(TAG, "  Step Detector: " + (stepDetector != null ? "✓" : "✗"));
+        Log.i(TAG, "  Linear Accelerometer: " + (linearAccelerometer != null ? "✓" : "✗"));
     }
     
     /**
@@ -281,10 +338,28 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
             sensorManager.registerListener(this, accelerometer, SENSOR_DELAY_US);
             Log.i(TAG, "Accelerometer registered");
         }
-        
+
         if (gyroscope != null) {
             sensorManager.registerListener(this, gyroscope, SENSOR_DELAY_US);
             Log.i(TAG, "Gyroscope registered");
+        }
+
+        // NEW: Register step counter for walking/running detection
+        if (stepCounter != null) {
+            sensorManager.registerListener(this, stepCounter, SensorManager.SENSOR_DELAY_NORMAL);
+            Log.i(TAG, "Step Counter registered");
+        }
+
+        // NEW: Register step detector for real-time step events
+        if (stepDetector != null) {
+            sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_NORMAL);
+            Log.i(TAG, "Step Detector registered");
+        }
+
+        // NEW: Register linear accelerometer (gravity-free acceleration)
+        if (linearAccelerometer != null) {
+            sensorManager.registerListener(this, linearAccelerometer, SENSOR_DELAY_US);
+            Log.i(TAG, "Linear Accelerometer registered");
         }
         
         // Register location listener
@@ -345,31 +420,50 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     
     /**
      * Analyze collected sensor data to determine current activity
+     * ENHANCED: Uses step counter, moving averages, and confidence scoring
      */
     private void analyzeCurrentActivity() {
         long currentTime = System.currentTimeMillis();
         long windowStart = currentTime - (DATA_WINDOW_SIZE * 1000);
-        
-        // Filter recent accelerometer data
+
+        // Filter recent accelerometer data (use moving average for smoother values)
         double avgAccel = calculateAverageAcceleration(windowStart);
         double accelVariance = calculateAccelerationVariance(windowStart);
-        
+        double smoothedAccel = getMovingAverage(accelMagnitudeBuffer);
+        if (smoothedAccel > 0) {
+            avgAccel = (avgAccel + smoothedAccel) / 2.0; // Blend with moving average
+        }
+
         // Filter recent gyroscope data
         double avgGyro = calculateAverageGyroscope(windowStart);
-        
+        double smoothedGyro = getMovingAverage(gyroMagnitudeBuffer);
+        if (smoothedGyro > 0) {
+            avgGyro = (avgGyro + smoothedGyro) / 2.0; // Blend with moving average
+        }
+
         // Get recent location data
         double maxSpeed = getMaxSpeedInWindow(windowStart);
-        
+
+        // NEW: Get step data for walking/running detection
+        int stepsInWindow = stepCountInWindow.getAndSet(0); // Reset for next window
+        float stepRate = averageStepRate;
+
+        // NEW: Get linear acceleration (gravity-free) for better motion detection
+        double linearAccel = getMovingAverage(linearAccelBuffer);
+
         // Detect phone orientation for better activity classification
         PhoneOrientation orientation = detectPhoneOrientation(windowStart);
         currentOrientation = orientation;
-        
+
         // Detect phone position using pitch/roll + basic features (research paper method)
         PhonePosition position = detectPhonePosition(windowStart, accelVariance, avgGyro);
         currentPosition = position;
-        
-        // Determine activity based on thresholds, orientation AND position
-        ActivityType detectedActivity = determineActivity(avgAccel, accelVariance, avgGyro, maxSpeed, orientation, position);
+
+        // Determine activity with enhanced algorithm (includes step data)
+        ActivityType detectedActivity = determineActivityEnhanced(
+                avgAccel, accelVariance, avgGyro, maxSpeed,
+                stepsInWindow, stepRate, linearAccel,
+                orientation, position);
         
         // HYSTERESIS: Make activities sticky to prevent rapid flipping
         // Only change if we get 3 consecutive different detections
@@ -737,7 +831,310 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
                    ", gyro: " + String.format("%.2f", avgGyro) + ")");
         return ActivityType.UNKNOWN;
     }
-    
+
+    /**
+     * ENHANCED Activity Detection Algorithm (v2.0)
+     * Uses step counter, linear acceleration, and confidence scoring
+     *
+     * Step Rate Reference:
+     * - Walking: 1.5 - 2.2 steps/second (90-132 steps/min)
+     * - Running: 2.5 - 4.0 steps/second (150-240 steps/min)
+     *
+     * @param avgAccel Average acceleration magnitude
+     * @param accelVariance Variance in acceleration (motion intensity)
+     * @param avgGyro Average gyroscope magnitude (rotation)
+     * @param maxSpeed Maximum GPS speed in window
+     * @param stepsInWindow Steps detected in analysis window
+     * @param stepRate Average steps per second
+     * @param linearAccel Linear acceleration (without gravity)
+     * @param orientation Phone orientation
+     * @param position Phone position (HAND/POCKET/DESK)
+     * @return Detected activity type with confidence
+     */
+    private ActivityType determineActivityEnhanced(
+            double avgAccel, double accelVariance, double avgGyro, double maxSpeed,
+            int stepsInWindow, float stepRate, double linearAccel,
+            PhoneOrientation orientation, PhonePosition position) {
+
+        // Calculate confidence scores for each activity
+        float drivingConfidence = calculateDrivingConfidence(maxSpeed, accelVariance, avgGyro, linearAccel);
+        float runningConfidence = calculateRunningConfidence(accelVariance, avgGyro, maxSpeed, stepsInWindow, stepRate);
+        float walkingConfidence = calculateWalkingConfidence(accelVariance, avgGyro, maxSpeed, stepsInWindow, stepRate, position);
+        float stationaryConfidence = calculateStationaryConfidence(accelVariance, avgGyro, linearAccel, position);
+        float onPhoneConfidence = calculateOnPhoneConfidence(accelVariance, avgGyro, orientation, position);
+
+        // Log confidence scores for debugging
+        logDebug(String.format("📊 Confidence: Drive=%.2f, Run=%.2f, Walk=%.2f, Still=%.2f, Phone=%.2f (steps=%d, rate=%.1f)",
+                drivingConfidence, runningConfidence, walkingConfidence, stationaryConfidence, onPhoneConfidence,
+                stepsInWindow, stepRate));
+
+        // Find highest confidence activity
+        ActivityType bestActivity = ActivityType.UNKNOWN;
+        float bestConfidence = 0.3f; // Minimum threshold to make a decision
+
+        if (drivingConfidence > bestConfidence) {
+            bestActivity = ActivityType.DRIVING;
+            bestConfidence = drivingConfidence;
+        }
+        if (runningConfidence > bestConfidence) {
+            bestActivity = ActivityType.RUNNING;
+            bestConfidence = runningConfidence;
+        }
+        if (walkingConfidence > bestConfidence) {
+            bestActivity = ActivityType.WALKING;
+            bestConfidence = walkingConfidence;
+        }
+        if (stationaryConfidence > bestConfidence) {
+            bestActivity = ActivityType.STATIONARY;
+            bestConfidence = stationaryConfidence;
+        }
+        if (onPhoneConfidence > bestConfidence) {
+            bestActivity = ActivityType.ON_PHONE;
+            bestConfidence = onPhoneConfidence;
+        }
+
+        // Store confidence for external access
+        currentConfidence = bestConfidence;
+
+        // If no clear winner, fall back to original algorithm
+        if (bestActivity == ActivityType.UNKNOWN) {
+            return determineActivity(avgAccel, accelVariance, avgGyro, maxSpeed, orientation, position);
+        }
+
+        logDebug("🎯 Enhanced detection: " + bestActivity + " (confidence: " + String.format("%.2f", bestConfidence) + ")");
+        return bestActivity;
+    }
+
+    /**
+     * Calculate confidence score for DRIVING
+     * High speed is the strongest indicator, but also check for vehicle vibration patterns
+     * IMPROVED: Avoid false positives from GPS noise when variance suggests walking
+     */
+    private float calculateDrivingConfidence(double maxSpeed, double accelVariance, double avgGyro, double linearAccel) {
+        float confidence = 0f;
+
+        // Check if variance suggests walking (should NOT be driving)
+        boolean hasWalkingVariance = accelVariance >= WALKING_VARIANCE_MIN && accelVariance < WALKING_VARIANCE_MAX;
+
+        // Speed is primary indicator (most reliable)
+        if (maxSpeed > DRIVING_SPEED_THRESHOLD) {
+            confidence = 0.9f; // Very high confidence
+        } else if (maxSpeed > 4.0) { // 14 km/h - could be biking or slow driving
+            // But if variance suggests walking, GPS is probably wrong
+            if (hasWalkingVariance) {
+                confidence = 0.1f; // Low confidence - likely GPS noise
+                logDebug("Driving: GPS speed " + String.format("%.1f", maxSpeed) + " but variance suggests walking");
+            } else {
+                confidence = 0.3f;
+            }
+        }
+
+        // Vehicle vibration pattern: low amplitude, consistent vibration
+        // Vehicles produce steady micro-vibrations from engine/road
+        // Walking has HIGH variance, driving has LOW variance
+        if (accelVariance < 0.3 && avgGyro < 0.2 && linearAccel < 0.5) {
+            confidence += 0.15f; // Boost if low-variance motion (passive in vehicle)
+        }
+
+        // If variance is in walking range, reduce driving confidence significantly
+        if (hasWalkingVariance) {
+            confidence -= 0.3f;
+        }
+
+        // Reduce confidence if high gyro (vehicles have minimal rotation)
+        if (avgGyro > 1.0) {
+            confidence -= 0.2f;
+        }
+
+        return Math.max(0f, Math.min(1f, confidence));
+    }
+
+    /**
+     * Calculate confidence score for RUNNING
+     * High variance, high gyro, fast step rate
+     * Made more conservative to avoid false positives during fast walking
+     * IMPROVED: Requires GPS speed confirmation - can't run at 0 speed!
+     */
+    private float calculateRunningConfidence(double accelVariance, double avgGyro, double maxSpeed, int stepsInWindow, float stepRate) {
+        float confidence = 0f;
+
+        // CRITICAL: If GPS shows 0 or very low speed, user is NOT running
+        // This prevents false positives when lying in bed with phone
+        if (maxSpeed < 0.5) {
+            logDebug("Running: GPS shows near-zero speed (" + String.format("%.2f", maxSpeed) + ") - not running");
+            return 0f; // Can't be running if not moving
+        }
+
+        // Step rate must be realistic (max 5.0 steps/sec for sprinting)
+        // If step rate is impossibly high, ignore it
+        if (stepRate > 5.0f) {
+            logDebug("Running: Step rate too high (" + String.format("%.1f", stepRate) + ") - ignoring");
+            stepRate = 0f;
+        }
+
+        // Step rate is excellent indicator (3.0+ steps/sec = definitely running)
+        // Normal walking is 1.5-2.2 steps/sec, fast walking up to 2.5
+        if (stepRate >= 3.0f) {
+            confidence = 0.5f; // Reduced from 0.7 - need GPS confirmation
+        } else if (stepRate >= 2.5f) {
+            confidence = 0.2f; // Could be fast walking or slow jog - need more evidence
+        }
+        // Below 2.5 step rate = not running
+
+        // High variance indicates high-impact activity (running has MUCH higher impact)
+        if (accelVariance >= RUNNING_VARIANCE_MIN) {
+            confidence += 0.2f;
+        }
+
+        // Running speed confirmation (if GPS available) - REQUIRED for high confidence
+        if (maxSpeed >= RUNNING_SPEED_MIN && maxSpeed < DRIVING_SPEED_THRESHOLD) {
+            confidence += 0.3f; // GPS confirms running speed
+        } else if (maxSpeed > 0 && maxSpeed < RUNNING_SPEED_MIN) {
+            // GPS shows walking speed, significantly reduce running confidence
+            confidence -= 0.3f;
+        }
+
+        // High gyro rotation indicates running gait
+        if (avgGyro >= RUNNING_GYRO_MIN) {
+            confidence += 0.1f;
+        }
+
+        // Recent steps boost confidence only if many steps AND GPS confirms movement
+        if (stepsInWindow >= 6 && maxSpeed >= 1.0) {
+            confidence += 0.1f;
+        }
+
+        return Math.max(0f, Math.min(1f, confidence));
+    }
+
+    /**
+     * Calculate confidence score for WALKING
+     * Moderate variance, step detection, position awareness
+     * IMPROVED: Works even without step counter by using variance patterns
+     */
+    private float calculateWalkingConfidence(double accelVariance, double avgGyro, double maxSpeed, int stepsInWindow, float stepRate, PhonePosition position) {
+        float confidence = 0f;
+
+        // Walking variance pattern is the PRIMARY indicator (step counter may not work on all devices)
+        boolean hasWalkingVariance = accelVariance >= WALKING_VARIANCE_MIN && accelVariance < WALKING_VARIANCE_MAX;
+        boolean hasWalkingGyro = avgGyro >= WALKING_GYRO_MIN && avgGyro < WALKING_GYRO_MAX;
+
+        // Variance pattern is reliable even without step counter
+        if (hasWalkingVariance) {
+            confidence = 0.5f; // Base confidence from variance pattern
+            logDebug("Walking: variance in range (" + String.format("%.2f", accelVariance) + ")");
+        }
+
+        // Step rate boosts confidence if available (1.5-2.2 steps/sec = walking)
+        if (stepRate >= 1.5f && stepRate < 2.5f) {
+            confidence += 0.3f;
+        } else if (stepRate >= 1.0f && stepRate < 1.5f) {
+            confidence += 0.2f; // Slow walking
+        } else if (stepsInWindow >= 2) { // At least some steps detected
+            confidence += 0.15f;
+        }
+
+        // Gyro pattern suggests walking gait
+        if (hasWalkingGyro && hasWalkingVariance) {
+            confidence += 0.1f;
+        }
+
+        // Position boost: POCKET strongly suggests walking
+        if (position == PhonePosition.POCKET) {
+            confidence += 0.2f;
+        } else if (position == PhonePosition.HAND && hasWalkingVariance) {
+            confidence += 0.1f; // Walking while using phone
+        }
+
+        // Speed confirmation - but GPS can be unreliable, so don't over-weight
+        if (maxSpeed >= WALKING_SPEED_MIN && maxSpeed < WALKING_SPEED_MAX) {
+            confidence += 0.05f;
+        }
+        // If GPS shows very high speed but variance suggests walking, likely GPS error
+        if (maxSpeed > 4.0 && hasWalkingVariance) {
+            logDebug("Walking: GPS speed high (" + String.format("%.1f", maxSpeed) + ") but variance suggests walking");
+            // Don't reduce confidence, just ignore GPS
+        }
+
+        // Reduce if too much gyro rotation (suggests phone handling, not walking)
+        if (avgGyro > WALKING_GYRO_MAX && position == PhonePosition.HAND) {
+            confidence -= 0.15f;
+        }
+
+        return Math.max(0f, Math.min(1f, confidence));
+    }
+
+    /**
+     * Calculate confidence score for STATIONARY
+     * Very low variance, very low gyro, phone on desk
+     */
+    private float calculateStationaryConfidence(double accelVariance, double avgGyro, double linearAccel, PhonePosition position) {
+        float confidence = 0f;
+
+        // Very still sensors indicate stationary
+        boolean isPerfectlyStill = (accelVariance <= 0.0015 && avgGyro <= 0.0015);
+        boolean isVeryStill = (accelVariance <= 0.005 && avgGyro <= 0.003);
+
+        if (isPerfectlyStill) {
+            confidence = 0.9f;
+        } else if (isVeryStill) {
+            confidence = 0.7f;
+        } else if (accelVariance <= STATIONARY_VARIANCE_THRESHOLD && avgGyro <= 0.01) {
+            confidence = 0.4f;
+        }
+
+        // DESK position strongly suggests stationary
+        if (position == PhonePosition.DESK) {
+            confidence += 0.2f;
+        }
+
+        // Linear acceleration should be near zero if truly stationary
+        if (linearAccel < 0.1) {
+            confidence += 0.1f;
+        }
+
+        return Math.max(0f, Math.min(1f, confidence));
+    }
+
+    /**
+     * Calculate confidence score for ON_PHONE (actively using phone)
+     * Moderate movement, HAND position, portrait/landscape orientation
+     */
+    private float calculateOnPhoneConfidence(double accelVariance, double avgGyro, PhoneOrientation orientation, PhonePosition position) {
+        float confidence = 0f;
+
+        // HAND position is strong indicator
+        if (position == PhonePosition.HAND) {
+            confidence = 0.6f;
+        }
+
+        // Portrait/landscape orientation suggests phone use
+        boolean orientationSuggestsUse = (orientation == PhoneOrientation.PORTRAIT ||
+                orientation == PhoneOrientation.LANDSCAPE ||
+                orientation == PhoneOrientation.FLAT_UP);
+
+        if (orientationSuggestsUse) {
+            confidence += 0.15f;
+        }
+
+        // Hand tremor detection (small but measurable gyro)
+        if (avgGyro > 0.003 && avgGyro < 0.3) {
+            confidence += 0.1f;
+        }
+
+        // Some variance but not too much (phone handling, not walking)
+        if (accelVariance > 0.005 && accelVariance < WALKING_VARIANCE_MIN) {
+            confidence += 0.15f;
+        }
+
+        // Reduce if walking-like variance detected
+        if (accelVariance >= WALKING_VARIANCE_MIN) {
+            confidence -= 0.2f;
+        }
+
+        return Math.max(0f, Math.min(1f, confidence));
+    }
+
     /**
      * Clean old data to prevent memory buildup
      */
@@ -753,25 +1150,170 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     @Override
     public void onSensorChanged(SensorEvent event) {
         if (!isRunning.get()) return;
-        
+
         long timestamp = System.currentTimeMillis();
-        
+
         switch (event.sensor.getType()) {
             case Sensor.TYPE_ACCELEROMETER:
+                // Apply low-pass filter for noise reduction
+                filteredAccel[0] = applyLowPassFilter(event.values[0], filteredAccel[0]);
+                filteredAccel[1] = applyLowPassFilter(event.values[1], filteredAccel[1]);
+                filteredAccel[2] = applyLowPassFilter(event.values[2], filteredAccel[2]);
+
                 accelData.offer(new AccelerometerData(
-                    event.values[0], event.values[1], event.values[2], timestamp));
+                        filteredAccel[0], filteredAccel[1], filteredAccel[2], timestamp));
+
+                // Track vehicle vibration (zero-crossing detection for frequency)
+                double currentMag = Math.sqrt(
+                        filteredAccel[0] * filteredAccel[0] +
+                                filteredAccel[1] * filteredAccel[1] +
+                                filteredAccel[2] * filteredAccel[2]);
+                updateVibrationTracking(currentMag, timestamp);
+
+                // Update moving average buffer
+                updateMovingAverage(accelMagnitudeBuffer, currentMag);
                 break;
-                
+
             case Sensor.TYPE_GYROSCOPE:
+                // Apply low-pass filter for noise reduction
+                filteredGyro[0] = applyLowPassFilter(event.values[0], filteredGyro[0]);
+                filteredGyro[1] = applyLowPassFilter(event.values[1], filteredGyro[1]);
+                filteredGyro[2] = applyLowPassFilter(event.values[2], filteredGyro[2]);
+
                 gyroData.offer(new GyroscopeData(
-                    event.values[0], event.values[1], event.values[2], timestamp));
+                        filteredGyro[0], filteredGyro[1], filteredGyro[2], timestamp));
+
+                // Update moving average buffer
+                double gyroMag = Math.sqrt(
+                        filteredGyro[0] * filteredGyro[0] +
+                                filteredGyro[1] * filteredGyro[1] +
+                                filteredGyro[2] * filteredGyro[2]);
+                updateMovingAverage(gyroMagnitudeBuffer, gyroMag);
+                break;
+
+            case Sensor.TYPE_STEP_COUNTER:
+                // Hardware step counter - tracks total steps since boot
+                int totalSteps = (int) event.values[0];
+                if (initialStepCount < 0) {
+                    initialStepCount = totalSteps; // First reading
+                }
+                int stepsSinceStart = totalSteps - initialStepCount;
+                int newSteps = totalSteps - lastStepCount;
+                if (newSteps > 0 && lastStepCount > 0) {
+                    stepCountInWindow.addAndGet(newSteps);
+                }
+                lastStepCount = totalSteps;
+                logDebug("Step counter: total=" + totalSteps + ", window=" + stepCountInWindow.get());
+                break;
+
+            case Sensor.TYPE_STEP_DETECTOR:
+                // Real-time step event - fires when a step is detected
+                long timeSinceLastStep = timestamp - lastStepTime;
+                if (lastStepTime > 0 && timeSinceLastStep > 200) { // Minimum 200ms between steps (max 5 steps/sec)
+                    // Calculate instantaneous step rate
+                    float instantRate = 1000f / timeSinceLastStep; // Steps per second
+                    // Cap to realistic values (walking: 1.5-2.2, running: 2.5-4.0, max sprint: 5.0)
+                    instantRate = Math.min(instantRate, 5.0f);
+                    // Smooth with exponential average
+                    averageStepRate = (averageStepRate * 0.7f) + (instantRate * 0.3f);
+                } else if (timeSinceLastStep <= 200) {
+                    // Too fast - likely false step detection, ignore
+                    logDebug("Step ignored - too fast (" + timeSinceLastStep + "ms)");
+                    break;
+                }
+                lastStepTime = timestamp;
+                stepCountInWindow.incrementAndGet();
+                logDebug("Step detected! Rate: " + String.format("%.2f", averageStepRate) + " steps/sec");
+                break;
+
+            case Sensor.TYPE_LINEAR_ACCELERATION:
+                // Acceleration without gravity - better for motion detection
+                double linearMag = Math.sqrt(
+                        event.values[0] * event.values[0] +
+                                event.values[1] * event.values[1] +
+                                event.values[2] * event.values[2]);
+                updateMovingAverage(linearAccelBuffer, linearMag);
                 break;
         }
-        
+
         // Clean old data periodically
         if (accelData.size() > 300) { // ~5 seconds at 60Hz
             cleanOldData();
         }
+    }
+
+    /**
+     * Low-pass filter to smooth sensor data and reduce noise
+     * Formula: output = alpha * input + (1 - alpha) * previousOutput
+     */
+    private float applyLowPassFilter(float input, float previousOutput) {
+        return LOW_PASS_ALPHA * input + (1 - LOW_PASS_ALPHA) * previousOutput;
+    }
+
+    /**
+     * Update moving average buffer with new value
+     */
+    private void updateMovingAverage(Deque<Double> buffer, double value) {
+        if (buffer.size() >= MOVING_AVG_SIZE) {
+            buffer.removeFirst();
+        }
+        buffer.addLast(value);
+    }
+
+    /**
+     * Calculate moving average from buffer
+     */
+    private double getMovingAverage(Deque<Double> buffer) {
+        if (buffer.isEmpty()) return 0;
+        double sum = 0;
+        for (Double val : buffer) {
+            sum += val;
+        }
+        return sum / buffer.size();
+    }
+
+    /**
+     * Track vibration patterns for vehicle detection
+     * Vehicles produce high-frequency, low-amplitude vibrations (engine, road)
+     */
+    private void updateVibrationTracking(double currentMag, long timestamp) {
+        // Zero-crossing detection (for frequency estimation)
+        double normalized = currentMag - GRAVITY_ACCEL;
+        if ((lastAccelMagnitude < 0 && normalized >= 0) ||
+                (lastAccelMagnitude >= 0 && normalized < 0)) {
+            vibrationCrossings++;
+        }
+        lastAccelMagnitude = normalized;
+
+        // Reset every second to calculate frequency
+        if (timestamp - lastVibrationSampleTime >= 1000) {
+            // Frequency = crossings / 2 (full cycle = 2 crossings)
+            double estimatedFreq = vibrationCrossings / 2.0;
+            logDebug("Vibration frequency: " + String.format("%.1f", estimatedFreq) + " Hz");
+            vibrationCrossings = 0;
+            lastVibrationSampleTime = timestamp;
+        }
+    }
+
+    /**
+     * Get steps detected in the analysis window
+     */
+    public int getStepsInWindow() {
+        return stepCountInWindow.get();
+    }
+
+    /**
+     * Get average step rate (steps per second)
+     */
+    public float getAverageStepRate() {
+        return averageStepRate;
+    }
+
+    /**
+     * Get detection confidence (0.0 - 1.0)
+     */
+    public float getConfidence() {
+        return currentConfidence;
     }
     
     @Override

@@ -206,7 +206,8 @@
       "WebFetch(domain:www.quransummary.com)",
       "WebFetch(domain:quranwbw.com)",
       "WebFetch(domain:www.duas.org)",
-      "WebFetch(domain:koran.center)"
+      "WebFetch(domain:koran.center)",
+      "WebFetch(domain:fonts.google.com)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
