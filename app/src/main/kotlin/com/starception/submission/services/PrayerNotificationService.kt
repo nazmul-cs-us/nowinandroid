@@ -1088,9 +1088,9 @@ class PrayerNotificationService : Service() {
         
         // Prayer time is still active, calculate normal progress
         val prayerEnd = nextPrayer?.time ?: prayerStart.plusHours(1) // Default 1 hour if no next prayer
-        
+
         val rawElapsedMinutes = Duration.between(prayerStart, now).toMinutes()
-        
+
         // SAFETY CHECK: Ensure elapsed time is never negative (for active prayer period)
         val elapsedMinutes = if (rawElapsedMinutes < 0) {
             Log.e(TAG, "🚨 NEGATIVE ELAPSED TIME IN ACTIVE PRAYER!")
@@ -1102,9 +1102,33 @@ class PrayerNotificationService : Service() {
         } else {
             rawElapsedMinutes
         }
-        
-        val totalDuration = Duration.between(prayerStart, prayerEnd).toMinutes()
-        val remainingMinutes = Duration.between(now, prayerEnd).toMinutes()
+
+        // CROSS-DAY FIX: Handle when next prayer is tomorrow (e.g., Isha → Fajr overnight)
+        // LocalTime.between() returns negative when end time is before start time (next day)
+        val isCrossDay = prayerEnd.isBefore(prayerStart)
+
+        val totalDuration: Long
+        val remainingMinutes: Long
+
+        if (isCrossDay) {
+            // Next prayer is tomorrow - calculate properly across midnight
+            Log.d(TAG, "🌙 CROSS-DAY ACTIVE PRAYER: ${nextPrayer?.name ?: "Unknown"} is tomorrow")
+
+            // Total time = time until midnight + time from midnight to next prayer
+            totalDuration = Duration.between(prayerStart, LocalTime.MAX).toMinutes() +
+                           Duration.between(LocalTime.MIN, prayerEnd).toMinutes() + 1
+
+            // Remaining time = time until midnight + time from midnight to next prayer
+            remainingMinutes = Duration.between(now, LocalTime.MAX).toMinutes() +
+                              Duration.between(LocalTime.MIN, prayerEnd).toMinutes() + 1
+
+            Log.d(TAG, "   Total duration (cross-day): ${totalDuration}m")
+            Log.d(TAG, "   Remaining (cross-day): ${remainingMinutes}m")
+        } else {
+            // Same day calculation
+            totalDuration = Duration.between(prayerStart, prayerEnd).toMinutes()
+            remainingMinutes = Duration.between(now, prayerEnd).toMinutes()
+        }
         
         // PHASE DETERMINATION - Edit these conditions to change when phases switch
         val progressPhase = when {
