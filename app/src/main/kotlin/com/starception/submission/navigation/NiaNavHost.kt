@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.starception.submission.MainActivityViewModel
 import com.starception.submission.feature.bookmarks.navigation.bookmarksSection
 import com.starception.submission.feature.foryou.navigation.ForYouBaseRoute
 import com.starception.submission.feature.foryou.navigation.forYouSection
@@ -49,6 +50,7 @@ fun NiaNavHost(
     appState: NiaAppState,
     onShowSnackbar: suspend (String, String?) -> Boolean,
     modifier: Modifier = Modifier,
+    mainViewModel: MainActivityViewModel? = null,
 ) {
     val navController = appState.navController
     NavHost(
@@ -60,14 +62,18 @@ fun NiaNavHost(
             onTopicClick = navController::navigateToTopic,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
             onDuaClick = { userNewsResource ->
-                // Extract dua number from title (e.g., "Quranic Dua #1" -> 1)
-                val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
-                    ?.groupValues?.get(1)?.toIntOrNull() ?: 1
+                // Extract dua number from title (e.g., "Quranic Dua 1:" or "Quranic Dua #1")
+                val duaNumber = Regex("Dua (\\d+)").find(userNewsResource.title)
+                    ?.groupValues?.get(1)?.toIntOrNull()
+                    ?: Regex("#(\\d+)").find(userNewsResource.title)
+                        ?.groupValues?.get(1)?.toIntOrNull()
+                    ?: 1
                 navController.navigateToDuaDetail(
                     title = userNewsResource.title,
                     content = userNewsResource.content,
                     quranReference = null,
-                    duaNumber = duaNumber
+                    duaNumber = duaNumber,
+                    newsResourceId = userNewsResource.id  // Pass the NiA news resource ID for bookmark sync
                 )
             },
         ) {
@@ -85,6 +91,12 @@ fun NiaNavHost(
                 onBackClick = navController::popBackStack,
                 onNavigateToSurah = { surahNumber, ayahNumber ->
                     navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber)
+                },
+                isBookmarked = { newsResourceId ->
+                    mainViewModel?.isNewsResourceBookmarked(newsResourceId) ?: false
+                },
+                onToggleBookmark = { newsResourceId ->
+                    mainViewModel?.toggleNewsResourceBookmark(newsResourceId)
                 }
             )
         }
@@ -93,14 +105,18 @@ fun NiaNavHost(
             onShowSnackbar = onShowSnackbar,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
             onDuaClick = { userNewsResource ->
-                // Extract dua number from title (e.g., "Quranic Dua #1" -> 1)
-                val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
-                    ?.groupValues?.get(1)?.toIntOrNull() ?: 1
+                // Extract dua number from title (e.g., "Quranic Dua 1:" or "Quranic Dua #1")
+                val duaNumber = Regex("Dua (\\d+)").find(userNewsResource.title)
+                    ?.groupValues?.get(1)?.toIntOrNull()
+                    ?: Regex("#(\\d+)").find(userNewsResource.title)
+                        ?.groupValues?.get(1)?.toIntOrNull()
+                    ?: 1
                 navController.navigateToDuaDetail(
                     title = userNewsResource.title,
                     content = userNewsResource.content,
                     quranReference = null,
-                    duaNumber = duaNumber
+                    duaNumber = duaNumber,
+                    newsResourceId = userNewsResource.id  // Pass the NiA news resource ID for bookmark sync
                 )
             },
         ) {
@@ -113,6 +129,12 @@ fun NiaNavHost(
                 onBackClick = navController::popBackStack,
                 onNavigateToSurah = { surahNumber, ayahNumber ->
                     navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber)
+                },
+                isBookmarked = { newsResourceId ->
+                    mainViewModel?.isNewsResourceBookmarked(newsResourceId) ?: false
+                },
+                onToggleBookmark = { newsResourceId ->
+                    mainViewModel?.toggleNewsResourceBookmark(newsResourceId)
                 }
             )
         }

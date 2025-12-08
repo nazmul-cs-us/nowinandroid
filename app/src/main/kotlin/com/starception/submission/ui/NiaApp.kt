@@ -76,6 +76,7 @@ import com.starception.submission.prayer.ui.PrayerSettingsDialog
 import com.starception.submission.navigation.NiaNavHost
 import com.starception.submission.navigation.TopLevelDestination
 import kotlin.reflect.KClass
+import com.starception.submission.MainActivityViewModel
 import com.starception.submission.feature.settings.R as settingsR
 
 @Composable
@@ -83,6 +84,7 @@ fun NiaApp(
     appState: NiaAppState,
     modifier: Modifier = Modifier,
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
+    mainViewModel: MainActivityViewModel? = null,
 ) {
     val shouldShowGradientBackground =
         appState.currentTopLevelDestination == TopLevelDestination.FOR_YOU
@@ -118,6 +120,7 @@ fun NiaApp(
                 onSettingsDismissed = { showSettingsDialog = false },
                 onTopAppBarActionClick = { showSettingsDialog = true },
                 windowAdaptiveInfo = windowAdaptiveInfo,
+                mainViewModel = mainViewModel,
             )
         }
     }
@@ -136,6 +139,7 @@ internal fun NiaApp(
     onTopAppBarActionClick: () -> Unit,
     modifier: Modifier = Modifier,
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
+    mainViewModel: MainActivityViewModel? = null,
 ) {
     val unreadDestinations by appState.topLevelDestinationsWithUnreadResources
         .collectAsStateWithLifecycle()
@@ -263,6 +267,7 @@ internal fun NiaApp(
                                 duration = Short,
                             ) == ActionPerformed
                         },
+                        mainViewModel = mainViewModel,
                     )
                 }
 

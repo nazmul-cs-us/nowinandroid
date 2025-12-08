@@ -238,7 +238,7 @@ class MainActivity : FragmentActivity() {
                     LocalAnalyticsHelper provides analyticsHelper,
                     LocalTimeZone provides currentTimeZone,
                 ) {
-                    NiaApp(appState)
+                    NiaApp(appState, mainViewModel = viewModel)
                 }
             }
         }
