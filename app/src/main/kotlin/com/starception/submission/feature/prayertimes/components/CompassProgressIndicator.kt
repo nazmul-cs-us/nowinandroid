@@ -227,6 +227,11 @@ fun CompassProgressIndicator(
     // QIBLA COMPASS ANIMATION - Needle points to Qibla direction
     // Combine device orientation with Qibla direction to show where Qibla is
     val targetDegree = -(compassDegree - qiblaDirection) // Point needle toward Qibla
+
+    // Debug logging for compass values
+    LaunchedEffect(compassDegree, qiblaDirection, targetDegree) {
+        android.util.Log.d("QiblaCompass", "compassDegree=$compassDegree, qiblaDirection=$qiblaDirection, targetDegree=$targetDegree")
+    }
     val currentDegreeState = remember { mutableFloatStateOf(targetDegree) }
     
     // Calculate the shortest rotation path
@@ -364,14 +369,8 @@ fun CompassProgressIndicator(
             kotlin.math.abs(normalizedAngle - 360f)
         )
 
-        // Exit threshold at ±15° (user requested - exit when beyond 15 degrees)
-        val wasNearQibla = remember { mutableStateOf(false) }
-        val isNearQibla = if (wasNearQibla.value) {
-            angularDistance <= 15f // Exit threshold (exit when beyond 15°)
-        } else {
-            angularDistance <= 12f // Entry threshold (stricter to enter, prevents rapid toggling)
-        }
-        wasNearQibla.value = isNearQibla
+        // Simple alignment check - no threshold/hysteresis
+        val isNearQibla = angularDistance <= 5f // User is facing Qibla when within 5°
 
         // Continuous radar-style haptic feedback while aligned with Qibla
         val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -432,12 +431,62 @@ fun CompassProgressIndicator(
             rawNeedsClockwise
         }
         
-        // Original elegant Qibla direction indicator with enhanced feedback
+        // ANIMATION: Professional surface tension effect
+        // Smooth, subtle transitions - arc merges elegantly into Kaaba
+
+        val arcAlpha by animateFloatAsState(
+            targetValue = if (isNearQibla) 0f else 1f,
+            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+            label = "arcAlpha"
+        )
+        val arcScale by animateFloatAsState(
+            targetValue = if (isNearQibla) 0.2f else 1f,
+            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+            label = "arcScale"
+        )
+        // Arc progress animates smoothly
+        val arcProgress by animateFloatAsState(
+            targetValue = if (isNearQibla) 0.03f else 0.1f, // Arc shrinks to small dot
+            animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+            label = "arcProgress"
+        )
+        val kaabaScale by animateFloatAsState(
+            targetValue = if (isNearQibla) 1.35f else 1f, // Subtle scale increase
+            animationSpec = spring(
+                dampingRatio = 0.7f, // Less bouncy, more controlled
+                stiffness = 400f // Quick but smooth
+            ),
+            label = "kaabaScale"
+        )
+        val kaabaGlow by animateFloatAsState(
+            targetValue = if (isNearQibla) 1f else 0f,
+            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+            label = "kaabaGlow"
+        )
+        // Subtle breathing effect for Kaaba when aligned
+        val infiniteTransition = rememberInfiniteTransition(label = "kaabaPulse")
+        val kaabaPulse by infiniteTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.06f, // Very subtle pulse
+            animationSpec = infiniteRepeatable(
+                animation = tween(1200, easing = FastOutSlowInEasing), // Slower, calmer
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "kaabaPulseAnim"
+        )
+        val effectiveKaabaScale = if (isNearQibla) kaabaScale * kaabaPulse else kaabaScale
+
+        // Original elegant Qibla direction indicator with surface tension animation
         CircularProgressIndicator(
-            progress = { 0.1f }, // Original 10% progress
+            progress = { arcProgress }, // Animated progress - shrinks to dot when aligned
             modifier = Modifier
                 .size(size - 16.dp)
-                .rotate(animatedCompassDegree),
+                .rotate(animatedCompassDegree - 18f) // Offset by -18° (half of 36°) so arc CENTER aligns with Kaaba when facing Qibla
+                .graphicsLayer {
+                    alpha = arcAlpha
+                    scaleX = arcScale
+                    scaleY = arcScale
+                },
             color = if (isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH) {
                 // When aligned with Qibla AND high accuracy, show bright green
                 Color(0xFF00C853) // Bright green - aligned with high accuracy!
@@ -451,35 +500,49 @@ fun CompassProgressIndicator(
             trackColor = Color.Black.copy(alpha = 0.1f),
             strokeCap = StrokeCap.Round,
         )
-        
-        // Minimal, elegant rotation direction hint - subtle dot indicator
-        if (!isNearQibla && !needsCalibration) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Canvas(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    val center = Offset(this.size.width / 2, this.size.height / 2)
-                    val radius = (this.size.minDimension / 2) - (if (size >= 260.dp) 28.dp else 12.dp).toPx()
-                    val indicatorAngle = if (needsClockwise) 45f else -45f
-                    val angleRad = Math.toRadians(indicatorAngle.toDouble())
-                    
-                    val dotX = center.x + (radius * kotlin.math.cos(angleRad).toFloat())
-                    val dotY = center.y + (radius * kotlin.math.sin(angleRad).toFloat())
-                    
-                    // Subtle gradient dot indicator showing rotation direction
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                accuracyColor.copy(alpha = 0.6f),
-                                accuracyColor.copy(alpha = 0.2f)
-                            ),
-                            center = Offset(dotX, dotY),
-                            radius = if (size >= 260.dp) 8.dp.toPx() else 5.dp.toPx()
-                        ),
-                        radius = if (size >= 260.dp) 8.dp.toPx() else 5.dp.toPx(),
-                        center = Offset(dotX, dotY)
+
+        // Kaaba icon positioned INSIDE the compass (not on arc track)
+        // Shows as target indicator - arc rotates around it
+        // ANIMATION: Kaaba grows and glows when arc aligns with it
+        if (!needsCalibration) {
+            // Position Kaaba inside the arc track (closer to center)
+            val radiusOffset = (size / 2) - (if (size >= 260.dp) 48.dp else 28.dp) // More inward
+
+            // Fixed at top (12 o'clock position) = -90° in math coordinates
+            val topAngleRad = Math.toRadians(-90.0)
+            val offsetX = (radiusOffset.value * kotlin.math.cos(topAngleRad)).dp
+            val offsetY = (radiusOffset.value * kotlin.math.sin(topAngleRad)).dp
+
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                // Subtle glow effect behind Kaaba when aligned
+                if (kaabaGlow > 0.1f) {
+                    // Single elegant glow
+                    Box(
+                        modifier = Modifier
+                            .offset(x = offsetX, y = offsetY)
+                            .size((22 * effectiveKaabaScale).dp)
+                            .graphicsLayer { alpha = kaabaGlow * 0.4f }
+                            .background(
+                                Color(0xFF10B981).copy(alpha = 0.25f), // Softer green
+                                shape = CircleShape
+                            )
                     )
                 }
+
+                // Kaaba icon fixed at top - absorbs the arc with surface tension effect
+                Text(
+                    text = "🕋",
+                    fontSize = (if (size >= 260.dp) 18.sp else 14.sp),
+                    modifier = Modifier
+                        .offset(x = offsetX, y = offsetY)
+                        .graphicsLayer {
+                            scaleX = effectiveKaabaScale
+                            scaleY = effectiveKaabaScale
+                        }
+                )
             }
         }
         
@@ -495,13 +558,13 @@ fun CompassProgressIndicator(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Qibla direction with better status for different sizes
+                // Qibla direction with status - no emoji since Kaaba icon is shown separately
                 val displayText = if (needsCalibration) {
-                    "🕋 Qibla"
+                    "Calibrate"
                 } else if (isNearQibla) {
-                    if (size >= 140.dp) "🕋 Facing Qibla" else "🕋 Aligned" // Shorter text for big tiles
+                    if (size >= 140.dp) "Facing Qibla" else "Aligned"
                 } else {
-                    "🕋 Qibla"
+                    "Qibla"
                 }
                 
                 
