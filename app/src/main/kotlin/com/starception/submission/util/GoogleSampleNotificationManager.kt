@@ -39,6 +39,11 @@ import java.time.format.DateTimeFormatter
 import java.util.logging.Level
 import java.util.logging.Logger
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
+import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.drawable.toBitmap
 
 object GoogleSampleNotificationManager {
     private lateinit var notificationManager: NotificationManager
@@ -405,7 +410,7 @@ object GoogleSampleNotificationManager {
         )
 
         // Android 16 Progress-Centric: Create meaningful progress points with proper milestone colors
-        // Tracker will automatically position at the exact progress point (no icon)
+        // Tracker positioned at exact progress point (no icon on tracker)
         val progressStyle = NotificationCompat.ProgressStyle()
             .setProgressPoints(
                 listOf(
@@ -415,7 +420,7 @@ object GoogleSampleNotificationManager {
                 )
             )
             .setProgressSegments(segments)  // Dynamic segment coloring
-            .setProgress(progress)  // Tracker positioned at exact progress point (no icon)
+            .setProgress(progress)  // Tracker positioned at exact progress point
         
         val phaseName = when (newPhase) {
             0 -> "Go to Mosque"
@@ -430,11 +435,23 @@ object GoogleSampleNotificationManager {
         android.util.Log.d("GoogleSampleNotificationManager", 
             "🎨 Segment Colors: Green (Go to Mosque) → Yellow (Best Time) → Red (Make Time)")
         
-        // Android 16 Progress-Centric: Create concise, clear status text for status chip
+        // Get activity emoji for AOD status chip
+        val currentActivity = ActivityTracker.getCurrentActivity()
+        val activityEmoji = when {
+            currentActivity.contains("Driving", ignoreCase = true) -> "🚗"
+            currentActivity.contains("Walking", ignoreCase = true) -> "🚶"
+            currentActivity.contains("Running", ignoreCase = true) -> "🏃"
+            currentActivity.contains("Phone", ignoreCase = true) -> "📱"
+            currentActivity.contains("Still", ignoreCase = true) -> "🧍"
+            else -> "🧍"
+        }
+
+        // Android 16 Progress-Centric: Create concise, clear status text for status chip (visible on AOD)
+        // Format: [Activity Emoji] [Prayer Phase]
         val shortCriticalText = when {
-            progress <= 20 -> "🕌 Go to Mosque"
-            progress <= 60 -> "🧎 Best Time"
-            else -> "⏰ Make Time"
+            progress <= 20 -> "$activityEmoji 🕌 Go to Mosque"
+            progress <= 60 -> "$activityEmoji 🧎 Best Time"
+            else -> "$activityEmoji ⏰ Make Time"
         }
         
         // Android 16 Progress-Centric: Combine content for clear journey communication
@@ -447,6 +464,9 @@ object GoogleSampleNotificationManager {
         // Create "Mark as Prayed" action button
         val markAsPrayedAction = createMarkAsPrayedAction()
         
+        // Get activity icon for notification large icon (top right corner)
+        val activityIconBitmap = getActivityIconBitmap()
+
         // Android 16 Progress-Centric: Build notification with recommended practices
         val notificationBuilder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_prayer)
@@ -460,6 +480,12 @@ object GoogleSampleNotificationManager {
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)  // Appropriate category
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)  // Public visibility for lock screen
             .addAction(markAsPrayedAction)  // Add "Mark as Prayed" action button
+
+        // Add activity icon as large icon (shows in top right corner of notification)
+        if (activityIconBitmap != null) {
+            notificationBuilder.setLargeIcon(activityIconBitmap)
+            android.util.Log.d("GoogleSampleNotificationManager", "🎨 Added large activity icon: ${ActivityTracker.getCurrentActivity()}")
+        }
         
         // Apply intelligent alert behavior: Only alert on phase changes, silent for progress updates
         if (shouldAlert) {
@@ -673,6 +699,70 @@ object GoogleSampleNotificationManager {
         } else {
             "No Adhan played yet"
         }
+    }
+
+    /**
+     * Get resource ID for current detected activity icon (colored, for large icon)
+     * Returns appropriate icon resource ID based on: Still, Walking, Running, Driving, On Phone
+     */
+    private fun getActivityIconResId(): Int {
+        val currentActivity = ActivityTracker.getCurrentActivity()
+        return when {
+            currentActivity.contains("Driving", ignoreCase = true) -> R.drawable.ic_activity_driving
+            currentActivity.contains("Walking", ignoreCase = true) -> R.drawable.ic_activity_walking
+            currentActivity.contains("Running", ignoreCase = true) -> R.drawable.ic_activity_running
+            currentActivity.contains("Phone", ignoreCase = true) -> R.drawable.ic_activity_phone
+            currentActivity.contains("Still", ignoreCase = true) -> R.drawable.ic_activity_still
+            else -> R.drawable.ic_activity_still // Default to still
+        }
+    }
+
+    /**
+     * Get resource ID for current detected activity SMALL icon (monochrome, for AOD)
+     * Returns appropriate monochrome icon for notification small icon
+     */
+    private fun getActivitySmallIconResId(): Int {
+        val currentActivity = ActivityTracker.getCurrentActivity()
+        return when {
+            currentActivity.contains("Driving", ignoreCase = true) -> R.drawable.ic_notif_driving
+            currentActivity.contains("Walking", ignoreCase = true) -> R.drawable.ic_notif_walking
+            currentActivity.contains("Running", ignoreCase = true) -> R.drawable.ic_notif_running
+            currentActivity.contains("Phone", ignoreCase = true) -> R.drawable.ic_notif_phone
+            currentActivity.contains("Still", ignoreCase = true) -> R.drawable.ic_notif_still
+            else -> R.drawable.ic_notif_still // Default to still
+        }
+    }
+
+    /**
+     * Get bitmap icon for current detected activity
+     * Returns appropriate icon based on: Still, Walking, Running, Driving, On Phone
+     */
+    private fun getActivityIconBitmap(): Bitmap? {
+        return try {
+            val iconResId = getActivityIconResId()
+
+            // Convert vector drawable to bitmap
+            val drawable = ResourcesCompat.getDrawable(appContext.resources, iconResId, null)
+            drawable?.let { vectorToBitmap(it) }
+        } catch (e: Exception) {
+            android.util.Log.e("GoogleSampleNotificationManager", "Error getting activity icon: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Convert vector drawable to bitmap for notification large icon
+     */
+    private fun vectorToBitmap(drawable: Drawable): Bitmap {
+        val bitmap = Bitmap.createBitmap(
+            drawable.intrinsicWidth.coerceAtLeast(1),
+            drawable.intrinsicHeight.coerceAtLeast(1),
+            Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
     }
 
     /**
