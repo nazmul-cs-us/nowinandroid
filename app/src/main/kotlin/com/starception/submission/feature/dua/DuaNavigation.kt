@@ -15,13 +15,15 @@ import java.net.URLEncoder
  * @param content The content of the dua (URL encoded)
  * @param quranReference Optional Quran reference (e.g., "2:127")
  * @param duaNumber The dua number (1-40 for Quranic duas)
+ * @param newsResourceId The NiA news resource ID for bookmark sync (128 for dua 1, 129 for dua 2, etc.)
  */
 @Serializable
 data class DuaDetailRoute(
     val title: String,
     val content: String,
     val quranReference: String? = null,
-    val duaNumber: Int = 1
+    val duaNumber: Int = 1,
+    val newsResourceId: String = ""
 )
 
 /**
@@ -32,17 +34,21 @@ fun NavController.navigateToDuaDetail(
     content: String,
     quranReference: String? = null,
     duaNumber: Int = 1,
+    newsResourceId: String = "",
     navOptions: NavOptions? = null
 ) {
     val encodedContent = URLEncoder.encode(content, "UTF-8")
     val encodedTitle = URLEncoder.encode(title, "UTF-8")
     val encodedRef = quranReference?.let { URLEncoder.encode(it, "UTF-8") }
+    // Calculate newsResourceId if not provided (dua 1 = 128, dua 2 = 129, etc.)
+    val resourceId = newsResourceId.ifEmpty { (127 + duaNumber).toString() }
     navigate(
         route = DuaDetailRoute(
             title = encodedTitle,
             content = encodedContent,
             quranReference = encodedRef,
-            duaNumber = duaNumber
+            duaNumber = duaNumber,
+            newsResourceId = resourceId
         ),
         navOptions = navOptions
     )
@@ -53,13 +59,17 @@ fun NavController.navigateToDuaDetail(
  */
 fun NavGraphBuilder.duaDetailScreen(
     onBackClick: () -> Unit,
-    onNavigateToSurah: ((surahNumber: Int, ayahNumber: Int) -> Unit)? = null
+    onNavigateToSurah: ((surahNumber: Int, ayahNumber: Int) -> Unit)? = null,
+    isBookmarked: (newsResourceId: String) -> Boolean = { false },
+    onToggleBookmark: (newsResourceId: String) -> Unit = {}
 ) {
     composable<DuaDetailRoute> { backStackEntry ->
         val route = backStackEntry.toRoute<DuaDetailRoute>()
         val decodedTitle = URLDecoder.decode(route.title, "UTF-8")
         val decodedContent = URLDecoder.decode(route.content, "UTF-8")
         val decodedRef = route.quranReference?.let { URLDecoder.decode(it, "UTF-8") }
+        // Calculate newsResourceId if not in route (dua 1 = 128, dua 2 = 129, etc.)
+        val newsResourceId = route.newsResourceId.ifEmpty { (127 + route.duaNumber).toString() }
 
         DuaDetailScreen(
             title = decodedTitle,
@@ -68,7 +78,10 @@ fun NavGraphBuilder.duaDetailScreen(
             onBackClick = onBackClick,
             currentDuaIndex = route.duaNumber - 1,
             onNavigateToDua = null, // Navigation handled via back stack for now
-            onNavigateToSurah = onNavigateToSurah
+            onNavigateToSurah = onNavigateToSurah,
+            initialNewsResourceId = newsResourceId,
+            isNiaBookmarked = isBookmarked,
+            onToggleNiaBookmark = onToggleBookmark
         )
     }
 }

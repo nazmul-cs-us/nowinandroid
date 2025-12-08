@@ -468,7 +468,10 @@ fun DuaDetailScreen(
     allDuas: List<DuaItem> = emptyList(),
     currentDuaIndex: Int = 0,
     onNavigateToDua: ((Int) -> Unit)? = null,
-    onNavigateToSurah: ((surahNumber: Int, ayahNumber: Int) -> Unit)? = null
+    onNavigateToSurah: ((surahNumber: Int, ayahNumber: Int) -> Unit)? = null,
+    initialNewsResourceId: String = "",
+    isNiaBookmarked: (newsResourceId: String) -> Boolean = { false },
+    onToggleNiaBookmark: (newsResourceId: String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel = remember { DuaDetailViewModel(context) }
@@ -513,8 +516,11 @@ fun DuaDetailScreen(
     val duasList = if (loadedDuas.isNotEmpty()) loadedDuas else allDuas
 
     // Find initial page index based on dua number from title
+    // Handle both formats: "Dua #2" and "Quranic Dua 2: Make us Muslims"
     val initialDuaNumber = remember(title) {
-        Regex("#(\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+        Regex("#(\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
+            ?: Regex("Dua (\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
+            ?: 1
     }
 
     val initialPageIndex = remember(duasList, initialDuaNumber) {
@@ -525,16 +531,28 @@ fun DuaDetailScreen(
         }
     }
 
+    // Calculate initial page index - 0-based (dua #2 should be at index 1)
+    val targetPageIndex = (initialDuaNumber - 1).coerceAtLeast(0)
+
     // Pager state
     val pagerState = rememberPagerState(
-        initialPage = if (duasList.isNotEmpty()) initialPageIndex else 0,
-        pageCount = { if (duasList.isNotEmpty()) duasList.size else 1 }
+        initialPage = targetPageIndex,
+        pageCount = { if (duasList.isNotEmpty()) duasList.size else 40 }
     )
 
-    // Update pager when duas load
-    LaunchedEffect(duasList, initialDuaNumber) {
+    // Force scroll to correct page on initial composition
+    LaunchedEffect(Unit) {
+        // Scroll immediately to the target page
+        if (pagerState.currentPage != targetPageIndex) {
+            pagerState.scrollToPage(targetPageIndex)
+        }
+    }
+
+    // Also scroll when duas load (in case index needs adjustment based on duaNumber field)
+    LaunchedEffect(duasList) {
         if (duasList.isNotEmpty()) {
-            val targetIndex = duasList.indexOfFirst { it.duaNumber == initialDuaNumber }.takeIf { it >= 0 } ?: 0
+            val targetIndex = duasList.indexOfFirst { it.duaNumber == initialDuaNumber }.takeIf { it >= 0 }
+                ?: targetPageIndex.coerceIn(0, duasList.size - 1)
             if (pagerState.currentPage != targetIndex) {
                 pagerState.scrollToPage(targetIndex)
             }
@@ -546,14 +564,22 @@ fun DuaDetailScreen(
     val hasPrevious = currentPage > 0
     val hasNext = currentPage < totalDuas - 1
 
-    // Get current dua ID for bookmark tracking
-    val currentDuaId = remember(currentPage, duasList) {
-        duasList.getOrNull(currentPage)?.id ?: "dua_$currentPage"
+    // Get current NiA news resource ID for bookmark tracking
+    // Dua 1 = news resource ID "128", Dua 2 = "129", etc.
+    val currentNewsResourceId = remember(currentPage) {
+        (128 + currentPage).toString()  // currentPage is 0-indexed, dua 1 is at page 0
     }
 
-    // Update bookmark state when page changes
-    LaunchedEffect(currentDuaId) {
-        isBookmarked = viewModel.isDuaBookmarked(currentDuaId)
+    // Update bookmark state when page changes using NiA's bookmark system
+    LaunchedEffect(currentPage, currentNewsResourceId) {
+        isBookmarked = isNiaBookmarked(currentNewsResourceId)
+    }
+
+    // Also update when the screen first loads with the initial ID
+    LaunchedEffect(initialNewsResourceId) {
+        if (initialNewsResourceId.isNotEmpty()) {
+            isBookmarked = isNiaBookmarked(initialNewsResourceId)
+        }
     }
 
     Scaffold(
@@ -640,9 +666,11 @@ fun DuaDetailScreen(
                                 }
                             }
 
-                            // Bookmark button
+                            // Bookmark button - uses NiA's bookmark system for sync with Saved tab
                             IconButton(onClick = {
-                                isBookmarked = viewModel.toggleDuaBookmark(currentDuaId)
+                                // Toggle bookmark using NiA's system (dua 1 = "128", dua 2 = "129", etc.)
+                                onToggleNiaBookmark(currentNewsResourceId)
+                                isBookmarked = !isBookmarked
                             }) {
                                 Icon(
                                     imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,

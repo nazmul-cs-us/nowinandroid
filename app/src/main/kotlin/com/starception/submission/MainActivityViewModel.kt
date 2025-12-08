@@ -67,6 +67,28 @@ class MainActivityViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Check if a news resource is bookmarked
+     */
+    fun isNewsResourceBookmarked(newsResourceId: String): Boolean {
+        val currentState = _uiState.value
+        return if (currentState is Success) {
+            newsResourceId in currentState.userData.bookmarkedNewsResources
+        } else {
+            false
+        }
+    }
+
+    /**
+     * Toggle bookmark state for a news resource
+     */
+    fun toggleNewsResourceBookmark(newsResourceId: String) {
+        viewModelScope.launch {
+            val isCurrentlyBookmarked = isNewsResourceBookmarked(newsResourceId)
+            userDataRepository.setNewsResourceBookmarked(newsResourceId, !isCurrentlyBookmarked)
+        }
+    }
 }
 
 sealed interface MainActivityUiState {
