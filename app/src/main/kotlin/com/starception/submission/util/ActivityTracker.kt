@@ -62,6 +62,9 @@ object ActivityTracker {
     private var toneGenerator: ToneGenerator? = null
     private var mediaPlayer: MediaPlayer? = null
     private var previousActivity: String = ""
+
+    // Callback for activity change (used to update notification immediately)
+    private var activityChangeCallback: ((String) -> Unit)? = null
     
     // Dua cooldown tracking
     private var lastDuaPlayTime: Long = 0L
@@ -197,6 +200,12 @@ object ActivityTracker {
         previousActivity = _currentActivity.value
         _currentActivity.value = activity
 
+        // Trigger callback if activity actually changed (for notification icon update)
+        if (oldActivity != activity && activityChangeCallback != null) {
+            Log.d("ActivityTracker", "🔄 Activity changed: $oldActivity → $activity - triggering notification update")
+            activityChangeCallback?.invoke(activity)
+        }
+
         // ========== DRIVING STARTED ==========
         if (activity == "Driving" && oldActivity != "Driving") {
             val timeSinceLastDua = currentTime - lastDuaPlayTime
@@ -289,10 +298,18 @@ object ActivityTracker {
                 return activityToString(service.getCurrentActivity())
             }
         }
-        
+
         return _currentActivity.value
     }
-    
+
+    /**
+     * Set callback for activity changes (used to trigger notification updates)
+     */
+    fun setActivityChangeCallback(callback: ((String) -> Unit)?) {
+        activityChangeCallback = callback
+        Log.d("ActivityTracker", "📱 Activity change callback ${if (callback != null) "registered" else "cleared"}")
+    }
+
     /**
      * Get current phone position synchronously for UI (NEW)
      */

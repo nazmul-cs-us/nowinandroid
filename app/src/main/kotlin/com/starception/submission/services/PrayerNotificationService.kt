@@ -44,7 +44,11 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.Duration
 import javax.inject.Inject
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.drawable.Drawable
+import androidx.core.content.res.ResourcesCompat
 
 /**
  * Prayer Notification Service with ANR Protection
@@ -150,6 +154,19 @@ class PrayerNotificationService : Service() {
             try {
                 ActivityTracker.initialize(this, startDetectionNow = true)
                 Log.d(TAG, "✓ ActivityTracker initialized with sensor-based detection")
+
+                // Register callback to update notification icon when activity changes
+                ActivityTracker.setActivityChangeCallback { newActivity ->
+                    Log.d(TAG, "🏃 Activity changed to: $newActivity - triggering notification refresh")
+                    serviceScope.launch {
+                        try {
+                            updatePrayerNotificationWithRealData()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error updating notification for activity change", e)
+                        }
+                    }
+                }
+                Log.d(TAG, "✓ Activity change callback registered for notification updates")
 
                 // Schedule WorkManager to keep activity detection alive (survives Doze mode)
                 com.starception.submission.worker.ActivityDetectionWorker.schedule(this)
@@ -312,7 +329,7 @@ class PrayerNotificationService : Service() {
         progress: Int = 0
     ): Notification {
         Log.d(TAG, "🎯 Creating direct Live Update notification: $title")
-        
+
         val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
@@ -357,11 +374,74 @@ class PrayerNotificationService : Service() {
             }
         }
         
+        // Add activity icon as large icon (shows in top right corner)
+        val activityIcon = getActivityIconBitmap()
+        if (activityIcon != null) {
+            builder.setLargeIcon(activityIcon)
+            Log.d(TAG, "🏃 Added activity icon: ${ActivityTracker.getCurrentActivity()}")
+        }
+
         val notification = builder.build()
         Log.d(TAG, "🚀 Live Update notification created with setRequestPromotedOngoing(true)")
         return notification
     }
-    
+
+    /**
+     * Get resource ID for current detected activity SMALL icon (monochrome, for AOD)
+     * Returns appropriate monochrome icon for notification small icon
+     */
+    private fun getActivitySmallIconResId(): Int {
+        val currentActivity = ActivityTracker.getCurrentActivity()
+        return when {
+            currentActivity.contains("Driving", ignoreCase = true) -> R.drawable.ic_notif_driving
+            currentActivity.contains("Walking", ignoreCase = true) -> R.drawable.ic_notif_walking
+            currentActivity.contains("Running", ignoreCase = true) -> R.drawable.ic_notif_running
+            currentActivity.contains("Phone", ignoreCase = true) -> R.drawable.ic_notif_phone
+            currentActivity.contains("Still", ignoreCase = true) -> R.drawable.ic_notif_still
+            else -> R.drawable.ic_notif_still // Default to still
+        }
+    }
+
+    /**
+     * Get bitmap icon for current detected activity
+     * Returns appropriate icon based on: Still, Walking, Running, Driving, On Phone
+     */
+    private fun getActivityIconBitmap(): Bitmap? {
+        return try {
+            val currentActivity = ActivityTracker.getCurrentActivity()
+            val iconResId = when {
+                currentActivity.contains("Driving", ignoreCase = true) -> R.drawable.ic_activity_driving
+                currentActivity.contains("Walking", ignoreCase = true) -> R.drawable.ic_activity_walking
+                currentActivity.contains("Running", ignoreCase = true) -> R.drawable.ic_activity_running
+                currentActivity.contains("Phone", ignoreCase = true) -> R.drawable.ic_activity_phone
+                currentActivity.contains("Still", ignoreCase = true) -> R.drawable.ic_activity_still
+                else -> R.drawable.ic_activity_still // Default to still
+            }
+
+            // Convert vector drawable to bitmap
+            val drawable = ResourcesCompat.getDrawable(resources, iconResId, null)
+            drawable?.let { vectorToBitmap(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting activity icon: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Convert vector drawable to bitmap for notification large icon
+     */
+    private fun vectorToBitmap(drawable: Drawable): Bitmap {
+        val bitmap = Bitmap.createBitmap(
+            drawable.intrinsicWidth.coerceAtLeast(1),
+            drawable.intrinsicHeight.coerceAtLeast(1),
+            Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
+    }
+
     /**
      * Create Live Update ProgressStyle (matching Google sample structure)
      */
@@ -1501,10 +1581,11 @@ class PrayerNotificationService : Service() {
                 Log.w(TAG, "Error stopping activity recognition", e)
             }
             
-            // Stop ActivityTracker sensor detection
+            // Stop ActivityTracker sensor detection and clear callback
             try {
+                ActivityTracker.setActivityChangeCallback(null)  // Clear callback first
                 ActivityTracker.stopDetection()
-                Log.d(TAG, "✓ ActivityTracker detection stopped")
+                Log.d(TAG, "✓ ActivityTracker detection stopped and callback cleared")
             } catch (e: Exception) {
                 Log.w(TAG, "Error stopping ActivityTracker", e)
             }

@@ -207,7 +207,10 @@
       "WebFetch(domain:quranwbw.com)",
       "WebFetch(domain:www.duas.org)",
       "WebFetch(domain:koran.center)",
-      "WebFetch(domain:fonts.google.com)"
+      "WebFetch(domain:fonts.google.com)",
+      "Bash(pip3 install:*)",
+      "Bash(/opt/homebrew/bin/python3 -m pip:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
