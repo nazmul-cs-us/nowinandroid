@@ -3,6 +3,8 @@ package com.starception.submission.dua;
 import android.content.Context;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.starception.submission.sensor.ActivityDetectionService;
@@ -13,11 +15,17 @@ import java.util.Map;
 
 /**
  * DUA MANAGER: Plays appropriate duas (prayers) based on detected user activity
- * 
+ *
  * This class integrates with ActivityDetectionService to automatically play
  * relevant Islamic duas when user activity changes. Each activity type has
  * associated duas that are contextually appropriate.
- * 
+ *
+ * TRAVEL DUA LOGIC:
+ * - When user starts DRIVING, wait for 1 minute of continuous driving
+ * - After 1 minute, play the travel dua so user can relax and recite
+ * - If user stops (traffic) and resumes within 5 minutes, don't play again (same trip)
+ * - If user stops for 5+ minutes then drives again, treat as new trip and play dua
+ *
  * ACTIVITY-DUA MAPPINGS:
  * - STATIONARY: General remembrance and contemplation duas
  * - WALKING: Travel duas and protection prayers
@@ -26,25 +34,37 @@ import java.util.Map;
  * - UNKNOWN: General supplications
  */
 public class DuaManager implements ActivityDetectionService.ActivityChangeCallback {
-    
+
     private static final String TAG = "DuaManager";
-    
+
     private Context context;
     private MediaPlayer mediaPlayer;
     private ActivityDetectionService activityDetectionService;
-    
+    private Handler handler;
+
     // Dua resources mapping - you can add actual audio files to res/raw/
     private Map<ActivityDetectionService.ActivityType, DuaInfo> duaMap;
-    
-    // Current state
+
+    // Current state for general duas
     private ActivityDetectionService.ActivityType lastPlayedActivity;
     private long lastPlayTime = 0;
     private static final long MIN_PLAY_INTERVAL = 300000; // 5 minutes minimum between plays
+
+    // Travel dua specific state
+    private static final long CONTINUOUS_DRIVING_THRESHOLD = 60000; // 1 minute of continuous driving
+    private static final long NEW_TRIP_THRESHOLD = 300000; // 5 minutes = new trip
+
+    private long drivingStartTime = 0;           // When current driving session started
+    private long lastDrivingEndTime = 0;         // When last driving session ended
+    private boolean travelDuaPlayedForTrip = false;  // Whether travel dua was played for current trip
+    private boolean isDriving = false;           // Current driving state
+    private Runnable travelDuaRunnable = null;   // Pending 1-minute timer callback
     
     public DuaManager(Context context) {
         this.context = context.getApplicationContext();
         this.activityDetectionService = new ActivityDetectionService(context);
-        
+        this.handler = new Handler(Looper.getMainLooper());
+
         initializeDuaMap();
     }
     
@@ -132,21 +152,186 @@ public class DuaManager implements ActivityDetectionService.ActivityChangeCallba
     
     /**
      * Called when user activity changes
+     *
+     * TRAVEL DUA LOGIC FOR DRIVING:
+     * 1. When DRIVING starts → check if this is a new trip (stopped for 5+ minutes)
+     * 2. If new trip → start 1-minute timer
+     * 3. After 1 minute of continuous driving → play travel dua
+     * 4. If user stops (traffic) and resumes within 5 min → don't play again (same trip)
+     * 5. If user stops for 5+ minutes → reset trip, next drive triggers new dua
      */
     @Override
-    public void onActivityChanged(ActivityDetectionService.ActivityType newActivity, 
-                                ActivityDetectionService.ActivityType previousActivity) {
-        
-        Log.i(TAG, "Activity changed: " + previousActivity + " -> " + newActivity);
-        
-        // Play dua if enough time has passed since last play
+    public void onActivityChanged(ActivityDetectionService.ActivityType newActivity,
+                                  ActivityDetectionService.ActivityType previousActivity) {
+
         long currentTime = System.currentTimeMillis();
-        if (currentTime - lastPlayTime > MIN_PLAY_INTERVAL || 
-            lastPlayedActivity != newActivity) {
-            
-            playDuaForActivity(newActivity);
-            lastPlayedActivity = newActivity;
-            lastPlayTime = currentTime;
+        Log.i(TAG, "🚗 Activity changed: " + previousActivity + " -> " + newActivity);
+
+        // Handle DRIVING activity specially for travel dua
+        if (newActivity == ActivityDetectionService.ActivityType.DRIVING) {
+            handleDrivingStarted(currentTime);
+        } else if (isDriving) {
+            // User was driving but now stopped
+            handleDrivingStopped(currentTime);
+        }
+
+        // Handle non-driving activities with general dua logic
+        if (newActivity != ActivityDetectionService.ActivityType.DRIVING) {
+            handleNonDrivingActivity(newActivity, currentTime);
+        }
+    }
+
+    /**
+     * Handle when user starts driving
+     */
+    private void handleDrivingStarted(long currentTime) {
+        Log.i(TAG, "🚗 Driving detected");
+
+        // Check if this is a NEW trip (stopped for 5+ minutes)
+        boolean isNewTrip = false;
+        if (!isDriving) {
+            // Was not driving before
+            if (lastDrivingEndTime == 0) {
+                // First time driving ever
+                isNewTrip = true;
+                Log.i(TAG, "🆕 First driving session - new trip");
+            } else {
+                long stoppedDuration = currentTime - lastDrivingEndTime;
+                if (stoppedDuration >= NEW_TRIP_THRESHOLD) {
+                    // Stopped for 5+ minutes - this is a new trip
+                    isNewTrip = true;
+                    Log.i(TAG, "🆕 Stopped for " + (stoppedDuration / 1000) + "s (>= 5 min) - NEW TRIP");
+                } else {
+                    // Stopped for less than 5 minutes - same trip (traffic stop)
+                    Log.i(TAG, "🚦 Stopped for " + (stoppedDuration / 1000) + "s (< 5 min) - SAME TRIP (traffic)");
+                }
+            }
+        }
+
+        isDriving = true;
+
+        if (isNewTrip) {
+            // Reset trip state
+            travelDuaPlayedForTrip = false;
+            drivingStartTime = currentTime;
+
+            // Cancel any pending timer
+            cancelTravelDuaTimer();
+
+            // Start 1-minute timer for continuous driving
+            Log.i(TAG, "⏱️ Starting 1-minute continuous driving timer");
+            startTravelDuaTimer();
+        } else if (!travelDuaPlayedForTrip && drivingStartTime == 0) {
+            // Resuming from traffic stop, but dua not played yet
+            // Continue the timer from where we left off (or restart if needed)
+            drivingStartTime = currentTime;
+            Log.i(TAG, "⏱️ Resuming driving - restarting timer");
+            startTravelDuaTimer();
+        }
+    }
+
+    /**
+     * Handle when user stops driving (traffic, arrived, etc.)
+     */
+    private void handleDrivingStopped(long currentTime) {
+        Log.i(TAG, "🛑 Driving stopped");
+        isDriving = false;
+        lastDrivingEndTime = currentTime;
+
+        // Cancel the 1-minute timer since driving stopped
+        cancelTravelDuaTimer();
+
+        long drivingDuration = currentTime - drivingStartTime;
+        Log.i(TAG, "📊 Drove for " + (drivingDuration / 1000) + " seconds");
+
+        // Reset driving start time (will be set again when driving resumes)
+        drivingStartTime = 0;
+    }
+
+    /**
+     * Start the 1-minute timer for continuous driving
+     */
+    private void startTravelDuaTimer() {
+        travelDuaRunnable = new Runnable() {
+            @Override
+            public void run() {
+                // Check if still driving
+                if (isDriving && !travelDuaPlayedForTrip) {
+                    long drivingDuration = System.currentTimeMillis() - drivingStartTime;
+                    Log.i(TAG, "⏱️ Timer fired! Drove continuously for " + (drivingDuration / 1000) + " seconds");
+
+                    if (drivingDuration >= CONTINUOUS_DRIVING_THRESHOLD) {
+                        // 1 minute of continuous driving achieved!
+                        Log.i(TAG, "✅ 1 minute of continuous driving - playing travel dua!");
+                        playTravelDua();
+                        travelDuaPlayedForTrip = true;
+                    }
+                } else {
+                    Log.i(TAG, "⏱️ Timer fired but not driving or already played");
+                }
+            }
+        };
+
+        // Schedule for 1 minute from now
+        handler.postDelayed(travelDuaRunnable, CONTINUOUS_DRIVING_THRESHOLD);
+    }
+
+    /**
+     * Cancel the pending travel dua timer
+     */
+    private void cancelTravelDuaTimer() {
+        if (travelDuaRunnable != null) {
+            handler.removeCallbacks(travelDuaRunnable);
+            travelDuaRunnable = null;
+            Log.i(TAG, "⏱️ Cancelled travel dua timer");
+        }
+    }
+
+    /**
+     * Play the travel dua for driving
+     */
+    private void playTravelDua() {
+        DuaInfo duaInfo = duaMap.get(ActivityDetectionService.ActivityType.DRIVING);
+        if (duaInfo != null) {
+            Log.i(TAG, "🕌 TRAVEL DUA: " + duaInfo.text);
+            Log.i(TAG, "📖 Meaning: " + duaInfo.meaning);
+            logDuaInfo(duaInfo);
+            lastPlayTime = System.currentTimeMillis();
+            lastPlayedActivity = ActivityDetectionService.ActivityType.DRIVING;
+
+            // TODO: Play audio when available
+            // playAudioDua(duaInfo.audioResource);
+        }
+    }
+
+    /**
+     * Handle non-driving activities (walking, running, stationary, etc.)
+     */
+    private void handleNonDrivingActivity(ActivityDetectionService.ActivityType newActivity, long currentTime) {
+        // Skip DRIVING - handled separately
+        if (newActivity == ActivityDetectionService.ActivityType.DRIVING) {
+            return;
+        }
+
+        // For other activities, use original logic with 5-minute interval
+        if (currentTime - lastPlayTime > MIN_PLAY_INTERVAL ||
+                lastPlayedActivity != newActivity) {
+
+            // Don't spam duas for stationary/on_phone (common states)
+            if (newActivity == ActivityDetectionService.ActivityType.STATIONARY ||
+                    newActivity == ActivityDetectionService.ActivityType.ON_PHONE) {
+                // Only play if activity changed AND enough time passed
+                if (lastPlayedActivity != newActivity && currentTime - lastPlayTime > MIN_PLAY_INTERVAL) {
+                    playDuaForActivity(newActivity);
+                    lastPlayedActivity = newActivity;
+                    lastPlayTime = currentTime;
+                }
+            } else {
+                // For walking, running - play when activity changes
+                playDuaForActivity(newActivity);
+                lastPlayedActivity = newActivity;
+                lastPlayTime = currentTime;
+            }
         }
     }
     
@@ -293,6 +478,13 @@ public class DuaManager implements ActivityDetectionService.ActivityChangeCallba
      */
     public void cleanup() {
         stop();
+        cancelTravelDuaTimer();
         releaseMediaPlayer();
+
+        // Reset trip state
+        isDriving = false;
+        travelDuaPlayedForTrip = false;
+        drivingStartTime = 0;
+        lastDrivingEndTime = 0;
     }
 }
