@@ -148,8 +148,12 @@ class PrayerNotificationService : Service() {
             
             // Initialize ActivityTracker with sensor-based detection
             try {
-                ActivityTracker.initialize(this)
+                ActivityTracker.initialize(this, startDetectionNow = true)
                 Log.d(TAG, "✓ ActivityTracker initialized with sensor-based detection")
+
+                // Schedule WorkManager to keep activity detection alive (survives Doze mode)
+                com.starception.submission.worker.ActivityDetectionWorker.schedule(this)
+                Log.d(TAG, "✓ Activity detection keep-alive worker scheduled")
             } catch (e: Exception) {
                 Log.e(TAG, "Error initializing ActivityTracker", e)
                 ActivityTracker.updateActivity("Detection Error")

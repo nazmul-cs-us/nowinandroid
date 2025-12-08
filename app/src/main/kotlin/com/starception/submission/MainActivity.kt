@@ -151,9 +151,13 @@ class MainActivity : FragmentActivity() {
         // EDGE-TO-EDGE DISPLAY - Modern Android UI extending behind system bars
         enableEdgeToEdge()
         
-        // Initialize ActivityTracker to load saved notification mode preference
-        com.starception.submission.util.ActivityTracker.initialize(this)
-        Log.d("MainActivity", "✅ ActivityTracker initialized with saved notification mode preference")
+        // Initialize ActivityTracker to load saved notification mode preference and start detection
+        com.starception.submission.util.ActivityTracker.initialize(this, startDetectionNow = true)
+        Log.d("MainActivity", "✅ ActivityTracker initialized with activity detection started")
+
+        // Schedule WorkManager to keep activity detection alive (survives Doze mode)
+        com.starception.submission.worker.ActivityDetectionWorker.schedule(this)
+        Log.d("MainActivity", "✅ Activity detection keep-alive worker scheduled")
 
         // PERMISSION HANDLING (Currently disabled for performance)
         // TODO: Re-enable after optimizing to prevent ANR

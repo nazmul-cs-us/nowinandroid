@@ -1046,12 +1046,22 @@ fun SwipeableBigTiles(
         }
     }
 
-    // Request Activity Recognition permission when user swipes to Smart Tracking tile (page 1)
+    // Request Activity Recognition permission and ensure detection is running when on Smart Tracking tile (page 1)
     LaunchedEffect(pagerState.currentPage) {
         val actualPage = pagerState.currentPage % 4
-        if (actualPage == 1 && !hasActivityPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            android.util.Log.i("SmartTracking", "📱 Requesting Activity Recognition permission for Smart Tracking tile")
-            activityPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+
+        if (actualPage == 1) {
+            // User is on Smart Tracking tile - ensure detection is running
+            android.util.Log.i("SmartTracking", "📍 User on Smart Tracking tile")
+
+            // Request permission if needed
+            if (!hasActivityPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                android.util.Log.i("SmartTracking", "📱 Requesting Activity Recognition permission")
+                activityPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
+
+            // Ensure detection is initialized and running (in case it stopped)
+            com.starception.submission.util.ActivityTracker.initialize(context, startDetectionNow = true)
         }
     }
 

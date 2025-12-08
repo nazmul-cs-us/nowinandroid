@@ -80,56 +80,84 @@ object ActivityTracker {
     /**
      * Initialize the activity tracker with sensor-based detection
      * Also loads saved notification mode preference from storage
+     *
+     * @param context Application context
+     * @param startDetectionNow If true, starts detection immediately (default: true for background operation)
      */
-    fun initialize(context: Context) {
-        if (isInitialized) return
-        
+    fun initialize(context: Context, startDetectionNow: Boolean = true) {
         try {
             this.context = context.applicationContext
-            activityDetectionService = ActivityDetectionService(context.applicationContext)
-            
+
+            // Only create service instance once
+            if (activityDetectionService == null) {
+                activityDetectionService = ActivityDetectionService(context.applicationContext)
+            }
+
             // Load saved notification mode preference
             val savedMode = loadNotificationMode(context)
             _notificationMode.value = savedMode
             _isBeepEnabled.value = (savedMode != NotificationMode.MUTE)
             Log.d("ActivityTracker", "📱 Loaded saved notification mode: $savedMode")
-            
+
             // Initialize ToneGenerator for beep sounds
-            try {
-                toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
-            } catch (e: Exception) {
-                Log.w("ActivityTracker", "Failed to initialize ToneGenerator: ${e.message}")
+            if (toneGenerator == null) {
+                try {
+                    toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+                } catch (e: Exception) {
+                    Log.w("ActivityTracker", "Failed to initialize ToneGenerator: ${e.message}")
+                }
             }
-            
-            // Check if we have required permissions
-            if (activityDetectionService?.hasRequiredPermissions() == true) {
-                // Start activity detection with callback to update our state
-                activityDetectionService?.startDetection(object : ActivityDetectionService.ActivityChangeCallback {
-                    override fun onActivityChanged(
-                        newActivity: ActivityDetectionService.ActivityType,
-                        previousActivity: ActivityDetectionService.ActivityType
-                    ) {
-                        updateActivity(activityToString(newActivity))
-                        // Update phone position
-                        updatePhonePosition()
-                        // Play beep sound when activity changes
-                        playActivityChangeBeep()
-                    }
-                })
-                _currentActivity.value = "Detecting..."
-                Log.d("ActivityTracker", "Activity detection started successfully")
-            } else {
-                // Provide more specific feedback about which permissions are missing
-                val missingPermissions = getMissingPermissions(context)
-                _currentActivity.value = "Need: $missingPermissions"
-                Log.w("ActivityTracker", "Missing permissions: $missingPermissions")
+
+            // Start detection (default: always start for continuous background operation)
+            if (startDetectionNow) {
+                startDetection()
             }
+
+            isInitialized = true
         } catch (e: Exception) {
             _currentActivity.value = "Detection error"
-            Log.e("ActivityTracker", "Error initializing activity detection", e)
+            Log.e("ActivityTracker", "Error initializing activity tracker", e)
         }
-        
-        isInitialized = true
+    }
+
+    /**
+     * Start activity detection - called when user navigates to Smart Tracking tile
+     */
+    fun startDetection() {
+        if (context == null) {
+            Log.w("ActivityTracker", "Cannot start detection - not initialized")
+            return
+        }
+
+        // Already running?
+        if (activityDetectionService?.isRunning() == true) {
+            Log.d("ActivityTracker", "📍 Detection already running")
+            return
+        }
+
+        // Check if we have required permissions
+        if (activityDetectionService?.hasRequiredPermissions() == true) {
+            // Start activity detection with callback to update our state
+            activityDetectionService?.startDetection(object : ActivityDetectionService.ActivityChangeCallback {
+                override fun onActivityChanged(
+                    newActivity: ActivityDetectionService.ActivityType,
+                    previousActivity: ActivityDetectionService.ActivityType
+                ) {
+                    updateActivity(activityToString(newActivity))
+                    // Update phone position
+                    updatePhonePosition()
+                    // Play beep sound when activity changes
+                    playActivityChangeBeep()
+                }
+            })
+            _currentActivity.value = "Detecting..."
+            Log.i("ActivityTracker", "🚀 Activity detection STARTED (user on Smart Tracking tile)")
+        } else {
+            // Provide more specific feedback about which permissions are missing
+            val missingPermissions = getMissingPermissions(context!!)
+            _currentActivity.value = "Need: $missingPermissions"
+            Log.w("ActivityTracker", "Missing permissions: $missingPermissions")
+        }
     }
     
     /**
@@ -281,25 +309,41 @@ object ActivityTracker {
     
     /**
      * Stop activity detection
+     *
+     * @param releaseResources If true, releases audio resources (for cleanup).
+     *                         If false, just pauses detection (can resume quickly)
      */
-    fun stopDetection() {
-        activityDetectionService?.stopDetection()
-        _currentActivity.value = "Stopped"
-
-        // Clean up ToneGenerator
-        try {
-            toneGenerator?.release()
-            toneGenerator = null
-        } catch (e: Exception) {
-            Log.w("ActivityTracker", "Error releasing ToneGenerator: ${e.message}")
+    fun stopDetection(releaseResources: Boolean = false) {
+        if (activityDetectionService?.isRunning() != true) {
+            Log.d("ActivityTracker", "📍 Detection not running, nothing to stop")
+            return
         }
 
-        // Clean up MediaPlayer
-        try {
-            mediaPlayer?.release()
-            mediaPlayer = null
-        } catch (e: Exception) {
-            Log.w("ActivityTracker", "Error releasing MediaPlayer: ${e.message}")
+        activityDetectionService?.stopDetection()
+        _currentActivity.value = "Stopped"
+        Log.i("ActivityTracker", "⏹️ Activity detection STOPPED")
+
+        // Cancel any pending dua
+        cancelPendingDua()
+
+        // Only release resources if explicitly requested (e.g., app closing)
+        if (releaseResources) {
+            // Clean up ToneGenerator
+            try {
+                toneGenerator?.release()
+                toneGenerator = null
+            } catch (e: Exception) {
+                Log.w("ActivityTracker", "Error releasing ToneGenerator: ${e.message}")
+            }
+
+            // Clean up MediaPlayer
+            try {
+                mediaPlayer?.release()
+                mediaPlayer = null
+            } catch (e: Exception) {
+                Log.w("ActivityTracker", "Error releasing MediaPlayer: ${e.message}")
+            }
+            Log.d("ActivityTracker", "🧹 Released audio resources")
         }
     }
     
