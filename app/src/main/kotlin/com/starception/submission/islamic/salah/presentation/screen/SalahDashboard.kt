@@ -23,6 +23,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.islamic.qibla.presentation.component.QiblaCompass
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
@@ -177,35 +182,87 @@ private fun SalahContent(
     val nextPrayer = dayPrayerTimes.getNextPrayer()
     val currentPrayer = actualPrayers.find { it.isCurrently }
     val timeUntilNext = dayPrayerTimes.getTimeUntilNextPrayer()
-    
-    LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Next prayer card with Qibla compass
-        item {
-            NextPrayerCard(
-                nextPrayer = nextPrayer,
-                currentPrayer = currentPrayer,
-                timeUntilNext = timeUntilNext ?: "",
-                locationService = locationService
-            )
-        }
 
-        // 3D Globe showing Qibla direction to Makkah
-        item {
-            QiblaGlobeCard(
-                locationService = locationService
-            )
-        }
+    // Detect orientation for adaptive layout
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-        // Prayer times list
-        item {
-            PrayerTimesSection(prayers = actualPrayers)
-        }
+    if (isLandscape) {
+        // LANDSCAPE LAYOUT: Two-column side-by-side
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Left column: Next prayer card + Qibla globe
+            Column(
+                modifier = Modifier.weight(0.5f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Next prayer card with Qibla compass
+                NextPrayerCard(
+                    nextPrayer = nextPrayer,
+                    currentPrayer = currentPrayer,
+                    timeUntilNext = timeUntilNext ?: "",
+                    locationService = locationService
+                )
 
-        // Location info
-        item {
-            LocationCard(location = dayPrayerTimes.location)
+                // 3D Globe showing Qibla direction
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    QiblaGlobeCard(locationService = locationService)
+                }
+            }
+
+            // Right column: Prayer times list + Location
+            LazyColumn(
+                modifier = Modifier.weight(0.5f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Prayer times list
+                item {
+                    PrayerTimesSection(prayers = actualPrayers)
+                }
+
+                // Location info
+                item {
+                    LocationCard(location = dayPrayerTimes.location)
+                }
+            }
+        }
+    } else {
+        // PORTRAIT LAYOUT: Original vertical layout
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Next prayer card with Qibla compass
+            item {
+                NextPrayerCard(
+                    nextPrayer = nextPrayer,
+                    currentPrayer = currentPrayer,
+                    timeUntilNext = timeUntilNext ?: "",
+                    locationService = locationService
+                )
+            }
+
+            // 3D Globe showing Qibla direction to Makkah
+            item {
+                QiblaGlobeCard(
+                    locationService = locationService
+                )
+            }
+
+            // Prayer times list
+            item {
+                PrayerTimesSection(prayers = actualPrayers)
+            }
+
+            // Location info
+            item {
+                LocationCard(location = dayPrayerTimes.location)
+            }
         }
     }
 }

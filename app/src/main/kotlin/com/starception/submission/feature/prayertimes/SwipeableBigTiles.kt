@@ -56,6 +56,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -1012,7 +1013,8 @@ fun SwipeableBigTiles(
     getPrayed: () -> Int = { 0 },
     getCurrentActivity: () -> String,
     onCompassClick: () -> Unit,
-    timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets()
+    timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
+    isLandscape: Boolean = false
 ) {
     // Swipeable Big Tiles - HorizontalPager with 3 tiles and infinite scroll
     val pagerState = rememberPagerState(
@@ -1065,16 +1067,27 @@ fun SwipeableBigTiles(
         }
     }
 
+    // Use dynamic height based on orientation
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 8.dp),
+        modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth()
     ) {
+        // In landscape, pager takes most height but leaves room for indicators
+        val pagerModifier = if (isLandscape) {
+            Modifier
+                .fillMaxWidth()
+                .weight(1f) // Take remaining space after indicators
+        } else {
+            Modifier
+                .fillMaxWidth()
+                .height(200.dp) // Fixed height in portrait
+        }
+
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp),
-            pageSpacing = 16.dp,
-            contentPadding = PaddingValues(horizontal = 8.dp)
+            modifier = pagerModifier,
+            pageSpacing = if (isLandscape) 12.dp else 16.dp,
+            contentPadding = PaddingValues(horizontal = if (isLandscape) 4.dp else 8.dp)
         ) { page ->
             val actualPage = page % 4 // Map infinite pages to our 4 actual tiles
             when (actualPage) {
@@ -1089,7 +1102,8 @@ fun SwipeableBigTiles(
                     getTimeUntilNextPrayer = getTimeUntilNextPrayer,
                     getTimeSinceCurrentPrayer = getTimeSinceCurrentPrayer,
                     onCompassClick = onCompassClick,
-                    timeOffsets = timeOffsets
+                    timeOffsets = timeOffsets,
+                    isLandscape = isLandscape
                 )
                 1 -> SmartInfoTile(
                     getSmartTitle = getSmartTitle,
@@ -1100,13 +1114,15 @@ fun SwipeableBigTiles(
                     getPrayed = getPrayed,
                     prayerTimes = prayerTimes,
                     currentTime = currentTime,
-                    timeOffsets = timeOffsets
+                    timeOffsets = timeOffsets,
+                    isLandscape = isLandscape
                 )
                 2 -> DailyStatsTile(
                     getPrayerProgress = getPrayerProgress,
                     getDailyStatsTitle = getDailyStatsTitle,
                     getDailyStatsMessage = getDailyStatsMessage,
-                    getPrayed = getPrayed
+                    getPrayed = getPrayed,
+                    isLandscape = isLandscape
                 )
                 3 -> QiblaGlobeTile(
                     prayerTimes = prayerTimes
@@ -1114,19 +1130,22 @@ fun SwipeableBigTiles(
             }
         }
         
-        // Page indicators for swipeable tiles
+        // Page indicators for swipeable tiles - compact in landscape
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 1.dp),
+                .padding(top = if (isLandscape) 2.dp else 1.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             repeat(4) { index ->
                 val isSelected = (pagerState.currentPage % 4) == index
+                // Smaller indicators in landscape
+                val selectedSize = if (isLandscape) 8.dp else 12.dp
+                val unselectedSize = if (isLandscape) 6.dp else 8.dp
                 Box(
                     modifier = Modifier
-                        .size(if (isSelected) 12.dp else 8.dp)
+                        .size(if (isSelected) selectedSize else unselectedSize)
                         .clip(CircleShape)
                         .background(
                             if (isSelected)
@@ -1136,16 +1155,16 @@ fun SwipeableBigTiles(
                         )
                 )
                 if (index < 3) {
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(if (isLandscape) 4.dp else 8.dp))
                 }
             }
         }
-        
-        // Professional swipe hint
+
+        // Professional swipe hint - compact in landscape
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 0.dp),
+                .padding(top = if (isLandscape) 2.dp else 0.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1153,21 +1172,22 @@ fun SwipeableBigTiles(
                 imageVector = Icons.Default.ChevronLeft,
                 contentDescription = "Swipe left",
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(if (isLandscape) 14.dp else 18.dp)
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(if (isLandscape) 4.dp else 6.dp))
             Text(
-                text = "Swipe for more insights",
+                text = if (isLandscape) "Swipe" else "Swipe for more insights",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                fontSize = if (isLandscape) 10.sp else 12.sp
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(if (isLandscape) 4.dp else 6.dp))
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Swipe right",
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(if (isLandscape) 14.dp else 18.dp)
             )
         }
     }
@@ -1185,7 +1205,8 @@ private fun NextPrayerTile(
     getTimeUntilNextPrayer: () -> String,
     getTimeSinceCurrentPrayer: () -> String,
     onCompassClick: () -> Unit,
-    timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets()
+    timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
+    isLandscape: Boolean = false
 ) {
     val view = LocalView.current
     val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
@@ -1208,7 +1229,7 @@ private fun NextPrayerTile(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
+                    .padding(if (isLandscape) 16.dp else 24.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 // Header: Icon + Title (matching Quran Player style)
@@ -1220,11 +1241,11 @@ private fun NextPrayerTile(
                         imageVector = Icons.Default.BatchPrediction,
                         contentDescription = "Smart Prediction",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(if (isLandscape) 16.dp else 20.dp)
                     )
                     Text(
                         text = "Smart Prediction",
-                        style = MaterialTheme.typography.labelLarge,
+                        style = if (isLandscape) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontWeight = FontWeight.Bold
                     )
@@ -1234,7 +1255,10 @@ private fun NextPrayerTile(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(top = 8.dp, bottom = 8.dp),
+                        .padding(
+                            top = if (isLandscape) 4.dp else 8.dp,
+                            bottom = if (isLandscape) 4.dp else 8.dp
+                        ),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1242,7 +1266,8 @@ private fun NextPrayerTile(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(end = 4.dp) // Minimal padding for maximum text space
+                            .padding(end = if (isLandscape) 8.dp else 4.dp),
+                        verticalArrangement = if (isLandscape) Arrangement.Center else Arrangement.Top
                     ) {
                         // Get notification-synchronized content using the SAME currentTime that updates every minute
                         // Pass timeOffsets to ensure smart prediction uses adjusted times (base + offset)
@@ -1252,53 +1277,54 @@ private fun NextPrayerTile(
                         
                         if (syncContent != null) {
                             // Clean layout with readable fonts and optimized spacing
+                            // More compact spacing in landscape
                             Column(
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                verticalArrangement = Arrangement.spacedBy(if (isLandscape) 2.dp else 6.dp)
                             ) {
                                 // Prayer phase title - compact and readable
                                 Text(
                                     text = syncContent.title,
-                                    style = MaterialTheme.typography.titleSmall,
+                                    style = if (isLandscape) MaterialTheme.typography.labelMedium else MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                
+
                                 // Main prayer time content - sized to fit longest text "59 minutes since Maghrib"
                                 Text(
                                     text = syncContent.content,
                                     style = MaterialTheme.typography.headlineSmall.copy(
-                                        fontSize = 22.sp,
+                                        fontSize = if (isLandscape) 18.sp else 22.sp,
                                         letterSpacing = (-0.4).sp
                                     ),
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
+                                    maxLines = if (isLandscape) 1 else 2,
                                     overflow = TextOverflow.Ellipsis,
-                                    lineHeight = 24.sp
+                                    lineHeight = if (isLandscape) 20.sp else 24.sp
                                 )
-                                
+
                                 // Next prayer info - enhanced with prominent chip styling and AI glow
                                 if (syncContent.nextPrayerInfo.isNotEmpty()) {
                                     Surface(
                                         color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.0f),
                                         shape = RoundedCornerShape(10.dp),
                                         modifier = Modifier
-                                            .padding(top = 2.dp)
+                                            .padding(top = if (isLandscape) 0.dp else 2.dp)
                                             .aiTextGlow()
                                     ) {
                                     Text(
                                         text = syncContent.nextPrayerInfo,
                                             style = MaterialTheme.typography.titleMedium.copy(
-                                                fontSize = 15.sp,
+                                                fontSize = if (isLandscape) 12.sp else 15.sp,
                                                 letterSpacing = (-0.2).sp
                                             ),
                                             color = MaterialTheme.colorScheme.tertiary,
                                             fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            modifier = Modifier.padding(horizontal = if (isLandscape) 4.dp else 8.dp, vertical = if (isLandscape) 2.dp else 4.dp)
                                     )
                                     }
                                 }
@@ -1389,36 +1415,47 @@ private fun NextPrayerTile(
                         label = "compassElevation"
                     )
                     
+                    // Dynamic compass size based on orientation
+                    val compassSize = if (isLandscape) 85.dp else 120.dp
+
+                    // Wrap compass in a centered container for proper alignment
                     Box(
                         modifier = Modifier
-                            .size(120.dp)
-                            .graphicsLayer {
-                                scaleX = compassScale
-                                scaleY = compassScale
-                            }
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = {
-                                        isPressed = true
-                                        tryAwaitRelease()
-                                        isPressed = false
-                                    },
-                                    onTap = {
-                                        view.performHapticFeedback(
-                                            HapticFeedbackConstants.CONTEXT_CLICK,
-                                            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-                                        )
-                                        onCompassClick()
-                                    }
-                                )
-                            }
+                            .then(if (isLandscape) Modifier.fillMaxHeight() else Modifier)
+                            .wrapContentSize(Alignment.Center),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .size(compassSize)
+                                .graphicsLayer {
+                                    scaleX = compassScale
+                                    scaleY = compassScale
+                                }
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onPress = {
+                                            isPressed = true
+                                            tryAwaitRelease()
+                                            isPressed = false
+                                        },
+                                        onTap = {
+                                            view.performHapticFeedback(
+                                                HapticFeedbackConstants.CONTEXT_CLICK,
+                                                HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                                            )
+                                            onCompassClick()
+                                        }
+                                    )
+                                }
+                        ) {
                         CompassProgressIndicator(
                             progress = 0.7f,
                             modifier = Modifier.fillMaxSize(),
-                            size = 120.dp,
+                            size = compassSize,
                             locationService = locationService
                         )
+                        }
                     }
                 }
             }
@@ -1472,7 +1509,8 @@ private fun SmartInfoTile(
     getPrayed: () -> Int = { 0 },
     prayerTimes: DayPrayerTimes? = null,
     currentTime: LocalTime,
-    timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets()
+    timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
+    isLandscape: Boolean = false
 ) {
     // State for bubble popup
     var selectedPrayer by remember { mutableStateOf<com.starception.submission.feature.prayertimes.components.PrayerBubbleData?>(null) }
@@ -1494,24 +1532,24 @@ private fun SmartInfoTile(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(if (isLandscape) 16.dp else 24.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
             // Header: Icon + Title (matching Quran Player style)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
-                modifier = Modifier.padding(bottom = 2.dp)
+                modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 2.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.BubbleChart,
                     contentDescription = "Smart Tracking",
                     tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(if (isLandscape) 16.dp else 20.dp)
                 )
                 Text(
                     text = "Smart Tracking",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = if (isLandscape) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     fontWeight = FontWeight.Bold
                 )
@@ -1521,9 +1559,9 @@ private fun SmartInfoTile(
                     modifier = Modifier
                         .fillMaxWidth()
                     .weight(1f)
-                    .padding(top = 20.dp, bottom = 8.dp),
+                    .padding(top = if (isLandscape) 8.dp else 20.dp, bottom = if (isLandscape) 4.dp else 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
             // Main content - Side-by-side layout with proper alignment
             Column(
@@ -1973,7 +2011,8 @@ private fun DailyStatsTile(
     getPrayerProgress: () -> Pair<Int, Int>,
     getDailyStatsTitle: () -> String,
     getDailyStatsMessage: () -> String,
-    getPrayed: () -> Int = { 0 }
+    getPrayed: () -> Int = { 0 },
+    isLandscape: Boolean = false
 ) {
     val view = LocalView.current
     val context = LocalContext.current
@@ -2248,16 +2287,16 @@ private fun DailyStatsTile(
                 else -> QuranFonts.PDMSSaleem
             }
 
-            // PLAYER VIEW - Ultra-compact design optimized for 200dp height tile
+            // PLAYER VIEW - Ultra-compact design optimized for tile height
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = if (isLandscape) 10.dp else 14.dp, vertical = if (isLandscape) 4.dp else 10.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 // Top section: Header and controls grouped together
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(if (isLandscape) 0.dp else 4.dp)
                 ) {
                     // Header row: Title + Language badge + Surah info (all in one compact row)
                     Row(
@@ -2274,11 +2313,11 @@ private fun DailyStatsTile(
                             imageVector = Icons.Default.AutoAwesome,
                             contentDescription = "Quran",
                             tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(if (isLandscape) 16.dp else 20.dp)
                         )
                         Text(
                             text = "The Noble Quran",
-                            style = MaterialTheme.typography.labelLarge,
+                            style = if (isLandscape) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onTertiaryContainer,
                             fontWeight = FontWeight.Bold
                         )
@@ -2340,41 +2379,44 @@ private fun DailyStatsTile(
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(if (isLandscape) 24.dp else 28.dp)
                             ) {
             Text(
                                     text = "${viewModel.currentSurahIndex + 1}",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = if (isLandscape) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
-                        // Surah names - very compact, single line
+                        // Surah names - very compact, single line (hide English in landscape)
                         Column {
                             Text(
                                 text = QuranData.surahs[viewModel.currentSurahIndex].nameArabic,
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontFamily = arabicFontFamily,
-                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+                                    fontSize = if (isLandscape) 12.sp else 14.sp
                                 ),
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                                 maxLines = 1
                             )
-                            Text(
-                                text = QuranData.surahs[viewModel.currentSurahIndex].nameEnglish,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
-                                maxLines = 1,
-                                fontSize = 10.sp
-                            )
+                            if (!isLandscape) {
+                                Text(
+                                    text = QuranData.surahs[viewModel.currentSurahIndex].nameEnglish,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                                    maxLines = 1,
+                                    fontSize = 10.sp
+                                )
+                            }
                         }
                     }
 
                     // Right: Inline playback controls
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Previous button - tiny
@@ -2386,13 +2428,13 @@ private fun DailyStatsTile(
                                 )
                                 viewModel.playPrevious()
                             },
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(if (isLandscape) 24.dp else 32.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.SkipPrevious,
                                 contentDescription = "Previous",
                                 tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(if (isLandscape) 16.dp else 22.dp)
                             )
                         }
 
@@ -2410,7 +2452,7 @@ private fun DailyStatsTile(
                                 }
                             },
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(if (isLandscape) 32.dp else 42.dp)
                                 .compactGlow(),
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.tertiary,
@@ -2424,7 +2466,7 @@ private fun DailyStatsTile(
                                     imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     contentDescription = if (viewModel.isPlaying) "Pause" else "Play",
                                     tint = MaterialTheme.colorScheme.onTertiary,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(if (isLandscape) 18.dp else 24.dp)
                                 )
                             }
                         }
@@ -2438,13 +2480,13 @@ private fun DailyStatsTile(
                                 )
                                 viewModel.playNext()
                             },
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(if (isLandscape) 24.dp else 32.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.SkipNext,
                                 contentDescription = "Next",
                                 tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(if (isLandscape) 16.dp else 22.dp)
                             )
                         }
                     }
@@ -2452,51 +2494,92 @@ private fun DailyStatsTile(
                 }
 
                 // Bottom section: Seek slider with time display - pushed to bottom
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    // Time labels above slider - clean and professional
+                if (isLandscape) {
+                    // Landscape: Time labels inline with slider to save vertical space
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
                             text = formatTime(viewModel.currentPosition),
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.tertiary,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
+                            fontSize = 9.sp
+                        )
+                        androidx.compose.material3.Slider(
+                            value = viewModel.currentPosition.toFloat(),
+                            onValueChange = { newValue ->
+                                view.performHapticFeedback(
+                                    HapticFeedbackConstants.TEXT_HANDLE_MOVE,
+                                    HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                                )
+                                viewModel.seekTo(newValue.toInt())
+                            },
+                            valueRange = 0f..viewModel.duration.toFloat().coerceAtLeast(1f),
+                            colors = androidx.compose.material3.SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.tertiary,
+                                activeTrackColor = MaterialTheme.colorScheme.tertiary,
+                                inactiveTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f)
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(20.dp)
                         )
                         Text(
                             text = formatTime(viewModel.duration),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
                             fontWeight = FontWeight.Medium,
-                            fontSize = 11.sp
+                            fontSize = 9.sp
                         )
                     }
-
-                    // Compact slider with glow - proper height to prevent cutoff
-                    androidx.compose.material3.Slider(
-                        value = viewModel.currentPosition.toFloat(),
-                        onValueChange = { newValue ->
-                            view.performHapticFeedback(
-                                HapticFeedbackConstants.TEXT_HANDLE_MOVE,
-                                HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                } else {
+                    // Portrait: Time labels above slider
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = formatTime(viewModel.currentPosition),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
                             )
-                            viewModel.seekTo(newValue.toInt())
-                        },
-                        valueRange = 0f..viewModel.duration.toFloat().coerceAtLeast(1f),
-                        colors = androidx.compose.material3.SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.tertiary,
-                            activeTrackColor = MaterialTheme.colorScheme.tertiary,
-                            inactiveTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(32.dp)
-                            .aiTextGlow()
-                    )
+                            Text(
+                                text = formatTime(viewModel.duration),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 11.sp
+                            )
+                        }
+                        androidx.compose.material3.Slider(
+                            value = viewModel.currentPosition.toFloat(),
+                            onValueChange = { newValue ->
+                                view.performHapticFeedback(
+                                    HapticFeedbackConstants.TEXT_HANDLE_MOVE,
+                                    HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                                )
+                                viewModel.seekTo(newValue.toInt())
+                            },
+                            valueRange = 0f..viewModel.duration.toFloat().coerceAtLeast(1f),
+                            colors = androidx.compose.material3.SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.tertiary,
+                                activeTrackColor = MaterialTheme.colorScheme.tertiary,
+                                inactiveTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(32.dp)
+                                .aiTextGlow()
+                        )
+                    }
                 }
             }
         }

@@ -44,6 +44,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import kotlin.math.*
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.horizontalScroll
 import com.starception.submission.prayer.service.EnhancedLocationService
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import androidx.compose.runtime.rememberCoroutineScope
@@ -272,6 +275,126 @@ fun CompassPopupScreen(
                 }
             }
 
+            // Detect orientation for adaptive layout
+            val configuration = LocalConfiguration.current
+            val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+            // Dynamic compass size based on orientation
+            val compassSizeDp = if (isLandscape) 180.dp else COMPASS_SIZE_DP.dp
+
+            if (isLandscape) {
+                // LANDSCAPE LAYOUT: Side-by-side compass and calibration
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Left side: Compass
+                    Column(
+                        modifier = Modifier
+                            .weight(0.45f)
+                            .fillMaxHeight(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        // Title
+                        Text(
+                            text = "🕋 Qibla Compass",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        // Compass
+                        CompassProgressIndicator(
+                            progress = progress,
+                            size = compassSizeDp,
+                            locationService = locationService,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        // Islamic context note
+                        Text(
+                            text = "Points toward Kaaba in Mecca",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    // Right side: Calibration guidance (scrollable)
+                    Column(
+                        modifier = Modifier
+                            .weight(0.55f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Top
+                    ) {
+                        // Calibration guidance card
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp)),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                // Animated calibration demonstration (smaller in landscape)
+                                Figure8AnimationDemo(
+                                    modifier = Modifier
+                                        .size(70.dp)
+                                        .padding(bottom = 4.dp)
+                                )
+
+                                Text(
+                                    text = "For Better Accuracy",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+
+                                Text(
+                                    text = "Move device in a figure-8 pattern for better accuracy.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+
+                                // Steps (compact)
+                                CalibrationStep(step = "1", instruction = "Hold phone flat")
+                                CalibrationStep(step = "2", instruction = "Move in figure-8 motions")
+                                CalibrationStep(step = "3", instruction = "Watch border turn green")
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Color guide (compact)
+                                Text(
+                                    text = "Color Guide:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                                ColorIndicatorRow(color = Color(0xFF10B981), text = "Green = Good")
+                                ColorIndicatorRow(color = Color(0xFFFFA500), text = "Orange = Fair")
+                                ColorIndicatorRow(color = Color(0xFFFF4444), text = "Red = Poor")
+                            }
+                        }
+                    }
+                }
+            } else {
+            // PORTRAIT LAYOUT: Original vertical layout
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -523,6 +646,7 @@ fun CompassPopupScreen(
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 24.dp) // Added bottom padding
                 )
             }
+            } // End of portrait layout else block
         }
     }
 }

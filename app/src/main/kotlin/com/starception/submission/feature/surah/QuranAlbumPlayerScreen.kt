@@ -69,6 +69,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.Manifest
+import android.os.Build
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.PermissionStatus
+import com.google.accompanist.permissions.rememberPermissionState
 
 /**
  * Helper function to convert font name to FontFamily
@@ -94,7 +99,7 @@ internal fun getArabicFontFamilyForSelection(selectedFont: String): androidx.com
  * Replicates the album-style design from MusicPlayerAlbumDemoFragment
  * but uses MaterialTheme.colorScheme directly for automatic theme support
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun QuranAlbumPlayerScreen(
     surahNumber: Int,
@@ -106,6 +111,29 @@ fun QuranAlbumPlayerScreen(
     userDataRepository: UserDataRepository = hiltViewModel<UserDataRepositoryHolder>().repository
 ) {
     val context = LocalContext.current
+
+    // Audio permission state for runtime permission request
+    val audioPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        rememberPermissionState(permission = Manifest.permission.READ_MEDIA_AUDIO)
+    } else {
+        rememberPermissionState(permission = Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
+
+    // Helper to check permission before playing audio
+    val playWithPermissionCheck: (() -> Unit) -> Unit = { playAction ->
+        if (audioPermissionState.status is PermissionStatus.Granted) {
+            playAction()
+        } else {
+            audioPermissionState.launchPermissionRequest()
+            // Show toast explaining permission is needed
+            Toast.makeText(
+                context,
+                "Audio permission is required to play Quran recitation",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     val playerViewModel = remember { QuranPlayerViewModel(context) }
     val uiState by viewModel.uiState.collectAsState()
     val currentTranslation by viewModel.currentTranslation.collectAsState()
@@ -375,9 +403,11 @@ fun QuranAlbumPlayerScreen(
                             if (service.isPlaying()) {
                                 service.togglePlayPause()
                             } else {
-                                showMusicPlayer = true
-                                service.setAudioLanguage(currentAudioLanguage)
-                                service.playSurah(surahNumber - 1, true)
+                                playWithPermissionCheck {
+                                    showMusicPlayer = true
+                                    service.setAudioLanguage(currentAudioLanguage)
+                                    service.playSurah(surahNumber - 1, true)
+                                }
                             }
                         }
                     },
@@ -398,9 +428,11 @@ fun QuranAlbumPlayerScreen(
                             if (service.isPlaying()) {
                                 service.togglePlayPause()
                             } else {
-                                showMusicPlayer = true
-                                service.setAudioLanguage(currentAudioLanguage)
-                                service.playSurah(surahNumber - 1, true)
+                                playWithPermissionCheck {
+                                    showMusicPlayer = true
+                                    service.setAudioLanguage(currentAudioLanguage)
+                                    service.playSurah(surahNumber - 1, true)
+                                }
                             }
                         }
                     },
@@ -416,30 +448,32 @@ fun QuranAlbumPlayerScreen(
                     onPlayAyahClick = { ayahNumber ->
                         val service = playbackService
                         if (service != null) {
-                            // Generate audio URL for this specific ayah
-                            val audioUrl = com.starception.submission.core.qurandatabase.getAyahAudioUrl(
-                                surahNumber = surahNumber,
-                                ayahNumber = ayahNumber,
-                                reciter = com.starception.submission.core.qurandatabase.QuranReciters.ALAFASY_128
-                            )
+                            playWithPermissionCheck {
+                                // Generate audio URL for this specific ayah
+                                val audioUrl = com.starception.submission.core.qurandatabase.getAyahAudioUrl(
+                                    surahNumber = surahNumber,
+                                    ayahNumber = ayahNumber,
+                                    reciter = com.starception.submission.core.qurandatabase.QuranReciters.ALAFASY_128
+                                )
 
-                            // Show music player
-                            showMusicPlayer = true
+                                // Show music player
+                                showMusicPlayer = true
 
-                            // Play the specific ayah using URL
-                            service.playAyahByUrl(
-                                audioUrl = audioUrl,
-                                surahName = state.surah.nameEnglish,
-                                ayahNumber = ayahNumber,
-                                shouldAutoPlay = true
-                            )
+                                // Play the specific ayah using URL
+                                service.playAyahByUrl(
+                                    audioUrl = audioUrl,
+                                    surahName = state.surah.nameEnglish,
+                                    ayahNumber = ayahNumber,
+                                    shouldAutoPlay = true
+                                )
 
-                            // Show toast with ayah info
-                            android.widget.Toast.makeText(
-                                context,
-                                "Playing ${state.surah.nameEnglish} - Ayah $ayahNumber",
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
+                                // Show toast with ayah info
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Playing ${state.surah.nameEnglish} - Ayah $ayahNumber",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         } else {
                             android.widget.Toast.makeText(
                                 context,

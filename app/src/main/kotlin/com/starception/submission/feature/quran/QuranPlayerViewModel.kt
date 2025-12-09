@@ -198,7 +198,11 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         if (serviceBound) {
-            context.unbindService(serviceConnection)
+            try {
+                context.unbindService(serviceConnection)
+            } catch (e: IllegalArgumentException) {
+                Log.w("QuranPlayerViewModel", "Service was not registered when trying to unbind: ${e.message}")
+            }
             serviceBound = false
         }
         // Don't stop the service - let it continue in background
