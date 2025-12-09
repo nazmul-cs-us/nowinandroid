@@ -41,7 +41,7 @@ object PrayerNotificationManager {
     // NOTIFICATION CONFIGURATION - Edit these to change notification behavior
     private const val CHANNEL_ID = "prayer_live_update_channel"
     private const val CHANNEL_NAME = "Prayer Notifications" 
-    private const val NOTIFICATION_ID = 1002  // Live Update notification ID (separate from foreground service)
+    private const val NOTIFICATION_ID = 1001  // Same ID as foreground service - replaces it with live update
     
     fun initialize(context: Context) {
         Log.d(TAG, "=== INITIALIZING PRAYER NOTIFICATION MANAGER ===")

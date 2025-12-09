@@ -52,7 +52,7 @@ object GoogleSampleNotificationManager {
 
     const val CHANNEL_ID = "google_live_updates_channel_id"
     private const val CHANNEL_NAME = "Google Live Updates Test"
-    private const val NOTIFICATION_ID = 9999
+    private const val NOTIFICATION_ID = 1001 // Must match PrayerNotificationService.NOTIFICATION_ID to replace foreground notification
 
     // SharedPreferences keys for persistent storage
     private const val PREFS_NAME = "adhan_tracker_prefs"
