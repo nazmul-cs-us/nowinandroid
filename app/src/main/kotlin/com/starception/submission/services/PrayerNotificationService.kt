@@ -86,8 +86,8 @@ class PrayerNotificationService : Service() {
         
         // NOTIFICATION CONFIGURATION - Edit these to change notification behavior
         private const val NOTIFICATION_CHANNEL_ID = "prayer_live_update_channel"
-        private const val NOTIFICATION_ID = 1001  // Foreground service notification ID
-        private const val LIVE_UPDATE_NOTIFICATION_ID = 1002 // Separate Live Update notification ID
+        private const val NOTIFICATION_ID = 1001  // Single notification ID for both foreground service and live update
+        private const val LIVE_UPDATE_NOTIFICATION_ID = 1001 // Same ID as foreground - replaces it with live update
         
         // Activity recognition action
         private const val ACTIVITY_TRANSITION_ACTION = "com.starception.submission.ACTIVITY_TRANSITION"
