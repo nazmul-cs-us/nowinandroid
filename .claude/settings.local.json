@@ -213,7 +213,12 @@
       "Bash(ls:*)",
       "Bash(for f in /Users/smarterai/Desktop/Activity_icon/*/*.png)",
       "Bash(do echo $f:)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(for f in /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-*/ic_activity_phone.png)",
+      "Bash(while read f)",
+      "Bash(for f in /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-xxxhdpi/ic_activity_*.png)",
+      "Bash(for f in /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-*/ic_notif_phone.png)",
+      "Bash(for f in /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-xxxhdpi/ic_notif_*.png)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
