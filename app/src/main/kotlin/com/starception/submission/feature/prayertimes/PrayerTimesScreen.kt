@@ -165,6 +165,8 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.Duration
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 
 /**
  * PRAYER TIMES SCREEN: Main UI for displaying Islamic prayer times with Material 3 design
@@ -1326,7 +1328,219 @@ fun PrayerTimesScreen(
         } else {
             // Main content with simple wobble transformations
             // Use wobbleState.wobbleIntensity from wobbleState
-            
+
+            // Detect orientation for adaptive layout
+            val configuration = LocalConfiguration.current
+            val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+            if (isLandscape) {
+                // LANDSCAPE LAYOUT: Side-by-side with swipeable tiles on left, prayer cards on right
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .wobbleTransform(wobbleState.wobbleIntensity),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Left column: Swipeable tiles + Location info
+                    Column(
+                        modifier = Modifier
+                            .weight(0.5f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Swipeable Big Tiles - take most of the height
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                        ) {
+                            SwipeableBigTiles(
+                                prayerTimes = prayerTimes,
+                                currentTime = currentTime,
+                                locationService = locationService,
+                                getNextPrayer = { PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes) },
+                                getCurrentPrayer = { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) },
+                                getPrayerStatus = { prayerName -> PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes) },
+                                getPrayerTimeDisplay = { prayerName -> PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes) },
+                                getTimeUntilNextPrayer = { PrayerTimeHelpers.getTimeUntilNextPrayer(currentTime, prayerTimes) },
+                                getCurrentDate = { PrayerTimeHelpers.getCurrentDate() },
+                                getSmartTitle = { SmartContentUtils.getSmartTitle(currentTime) },
+                                getSmartContent = { SmartContentUtils.getSmartContent(currentTime, prayerTimes) { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) } },
+                                getSmartFooter = { SmartContentUtils.getSmartFooter(PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes), PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes)) },
+                                getTimeSinceCurrentPrayer = { SmartContentUtils.formatTimeSinceCurrentPrayer(SmartContentUtils.getMinutesSinceCurrentPrayer(prayerTimes, currentTime) { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) }) },
+                                getPrayerProgress = { SmartContentUtils.getPrayerProgress(prayerTimes, currentTime) },
+                                getDailyStatsTitle = {
+                                    val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
+                                    SmartContentUtils.getDailyStatsTitle(completed, total)
+                                },
+                                getDailyStatsMessage = {
+                                    val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
+                                    SmartContentUtils.getDailyStatsMessage(completed, total)
+                                },
+                                getPrayed = { prayedCount },
+                                getCurrentActivity = {
+                                    try {
+                                        com.starception.submission.util.ActivityTracker.getCurrentActivity()
+                                    } catch (e: Exception) {
+                                        "UNKNOWN"
+                                    }
+                                },
+                                onCompassClick = {
+                                    Log.d("PrayerTimes", "Compass clicked, showing popup")
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    showCompassPopup = true
+                                },
+                                timeOffsets = storedOffsets,
+                                isLandscape = true
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Location info at bottom - larger for better visibility
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shadowElevation = 2.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.LocationOn,
+                                    contentDescription = "Location",
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = getLocationWithCountryCode(location, prayerTimes?.location),
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    textAlign = TextAlign.Start,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+
+                    // Right column: Prayer cards in scrollable column
+                    Column(
+                        modifier = Modifier
+                            .weight(0.5f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // No instruction banner in landscape to save space
+
+                        // Get ordered prayers
+                        val orderedPrayers = remember(currentTime, prayerTimes) {
+                            val result = mutableListOf<String>()
+                            val allPrayersList = prayerTimes?.let { times ->
+                                listOf(
+                                    "Fajr" to times.fajr, "Sunrise" to times.sunrise,
+                                    "Dhuhr" to times.dhuhr, "Asr" to times.asr,
+                                    "Maghrib" to times.maghrib, "Isha" to times.isha
+                                )
+                            } ?: emptyList()
+                            if (allPrayersList.isNotEmpty()) {
+                                val currentPrayerIndex = allPrayersList.indexOfLast { it.second.isBefore(currentTime) || it.second == currentTime }
+                                if (currentPrayerIndex != -1) {
+                                    for (i in 0 until 6) {
+                                        val index = (currentPrayerIndex + i) % allPrayersList.size
+                                        result.add(allPrayersList[index].first)
+                                    }
+                                } else {
+                                    result.addAll(allPrayersList.map { it.first })
+                                }
+                            }
+                            result
+                        }
+
+                        // Prayer cards in a 2-column grid for landscape
+                        // Use appropriate height to show prayer time info (name + arabic + time)
+                        val landscapeTileHeight = 115.dp
+                        for (i in orderedPrayers.indices step 2) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // First card in row
+                                InteractivePrayerCard(
+                                    prayerName = orderedPrayers[i],
+                                    currentEditingTile = currentEditingTile,
+                                    onEditingTileChange = { currentEditingTile = it },
+                                    currentOffset = when (orderedPrayers[i]) {
+                                        "Fajr" -> storedOffsets.fajr
+                                        "Dhuhr" -> storedOffsets.dhuhr
+                                        "Asr" -> storedOffsets.asr
+                                        "Maghrib" -> storedOffsets.maghrib
+                                        "Isha" -> storedOffsets.isha
+                                        else -> 0
+                                    },
+                                    notificationEnabled = when (orderedPrayers[i]) {
+                                        "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                        "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                        "Asr" -> notificationPreferences.asrNotificationEnabled
+                                        "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                        "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                        else -> true
+                                    },
+                                    onNotificationToggle = { enabled ->
+                                        repository.togglePrayerNotification(orderedPrayers[i], enabled)
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(landscapeTileHeight),
+                                    onShowPopup = { prayerName -> popupDialState = prayerName }
+                                )
+
+                                // Second card in row (if exists)
+                                if (i + 1 < orderedPrayers.size) {
+                                    InteractivePrayerCard(
+                                        prayerName = orderedPrayers[i + 1],
+                                        currentEditingTile = currentEditingTile,
+                                        onEditingTileChange = { currentEditingTile = it },
+                                        currentOffset = when (orderedPrayers[i + 1]) {
+                                            "Fajr" -> storedOffsets.fajr
+                                            "Dhuhr" -> storedOffsets.dhuhr
+                                            "Asr" -> storedOffsets.asr
+                                            "Maghrib" -> storedOffsets.maghrib
+                                            "Isha" -> storedOffsets.isha
+                                            else -> 0
+                                        },
+                                        notificationEnabled = when (orderedPrayers[i + 1]) {
+                                            "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                            "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                            "Asr" -> notificationPreferences.asrNotificationEnabled
+                                            "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                            "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                            else -> true
+                                        },
+                                        onNotificationToggle = { enabled ->
+                                            repository.togglePrayerNotification(orderedPrayers[i + 1], enabled)
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(landscapeTileHeight),
+                                        onShowPopup = { prayerName -> popupDialState = prayerName }
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+            // PORTRAIT LAYOUT: Original vertical layout
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1966,9 +2180,10 @@ fun PrayerTimesScreen(
                     }
                 }
             }
+            } // End of portrait layout else block
         }
     }
-    
+
     // MATERIAL 3 EXPRESSIVE LOCATION SERVICE DIALOG
     AnimatedVisibility(
         visible = showLocationServiceDialog,

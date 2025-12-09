@@ -489,6 +489,80 @@ if (!isUserInteracting && (currentTime - lastInteractionTime) > 2000) {
   - Optimized layout to prevent text cutoff while maintaining readability
   - Updated `SmartContentUtils.kt` with better content formatting for various tile sizes
 
+### Landscape Layout Support (December 2025)
+
+Comprehensive landscape orientation support for all prayer times and Islamic features screens.
+
+#### Files Modified for Landscape Support
+1. **PrayerTimesScreen.kt** - Main prayer times dashboard
+   - Side-by-side layout with swipeable tiles on left (50%) and prayer cards on right (50%)
+   - Prayer cards displayed in 2-column grid for landscape
+   - Location card at bottom of left column
+   - Orientation detection using `LocalConfiguration.current`
+
+2. **SwipeableBigTiles.kt** - All 4 swipeable tiles
+   - Added `isLandscape: Boolean` parameter to all tile composables
+   - Dynamic pager height: `weight(1f)` in landscape vs fixed `200.dp` in portrait
+   - Compact page indicators (8dp/6dp in landscape vs 12dp/8dp in portrait)
+   - Compact swipe hint text ("Swipe" vs "Swipe for more insights")
+
+3. **SalahDashboard.kt** - Salah dashboard screen
+   - Two-column side-by-side layout for landscape
+   - Next prayer card + Qibla globe on left, prayer times list on right
+
+4. **CompassPopupScreen.kt** - Full-screen compass popup
+   - Side-by-side layout: compass on left (45%), calibration guidance on right (55%)
+   - Smaller compass size (180dp in landscape vs 260dp in portrait)
+   - Scrollable calibration content for limited vertical space
+
+#### Tile-Specific Landscape Optimizations
+
+**Smart Prediction Tile (NextPrayerTile):**
+- Compass size: 85dp (landscape) vs 120dp (portrait)
+- Centered compass container with `fillMaxHeight()` alignment
+- Reduced padding: 16dp (landscape) vs 24dp (portrait)
+- Compact text with single-line content
+
+**Smart Tracking Tile (SmartInfoTile):**
+- Reduced padding and spacing for compact display
+- Smaller header icons and text
+- All content fits without cutoff
+
+**Noble Quran Tile (DailyStatsTile):**
+- Inline time labels with slider (landscape) vs time labels above slider (portrait)
+- Smaller play button: 32dp (landscape) vs 42dp (portrait)
+- Smaller skip buttons: 24dp (landscape) vs 32dp (portrait)
+- Hidden English surah name in landscape to save vertical space
+- Smaller surah badge: 24dp (landscape) vs 28dp (portrait)
+- Reduced vertical padding: 4dp (landscape) vs 10dp (portrait)
+
+**Qibla Globe Tile:**
+- Automatically adapts to available space
+- Maintains proper aspect ratio in landscape
+
+#### Implementation Pattern
+```kotlin
+// Orientation detection
+val configuration = LocalConfiguration.current
+val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+// Conditional layout
+if (isLandscape) {
+    Row(modifier = Modifier.fillMaxSize()) {
+        // Left column
+        Column(modifier = Modifier.weight(0.5f)) { ... }
+        // Right column
+        Column(modifier = Modifier.weight(0.5f)) { ... }
+    }
+} else {
+    // Portrait layout
+    Column { ... }
+}
+
+// Conditional sizing
+Modifier.size(if (isLandscape) 85.dp else 120.dp)
+```
+
 ## Prayer Settings Auto-Detection System
 
 ### Implementation Details

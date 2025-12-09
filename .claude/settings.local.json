@@ -210,7 +210,10 @@
       "WebFetch(domain:fonts.google.com)",
       "Bash(pip3 install:*)",
       "Bash(/opt/homebrew/bin/python3 -m pip:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(for f in /Users/smarterai/Desktop/Activity_icon/*/*.png)",
+      "Bash(do echo $f:)",
+      "Bash(done)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
