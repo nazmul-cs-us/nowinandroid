@@ -156,10 +156,14 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
     }
 
     fun playNext() {
+        val nextIndex = (currentSurahIndex + 1) % QuranData.surahs.size
+        _currentSurahIndex.value = nextIndex
         playbackService?.playNext()
     }
 
     fun playPrevious() {
+        val prevIndex = if (currentSurahIndex > 0) currentSurahIndex - 1 else QuranData.surahs.size - 1
+        _currentSurahIndex.value = prevIndex
         playbackService?.playPrevious()
     }
 

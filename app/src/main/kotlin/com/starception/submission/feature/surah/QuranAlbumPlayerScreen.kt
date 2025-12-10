@@ -147,11 +147,29 @@ fun QuranAlbumPlayerScreen(
     // Track current playing surah number for updating AlbumInfoCard when next/previous is pressed
     var currentPlayingSurahNumber by remember { mutableStateOf(surahNumber) }
 
+    // Fetch current playing surah AND ayahs when it changes (at parent level for proper recomposition)
+    var currentPlayingSurah by remember { mutableStateOf<Surah?>(null) }
+    var currentPlayingAyahs by remember { mutableStateOf<List<Ayah>?>(null) }
+    LaunchedEffect(currentPlayingSurahNumber) {
+        android.util.Log.d("QuranAlbumPlayer", "📥 PARENT_FETCH | surahNumber=$currentPlayingSurahNumber | original=$surahNumber")
+        if (currentPlayingSurahNumber != surahNumber) {
+            val fetchedSurah = quranRepository.getSurahByNumber(currentPlayingSurahNumber)
+            val fetchedAyahs = quranRepository.getAyahsBySurahOnce(currentPlayingSurahNumber)
+            android.util.Log.d("QuranAlbumPlayer", "✅ PARENT_FETCHED | surah=${fetchedSurah?.nameEnglish} | ayahs=${fetchedAyahs.size}")
+            currentPlayingSurah = fetchedSurah
+            currentPlayingAyahs = fetchedAyahs
+        } else {
+            currentPlayingSurah = null
+            currentPlayingAyahs = null
+        }
+    }
+
     // Load volume from ViewModel (persisted in SharedPreferences)
     val currentVolume by viewModel.currentVolume.collectAsState()
 
     var showTranslationDialog by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
+    var showTajweedLegendDialog by remember { mutableStateOf(false) }
 
     // Enhanced database features
     val wordStudyData by viewModel.wordStudyData.collectAsState()
@@ -194,6 +212,10 @@ fun QuranAlbumPlayerScreen(
 
     // Text alignment state - loaded from ViewModel (persisted in SharedPreferences)
     val textAlignment by viewModel.textAlignment.collectAsState()
+
+    // Tajweed state - loaded from ViewModel (persisted in SharedPreferences)
+    val showTajweed by viewModel.showTajweed.collectAsState()
+    val tajweedAnnotations by viewModel.tajweedAnnotations.collectAsState()
 
     // Track bookmark state using UserDataRepository (the correct repository for news bookmarks)
     var isBookmarked by remember { mutableStateOf(false) }
@@ -381,12 +403,17 @@ fun QuranAlbumPlayerScreen(
                     currentProgress = currentProgress,
                     currentVolume = currentVolume,
                     currentPlayingSurahNumber = currentPlayingSurahNumber,
+                    currentPlayingSurah = currentPlayingSurah,
+                    currentPlayingAyahs = currentPlayingAyahs,
                     showFabVisible = showFabVisible,
                     selectedArabicFont = selectedArabicFont,
                     arabicFontSize = arabicFontSize,
                     textAlignment = textAlignment,
                     showTranslationInText = showTranslationInText,
                     showBismillahRow = showBismillahRow,
+                    showTajweed = showTajweed,
+                    tajweedAnnotations = tajweedAnnotations,
+                    onToggleTajweed = { viewModel.changeTajweed(!showTajweed) },
                     onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) },
                     onCycleAlignment = {
                         // Cycle through: start -> center -> end -> start
@@ -412,9 +439,15 @@ fun QuranAlbumPlayerScreen(
                         }
                     },
                     onRewindClick = {
+                        // Immediately update the current surah number for UI sync
+                        val prevSurahNumber = if (currentPlayingSurahNumber > 1) currentPlayingSurahNumber - 1 else 114
+                        currentPlayingSurahNumber = prevSurahNumber
                         playbackService?.playPrevious()
                     },
                     onForwardClick = {
+                        // Immediately update the current surah number for UI sync
+                        val nextSurahNumber = if (currentPlayingSurahNumber < 114) currentPlayingSurahNumber + 1 else 1
+                        currentPlayingSurahNumber = nextSurahNumber
                         playbackService?.playNext()
                     },
                     onVolumeChange = { volume ->
@@ -656,7 +689,10 @@ fun QuranAlbumPlayerScreen(
                         viewModel.changeTextAlignment(alignment)
                     },
                     showTranslation = showTranslationInText,
-                    onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) }
+                    onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) },
+                    showTajweed = showTajweed,
+                    onToggleTajweed = { viewModel.changeTajweed(!showTajweed) },
+                    onShowTajweedLegend = { showTajweedLegendDialog = true }
                 )
             }
         }
@@ -684,6 +720,13 @@ fun QuranAlbumPlayerScreen(
                     showTafseerDialog = false
                     viewModel.clearTafseer()
                 }
+            )
+        }
+
+        // Tajweed Legend dialog
+        if (showTajweedLegendDialog) {
+            com.starception.submission.feature.surah.tajweed.TajweedLegendDialog(
+                onDismiss = { showTajweedLegendDialog = false }
             )
         }
     }
@@ -871,12 +914,17 @@ private fun AlbumPlayerContent(
     currentProgress: Float,
     currentVolume: Float,
     currentPlayingSurahNumber: Int,
+    currentPlayingSurah: Surah?, // Passed from parent for proper recomposition
+    currentPlayingAyahs: List<Ayah>?, // Passed from parent for proper recomposition
     showFabVisible: Boolean,
     selectedArabicFont: String,
     arabicFontSize: Float,
     textAlignment: String,
     showTranslationInText: Boolean,
     showBismillahRow: Boolean,
+    showTajweed: Boolean,
+    tajweedAnnotations: Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>,
+    onToggleTajweed: () -> Unit,
     onToggleTranslation: () -> Unit,
     onCycleAlignment: () -> Unit,
     onPlayPauseClick: () -> Unit,
@@ -891,8 +939,10 @@ private fun AlbumPlayerContent(
     onPlayAyahClick: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // Track the currently playing surah - load from repository when surah number changes
-    var currentPlayingSurah by remember { mutableStateOf<Surah?>(null) }
+    // Use current playing surah/ayahs if available, otherwise use original
+    val displaySurah = currentPlayingSurah ?: surah
+    val displayAyahs = currentPlayingAyahs ?: ayahs
+
     val quranRepository = hiltViewModel<QuranRepositoryHolder>().repository
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -910,25 +960,12 @@ private fun AlbumPlayerContent(
         android.util.Log.d("QuranAlbumPlayer_FAVOURITE", "📥 LOADED | surah=${surah.number} | count=${favouriteAyahs.size} | ayahs=$favouriteAyahs")
     }
 
-    LaunchedEffect(currentPlayingSurahNumber) {
-        // Fetch the new surah when the playing surah number changes
-        android.util.Log.d("QuranAlbumPlayer", "📥 FETCHING_SURAH | current=$currentPlayingSurahNumber | original=${surah.number}")
-        if (currentPlayingSurahNumber != surah.number) {
-            val fetchedSurah = quranRepository.getSurahByNumber(currentPlayingSurahNumber)
-            android.util.Log.d("QuranAlbumPlayer", "✅ FETCHED | surah=${fetchedSurah?.nameEnglish} | number=${fetchedSurah?.number}")
-            currentPlayingSurah = fetchedSurah
-        } else {
-            android.util.Log.d("QuranAlbumPlayer", "↩️ USING_ORIGINAL | surah=${surah.nameEnglish}")
-            currentPlayingSurah = null // Use the original surah
-        }
-    }
-
     // Calculate total items for scrollbar state
-    val totalItems = remember(ayahs, showMusicPlayer) {
+    val totalItems = remember(displayAyahs, showMusicPlayer) {
         1 + // AlbumHeader
         (if (showMusicPlayer) 1 else 0) + // MusicPlayerControls
         (if (!showMusicPlayer) 1 else 0) + // AlbumInfoCard
-        ayahs.size // Ayah items
+        displayAyahs.size // Ayah items
     }
 
     val scrollbarState = scrollState.scrollbarState(
@@ -995,7 +1032,6 @@ private fun AlbumPlayerContent(
                         ) { showPlayer ->
                             if (showPlayer) {
                                 // Music Player Controls - show current playing surah name
-                                val displaySurah = currentPlayingSurah ?: surah
                                 MusicPlayerControls(
                                     isPlaying = isPlaying,
                                     currentProgress = currentProgress,
@@ -1012,7 +1048,7 @@ private fun AlbumPlayerContent(
                             } else {
                                 // Album Info Card - show current playing surah info
                                 AlbumInfoCard(
-                                    surah = currentPlayingSurah ?: surah,
+                                    surah = displaySurah,
                                     selectedArabicFont = selectedArabicFont,
                                     collapseProgress = collapseProgress
                                 )
@@ -1078,10 +1114,10 @@ private fun AlbumPlayerContent(
             }
         }
 
-        // Ayah List (Track List)
+        // Ayah List (Track List) - use displayAyahs for current playing surah
         items(
-            items = ayahs,
-            key = { it.numberInSurah }
+            items = displayAyahs,
+            key = { "${displaySurah.number}_${it.numberInSurah}" }
         ) { ayah ->
             AyahTrackItem(
                 ayah = ayah,
@@ -1089,6 +1125,8 @@ private fun AlbumPlayerContent(
                 arabicFontSize = arabicFontSize,
                 textAlignment = textAlignment,
                 showTranslation = showTranslationInText,
+                showTajweed = showTajweed,
+                tajweedAnnotations = tajweedAnnotations[ayah.numberInSurah],
                 isFavourite = ayah.numberInSurah in favouriteAyahs,
                 onClick = { onAyahClick(ayah) },
                 onLongPress = {
@@ -1686,6 +1724,8 @@ private fun AyahTrackItem(
     arabicFontSize: Float = 22f,
     textAlignment: String = "start",
     showTranslation: Boolean = true,
+    showTajweed: Boolean = false,
+    tajweedAnnotations: List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>? = null,
     isFavourite: Boolean = false,
     onClick: () -> Unit,
     onLongPress: () -> Unit = {},
@@ -1779,13 +1819,29 @@ private fun AyahTrackItem(
             ) {
                 // Arabic text with user-selected font and size
                 val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
-                Text(
-                    text = arabicText,
-                    style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = textAlign,
-                    modifier = Modifier.fillMaxWidth()
-                )
+
+                // Apply Tajweed coloring if enabled and annotations are available
+                if (showTajweed && tajweedAnnotations != null && tajweedAnnotations.isNotEmpty()) {
+                    val annotatedArabicText = com.starception.submission.feature.surah.tajweed.TajweedTextApplier.applyWithOverlap(
+                        text = arabicText,
+                        annotations = tajweedAnnotations,
+                        defaultStyle = androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.onSurface)
+                    )
+                    Text(
+                        text = annotatedArabicText,
+                        style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle),
+                        textAlign = textAlign,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        text = arabicText,
+                        style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = textAlign,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 // Translation text with 2:1 ratio (translation is 1/2 of Arabic size)
                 if (showTranslation && translationText != null && translationText.isNotBlank()) {
@@ -1876,6 +1932,9 @@ private fun FloatingActionToolbar(
     onSetAlignment: (String) -> Unit = {},
     showTranslation: Boolean = true,
     onToggleTranslation: () -> Unit = {},
+    showTajweed: Boolean = false,
+    onToggleTajweed: () -> Unit = {},
+    onShowTajweedLegend: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
 
@@ -1996,6 +2055,24 @@ private fun FloatingActionToolbar(
                         selected = showTranslation,
                         onClick = onToggleTranslation
                     )
+
+                    // Toggle Tajweed color-coding
+                    FloatingToolbarButton(
+                        icon = Icons.Default.Palette,
+                        contentDescription = if (showTajweed) "Disable Tajweed colors" else "Enable Tajweed colors",
+                        selected = showTajweed,
+                        onClick = onToggleTajweed
+                    )
+
+                    // Tajweed legend info button (only shown when Tajweed is enabled)
+                    if (showTajweed) {
+                        FloatingToolbarButton(
+                            icon = Icons.Default.Info,
+                            contentDescription = "Show Tajweed color guide",
+                            selected = false,
+                            onClick = onShowTajweedLegend
+                        )
+                    }
                 }
             }
             }

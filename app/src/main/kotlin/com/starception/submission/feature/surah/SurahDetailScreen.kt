@@ -70,7 +70,8 @@ import javax.inject.Inject
 @HiltViewModel
 class SurahDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val quranEnhancedRepository: com.starception.submission.core.qurandatabase.QuranEnhancedRepository
+    private val quranEnhancedRepository: com.starception.submission.core.qurandatabase.QuranEnhancedRepository,
+    private val tajweedRepository: com.starception.submission.feature.surah.tajweed.TajweedRepository
 ) : ViewModel() {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
@@ -116,6 +117,15 @@ class SurahDetailViewModel @Inject constructor(
     )
     val textAlignment: StateFlow<String> = _textAlignment.asStateFlow()
 
+    // Tajweed settings
+    private val _showTajweed = MutableStateFlow(
+        prefs.getBoolean("show_tajweed", false)
+    )
+    val showTajweed: StateFlow<Boolean> = _showTajweed.asStateFlow()
+
+    private val _tajweedAnnotations = MutableStateFlow<Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>>(emptyMap())
+    val tajweedAnnotations: StateFlow<Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>> = _tajweedAnnotations.asStateFlow()
+
     private val translations = QuranTranslationHelper.getAvailableTranslations()
 
     fun getRepository(translationCode: String): QuranTranslationRepository {
@@ -124,6 +134,8 @@ class SurahDetailViewModel @Inject constructor(
 
     fun loadSurah(surahNumber: Int) {
         loadSurah(surahNumber, _currentTranslation.value)
+        // Load Tajweed annotations for this surah
+        loadTajweedForSurah(surahNumber)
     }
 
     /**
@@ -393,6 +405,25 @@ class SurahDetailViewModel @Inject constructor(
 
     fun clearTafseer() {
         _tafseerData.value = null
+    }
+
+    // Tajweed methods
+    fun changeTajweed(enabled: Boolean) {
+        _showTajweed.value = enabled
+        prefs.edit().putBoolean("show_tajweed", enabled).apply()
+        android.util.Log.d("SurahDetailVM", "🎨 Tajweed changed to: $enabled")
+    }
+
+    fun loadTajweedForSurah(surahNumber: Int) {
+        viewModelScope.launch {
+            try {
+                val annotations = tajweedRepository.getAnnotationsForSurah(surahNumber)
+                _tajweedAnnotations.value = annotations
+                android.util.Log.d("SurahDetailVM", "📗 Loaded Tajweed for surah $surahNumber: ${annotations.size} ayahs")
+            } catch (e: Exception) {
+                android.util.Log.e("SurahDetailVM", "❌ Error loading Tajweed: ${e.message}", e)
+            }
+        }
     }
 }
 
