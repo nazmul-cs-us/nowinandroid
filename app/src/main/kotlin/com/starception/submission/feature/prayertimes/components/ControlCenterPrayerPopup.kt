@@ -65,7 +65,7 @@ private fun convertProgress(progress: Float): Float {
 }
 
 /**
- * Control Center style popup - EXACT copy from AndroidLiquidGlass catalog app
+ * Control Center style popup - iOS Control Center style with glass tiles
  */
 @Composable
 fun ControlCenterPrayerPopup(
@@ -74,6 +74,8 @@ fun ControlCenterPrayerPopup(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Create backdrop for glass tile effects
+    val backdrop = rememberLayerBackdrop()
     val isLightTheme = !isSystemInDarkTheme()
     val accentColor = if (isLightTheme) Color(0xFF0088FF) else Color(0xFF0091FF)
     val containerColor = Color.Black.copy(0.05f)
@@ -157,8 +159,6 @@ fun ControlCenterPrayerPopup(
         }
     }
 
-    val backdrop = rememberLayerBackdrop()
-
     val backdropModifier = Modifier
         .draggable(
             rememberDraggableState { delta ->
@@ -218,14 +218,14 @@ fun ControlCenterPrayerPopup(
             }
         }
 
-    // Main layout with background image and glass content
+    // Main layout - Control Center with app screenshot as backdrop
     Box(
         modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        // Background image with layerBackdrop
+        // App home screen image as backdrop source - creates glass blur effect
         Image(
-            painterResource(R.drawable.system_home_screen_light),
+            painterResource(R.drawable.app_home_backdrop),
             null,
             Modifier
                 .layerBackdrop(backdrop)

@@ -1215,16 +1215,15 @@ fun PrayerTimesScreen(
         calculatePrayerTimes()
     }
     
-    
 
-    
-    // Use WobblePullToRefresh component
-    
-    WobblePullToRefresh(
-        isRefreshing = isRefreshing,
-        onRefresh = { isRefreshing = true },
-        modifier = modifier
-    ) { wobbleState ->
+
+    // Use WobblePullToRefresh component wrapped in Box for Control Center overlay
+    Box(modifier = modifier.fillMaxSize()) {
+        WobblePullToRefresh(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true },
+            modifier = Modifier.fillMaxSize()
+        ) { wobbleState ->
         Column(modifier = Modifier.fillMaxSize()) {
             // Show pull instruction ONLY when dragging with smooth animation
             AnimatedVisibility(
@@ -2363,51 +2362,42 @@ fun PrayerTimesScreen(
             }
         )
     }
-    
-    // INTERACTIVE PRAYER DIAL POPUP - Material 3 expressive overlay
-    // Debug logging for popup state
-    LaunchedEffect(popupDialState) {
-        android.util.Log.w("PrayerDialPopup", "🎯 popupDialState changed to: $popupDialState")
-        android.util.Log.w("PrayerDialPopup", "   Visible = ${popupDialState != null}")
-    }
 
-    if (popupDialState != null) {
-        // Use popup state directly - it won't be null inside AnimatedVisibility when visible
-        val safePrayerName = popupDialState ?: "Dhuhr"
-        Log.d("PrayerTimes", "Popup dial is active, rendering ControlCenterPrayerPopup for $safePrayerName")
+        } // Close Column inside WobblePullToRefresh
+        } // Close WobblePullToRefresh lambda
 
-        // Format prayer time for display
-        val prayerTimeDisplay = when (safePrayerName) {
-            "Fajr" -> prayerTimes?.fajr ?: LocalTime.of(5, 23)
-            "Sunrise" -> prayerTimes?.sunrise ?: LocalTime.of(6, 42)
-            "Dhuhr" -> prayerTimes?.dhuhr ?: LocalTime.of(12, 0)
-            "Asr" -> prayerTimes?.asr ?: LocalTime.of(15, 46)
-            "Maghrib" -> prayerTimes?.maghrib ?: LocalTime.of(18, 25)
-            "Isha" -> prayerTimes?.isha ?: LocalTime.of(19, 55)
-            else -> LocalTime.of(12, 0)
+        // INTERACTIVE PRAYER DIAL POPUP - Control Center overlay (OUTSIDE WobblePullToRefresh, inside Box)
+        // Debug logging for popup state
+        LaunchedEffect(popupDialState) {
+            android.util.Log.w("PrayerDialPopup", "🎯 popupDialState changed to: $popupDialState")
+            android.util.Log.w("PrayerDialPopup", "   Visible = ${popupDialState != null}")
         }
-        val formattedTime = prayerTimeDisplay.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
 
-        // Use Dialog to ensure proper overlay on top of all content
-        androidx.compose.ui.window.Dialog(
-            onDismissRequest = { popupDialState = null },
-            properties = androidx.compose.ui.window.DialogProperties(
-                dismissOnBackPress = true,
-                dismissOnClickOutside = false,
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false
-            )
-        ) {
+        // Control Center overlay - renders on top of WobblePullToRefresh content
+        if (popupDialState != null) {
+            val safePrayerName = popupDialState ?: "Dhuhr"
+            Log.d("PrayerTimes", "Control Center active for $safePrayerName")
+
+            val prayerTimeDisplay = when (safePrayerName) {
+                "Fajr" -> prayerTimes?.fajr ?: LocalTime.of(5, 23)
+                "Sunrise" -> prayerTimes?.sunrise ?: LocalTime.of(6, 42)
+                "Dhuhr" -> prayerTimes?.dhuhr ?: LocalTime.of(12, 0)
+                "Asr" -> prayerTimes?.asr ?: LocalTime.of(15, 46)
+                "Maghrib" -> prayerTimes?.maghrib ?: LocalTime.of(18, 25)
+                "Isha" -> prayerTimes?.isha ?: LocalTime.of(19, 55)
+                else -> LocalTime.of(12, 0)
+            }
+            val formattedTime = prayerTimeDisplay.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+
+            // Control Center overlay - directly in composition, on top of all content
             com.starception.submission.feature.prayertimes.components.ControlCenterPrayerPopup(
                 prayerName = safePrayerName,
                 prayerTime = formattedTime,
                 onDismiss = { popupDialState = null },
                 modifier = Modifier.fillMaxSize()
             )
-        }
-    } // Close if (popupDialState != null)
-    } // Close inner content scope
-    } // Close main PrayerTimesScreen scope
+        } // Close if (popupDialState != null)
+    } // Close outer Box
 }
 
 /**
