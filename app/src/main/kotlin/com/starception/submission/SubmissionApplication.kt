@@ -32,6 +32,7 @@ import android.os.Build
 import android.util.Log
 import com.starception.submission.services.PrayerNotificationService
 import com.starception.submission.util.PrayerNotificationManager
+import com.starception.submission.prayer.util.FileLogger
 
 /**
  * [Application] class for Submission
@@ -47,6 +48,10 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         Log.d("SubmissionApplication", "Application onCreate started")
         super.onCreate()
+
+        // Initialize FileLogger for prayer/adhan debugging
+        FileLogger.init(this)
+        FileLogger.i("SubmissionApplication", "Application onCreate started - FileLogger initialized")
 
         // Initialize Prayer Tracker for tracking completed prayers
         com.starception.submission.util.PrayerTracker.initialize(this)

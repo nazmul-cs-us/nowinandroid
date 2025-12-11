@@ -49,6 +49,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.Drawable
 import androidx.core.content.res.ResourcesCompat
+import com.starception.submission.prayer.util.FileLogger
 
 /**
  * Prayer Notification Service with ANR Protection
@@ -137,6 +138,7 @@ class PrayerNotificationService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Prayer notification service created")
+        FileLogger.i(TAG, "Service onCreate - Prayer notification service created")
         
         // Create notification channel and basic setup - keeping ANR protection
         try {
@@ -727,6 +729,20 @@ class PrayerNotificationService : Service() {
                                 prayerTime = prayerTime
                             )
                             Log.d(TAG, "🧪 Posted SINGLE prayer notification via Google Live Update system with phase: $prayerPhase, real progress: ${progress}%")
+
+                            // Log notification update to file
+                            FileLogger.logPrayerEvent(
+                                event = "NOTIFICATION_POSTED",
+                                prayerName = prayerName,
+                                actualTime = java.time.LocalTime.now().toString(),
+                                details = mapOf(
+                                    "phase" to prayerPhase,
+                                    "progress" to progress,
+                                    "title" to title,
+                                    "content" to content,
+                                    "prayerTime" to prayerTime
+                                )
+                            )
                         } catch (e: Exception) {
                             Log.e(TAG, "Google Live Update failed: ${e.message}")
                             // Don't create fallback notifications - better to have no notification than duplicates
@@ -933,6 +949,25 @@ class PrayerNotificationService : Service() {
                 Log.d(TAG, "🔍 FINAL PRAYER DETECTION:")
                 Log.d(TAG, "   Current Prayer: ${currentPrayer?.name ?: "None"} at ${currentPrayer?.time}")
                 Log.d(TAG, "   Next Prayer: ${nextPrayer?.name ?: "None"} at ${nextPrayer?.time}")
+
+                // Log prayer detection to file for debugging
+                FileLogger.logPrayerEvent(
+                    event = "PRAYER_DETECTION",
+                    prayerName = currentPrayer?.name ?: "None",
+                    actualTime = now.toString(),
+                    details = mapOf(
+                        "currentPrayer" to (currentPrayer?.name ?: "None"),
+                        "currentPrayerTime" to (currentPrayer?.time?.toString() ?: "N/A"),
+                        "nextPrayer" to (nextPrayer?.name ?: "None"),
+                        "nextPrayerTime" to (nextPrayer?.time?.toString() ?: "N/A"),
+                        "fajr" to adjustedFajr.toString(),
+                        "dhuhr" to adjustedDhuhr.toString(),
+                        "asr" to adjustedAsr.toString(),
+                        "maghrib" to adjustedMaghrib.toString(),
+                        "isha" to adjustedIsha.toString(),
+                        "calculationMethod" to settings.calculationMethod.displayName
+                    )
+                )
 
                 // Handle fallback case (should rarely happen with new logic)
                 if (currentPrayer == null || nextPrayer == null) {

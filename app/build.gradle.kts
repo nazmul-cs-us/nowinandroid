@@ -130,6 +130,7 @@ dependencies {
 
     // AndroidLiquidGlass library for glassmorphism effects
     implementation("io.github.kyant0:backdrop:1.0.0")
+    implementation("io.github.kyant0:capsule:2.1.2")
 
     ksp(libs.hilt.compiler)
     ksp(libs.hilt.ext.compiler)

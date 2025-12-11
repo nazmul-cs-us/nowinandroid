@@ -1019,7 +1019,7 @@ fun SwipeableBigTiles(
     // Swipeable Big Tiles - HorizontalPager with 3 tiles and infinite scroll
     val pagerState = rememberPagerState(
         pageCount = { Int.MAX_VALUE }, // Enable infinite scrolling
-        initialPage = Int.MAX_VALUE / 2 // Start in the middle for smooth infinite scroll
+        initialPage = (Int.MAX_VALUE / 2 / 4) * 4 // Start in middle, adjusted to show Smart Prediction tile (index 0) first
     )
 
     // Activity Recognition Permission for Smart Tracking tile

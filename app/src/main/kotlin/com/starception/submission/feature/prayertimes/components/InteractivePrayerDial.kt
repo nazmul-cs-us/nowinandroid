@@ -57,6 +57,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import kotlin.math.PI
 import kotlin.math.abs
@@ -66,7 +67,140 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import android.util.Log
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.graphics.drawscope.rotate
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.highlight.HighlightStyle
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import kotlin.math.atan2
+import kotlin.math.sqrt
 
+// ============================================================================
+// UI SENSOR FOR DYNAMIC HIGHLIGHT (from AndroidLiquidGlass)
+// ============================================================================
+
+@Composable
+fun rememberUISensor(): UISensor {
+    val context = LocalContext.current
+    val uiSensor = remember { UISensor(context) }
+
+    DisposableEffect(Unit) {
+        uiSensor.start()
+        onDispose { uiSensor.stop() }
+    }
+
+    return uiSensor
+}
+
+class UISensor(context: Context) {
+    var gravityAngle: Float by mutableFloatStateOf(45f)
+        private set
+    var gravity: Offset by mutableStateOf(Offset.Zero)
+        private set
+
+    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+    private val listener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            if (event == null) return
+            if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+                val x = event.values[0]
+                val y = event.values[1]
+                val norm = sqrt(x * x + y * y + 9.81f * 9.81f)
+
+                val alpha = 0.5f
+                gravityAngle = gravityAngle * (1f - alpha) + atan2(y, x) * (180f / PI).toFloat() * alpha
+                gravity = gravity * (1f - alpha) + Offset(x / norm, y / norm) * alpha
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+    }
+
+    fun start() {
+        sensorManager.registerListener(listener, accelerometer, SensorManager.SENSOR_DELAY_UI)
+    }
+
+    fun stop() {
+        sensorManager.unregisterListener(listener)
+    }
+}
+
+// ============================================================================
+// WATCHFACE DIAL STYLE DATA CLASSES (copied from watchface-main project)
+// ============================================================================
+
+data class DialStyle(
+    val stepsWidth: Float = 1.2f,
+    val stepsColor: Color = Color.Black,
+    val normalStepsLineHeight: Float = 8f,
+    val fiveStepsLineHeight: Float = 16f,
+    val stepsTextStyle: TextStyle = TextStyle(),
+    val stepsLabelTopPadding: Float = 20f,
+)
+
+data class ClockStyle(
+    val secondsDialStyle: DialStyle = DialStyle(),
+    val minutesDialStyle: DialStyle = DialStyle(),
+    val hourLabelStyle: TextStyle = TextStyle(),
+    val overlayStrokeWidth: Float = 2f,
+    val overlayStrokeColor: Color = Color.Red
+)
+
+val PrayerDialStyle = ClockStyle(
+    secondsDialStyle = DialStyle(
+        stepsTextStyle = TextStyle(
+            color = Color.White, // White text for Control Center glass
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Medium
+        ),
+        stepsColor = Color.White.copy(alpha = 0.6f), // Subtle white tick marks
+        stepsLabelTopPadding = 18f,
+        normalStepsLineHeight = 6f,
+        fiveStepsLineHeight = 12f
+    ),
+    minutesDialStyle = DialStyle(
+        stepsTextStyle = TextStyle(
+            color = Color.White.copy(alpha = 0.8f), // Slightly transparent white
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Normal
+        ),
+        stepsColor = Color.White.copy(alpha = 0.4f), // More subtle inner tick marks
+        stepsLabelTopPadding = 16f,
+        normalStepsLineHeight = 4f,
+        fiveStepsLineHeight = 10f
+    ),
+    hourLabelStyle = TextStyle(
+        color = Color.White, // White hour label
+        fontSize = 56.sp,
+        fontWeight = FontWeight.Bold
+    ),
+    overlayStrokeColor = Color.White.copy(alpha = 0.8f), // White overlay
+    overlayStrokeWidth = 1.5f
+)
+
+// ============================================================================
+// INTERACTIVE PRAYER DIAL COMPOSABLE
+// ============================================================================
+
+@OptIn(ExperimentalTextApi::class)
 @Composable
 fun InteractivePrayerDial(
     modifier: Modifier = Modifier,
@@ -77,6 +211,55 @@ fun InteractivePrayerDial(
     onSaveAdjustment: (String, Int) -> Unit,
     onResetAdjustment: () -> Unit
 ) {
+    // TextMeasurer for drawing text on Canvas (from watchface)
+    val textMeasurer = rememberTextMeasurer()
+
+    // ========================================================================
+    // CONTROL CENTER STYLE LIQUID GLASS CONFIGURATION
+    // ========================================================================
+
+    // UI Sensor for dynamic highlight based on device tilt
+    val uiSensor = rememberUISensor()
+
+    // Liquid glass backdrop
+    val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val backdrop = rememberLayerBackdrop {
+        drawRect(surfaceColor)
+        drawContent()
+    }
+    val density = LocalDensity.current
+
+    // Control Center style colors
+    val containerColor = Color.Black.copy(alpha = 0.05f)  // Very subtle dark tint
+
+    // Glass shape provider for circle
+    val glassShape: () -> androidx.compose.ui.graphics.Shape = { CircleShape }
+
+    // Dynamic highlight based on device orientation (like Control Center)
+    val glassHighlight: () -> Highlight = {
+        Highlight(
+            style = HighlightStyle.Default(
+                angle = uiSensor.gravityAngle,
+                falloff = 2f
+            )
+        )
+    }
+
+    // Glass effects with vibrancy and lens (with depth effect)
+    val glassEffects: com.kyant.backdrop.BackdropEffectScope.() -> Unit = {
+        vibrancy()
+        lens(
+            with(density) { 24.dp.toPx() },
+            with(density) { 48.dp.toPx() },
+            depthEffect = true
+        )
+    }
+
+    // Glass surface drawing
+    val glassSurface: DrawScope.() -> Unit = {
+        drawRect(containerColor)
+    }
+
     // CRITICAL LOGGING: Track when timeAdjustment parameter changes
     LaunchedEffect(timeAdjustment) {
         Log.w("InteractiveDial", "⚠️ PARAMETER CHANGE DETECTED - Prayer: $prayerName")
@@ -86,10 +269,51 @@ fun InteractivePrayerDial(
     }
 
     val hapticFeedback = LocalHapticFeedback.current
-    val density = LocalDensity.current
     var lastAngle by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
     var accumulatedAngle by remember { mutableStateOf(0f) }
+
+    // ========================================================================
+    // WATCHFACE ROTATION STATES (copied from watchface-main Clock.kt)
+    // ========================================================================
+    var minuteRotation by remember { mutableStateOf(0f) }
+    var secondRotation by remember { mutableStateOf(0f) }
+    var hour by remember { mutableStateOf(0) }
+
+    // Initialize rotation from current time
+    LaunchedEffect(key1 = true) {
+        val calendar = java.util.Calendar.getInstance()
+        val currentHour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+        val currentMinute = calendar.get(java.util.Calendar.MINUTE)
+        val currentSecond = calendar.get(java.util.Calendar.SECOND)
+        secondRotation = -(currentSecond) * 6f
+        minuteRotation = -(currentMinute) * 6f
+        hour = currentHour
+    }
+
+    // Smooth second hand animation (16ms updates for 60fps)
+    LaunchedEffect(key1 = true) {
+        while (true) {
+            kotlinx.coroutines.delay(16)
+            secondRotation -= 0.096f
+        }
+    }
+
+    // Minute hand animation (update every second)
+    LaunchedEffect(key1 = true) {
+        while (true) {
+            kotlinx.coroutines.delay(1000)
+            minuteRotation -= 0.1f
+        }
+    }
+
+    // Hour update (every hour)
+    LaunchedEffect(key1 = true) {
+        while (true) {
+            kotlinx.coroutines.delay(60 * 60 * 1000L)
+            hour = (hour + 1) % 24
+        }
+    }
 
     // CRITICAL: Store the ORIGINAL offset when dial opens - this is what we reset to
     val originalOffset by remember { mutableStateOf(timeAdjustment) }
@@ -150,7 +374,7 @@ fun InteractivePrayerDial(
     )
 
     // Get Material 3 theme colors for dark/light mode support
-    val surfaceColor = MaterialTheme.colorScheme.surface
+    val themeSurfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val outlineColor = MaterialTheme.colorScheme.outline
 
@@ -168,7 +392,15 @@ fun InteractivePrayerDial(
             .graphicsLayer {
                 scaleX = dialScale
                 scaleY = dialScale
-            },
+            }
+            .drawBackdrop(
+                backdrop = backdrop,
+                shape = glassShape,
+                effects = glassEffects,
+                highlight = glassHighlight,
+                shadow = null,
+                onDrawSurface = glassSurface
+            ),
         contentAlignment = Alignment.Center
     ) {
         Canvas(
@@ -292,27 +524,92 @@ fun InteractivePrayerDial(
                     }
                 }
         ) {
-            // Ensure perfect centering - use DrawScope's center property (most reliable)
-            // This is the true geometric center of the drawing canvas
-            val center = this.center
-            val radius = kotlin.math.min(size.width, size.height) * 0.4f
-            
-            
-            // Use Material 3 theme colors passed from Composable
-            
-            // Draw clean circular timer design with theme colors
-            drawCleanCircularTimer(
-                center = center,
-                radius = radius,
-                timeAdjustment = currentAdjustment,
-                originalTime = originalTime,
-                isDragging = isDragging,
-                currentDragAngle = currentDragAngle,
-                surfaceColor = surfaceColor,
-                onSurfaceColor = onSurfaceColor,
-                outlineColor = outlineColor,
-                knobScale = knobScale,
-                progressArcGlow = progressArcGlow
+            // ================================================================
+            // WATCHFACE DIAL DRAWING (copied from watchface-main Clock.kt)
+            // ================================================================
+            val outerRadius = minOf(this.size.width, this.size.height) / 2f
+            val innerRadius = outerRadius - 60f // dp converted roughly
+            val clockStyle = PrayerDialStyle
+
+            // ================================================================
+            // CONTROL CENTER STYLE - Glass handled by drawBackdrop
+            // No additional background needed - just the dial elements
+            // ================================================================
+
+            // Seconds Dial (outer ring with rotating numbers)
+            drawWatchfaceDial(
+                radius = outerRadius,
+                rotation = secondRotation,
+                textMeasurer = textMeasurer,
+                dialStyle = clockStyle.secondsDialStyle
+            )
+
+            // Minutes Dial (inner ring with rotating numbers)
+            drawWatchfaceDial(
+                radius = innerRadius,
+                rotation = minuteRotation,
+                textMeasurer = textMeasurer,
+                dialStyle = clockStyle.minutesDialStyle
+            )
+
+            // Draw hour label in center
+            val hourString = String.format("%02d", hour)
+            val hourTextMeasureOutput = textMeasurer.measure(
+                text = buildAnnotatedString { append(hourString) },
+                style = clockStyle.hourLabelStyle
+            )
+            val hourTopLeft = Offset(
+                x = this.center.x - (hourTextMeasureOutput.size.width / 2),
+                y = this.center.y - (hourTextMeasureOutput.size.height / 2),
+            )
+            drawText(
+                textMeasurer = textMeasurer,
+                text = hourString,
+                topLeft = hourTopLeft,
+                style = clockStyle.hourLabelStyle
+            )
+
+            // Drawing minute-second overlay indicator (pointing to 3 o'clock)
+            val minuteHandOverlayPath = Path().apply {
+                val startOffset = Offset(
+                    x = center.x + (outerRadius * cos(8f * Math.PI / 180f)).toFloat(),
+                    y = center.y - (outerRadius * sin(8f * Math.PI / 180f)).toFloat(),
+                )
+                val endOffset = Offset(
+                    x = center.x + (outerRadius * cos(-8f * Math.PI / 180f)).toFloat(),
+                    y = center.y - (outerRadius * sin(-8f * Math.PI / 180f)).toFloat(),
+                )
+                val overlayRadius = (endOffset.y - startOffset.y) / 2f
+
+                val secondsLabelMaxWidth = textMeasurer.measure(
+                    text = buildAnnotatedString { append("60") },
+                    style = clockStyle.secondsDialStyle.stepsTextStyle
+                ).size.width
+
+                val minutesLabelMaxWidth = textMeasurer.measure(
+                    text = buildAnnotatedString { append("60") },
+                    style = clockStyle.minutesDialStyle.stepsTextStyle
+                ).size.width
+
+                val overlayLineX =
+                    size.width - clockStyle.secondsDialStyle.fiveStepsLineHeight - clockStyle.secondsDialStyle.stepsLabelTopPadding - secondsLabelMaxWidth - clockStyle.minutesDialStyle.fiveStepsLineHeight - clockStyle.minutesDialStyle.stepsLabelTopPadding - (minutesLabelMaxWidth / 2f)
+                moveTo(x = startOffset.x, y = startOffset.y)
+                lineTo(x = overlayLineX, y = startOffset.y)
+                cubicTo(
+                    x1 = overlayLineX - overlayRadius,
+                    y1 = startOffset.y,
+                    x2 = overlayLineX - overlayRadius,
+                    y2 = endOffset.y,
+                    x3 = overlayLineX,
+                    y3 = endOffset.y
+                )
+                lineTo(endOffset.x, endOffset.y)
+            }
+
+            drawPath(
+                path = minuteHandOverlayPath,
+                color = clockStyle.overlayStrokeColor,
+                style = Stroke(width = clockStyle.overlayStrokeWidth)
             )
         }
 
@@ -988,5 +1285,87 @@ private fun adjustTimeByMinutes(originalTime: LocalTime, minutes: Int): String {
     val amPm = if (adjustedTime.hour < 12) "AM" else "PM"
 
     return String.format("%d:%02d %s", hour12, adjustedTime.minute, amPm)
+}
+
+// ============================================================================
+// WATCHFACE DIAL DRAWING FUNCTION (copied from watchface-main Dial.kt)
+// ============================================================================
+
+@OptIn(ExperimentalTextApi::class)
+private fun DrawScope.drawWatchfaceDial(
+    radius: Float,
+    rotation: Float,
+    textMeasurer: TextMeasurer,
+    dialStyle: DialStyle = DialStyle()
+) {
+    var stepsAngle = 0
+
+    // This will draw 60 steps around the dial
+    repeat(60) { steps ->
+
+        // fiveStep lineHeight > normalStep lineHeight
+        val stepsHeight = if (steps % 5 == 0) {
+            dialStyle.fiveStepsLineHeight
+        } else {
+            dialStyle.normalStepsLineHeight
+        }
+
+        // Calculate steps start and end offset
+        val stepsStartOffset = Offset(
+            x = center.x + (radius * cos((stepsAngle + rotation) * (Math.PI / 180f))).toFloat(),
+            y = center.y - (radius * sin((stepsAngle + rotation) * (Math.PI / 180))).toFloat()
+        )
+        val stepsEndOffset = Offset(
+            x = center.x + (radius - stepsHeight) * cos(
+                (stepsAngle + rotation) * (Math.PI / 180)
+            ).toFloat(),
+            y = center.y - (radius - stepsHeight) * sin(
+                (stepsAngle + rotation) * (Math.PI / 180)
+            ).toFloat()
+        )
+
+        // Draw step line
+        drawLine(
+            color = dialStyle.stepsColor,
+            start = stepsStartOffset,
+            end = stepsEndOffset,
+            strokeWidth = dialStyle.stepsWidth,
+            cap = StrokeCap.Round
+        )
+
+        // Draw steps labels (every 5th step)
+        if (steps % 5 == 0) {
+            // Measure the given label width and height
+            val stepsLabel = String.format("%02d", steps)
+            val stepsLabelTextLayout = textMeasurer.measure(
+                text = buildAnnotatedString { append(stepsLabel) },
+                style = dialStyle.stepsTextStyle
+            )
+
+            // Calculate the offset for label position
+            val stepsLabelOffset = Offset(
+                x = center.x + (radius - stepsHeight - dialStyle.stepsLabelTopPadding) * cos(
+                    (stepsAngle + rotation) * (Math.PI / 180)
+                ).toFloat(),
+                y = center.y - (radius - stepsHeight - dialStyle.stepsLabelTopPadding) * sin(
+                    (stepsAngle + rotation) * (Math.PI / 180)
+                ).toFloat()
+            )
+
+            // Subtract the label width and height to position label at the center of the step
+            val stepsLabelTopLeft = Offset(
+                stepsLabelOffset.x - ((stepsLabelTextLayout.size.width) / 2f),
+                stepsLabelOffset.y - (stepsLabelTextLayout.size.height / 2f)
+            )
+
+            drawText(
+                textMeasurer = textMeasurer,
+                text = stepsLabel,
+                topLeft = stepsLabelTopLeft,
+                style = dialStyle.stepsTextStyle
+            )
+        }
+        stepsAngle += 6
+    }
 }
 

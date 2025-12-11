@@ -135,6 +135,14 @@ fun QuranAlbumPlayerScreen(
     }
 
     val playerViewModel = remember { QuranPlayerViewModel(context) }
+
+    // Properly clean up the ViewModel when composable leaves composition
+    DisposableEffect(Unit) {
+        onDispose {
+            // Manually call cleanup to unbind service connection
+            playerViewModel.cleanup()
+        }
+    }
     val uiState by viewModel.uiState.collectAsState()
     val currentTranslation by viewModel.currentTranslation.collectAsState()
     val scrollState = rememberLazyListState()
