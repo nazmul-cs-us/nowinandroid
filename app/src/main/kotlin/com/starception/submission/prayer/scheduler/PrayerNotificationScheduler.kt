@@ -15,6 +15,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
+import com.starception.submission.prayer.util.FileLogger
 
 /**
  * Prayer Notification Scheduler
@@ -51,6 +52,12 @@ object PrayerNotificationScheduler {
     ) {
         try {
             Log.d(TAG, "📅 Scheduling prayer notification: $prayerName at $prayerTime")
+            FileLogger.logPrayerEvent(
+                event = "SCHEDULE_REQUEST",
+                prayerName = prayerName,
+                scheduledTime = prayerTime,
+                details = mapOf("reminderMinutes" to reminderMinutes)
+            )
 
             // Check if notifications are enabled for this specific prayer
             val notificationsEnabled = isNotificationEnabledForPrayer(context, prayerName)
@@ -312,7 +319,19 @@ object PrayerNotificationScheduler {
             
             val delaySeconds = java.time.Duration.between(LocalDateTime.now(), notificationTime).seconds
             Log.d(TAG, "⏰ Scheduled with AlarmManager: $prayerName ($notificationType) in ${delaySeconds}s at $notificationTime")
-            
+
+            // Log adhan scheduling with FileLogger
+            FileLogger.logAdhanSchedule(
+                prayerName = prayerName,
+                scheduledTimeMillis = triggerTime,
+                alarmType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) "EXACT_ALLOW_IDLE" else "EXACT",
+                details = mapOf(
+                    "notificationType" to notificationType,
+                    "scheduledDateTime" to notificationTime.toString(),
+                    "delaySeconds" to delaySeconds
+                )
+            )
+
         } catch (e: SecurityException) {
             Log.e(TAG, "❌ SecurityException scheduling alarm - exact alarm permission not granted", e)
         } catch (e: Exception) {

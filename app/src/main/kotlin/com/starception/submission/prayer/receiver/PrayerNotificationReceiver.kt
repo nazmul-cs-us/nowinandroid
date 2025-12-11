@@ -14,6 +14,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.work.*
 import com.starception.submission.R
 import com.starception.submission.prayer.worker.PrayerNotificationWorker
+import com.starception.submission.prayer.util.FileLogger
 import java.util.concurrent.TimeUnit
 
 /**
@@ -30,21 +31,34 @@ import java.util.concurrent.TimeUnit
 class PrayerNotificationReceiver : BroadcastReceiver() {
     
     override fun onReceive(context: Context, intent: Intent) {
+        val receiveTime = System.currentTimeMillis()
         try {
             Log.d(TAG, "📱 PrayerNotificationReceiver triggered")
-            
+
             val prayerName = intent.getStringExtra(PrayerNotificationWorker.PRAYER_NAME_KEY) ?: "Prayer"
             val prayerTime = intent.getStringExtra(PrayerNotificationWorker.PRAYER_TIME_KEY) ?: ""
-            val notificationType = intent.getStringExtra(PrayerNotificationWorker.NOTIFICATION_TYPE_KEY) 
+            val notificationType = intent.getStringExtra(PrayerNotificationWorker.NOTIFICATION_TYPE_KEY)
                 ?: PrayerNotificationWorker.TYPE_PRAYER_TIME
-            
+
             Log.d(TAG, "Processing: $prayerName at $prayerTime (type: $notificationType)")
-            
+
+            // Log adhan fired with FileLogger
+            FileLogger.logAdhanFired(
+                prayerName = prayerName,
+                actualTimeMillis = receiveTime,
+                details = mapOf(
+                    "notificationType" to notificationType,
+                    "scheduledPrayerTime" to prayerTime,
+                    "source" to "AlarmManager"
+                )
+            )
+
             // Show notification directly (WorkManager has issues with Hilt)
             showPrayerNotification(context, prayerName, prayerTime, notificationType)
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "❌ PrayerNotificationReceiver failed", e)
+            FileLogger.e(TAG, "PrayerNotificationReceiver failed", e)
         }
     }
     

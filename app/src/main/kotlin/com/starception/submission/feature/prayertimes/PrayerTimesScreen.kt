@@ -37,6 +37,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
 import kotlin.math.sin
 import kotlin.math.PI
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -2369,161 +2374,40 @@ fun PrayerTimesScreen(
     if (popupDialState != null) {
         // Use popup state directly - it won't be null inside AnimatedVisibility when visible
         val safePrayerName = popupDialState ?: "Dhuhr"
-        Log.d("PrayerTimes", "Popup dial is active, rendering InteractivePrayerDial overlay for $safePrayerName")
-        
-        // Full screen overlay with Material 3 expressive backdrop
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.8f)),
-            contentAlignment = Alignment.Center
-        ) {
-            // Clickable background layer that fills the entire screen
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        // Tap anywhere to close
-                        Log.d("PrayerTimes", "Background tapped, closing popup")
-                        popupDialState = null  // Single state update for clean dismissal
-                    }
+        Log.d("PrayerTimes", "Popup dial is active, rendering ControlCenterPrayerPopup for $safePrayerName")
+
+        // Format prayer time for display
+        val prayerTimeDisplay = when (safePrayerName) {
+            "Fajr" -> prayerTimes?.fajr ?: LocalTime.of(5, 23)
+            "Sunrise" -> prayerTimes?.sunrise ?: LocalTime.of(6, 42)
+            "Dhuhr" -> prayerTimes?.dhuhr ?: LocalTime.of(12, 0)
+            "Asr" -> prayerTimes?.asr ?: LocalTime.of(15, 46)
+            "Maghrib" -> prayerTimes?.maghrib ?: LocalTime.of(18, 25)
+            "Isha" -> prayerTimes?.isha ?: LocalTime.of(19, 55)
+            else -> LocalTime.of(12, 0)
+        }
+        val formattedTime = prayerTimeDisplay.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+
+        // Use Dialog to ensure proper overlay on top of all content
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { popupDialState = null },
+            properties = androidx.compose.ui.window.DialogProperties(
+                dismissOnBackPress = true,
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
             )
-            // State for adjustment in popup
-            var timeAdjustment by remember { mutableStateOf(
-                when (popupDialState) {
-                    "Fajr" -> storedOffsets.fajr
-                    "Sunrise" -> storedOffsets.sunrise
-                    "Dhuhr" -> storedOffsets.dhuhr
-                    "Asr" -> storedOffsets.asr
-                    "Maghrib" -> storedOffsets.maghrib
-                    "Isha" -> storedOffsets.isha
-                    else -> 0
-                }
-            ) }
-            
-            // Circular dial container - no clickable to allow background taps through
-            Box(
-                modifier = Modifier
-                    .size(350.dp) // Larger size for better interaction
-                    .offset(y = (-300).dp), // Shift up to position dial in upper portion of screen
-                contentAlignment = Alignment.Center
-            ) {
-                // Close button at top-right of dial
-                Surface(
-                    onClick = {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        Log.d("PrayerTimes", "✖️ Close button clicked")
-                        popupDialState = null  // Single state update for clean dismissal
-                    },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(16.dp)
-                        .size(56.dp),
-                    shape = CircleShape,
-                    color = Color.White,
-                    shadowElevation = 8.dp
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = Color.Black,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                }
-                
-                com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
-                    prayerName = safePrayerName,
-                    originalTime = when (safePrayerName) {
-                        "Fajr" -> prayerTimes?.fajr ?: LocalTime.of(5, 23)
-                        "Sunrise" -> prayerTimes?.sunrise ?: LocalTime.of(6, 42)
-                        "Dhuhr" -> prayerTimes?.dhuhr ?: LocalTime.of(12, 0)
-                        "Asr" -> prayerTimes?.asr ?: LocalTime.of(15, 46)
-                        "Maghrib" -> prayerTimes?.maghrib ?: LocalTime.of(18, 25)
-                        "Isha" -> prayerTimes?.isha ?: LocalTime.of(19, 55)
-                        else -> LocalTime.of(12, 0)
-                    },
-                    timeAdjustment = timeAdjustment,
-                    onTimeAdjusted = { adjustment ->
-                        timeAdjustment = adjustment
-                    },
-                    onSaveAdjustment = { prayerName, finalAdjustment ->
-                        android.util.Log.d("PrayerTimesScreen", "🎯 POPUP DIAL SAVE:")
-                        android.util.Log.d("PrayerTimesScreen", "   📝 Prayer: $prayerName")
-                        android.util.Log.d("PrayerTimesScreen", "   ⏱️ Final Adjustment: $finalAdjustment minutes")
-                        android.util.Log.d("PrayerTimesScreen", "   💾 Saving to prayer settings...")
-
-                        // Save the adjustment to Prayer settings using singleton repository
-                        CoroutineScope(Dispatchers.IO).launch {
-                            try {
-                                // CRITICAL FIX: Use singleton repository from EntryPoint, not new instance
-                                val entryPoint = EntryPointAccessors.fromApplication(
-                                    screenContext.applicationContext,
-                                    com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
-                                )
-                                val repository = entryPoint.prayerSettingsRepository()
-                                repository.updateSinglePrayerOffset(prayerName, finalAdjustment)
-                                android.util.Log.i("PrayerTimesScreen", "✅ SAVE SUCCESS: $prayerName offset saved as $finalAdjustment minutes")
-
-                                // CRITICAL: Wait for preferences to be fully written to disk
-                                // This ensures the recalculation will read the NEW offset values
-                                delay(100) // 100ms delay to ensure SharedPreferences commit completes
-                                android.util.Log.d("PrayerTimesScreen", "⏸️ Waited 100ms for preferences write to complete")
-
-                                // CRITICAL: Update scheduled notifications with new prayer time
-                                try {
-                                    val appContext = screenContext.applicationContext
-                                    val serviceManager = dagger.hilt.android.EntryPointAccessors.fromApplication(
-                                        appContext,
-                                        com.starception.submission.prayer.service.PrayerNotificationServiceManagerEntryPoint::class.java
-                                    ).prayerNotificationServiceManager()
-                                    serviceManager.updatePrayerNotifications()
-                                    android.util.Log.i("PrayerTimesScreen", "🔔 NOTIFICATIONS UPDATED: Rescheduled with new $prayerName time")
-                                } catch (e: Exception) {
-                                    android.util.Log.e("PrayerTimesScreen", "❌ Failed to update notifications", e)
-                                }
-
-                                // Update UI on main thread
-                                withContext(Dispatchers.Main) {
-                                    // NO MANUAL UPDATE NEEDED - The repository flow automatically updates storedOffsets!
-                                    // When we call repository.updateCalculationSettings() above, it triggers the flow
-                                    // which causes calculationSettingsFlow.collectAsState() to recompose with new values
-                                    android.util.Log.d("PrayerTimesScreen", "✅ Offset saved - repository flow will automatically update UI")
-                                    android.util.Log.d("PrayerTimesScreen", "   💾 Saved $prayerName offset: $finalAdjustment minutes")
-                                    android.util.Log.d("PrayerTimesScreen", "   🔄 Flow-based recomposition will trigger automatically")
-
-                                    // Close popup after successful saving
-                                    popupDialState = null  // Single state update for clean dismissal
-                                    android.util.Log.d("PrayerTimesScreen", "🚪 Closed popup - returning to main view")
-                                }
-                            } catch (e: Exception) {
-                                android.util.Log.e("PrayerTimesScreen", "❌ SAVE FAILED: Error saving $prayerName offset", e)
-                                // Still close popup even if save failed
-                                withContext(Dispatchers.Main) {
-                                    popupDialState = null  // Single state update for clean dismissal
-                                }
-                            }
-                        }
-                    },
-                    onResetAdjustment = {
-                        Log.d("PrayerTimes", "🔄 POPUP DIAL RESET for $safePrayerName")
-                        timeAdjustment = 0
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+        ) {
+            com.starception.submission.feature.prayertimes.components.ControlCenterPrayerPopup(
+                prayerName = safePrayerName,
+                prayerTime = formattedTime,
+                onDismiss = { popupDialState = null },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     } // Close if (popupDialState != null)
-    } // Missing brace 1
-    } // Missing brace 2
+    } // Close inner content scope
+    } // Close main PrayerTimesScreen scope
 }
 
 /**

@@ -181,6 +181,23 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
         _errorMessage.value = null
     }
 
+    /**
+     * Cleanup method to unbind service connection.
+     * Called from DisposableEffect when composable leaves composition.
+     */
+    fun cleanup() {
+        if (serviceBound) {
+            try {
+                context.unbindService(serviceConnection)
+                Log.d("QuranPlayerViewModel", "Service unbound via cleanup()")
+            } catch (e: IllegalArgumentException) {
+                Log.w("QuranPlayerViewModel", "Service was not registered when trying to unbind: ${e.message}")
+            }
+            serviceBound = false
+            playbackService = null
+        }
+    }
+
     private fun startProgressTracking() {
         viewModelScope.launch {
             while (isActive) {
@@ -201,14 +218,7 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
-        if (serviceBound) {
-            try {
-                context.unbindService(serviceConnection)
-            } catch (e: IllegalArgumentException) {
-                Log.w("QuranPlayerViewModel", "Service was not registered when trying to unbind: ${e.message}")
-            }
-            serviceBound = false
-        }
+        cleanup()
         // Don't stop the service - let it continue in background
     }
 }
