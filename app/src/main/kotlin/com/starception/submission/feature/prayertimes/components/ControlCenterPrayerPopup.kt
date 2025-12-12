@@ -41,10 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceAtLeast
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
-import com.kyant.backdrop.BackdropEffectScope
 import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.BackdropEffectScope
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
@@ -65,7 +63,7 @@ private fun convertProgress(progress: Float): Float {
 
 /**
  * Control Center style popup - iOS Control Center style with glass tiles
- * @param backdrop The backdrop from the parent that captures the actual app content
+ * Uses live app content as backdrop for glass blur effect
  */
 @Composable
 fun ControlCenterPrayerPopup(
@@ -75,7 +73,6 @@ fun ControlCenterPrayerPopup(
     backdrop: Backdrop,
     modifier: Modifier = Modifier
 ) {
-    // Use the backdrop passed from parent (captures actual app content)
     val isLightTheme = !isSystemInDarkTheme()
     val accentColor = if (isLightTheme) Color(0xFF0088FF) else Color(0xFF0091FF)
     val containerColor = Color.Black.copy(0.05f)
@@ -159,75 +156,60 @@ fun ControlCenterPrayerPopup(
         }
     }
 
-    // Drag modifier for Control Center gestures (no blur - blur is on background)
-    val dragModifier = Modifier
-        .draggable(
-            rememberDraggableState { delta ->
-                val targetProgress = enterProgressAnimation.value + delta / maxDragHeight
-                animationScope.launch {
-                    launch {
-                        enterProgressAnimation.snapTo(targetProgress)
-                    }
-                    launch {
-                        safeEnterProgressAnimation.snapTo(targetProgress.fastCoerceIn(0f, 1f))
-                    }
-                }
-            },
-            Orientation.Vertical,
-            onDragStopped = { velocity ->
-                val targetProgress = when {
-                    velocity < -500f -> 0f  // Fast swipe up
-                    velocity < 0f -> 0f      // Slow swipe up
-                    velocity > 0f -> 1f      // Swipe down
-                    else -> if (enterProgressAnimation.value < 0.5f) 0f else 1f
-                }
-
-                // Dismiss when target is 0 (any upward swipe dismisses)
-                if (targetProgress == 0f) {
-                    onDismiss()
-                }
-
-                animationScope.launch {
-                    launch {
-                        enterProgressAnimation.animateTo(
-                            targetProgress,
-                            if (targetProgress > 0.5f) {
-                                spring(0.5f, 300f, 0.5f / maxDragHeight)
-                            } else {
-                                spring(1f, 300f, 0.01f)
-                            },
-                            velocity / maxDragHeight
-                        )
-                    }
-                    launch {
-                        safeEnterProgressAnimation.animateTo(
-                            targetProgress,
-                            spring(1f, 300f, 0.01f)
-                        )
-                    }
-                }
-            }
-        )
-
-    // Main layout - Control Center (backdrop is captured by parent from actual app content)
-    // Dim overlay on background
+    // Main layout - uses backdrop passed from parent (live app content)
     Box(
         modifier
             .fillMaxSize()
-            .drawWithContent {
-                drawContent()
-                // Dim the background
-                drawRect(dimColor.copy(dimColor.alpha * safeEnterProgressAnimation.value))
-            }
+            .draggable(
+                rememberDraggableState { delta ->
+                    val targetProgress = enterProgressAnimation.value + delta / maxDragHeight
+                    animationScope.launch {
+                        launch {
+                            enterProgressAnimation.snapTo(targetProgress)
+                        }
+                        launch {
+                            safeEnterProgressAnimation.snapTo(targetProgress.fastCoerceIn(0f, 1f))
+                        }
+                    }
+                },
+                Orientation.Vertical,
+                onDragStopped = { velocity ->
+                    val targetProgress = when {
+                        velocity < 0f -> 0f  // Any upward swipe dismisses
+                        velocity > 0f -> 1f
+                        else -> if (enterProgressAnimation.value < 0.5f) 0f else 1f
+                    }
+
+                    // Dismiss when target is 0
+                    if (targetProgress == 0f) {
+                        onDismiss()
+                    }
+
+                    animationScope.launch {
+                        launch {
+                            enterProgressAnimation.animateTo(
+                                targetProgress,
+                                if (targetProgress > 0.5f) {
+                                    spring(0.5f, 300f, 0.5f / maxDragHeight)
+                                } else {
+                                    spring(1f, 300f, 0.01f)
+                                },
+                                velocity / maxDragHeight
+                            )
+                        }
+                        launch {
+                            safeEnterProgressAnimation.animateTo(
+                                targetProgress,
+                                spring(1f, 300f, 0.01f)
+                            )
+                        }
+                    }
+                }
+            ),
+        contentAlignment = Alignment.Center
     ) {
-        // Control Center content with drag gestures
-        Box(
-            Modifier
-                .fillMaxSize()
-                .then(dragModifier),
-            contentAlignment = Alignment.Center
-        ) {
-        // Control Center glass tiles
+        // Control Center glass tiles (using backdrop from live app content)
+        // Note: Blur/dim is applied to the background content in PrayerTimesScreen
         Column(
             Modifier
                 .padding(top = 80f.dp)
@@ -466,6 +448,5 @@ fun ControlCenterPrayerPopup(
                 }
             }
         }
-        } // Close inner Box (drag gestures)
-    } // Close outer Box (dim overlay)
+    }
 }
