@@ -94,8 +94,9 @@ fun ControlCenterPrayerPopup(
     val iconColorFilter = ColorFilter.tint(Color.White)
 
     val animationScope = rememberCoroutineScope()
-    val enterProgressAnimation = remember { Animatable(1f) }
-    val safeEnterProgressAnimation = remember { Animatable(1f) }
+    // Start at 0 for smooth enter animation
+    val enterProgressAnimation = remember { Animatable(0f) }
+    val safeEnterProgressAnimation = remember { Animatable(0f) }
     val progress by remember {
         derivedStateOf {
             val p = enterProgressAnimation.value
@@ -107,6 +108,22 @@ fun ControlCenterPrayerPopup(
         }
     }
     val maxDragHeight = 1000f
+
+    // Smooth enter animation when Control Center appears
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        animationScope.launch {
+            enterProgressAnimation.animateTo(
+                1f,
+                spring(dampingRatio = 0.7f, stiffness = 300f)
+            )
+        }
+        animationScope.launch {
+            safeEnterProgressAnimation.animateTo(
+                1f,
+                spring(dampingRatio = 0.8f, stiffness = 400f)
+            )
+        }
+    }
 
     val uiSensor = rememberUISensor()
     val glassShape = { itemShape }
