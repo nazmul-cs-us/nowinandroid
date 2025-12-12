@@ -1219,6 +1219,8 @@ fun PrayerTimesScreen(
 
     // Use WobblePullToRefresh component wrapped in Box for Control Center overlay
     Box(modifier = modifier.fillMaxSize()) {
+        // Hide main content when Control Center is showing
+        if (popupDialState == null) {
         WobblePullToRefresh(
             isRefreshing = isRefreshing,
             onRefresh = { isRefreshing = true },
@@ -2365,6 +2367,7 @@ fun PrayerTimesScreen(
 
         } // Close Column inside WobblePullToRefresh
         } // Close WobblePullToRefresh lambda
+        } // Close if (popupDialState == null)
 
         // INTERACTIVE PRAYER DIAL POPUP - Control Center overlay (OUTSIDE WobblePullToRefresh, inside Box)
         // Debug logging for popup state

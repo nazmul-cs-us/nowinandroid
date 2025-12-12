@@ -1033,7 +1033,84 @@ class PrayerNotificationService : Service() {
         Log.d(TAG, "Current time: $now")
         Log.d(TAG, "Current prayer: ${currentPrayer.name} at $prayerStart")
         Log.d(TAG, "Next prayer: ${nextPrayer?.name ?: "None"} at ${nextPrayer?.time ?: "N/A"}")
-        
+
+        // CROSS-MIDNIGHT FIX: Detect when we've crossed midnight (Isha → Fajr overnight period)
+        // This happens when:
+        // 1. Current prayer is Isha (last prayer of the day)
+        // 2. Current time is BEFORE the prayer start time (meaning we crossed midnight)
+        // 3. Next prayer is Fajr (or we're waiting for tomorrow's Fajr)
+        val isCrossMidnightScenario = currentPrayer.name.equals("Isha", ignoreCase = true) &&
+                                       now.isBefore(prayerStart) &&
+                                       (nextPrayer == null || nextPrayer.name.equals("Fajr", ignoreCase = true))
+
+        if (isCrossMidnightScenario) {
+            Log.d(TAG, "🌙 CROSS-MIDNIGHT SCENARIO DETECTED!")
+            Log.d(TAG, "   Current time ($now) is after midnight but Isha started before midnight ($prayerStart)")
+
+            // Calculate elapsed time properly across midnight
+            // Elapsed = time from yesterday's Isha to midnight + time from midnight to now
+            val minutesFromIshaToMidnight = Duration.between(prayerStart, LocalTime.MAX).toMinutes() + 1
+            val minutesFromMidnightToNow = Duration.between(LocalTime.MIN, now).toMinutes()
+            val elapsedMinutes = minutesFromIshaToMidnight + minutesFromMidnightToNow
+
+            // Calculate time until next prayer (Fajr)
+            val remainingMinutes = if (nextPrayer != null && now.isBefore(nextPrayer.time)) {
+                Duration.between(now, nextPrayer.time).toMinutes()
+            } else {
+                0L
+            }
+
+            // Total duration from yesterday's Isha to today's Fajr
+            val totalDuration = if (nextPrayer != null) {
+                minutesFromIshaToMidnight + Duration.between(LocalTime.MIN, nextPrayer.time).toMinutes()
+            } else {
+                elapsedMinutes // Use elapsed as total if no next prayer
+            }
+
+            Log.d(TAG, "   Elapsed since yesterday's Isha: ${elapsedMinutes}m")
+            Log.d(TAG, "   Remaining until Fajr: ${remainingMinutes}m")
+            Log.d(TAG, "   Total Isha→Fajr duration: ${totalDuration}m")
+
+            // Determine phase based on elapsed time (cross-midnight is always MAKE_TIME since Isha passed hours ago)
+            val progressPhase = when {
+                elapsedMinutes < 20 -> PrayerPhase.GO_TO_MOSQUE
+                elapsedMinutes < (totalDuration / 2) -> PrayerPhase.BEST_TIME
+                else -> PrayerPhase.MAKE_TIME
+            }
+
+            // Calculate progress percentage using 3-segment logic
+            val progressPercentage = when (progressPhase) {
+                PrayerPhase.GO_TO_MOSQUE -> {
+                    val segmentProgress = (elapsedMinutes.toFloat() / 20f).coerceIn(0f, 1f)
+                    (segmentProgress * 20f).coerceIn(0f, 20f)
+                }
+                PrayerPhase.BEST_TIME -> {
+                    val halfway = totalDuration / 2
+                    val segmentElapsed = (elapsedMinutes - 20).coerceAtLeast(0)
+                    val segmentDuration = (halfway - 20).coerceAtLeast(1)
+                    val segmentProgress = (segmentElapsed.toFloat() / segmentDuration.toFloat()).coerceIn(0f, 1f)
+                    (20f + segmentProgress * 40f).coerceIn(20f, 60f)
+                }
+                PrayerPhase.MAKE_TIME -> {
+                    val halfway = totalDuration / 2
+                    val segmentElapsed = (elapsedMinutes - halfway).coerceAtLeast(0)
+                    val segmentDuration = (totalDuration - halfway).coerceAtLeast(1)
+                    val segmentProgress = (segmentElapsed.toFloat() / segmentDuration.toFloat()).coerceIn(0f, 1f)
+                    (60f + segmentProgress * 40f).coerceIn(60f, 100f)
+                }
+            }
+
+            Log.d(TAG, "   Phase: $progressPhase, Progress: ${progressPercentage.toInt()}%")
+
+            return PrayerProgress(
+                elapsedMinutes = elapsedMinutes,
+                remainingMinutes = remainingMinutes.coerceAtLeast(0),
+                totalDuration = totalDuration,
+                progressPercentage = progressPercentage,
+                phase = progressPhase
+            )
+        }
+
         // Check if the current prayer time has already passed
         val prayerEndThreshold = prayerStart.plusHours(2)
         Log.d(TAG, "Prayer time threshold (end): $prayerEndThreshold")
