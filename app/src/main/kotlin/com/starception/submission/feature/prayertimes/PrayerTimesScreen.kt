@@ -458,6 +458,9 @@ fun PrayerTimesScreen(
     // INTERACTIVE PRAYER DIAL POPUP STATE
     var popupDialState by remember { mutableStateOf<String?>(null) }  // null means closed, non-null means open with that prayer name
 
+    // BACKDROP FOR CONTROL CENTER - captures actual app content for glass blur effect
+    val controlCenterBackdrop = rememberLayerBackdrop()
+
     val hapticFeedback = LocalHapticFeedback.current
 
     // OBSERVE PRAYER OFFSETS FROM REPOSITORY FLOW - Automatically updates when settings change!
@@ -1219,12 +1222,13 @@ fun PrayerTimesScreen(
 
     // Use WobblePullToRefresh component wrapped in Box for Control Center overlay
     Box(modifier = modifier.fillMaxSize()) {
-        // Hide main content when Control Center is showing
-        if (popupDialState == null) {
+        // Main content - always visible, applies backdrop for Control Center glass effect
         WobblePullToRefresh(
             isRefreshing = isRefreshing,
             onRefresh = { isRefreshing = true },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .layerBackdrop(controlCenterBackdrop)  // Capture content for Control Center glass blur
         ) { wobbleState ->
         Column(modifier = Modifier.fillMaxSize()) {
             // Show pull instruction ONLY when dragging with smooth animation
@@ -2367,7 +2371,6 @@ fun PrayerTimesScreen(
 
         } // Close Column inside WobblePullToRefresh
         } // Close WobblePullToRefresh lambda
-        } // Close if (popupDialState == null)
 
         // INTERACTIVE PRAYER DIAL POPUP - Control Center overlay (OUTSIDE WobblePullToRefresh, inside Box)
         // Debug logging for popup state
@@ -2397,6 +2400,7 @@ fun PrayerTimesScreen(
                 prayerName = safePrayerName,
                 prayerTime = formattedTime,
                 onDismiss = { popupDialState = null },
+                backdrop = controlCenterBackdrop,  // Pass the backdrop captured from app content
                 modifier = Modifier.fillMaxSize()
             )
         } // Close if (popupDialState != null)
