@@ -1220,29 +1220,33 @@ fun PrayerTimesScreen(
     
 
 
+    // Animate blur/dim for smooth Control Center transitions
+    val controlCenterProgress by animateFloatAsState(
+        targetValue = if (popupDialState != null) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
+        label = "controlCenterProgress"
+    )
+
     // Use WobblePullToRefresh component wrapped in Box for Control Center overlay
     Box(modifier = modifier.fillMaxSize()) {
         // Main content - wrapped in Box with layerBackdrop to capture for Control Center glass effect
-        // When Control Center is active, apply blur and dim to the background
+        // Blur and dim animate smoothly based on Control Center progress
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .layerBackdrop(controlCenterBackdrop)
-                .then(
-                    if (popupDialState != null) {
-                        Modifier
-                            .graphicsLayer {
-                                val blurRadius = 4f.dp.toPx()
-                                renderEffect = androidx.compose.ui.graphics.BlurEffect(blurRadius, blurRadius)
-                            }
-                            .drawWithContent {
-                                drawContent()
-                                drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f))
-                            }
-                    } else {
-                        Modifier
+                .graphicsLayer {
+                    if (controlCenterProgress > 0f) {
+                        val blurRadius = 4f.dp.toPx() * controlCenterProgress
+                        renderEffect = androidx.compose.ui.graphics.BlurEffect(blurRadius, blurRadius)
                     }
-                )
+                }
+                .drawWithContent {
+                    drawContent()
+                    if (controlCenterProgress > 0f) {
+                        drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f * controlCenterProgress))
+                    }
+                }
         ) {
             WobblePullToRefresh(
                 isRefreshing = isRefreshing,
