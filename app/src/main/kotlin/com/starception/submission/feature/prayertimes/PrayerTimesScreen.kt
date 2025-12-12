@@ -458,7 +458,7 @@ fun PrayerTimesScreen(
     // INTERACTIVE PRAYER DIAL POPUP STATE
     var popupDialState by remember { mutableStateOf<String?>(null) }  // null means closed, non-null means open with that prayer name
 
-    // BACKDROP FOR CONTROL CENTER - captures actual app content for glass blur effect
+    // BACKDROP FOR CONTROL CENTER - captures live app content for glass blur effect
     val controlCenterBackdrop = rememberLayerBackdrop()
 
     val hapticFeedback = LocalHapticFeedback.current
@@ -1222,15 +1222,34 @@ fun PrayerTimesScreen(
 
     // Use WobblePullToRefresh component wrapped in Box for Control Center overlay
     Box(modifier = modifier.fillMaxSize()) {
-        // Main content - always visible, applies backdrop for Control Center glass effect
-        WobblePullToRefresh(
-            isRefreshing = isRefreshing,
-            onRefresh = { isRefreshing = true },
+        // Main content - wrapped in Box with layerBackdrop to capture for Control Center glass effect
+        // When Control Center is active, apply blur and dim to the background
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .layerBackdrop(controlCenterBackdrop)  // Capture content for Control Center glass blur
-        ) { wobbleState ->
-        Column(modifier = Modifier.fillMaxSize()) {
+                .layerBackdrop(controlCenterBackdrop)
+                .then(
+                    if (popupDialState != null) {
+                        Modifier
+                            .graphicsLayer {
+                                val blurRadius = 4f.dp.toPx()
+                                renderEffect = androidx.compose.ui.graphics.BlurEffect(blurRadius, blurRadius)
+                            }
+                            .drawWithContent {
+                                drawContent()
+                                drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f))
+                            }
+                    } else {
+                        Modifier
+                    }
+                )
+        ) {
+            WobblePullToRefresh(
+                isRefreshing = isRefreshing,
+                onRefresh = { isRefreshing = true },
+                modifier = Modifier.fillMaxSize()
+            ) { wobbleState ->
+            Column(modifier = Modifier.fillMaxSize()) {
             // Show pull instruction ONLY when dragging with smooth animation
             AnimatedVisibility(
                 visible = wobbleState.dragDistance > 30f && !isRefreshing,
@@ -2371,6 +2390,7 @@ fun PrayerTimesScreen(
 
         } // Close Column inside WobblePullToRefresh
         } // Close WobblePullToRefresh lambda
+        } // Close Box with layerBackdrop
 
         // INTERACTIVE PRAYER DIAL POPUP - Control Center overlay (OUTSIDE WobblePullToRefresh, inside Box)
         // Debug logging for popup state
@@ -2400,7 +2420,7 @@ fun PrayerTimesScreen(
                 prayerName = safePrayerName,
                 prayerTime = formattedTime,
                 onDismiss = { popupDialState = null },
-                backdrop = controlCenterBackdrop,  // Pass the backdrop captured from app content
+                backdrop = controlCenterBackdrop,
                 modifier = Modifier.fillMaxSize()
             )
         } // Close if (popupDialState != null)
