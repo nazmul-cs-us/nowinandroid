@@ -3,7 +3,6 @@ package com.starception.submission.feature.prayertimes.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseIn
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -36,7 +35,6 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -44,6 +42,7 @@ import androidx.compose.ui.util.fastCoerceAtLeast
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
 import com.kyant.backdrop.BackdropEffectScope
+import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
@@ -66,16 +65,17 @@ private fun convertProgress(progress: Float): Float {
 
 /**
  * Control Center style popup - iOS Control Center style with glass tiles
+ * @param backdrop The backdrop from the parent that captures the actual app content
  */
 @Composable
 fun ControlCenterPrayerPopup(
     prayerName: String,
     prayerTime: String,
     onDismiss: () -> Unit,
+    backdrop: Backdrop,
     modifier: Modifier = Modifier
 ) {
-    // Create backdrop for glass tile effects
-    val backdrop = rememberLayerBackdrop()
+    // Use the backdrop passed from parent (captures actual app content)
     val isLightTheme = !isSystemInDarkTheme()
     val accentColor = if (isLightTheme) Color(0xFF0088FF) else Color(0xFF0091FF)
     val containerColor = Color.Black.copy(0.05f)
@@ -159,7 +159,8 @@ fun ControlCenterPrayerPopup(
         }
     }
 
-    val backdropModifier = Modifier
+    // Drag modifier for Control Center gestures (no blur - blur is on background)
+    val dragModifier = Modifier
         .draggable(
             rememberDraggableState { delta ->
                 val targetProgress = enterProgressAnimation.value + delta / maxDragHeight
@@ -175,15 +176,17 @@ fun ControlCenterPrayerPopup(
             Orientation.Vertical,
             onDragStopped = { velocity ->
                 val targetProgress = when {
-                    velocity < -500f -> {
-                        // Swipe up to dismiss
-                        onDismiss()
-                        0f
-                    }
-                    velocity < 0f -> 0f
-                    velocity > 0f -> 1f
+                    velocity < -500f -> 0f  // Fast swipe up
+                    velocity < 0f -> 0f      // Slow swipe up
+                    velocity > 0f -> 1f      // Swipe down
                     else -> if (enterProgressAnimation.value < 0.5f) 0f else 1f
                 }
+
+                // Dismiss when target is 0 (any upward swipe dismisses)
+                if (targetProgress == 0f) {
+                    onDismiss()
+                }
+
                 animationScope.launch {
                     launch {
                         enterProgressAnimation.animateTo(
@@ -205,35 +208,25 @@ fun ControlCenterPrayerPopup(
                 }
             }
         )
-        .drawWithContent {
-            val p = safeEnterProgressAnimation.value
-            drawContent()
-            drawRect(dimColor.copy(dimColor.alpha * p))
-        }
-        .graphicsLayer {
-            val p = safeEnterProgressAnimation.value
-            val blurRadius = 4f.dp.toPx() * p
-            if (blurRadius > 0f) {
-                renderEffect = BlurEffect(blurRadius, blurRadius)
-            }
-        }
 
-    // Main layout - Control Center with app screenshot as backdrop
+    // Main layout - Control Center (backdrop is captured by parent from actual app content)
+    // Dim overlay on background
     Box(
-        modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        modifier
+            .fillMaxSize()
+            .drawWithContent {
+                drawContent()
+                // Dim the background
+                drawRect(dimColor.copy(dimColor.alpha * safeEnterProgressAnimation.value))
+            }
     ) {
-        // App home screen image as backdrop source - creates glass blur effect
-        Image(
-            painterResource(R.drawable.app_home_backdrop),
-            null,
+        // Control Center content with drag gestures
+        Box(
             Modifier
-                .layerBackdrop(backdrop)
-                .then(backdropModifier)
-                .fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-
+                .fillMaxSize()
+                .then(dragModifier),
+            contentAlignment = Alignment.Center
+        ) {
         // Control Center glass tiles
         Column(
             Modifier
@@ -473,5 +466,6 @@ fun ControlCenterPrayerPopup(
                 }
             }
         }
-    }
+        } // Close inner Box (drag gestures)
+    } // Close outer Box (dim overlay)
 }
