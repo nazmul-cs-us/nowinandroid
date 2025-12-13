@@ -219,7 +219,8 @@
       "Bash(for f in /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-xxxhdpi/ic_activity_*.png)",
       "Bash(for f in /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-*/ic_notif_phone.png)",
       "Bash(for f in /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-xxxhdpi/ic_notif_*.png)",
-      "Bash(git clone:*)"
+      "Bash(git clone:*)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

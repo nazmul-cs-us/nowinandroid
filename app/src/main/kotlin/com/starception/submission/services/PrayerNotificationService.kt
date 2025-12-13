@@ -342,6 +342,7 @@ class PrayerNotificationService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)
             .setShowWhen(true)
+            .setWhen(System.currentTimeMillis()) // Always update timestamp
             .setAutoCancel(false)
             .setSilent(true)
             .setLocalOnly(false)

@@ -479,6 +479,8 @@ object GoogleSampleNotificationManager {
             .setUsesChronometer(false)  // Don't use chronometer for prayer tracking
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)  // Appropriate category
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)  // Public visibility for lock screen
+            .setShowWhen(true)  // Show timestamp on notification
+            .setWhen(System.currentTimeMillis())  // Update timestamp with each notification update
             .addAction(markAsPrayedAction)  // Add "Mark as Prayed" action button
 
         // Add activity icon as large icon (shows in top right corner of notification)

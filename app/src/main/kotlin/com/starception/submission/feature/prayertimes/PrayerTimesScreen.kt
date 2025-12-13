@@ -2419,11 +2419,60 @@ fun PrayerTimesScreen(
             }
             val formattedTime = prayerTimeDisplay.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
 
+            // Get current offset for this prayer
+            val currentPrayerOffset = when (safePrayerName) {
+                "Fajr" -> storedOffsets.fajr
+                "Sunrise" -> storedOffsets.sunrise
+                "Dhuhr" -> storedOffsets.dhuhr
+                "Asr" -> storedOffsets.asr
+                "Maghrib" -> storedOffsets.maghrib
+                "Isha" -> storedOffsets.isha
+                else -> 0
+            }
+
             // Control Center overlay - directly in composition, on top of all content
             com.starception.submission.feature.prayertimes.components.ControlCenterPrayerPopup(
                 prayerName = safePrayerName,
                 prayerTime = formattedTime,
+                originalTime = prayerTimeDisplay,
+                currentOffset = currentPrayerOffset,
                 onDismiss = { popupDialState = null },
+                onSaveAdjustment = { prayerName, adjustment ->
+                    Log.d("PrayerTimes", "🎯 Control Center SAVE: $prayerName offset = $adjustment minutes")
+                    // Save adjustment via repository
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            repository.updateSinglePrayerOffset(prayerName, adjustment)
+                            Log.i("PrayerTimes", "✅ Saved $prayerName offset: $adjustment minutes")
+
+                            // Wait for preferences to be written
+                            delay(100)
+
+                            // Update notifications
+                            try {
+                                val appContext = screenContext.applicationContext
+                                val serviceManager = dagger.hilt.android.EntryPointAccessors.fromApplication(
+                                    appContext,
+                                    com.starception.submission.prayer.service.PrayerNotificationServiceManagerEntryPoint::class.java
+                                ).prayerNotificationServiceManager()
+                                serviceManager.updatePrayerNotifications()
+                                Log.i("PrayerTimes", "🔔 Notifications updated for $prayerName")
+                            } catch (e: Exception) {
+                                Log.e("PrayerTimes", "❌ Failed to update notifications", e)
+                            }
+
+                            // Close popup on main thread
+                            withContext(Dispatchers.Main) {
+                                popupDialState = null
+                            }
+                        } catch (e: Exception) {
+                            Log.e("PrayerTimes", "❌ Failed to save $prayerName offset", e)
+                            withContext(Dispatchers.Main) {
+                                popupDialState = null
+                            }
+                        }
+                    }
+                },
                 backdrop = controlCenterBackdrop,
                 modifier = Modifier.fillMaxSize()
             )

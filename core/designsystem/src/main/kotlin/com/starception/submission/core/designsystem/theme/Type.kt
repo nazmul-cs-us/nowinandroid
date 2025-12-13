@@ -37,7 +37,7 @@ private val provider = GoogleFont.Provider(
 
 private val robotoSerifFontName = GoogleFont("Roboto Serif")
 
-private val ubuntuInspiredFontFamily = FontFamily(
+val ubuntuInspiredFontFamily = FontFamily(
     Font(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Light),
     Font(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Normal),
     Font(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Medium),
