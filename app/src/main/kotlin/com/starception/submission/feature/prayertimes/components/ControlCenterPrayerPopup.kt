@@ -45,8 +45,8 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Done
+import androidx.compose.material.icons.rounded.Undo
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -221,8 +221,8 @@ fun ControlCenterPrayerPopup(
     var isDragging by remember { mutableStateOf(false) }
     var currentDragAngle by remember { mutableFloatStateOf(0f) }
     var lastHapticAdjustment by remember { mutableIntStateOf(currentOffset) }
-    // Track if user is swiping on tabs - keeps buttons visible during swipe animation
-    var isSwipingTabs by remember { mutableStateOf(false) }
+    // Keeps buttons visible briefly after Reset to allow animation to complete
+    var keepButtonsVisible by remember { mutableStateOf(false) }
 
 
     // Watch face rotation states - derived from adjusted prayer time
@@ -351,8 +351,8 @@ fun ControlCenterPrayerPopup(
                                     (offset.y - center.y) * (offset.y - center.y)
                                 )
                                 val outerRadius = kotlin.math.min(size.width, size.height) * 0.5f
-                                // Exclude center area where Reset/Save buttons are (about 35% of radius)
-                                val innerExclusionRadius = outerRadius * 0.35f
+                                // Exclude center area where Reset/Save buttons are (50% of radius)
+                                val innerExclusionRadius = outerRadius * 0.50f
 
                                 // Only start dial rotation if touch is in the outer ring (not center)
                                 if (distanceFromCenter <= outerRadius && distanceFromCenter >= innerExclusionRadius) {
@@ -647,13 +647,9 @@ fun ControlCenterPrayerPopup(
 
                     val hasAdjusted = timeAdjustment != baseAdjustment
                     // Show buttons after user releases finger from dial dragging
-                    // Keep buttons visible while swiping on tabs (even after Reset makes hasAdjusted false)
-                    val showButtons = (hasAdjusted && !isDragging) || isSwipingTabs
+                    // keepButtonsVisible keeps them visible briefly after Reset
+                    val showButtons = (hasAdjusted && !isDragging) || keepButtonsVisible
 
-                    // Debug logging
-                    LaunchedEffect(timeAdjustment, baseAdjustment, isDragging, isSwipingTabs) {
-                        Log.d("ControlCenter", "🔍 STATE: timeAdjustment=$timeAdjustment, baseAdjustment=$baseAdjustment, hasAdjusted=$hasAdjusted, isDragging=$isDragging, isSwipingTabs=$isSwipingTabs, showButtons=$showButtons")
-                    }
 
                     // Fixed height container to prevent layout jumps
                     Spacer(modifier = Modifier.height(16.dp))
@@ -683,16 +679,20 @@ fun ControlCenterPrayerPopup(
                                     selectedTabIndex = index
                                     when (index) {
                                         0 -> {
-                                            // Reset
-                                            Log.d("ControlCenter", "↶ RESET to original: $originalOffset")
+                                            // Reset - keep buttons visible briefly for animation
+                                            keepButtonsVisible = true
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                             timeAdjustment = originalOffset
                                             baseAdjustment = originalOffset
                                             accumulatedAngle = 0f
+                                            // Hide buttons after animation delay
+                                            animationScope.launch {
+                                                kotlinx.coroutines.delay(300)
+                                                keepButtonsVisible = false
+                                            }
                                         }
                                         1 -> {
                                             // Save
-                                            Log.d("ControlCenter", "✓ SAVE adjustment: $timeAdjustment")
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                             onSaveAdjustment(prayerName, timeAdjustment)
                                         }
@@ -700,23 +700,25 @@ fun ControlCenterPrayerPopup(
                                 },
                                 backdrop = backdrop,
                                 tabsCount = 2,
-                                modifier = Modifier.fillMaxWidth(0.7f),
-                                onDragStarted = { isSwipingTabs = true },
-                                onDragStopped = { isSwipingTabs = false }
+                                modifier = Modifier.fillMaxWidth(0.7f)
                             ) {
                                 // Reset Tab
                                 LiquidBottomTab(
                                     onClick = {
                                         selectedTabIndex = 0
-                                        Log.d("ControlCenter", "↶ RESET to original: $originalOffset")
+                                        keepButtonsVisible = true
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                         timeAdjustment = originalOffset
                                         baseAdjustment = originalOffset
                                         accumulatedAngle = 0f
+                                        animationScope.launch {
+                                            kotlinx.coroutines.delay(300)
+                                            keepButtonsVisible = false
+                                        }
                                     }
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Rounded.Close,
+                                        imageVector = Icons.Rounded.Undo,
                                         contentDescription = "Reset",
                                         modifier = Modifier.size(24.dp),
                                         tint = Color.White.copy(alpha = 0.9f)
@@ -732,7 +734,6 @@ fun ControlCenterPrayerPopup(
                                 LiquidBottomTab(
                                     onClick = {
                                         selectedTabIndex = 1
-                                        Log.d("ControlCenter", "✓ SAVE adjustment: $timeAdjustment")
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                         onSaveAdjustment(prayerName, timeAdjustment)
                                     }
