@@ -63,6 +63,8 @@ fun LiquidBottomTabs(
     backdrop: Backdrop,
     tabsCount: Int,
     modifier: Modifier = Modifier,
+    onDragStarted: () -> Unit = {},
+    onDragStopped: () -> Unit = {},
     content: @Composable RowScope.() -> Unit
 ) {
     val isLightTheme = !isSystemInDarkTheme()
@@ -107,11 +109,15 @@ fun LiquidBottomTabs(
                 visibilityThreshold = 0.001f,
                 initialScale = 1f,
                 pressedScale = 78f / 56f,
-                onDragStarted = {},
+                onDragStarted = { onDragStarted() },
                 onDragStopped = {
+                    onDragStopped()
                     val targetIndex = targetValue.fastRoundToInt().fastCoerceIn(0, tabsCount - 1)
                     currentIndex = targetIndex
                     animateToValue(targetIndex.toFloat())
+                    // Always call onTabSelected when drag stops, even if index didn't change
+                    // This ensures Reset works even when already selected
+                    onTabSelected(targetIndex)
                     animationScope.launch {
                         offsetAnimation.animateTo(
                             0f,

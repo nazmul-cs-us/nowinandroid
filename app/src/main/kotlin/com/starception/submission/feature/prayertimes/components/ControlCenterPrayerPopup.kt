@@ -221,6 +221,8 @@ fun ControlCenterPrayerPopup(
     var isDragging by remember { mutableStateOf(false) }
     var currentDragAngle by remember { mutableFloatStateOf(0f) }
     var lastHapticAdjustment by remember { mutableIntStateOf(currentOffset) }
+    // Track if user is swiping on tabs - keeps buttons visible during swipe animation
+    var isSwipingTabs by remember { mutableStateOf(false) }
 
 
     // Watch face rotation states - derived from adjusted prayer time
@@ -349,8 +351,11 @@ fun ControlCenterPrayerPopup(
                                     (offset.y - center.y) * (offset.y - center.y)
                                 )
                                 val outerRadius = kotlin.math.min(size.width, size.height) * 0.5f
+                                // Exclude center area where Reset/Save buttons are (about 35% of radius)
+                                val innerExclusionRadius = outerRadius * 0.35f
 
-                                if (distanceFromCenter <= outerRadius) {
+                                // Only start dial rotation if touch is in the outer ring (not center)
+                                if (distanceFromCenter <= outerRadius && distanceFromCenter >= innerExclusionRadius) {
                                     isDragging = true
                                     lastAngle = atan2(
                                         offset.y - center.y,
@@ -641,6 +646,14 @@ fun ControlCenterPrayerPopup(
                     )
 
                     val hasAdjusted = timeAdjustment != baseAdjustment
+                    // Show buttons after user releases finger from dial dragging
+                    // Keep buttons visible while swiping on tabs (even after Reset makes hasAdjusted false)
+                    val showButtons = (hasAdjusted && !isDragging) || isSwipingTabs
+
+                    // Debug logging
+                    LaunchedEffect(timeAdjustment, baseAdjustment, isDragging, isSwipingTabs) {
+                        Log.d("ControlCenter", "🔍 STATE: timeAdjustment=$timeAdjustment, baseAdjustment=$baseAdjustment, hasAdjusted=$hasAdjusted, isDragging=$isDragging, isSwipingTabs=$isSwipingTabs, showButtons=$showButtons")
+                    }
 
                     // Fixed height container to prevent layout jumps
                     Spacer(modifier = Modifier.height(16.dp))
@@ -651,7 +664,7 @@ fun ControlCenterPrayerPopup(
                         verticalArrangement = Arrangement.Center
                     ) {
                         androidx.compose.animation.AnimatedVisibility(
-                            visible = hasAdjusted,
+                            visible = showButtons,
                             enter = slideInVertically(
                                 initialOffsetY = { it },
                                 animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f)
@@ -687,7 +700,9 @@ fun ControlCenterPrayerPopup(
                                 },
                                 backdrop = backdrop,
                                 tabsCount = 2,
-                                modifier = Modifier.fillMaxWidth(0.7f)
+                                modifier = Modifier.fillMaxWidth(0.7f),
+                                onDragStarted = { isSwipingTabs = true },
+                                onDragStopped = { isSwipingTabs = false }
                             ) {
                                 // Reset Tab
                                 LiquidBottomTab(
@@ -737,9 +752,9 @@ fun ControlCenterPrayerPopup(
                             }
                         }
 
-                        // Hint text when not adjusted (slides down to exit, up to enter)
+                        // Hint text when not showing buttons (not adjusted OR currently dragging)
                         androidx.compose.animation.AnimatedVisibility(
-                            visible = !hasAdjusted,
+                            visible = !showButtons,
                             enter = slideInVertically(
                                 initialOffsetY = { -it },
                                 animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f)
@@ -753,7 +768,8 @@ fun ControlCenterPrayerPopup(
                                 text = "Rotate dial to adjust time",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = Color.White.copy(alpha = 0.6f),
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.offset(y = (-16).dp)
                             )
                         }
                     }
