@@ -19,10 +19,15 @@ import com.kyant.capsule.ContinuousCapsule
 internal val LocalLiquidBottomTabScale =
     staticCompositionLocalOf { { 1f } }
 
+// Function to animate to a specific tab index
+internal val LocalAnimateToTab =
+    staticCompositionLocalOf<((Int) -> Unit)?> { null }
+
 @Composable
 fun RowScope.LiquidBottomTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val scale = LocalLiquidBottomTabScale.current
@@ -43,7 +48,7 @@ fun RowScope.LiquidBottomTab(
                 scaleY = scale
             },
         verticalArrangement = Arrangement.spacedBy(2f.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = horizontalAlignment,
         content = content
     )
 }
