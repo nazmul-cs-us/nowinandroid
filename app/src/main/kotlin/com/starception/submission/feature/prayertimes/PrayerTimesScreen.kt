@@ -68,6 +68,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -831,22 +832,25 @@ fun PrayerTimesScreen(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                ElevatedCard(
+                // Using Card with border instead of shadow - shadows cause navigation artifacts
+                Card(
                     shape = CircleShape, // Make the card circular for the dial
-                    elevation = CardDefaults.elevatedCardElevation(
-                        defaultElevation = 0.dp,  // TEMP: Testing shadow artifact issue
-                        pressedElevation = 0.dp,
-                        focusedElevation = 0.dp
-                    ),
-                    colors = CardDefaults.elevatedCardColors(
+                    colors = CardDefaults.cardColors(
                         containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                             "Current" -> MaterialTheme.colorScheme.tertiaryContainer
                             "Next" -> MaterialTheme.colorScheme.primaryContainer
                             else -> MaterialTheme.colorScheme.surfaceVariant
                         }
                     ),
-                    modifier = Modifier
-                        .fillMaxSize() // Fill container space
+                    border = BorderStroke(
+                        2.dp,
+                        when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                            "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+                            "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        }
+                    ),
+                    modifier = Modifier.fillMaxSize()
             ) {
                 // ONLY show the circular dial - complete transformation with no overlapping content
                 com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
@@ -932,18 +936,22 @@ fun PrayerTimesScreen(
             }
         } else {
             // Show regular small card with long-press detection
-            ElevatedCard(
+            // Using Card with border instead of shadow - shadows cause navigation artifacts
+            Card(
                 shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.elevatedCardElevation(
-                    defaultElevation = 0.dp,  // TEMP: Testing shadow artifact issue
-                    pressedElevation = 0.dp,
-                    focusedElevation = 0.dp
-                ),
-                colors = CardDefaults.elevatedCardColors(
+                colors = CardDefaults.cardColors(
                     containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                         "Current" -> MaterialTheme.colorScheme.tertiaryContainer
                         "Next" -> MaterialTheme.colorScheme.primaryContainer
                         else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                ),
+                border = BorderStroke(
+                    1.5.dp,
+                    when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                        "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f)
+                        "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                     }
                 ),
                 modifier = modifier
@@ -1561,7 +1569,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.secondaryContainer,
-                            shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
+                            shadowElevation = 0.dp  // Removed to prevent navigation artifacts
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -2284,7 +2292,7 @@ fun PrayerTimesScreen(
                         .padding(horizontal = 4.dp),
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer,
-                    shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
+                    shadowElevation = 0.dp  // Removed to prevent navigation artifacts
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),

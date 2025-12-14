@@ -107,6 +107,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
@@ -1209,13 +1210,10 @@ private fun NextPrayerTile(
     // Show prayer tile if we have prayer data, even if mainPrayer logic fails
     if (mainPrayer != null || prayerTimes != null) {
         Surface(
-            modifier = Modifier
-                .fillMaxSize(),
-                // TEMPORARILY DISABLED geminiGradientEdge to test shadow issue
-                // .geminiGradientEdge(borderWidth = 1.5.dp, topStart = 32.dp, topEnd = 32.dp, bottomStart = 32.dp, bottomEnd = 32.dp),
+            modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
-            shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
+            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
         ) {
             Column(
                 modifier = Modifier
@@ -1507,13 +1505,10 @@ private fun SmartInfoTile(
     var selectedPrayer by remember { mutableStateOf<com.starception.submission.feature.prayertimes.components.PrayerBubbleData?>(null) }
     val view = LocalView.current
     Surface(
-        modifier = Modifier
-            .fillMaxSize(),
-            // TEMPORARILY DISABLED geminiGradientEdge to test shadow issue
-            // .geminiGradientEdge(borderWidth = 1.5.dp, topStart = 32.dp, topEnd = 32.dp, bottomStart = 32.dp, bottomEnd = 32.dp),
+        modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
-        shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f))
     ) {
         Column(
             modifier = Modifier
@@ -1875,7 +1870,7 @@ private fun QiblaGlobeTile(
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -2023,13 +2018,10 @@ private fun DailyStatsTile(
     }
 
     Surface(
-        modifier = Modifier
-            .fillMaxSize(),
-            // TEMPORARILY DISABLED geminiGradientEdge to test shadow issue
-            // .geminiGradientEdge(borderWidth = 1.5.dp, topStart = 32.dp, topEnd = 32.dp, bottomStart = 32.dp, bottomEnd = 32.dp),
+        modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.tertiaryContainer,
-        shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f))
     ) {
         if (showSurahList) {
             // Search query state
@@ -2436,8 +2428,7 @@ private fun DailyStatsTile(
                                 .size(if (isLandscape) 32.dp else 42.dp)
                                 .compactGlow(),
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
+                            color = MaterialTheme.colorScheme.tertiary
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
