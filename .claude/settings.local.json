@@ -220,7 +220,10 @@
       "Bash(for f in /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-*/ic_notif_phone.png)",
       "Bash(for f in /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-xxxhdpi/ic_notif_*.png)",
       "Bash(git clone:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(for i in 1 2 3 4 5)",
+      "Bash(do sleep 5)",
+      "Bash(break)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

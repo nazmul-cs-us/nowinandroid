@@ -95,6 +95,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntSize
 import android.util.Log
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -118,6 +119,8 @@ import android.os.Vibrator
 import kotlin.math.absoluteValue
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -263,7 +266,7 @@ private fun getSelectedArabicFontFamily(context: Context): androidx.compose.ui.t
     return com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedFont)
 }
 
-@OptIn(ExperimentalPermissionsApi::class)
+@OptIn(ExperimentalPermissionsApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun PrayerTimesScreen(
     modifier: Modifier = Modifier,
@@ -945,12 +948,39 @@ fun PrayerTimesScreen(
                 Box(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Background layer - invisible but handles long-press gestures
+                    // Background layer - invisible but handles tap gestures for the whole card
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .pointerInput(prayerName) {
+                            .pointerInput(prayerName, currentOffset) {
                                 detectTapGestures(
+                                    onDoubleTap = {
+                                        android.util.Log.d("PrayerCard", "👆👆 DOUBLE TAP detected on $prayerName card!")
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+
+                                        // Reset to auto-detected default offset (not 0)
+                                        CoroutineScope(Dispatchers.IO).launch {
+                                            try {
+                                                val entryPoint = EntryPointAccessors.fromApplication(
+                                                    screenContext.applicationContext,
+                                                    com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                                                )
+                                                val repository = entryPoint.prayerSettingsRepository()
+
+                                                // Get the default offset from auto-detected settings
+                                                val defaultOffset = repository.getDefaultPrayerOffset(prayerName)
+
+                                                if (currentOffset != defaultOffset) {
+                                                    repository.updateSinglePrayerOffset(prayerName, defaultOffset)
+                                                    android.util.Log.d("PrayerCard", "✅ RESET: $prayerName offset -> $defaultOffset minutes (auto-detected default)")
+                                                } else {
+                                                    android.util.Log.d("PrayerCard", "ℹ️ $prayerName already at default offset: $defaultOffset")
+                                                }
+                                            } catch (e: Exception) {
+                                                android.util.Log.e("PrayerCard", "❌ Failed to reset offset", e)
+                                            }
+                                        }
+                                    },
                                     onLongPress = {
                                         android.util.Log.d("PrayerCard", "🔥 LONG PRESS detected on $prayerName card!")
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -1065,25 +1095,102 @@ fun PrayerTimesScreen(
                                 Pair(String.format("%d:%02d", hour12, adjusted.minute), period)
                             } ?: Pair("", "")
 
-                            // Time display with separated AM/PM and offset
+                            // Scroll accumulator for time adjustment
+                            var scrollAccumulator by remember { mutableFloatStateOf(0f) }
+                            val scrollThreshold = 15f // pixels per minute (faster adjustment)
+
+                            // Time display with separated AM/PM and offset - NOW WITH GESTURES
+                            // Using draggable for swipe (first) and combinedClickable for taps (second)
+                            // Key insight: draggable only triggers on significant movement, allowing taps to work
                             Row(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.Bottom,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .pointerInput(prayerName) {
-                                        detectTapGestures(
-                                            onLongPress = {
-                                                android.util.Log.d("PrayerCard", "🔥 LONG PRESS detected on $prayerName time area!")
-                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                onShowPopup(prayerName)
-                                                android.util.Log.d("PrayerCard", "✅ Called onShowPopup for $prayerName")
-                                            },
-                                            onTap = {
-                                                android.util.Log.d("PrayerCard", "👆 Regular tap on $prayerName time area")
+                                    // DRAG GESTURE FIRST - Uses higher-level draggable API that plays nicely with clicks
+                                    .draggable(
+                                        orientation = Orientation.Horizontal,
+                                        state = rememberDraggableState { delta ->
+                                            // Accumulate swipe amount
+                                            scrollAccumulator += delta
+
+                                            // Calculate how many minutes to adjust
+                                            val minutesToAdjust = (scrollAccumulator / scrollThreshold).toInt()
+
+                                            if (minutesToAdjust != 0) {
+                                                // Swipe right (positive) = add minutes, swipe left (negative) = subtract minutes
+                                                val newOffset = currentOffset + minutesToAdjust
+
+                                                // Haptic feedback for each minute change
+                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+
+                                                // Save the adjustment immediately
+                                                CoroutineScope(Dispatchers.IO).launch {
+                                                    try {
+                                                        val entryPoint = EntryPointAccessors.fromApplication(
+                                                            screenContext.applicationContext,
+                                                            com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                                                        )
+                                                        val repository = entryPoint.prayerSettingsRepository()
+                                                        repository.updateSinglePrayerOffset(prayerName, newOffset)
+                                                        android.util.Log.d("PrayerCard", "👉 SWIPE: $prayerName offset -> $newOffset minutes")
+                                                    } catch (e: Exception) {
+                                                        android.util.Log.e("PrayerCard", "❌ Failed to save swipe adjustment", e)
+                                                    }
+                                                }
+
+                                                // Reset accumulator for the consumed amount
+                                                scrollAccumulator -= minutesToAdjust * scrollThreshold
                                             }
-                                        )
-                                    }
+                                        },
+                                        onDragStarted = {
+                                            scrollAccumulator = 0f
+                                        },
+                                        onDragStopped = {
+                                            scrollAccumulator = 0f
+                                        }
+                                    )
+                                    // TAP GESTURES SECOND - combinedClickable handles double-click and long-click
+                                    .combinedClickable(
+                                        onClick = {
+                                            // Single tap does nothing (avoids accidental triggers)
+                                            android.util.Log.d("PrayerCard", "👆 SINGLE TAP on $prayerName (no action)")
+                                        },
+                                        onDoubleClick = {
+                                            // Double-tap to reset offset to the stored default offset
+                                            android.util.Log.d("PrayerCard", "👆👆 DOUBLE TAP detected on $prayerName!")
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+
+                                            // Get the default offset from auto-detected settings
+                                            CoroutineScope(Dispatchers.IO).launch {
+                                                try {
+                                                    val entryPoint = EntryPointAccessors.fromApplication(
+                                                        screenContext.applicationContext,
+                                                        com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                                                    )
+                                                    val repository = entryPoint.prayerSettingsRepository()
+
+                                                    // Get the default offset from auto-detected settings
+                                                    val defaultOffset = repository.getDefaultPrayerOffset(prayerName)
+
+                                                    if (currentOffset != defaultOffset) {
+                                                        repository.updateSinglePrayerOffset(prayerName, defaultOffset)
+                                                        android.util.Log.d("PrayerCard", "✅ RESET: $prayerName offset -> $defaultOffset minutes (default)")
+                                                    } else {
+                                                        android.util.Log.d("PrayerCard", "ℹ️ $prayerName already at default offset: $defaultOffset")
+                                                    }
+                                                } catch (e: Exception) {
+                                                    android.util.Log.e("PrayerCard", "❌ Failed to reset offset", e)
+                                                }
+                                            }
+                                        },
+                                        onLongClick = {
+                                            android.util.Log.d("PrayerCard", "🔥 LONG PRESS detected on $prayerName time area!")
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onShowPopup(prayerName)
+                                            android.util.Log.d("PrayerCard", "✅ Called onShowPopup for $prayerName")
+                                        }
+                                    )
                             ) {
                                 val baseColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                                     "Current" -> MaterialTheme.colorScheme.tertiary

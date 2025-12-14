@@ -975,6 +975,48 @@ class PrayerSettingsRepository @Inject constructor(
     }
     
     /**
+     * Get the default (auto-detected) offset for a specific prayer
+     * Used by double-tap gesture to reset to country-based default
+     *
+     * @param prayerName Name of the prayer (Fajr, Dhuhr, Asr, Maghrib, Isha, Sunrise)
+     * @return The auto-detected default offset for this prayer, or 0 if not available
+     */
+    fun getDefaultPrayerOffset(prayerName: String): Int {
+        Log.d(TAG, "🔍 GET DEFAULT OFFSET: Retrieving auto-detected offset for $prayerName")
+
+        // Get the cached country code
+        val cachedCountry = getCachedCountry()
+        if (cachedCountry == null) {
+            Log.w(TAG, "⚠️ No country code available - returning 0 as default offset")
+            return 0
+        }
+
+        // Get auto-detected settings for the country
+        val autoDetectedSettings = getAutoDetectedSettingsForCountry(cachedCountry)
+        if (autoDetectedSettings == null) {
+            Log.w(TAG, "⚠️ No auto-detected settings for country '$cachedCountry' - returning 0 as default offset")
+            return 0
+        }
+
+        // Get the offset for the specific prayer
+        val defaultOffset = when (prayerName.lowercase()) {
+            "fajr" -> autoDetectedSettings.timeOffsets.fajr
+            "sunrise" -> autoDetectedSettings.timeOffsets.sunrise
+            "dhuhr" -> autoDetectedSettings.timeOffsets.dhuhr
+            "asr" -> autoDetectedSettings.timeOffsets.asr
+            "maghrib" -> autoDetectedSettings.timeOffsets.maghrib
+            "isha" -> autoDetectedSettings.timeOffsets.isha
+            else -> {
+                Log.w(TAG, "⚠️ Unknown prayer name: $prayerName - returning 0 as default offset")
+                0
+            }
+        }
+
+        Log.d(TAG, "✅ DEFAULT OFFSET for $prayerName: $defaultOffset minutes (from country: $cachedCountry)")
+        return defaultOffset
+    }
+
+    /**
      * Update offset for a single prayer (used by Interactive Prayer Dial)
      */
     suspend fun updateSinglePrayerOffset(prayerName: String, offsetMinutes: Int) {
