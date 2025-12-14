@@ -23,6 +23,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -515,9 +516,49 @@ fun ControlCenterPrayerPopup(
                     val hourDisplay = String.format("%d", hour12)
                     val minuteDisplay = String.format("%02d", adjustedLocalTime.minute)
 
+                    // Accumulated scroll for smooth minute adjustment
+                    var scrollAccumulator by remember { mutableFloatStateOf(0f) }
+                    val scrollThreshold = 20f // pixels per minute
+
                     Row(
                         horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .pointerInput(Unit) {
+                                detectVerticalDragGestures(
+                                    onDragStart = {
+                                        scrollAccumulator = 0f
+                                    },
+                                    onDragEnd = {
+                                        scrollAccumulator = 0f
+                                    }
+                                ) { _, dragAmount ->
+                                    // Accumulate scroll amount
+                                    scrollAccumulator += dragAmount
+
+                                    // Calculate how many minutes to adjust
+                                    val minutesToAdjust = (scrollAccumulator / scrollThreshold).toInt()
+
+                                    if (minutesToAdjust != 0) {
+                                        // Scroll down (positive) = add minutes, scroll up (negative) = subtract minutes
+                                        val newAdjustment = timeAdjustment + minutesToAdjust
+                                        timeAdjustment = newAdjustment
+
+                                        // Update base adjustment for dial sync
+                                        baseAdjustment = newAdjustment
+                                        accumulatedAngle = 0f
+
+                                        // Haptic feedback for each minute change
+                                        if (newAdjustment != lastHapticAdjustment) {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            lastHapticAdjustment = newAdjustment
+                                        }
+
+                                        // Reset accumulator for the consumed amount
+                                        scrollAccumulator -= minutesToAdjust * scrollThreshold
+                                    }
+                                }
+                            }
                     ) {
                         // Hour
                         Text(
