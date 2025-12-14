@@ -108,6 +108,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import com.starception.submission.feature.prayertimes.components.ElasticTopShape
 import com.starception.submission.feature.prayertimes.wobble.WobblePullToRefresh
@@ -460,6 +461,13 @@ fun PrayerTimesScreen(
     
     // INTERACTIVE PRAYER DIAL POPUP STATE
     var popupDialState by remember { mutableStateOf<String?>(null) }  // null means closed, non-null means open with that prayer name
+
+    // Clean up popup state when navigating away to prevent lingering shadow effects
+    DisposableEffect(Unit) {
+        onDispose {
+            popupDialState = null
+        }
+    }
 
     // BACKDROP FOR CONTROL CENTER - captures live app content for glass blur effect
     val controlCenterBackdrop = rememberLayerBackdrop()
@@ -826,9 +834,9 @@ fun PrayerTimesScreen(
                 ElevatedCard(
                     shape = CircleShape, // Make the card circular for the dial
                     elevation = CardDefaults.elevatedCardElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 4.dp,
-                        focusedElevation = 4.dp
+                        defaultElevation = 0.dp,  // TEMP: Testing shadow artifact issue
+                        pressedElevation = 0.dp,
+                        focusedElevation = 0.dp
                     ),
                     colors = CardDefaults.elevatedCardColors(
                         containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
@@ -927,9 +935,9 @@ fun PrayerTimesScreen(
             ElevatedCard(
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.elevatedCardElevation(
-                    defaultElevation = 2.dp,
-                    pressedElevation = 4.dp,
-                    focusedElevation = 3.dp
+                    defaultElevation = 0.dp,  // TEMP: Testing shadow artifact issue
+                    pressedElevation = 0.dp,
+                    focusedElevation = 0.dp
                 ),
                 colors = CardDefaults.elevatedCardColors(
                     containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
@@ -1338,22 +1346,32 @@ fun PrayerTimesScreen(
     Box(modifier = modifier.fillMaxSize()) {
         // Main content - wrapped in Box with layerBackdrop to capture for Control Center glass effect
         // Blur and dim animate smoothly based on Control Center progress
+        // CRITICAL: Check popupDialState != null to immediately stop effects on dismiss (prevents lingering shadow on navigation)
+        val isPopupActive = popupDialState != null
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .layerBackdrop(controlCenterBackdrop)
-                .graphicsLayer {
-                    if (controlCenterProgress > 0f) {
-                        val blurRadius = 4f.dp.toPx() * controlCenterProgress
-                        renderEffect = androidx.compose.ui.graphics.BlurEffect(blurRadius, blurRadius)
+                // CRITICAL: Only apply ALL layer effects when popup is active to prevent visual artifacts during navigation
+                .then(
+                    if (isPopupActive) {
+                        Modifier
+                            .layerBackdrop(controlCenterBackdrop)
+                            .graphicsLayer {
+                                if (controlCenterProgress > 0f) {
+                                    val blurRadius = 4f.dp.toPx() * controlCenterProgress
+                                    renderEffect = androidx.compose.ui.graphics.BlurEffect(blurRadius, blurRadius)
+                                }
+                            }
+                            .drawWithContent {
+                                drawContent()
+                                if (controlCenterProgress > 0f) {
+                                    drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f * controlCenterProgress))
+                                }
+                            }
+                    } else {
+                        Modifier
                     }
-                }
-                .drawWithContent {
-                    drawContent()
-                    if (controlCenterProgress > 0f) {
-                        drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f * controlCenterProgress))
-                    }
-                }
+                )
         ) {
             WobblePullToRefresh(
                 isRefreshing = isRefreshing,
@@ -1543,7 +1561,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.secondaryContainer,
-                            shadowElevation = 2.dp
+                            shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -2266,7 +2284,7 @@ fun PrayerTimesScreen(
                         .padding(horizontal = 4.dp),
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer,
-                    shadowElevation = 2.dp
+                    shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
