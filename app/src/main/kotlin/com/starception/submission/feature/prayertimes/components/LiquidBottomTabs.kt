@@ -63,8 +63,10 @@ fun LiquidBottomTabs(
     backdrop: Backdrop,
     tabsCount: Int,
     modifier: Modifier = Modifier,
+    initialPosition: Float? = null, // null = use selectedTabIndex, or specify 0.5f for middle
     onDragStarted: () -> Unit = {},
     onDragStopped: () -> Unit = {},
+    onAnimateToTab: ((animateTo: (Int) -> Unit) -> Unit)? = null, // Callback to expose animation function
     content: @Composable RowScope.() -> Unit
 ) {
     val isLightTheme = !isSystemInDarkTheme()
@@ -98,13 +100,15 @@ fun LiquidBottomTabs(
 
         val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
         val animationScope = rememberCoroutineScope()
-        var currentIndex by remember(selectedTabIndex) {
-            mutableIntStateOf(selectedTabIndex())
+        // Use initialPosition for middle start, otherwise use selected tab
+        val hasInitialPosition = initialPosition != null
+        var currentIndex by remember {
+            mutableIntStateOf(if (hasInitialPosition) -1 else selectedTabIndex())
         }
         val dampedDragAnimation = remember(animationScope) {
             DampedDragAnimation(
                 animationScope = animationScope,
-                initialValue = selectedTabIndex().toFloat(),
+                initialValue = initialPosition ?: selectedTabIndex().toFloat(),
                 valueRange = 0f..(tabsCount - 1).toFloat(),
                 visibilityThreshold = 0.001f,
                 initialScale = 1f,
@@ -136,11 +140,14 @@ fun LiquidBottomTabs(
                 }
             )
         }
-        LaunchedEffect(selectedTabIndex) {
-            snapshotFlow { selectedTabIndex() }
-                .collectLatest { index ->
-                    currentIndex = index
-                }
+        // Only sync selectedTabIndex when not using initialPosition
+        if (!hasInitialPosition) {
+            LaunchedEffect(selectedTabIndex) {
+                snapshotFlow { selectedTabIndex() }
+                    .collectLatest { index ->
+                        currentIndex = index
+                    }
+            }
         }
         LaunchedEffect(dampedDragAnimation) {
             snapshotFlow { currentIndex }
@@ -164,6 +171,18 @@ fun LiquidBottomTabs(
             )
         }
 
+        // Function to animate to a tab and trigger selection
+        // Animate to edges for a nicer effect (-0.15 for left edge, 1.15 for right edge)
+        val animateToTab: (Int) -> Unit = { targetIndex ->
+            currentIndex = targetIndex
+            animationScope.launch {
+                val edgePosition = if (targetIndex == 0) -0.15f else (tabsCount - 1).toFloat() + 0.15f
+                dampedDragAnimation.animateToValue(edgePosition)
+                onTabSelected(targetIndex)
+            }
+        }
+
+        CompositionLocalProvider(LocalAnimateToTab provides animateToTab) {
         Row(
             Modifier
                 .graphicsLayer {
@@ -234,13 +253,16 @@ fun LiquidBottomTabs(
             )
         }
 
+        // Offset to center the narrower pill (0.7 width) within the tab area
+        val pillCenterOffset = tabWidth * 0.15f
+
         Box(
             Modifier
                 .padding(horizontal = 4f.dp)
                 .graphicsLayer {
                     translationX =
-                        if (isLtr) dampedDragAnimation.value * tabWidth + panelOffset
-                        else size.width - (dampedDragAnimation.value + 1f) * tabWidth + panelOffset
+                        if (isLtr) dampedDragAnimation.value * tabWidth + pillCenterOffset + panelOffset
+                        else size.width - (dampedDragAnimation.value + 1f) * tabWidth - pillCenterOffset + panelOffset
                 }
                 .then(interactiveHighlight.gestureModifier)
                 .then(dampedDragAnimation.modifier)
@@ -288,7 +310,8 @@ fun LiquidBottomTabs(
                     }
                 )
                 .height(56f.dp)
-                .fillMaxWidth(1f / tabsCount)
+                .fillMaxWidth(0.7f / tabsCount) // Shorter pill
         )
+        } // End CompositionLocalProvider
     }
 }

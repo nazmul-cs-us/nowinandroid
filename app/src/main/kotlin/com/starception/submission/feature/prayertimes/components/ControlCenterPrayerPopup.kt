@@ -45,8 +45,8 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Done
-import androidx.compose.material.icons.rounded.Undo
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -670,8 +670,8 @@ fun ControlCenterPrayerPopup(
                                 animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f)
                             ) + fadeOut(animationSpec = spring(stiffness = 400f))
                         ) {
-                            // Liquid Glass Bottom Tabs UI (exact copy from catalog app)
-                            var selectedTabIndex by remember { mutableIntStateOf(0) }
+                            // Liquid Glass Bottom Tabs UI - starts in middle, user swipes to select
+                            var selectedTabIndex by remember { mutableIntStateOf(-1) }
 
                             LiquidBottomTabs(
                                 selectedTabIndex = { selectedTabIndex },
@@ -700,54 +700,53 @@ fun ControlCenterPrayerPopup(
                                 },
                                 backdrop = backdrop,
                                 tabsCount = 2,
-                                modifier = Modifier.fillMaxWidth(0.7f)
+                                modifier = Modifier.fillMaxWidth(0.7f),
+                                initialPosition = 0.5f // Start pill in the middle (centered for narrower pill)
                             ) {
-                                // Reset Tab
+                                // Get the animateToTab function from CompositionLocal
+                                val animateToTab = LocalAnimateToTab.current
+
+                                // Reset Tab - aligned towards left with internal padding
                                 LiquidBottomTab(
                                     onClick = {
-                                        selectedTabIndex = 0
-                                        keepButtonsVisible = true
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        timeAdjustment = originalOffset
-                                        baseAdjustment = originalOffset
-                                        accumulatedAngle = 0f
-                                        animationScope.launch {
-                                            kotlinx.coroutines.delay(300)
-                                            keepButtonsVisible = false
-                                        }
-                                    }
+                                        // Animate to Reset tab, action will be triggered via onTabSelected
+                                        animateToTab?.invoke(0)
+                                    },
+                                    horizontalAlignment = Alignment.Start
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Rounded.Undo,
+                                        imageVector = Icons.Outlined.Restore,
                                         contentDescription = "Reset",
-                                        modifier = Modifier.size(24.dp),
+                                        modifier = Modifier.size(24.dp).padding(start = 14.dp),
                                         tint = Color.White.copy(alpha = 0.9f)
                                     )
                                     Text(
                                         text = "Reset",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White.copy(alpha = 0.8f)
+                                        color = Color.White.copy(alpha = 0.8f),
+                                        modifier = Modifier.padding(start = 14.dp)
                                     )
                                 }
 
-                                // Save Tab
+                                // Save Tab - aligned towards right with internal padding
                                 LiquidBottomTab(
                                     onClick = {
-                                        selectedTabIndex = 1
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        onSaveAdjustment(prayerName, timeAdjustment)
-                                    }
+                                        // Animate to Save tab, action will be triggered via onTabSelected
+                                        animateToTab?.invoke(1)
+                                    },
+                                    horizontalAlignment = Alignment.End
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Rounded.Check,
+                                        imageVector = Icons.Outlined.Check,
                                         contentDescription = "Save",
-                                        modifier = Modifier.size(24.dp),
+                                        modifier = Modifier.size(24.dp).padding(end = 14.dp),
                                         tint = Color(0xFF26C6DA)
                                     )
                                     Text(
                                         text = "Save",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFF26C6DA)
+                                        color = Color(0xFF26C6DA),
+                                        modifier = Modifier.padding(end = 14.dp)
                                     )
                                 }
                             }

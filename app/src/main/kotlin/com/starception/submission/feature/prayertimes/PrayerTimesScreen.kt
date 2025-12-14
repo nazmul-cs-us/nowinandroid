@@ -1619,6 +1619,7 @@ fun PrayerTimesScreen(
                                     onEditingTileChange = { currentEditingTile = it },
                                     currentOffset = when (orderedPrayers[i]) {
                                         "Fajr" -> storedOffsets.fajr
+                                        "Sunrise" -> storedOffsets.sunrise
                                         "Dhuhr" -> storedOffsets.dhuhr
                                         "Asr" -> storedOffsets.asr
                                         "Maghrib" -> storedOffsets.maghrib
@@ -1650,6 +1651,7 @@ fun PrayerTimesScreen(
                                         onEditingTileChange = { currentEditingTile = it },
                                         currentOffset = when (orderedPrayers[i + 1]) {
                                             "Fajr" -> storedOffsets.fajr
+                                            "Sunrise" -> storedOffsets.sunrise
                                             "Dhuhr" -> storedOffsets.dhuhr
                                             "Asr" -> storedOffsets.asr
                                             "Maghrib" -> storedOffsets.maghrib
@@ -1898,6 +1900,7 @@ fun PrayerTimesScreen(
                             onEditingTileChange = { currentEditingTile = it },
                             currentOffset = when (orderedPrayers[0]) {
                                 "Fajr" -> storedOffsets.fajr
+                                "Sunrise" -> storedOffsets.sunrise
                                 "Dhuhr" -> storedOffsets.dhuhr
                                 "Asr" -> storedOffsets.asr
                                 "Maghrib" -> storedOffsets.maghrib
@@ -1935,6 +1938,7 @@ fun PrayerTimesScreen(
                             onEditingTileChange = { currentEditingTile = it },
                             currentOffset = when (orderedPrayers[1]) {
                                 "Fajr" -> storedOffsets.fajr
+                                "Sunrise" -> storedOffsets.sunrise
                                 "Dhuhr" -> storedOffsets.dhuhr
                                 "Asr" -> storedOffsets.asr
                                 "Maghrib" -> storedOffsets.maghrib
@@ -1987,6 +1991,7 @@ fun PrayerTimesScreen(
                             onEditingTileChange = { currentEditingTile = it },
                             currentOffset = when (orderedPrayers[2]) {
                                 "Fajr" -> storedOffsets.fajr
+                                "Sunrise" -> storedOffsets.sunrise
                                 "Dhuhr" -> storedOffsets.dhuhr
                                 "Asr" -> storedOffsets.asr
                                 "Maghrib" -> storedOffsets.maghrib
@@ -2024,6 +2029,7 @@ fun PrayerTimesScreen(
                             onEditingTileChange = { currentEditingTile = it },
                             currentOffset = when (orderedPrayers[3]) {
                                 "Fajr" -> storedOffsets.fajr
+                                "Sunrise" -> storedOffsets.sunrise
                                 "Dhuhr" -> storedOffsets.dhuhr
                                 "Asr" -> storedOffsets.asr
                                 "Maghrib" -> storedOffsets.maghrib
