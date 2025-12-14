@@ -471,12 +471,8 @@ fun Modifier.geminiGradientEdge(
                 blendMode = BlendMode.Screen
             )
         }
-        .graphicsLayer {
-            // Add subtle depth with shadow (neumorphism)
-            shadowElevation = 4.dp.toPx()
-            shape = RoundedCornerShape(32.dp)
-            clip = false
-        }
+        // NOTE: Removed graphicsLayer shadow (shadowElevation = 4dp) as it caused visual artifacts
+        // during navigation transitions. The Surface/ElevatedCard already provides elevation shadow.
 }
 
 // Compact glow for small UI elements (badges, buttons)
@@ -1214,17 +1210,12 @@ private fun NextPrayerTile(
     if (mainPrayer != null || prayerTimes != null) {
         Surface(
             modifier = Modifier
-                .fillMaxSize()
-                .geminiGradientEdge(
-                    borderWidth = 1.5.dp,
-                    topStart = 32.dp,
-                    topEnd = 32.dp,
-                    bottomStart = 32.dp,
-                    bottomEnd = 32.dp
-                ),
+                .fillMaxSize(),
+                // TEMPORARILY DISABLED geminiGradientEdge to test shadow issue
+                // .geminiGradientEdge(borderWidth = 1.5.dp, topStart = 32.dp, topEnd = 32.dp, bottomStart = 32.dp, bottomEnd = 32.dp),
             shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
-            shadowElevation = 2.dp
+            shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
         ) {
             Column(
                 modifier = Modifier
@@ -1517,17 +1508,12 @@ private fun SmartInfoTile(
     val view = LocalView.current
     Surface(
         modifier = Modifier
-            .fillMaxSize()
-            .geminiGradientEdge(
-                borderWidth = 1.5.dp,
-                topStart = 32.dp,
-                topEnd = 32.dp,
-                bottomStart = 32.dp,
-                bottomEnd = 32.dp
-            ),
+            .fillMaxSize(),
+            // TEMPORARILY DISABLED geminiGradientEdge to test shadow issue
+            // .geminiGradientEdge(borderWidth = 1.5.dp, topStart = 32.dp, topEnd = 32.dp, bottomStart = 32.dp, bottomEnd = 32.dp),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
-        shadowElevation = 2.dp
+        shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
     ) {
         Column(
             modifier = Modifier
@@ -1889,7 +1875,7 @@ private fun QiblaGlobeTile(
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 2.dp
+        shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -2038,17 +2024,12 @@ private fun DailyStatsTile(
 
     Surface(
         modifier = Modifier
-            .fillMaxSize()
-            .geminiGradientEdge(
-                borderWidth = 1.5.dp,
-                topStart = 32.dp,
-                topEnd = 32.dp,
-                bottomStart = 32.dp,
-                bottomEnd = 32.dp
-            ),
+            .fillMaxSize(),
+            // TEMPORARILY DISABLED geminiGradientEdge to test shadow issue
+            // .geminiGradientEdge(borderWidth = 1.5.dp, topStart = 32.dp, topEnd = 32.dp, bottomStart = 32.dp, bottomEnd = 32.dp),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.tertiaryContainer,
-        shadowElevation = 2.dp
+        shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
     ) {
         if (showSurahList) {
             // Search query state
@@ -2456,7 +2437,7 @@ private fun DailyStatsTile(
                                 .compactGlow(),
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.tertiary,
-                            shadowElevation = 3.dp
+                            shadowElevation = 0.dp  // TEMP: Testing shadow artifact issue
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
