@@ -998,10 +998,8 @@ fun PrayerTimesScreen(
                                         }
                                     },
                                     onLongPress = {
-                                        android.util.Log.d("PrayerCard", "🔥 LONG PRESS detected on $prayerName card!")
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        onShowPopup(prayerName)
-                                        android.util.Log.d("PrayerCard", "✅ Called onShowPopup for $prayerName")
+                                        // Long press disabled - use swipe to adjust instead
+                                        android.util.Log.d("PrayerCard", "ℹ️ Long press disabled on $prayerName card - use swipe to adjust")
                                     },
                                     onTap = {
                                         android.util.Log.d("PrayerCard", "👆 Regular tap detected on $prayerName card")
@@ -1201,10 +1199,8 @@ fun PrayerTimesScreen(
                                             }
                                         },
                                         onLongClick = {
-                                            android.util.Log.d("PrayerCard", "🔥 LONG PRESS detected on $prayerName time area!")
-                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            onShowPopup(prayerName)
-                                            android.util.Log.d("PrayerCard", "✅ Called onShowPopup for $prayerName")
+                                            // Long press disabled - use swipe to adjust instead
+                                            android.util.Log.d("PrayerCard", "ℹ️ Long press disabled on $prayerName time area - use swipe to adjust")
                                         }
                                     )
                             ) {
@@ -1813,7 +1809,7 @@ fun PrayerTimesScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Hold any prayer card to fine-tune times",
+                                text = "Swipe left or right on prayer time to adjust",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
                             )
