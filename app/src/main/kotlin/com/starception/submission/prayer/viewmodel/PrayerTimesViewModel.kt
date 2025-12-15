@@ -6,9 +6,11 @@ import com.starception.submission.prayer.model.AsrMadhhab
 import com.starception.submission.prayer.model.AutoDetectedSettingsBackup
 import com.starception.submission.prayer.model.CalculationMethod
 import com.starception.submission.prayer.model.DayPrayerTimes
+import com.starception.submission.prayer.model.DayPrayerSuggestions
 import com.starception.submission.prayer.model.Location
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
+import com.starception.submission.prayer.repository.PrayerTimeSuggestionRepository
 import com.starception.submission.prayer.service.LocationService
 import com.starception.submission.prayer.service.EnhancedLocationService
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
@@ -75,10 +77,14 @@ class PrayerTimesViewModel @Inject constructor(
     private val locationService: LocationService,
     private val enhancedLocationService: EnhancedLocationService,
     private val settingsRepository: PrayerSettingsRepository,
-    private val countryPrayerMethodService: CountryPrayerMethodService
+    private val countryPrayerMethodService: CountryPrayerMethodService,
+    private val suggestionRepository: PrayerTimeSuggestionRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PrayerTimesUiState())
+
+    // AI-powered prayer time suggestions
+    val suggestions: StateFlow<DayPrayerSuggestions> = suggestionRepository.suggestions
     val uiState: StateFlow<PrayerTimesUiState> = _uiState.asStateFlow()
     
     // Connect to repository's settings flow with proper scoping to prevent ANR
@@ -192,10 +198,10 @@ class PrayerTimesViewModel @Inject constructor(
                 prayerTimes?.let { times ->
                     val timeUntilNext = prayerCalculatorService.getTimeUntilNextPrayer(times)
                     val isUsingDefault = (currentSettings.location == null)
-                    
+
                     // Cache the calculated prayer times for quick loading next time
                     settingsRepository.cachePrayerTimes(times)
-                    
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = if (showLoading && clearLoadingImmediately) false else _uiState.value.isLoading,
                         prayerTimes = times,
@@ -204,6 +210,9 @@ class PrayerTimesViewModel @Inject constructor(
                         calculationMethod = currentSettings.calculationMethod,
                         error = if (isUsingDefault) "Using default location (${location.getDisplayName()}). Tap 'Get Location' for accurate times." else null
                     )
+
+                    // Fetch AI suggestions in background (non-blocking)
+                    fetchAiSuggestions(times, currentSettings)
                 } ?: run {
                     _uiState.value = _uiState.value.copy(
                         isLoading = if (showLoading && clearLoadingImmediately) false else _uiState.value.isLoading,
@@ -508,6 +517,43 @@ class PrayerTimesViewModel @Inject constructor(
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    /**
+     * Fetches AI-powered prayer time suggestions in background.
+     * Compares our calculated times with reference API to suggest offsets.
+     */
+    private fun fetchAiSuggestions(prayerTimes: DayPrayerTimes, settings: PrayerSettings) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                android.util.Log.d("PrayerTimesViewModel", "✨ Fetching AI suggestions...")
+                suggestionRepository.fetchSuggestions(prayerTimes, settings)
+                android.util.Log.d("PrayerTimesViewModel", "✨ AI suggestions fetched successfully")
+            } catch (e: Exception) {
+                android.util.Log.e("PrayerTimesViewModel", "❌ Failed to fetch AI suggestions: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Applies an AI-suggested offset to a prayer.
+     * This updates the user's offset for the specified prayer to match the suggestion.
+     */
+    fun applySuggestion(prayerName: String, suggestedOffset: Int) {
+        android.util.Log.i("PrayerTimesViewModel", "✨ Applying AI suggestion: $prayerName → $suggestedOffset minutes")
+
+        val currentSettings = settings.value
+        val updatedOffsets = when (prayerName.lowercase()) {
+            "fajr" -> currentSettings.timeOffsets.copy(fajr = suggestedOffset)
+            "dhuhr" -> currentSettings.timeOffsets.copy(dhuhr = suggestedOffset)
+            "asr" -> currentSettings.timeOffsets.copy(asr = suggestedOffset)
+            "maghrib" -> currentSettings.timeOffsets.copy(maghrib = suggestedOffset)
+            "isha" -> currentSettings.timeOffsets.copy(isha = suggestedOffset)
+            else -> currentSettings.timeOffsets
+        }
+
+        val updatedSettings = currentSettings.copy(timeOffsets = updatedOffsets)
+        updateSettings(updatedSettings)
     }
     
     /**

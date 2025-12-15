@@ -31,8 +31,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Spellcheck
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
 import androidx.compose.ui.text.style.TextAlign
@@ -562,9 +565,11 @@ fun SurahDetailScreen(
             currentTranslation = currentTranslation,
             isBookmarked = isBookmarked,
             selectedArabicFont = selectedArabicFont,
+            showTajweed = showTajweed,
             onBackClick = onBackClick,
             onTranslationClick = { showTranslationDialog = true },
             onFontClick = { showFontDialog = true },
+            onTajweedClick = { viewModel.changeTajweed(!showTajweed) },
             onBookmarkClick = {
                 // Only toggle bookmark if we have a valid news resource ID
                 if (newsResourceId != null) {
@@ -703,10 +708,7 @@ fun SurahDetailScreen(
                         viewModel.changeTextAlignment(alignment)
                     },
                     showTranslation = showTranslationInText,
-                    onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) },
-                    showTajweed = showTajweed,
-                    onToggleTajweed = { viewModel.changeTajweed(!showTajweed) },
-                    onShowTajweedLegend = { showTajweedLegendDialog = true }
+                    onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) }
                 )
             }
         }
@@ -755,9 +757,11 @@ private fun AlbumPlayerTopBar(
     currentTranslation: String,
     isBookmarked: Boolean,
     selectedArabicFont: String,
+    showTajweed: Boolean,
     onBackClick: () -> Unit,
     onTranslationClick: () -> Unit = {},
     onFontClick: () -> Unit = {},
+    onTajweedClick: () -> Unit = {},
     onBookmarkClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -850,32 +854,46 @@ private fun AlbumPlayerTopBar(
 
             Spacer(Modifier.weight(1f))
 
-            // Translation button with indicator
-            Box(
-                contentAlignment = Alignment.Center
+            // Translation button with language indicator
+            Surface(
+                onClick = onTranslationClick,
+                modifier = Modifier.size(40.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = contentColor.copy(alpha = 0.12f),
+                contentColor = contentColor
             ) {
-                IconButton(onClick = onTranslationClick) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Translate,
-                            contentDescription = "Translation",
-                            tint = contentColor,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = translationDisplay,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = contentColor,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Language,
+                        contentDescription = "Translation",
+                        tint = contentColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = translationDisplay,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = contentColor,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
-            // Font selection button with icon in rounded box
+            Spacer(Modifier.width(8.dp))
+
+            // Font selection button with font hint
+            val fontDisplay = when (selectedArabicFont) {
+                "pdms_saleem" -> "PS"
+                "noor_e_hidayat" -> "NH"
+                "thabit" -> "TH"
+                "uthmani_script" -> "US"
+                "indopak_script" -> "IP"
+                else -> "F"
+            }
             Surface(
                 onClick = onFontClick,
                 modifier = Modifier.size(40.dp),
@@ -883,17 +901,36 @@ private fun AlbumPlayerTopBar(
                 color = contentColor.copy(alpha = 0.12f),
                 contentColor = contentColor
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                     modifier = Modifier.fillMaxSize()
                 ) {
                     Icon(
-                        imageVector = Icons.Default.FontDownload,
+                        imageVector = Icons.Default.TextFormat,
                         contentDescription = "Font selection",
                         tint = contentColor,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = fontDisplay,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = contentColor,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
+            }
+
+            Spacer(Modifier.width(4.dp))
+
+            // Tajweed toggle button - uses Check icons like bookmark
+            IconButton(onClick = onTajweedClick) {
+                Icon(
+                    imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                    contentDescription = if (showTajweed) "Disable Tajweed colors" else "Enable Tajweed colors",
+                    tint = contentColor
+                )
             }
 
             IconButton(onClick = onBookmarkClick) {
@@ -1084,7 +1121,7 @@ private fun AlbumPlayerContent(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .offset(y = (-168.dp)) // Position FAB lower with more overlap on info card (75% on info card, 25% on artwork)
-                        .padding(end = 24.dp)
+                        .padding(end = 12.dp)
                 ) {
                     FloatingActionButton(
                         onClick = {
@@ -1946,9 +1983,6 @@ private fun FloatingActionToolbar(
     onSetAlignment: (String) -> Unit = {},
     showTranslation: Boolean = true,
     onToggleTranslation: () -> Unit = {},
-    showTajweed: Boolean = false,
-    onToggleTajweed: () -> Unit = {},
-    onShowTajweedLegend: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
 
@@ -2069,24 +2103,6 @@ private fun FloatingActionToolbar(
                         selected = showTranslation,
                         onClick = onToggleTranslation
                     )
-
-                    // Toggle Tajweed color-coding
-                    FloatingToolbarButton(
-                        icon = Icons.Default.Palette,
-                        contentDescription = if (showTajweed) "Disable Tajweed colors" else "Enable Tajweed colors",
-                        selected = showTajweed,
-                        onClick = onToggleTajweed
-                    )
-
-                    // Tajweed legend info button (only shown when Tajweed is enabled)
-                    if (showTajweed) {
-                        FloatingToolbarButton(
-                            icon = Icons.Default.Info,
-                            contentDescription = "Show Tajweed color guide",
-                            selected = false,
-                            onClick = onShowTajweedLegend
-                        )
-                    }
                 }
             }
             }

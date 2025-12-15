@@ -1373,6 +1373,7 @@ class PrayerSettingsRepository @Inject constructor(
             val calculationMethod = when (methodName) {
                 "Muslim_World_League" -> CalculationMethod.MUSLIM_WORLD_LEAGUE
                 "Umm_al_Qura_University_Makkah" -> CalculationMethod.UMM_AL_QURA
+                "UAE_IACAD" -> CalculationMethod.UAE_IACAD
                 "Egyptian_General_Authority_of_Survey" -> CalculationMethod.EGYPTIAN_AUTHORITY
                 "University_of_Islamic_Sciences_Karachi", "University_of_Karachi" -> CalculationMethod.UNIVERSITY_OF_ISLAMIC_SCIENCES
                 "Islamic_Society_of_North_America" -> CalculationMethod.ISNA
