@@ -8,12 +8,10 @@
     },
     "AE": {
       "name": "United Arab Emirates",
-      "calculationMethod": "Umm_al_Qura_University_Makkah",
+      "calculationMethod": "UAE_IACAD",
       "madhhab": "Maliki",
-      "customFajrAngle": 18.2,
-      "customIshaAngle": 18.2,
-      "timeOffsets":{"fajr":-17,"sunrise":-21,"dhuhr":-14,"asr":-16,"maghrib":-13,"isha":-17},
-      "coordinates": { "latitude": 23.4241, "longitude": 53.8478 }
+      "coordinates": { "latitude": 23.4241, "longitude": 53.8478 },
+      "defaultTimeOffsets": { "fajr": 0, "sunrise": 0, "dhuhr": -5, "asr": -5, "maghrib": -5, "isha": 0 }
     },
     "AF": {
       "name": "Afghanistan",
@@ -1536,6 +1534,14 @@
       "maghribOffset": 0,
       "ishaOffset": 90,
       "region": "Saudi Arabia"
+    },
+    "UAE_IACAD": {
+      "name": "UAE IACAD (Dubai)",
+      "fajrAngle": 19.5,
+      "ishaAngle": 0,
+      "maghribOffset": 0,
+      "ishaOffset": 90,
+      "region": "United Arab Emirates"
     },
     "Institute_of_Geophysics_University_of_Tehran": {
       "name": "Institute of Geophysics, University of Tehran",

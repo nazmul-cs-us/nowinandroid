@@ -487,9 +487,21 @@ fun PrayerTimesScreen(
         repo
     }
 
+    // AI SUGGESTION REPOSITORY - For AI-powered prayer time offset suggestions
+    val suggestionRepository = remember {
+        val entryPoint = EntryPointAccessors.fromApplication(
+            screenContext.applicationContext,
+            com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+        )
+        entryPoint.prayerTimeSuggestionRepository()
+    }
+
     // Observe the reactive flow - this automatically updates when Prayer Settings changes!
     val calculationSettings = repository.calculationSettingsFlow.collectAsState().value
     val storedOffsets = calculationSettings.timeOffsets
+
+    // Observe AI suggestions flow
+    val aiSuggestions = suggestionRepository.suggestions.collectAsState().value
 
     // Observe notification preferences for per-prayer notification toggles
     val notificationPreferences = repository.notificationPreferencesFlow.collectAsState().value
@@ -525,7 +537,47 @@ fun PrayerTimesScreen(
         android.util.Log.d("PrayerTimesScreen", "   🌆 Maghrib: ${notificationPreferences.maghribNotificationEnabled}")
         android.util.Log.d("PrayerTimesScreen", "   🌙 Isha: ${notificationPreferences.ishaNotificationEnabled}")
     }
-    
+
+    // Fetch AI suggestions when prayer times are available
+    LaunchedEffect(prayerTimes, calculationSettings) {
+        if (prayerTimes != null) {
+            kotlinx.coroutines.Dispatchers.IO.let { dispatcher ->
+                kotlinx.coroutines.withContext(dispatcher) {
+                    try {
+                        android.util.Log.d("PrayerTimesScreen", "✨ Fetching AI suggestions for prayer times...")
+                        suggestionRepository.fetchSuggestions(
+                            ourCalculatedTimes = prayerTimes!!,
+                            settings = com.starception.submission.prayer.model.PrayerSettings(
+                                calculationMethod = calculationSettings.calculationMethod,
+                                asrMadhhab = calculationSettings.asrMadhhab,
+                                timeOffsets = storedOffsets
+                            )
+                        )
+                    } catch (e: Exception) {
+                        android.util.Log.e("PrayerTimesScreen", "❌ Failed to fetch AI suggestions: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    // Helper function to apply AI suggestion
+    val applySuggestion: (String, Int) -> Unit = { prayerName, suggestedOffset ->
+        kotlinx.coroutines.MainScope().launch {
+            try {
+                repository.updateSinglePrayerOffset(prayerName, suggestedOffset)
+                android.util.Log.i("PrayerTimesScreen", "✨ AI suggestion applied: $prayerName → $suggestedOffset minutes")
+            } catch (e: Exception) {
+                android.util.Log.e("PrayerTimesScreen", "❌ Failed to apply suggestion: ${e.message}")
+            }
+        }
+    }
+
+    // Helper function to get AI suggestion for a specific prayer
+    val getSuggestionFor: (String) -> com.starception.submission.prayer.model.PrayerTimeSuggestion? = { prayerName ->
+        aiSuggestions.getSuggestionFor(prayerName)
+    }
+
     // LOCATION SERVICE - For Qibla compass functionality
     val locationService = remember {
         val entryPoint = EntryPointAccessors.fromApplication(
@@ -770,7 +822,9 @@ fun PrayerTimesScreen(
         notificationEnabled: Boolean = true,
         onNotificationToggle: (Boolean) -> Unit = {},
         modifier: Modifier = Modifier,
-        onShowPopup: (String) -> Unit = {}
+        onShowPopup: (String) -> Unit = {},
+        suggestion: com.starception.submission.prayer.model.PrayerTimeSuggestion? = null,
+        onApplySuggestion: ((String, Int) -> Unit)? = null
     ) {
         // Check if this specific card is in edit mode
         val isInEditMode = currentEditingTile == prayerName
@@ -1235,13 +1289,14 @@ fun PrayerTimesScreen(
                                     )
                                 }
 
-                                // Right side: Offset indicator
-                                Text(
-                                    text = if (currentOffset > 0) "+${currentOffset}m" else if (currentOffset < 0) "${currentOffset}m" else "±0m",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
-                                    color = if (currentOffset != 0) baseColor.copy(alpha = 0.85f) else baseColor.copy(alpha = 0.6f),
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(bottom = 2.dp)
+                                // Right side: Offset indicator with AI suggestion alternation
+                                com.starception.submission.feature.prayertimes.components.AiSuggestionBadge(
+                                    currentOffset = currentOffset,
+                                    suggestion = suggestion,
+                                    baseColor = baseColor,
+                                    onApplySuggestion = if (onApplySuggestion != null) {
+                                        { suggestedOffset -> onApplySuggestion(prayerName, suggestedOffset) }
+                                    } else null
                                 )
                             }
                         }
@@ -1662,7 +1717,9 @@ fun PrayerTimesScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(landscapeTileHeight),
-                                    onShowPopup = { prayerName -> popupDialState = prayerName }
+                                    onShowPopup = { prayerName -> popupDialState = prayerName },
+                                    suggestion = getSuggestionFor(orderedPrayers[i]),
+                                    onApplySuggestion = applySuggestion
                                 )
 
                                 // Second card in row (if exists)
@@ -1694,7 +1751,9 @@ fun PrayerTimesScreen(
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(landscapeTileHeight),
-                                        onShowPopup = { prayerName -> popupDialState = prayerName }
+                                        onShowPopup = { prayerName -> popupDialState = prayerName },
+                                        suggestion = getSuggestionFor(orderedPrayers[i + 1]),
+                                        onApplySuggestion = applySuggestion
                                     )
                                 } else {
                                     Spacer(modifier = Modifier.weight(1f))
@@ -1948,7 +2007,9 @@ fun PrayerTimesScreen(
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
                                 android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                            }
+                            },
+                            suggestion = getSuggestionFor(orderedPrayers[0]),
+                            onApplySuggestion = applySuggestion
                         )
                     }
 
@@ -1986,7 +2047,9 @@ fun PrayerTimesScreen(
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
                                 android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                            }
+                            },
+                            suggestion = getSuggestionFor(orderedPrayers[1]),
+                            onApplySuggestion = applySuggestion
                         )
                     }
                 }
@@ -2039,7 +2102,9 @@ fun PrayerTimesScreen(
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
                                 android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                            }
+                            },
+                            suggestion = getSuggestionFor(orderedPrayers[2]),
+                            onApplySuggestion = applySuggestion
                         )
                     }
 
@@ -2077,11 +2142,13 @@ fun PrayerTimesScreen(
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
                                 android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                            }
+                            },
+                            suggestion = getSuggestionFor(orderedPrayers[3]),
+                            onApplySuggestion = applySuggestion
                         )
                     }
                 }
-                
+
                 // Material 3 expressive expandable section with spring-based animations
                 AnimatedVisibility(
                     visible = showAllPrayers,
@@ -2166,7 +2233,9 @@ fun PrayerTimesScreen(
                                     android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                     popupDialState = prayerName
                                     android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                                }
+                                },
+                                suggestion = getSuggestionFor(orderedPrayers[4]),
+                                onApplySuggestion = applySuggestion
                             )
                         }
 
@@ -2211,12 +2280,14 @@ fun PrayerTimesScreen(
                                     android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                     popupDialState = prayerName
                                     android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                                }
+                                },
+                                suggestion = getSuggestionFor(orderedPrayers[5]),
+                                onApplySuggestion = applySuggestion
                             )
                         }
                     }
                 }
-                
+
                 // Material 3 expressive toggle button with smooth icon rotation and scale
                 val buttonIconRotation by animateFloatAsState(
                     targetValue = if (showAllPrayers) 180f else 0f,

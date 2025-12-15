@@ -124,8 +124,9 @@ class CountryPrayerMethodService @Inject constructor(
                     // Extract custom angle parameters from JSON
                     customFajrAngle = calculationMethodDetails?.fajrAngle,
                     customIshaAngle = calculationMethodDetails?.let { method ->
-                        // Only use ishaAngle if it's not 0 (some methods use ishaOffset instead)
-                        if (method.ishaAngle != 0.0) method.ishaAngle else null
+                        // If ishaOffset is set (delay-based), set ishaAngle to 0.0 so getEffectiveIshaAngle() returns null
+                        // This forces delay-based calculation instead of using enum's default ishaAngle
+                        if (method.ishaOffset > 0) 0.0 else if (method.ishaAngle > 0) method.ishaAngle else null
                     },
                     customMaghribOffset = calculationMethodDetails?.let { method ->
                         if (method.maghribOffset != 0.0) method.maghribOffset.toInt() else null
@@ -304,6 +305,7 @@ class CountryPrayerMethodService @Inject constructor(
     private fun mapCalculationMethod(methodName: String): CalculationMethod {
         return when (methodName) {
             "Umm_al_Qura_University_Makkah" -> CalculationMethod.UMM_AL_QURA
+            "UAE_IACAD" -> CalculationMethod.UAE_IACAD
             "Egyptian_General_Authority_of_Survey" -> CalculationMethod.EGYPTIAN_AUTHORITY
             "University_of_Karachi" -> CalculationMethod.UNIVERSITY_OF_ISLAMIC_SCIENCES
             "Institute_of_Geophysics_University_of_Tehran" -> CalculationMethod.INSTITUTE_OF_GEOPHYSICS_TEHRAN
@@ -338,7 +340,9 @@ data class LocationBasedPrayerSettings(
     val customFajrAngle: Double? = null,
     val customIshaAngle: Double? = null,
     val customMaghribOffset: Int? = null,
-    val customIshaOffset: Int? = null
+    val customIshaOffset: Int? = null,
+    // Country-specific default time offsets (in minutes) to match official times
+    val defaultTimeOffsets: DefaultTimeOffsets? = null
 )
 
 /**
@@ -356,7 +360,18 @@ data class CountryPrayerInfo(
     val name: String,
     val calculationMethod: String,
     val madhhab: String,
-    val coordinates: Coordinates
+    val coordinates: Coordinates,
+    val defaultTimeOffsets: DefaultTimeOffsets? = null
+)
+
+@Serializable
+data class DefaultTimeOffsets(
+    val fajr: Int = 0,
+    val sunrise: Int = 0,
+    val dhuhr: Int = 0,
+    val asr: Int = 0,
+    val maghrib: Int = 0,
+    val isha: Int = 0
 )
 
 @Serializable

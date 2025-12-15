@@ -21,6 +21,7 @@ interface PrayerTimeCalculatorEntryPoint {
     fun enhancedLocationService(): com.starception.submission.prayer.service.EnhancedLocationService
     fun prayerSettingsRepository(): com.starception.submission.prayer.repository.PrayerSettingsRepository
     fun locationCache(): com.starception.submission.prayer.cache.LocationCache
+    fun prayerTimeSuggestionRepository(): com.starception.submission.prayer.repository.PrayerTimeSuggestionRepository
 }
 
 /**

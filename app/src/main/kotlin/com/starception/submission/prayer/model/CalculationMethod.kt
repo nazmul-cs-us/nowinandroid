@@ -28,7 +28,15 @@ enum class CalculationMethod(
         ishaDelay = 90, // 120 in Ramadan, 90 in other months
         description = "Used in Saudi Arabia"
     ),
-    
+
+    UAE_IACAD(
+        displayName = "UAE IACAD (Dubai)",
+        fajrAngle = 19.5,
+        ishaAngle = 0.0,  // Uses time-based calculation (ishaDelay) instead of angle
+        ishaDelay = 90, // 90 minutes after Maghrib
+        description = "Official UAE calculation method (IACAD)"
+    ),
+
     EGYPTIAN_AUTHORITY(
         displayName = "Egyptian General Authority",
         fajrAngle = 19.5,
@@ -76,7 +84,8 @@ enum class CalculationMethod(
     companion object {
         fun getMethodForCountry(countryCode: String): CalculationMethod {
             return when (countryCode.uppercase()) {
-                "SA", "AE", "KW", "QA", "BH", "OM" -> UMM_AL_QURA
+                "AE" -> UAE_IACAD
+                "SA", "KW", "QA", "BH", "OM" -> UMM_AL_QURA
                 "EG", "SY", "IQ", "LB", "JO" -> EGYPTIAN_AUTHORITY
                 "PK", "BD", "IN", "AF" -> UNIVERSITY_OF_ISLAMIC_SCIENCES
                 "US", "CA", "MX" -> ISNA
