@@ -95,7 +95,8 @@ fun CompassProgressIndicator(
     var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
     var isInitializing by remember { mutableStateOf(true) }
     var magneticFieldStrength by remember { mutableFloatStateOf(0f) } // For accuracy detection
-    
+    var isInForeground by remember { mutableStateOf(true) } // Track if app is in foreground for haptic control
+
     // Throttling for compass updates to prevent flickering
     var lastCompassUpdateTime by remember { mutableLongStateOf(0L) }
     val COMPASS_UPDATE_INTERVAL_MS = 50L // Update at most every 50ms (20 updates per second)
@@ -268,6 +269,7 @@ fun CompassProgressIndicator(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
+                    isInForeground = true
                     // Register orientation sensor for compass direction
                     orientationSensor?.let {
                         sensorManager.registerListener(
@@ -286,6 +288,7 @@ fun CompassProgressIndicator(
                     }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
+                    isInForeground = false
                     // Unregister both sensors
                     sensorManager.unregisterListener(orientationListener)
                     sensorManager.unregisterListener(magneticFieldListener)
@@ -377,17 +380,18 @@ fun CompassProgressIndicator(
         val currentlyAligned = isNearQibla && !needsCalibration
 
         // Continuous pulsing haptic feedback every second while aligned (like radar confirmation)
-        LaunchedEffect(currentlyAligned) {
-            if (size >= 260.dp && currentlyAligned) {
-                android.util.Log.d("QiblaAlignment", "🎯 ALIGNED! Starting radar-style haptic loop")
-                while (currentlyAligned) {
+        // Only trigger haptic when app is in foreground to avoid background vibration annoyance
+        LaunchedEffect(currentlyAligned, isInForeground) {
+            if (size >= 260.dp && currentlyAligned && isInForeground) {
+                android.util.Log.d("QiblaAlignment", "🎯 ALIGNED! Starting radar-style haptic loop (foreground)")
+                while (currentlyAligned && isInForeground) {
                     // Strong haptic pulse
                     hapticFeedback.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                     android.util.Log.d("QiblaAlignment", "📡 Haptic pulse (radar ping)")
                     // Wait 1 second before next pulse
                     kotlinx.coroutines.delay(1000)
                 }
-                android.util.Log.d("QiblaAlignment", "⏸️ Stopped haptic loop (not aligned)")
+                android.util.Log.d("QiblaAlignment", "⏸️ Stopped haptic loop (not aligned or backgrounded)")
             }
         }
 
