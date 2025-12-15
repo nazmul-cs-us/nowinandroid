@@ -1,0 +1,383 @@
+package com.starception.submission.feature.surah
+
+import android.content.Context
+import android.content.SharedPreferences
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.starception.submission.core.qurandatabase.Ayah
+import com.starception.submission.core.qurandatabase.Surah
+import com.starception.submission.core.qurandatabase.QuranTranslationHelper
+import com.starception.submission.core.qurandatabase.QuranTranslationRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class SurahDetailViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val quranEnhancedRepository: com.starception.submission.core.qurandatabase.QuranEnhancedRepository,
+    private val tajweedRepository: com.starception.submission.feature.surah.tajweed.TajweedRepository
+) : ViewModel() {
+
+    private val prefs: SharedPreferences = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
+
+    private val _uiState = MutableStateFlow<SurahDetailUiState>(SurahDetailUiState.Loading)
+    val uiState: StateFlow<SurahDetailUiState> = _uiState.asStateFlow()
+
+    private val _showBismillahRow = MutableStateFlow(false)
+    val showBismillahRow: StateFlow<Boolean> = _showBismillahRow.asStateFlow()
+
+    private val _currentTranslation = MutableStateFlow(
+        prefs.getString("quran_translation", "ar") ?: "ar"
+    )
+    val currentTranslation: StateFlow<String> = _currentTranslation.asStateFlow()
+
+    private val _selectedArabicFont = MutableStateFlow(
+        prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+    )
+    val selectedArabicFont: StateFlow<String> = _selectedArabicFont.asStateFlow()
+
+    private val _arabicFontSize = MutableStateFlow(
+        prefs.getFloat("arabic_font_size", 22f)
+    )
+    val arabicFontSize: StateFlow<Float> = _arabicFontSize.asStateFlow()
+
+    private val _currentVolume = MutableStateFlow(
+        prefs.getFloat("audio_volume", 0.7f)
+    )
+    val currentVolume: StateFlow<Float> = _currentVolume.asStateFlow()
+
+    private val _currentAudioLanguage = MutableStateFlow(
+        prefs.getString("audio_language", "ARABIC_ONLY") ?: "ARABIC_ONLY"
+    )
+    val currentAudioLanguage: StateFlow<String> = _currentAudioLanguage.asStateFlow()
+
+    private val _showTranslation = MutableStateFlow(
+        prefs.getBoolean("show_translation", true)
+    )
+    val showTranslation: StateFlow<Boolean> = _showTranslation.asStateFlow()
+
+    private val _textAlignment = MutableStateFlow(
+        prefs.getString("text_alignment", "start") ?: "start"
+    )
+    val textAlignment: StateFlow<String> = _textAlignment.asStateFlow()
+
+    // Tajweed settings
+    private val _showTajweed = MutableStateFlow(
+        prefs.getBoolean("show_tajweed", false)
+    )
+    val showTajweed: StateFlow<Boolean> = _showTajweed.asStateFlow()
+
+    private val _tajweedAnnotations = MutableStateFlow<Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>>(emptyMap())
+    val tajweedAnnotations: StateFlow<Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>> = _tajweedAnnotations.asStateFlow()
+
+    private val translations = QuranTranslationHelper.getAvailableTranslations()
+
+    fun getRepository(translationCode: String): QuranTranslationRepository {
+        return QuranTranslationRepository(context, translationCode)
+    }
+
+    fun loadSurah(surahNumber: Int) {
+        loadSurah(surahNumber, _currentTranslation.value)
+        // Load Tajweed annotations for this surah
+        loadTajweedForSurah(surahNumber)
+    }
+
+    /**
+     * Helper function to check if Bismillah exists in the ayah text
+     */
+    private fun hasBismillah(ayahText: String): Boolean {
+        val bismillahRegex = Regex(
+            "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*ا[ٱ]*لل[َّ]*ه[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ْۡ]*م[َٰ]*ن[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
+            RegexOption.IGNORE_CASE
+        )
+
+        if (bismillahRegex.containsMatchIn(ayahText)) {
+            return true
+        }
+
+        val bismillahPatterns = listOf(
+            "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ",
+            "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+            "بسم الله الرحمن الرحيم",
+            "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"
+        )
+
+        return bismillahPatterns.any { ayahText.trim().startsWith(it) }
+    }
+
+    /**
+     * Helper function to remove Bismillah from ayah text
+     */
+    private fun removeBismillahIfNeeded(ayahText: String, surahNumber: Int, ayahNumberInSurah: Int): String {
+        // Only process first ayah of surahs 2-8 and 10-114
+        if (ayahNumberInSurah != 1 || surahNumber == 1 || surahNumber == 9) {
+            return ayahText
+        }
+
+        // Use regex to match any Bismillah pattern with flexible diacritics and spacing
+        // Pattern matches: بسم الله الرحمن الرحيم (with any combination of diacritics)
+        val bismillahRegex = Regex(
+            "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*ا[ٱ]*لل[َّ]*ه[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ْۡ]*م[َٰ]*ن[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
+            RegexOption.IGNORE_CASE
+        )
+
+        var cleanedText = ayahText
+
+        // Try regex first (most flexible)
+        cleanedText = bismillahRegex.replace(cleanedText, "").trim()
+
+        // If regex didn't match (ayah text unchanged), try exact pattern matching
+        if (cleanedText == ayahText) {
+            val bismillahPatterns = listOf(
+                "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ",  // With Quranic diacritics
+                "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",  // Standard diacritics
+                "بسم الله الرحمن الرحيم",                  // Without diacritics
+                "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"   // Another variant
+            )
+
+            for (pattern in bismillahPatterns) {
+                if (cleanedText.startsWith(pattern)) {
+                    cleanedText = cleanedText.removePrefix(pattern).trim()
+                    break
+                }
+            }
+        }
+
+        android.util.Log.d("SurahDetail", "🔄 Bismillah removal | Surah $surahNumber | Original length: ${ayahText.length} | Cleaned length: ${cleanedText.length}")
+
+        return cleanedText
+    }
+
+    fun loadSurah(surahNumber: Int, translationCode: String) {
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("SurahDetail", "🔍 Loading Surah $surahNumber in translation: $translationCode")
+
+                val repository = try {
+                    getRepository(translationCode)
+                } catch (e: Exception) {
+                    android.util.Log.e("SurahDetail", "❌ Failed to create repository for translation: $translationCode", e)
+                    _uiState.value = SurahDetailUiState.Error("Failed to load translation database: ${e.message}")
+                    return@launch
+                }
+
+                val surah = repository.getSurahByNumber(surahNumber)
+
+                if (surah == null) {
+                    android.util.Log.e("SurahDetail", "❌ Surah $surahNumber not found in translation: $translationCode")
+                    _uiState.value = SurahDetailUiState.Error("Surah not found in $translationCode translation")
+                    return@launch
+                }
+
+                android.util.Log.d("SurahDetail", "✅ Surah found: ${surah.nameEnglish} (ID: ${surah.id}, Number: ${surah.number})")
+
+                // Load ayahs first to check for Bismillah in first ayah
+                val rawAyahs = if (translationCode != "ar") {
+                    val arabicRepository = getRepository("ar")
+                    arabicRepository.getAyahsBySurahOnce(surah.id)
+                } else {
+                    repository.getAyahsBySurahOnce(surah.id)
+                }
+
+                // Check if first ayah has Bismillah (only for surahs 2-8, 10-114)
+                val shouldShowBismillah = if (surahNumber != 1 && surahNumber != 9 && rawAyahs.isNotEmpty()) {
+                    hasBismillah(rawAyahs.first().text)
+                } else {
+                    false
+                }
+
+                // Update state to show/hide Bismillah row
+                _showBismillahRow.value = shouldShowBismillah
+                android.util.Log.d("SurahDetail", "🔍 Bismillah check | Surah $surahNumber | Show Bismillah: $shouldShowBismillah")
+
+                // If non-Arabic translation is selected, load both Arabic and translation
+                val ayahs = if (translationCode != "ar") {
+                    android.util.Log.d("SurahDetail", "📖 Loading dual language: Arabic + $translationCode")
+
+                    // Load Arabic ayahs
+                    val arabicRepository = getRepository("ar")
+                    val arabicAyahs = arabicRepository.getAyahsBySurahOnce(surah.id)
+
+                    // Load translation ayahs
+                    val translationAyahs = repository.getAyahsBySurahOnce(surah.id)
+
+                    // Combine them - each Ayah will show both Arabic and translation
+                    // Remove Bismillah from first ayah if needed
+                    arabicAyahs.mapIndexed { index, arabicAyah ->
+                        val translationText = translationAyahs.getOrNull(index)?.text ?: ""
+                        val cleanedArabicText = removeBismillahIfNeeded(
+                            arabicAyah.text,
+                            surahNumber,
+                            arabicAyah.numberInSurah
+                        )
+                        val cleanedTranslationText = removeBismillahIfNeeded(
+                            translationText,
+                            surahNumber,
+                            arabicAyah.numberInSurah
+                        )
+                        // Create a combined ayah with both texts separated by newlines
+                        arabicAyah.copy(
+                            text = "$cleanedArabicText\n\n$cleanedTranslationText"
+                        )
+                    }
+                } else {
+                    // Arabic only - remove Bismillah from first ayah if needed
+                    repository.getAyahsBySurahOnce(surah.id).map { ayah ->
+                        ayah.copy(
+                            text = removeBismillahIfNeeded(
+                                ayah.text,
+                                surahNumber,
+                                ayah.numberInSurah
+                            )
+                        )
+                    }
+                }
+
+                android.util.Log.d("SurahDetail", "✅ Loaded ${ayahs.size} Ayahs from $translationCode")
+                _uiState.value = SurahDetailUiState.Success(surah, ayahs)
+            } catch (e: Exception) {
+                android.util.Log.e("SurahDetail", "❌ Error loading Surah $surahNumber in translation: $translationCode", e)
+                e.printStackTrace()
+                _uiState.value = SurahDetailUiState.Error("Error: ${e.message ?: "Unknown error"}")
+            }
+        }
+    }
+
+    fun changeTranslation(translationCode: String, surahNumber: Int) {
+        viewModelScope.launch {
+            _currentTranslation.value = translationCode
+            prefs.edit().putString("quran_translation", translationCode).apply()
+            loadSurah(surahNumber, translationCode)
+        }
+    }
+
+    fun changeArabicFont(fontName: String) {
+        viewModelScope.launch {
+            _selectedArabicFont.value = fontName
+            prefs.edit().putString("arabic_font", fontName).apply()
+        }
+    }
+
+    fun changeArabicFontSize(fontSize: Float) {
+        viewModelScope.launch {
+            _arabicFontSize.value = fontSize
+            prefs.edit().putFloat("arabic_font_size", fontSize).apply()
+        }
+    }
+
+    fun changeVolume(volume: Float) {
+        viewModelScope.launch {
+            _currentVolume.value = volume
+            prefs.edit().putFloat("audio_volume", volume).apply()
+        }
+    }
+
+    fun changeAudioLanguage(languageCode: String) {
+        viewModelScope.launch {
+            _currentAudioLanguage.value = languageCode
+            prefs.edit().putString("audio_language", languageCode).apply()
+        }
+    }
+
+    fun changeShowTranslation(show: Boolean) {
+        viewModelScope.launch {
+            _showTranslation.value = show
+            prefs.edit().putBoolean("show_translation", show).apply()
+        }
+    }
+
+    fun changeTextAlignment(alignment: String) {
+        viewModelScope.launch {
+            _textAlignment.value = alignment
+            prefs.edit().putString("text_alignment", alignment).apply()
+        }
+    }
+
+    fun getAvailableTranslations(): List<String> = translations
+
+    fun getTranslationName(code: String): String = QuranTranslationHelper.getTranslationName(code)
+
+    fun getAvailableArabicFonts(): List<String> = listOf(
+        "pdms_saleem",
+        "noor_e_hidayat",
+        "thabit",
+        "uthmani_script",
+        "indopak_script"
+    )
+
+    fun getArabicFontDisplayName(font: String): String = when (font) {
+        "pdms_saleem" -> "PDMS Saleem"
+        "noor_e_hidayat" -> "Noor-e-Hidayat"
+        "thabit" -> "Thabit"
+        "uthmani_script" -> "Uthmani Script"
+        "indopak_script" -> "IndoPak Script"
+        else -> "PDMS Saleem"
+    }
+
+    // ============= Enhanced Database Features (Word Study & Tafseer) =============
+
+    private val _wordStudyData = MutableStateFlow<com.starception.submission.core.qurandatabase.AyahMeaningsItem?>(null)
+    val wordStudyData: StateFlow<com.starception.submission.core.qurandatabase.AyahMeaningsItem?> = _wordStudyData.asStateFlow()
+
+    private val _tafseerData = MutableStateFlow<com.starception.submission.core.qurandatabase.QuranAyahTafseer?>(null)
+    val tafseerData: StateFlow<com.starception.submission.core.qurandatabase.QuranAyahTafseer?> = _tafseerData.asStateFlow()
+
+    private val _selectedTafseerBook = MutableStateFlow("saadi")
+    val selectedTafseerBook: StateFlow<String> = _selectedTafseerBook.asStateFlow()
+
+    fun loadWordStudy(surahNumber: Int, ayahNumber: Int) {
+        viewModelScope.launch {
+            val meanings = quranEnhancedRepository.getAyahMeanings(surahNumber, ayahNumber)
+            _wordStudyData.value = meanings
+        }
+    }
+
+    fun loadTafseer(surahNumber: Int, ayahNumber: Int) {
+        viewModelScope.launch {
+            val tafseer = quranEnhancedRepository.getTafseerForAyah(surahNumber, ayahNumber)
+            _tafseerData.value = tafseer
+        }
+    }
+
+    fun selectTafseerBook(book: String) {
+        _selectedTafseerBook.value = book
+    }
+
+    fun clearWordStudy() {
+        _wordStudyData.value = null
+    }
+
+    fun clearTafseer() {
+        _tafseerData.value = null
+    }
+
+    // Tajweed methods
+    fun changeTajweed(enabled: Boolean) {
+        _showTajweed.value = enabled
+        prefs.edit().putBoolean("show_tajweed", enabled).apply()
+        android.util.Log.d("SurahDetailVM", "🎨 Tajweed changed to: $enabled")
+    }
+
+    fun loadTajweedForSurah(surahNumber: Int) {
+        viewModelScope.launch {
+            try {
+                val annotations = tajweedRepository.getAnnotationsForSurah(surahNumber)
+                _tajweedAnnotations.value = annotations
+                android.util.Log.d("SurahDetailVM", "📗 Loaded Tajweed for surah $surahNumber: ${annotations.size} ayahs")
+            } catch (e: Exception) {
+                android.util.Log.e("SurahDetailVM", "❌ Error loading Tajweed: ${e.message}", e)
+            }
+        }
+    }
+}
+
+sealed interface SurahDetailUiState {
+    data object Loading : SurahDetailUiState
+    data class Success(val surah: Surah, val ayahs: List<Ayah>) : SurahDetailUiState
+    data class Error(val message: String) : SurahDetailUiState
+}
