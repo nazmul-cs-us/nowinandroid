@@ -77,6 +77,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import com.starception.submission.core.qurandatabase.QuranTranslationHelper
 import com.starception.submission.core.qurandatabase.QuranTranslationRepository
+import com.starception.submission.feature.surah.tajweed.TajweedAnnotation
+import com.starception.submission.feature.surah.tajweed.TajweedParser
+import com.starception.submission.feature.surah.tajweed.TajweedTextApplier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -129,6 +132,15 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
     )
     val selectedTranslation: StateFlow<String> = _selectedTranslation.asStateFlow()
 
+    // Tajweed setting - synced with Surah page
+    private val _showTajweed = MutableStateFlow(
+        prefs.getBoolean("show_tajweed", false)
+    )
+    val showTajweed: StateFlow<Boolean> = _showTajweed.asStateFlow()
+
+    // Tajweed data cache
+    private var tajweedData: Map<String, List<TajweedAnnotation>>? = null
+
     private val _allDuas = MutableStateFlow<List<DuaItem>>(emptyList())
     val allDuas: StateFlow<List<DuaItem>> = _allDuas.asStateFlow()
 
@@ -148,10 +160,37 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                         // Reload duas with new translation
                         reloadDuasWithTranslation(newTranslation)
                     }
+                    "show_tajweed" -> {
+                        _showTajweed.value = prefs.getBoolean("show_tajweed", false)
+                    }
                 }
             }
+            // Load Tajweed data
+            loadTajweedData()
         }
         loadAllDuas(context)
+    }
+
+    /**
+     * Load Tajweed data from assets
+     */
+    private suspend fun loadTajweedData() {
+        withContext(Dispatchers.IO) {
+            try {
+                tajweedData = TajweedParser.parse(context)
+                android.util.Log.d("DuaDetailViewModel", "📗 Loaded Tajweed data with ${tajweedData?.size ?: 0} entries")
+            } catch (e: Exception) {
+                android.util.Log.e("DuaDetailViewModel", "❌ Error loading Tajweed data", e)
+            }
+        }
+    }
+
+    /**
+     * Get Tajweed annotations for a specific ayah
+     */
+    fun getTajweedAnnotations(surahNumber: Int, ayahNumber: Int): List<TajweedAnnotation> {
+        val key = "$surahNumber:$ayahNumber"
+        return tajweedData?.get(key) ?: emptyList()
     }
 
     /**
@@ -477,6 +516,7 @@ fun DuaDetailScreen(
     val viewModel = remember { DuaDetailViewModel(context) }
     val selectedFont by viewModel.selectedArabicFont.collectAsState()
     val selectedTranslation by viewModel.selectedTranslation.collectAsState()
+    val showTajweed by viewModel.showTajweed.collectAsState()
     val arabicFontFamily = getArabicFontFamilyForDua(selectedFont)
     val scope = rememberCoroutineScope()
 
@@ -766,7 +806,9 @@ fun DuaDetailScreen(
                         DuaPageContent(
                             dua = dua,
                             arabicFontFamily = arabicFontFamily,
-                            onNavigateToSurah = onNavigateToSurah
+                            onNavigateToSurah = onNavigateToSurah,
+                            showTajweed = showTajweed,
+                            getTajweedAnnotations = { surah, ayah -> viewModel.getTajweedAnnotations(surah, ayah) }
                         )
                     }
                 } else {
@@ -906,7 +948,9 @@ private fun DuaPageContent(
     dua: DuaItem,
     arabicFontFamily: FontFamily,
     modifier: Modifier = Modifier,
-    onNavigateToSurah: ((surahNumber: Int, ayahNumber: Int) -> Unit)? = null
+    onNavigateToSurah: ((surahNumber: Int, ayahNumber: Int) -> Unit)? = null,
+    showTajweed: Boolean = false,
+    getTajweedAnnotations: ((Int, Int) -> List<TajweedAnnotation>)? = null
 ) {
     Column(
         modifier = modifier
@@ -930,14 +974,39 @@ private fun DuaPageContent(
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = dua.arabicText,
-                        fontFamily = arabicFontFamily,
-                        fontSize = 36.sp,
-                        lineHeight = 58.sp,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    // Get Tajweed annotations if enabled and dua has Quran reference
+                    val tajweedAnnotations = if (showTajweed && dua.surahNumber > 0 && dua.ayahNumber > 0) {
+                        getTajweedAnnotations?.invoke(dua.surahNumber, dua.ayahNumber) ?: emptyList()
+                    } else {
+                        emptyList()
+                    }
+
+                    // Apply Tajweed coloring if enabled and annotations are available
+                    if (showTajweed && tajweedAnnotations.isNotEmpty()) {
+                        val annotatedText = TajweedTextApplier.applyWithOverlap(
+                            text = dua.arabicText,
+                            annotations = tajweedAnnotations,
+                            defaultStyle = androidx.compose.ui.text.SpanStyle(
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        )
+                        Text(
+                            text = annotatedText,
+                            fontFamily = arabicFontFamily,
+                            fontSize = 36.sp,
+                            lineHeight = 58.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        Text(
+                            text = dua.arabicText,
+                            fontFamily = arabicFontFamily,
+                            fontSize = 36.sp,
+                            lineHeight = 58.sp,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
             }
         }

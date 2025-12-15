@@ -134,6 +134,7 @@ fun QiblaGlobeView(
     var lastInteractionTime by remember { mutableStateOf(0L) }
     var wasAlignedWithQibla by remember { mutableStateOf(false) }
     var headingIndicator by remember { mutableStateOf<Polygon?>(null) }
+    var isInForeground by remember { mutableStateOf(true) } // Track if app is in foreground for haptic control
 
     // Calculate magnetic declination for location
     val magneticDeclination = remember(userLatitude, userLongitude) {
@@ -156,9 +157,9 @@ fun QiblaGlobeView(
     val normalizedDiff = if (angularDiff > 180f) 360f - angularDiff else angularDiff
     val isAlignedWithQibla = normalizedDiff <= 5f
 
-    // Haptic feedback when becoming aligned
-    LaunchedEffect(isAlignedWithQibla) {
-        if (isAlignedWithQibla && !wasAlignedWithQibla) {
+    // Haptic feedback when becoming aligned - only in foreground to avoid background vibration
+    LaunchedEffect(isAlignedWithQibla, isInForeground) {
+        if (isAlignedWithQibla && !wasAlignedWithQibla && isInForeground) {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             wasAlignedWithQibla = true
         } else if (!isAlignedWithQibla) {
@@ -292,9 +293,11 @@ fun QiblaGlobeView(
                 val observer = LifecycleEventObserver { _, event ->
                     when (event) {
                         Lifecycle.Event.ON_RESUME -> {
+                            isInForeground = true
                             worldWindow.onResume()
                         }
                         Lifecycle.Event.ON_PAUSE -> {
+                            isInForeground = false
                             worldWindow.onPause()
                         }
                         else -> {}
