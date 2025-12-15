@@ -5,7 +5,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.starception.submission.feature.surah.QuranAlbumPlayerScreen
+import com.starception.submission.feature.surah.SurahDetailScreen
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -29,8 +29,8 @@ fun NavGraphBuilder.surahScreen(
 ) {
     composable<SurahRoute> { backStackEntry ->
         val surahRoute = backStackEntry.toRoute<SurahRoute>()
-        // Use the new Compose album player screen with MaterialTheme.colorScheme
-        QuranAlbumPlayerScreen(
+        // Use the Surah detail screen with MaterialTheme.colorScheme
+        SurahDetailScreen(
             surahNumber = surahRoute.surahNumber,
             newsResourceId = surahRoute.newsResourceId,
             scrollToAyah = surahRoute.scrollToAyah,

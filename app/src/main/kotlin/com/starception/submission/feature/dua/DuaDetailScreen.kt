@@ -1310,7 +1310,7 @@ private fun SingleDuaContent(
 }
 
 /**
- * Translation selector dialog for Dua screen - matches QuranAlbumPlayerScreen style
+ * Translation selector dialog for Dua screen - matches SurahDetailScreen style
  */
 @Composable
 fun DuaTranslationSelectorDialog(
@@ -1367,7 +1367,7 @@ fun DuaTranslationSelectorDialog(
 }
 
 /**
- * Font selector dialog for Dua screen - matches QuranAlbumPlayerScreen style
+ * Font selector dialog for Dua screen - matches SurahDetailScreen style
  */
 @Composable
 fun DuaFontSelectorDialog(
