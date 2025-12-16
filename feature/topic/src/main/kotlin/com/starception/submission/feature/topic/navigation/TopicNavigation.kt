@@ -38,6 +38,7 @@ fun NavGraphBuilder.topicScreen(
     showBackButton: Boolean,
     onBackClick: () -> Unit,
     onTopicClick: (String) -> Unit,
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
 ) {
     composable<TopicRoute> { entry ->
         val id = entry.toRoute<TopicRoute>().id
@@ -45,6 +46,7 @@ fun NavGraphBuilder.topicScreen(
             showBackButton = showBackButton,
             onBackClick = onBackClick,
             onTopicClick = onTopicClick,
+            onSurahClick = onSurahClick,
             viewModel = hiltViewModel<TopicViewModel, TopicViewModel.Factory>(
                 key = id,
             ) { factory ->

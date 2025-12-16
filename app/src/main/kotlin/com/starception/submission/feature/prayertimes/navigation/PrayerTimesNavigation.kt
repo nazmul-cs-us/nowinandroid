@@ -14,9 +14,12 @@ fun NavController.navigateToPrayerTimes() = navigate(PrayerTimesRoute)
 
 fun NavGraphBuilder.prayerTimesScreen(
     onSettingsClick: () -> Unit = {},
-    locationService: EnhancedLocationService? = null
+    locationService: EnhancedLocationService? = null,
+    onSurahClick: (Int) -> Unit = {}
 ) {
     composable<PrayerTimesRoute> {
-        PrayerTimesScreen()
+        PrayerTimesScreen(
+            onSurahClick = onSurahClick
+        )
     }
 }

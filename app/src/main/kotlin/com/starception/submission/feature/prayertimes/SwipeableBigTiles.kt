@@ -1011,7 +1011,8 @@ fun SwipeableBigTiles(
     getCurrentActivity: () -> String,
     onCompassClick: () -> Unit,
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    onSurahClick: (Int) -> Unit = {}
 ) {
     // Swipeable Big Tiles - HorizontalPager with 3 tiles and infinite scroll
     val pagerState = rememberPagerState(
@@ -1119,7 +1120,8 @@ fun SwipeableBigTiles(
                     getDailyStatsTitle = getDailyStatsTitle,
                     getDailyStatsMessage = getDailyStatsMessage,
                     getPrayed = getPrayed,
-                    isLandscape = isLandscape
+                    isLandscape = isLandscape,
+                    onSurahClick = onSurahClick
                 )
                 3 -> QiblaGlobeTile(
                     prayerTimes = prayerTimes
@@ -1993,7 +1995,8 @@ private fun DailyStatsTile(
     getDailyStatsTitle: () -> String,
     getDailyStatsMessage: () -> String,
     getPrayed: () -> Int = { 0 },
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    onSurahClick: (Int) -> Unit = {}
 ) {
     val view = LocalView.current
     val context = LocalContext.current
@@ -2160,13 +2163,9 @@ private fun DailyStatsTile(
                                     HapticFeedbackConstants.CONTEXT_CLICK,
                                     HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
                                 )
-                                viewModel.selectSurah(index)
-                                if (viewModel.needsAudioPermission) {
-                                    audioPermissionState.launchPermissionRequest()
-                                } else {
-                                    viewModel.playSurah(index)
-                                    showSurahList = false  // Go back to player view
-                                }
+                                // Navigate to Surah detail screen
+                                showSurahList = false
+                                onSurahClick(surah.number)
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(8.dp),
@@ -2183,8 +2182,8 @@ private fun DailyStatsTile(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 8.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 // Smaller number badge
                                 Surface(
@@ -2195,14 +2194,14 @@ private fun DailyStatsTile(
                                     Box(
                                         contentAlignment = Alignment.Center,
                                         modifier = Modifier.fillMaxSize()
-                ) {
-                    Text(
+                                    ) {
+                                        Text(
                                             text = "${surah.number}",
                                             style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.tertiary,
+                                            color = MaterialTheme.colorScheme.tertiary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 11.sp
-                    )
+                                        )
                                     }
                                 }
 
@@ -2227,6 +2226,31 @@ private fun DailyStatsTile(
                                     )
                                 }
 
+                                // Play button - tap to play audio
+                                IconButton(
+                                    onClick = {
+                                        view.performHapticFeedback(
+                                            HapticFeedbackConstants.CONTEXT_CLICK,
+                                            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                                        )
+                                        viewModel.selectSurah(index)
+                                        if (viewModel.needsAudioPermission) {
+                                            audioPermissionState.launchPermissionRequest()
+                                        } else {
+                                            viewModel.playSurah(index)
+                                            showSurahList = false  // Go back to player view
+                                        }
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Play Surah",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
                                 // Type badge - clean and simple
                                 Text(
                                     text = surah.revelationType.take(1),
@@ -2234,7 +2258,7 @@ private fun DailyStatsTile(
                                     color = MaterialTheme.colorScheme.tertiary,
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 10.sp,
-                    modifier = Modifier
+                                    modifier = Modifier
                                         .background(
                                             MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
                                             RoundedCornerShape(4.dp)

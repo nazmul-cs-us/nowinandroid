@@ -461,9 +461,22 @@ object GoogleSampleNotificationManager {
             content
         }
         
-        // Create "Mark as Prayed" action button
-        val markAsPrayedAction = createMarkAsPrayedAction()
-        
+        // Check if this prayer is already marked as prayed
+        val isPrayerAlreadyMarked = if (currentPrayerName.isNotEmpty()) {
+            PrayerTracker.isPrayerMarkedToday(currentPrayerName)
+        } else {
+            false
+        }
+
+        // Create "Mark as Prayed" action button only if prayer is NOT already marked
+        val markAsPrayedAction = if (!isPrayerAlreadyMarked) {
+            createMarkAsPrayedAction()
+        } else {
+            android.util.Log.d("GoogleSampleNotificationManager",
+                "✅ Prayer '$currentPrayerName' already marked - hiding 'Mark as Prayed' button")
+            null
+        }
+
         // Get activity icon for notification large icon (top right corner)
         val activityIconBitmap = getActivityIconBitmap()
 
@@ -481,7 +494,11 @@ object GoogleSampleNotificationManager {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)  // Public visibility for lock screen
             .setShowWhen(true)  // Show timestamp on notification
             .setWhen(System.currentTimeMillis())  // Update timestamp with each notification update
-            .addAction(markAsPrayedAction)  // Add "Mark as Prayed" action button
+
+        // Add "Mark as Prayed" action button only if prayer is NOT already marked
+        if (markAsPrayedAction != null) {
+            notificationBuilder.addAction(markAsPrayedAction)
+        }
 
         // Add activity icon as large icon (shows in top right corner of notification)
         if (activityIconBitmap != null) {

@@ -81,6 +81,7 @@ fun NiaNavHost(
                 showBackButton = true,
                 onBackClick = navController::popBackStack,
                 onTopicClick = navController::navigateToTopic,
+                onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
             )
             // Surah screen nested within For You section
             surahScreen(
@@ -145,6 +146,12 @@ fun NiaNavHost(
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
         )
         interestsListDetailScreen()
-        prayerTimesScreen()
+        prayerTimesScreen(
+            onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) }
+        )
+        // Surah screen accessible from Prayer Times (Noble Quran tile)
+        surahScreen(
+            onBackClick = navController::popBackStack
+        )
     }
 }
