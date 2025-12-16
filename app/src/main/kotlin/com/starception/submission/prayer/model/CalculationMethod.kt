@@ -31,10 +31,10 @@ enum class CalculationMethod(
 
     UAE_IACAD(
         displayName = "UAE IACAD (Dubai)",
-        fajrAngle = 19.5,
-        ishaAngle = 0.0,  // Uses time-based calculation (ishaDelay) instead of angle
-        ishaDelay = 90, // 90 minutes after Maghrib
-        description = "Official UAE calculation method (IACAD)"
+        fajrAngle = 18.2,  // Corrected: IACAD uses 18.2° not 19.5°
+        ishaAngle = 18.2,  // Corrected: IACAD uses 18.2° angle, not 90-min delay
+        ishaDelay = 0,     // No delay - uses angle-based calculation
+        description = "Official UAE calculation method (IACAD) - 18.2° for Fajr/Isha with +3min offsets"
     ),
 
     EGYPTIAN_AUTHORITY(

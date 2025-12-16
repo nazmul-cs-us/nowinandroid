@@ -844,6 +844,12 @@ class PrayerTimesViewModel @Inject constructor(
                     locationBasedSettings.countryCode
                 } else {
                     null
+                },
+                // Apply country-specific time offsets for official prayer time matching
+                timeOffsets = if (shouldAutoUpdate && locationBasedSettings.isAutoDetected && locationBasedSettings.timeOffsets != null) {
+                    locationBasedSettings.timeOffsets.toPrayerTimeOffsets()
+                } else {
+                    currentSettings.timeOffsets
                 }
             )
             
