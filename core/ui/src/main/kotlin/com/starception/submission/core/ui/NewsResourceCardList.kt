@@ -31,13 +31,16 @@ import com.starception.submission.core.model.data.UserNewsResource
  * [UserNewsResource]s.
  *
  * [onToggleBookmark] defines the action invoked when a user wishes to bookmark an item
- * When a news resource card is tapped it will open the news resource URL in a Chrome Custom Tab.
+ * [onSurahClick] defines the action for Surah items (navigates to Surah detail instead of URL)
+ * When a news resource card is tapped it will open the news resource URL in a Chrome Custom Tab,
+ * unless it's a Surah item which navigates to the Surah detail screen.
  */
 fun LazyListScope.userNewsResourceCardItems(
     items: List<UserNewsResource>,
     onToggleBookmark: (item: UserNewsResource) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     itemModifier: Modifier = Modifier,
 ) = items(
     items = items,
@@ -48,6 +51,13 @@ fun LazyListScope.userNewsResourceCardItems(
         val context = LocalContext.current
         val analyticsHelper = LocalAnalyticsHelper.current
 
+        // Check if this is a Surah item
+        val surahNumber = extractSurahNumber(
+            title = userNewsResource.title,
+            url = userNewsResource.url,
+            type = userNewsResource.type
+        )
+
         NewsResourceCardExpanded(
             userNewsResource = userNewsResource,
             isBookmarked = userNewsResource.isSaved,
@@ -57,7 +67,13 @@ fun LazyListScope.userNewsResourceCardItems(
                 analyticsHelper.logNewsResourceOpened(
                     newsResourceId = userNewsResource.id,
                 )
-                launchCustomChromeTab(context, resourceUrl, backgroundColor)
+
+                // If it's a Surah, navigate to Surah detail instead of opening URL
+                if (surahNumber != null) {
+                    onSurahClick(surahNumber, userNewsResource.id)
+                } else {
+                    launchCustomChromeTab(context, resourceUrl, backgroundColor)
+                }
                 onNewsResourceViewed(userNewsResource.id)
             },
             onTopicClick = onTopicClick,

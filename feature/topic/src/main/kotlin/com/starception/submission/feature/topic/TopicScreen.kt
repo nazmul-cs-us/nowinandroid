@@ -75,6 +75,7 @@ fun TopicScreen(
     showBackButton: Boolean,
     onBackClick: () -> Unit,
     onTopicClick: (String) -> Unit,
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     viewModel: TopicViewModel = hiltViewModel(),
 ) {
@@ -92,6 +93,7 @@ fun TopicScreen(
         onBookmarkChanged = viewModel::bookmarkNews,
         onNewsResourceViewed = { viewModel.setNewsResourceViewed(it, true) },
         onTopicClick = onTopicClick,
+        onSurahClick = onSurahClick,
     )
 }
 
@@ -106,6 +108,7 @@ internal fun TopicScreen(
     onTopicClick: (String) -> Unit,
     onBookmarkChanged: (String, Boolean) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val state = rememberLazyListState()
@@ -146,6 +149,7 @@ internal fun TopicScreen(
                         onBookmarkChanged = onBookmarkChanged,
                         onNewsResourceViewed = onNewsResourceViewed,
                         onTopicClick = onTopicClick,
+                        onSurahClick = onSurahClick,
                     )
                 }
             }
@@ -193,13 +197,14 @@ private fun LazyListScope.topicBody(
     onBookmarkChanged: (String, Boolean) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
 ) {
     // TODO: Show icon if available
     item {
         TopicHeader(name, description, imageUrl)
     }
 
-    userNewsResourceCards(news, onBookmarkChanged, onNewsResourceViewed, onTopicClick)
+    userNewsResourceCards(news, onBookmarkChanged, onNewsResourceViewed, onTopicClick, onSurahClick)
 }
 
 @Composable
@@ -232,6 +237,7 @@ private fun LazyListScope.userNewsResourceCards(
     onBookmarkChanged: (String, Boolean) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
 ) {
     when (news) {
         is NewsUiState.Success -> {
@@ -240,6 +246,7 @@ private fun LazyListScope.userNewsResourceCards(
                 onToggleBookmark = { onBookmarkChanged(it.id, !it.isSaved) },
                 onNewsResourceViewed = onNewsResourceViewed,
                 onTopicClick = onTopicClick,
+                onSurahClick = onSurahClick,
                 itemModifier = Modifier.padding(24.dp),
             )
         }

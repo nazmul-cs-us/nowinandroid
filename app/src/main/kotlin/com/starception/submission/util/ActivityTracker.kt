@@ -10,6 +10,9 @@ import android.media.ToneGenerator
 import android.media.AudioManager
 import android.media.MediaPlayer
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,6 +66,10 @@ object ActivityTracker {
     private var mediaPlayer: MediaPlayer? = null
     private var previousActivity: String = ""
 
+    // Foreground state tracking - only play sound/vibration when app is visible
+    private var isAppInForeground = false
+    private var lifecycleObserverRegistered = false
+
     // Callback for activity change (used to update notification immediately)
     private var activityChangeCallback: ((String) -> Unit)? = null
     
@@ -81,6 +88,22 @@ object ActivityTracker {
     private var pendingDuaRunnable: Runnable? = null
     
     /**
+     * Lifecycle observer to track app foreground/background state
+     * Used to suppress sound/vibration notifications when app is in background
+     */
+    private val appLifecycleObserver = object : DefaultLifecycleObserver {
+        override fun onStart(owner: LifecycleOwner) {
+            isAppInForeground = true
+            Log.d("ActivityTracker", "📱 App moved to FOREGROUND - sound/vibration enabled")
+        }
+
+        override fun onStop(owner: LifecycleOwner) {
+            isAppInForeground = false
+            Log.d("ActivityTracker", "📱 App moved to BACKGROUND - sound/vibration disabled")
+        }
+    }
+
+    /**
      * Initialize the activity tracker with sensor-based detection
      * Also loads saved notification mode preference from storage
      *
@@ -94,6 +117,19 @@ object ActivityTracker {
             // Only create service instance once
             if (activityDetectionService == null) {
                 activityDetectionService = ActivityDetectionService(context.applicationContext)
+            }
+
+            // Register lifecycle observer to track foreground state (only once)
+            if (!lifecycleObserverRegistered) {
+                try {
+                    ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
+                    lifecycleObserverRegistered = true
+                    // Assume foreground on initialization since it's called from Activity
+                    isAppInForeground = true
+                    Log.d("ActivityTracker", "📱 Lifecycle observer registered for foreground tracking")
+                } catch (e: Exception) {
+                    Log.w("ActivityTracker", "Failed to register lifecycle observer: ${e.message}")
+                }
             }
 
             // Load saved notification mode preference
@@ -405,8 +441,15 @@ object ActivityTracker {
     
     /**
      * Play notification when activity changes (based on selected mode)
+     * Only plays sound/vibration when app is in foreground to avoid disturbing user
      */
     private fun playActivityChangeBeep() {
+        // Skip sound/vibration when app is in background
+        if (!isAppInForeground) {
+            Log.d("ActivityTracker", "🔕 Activity changed but app in BACKGROUND - suppressing sound/vibration")
+            return
+        }
+
         when (_notificationMode.value) {
             NotificationMode.MUTE -> {
                 Log.d("ActivityTracker", "🔇 Activity change notification muted")
@@ -415,11 +458,11 @@ object ActivityTracker {
             NotificationMode.SPEAKER -> {
                 playSound()
                 playVibration()
-                Log.d("ActivityTracker", "🔊 Activity change: Sound + Vibrate")
+                Log.d("ActivityTracker", "🔊 Activity change: Sound + Vibrate (app in foreground)")
             }
             NotificationMode.VIBRATE -> {
                 playVibration()
-                Log.d("ActivityTracker", "📳 Activity change: Vibrate only")
+                Log.d("ActivityTracker", "📳 Activity change: Vibrate only (app in foreground)")
             }
         }
     }

@@ -27,11 +27,16 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.FontDownload
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.filled.TextFormat
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
@@ -269,6 +274,15 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
      */
     fun isDuaBookmarked(duaId: String): Boolean {
         return duaId in bookmarkedDuas
+    }
+
+    /**
+     * Toggle Tajweed display
+     */
+    fun toggleTajweed() {
+        val newValue = !_showTajweed.value
+        prefs.edit().putBoolean("show_tajweed", newValue).apply()
+        _showTajweed.value = newValue
     }
 
     /**
@@ -664,46 +678,83 @@ fun DuaDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Translation button with indicator
-                            IconButton(onClick = { showTranslationDialog = true }) {
+                            // Translation button with language indicator - matches SurahDetailScreen
+                            Surface(
+                                onClick = { showTranslationDialog = true },
+                                modifier = Modifier.size(40.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color.White.copy(alpha = 0.12f),
+                                contentColor = Color.White
+                            ) {
                                 Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxSize()
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Translate,
+                                        imageVector = Icons.Default.Language,
                                         contentDescription = "Translation",
                                         tint = Color.White,
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                     Text(
                                         text = translationCode,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color.White,
-                                        fontSize = 9.sp,
+                                        fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
 
-                            // Font selection button with icon in rounded box
+                            Spacer(Modifier.width(8.dp))
+
+                            // Font selection button with font hint - matches SurahDetailScreen
+                            val fontDisplay = when (selectedFont) {
+                                "pdms_saleem" -> "PS"
+                                "noor_e_hidayat" -> "NH"
+                                "thabit" -> "TH"
+                                "uthmani_script" -> "US"
+                                "indopak_script" -> "IP"
+                                else -> "F"
+                            }
                             Surface(
                                 onClick = { showFontDialog = true },
                                 modifier = Modifier.size(40.dp),
                                 shape = RoundedCornerShape(8.dp),
-                                color = Color.White.copy(alpha = 0.15f),
+                                color = Color.White.copy(alpha = 0.12f),
                                 contentColor = Color.White
                             ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
                                     modifier = Modifier.fillMaxSize()
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.FontDownload,
+                                        imageVector = Icons.Default.TextFormat,
                                         contentDescription = "Font selection",
                                         tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = fontDisplay,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
+                            }
+
+                            Spacer(Modifier.width(4.dp))
+
+                            // Tajweed toggle button - uses Check icons like SurahDetailScreen
+                            IconButton(onClick = { viewModel.toggleTajweed() }) {
+                                Icon(
+                                    imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                                    contentDescription = if (showTajweed) "Disable Tajweed colors" else "Enable Tajweed colors",
+                                    tint = Color.White
+                                )
                             }
 
                             // Bookmark button - uses NiA's bookmark system for sync with Saved tab
@@ -713,7 +764,7 @@ fun DuaDetailScreen(
                                 isBookmarked = !isBookmarked
                             }) {
                                 Icon(
-                                    imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                    imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
                                     contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
                                     tint = Color.White
                                 )
