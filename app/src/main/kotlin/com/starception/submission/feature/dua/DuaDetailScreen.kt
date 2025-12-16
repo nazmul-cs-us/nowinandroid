@@ -37,6 +37,12 @@ import androidx.compose.material.icons.filled.TextFormat
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CheckCircleOutline
+import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
@@ -636,372 +642,530 @@ fun DuaDetailScreen(
         }
     }
 
+    // Font display code for toolbar
+    val fontDisplay = when (selectedFont) {
+        "pdms_saleem" -> "PS"
+        "noor_e_hidayat" -> "NH"
+        "thabit" -> "TH"
+        "uthmani_script" -> "US"
+        "indopak_script" -> "IP"
+        else -> "F"
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surface
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                // Gradient Header - Material 3 Expressive
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(280.dp)
-                        .background(
-                            brush = Brush.linearGradient(colors = DuaGradientColors)
-                        )
-                ) {
-                    // Top toolbar row
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp)
-                            .padding(top = 12.dp, bottom = 4.dp)
-                            .align(Alignment.TopCenter),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Back button
-                        IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = Color.White
-                            )
-                        }
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            // Pager for duas - swipeable, with scrollable header inside each page
+            if (duasList.isNotEmpty()) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    val dua = duasList[page]
 
-                        // Right side toolbar buttons
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Translation button with language indicator - matches SurahDetailScreen
-                            Surface(
-                                onClick = { showTranslationDialog = true },
-                                modifier = Modifier.size(40.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color.White.copy(alpha = 0.12f),
-                                contentColor = Color.White
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Language,
-                                        contentDescription = "Translation",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = translationCode,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Spacer(Modifier.width(8.dp))
-
-                            // Font selection button with font hint - matches SurahDetailScreen
-                            val fontDisplay = when (selectedFont) {
-                                "pdms_saleem" -> "PS"
-                                "noor_e_hidayat" -> "NH"
-                                "thabit" -> "TH"
-                                "uthmani_script" -> "US"
-                                "indopak_script" -> "IP"
-                                else -> "F"
-                            }
-                            Surface(
-                                onClick = { showFontDialog = true },
-                                modifier = Modifier.size(40.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color.White.copy(alpha = 0.12f),
-                                contentColor = Color.White
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.TextFormat,
-                                        contentDescription = "Font selection",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = fontDisplay,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Spacer(Modifier.width(4.dp))
-
-                            // Tajweed toggle button - uses Check icons like SurahDetailScreen
-                            IconButton(onClick = { viewModel.toggleTajweed() }) {
-                                Icon(
-                                    imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
-                                    contentDescription = if (showTajweed) "Disable Tajweed colors" else "Enable Tajweed colors",
-                                    tint = Color.White
-                                )
-                            }
-
-                            // Bookmark button - uses NiA's bookmark system for sync with Saved tab
-                            IconButton(onClick = {
-                                // Toggle bookmark using NiA's system (dua 1 = "128", dua 2 = "129", etc.)
-                                onToggleNiaBookmark(currentNewsResourceId)
-                                isBookmarked = !isBookmarked
-                            }) {
-                                Icon(
-                                    imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                                    contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
-                                    tint = Color.White
-                                )
-                            }
-                        }
-                    }
-
-                    // Header content
-                    Column(
+                    // Each page has its own LazyColumn with header + content
+                    LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 16.dp)
-                            .padding(top = 56.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.SpaceEvenly,
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .padding(bottom = 72.dp) // Space for bottom navigation
                     ) {
-                        // Get current dua for title display
-                        val currentDua = if (duasList.isNotEmpty() && currentPage < duasList.size) {
-                            duasList[currentPage]
-                        } else null
-
-                        // Icon and Title group
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            // Dua icon - glassmorphism style with glow effect
+                        // Gradient Header - scrollable with content
+                        item {
                             Box(
-                                contentAlignment = Alignment.Center
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(280.dp)
+                                    .background(
+                                        brush = Brush.linearGradient(colors = DuaGradientColors)
+                                    )
                             ) {
-                                // Outer glow
-                                Surface(
-                                    modifier = Modifier.size(52.dp),
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = Color.White.copy(alpha = 0.08f)
-                                ) {}
-                                // Inner icon container
-                                Surface(
-                                    modifier = Modifier.size(44.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color.White.copy(alpha = 0.18f)
+                                // Top toolbar row
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp)
+                                        .padding(top = 12.dp, bottom = 4.dp)
+                                        .align(Alignment.TopCenter),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
+                                    // Back button
+                                    IconButton(onClick = onBackClick) {
                                         Icon(
-                                            imageVector = Icons.Default.AutoStories,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(22.dp)
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = "Back",
+                                            tint = Color.White
                                         )
+                                    }
+
+                                    // Right side toolbar buttons
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Translation button
+                                        Surface(
+                                            onClick = { showTranslationDialog = true },
+                                            modifier = Modifier.size(40.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = Color.White.copy(alpha = 0.12f),
+                                            contentColor = Color.White
+                                        ) {
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center,
+                                                modifier = Modifier.fillMaxSize()
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Language,
+                                                    contentDescription = "Translation",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Text(
+                                                    text = translationCode,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Color.White,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(Modifier.width(8.dp))
+
+                                        // Font selection button
+                                        Surface(
+                                            onClick = { showFontDialog = true },
+                                            modifier = Modifier.size(40.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = Color.White.copy(alpha = 0.12f),
+                                            contentColor = Color.White
+                                        ) {
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center,
+                                                modifier = Modifier.fillMaxSize()
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.TextFormat,
+                                                    contentDescription = "Font selection",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Text(
+                                                    text = fontDisplay,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Color.White,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(Modifier.width(4.dp))
+
+                                        // Tajweed toggle button
+                                        IconButton(onClick = { viewModel.toggleTajweed() }) {
+                                            Icon(
+                                                imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                                                contentDescription = if (showTajweed) "Disable Tajweed colors" else "Enable Tajweed colors",
+                                                tint = Color.White
+                                            )
+                                        }
+
+                                        // Bookmark button
+                                        IconButton(onClick = {
+                                            onToggleNiaBookmark(currentNewsResourceId)
+                                            isBookmarked = !isBookmarked
+                                        }) {
+                                            Icon(
+                                                imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                                                contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
+                                                tint = Color.White
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Header content
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 16.dp)
+                                        .padding(top = 56.dp, bottom = 12.dp),
+                                    verticalArrangement = Arrangement.SpaceEvenly,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    // Icon and Title group
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        // Dua icon - glassmorphism style
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Surface(
+                                                modifier = Modifier.size(52.dp),
+                                                shape = RoundedCornerShape(14.dp),
+                                                color = Color.White.copy(alpha = 0.08f)
+                                            ) {}
+                                            Surface(
+                                                modifier = Modifier.size(44.dp),
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = Color.White.copy(alpha = 0.18f)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.AutoStories,
+                                                        contentDescription = null,
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(22.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        Text(
+                                            text = "Quranic Dua",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    }
+
+                                    // Dua theme/title
+                                    val duaTheme = dua.title
+                                        .replace(Regex("Quranic Dua \\d+:\\s*"), "")
+                                        .replace(Regex("Dua #\\d+:\\s*"), "")
+                                        .replace(Regex("Dua \\d+:\\s*"), "")
+                                        .replace(Regex("\\s*\\(\\d+:\\d+\\)\\s*$"), "")
+                                        .trim()
+
+                                    if (duaTheme.isNotEmpty() && duaTheme != dua.title) {
+                                        Text(
+                                            text = duaTheme,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = Color.White.copy(alpha = 0.9f),
+                                            fontWeight = FontWeight.Medium,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 2
+                                        )
+                                    }
+
+                                    // Quran reference link
+                                    if (dua.surahNumber > 0 && dua.ayahNumber > 0) {
+                                        val surahDisplayName = if (dua.surahName.isNotEmpty()) {
+                                            dua.surahName
+                                        } else {
+                                            "Surah ${dua.surahNumber}"
+                                        }
+
+                                        Surface(
+                                            onClick = { onNavigateToSurah?.invoke(dua.surahNumber, dua.ayahNumber) },
+                                            shape = RoundedCornerShape(20.dp),
+                                            color = Color.White.copy(alpha = 0.2f),
+                                            contentColor = Color.White
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                                            ) {
+                                                Text(
+                                                    text = "$surahDisplayName : ${dua.ayahNumber}",
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Icon(
+                                                    imageVector = Icons.Default.ChevronRight,
+                                                    contentDescription = "Go to Surah",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Main Title - "Quranic Dua"
-                            Text(
-                                text = "Quranic Dua",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            )
                         }
 
-                        // Dua theme/title from content (if available)
-                        if (currentDua != null) {
-                            // Extract theme from title (e.g., "Quranic Dua 1: Make us Muslims" -> "Make us Muslims")
-                            var duaTheme = currentDua.title
-                                .replace(Regex("Quranic Dua \\d+:\\s*"), "")
-                                .replace(Regex("Dua #\\d+:\\s*"), "")
-                                .replace(Regex("Dua \\d+:\\s*"), "")
-                                .replace(Regex("\\s*\\(\\d+:\\d+\\)\\s*$"), "") // Remove trailing (2:127) reference
-                                .trim()
+                        // Arabic Text Card
+                        if (dua.arabicText.isNotEmpty()) {
+                            item {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                        .shadow(
+                                            elevation = 8.dp,
+                                            shape = RoundedCornerShape(24.dp),
+                                            ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                        ),
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    tonalElevation = 2.dp
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 20.dp, vertical = 28.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        // Quran icon badge
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                            modifier = Modifier.padding(bottom = 16.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.MenuBook,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(8.dp).size(20.dp)
+                                            )
+                                        }
 
-                            if (duaTheme.isNotEmpty() && duaTheme != currentDua.title) {
-                                Text(
-                                    text = duaTheme,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    fontWeight = FontWeight.Medium,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 2
-                                )
+                                        val tajweedAnnotations = if (showTajweed && dua.surahNumber > 0 && dua.ayahNumber > 0) {
+                                            viewModel.getTajweedAnnotations(dua.surahNumber, dua.ayahNumber)
+                                        } else {
+                                            emptyList()
+                                        }
+
+                                        if (showTajweed && tajweedAnnotations.isNotEmpty()) {
+                                            val annotatedText = TajweedTextApplier.applyWithOverlap(
+                                                text = dua.arabicText,
+                                                annotations = tajweedAnnotations,
+                                                defaultStyle = androidx.compose.ui.text.SpanStyle(
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                            )
+                                            Text(
+                                                text = annotatedText,
+                                                fontFamily = arabicFontFamily,
+                                                fontSize = 34.sp,
+                                                lineHeight = 56.sp,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        } else {
+                                            Text(
+                                                text = dua.arabicText,
+                                                fontFamily = arabicFontFamily,
+                                                fontSize = 34.sp,
+                                                lineHeight = 56.sp,
+                                                textAlign = TextAlign.Center,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 
-                        // Quran reference link - clickable to navigate to Surah
-                        if (currentDua != null && currentDua.surahNumber > 0 && currentDua.ayahNumber > 0) {
-                            val surahDisplayName = if (currentDua.surahName.isNotEmpty()) {
-                                currentDua.surahName
-                            } else {
-                                "Surah ${currentDua.surahNumber}"
-                            }
-
-                            Surface(
-                                onClick = {
-                                    onNavigateToSurah?.invoke(currentDua.surahNumber, currentDua.ayahNumber)
-                                },
-                                shape = RoundedCornerShape(20.dp),
-                                color = Color.White.copy(alpha = 0.2f),
-                                contentColor = Color.White
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                        // Transliteration
+                        if (dua.transliteration.isNotEmpty()) {
+                            item {
+                                DuaSectionCard(
+                                    icon = Icons.Outlined.RecordVoiceOver,
+                                    title = "Transliteration",
+                                    iconTint = MaterialTheme.colorScheme.secondary,
+                                    backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                                 ) {
                                     Text(
-                                        text = "$surahDisplayName : ${currentDua.ayahNumber}",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Icon(
-                                        imageVector = Icons.Default.ChevronRight,
-                                        contentDescription = "Go to Surah",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
+                                        text = dua.transliteration,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontSize = 16.sp,
+                                            lineHeight = 26.sp,
+                                            fontStyle = FontStyle.Italic
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 }
                             }
                         }
-                    }
-                }
 
-                // Pager for duas - swipeable
-                if (duasList.isNotEmpty()) {
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    ) { page ->
-                        val dua = duasList[page]
-                        DuaPageContent(
-                            dua = dua,
-                            arabicFontFamily = arabicFontFamily,
-                            onNavigateToSurah = onNavigateToSurah,
-                            showTajweed = showTajweed,
-                            getTajweedAnnotations = { surah, ayah -> viewModel.getTajweedAnnotations(surah, ayah) }
-                        )
+                        // Translation
+                        if (dua.translation.isNotEmpty()) {
+                            item {
+                                DuaSectionCard(
+                                    icon = Icons.Outlined.Translate,
+                                    title = "Translation",
+                                    iconTint = MaterialTheme.colorScheme.tertiary,
+                                    backgroundColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = dua.translation,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontSize = 15.sp,
+                                            lineHeight = 24.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                }
+                            }
+                        }
+
+                        // Explanation
+                        if (dua.explanation.isNotEmpty()) {
+                            item {
+                                DuaSectionCard(
+                                    icon = Icons.Outlined.Lightbulb,
+                                    title = "Explanation",
+                                    iconTint = MaterialTheme.colorScheme.primary,
+                                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = dua.explanation,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 14.sp,
+                                            lineHeight = 22.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        // Bottom spacing
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
                     }
-                } else {
-                    // Fallback to single dua from navigation params
-                    val parsedContent = remember(content, quranReference) {
-                        parseDuaContent(content, quranReference)
-                    }
-                    SingleDuaContent(
-                        parsedContent = parsedContent,
-                        arabicFontFamily = arabicFontFamily,
-                        modifier = Modifier.weight(1f)
-                    )
                 }
+            } else {
+                // Fallback to single dua from navigation params
+                val parsedContent = remember(content, quranReference) {
+                    parseDuaContent(content, quranReference)
+                }
+                SingleDuaContent(
+                    parsedContent = parsedContent,
+                    arabicFontFamily = arabicFontFamily,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
 
-            // Bottom navigation bar - Material 3 Expressive
+            // Bottom navigation bar - Enhanced Material 3 Design
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 3.dp,
-                shadowElevation = 8.dp
+                tonalElevation = 4.dp,
+                shadowElevation = 12.dp
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Previous button
-                    FilledIconButton(
-                        onClick = {
-                            if (hasPrevious) {
-                                scope.launch {
-                                    pagerState.animateScrollToPage(currentPage - 1)
-                                }
-                            }
-                        },
-                        enabled = hasPrevious,
-                        modifier = Modifier.size(48.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                        )
+                Column {
+                    // Progress indicator at top
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronLeft,
-                            contentDescription = "Previous Dua",
-                            modifier = Modifier.size(28.dp)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(fraction = (currentPage + 1).toFloat() / totalDuas.toFloat())
+                                .height(3.dp)
+                                .background(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.tertiary
+                                        )
+                                    )
+                                )
                         )
                     }
 
-                    // Center indicator
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${currentPage + 1}",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "of $totalDuas Duas",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Next button
-                    FilledIconButton(
-                        onClick = {
-                            if (hasNext) {
-                                scope.launch {
-                                    pagerState.animateScrollToPage(currentPage + 1)
+                        // Previous button - Enhanced
+                        FilledIconButton(
+                            onClick = {
+                                if (hasPrevious) {
+                                    scope.launch {
+                                        pagerState.animateScrollToPage(currentPage - 1)
+                                    }
                                 }
+                            },
+                            enabled = hasPrevious,
+                            modifier = Modifier.size(50.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ChevronLeft,
+                                contentDescription = "Previous Dua",
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+
+                        // Center indicator - Enhanced with badge style
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = "${currentPage + 1}",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = " / $totalDuas",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
-                        },
-                        enabled = hasNext,
-                        modifier = Modifier.size(48.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "Next Dua",
-                            modifier = Modifier.size(28.dp)
-                        )
+                        }
+
+                        // Next button - Enhanced
+                        FilledIconButton(
+                            onClick = {
+                                if (hasNext) {
+                                    scope.launch {
+                                        pagerState.animateScrollToPage(currentPage + 1)
+                                    }
+                                }
+                            },
+                            enabled = hasNext,
+                            modifier = Modifier.size(50.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = "Next Dua",
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -1053,24 +1217,47 @@ private fun DuaPageContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .padding(bottom = 72.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Arabic Text Card
+        // Arabic Text Card - Enhanced with shadow and better styling
         if (dua.arabicText.isNotEmpty()) {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(24.dp),
+                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    ),
+                shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
-                tonalElevation = 0.dp
+                tonalElevation = 2.dp
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
+                        .padding(horizontal = 20.dp, vertical = 28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // Quran icon badge at top
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.MenuBook,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .size(20.dp)
+                        )
+                    }
+
                     // Get Tajweed annotations if enabled and dua has Quran reference
                     val tajweedAnnotations = if (showTajweed && dua.surahNumber > 0 && dua.ayahNumber > 0) {
                         getTajweedAnnotations?.invoke(dua.surahNumber, dua.ayahNumber) ?: emptyList()
@@ -1090,16 +1277,16 @@ private fun DuaPageContent(
                         Text(
                             text = annotatedText,
                             fontFamily = arabicFontFamily,
-                            fontSize = 36.sp,
-                            lineHeight = 58.sp,
+                            fontSize = 34.sp,
+                            lineHeight = 56.sp,
                             textAlign = TextAlign.Center
                         )
                     } else {
                         Text(
                             text = dua.arabicText,
                             fontFamily = arabicFontFamily,
-                            fontSize = 36.sp,
-                            lineHeight = 58.sp,
+                            fontSize = 34.sp,
+                            lineHeight = 56.sp,
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
@@ -1108,106 +1295,131 @@ private fun DuaPageContent(
             }
         }
 
-        // Transliteration
+        // Transliteration - Enhanced with icon
         if (dua.transliteration.isNotEmpty()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                tonalElevation = 0.dp
+            DuaSectionCard(
+                icon = Icons.Outlined.RecordVoiceOver,
+                title = "Transliteration",
+                iconTint = MaterialTheme.colorScheme.secondary,
+                backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
-                    Text(
-                        text = "Transliteration",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = dua.transliteration,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontSize = 16.sp,
-                            lineHeight = 26.sp,
-                            fontStyle = FontStyle.Italic
-                        ),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
+                Text(
+                    text = dua.transliteration,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 16.sp,
+                        lineHeight = 26.sp,
+                        fontStyle = FontStyle.Italic
+                    ),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
             }
         }
 
-        // Translation
+        // Translation - Enhanced with icon
         if (dua.translation.isNotEmpty()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
-                tonalElevation = 0.dp
+            DuaSectionCard(
+                icon = Icons.Outlined.Translate,
+                title = "Translation",
+                iconTint = MaterialTheme.colorScheme.tertiary,
+                backgroundColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
-                    Text(
-                        text = "Translation",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = dua.translation,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontSize = 15.sp,
-                            lineHeight = 24.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                }
+                Text(
+                    text = dua.translation,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 15.sp,
+                        lineHeight = 24.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
             }
         }
 
-        // Explanation
+        // Explanation - Enhanced with icon
         if (dua.explanation.isNotEmpty()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                tonalElevation = 0.dp
+            DuaSectionCard(
+                icon = Icons.Outlined.Lightbulb,
+                title = "Explanation",
+                iconTint = MaterialTheme.colorScheme.primary,
+                backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
-                    Text(
-                        text = "Explanation",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = dua.explanation,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 14.sp,
-                            lineHeight = 22.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = dua.explanation,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 14.sp,
+                        lineHeight = 22.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
+    }
+}
 
+/**
+ * Reusable section card component with icon header
+ */
+@Composable
+private fun DuaSectionCard(
+    icon: ImageVector,
+    title: String,
+    iconTint: Color,
+    backgroundColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 4.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = Color.Black.copy(alpha = 0.08f),
+                spotColor = Color.Black.copy(alpha = 0.05f)
+            ),
+        shape = RoundedCornerShape(20.dp),
+        color = backgroundColor,
+        tonalElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            // Header with icon
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = iconTint.copy(alpha = 0.15f),
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = iconTint,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = contentColor,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.5.sp
+                )
+            }
+            // Content
+            content()
+        }
     }
 }
 
