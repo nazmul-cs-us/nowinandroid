@@ -10,8 +10,8 @@
       "name": "United Arab Emirates",
       "calculationMethod": "UAE_IACAD",
       "madhhab": "Maliki",
-      "coordinates": { "latitude": 23.4241, "longitude": 53.8478 },
-      "defaultTimeOffsets": { "fajr": 0, "sunrise": 0, "dhuhr": -5, "asr": -5, "maghrib": -5, "isha": 0 }
+      "coordinates": { "latitude": 25.2048, "longitude": 55.2708 },
+      "timeOffsets": { "fajr": -5, "sunrise": -8, "dhuhr": -2, "asr": -4, "maghrib": 0, "isha": -5 }
     },
     "AF": {
       "name": "Afghanistan",
@@ -1537,10 +1537,10 @@
     },
     "UAE_IACAD": {
       "name": "UAE IACAD (Dubai)",
-      "fajrAngle": 19.5,
-      "ishaAngle": 0,
+      "fajrAngle": 18.2,
+      "ishaAngle": 18.2,
       "maghribOffset": 0,
-      "ishaOffset": 90,
+      "ishaOffset": 0,
       "region": "United Arab Emirates"
     },
     "Institute_of_Geophysics_University_of_Tehran": {

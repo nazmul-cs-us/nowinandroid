@@ -7,6 +7,7 @@ import android.util.Log
 import com.starception.submission.prayer.model.CalculationMethod
 import com.starception.submission.prayer.model.AsrMadhhab
 import com.starception.submission.prayer.model.Location
+import com.starception.submission.prayer.model.PrayerTimeOffsets
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -133,9 +134,11 @@ class CountryPrayerMethodService @Inject constructor(
                     },
                     customIshaOffset = calculationMethodDetails?.let { method ->
                         if (method.ishaOffset != 0.0) method.ishaOffset.toInt() else null
-                    }
+                    },
+                    // Include country-specific default time offsets to match official times
+                    timeOffsets = countrySettings.timeOffsets
                 )
-                
+
                 // Log comprehensive result
                 logInfo("✅ Auto-detection successful for ${result.countryName}")
                 logDebug("📊 Final Settings:")
@@ -144,6 +147,10 @@ class CountryPrayerMethodService @Inject constructor(
                 logDebug("   - Fajr Angle: ${result.customFajrAngle ?: "default"}°")
                 logDebug("   - Isha: ${result.customIshaAngle?.let { "${it}°" } ?: result.customIshaOffset?.let { "${it}min offset" } ?: "default"}")
                 logDebug("   - Maghrib Offset: ${result.customMaghribOffset ?: "default"}min")
+                // Log time offsets if present
+                countrySettings.timeOffsets?.let { offsets ->
+                    logDebug("   - Time Offsets: Fajr=${offsets.fajr}, Dhuhr=${offsets.dhuhr}, Asr=${offsets.asr}, Maghrib=${offsets.maghrib}, Isha=${offsets.isha}")
+                }
                 
                 result
             } else {
@@ -342,7 +349,7 @@ data class LocationBasedPrayerSettings(
     val customMaghribOffset: Int? = null,
     val customIshaOffset: Int? = null,
     // Country-specific default time offsets (in minutes) to match official times
-    val defaultTimeOffsets: DefaultTimeOffsets? = null
+    val timeOffsets: TimeOffsetsJson? = null
 )
 
 /**
@@ -361,18 +368,30 @@ data class CountryPrayerInfo(
     val calculationMethod: String,
     val madhhab: String,
     val coordinates: Coordinates,
-    val defaultTimeOffsets: DefaultTimeOffsets? = null
+    val timeOffsets: TimeOffsetsJson? = null
 )
 
 @Serializable
-data class DefaultTimeOffsets(
+data class TimeOffsetsJson(
     val fajr: Int = 0,
     val sunrise: Int = 0,
     val dhuhr: Int = 0,
     val asr: Int = 0,
     val maghrib: Int = 0,
     val isha: Int = 0
-)
+) {
+    /**
+     * Convert JSON time offsets to PrayerTimeOffsets model
+     */
+    fun toPrayerTimeOffsets(): PrayerTimeOffsets = PrayerTimeOffsets(
+        fajr = fajr,
+        sunrise = sunrise,
+        dhuhr = dhuhr,
+        asr = asr,
+        maghrib = maghrib,
+        isha = isha
+    )
+}
 
 @Serializable
 data class Coordinates(
