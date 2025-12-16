@@ -205,7 +205,22 @@ fun launchCustomChromeTab(context: Context, uri: Uri, @ColorInt toolbarColor: In
         .setDefaultColorSchemeParams(customTabBarColor)
         .build()
 
-    customTabsIntent.launchUrl(context, uri)
+    try {
+        customTabsIntent.launchUrl(context, uri)
+    } catch (e: android.content.ActivityNotFoundException) {
+        // Fallback to regular browser intent if Custom Tabs not available
+        try {
+            val browserIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+            context.startActivity(browserIntent)
+        } catch (e2: android.content.ActivityNotFoundException) {
+            // No browser available - show toast or log
+            android.widget.Toast.makeText(
+                context,
+                "No browser available to open link",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 }
 
 /**
