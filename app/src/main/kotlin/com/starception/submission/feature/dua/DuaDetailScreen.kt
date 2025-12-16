@@ -650,7 +650,7 @@ fun DuaDetailScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(160.dp)
+                        .height(280.dp)
                         .background(
                             brush = Brush.linearGradient(colors = DuaGradientColors)
                         )
@@ -659,7 +659,8 @@ fun DuaDetailScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                            .padding(horizontal = 4.dp)
+                            .padding(top = 12.dp, bottom = 4.dp)
                             .align(Alignment.TopCenter),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -675,7 +676,7 @@ fun DuaDetailScreen(
 
                         // Right side toolbar buttons
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Translation button with language indicator - matches SurahDetailScreen
@@ -776,70 +777,115 @@ fun DuaDetailScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 24.dp)
-                            .padding(top = 44.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.Center,
+                            .padding(horizontal = 16.dp)
+                            .padding(top = 56.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.SpaceEvenly,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Dua icon - glassmorphism style
-                        Surface(
-                            modifier = Modifier.size(44.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White.copy(alpha = 0.15f)
+                        // Get current dua for title display
+                        val currentDua = if (duasList.isNotEmpty() && currentPage < duasList.size) {
+                            duasList[currentPage]
+                        } else null
+
+                        // Icon and Title group
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoStories,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(22.dp)
+                            // Dua icon - glassmorphism style with glow effect
+                            Box(
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // Outer glow
+                                Surface(
+                                    modifier = Modifier.size(52.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = Color.White.copy(alpha = 0.08f)
+                                ) {}
+                                // Inner icon container
+                                Surface(
+                                    modifier = Modifier.size(44.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color.White.copy(alpha = 0.18f)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.AutoStories,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Main Title - "Quranic Dua"
+                            Text(
+                                text = "Quranic Dua",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+
+                        // Dua theme/title from content (if available)
+                        if (currentDua != null) {
+                            // Extract theme from title (e.g., "Quranic Dua 1: Make us Muslims" -> "Make us Muslims")
+                            var duaTheme = currentDua.title
+                                .replace(Regex("Quranic Dua \\d+:\\s*"), "")
+                                .replace(Regex("Dua #\\d+:\\s*"), "")
+                                .replace(Regex("Dua \\d+:\\s*"), "")
+                                .replace(Regex("\\s*\\(\\d+:\\d+\\)\\s*$"), "") // Remove trailing (2:127) reference
+                                .trim()
+
+                            if (duaTheme.isNotEmpty() && duaTheme != currentDua.title) {
+                                Text(
+                                    text = duaTheme,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 2
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Title
-                        Text(
-                            text = "Quranic Dua",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Pills row with dua number and translation
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Dua number pill
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = Color.White.copy(alpha = 0.2f)
-                            ) {
-                                Text(
-                                    text = "${currentPage + 1} / $totalDuas",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
-                                )
+                        // Quran reference link - clickable to navigate to Surah
+                        if (currentDua != null && currentDua.surahNumber > 0 && currentDua.ayahNumber > 0) {
+                            val surahDisplayName = if (currentDua.surahName.isNotEmpty()) {
+                                currentDua.surahName
+                            } else {
+                                "Surah ${currentDua.surahNumber}"
                             }
 
-                            // Translation language pill
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = Color.White.copy(alpha = 0.15f)
+                                onClick = {
+                                    onNavigateToSurah?.invoke(currentDua.surahNumber, currentDua.ayahNumber)
+                                },
+                                shape = RoundedCornerShape(20.dp),
+                                color = Color.White.copy(alpha = 0.2f),
+                                contentColor = Color.White
                             ) {
-                                Text(
-                                    text = translationDisplayName,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                                ) {
+                                    Text(
+                                        text = "$surahDisplayName : ${currentDua.ayahNumber}",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = "Go to Surah",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -1162,56 +1208,6 @@ private fun DuaPageContent(
             }
         }
 
-        // Quran reference badge - show Surah name and Ayah number (clickable link)
-        if (!dua.quranReference.isNullOrEmpty() && dua.surahNumber > 0 && dua.ayahNumber > 0) {
-            val referenceText = if (dua.surahName.isNotEmpty()) {
-                "Surah ${dua.surahName}, Ayah ${dua.ayahNumber}"
-            } else {
-                "Surah ${dua.quranReference}"
-            }
-            val isClickable = onNavigateToSurah != null
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (isClickable) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                    } else {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                    },
-                    modifier = if (isClickable) {
-                        Modifier.clickable {
-                            onNavigateToSurah?.invoke(dua.surahNumber, dua.ayahNumber)
-                        }
-                    } else {
-                        Modifier
-                    }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                    ) {
-                        Text(
-                            text = referenceText,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                        if (isClickable) {
-                            Spacer(modifier = Modifier.size(6.dp))
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = "Go to Surah",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 

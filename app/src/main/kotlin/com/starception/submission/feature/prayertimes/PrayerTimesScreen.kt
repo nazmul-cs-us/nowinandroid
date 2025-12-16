@@ -539,6 +539,22 @@ fun PrayerTimesScreen(
         android.util.Log.d("PrayerTimesScreen", "   🌙 Isha: ${notificationPreferences.ishaNotificationEnabled}")
     }
 
+    // Helper function to toggle prayer notification and update scheduled notifications
+    val togglePrayerNotificationAndUpdate: (String, Boolean) -> Unit = { prayerName, enabled ->
+        repository.togglePrayerNotification(prayerName, enabled)
+        // Update scheduled notifications to reflect the change
+        try {
+            val serviceManager = dagger.hilt.android.EntryPointAccessors.fromApplication(
+                screenContext.applicationContext,
+                com.starception.submission.prayer.service.PrayerNotificationServiceManagerEntryPoint::class.java
+            ).prayerNotificationServiceManager()
+            serviceManager.updatePrayerNotifications()
+            android.util.Log.i("PrayerTimesScreen", "🔔 NOTIFICATIONS UPDATED: $prayerName ${if (enabled) "enabled" else "disabled"}")
+        } catch (e: Exception) {
+            android.util.Log.e("PrayerTimesScreen", "❌ Failed to update notifications after toggle", e)
+        }
+    }
+
     // Fetch AI suggestions when prayer times are available
     LaunchedEffect(prayerTimes, calculationSettings) {
         if (prayerTimes != null) {
@@ -1714,7 +1730,7 @@ fun PrayerTimesScreen(
                                         else -> true
                                     },
                                     onNotificationToggle = { enabled ->
-                                        repository.togglePrayerNotification(orderedPrayers[i], enabled)
+                                        togglePrayerNotificationAndUpdate(orderedPrayers[i], enabled)
                                     },
                                     modifier = Modifier
                                         .weight(1f)
@@ -1748,7 +1764,7 @@ fun PrayerTimesScreen(
                                             else -> true
                                         },
                                         onNotificationToggle = { enabled ->
-                                            repository.togglePrayerNotification(orderedPrayers[i + 1], enabled)
+                                            togglePrayerNotificationAndUpdate(orderedPrayers[i + 1], enabled)
                                         },
                                         modifier = Modifier
                                             .weight(1f)
@@ -2000,7 +2016,7 @@ fun PrayerTimesScreen(
                                 else -> true
                             },
                             onNotificationToggle = { enabled ->
-                                repository.togglePrayerNotification(orderedPrayers[0], enabled)
+                                togglePrayerNotificationAndUpdate(orderedPrayers[0], enabled)
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -2040,7 +2056,7 @@ fun PrayerTimesScreen(
                                 else -> true
                             },
                             onNotificationToggle = { enabled ->
-                                repository.togglePrayerNotification(orderedPrayers[1], enabled)
+                                togglePrayerNotificationAndUpdate(orderedPrayers[1], enabled)
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -2095,7 +2111,7 @@ fun PrayerTimesScreen(
                                 else -> true
                             },
                             onNotificationToggle = { enabled ->
-                                repository.togglePrayerNotification(orderedPrayers[2], enabled)
+                                togglePrayerNotificationAndUpdate(orderedPrayers[2], enabled)
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -2135,7 +2151,7 @@ fun PrayerTimesScreen(
                                 else -> true
                             },
                             onNotificationToggle = { enabled ->
-                                repository.togglePrayerNotification(orderedPrayers[3], enabled)
+                                togglePrayerNotificationAndUpdate(orderedPrayers[3], enabled)
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -2219,7 +2235,7 @@ fun PrayerTimesScreen(
                                     else -> true
                                 },
                                 onNotificationToggle = { enabled ->
-                                    repository.togglePrayerNotification(orderedPrayers[4], enabled)
+                                    togglePrayerNotificationAndUpdate(orderedPrayers[4], enabled)
                                 },
                                 modifier = Modifier
                                     .weight(1f)
@@ -2266,7 +2282,7 @@ fun PrayerTimesScreen(
                                     else -> true
                                 },
                                 onNotificationToggle = { enabled ->
-                                    repository.togglePrayerNotification(orderedPrayers[5], enabled)
+                                    togglePrayerNotificationAndUpdate(orderedPrayers[5], enabled)
                                 },
                                 modifier = Modifier
                                     .weight(1f)
