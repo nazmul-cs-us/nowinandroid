@@ -590,6 +590,72 @@ fun SurahDetailScreen(
             modifier = Modifier.align(Alignment.TopCenter)
         )
 
+        // Floating Surah name that moves from info card to toolbar when scrolling
+        // Uses scroll offset for smooth translation (like DuaDetailScreen)
+        if (uiState is SurahDetailUiState.Success) {
+            val surah = (uiState as SurahDetailUiState.Success).surah
+            val density = LocalDensity.current
+            val configuration = LocalConfiguration.current
+
+            // Calculate positions once (stable values)
+            val albumHeaderHeight = configuration.screenWidthDp
+            val headerYPx = with(density) { (albumHeaderHeight + 24).dp.toPx() }
+            val toolbarYPx = with(density) { 8.dp.toPx() }
+            val startXPx = with(density) { 24.dp.toPx() }
+            val endXPx = with(density) { 56.dp.toPx() }
+
+            // Use derivedStateOf for stable, optimized updates
+            val floatingState by remember {
+                derivedStateOf {
+                    val scrollOffset = if (scrollState.firstVisibleItemIndex == 0) {
+                        scrollState.firstVisibleItemScrollOffset.toFloat()
+                    } else {
+                        headerYPx
+                    }
+                    val namesY = (headerYPx - scrollOffset).coerceAtLeast(toolbarYPx)
+                    val progress = ((headerYPx - namesY) / (headerYPx - toolbarYPx)).coerceIn(0f, 1f)
+                    Triple(namesY, progress, startXPx + (progress * (endXPx - startXPx)))
+                }
+            }
+
+            val (namesYPx, progress, xOffsetPx) = floatingState
+            val scale = 1f - (progress * 0.4f)
+            val contentColor = MaterialTheme.colorScheme.onSurface
+
+            Box(
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .graphicsLayer {
+                        translationX = xOffsetPx
+                        translationY = namesYPx
+                        scaleX = scale
+                        scaleY = scale
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                    }
+            ) {
+                Column {
+                    Text(
+                        text = surah.nameEnglish,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = contentColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = surah.nameArabic,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                            fontWeight = FontWeight.Normal
+                        ),
+                        color = contentColor.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
         // Translation selection dialog
         if (showTranslationDialog) {
             TranslationSelectionDialog(
@@ -817,41 +883,7 @@ private fun AlbumPlayerTopBar(
                 )
             }
 
-            // Smooth blending title that appears to rise from AlbumInfoCard
-            Column(
-                modifier = Modifier
-                    .padding(start = 16.dp)
-                    .graphicsLayer {
-                        alpha = collapseProgress
-                        scaleX = 0.9f + (collapseProgress * 0.1f)
-                        scaleY = 0.9f + (collapseProgress * 0.1f)
-                    }
-            ) {
-                if (collapseProgress > 0f) {
-                    // Surah name in English - matches AlbumInfoCard styling
-                    Text(
-                        text = surahName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = contentColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    // Surah name in Arabic - matches AlbumInfoCard styling
-                    Text(
-                        text = surahNameArabic,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
-                            fontWeight = FontWeight.Normal
-                        ),
-                        color = contentColor.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
+            // Spacer for title area (actual floating title is an overlay)
             Spacer(Modifier.weight(1f))
 
             // Translation button with language indicator
@@ -1483,12 +1515,8 @@ private fun AlbumInfoCard(
     selectedArabicFont: String,
     collapseProgress: Float = 0f
 ) {
-    // Debug logging to track font changes
-    LaunchedEffect(selectedArabicFont) {
-        android.util.Log.d("AlbumInfoCard_FONT", "🎨 Font changed to: $selectedArabicFont for surah: ${surah.nameArabic}")
-    }
-
     // Use MaterialTheme.colorScheme for automatic theme support
+    // NOTE: Surah names are now handled by the floating overlay for smooth scroll transition
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier
@@ -1501,33 +1529,8 @@ private fun AlbumInfoCard(
                 .padding(24.dp),
             verticalArrangement = Arrangement.Center
         ) {
-            // Surah name in English - fades out as it blends into toolbar
-            Text(
-                text = surah.nameEnglish,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.graphicsLayer {
-                    alpha = 1f - collapseProgress
-                }
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            // Surah name in Arabic - fades out as it blends into toolbar
-            Text(
-                text = surah.nameArabic,
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
-                    fontWeight = FontWeight.Normal
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.graphicsLayer {
-                    alpha = 1f - collapseProgress
-                }
-            )
-
-            Spacer(Modifier.height(16.dp))
+            // Spacer for the floating Surah name overlay (names are now positioned as overlay)
+            Spacer(Modifier.height(56.dp))
 
             // Surah info chips
             Row(
