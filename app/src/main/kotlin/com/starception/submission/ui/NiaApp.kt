@@ -71,9 +71,8 @@ import com.starception.submission.core.designsystem.component.NiaTopAppBar
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.designsystem.theme.GradientColors
 import com.starception.submission.core.designsystem.theme.LocalGradientColors
-import com.starception.submission.feature.settings.SettingsDialog
-import com.starception.submission.prayer.ui.PrayerSettingsDialog
 import com.starception.submission.navigation.NiaNavHost
+import com.starception.submission.settings.navigation.navigateToSettings
 import com.starception.submission.navigation.TopLevelDestination
 import kotlin.reflect.KClass
 import com.starception.submission.MainActivityViewModel
@@ -88,7 +87,6 @@ fun NiaApp(
 ) {
     val shouldShowGradientBackground =
         appState.currentTopLevelDestination == TopLevelDestination.FOR_YOU
-    var showSettingsDialog by rememberSaveable { mutableStateOf(false) }
 
     NiaBackground(modifier = modifier) {
         NiaGradientBackground(
@@ -113,12 +111,10 @@ fun NiaApp(
                 }
             }
 
-            NiaApp(
+            NiaAppContent(
                 appState = appState,
                 snackbarHostState = snackbarHostState,
-                showSettingsDialog = showSettingsDialog,
-                onSettingsDismissed = { showSettingsDialog = false },
-                onTopAppBarActionClick = { showSettingsDialog = true },
+                onTopAppBarActionClick = { appState.navController.navigateToSettings() },
                 windowAdaptiveInfo = windowAdaptiveInfo,
                 mainViewModel = mainViewModel,
             )
@@ -131,11 +127,9 @@ fun NiaApp(
     ExperimentalMaterial3Api::class,
     ExperimentalComposeUiApi::class,
 )
-internal fun NiaApp(
+internal fun NiaAppContent(
     appState: NiaAppState,
     snackbarHostState: SnackbarHostState,
-    showSettingsDialog: Boolean,
-    onSettingsDismissed: () -> Unit,
     onTopAppBarActionClick: () -> Unit,
     modifier: Modifier = Modifier,
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
@@ -145,27 +139,7 @@ internal fun NiaApp(
         .collectAsStateWithLifecycle()
     val currentDestination = appState.currentDestination
 
-    // Modal overlay for settings dialog
-    if (showSettingsDialog) {
-        val isPrayerTimesPage = currentDestination?.hasRoute<com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute>() == true
-        
-        // Full screen modal overlay
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            if (isPrayerTimesPage) {
-                PrayerSettingsDialog(
-                    onDismiss = { onSettingsDismissed() },
-                )
-            } else {
-                SettingsDialog(
-                    onDismiss = { onSettingsDismissed() },
-                )
-            }
-        }
-    } else {
-        // Show main app content when dialog is not shown
-        NiaNavigationSuiteScaffold(
+    NiaNavigationSuiteScaffold(
         navigationSuiteItems = {
             appState.topLevelDestinations.forEach { destination ->
                 val hasUnread = unreadDestinations.contains(destination)
@@ -274,7 +248,6 @@ internal fun NiaApp(
                 // TODO: We may want to add padding or spacer when the snackbar is shown so that
                 //  content doesn't display behind it.
             }
-        }
         }
     }
 }

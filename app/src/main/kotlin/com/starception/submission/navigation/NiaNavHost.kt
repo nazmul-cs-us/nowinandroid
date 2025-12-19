@@ -35,6 +35,7 @@ import com.starception.submission.feature.surah.navigation.surahScreen
 import com.starception.submission.feature.dua.duaDetailScreen
 import com.starception.submission.feature.dua.navigateToDuaDetail
 import com.starception.submission.navigation.TopLevelDestination.INTERESTS
+import com.starception.submission.settings.navigation.settingsScreen
 import com.starception.submission.ui.NiaAppState
 import com.starception.submission.ui.interests2pane.interestsListDetailScreen
 
@@ -151,6 +152,10 @@ fun NiaNavHost(
         )
         // Surah screen accessible from Prayer Times (Noble Quran tile)
         surahScreen(
+            onBackClick = navController::popBackStack
+        )
+        // Unified Settings screen
+        settingsScreen(
             onBackClick = navController::popBackStack
         )
     }
