@@ -1541,9 +1541,20 @@ private fun AlbumInfoCard(
             // Spacer for the floating Surah name overlay (names are now positioned as overlay)
             Spacer(Modifier.height(56.dp))
 
+            // Surah meaning (translation of the name)
+            if (surah.nameTranslation.isNotBlank()) {
+                Text(
+                    text = "\"${surah.nameTranslation}\"",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+
             // Surah info chips
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 InfoChip(text = "${surah.ayahCount} Ayahs")
                 InfoChip(text = surah.revelationType)
@@ -1611,33 +1622,8 @@ private fun MusicPlayerControls(
                 trackColor = Color.Gray.copy(alpha = 0.3f),
             )
 
-            Spacer(Modifier.height(12.dp))
-
-            // Title and Artist
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalAlignment = Alignment.Start
-            ) {
-                Text(
-                    text = surahName,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = surahNameArabic,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
-                        fontWeight = FontWeight.Normal
-                    ),
-                    color = Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
+            // Spacer for the floating Surah name overlay (names are handled by the overlay)
+            Spacer(Modifier.height(72.dp))
 
             // Playback controls - minimal style matching reference
             Row(
