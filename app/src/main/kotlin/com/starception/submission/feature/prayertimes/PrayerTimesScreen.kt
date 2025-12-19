@@ -62,6 +62,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.runtime.*
@@ -1887,7 +1888,7 @@ fun PrayerTimesScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Swipe left or right on prayer time to adjust",
+                                text = "Swipe prayer time to adjust · Tap ✨ for AI",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
                             )
