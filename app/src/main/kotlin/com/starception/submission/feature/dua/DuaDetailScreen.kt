@@ -2,6 +2,12 @@ package com.starception.submission.feature.dua
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -380,65 +386,74 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
     private fun loadAllDuas(context: Context) {
         viewModelScope.launch {
             try {
-                val inputStream = context.assets.open("news.json")
-                val reader = BufferedReader(InputStreamReader(inputStream))
-                val jsonString = reader.readText()
-                reader.close()
+                // Phase 1: Parse JSON on IO thread and emit immediately (fast)
+                val sortedDuas = withContext(Dispatchers.IO) {
+                    val inputStream = context.assets.open("news.json")
+                    val reader = BufferedReader(InputStreamReader(inputStream))
+                    val jsonString = reader.readText()
+                    reader.close()
 
-                val jsonArray = JSONArray(jsonString)
-                val duas = mutableListOf<DuaItem>()
+                    val jsonArray = JSONArray(jsonString)
+                    val duas = mutableListOf<DuaItem>()
 
-                for (i in 0 until jsonArray.length()) {
-                    val item = jsonArray.getJSONObject(i)
-                    val type = item.optString("type", "")
+                    for (i in 0 until jsonArray.length()) {
+                        val item = jsonArray.getJSONObject(i)
+                        val type = item.optString("type", "")
 
-                    if (type.contains("Dua", ignoreCase = true)) {
-                        val content = item.optString("content", "")
-                        val quranRef = item.optString("quranReference", "")
-                        val parsed = parseDuaContent(content, quranRef.ifEmpty { null })
-                        val title = item.optString("title", "")
-                        val duaNumber = Regex("#(\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
-                            ?: Regex("Dua (\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
-                            ?: (duas.size + 1)
+                        if (type.contains("Dua", ignoreCase = true)) {
+                            val content = item.optString("content", "")
+                            val quranRef = item.optString("quranReference", "")
+                            val parsed = parseDuaContent(content, quranRef.ifEmpty { null })
+                            val title = item.optString("title", "")
+                            val duaNumber = Regex("#(\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                                ?: Regex("Dua (\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                                ?: (duas.size + 1)
 
-                        // Parse the Quran reference for database lookup
-                        val (surahNumber, ayahNumber) = parseQuranReference(quranRef.ifEmpty { null })
+                            // Parse the Quran reference for database lookup
+                            val (surahNumber, ayahNumber) = parseQuranReference(quranRef.ifEmpty { null })
 
-                        duas.add(
-                            DuaItem(
-                                id = item.optString("id", ""),
-                                title = title,
-                                arabicText = parsed.arabicText,
-                                transliteration = parsed.transliteration,
-                                translation = parsed.translation,
-                                explanation = parsed.explanation,
-                                quranReference = quranRef.ifEmpty { null },
-                                duaNumber = duaNumber,
-                                surahNumber = surahNumber,
-                                ayahNumber = ayahNumber
+                            duas.add(
+                                DuaItem(
+                                    id = item.optString("id", ""),
+                                    title = title,
+                                    arabicText = parsed.arabicText,
+                                    transliteration = parsed.transliteration,
+                                    translation = parsed.translation,
+                                    explanation = parsed.explanation,
+                                    quranReference = quranRef.ifEmpty { null },
+                                    duaNumber = duaNumber,
+                                    surahNumber = surahNumber,
+                                    ayahNumber = ayahNumber
+                                )
                             )
-                        )
+                        }
                     }
+
+                    duas.sortedBy { it.duaNumber }
                 }
 
-                // Sort by dua number
-                val sortedDuas = duas.sortedBy { it.duaNumber }
+                // Emit immediately with basic data - UI can show content now
+                baseDuas = sortedDuas
+                _allDuas.value = sortedDuas
 
-                // Load Surah names and translations from database
+                // Phase 2: Load translations and Surah names in background (slow but non-blocking)
                 val translationCode = _selectedTranslation.value
-                val duasWithDetails = sortedDuas.map { dua ->
-                    if (dua.surahNumber > 0 && dua.ayahNumber > 0) {
-                        val translatedText = fetchTranslation(translationCode, dua.surahNumber, dua.ayahNumber)
-                        val surahName = fetchSurahName(dua.surahNumber)
-                        dua.copy(
-                            translation = translatedText ?: dua.translation,
-                            surahName = surahName
-                        )
-                    } else {
-                        dua
+                val duasWithDetails = withContext(Dispatchers.IO) {
+                    sortedDuas.map { dua ->
+                        if (dua.surahNumber > 0 && dua.ayahNumber > 0) {
+                            val translatedText = fetchTranslation(translationCode, dua.surahNumber, dua.ayahNumber)
+                            val surahName = fetchSurahName(dua.surahNumber)
+                            dua.copy(
+                                translation = translatedText ?: dua.translation,
+                                surahName = surahName
+                            )
+                        } else {
+                            dua
+                        }
                     }
                 }
 
+                // Update with full details
                 baseDuas = duasWithDetails
                 _allDuas.value = duasWithDetails
             } catch (e: Exception) {
@@ -659,90 +674,11 @@ fun DuaDetailScreen(
         containerColor = MaterialTheme.colorScheme.surface
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            // Show loading state with gradient header while data loads
+            // Show shimmer loading state while data loads
             if (duasList.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    // Gradient header - shown immediately
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(284.dp)
-                            .background(
-                                brush = Brush.linearGradient(colors = DuaGradientColors)
-                            )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp)
-                                .padding(top = 80.dp, bottom = 12.dp),
-                            verticalArrangement = Arrangement.SpaceEvenly,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Surface(
-                                        modifier = Modifier.size(52.dp),
-                                        shape = RoundedCornerShape(14.dp),
-                                        color = Color.White.copy(alpha = 0.08f)
-                                    ) {}
-                                    Surface(
-                                        modifier = Modifier.size(44.dp),
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = Color.White.copy(alpha = 0.18f)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.Default.AutoStories,
-                                                contentDescription = null,
-                                                tint = Color.White,
-                                                modifier = Modifier.size(22.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = "Quranic Dua",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            // Loading indicator
-                            androidx.compose.material3.CircularProgressIndicator(
-                                color = Color.White,
-                                modifier = Modifier.size(32.dp),
-                                strokeWidth = 3.dp
-                            )
-                        }
-                    }
-                    // Toolbar overlay
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp)
-                            .align(Alignment.TopCenter)
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(DuaGradientColors[0], DuaGradientColors[1])
-                                )
-                            )
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = onBackClick) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = Color.White
-                                )
-                            }
-                        }
-                    }
-                }
+                DuaShimmerLoadingContent(
+                    onBackClick = onBackClick
+                )
             }
 
             // Pager for duas - swipeable, with scrollable header inside each page
@@ -1848,4 +1784,369 @@ fun DuaFontSelectorDialog(
             }
         }
     )
+}
+
+/**
+ * Shimmer effect brush for loading placeholders
+ */
+@Composable
+private fun shimmerBrush(
+    targetValue: Float = 1000f,
+    showShimmer: Boolean = true
+): Brush {
+    return if (showShimmer) {
+        val shimmerColors = listOf(
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+        )
+
+        val transition = rememberInfiniteTransition(label = "shimmer")
+        val translateAnimation = transition.animateFloat(
+            initialValue = 0f,
+            targetValue = targetValue,
+            animationSpec = infiniteRepeatable(
+                animation = tween(
+                    durationMillis = 1000,
+                    easing = LinearEasing
+                ),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "shimmer_translate"
+        )
+
+        Brush.linearGradient(
+            colors = shimmerColors,
+            start = androidx.compose.ui.geometry.Offset(translateAnimation.value - 200f, 0f),
+            end = androidx.compose.ui.geometry.Offset(translateAnimation.value, 0f)
+        )
+    } else {
+        Brush.linearGradient(
+            colors = listOf(Color.Transparent, Color.Transparent)
+        )
+    }
+}
+
+/**
+ * Shimmer placeholder box
+ */
+@Composable
+private fun ShimmerBox(
+    modifier: Modifier = Modifier,
+    shape: RoundedCornerShape = RoundedCornerShape(8.dp)
+) {
+    val brush = shimmerBrush()
+    Box(
+        modifier = modifier
+            .background(brush = brush, shape = shape)
+    )
+}
+
+/**
+ * Shimmer loading content that matches the actual Dua layout
+ */
+@Composable
+private fun DuaShimmerLoadingContent(
+    onBackClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Gradient header - shown immediately with shimmer placeholders
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(284.dp)
+                    .background(
+                        brush = Brush.linearGradient(colors = DuaGradientColors)
+                    )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 80.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.SpaceEvenly,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        // Icon - glassmorphism style (actual content, not shimmer)
+                        Box(contentAlignment = Alignment.Center) {
+                            Surface(
+                                modifier = Modifier.size(52.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color.White.copy(alpha = 0.08f)
+                            ) {}
+                            Surface(
+                                modifier = Modifier.size(44.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color.White.copy(alpha = 0.18f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoStories,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Quranic Dua",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Shimmer placeholder for dua theme title
+                    Box(
+                        modifier = Modifier
+                            .width(180.dp)
+                            .height(24.dp)
+                            .background(
+                                color = Color.White.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                    )
+
+                    // Shimmer placeholder for Surah reference pill
+                    Box(
+                        modifier = Modifier
+                            .width(140.dp)
+                            .height(44.dp)
+                            .background(
+                                color = Color.White.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(22.dp)
+                            )
+                    )
+                }
+            }
+
+            // Content area with shimmer cards
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Arabic Text Card shimmer
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(
+                            elevation = 8.dp,
+                            shape = RoundedCornerShape(24.dp),
+                            ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        ),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    tonalElevation = 2.dp
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Arabic text shimmer lines
+                        ShimmerBox(
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .height(32.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        ShimmerBox(
+                            modifier = Modifier
+                                .fillMaxWidth(0.75f)
+                                .height(32.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        ShimmerBox(
+                            modifier = Modifier
+                                .fillMaxWidth(0.6f)
+                                .height(32.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
+                }
+
+                // Transliteration Card shimmer
+                ShimmerSectionCard(
+                    iconTint = MaterialTheme.colorScheme.secondary,
+                    backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                )
+
+                // Translation Card shimmer
+                ShimmerSectionCard(
+                    iconTint = MaterialTheme.colorScheme.tertiary,
+                    backgroundColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                )
+
+                // Explanation Card shimmer
+                ShimmerSectionCard(
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                    lineCount = 4
+                )
+            }
+        }
+
+        // Toolbar overlay - always visible
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(DuaGradientColors[0], DuaGradientColors[1])
+                    )
+                )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBackClick) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White
+                    )
+                }
+            }
+        }
+
+        // Bottom navigation bar shimmer
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 4.dp,
+            shadowElevation = 12.dp
+        ) {
+            Column {
+                // Progress indicator placeholder
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Previous button placeholder
+                    ShimmerBox(
+                        modifier = Modifier.size(50.dp),
+                        shape = RoundedCornerShape(25.dp)
+                    )
+
+                    // Center indicator placeholder
+                    ShimmerBox(
+                        modifier = Modifier
+                            .width(80.dp)
+                            .height(40.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+
+                    // Next button placeholder
+                    ShimmerBox(
+                        modifier = Modifier.size(50.dp),
+                        shape = RoundedCornerShape(25.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Shimmer placeholder for section cards (Transliteration, Translation, Explanation)
+ */
+@Composable
+private fun ShimmerSectionCard(
+    iconTint: Color,
+    backgroundColor: Color,
+    lineCount: Int = 3,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 4.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = Color.Black.copy(alpha = 0.08f),
+                spotColor = Color.Black.copy(alpha = 0.05f)
+            ),
+        shape = RoundedCornerShape(20.dp),
+        color = backgroundColor,
+        tonalElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            // Header with icon shimmer
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = iconTint.copy(alpha = 0.15f),
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        ShimmerBox(
+                            modifier = Modifier.size(18.dp),
+                            shape = RoundedCornerShape(4.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                ShimmerBox(
+                    modifier = Modifier
+                        .width(100.dp)
+                        .height(16.dp),
+                    shape = RoundedCornerShape(4.dp)
+                )
+            }
+
+            // Content lines shimmer
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(lineCount) { index ->
+                    val widthFraction = when (index) {
+                        0 -> 1f
+                        lineCount - 1 -> 0.6f
+                        else -> 0.85f
+                    }
+                    ShimmerBox(
+                        modifier = Modifier
+                            .fillMaxWidth(widthFraction)
+                            .height(14.dp),
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                }
+            }
+        }
+    }
 }

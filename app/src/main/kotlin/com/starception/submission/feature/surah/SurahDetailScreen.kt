@@ -321,23 +321,32 @@ fun SurahDetailScreen(
         }
     }
 
-    // Calculate toolbar collapse state with smooth transition
-    // Track when AlbumInfoCard (item 1) is scrolling up toward the toolbar
+    // Calculate toolbar collapse state with smooth single-stage transition:
+    // At top (album art visible) → Transparent
+    // Scrolled down (past album art) → Solid theme color
     val collapseProgress = remember {
         derivedStateOf {
+            val itemIndex = scrollState.firstVisibleItemIndex
+            val offset = scrollState.firstVisibleItemScrollOffset.toFloat()
+
             when {
-                scrollState.firstVisibleItemIndex > 1 -> 1f
-                scrollState.firstVisibleItemIndex == 1 -> {
-                    // Smooth transition as item 1 (AlbumInfoCard) scrolls up
-                    val offset = scrollState.firstVisibleItemScrollOffset
-                    (offset / 200f).coerceIn(0f, 1f)
+                // Past the header - fully solid
+                itemIndex >= 1 -> 1f
+
+                // Within AlbumHeader + InfoCard (item 0)
+                // Smooth transition as album art scrolls off
+                itemIndex == 0 -> {
+                    // Transition zone: 600px to 1000px of scroll
+                    val transitionStart = 600f
+                    val transitionEnd = 1000f
+
+                    when {
+                        offset <= transitionStart -> 0f  // Transparent
+                        offset >= transitionEnd -> 1f    // Solid
+                        else -> (offset - transitionStart) / (transitionEnd - transitionStart)
+                    }
                 }
-                scrollState.firstVisibleItemIndex == 0 -> {
-                    // Check if we're near the end of item 0 (AlbumHeader)
-                    // Assuming AlbumHeader height is around screen width (square)
-                    val offset = scrollState.firstVisibleItemScrollOffset
-                    ((offset - 800) / 200f).coerceIn(0f, 1f)
-                }
+
                 else -> 0f
             }
         }
@@ -600,7 +609,7 @@ fun SurahDetailScreen(
             // Calculate positions once (stable values)
             val albumHeaderHeight = configuration.screenWidthDp
             val headerYPx = with(density) { (albumHeaderHeight + 24).dp.toPx() }
-            val toolbarYPx = with(density) { 8.dp.toPx() }
+            val toolbarYPx = with(density) { 16.dp.toPx() }  // Moved down for better vertical centering in toolbar
             val startXPx = with(density) { 24.dp.toPx() }
             val endXPx = with(density) { 56.dp.toPx() }
 
@@ -831,18 +840,18 @@ private fun AlbumPlayerTopBar(
     onBookmarkClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // Use MaterialTheme.colorScheme for automatic theme support
-    val backgroundColor = if (isCollapsed) {
-        MaterialTheme.colorScheme.surface
-    } else {
-        Color.Transparent
-    }
+    // Smooth transition based on collapseProgress (0 = transparent, 1 = solid)
+    // Toolbar becomes transparent as user scrolls up, solid as user scrolls down
+    val backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = collapseProgress)
 
-    val contentColor = if (isCollapsed) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        Color.White
-    }
+    // Content color transitions from white (over album art) to onSurface (over solid background)
+    val surfaceColor = MaterialTheme.colorScheme.onSurface
+    val contentColor = Color(
+        red = 1f + (surfaceColor.red - 1f) * collapseProgress,
+        green = 1f + (surfaceColor.green - 1f) * collapseProgress,
+        blue = 1f + (surfaceColor.blue - 1f) * collapseProgress,
+        alpha = 1f
+    )
 
     // Get short translation code for display
     val translationDisplay = when (currentTranslation) {
@@ -863,7 +872,7 @@ private fun AlbumPlayerTopBar(
 
     Surface(
         color = backgroundColor,
-        tonalElevation = if (isCollapsed) 4.dp else 0.dp,
+        tonalElevation = (4 * collapseProgress).dp, // Smooth elevation transition
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
