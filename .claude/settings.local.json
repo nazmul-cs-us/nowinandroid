@@ -238,7 +238,10 @@
       "WebFetch(domain:iacad.gov.ae)",
       "WebFetch(domain:www.iacad.gov.ae)",
       "WebFetch(domain:www.bayut.com)",
-      "WebFetch(domain:aladhan.com)"
+      "WebFetch(domain:aladhan.com)",
+      "WebFetch(domain:services.iacad.gov.ae)",
+      "Bash(# Fetch prayer times from AlAdhan API for Dubai today (Dec 20, 2025) # Method 16 = Dubai (UAE General Authority of Islamic Affairs & Endowments) curl -s \"\"https://api.aladhan.com/v1/timings/20-12-2025?latitude=25.2048&longitude=55.2708&method=16\"\" | python3 -m json.tool)",
+      "Bash(# Also check IslamicFinder which often matches official times curl -s \"\"https://www.islamicfinder.org/prayer-widget/2761369/shafi/15/0/18.2/18.2\"\")"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

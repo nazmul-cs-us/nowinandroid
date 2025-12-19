@@ -11,7 +11,7 @@
       "calculationMethod": "UAE_IACAD",
       "madhhab": "Maliki",
       "coordinates": { "latitude": 25.2048, "longitude": 55.2708 },
-      "timeOffsets": { "fajr": -5, "sunrise": -8, "dhuhr": -2, "asr": -4, "maghrib": 0, "isha": -5 }
+      "timeOffsets": { "fajr": -2, "sunrise": -3, "dhuhr": 1, "asr": -3, "maghrib": 1, "isha": -3 }
     },
     "AF": {
       "name": "Afghanistan",
