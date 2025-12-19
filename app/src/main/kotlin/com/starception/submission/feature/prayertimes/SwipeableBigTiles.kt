@@ -1315,7 +1315,7 @@ private fun NextPrayerTile(
                                             fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = if (isLandscape) 4.dp else 8.dp, vertical = if (isLandscape) 2.dp else 4.dp)
+                                            modifier = Modifier.padding(horizontal = 0.dp, vertical = if (isLandscape) 2.dp else 4.dp)
                                     )
                                     }
                                 }

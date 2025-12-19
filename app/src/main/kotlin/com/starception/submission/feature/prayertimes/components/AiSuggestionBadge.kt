@@ -1,7 +1,8 @@
 package com.starception.submission.feature.prayertimes.components
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,7 +19,7 @@ import com.starception.submission.prayer.model.PrayerTimeSuggestion
  * Displays prayer time offset with optional AI suggestion indicator.
  *
  * Shows the current offset (e.g., "-8m", "-2m", "±0m").
- * If an AI suggestion differs from current, shows a small ✨ sparkle.
+ * If an AI suggestion differs from current, shows a small ✨ sparkle as superscript.
  * Tapping the sparkle applies the suggestion.
  *
  * @param currentOffset The user's current offset in minutes
@@ -36,9 +37,8 @@ fun AiSuggestionBadge(
 ) {
     val hasDifferentSuggestion = suggestion != null && suggestion.suggestedOffset != currentOffset
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.padding(bottom = 2.dp)
+    Box(
+        modifier = modifier.padding(bottom = 2.dp, end = if (hasDifferentSuggestion) 10.dp else 0.dp)
     ) {
         Text(
             text = formatOffset(currentOffset),
@@ -47,12 +47,15 @@ fun AiSuggestionBadge(
             fontWeight = FontWeight.Medium
         )
 
-        // Show sparkle if AI suggestion differs - tap to apply
+        // Show sparkle as superscript if AI suggestion differs - tap to apply
         if (hasDifferentSuggestion && onApplySuggestion != null) {
             Text(
-                text = " ✨",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                modifier = Modifier.clickable { onApplySuggestion(suggestion!!.suggestedOffset) }
+                text = "✨",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 8.sp),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 10.dp, y = (-2).dp)
+                    .clickable { onApplySuggestion(suggestion!!.suggestedOffset) }
             )
         }
     }
