@@ -22,6 +22,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.feature.topic.TopicScreen
 import com.starception.submission.feature.topic.TopicViewModel
 import kotlinx.serialization.Serializable
@@ -39,6 +40,7 @@ fun NavGraphBuilder.topicScreen(
     onBackClick: () -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
 ) {
     composable<TopicRoute> { entry ->
         val id = entry.toRoute<TopicRoute>().id
@@ -47,6 +49,7 @@ fun NavGraphBuilder.topicScreen(
             onBackClick = onBackClick,
             onTopicClick = onTopicClick,
             onSurahClick = onSurahClick,
+            onDuaClick = onDuaClick,
             viewModel = hiltViewModel<TopicViewModel, TopicViewModel.Factory>(
                 key = id,
             ) { factory ->
