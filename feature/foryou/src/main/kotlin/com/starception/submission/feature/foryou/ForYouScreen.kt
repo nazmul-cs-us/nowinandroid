@@ -309,7 +309,8 @@ private fun LazyStaggeredGridScope.onboarding(
                             modifier = Modifier
                                 .padding(horizontal = 24.dp)
                                 .widthIn(364.dp)
-                                .fillMaxWidth(),
+                                .fillMaxWidth()
+                                .height(48.dp),
                         ) {
                             Text(
                                 text = stringResource(R.string.feature_foryou_done),
