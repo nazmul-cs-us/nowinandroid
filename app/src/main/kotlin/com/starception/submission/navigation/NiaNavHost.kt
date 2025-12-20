@@ -83,6 +83,20 @@ fun NiaNavHost(
                 onBackClick = navController::popBackStack,
                 onTopicClick = navController::navigateToTopic,
                 onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
+                onDuaClick = { userNewsResource ->
+                    val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
+                        ?.groupValues?.get(1)?.toIntOrNull()
+                        ?: Regex("Dua (\\d+)").find(userNewsResource.title)
+                            ?.groupValues?.get(1)?.toIntOrNull()
+                        ?: 1
+                    navController.navigateToDuaDetail(
+                        title = userNewsResource.title,
+                        content = userNewsResource.content,
+                        quranReference = null,
+                        duaNumber = duaNumber,
+                        newsResourceId = userNewsResource.id
+                    )
+                },
             )
             // Surah screen nested within For You section
             surahScreen(
@@ -146,7 +160,23 @@ fun NiaNavHost(
             onTopicClick = navController::navigateToTopic,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
         )
-        interestsListDetailScreen()
+        interestsListDetailScreen(
+            onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
+            onDuaClick = { userNewsResource ->
+                val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
+                    ?.groupValues?.get(1)?.toIntOrNull()
+                    ?: Regex("Dua (\\d+)").find(userNewsResource.title)
+                        ?.groupValues?.get(1)?.toIntOrNull()
+                    ?: 1
+                navController.navigateToDuaDetail(
+                    title = userNewsResource.title,
+                    content = userNewsResource.content,
+                    quranReference = null,
+                    duaNumber = duaNumber,
+                    newsResourceId = userNewsResource.id
+                )
+            },
+        )
         prayerTimesScreen(
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) }
         )

@@ -32,8 +32,9 @@ import com.starception.submission.core.model.data.UserNewsResource
  *
  * [onToggleBookmark] defines the action invoked when a user wishes to bookmark an item
  * [onSurahClick] defines the action for Surah items (navigates to Surah detail instead of URL)
+ * [onDuaClick] defines the action for Dua items (navigates to Dua detail instead of URL)
  * When a news resource card is tapped it will open the news resource URL in a Chrome Custom Tab,
- * unless it's a Surah item which navigates to the Surah detail screen.
+ * unless it's a Surah/Dua item which navigates to the respective detail screen.
  */
 fun LazyListScope.userNewsResourceCardItems(
     items: List<UserNewsResource>,
@@ -41,6 +42,7 @@ fun LazyListScope.userNewsResourceCardItems(
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     itemModifier: Modifier = Modifier,
 ) = items(
     items = items,
@@ -58,6 +60,9 @@ fun LazyListScope.userNewsResourceCardItems(
             type = userNewsResource.type
         )
 
+        // Check if this is a Dua item
+        val isDuaItem = userNewsResource.type.contains("Dua", ignoreCase = true)
+
         NewsResourceCardExpanded(
             userNewsResource = userNewsResource,
             isBookmarked = userNewsResource.isSaved,
@@ -68,10 +73,13 @@ fun LazyListScope.userNewsResourceCardItems(
                     newsResourceId = userNewsResource.id,
                 )
 
-                // If it's a Surah, navigate to Surah detail instead of opening URL
+                // If it's a Surah, navigate to Surah detail
                 if (surahNumber != null) {
                     onSurahClick(surahNumber, userNewsResource.id)
-                } else {
+                } else if (isDuaItem) {
+                    // If it's a Dua, navigate to Dua detail
+                    onDuaClick(userNewsResource)
+                } else if (userNewsResource.url.isNotBlank()) {
                     launchCustomChromeTab(context, resourceUrl, backgroundColor)
                 }
                 onNewsResourceViewed(userNewsResource.id)

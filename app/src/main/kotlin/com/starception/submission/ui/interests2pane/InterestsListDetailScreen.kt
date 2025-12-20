@@ -52,6 +52,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.feature.interests.InterestsRoute
 import com.starception.submission.feature.interests.navigation.InterestsRoute
 import com.starception.submission.feature.topic.TopicDetailPlaceholder
@@ -64,9 +65,15 @@ import kotlin.math.max
 
 @Serializable internal object TopicPlaceholderRoute
 
-fun NavGraphBuilder.interestsListDetailScreen() {
+fun NavGraphBuilder.interestsListDetailScreen(
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+) {
     composable<InterestsRoute> {
-        InterestsListDetailScreen()
+        InterestsListDetailScreen(
+            onSurahClick = onSurahClick,
+            onDuaClick = onDuaClick,
+        )
     }
 }
 
@@ -74,12 +81,16 @@ fun NavGraphBuilder.interestsListDetailScreen() {
 internal fun InterestsListDetailScreen(
     viewModel: Interests2PaneViewModel = hiltViewModel(),
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
 ) {
     val selectedTopicId by viewModel.selectedTopicId.collectAsStateWithLifecycle()
     InterestsListDetailScreen(
         selectedTopicId = selectedTopicId,
         onTopicClick = viewModel::onTopicClick,
         windowAdaptiveInfo = windowAdaptiveInfo,
+        onSurahClick = onSurahClick,
+        onDuaClick = onDuaClick,
     )
 }
 
@@ -89,6 +100,8 @@ internal fun InterestsListDetailScreen(
     selectedTopicId: String?,
     onTopicClick: (String) -> Unit,
     windowAdaptiveInfo: WindowAdaptiveInfo,
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
 ) {
     val listDetailNavigator = rememberListDetailPaneScaffoldNavigator(
         scaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo),
@@ -205,6 +218,8 @@ internal fun InterestsListDetailScreen(
                                         }
                                     },
                                     onTopicClick = ::onTopicClickShowDetailPane,
+                                    onSurahClick = onSurahClick,
+                                    onDuaClick = onDuaClick,
                                     viewModel = hiltViewModel<TopicViewModel, TopicViewModel.Factory>(
                                         key = route.id,
                                     ) { factory ->

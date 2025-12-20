@@ -76,6 +76,7 @@ fun TopicScreen(
     onBackClick: () -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     modifier: Modifier = Modifier,
     viewModel: TopicViewModel = hiltViewModel(),
 ) {
@@ -94,6 +95,7 @@ fun TopicScreen(
         onNewsResourceViewed = { viewModel.setNewsResourceViewed(it, true) },
         onTopicClick = onTopicClick,
         onSurahClick = onSurahClick,
+        onDuaClick = onDuaClick,
     )
 }
 
@@ -109,6 +111,7 @@ internal fun TopicScreen(
     onBookmarkChanged: (String, Boolean) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     modifier: Modifier = Modifier,
 ) {
     val state = rememberLazyListState()
@@ -150,6 +153,7 @@ internal fun TopicScreen(
                         onNewsResourceViewed = onNewsResourceViewed,
                         onTopicClick = onTopicClick,
                         onSurahClick = onSurahClick,
+                        onDuaClick = onDuaClick,
                     )
                 }
             }
@@ -198,13 +202,14 @@ private fun LazyListScope.topicBody(
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
 ) {
     // TODO: Show icon if available
     item {
         TopicHeader(name, description, imageUrl)
     }
 
-    userNewsResourceCards(news, onBookmarkChanged, onNewsResourceViewed, onTopicClick, onSurahClick)
+    userNewsResourceCards(news, onBookmarkChanged, onNewsResourceViewed, onTopicClick, onSurahClick, onDuaClick)
 }
 
 @Composable
@@ -238,6 +243,7 @@ private fun LazyListScope.userNewsResourceCards(
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
 ) {
     when (news) {
         is NewsUiState.Success -> {
@@ -247,6 +253,7 @@ private fun LazyListScope.userNewsResourceCards(
                 onNewsResourceViewed = onNewsResourceViewed,
                 onTopicClick = onTopicClick,
                 onSurahClick = onSurahClick,
+                onDuaClick = onDuaClick,
                 itemModifier = Modifier.padding(24.dp),
             )
         }
