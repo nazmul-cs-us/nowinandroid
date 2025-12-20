@@ -638,8 +638,9 @@ fun DuaDetailScreen(
 
     val totalDuas = if (duasList.isNotEmpty()) duasList.size else 40
     val currentPage = pagerState.currentPage
-    val hasPrevious = currentPage > 0
-    val hasNext = currentPage < totalDuas - 1
+    // Enable circular navigation - always allow navigation when there are multiple duas
+    val hasPrevious = totalDuas > 1
+    val hasNext = totalDuas > 1
 
     // Get current NiA news resource ID for bookmark tracking
     // Dua 1 = news resource ID "128", Dua 2 = "129", etc.
@@ -1205,12 +1206,14 @@ fun DuaDetailScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Previous button - Enhanced
+                        // Previous button - Enhanced with circular navigation
                         FilledIconButton(
                             onClick = {
                                 if (hasPrevious) {
                                     scope.launch {
-                                        pagerState.animateScrollToPage(currentPage - 1)
+                                        // Wrap to last page when at first page
+                                        val targetPage = if (currentPage == 0) totalDuas - 1 else currentPage - 1
+                                        pagerState.animateScrollToPage(targetPage)
                                     }
                                 }
                             },
@@ -1253,12 +1256,14 @@ fun DuaDetailScreen(
                             }
                         }
 
-                        // Next button - Enhanced
+                        // Next button - Enhanced with circular navigation
                         FilledIconButton(
                             onClick = {
                                 if (hasNext) {
                                     scope.launch {
-                                        pagerState.animateScrollToPage(currentPage + 1)
+                                        // Wrap to first page when at last page
+                                        val targetPage = if (currentPage == totalDuas - 1) 0 else currentPage + 1
+                                        pagerState.animateScrollToPage(targetPage)
                                     }
                                 }
                             },
