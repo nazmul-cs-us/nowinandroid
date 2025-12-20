@@ -790,7 +790,7 @@ fun DuaDetailScreen(
                                             )
                                         }
 
-                                        // Placeholder space for Surah reference (actual pill is an overlay that pins to toolbar)
+                                        // Space for floating Surah pill overlay
                                         if (dua.surahNumber > 0 && dua.ayahNumber > 0) {
                                             Spacer(modifier = Modifier.height(50.dp))
                                         }
@@ -979,7 +979,7 @@ fun DuaDetailScreen(
                                     )
                                 }
 
-                                // Spacer for center (Surah pill is a floating overlay)
+                                // Spacer for center (Surah pill is a floating overlay that pins next to back button)
                                 Spacer(modifier = Modifier.weight(1f))
 
                                 // Right side toolbar buttons - matching SurahDetailScreen spacing
@@ -1074,13 +1074,13 @@ fun DuaDetailScreen(
                             }
                         }
 
-                        // Floating Surah pill that pins to toolbar when scrolled
+                        // Floating Surah pill that animates from header to toolbar (pins next to back arrow)
                         if (dua.surahNumber > 0 && dua.ayahNumber > 0 && surahDisplayName.isNotEmpty()) {
                             val density = androidx.compose.ui.platform.LocalDensity.current
 
-                            // Header position (where pill starts) and toolbar position (where pill pins)
+                            // Header position (where pill starts - centered) and toolbar position (next to back button)
                             val headerY = with(density) { 230.dp.toPx() }
-                            val toolbarY = with(density) { 8.dp.toPx() } // Vertically centered in 64dp toolbar
+                            val toolbarY = with(density) { 10.dp.toPx() } // Vertically centered in 64dp toolbar
 
                             // Get current scroll offset
                             val scrollOffset = if (lazyListState.firstVisibleItemIndex == 0) {
@@ -1089,19 +1089,15 @@ fun DuaDetailScreen(
                                 headerY // Max scroll - pill should be at toolbar position
                             }
 
-                            // Calculate pill Y position: starts at headerY, moves up with scroll, but stops at toolbarY
+                            // Calculate pill Y position: starts at headerY, moves up with scroll, stops at toolbarY
                             val pillY = (headerY - scrollOffset).coerceAtLeast(toolbarY)
 
                             // Progress: 0 = header position, 1 = toolbar position
                             val progress = ((headerY - pillY) / (headerY - toolbarY)).coerceIn(0f, 1f)
 
-                            // Scale: slightly smaller when in toolbar position
-                            val scale = 1f - (progress * 0.1f)
-
-                            // X offset: move left as it goes to toolbar to avoid overlapping with icons
-                            // At progress=0 (header): centered (0 offset)
-                            // At progress=1 (toolbar): shifted left by ~70dp to avoid overlapping translation icon
-                            val xOffset = with(density) { (-70.dp * progress).toPx() }
+                            // X offset: at progress=0 (header) = 0 (centered), at progress=1 (toolbar) = move left
+                            // Move left by half the screen width minus back button position to align next to back
+                            val xOffset = with(density) { (-100.dp * progress).toPx() }
 
                             Box(
                                 modifier = Modifier
@@ -1114,24 +1110,20 @@ fun DuaDetailScreen(
                             ) {
                                 Surface(
                                     onClick = { onNavigateToSurah?.invoke(dua.surahNumber, dua.ayahNumber) },
-                                    shape = RoundedCornerShape(20.dp),
+                                    shape = RoundedCornerShape(18.dp),
                                     color = Color.White.copy(alpha = 0.2f),
-                                    contentColor = Color.White,
-                                    modifier = Modifier.graphicsLayer {
-                                        scaleX = scale
-                                        scaleY = scale
-                                    }
+                                    contentColor = Color.White
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                                     ) {
                                         Column(
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             Text(
                                                 text = surahDisplayName,
-                                                style = MaterialTheme.typography.labelLarge,
+                                                style = MaterialTheme.typography.labelMedium,
                                                 color = Color.White,
                                                 fontWeight = FontWeight.SemiBold
                                             )
@@ -1139,15 +1131,15 @@ fun DuaDetailScreen(
                                                 text = "Ayah ${dua.ayahNumber}",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = Color.White.copy(alpha = 0.8f),
-                                                fontWeight = FontWeight.Normal
+                                                fontSize = 10.sp
                                             )
                                         }
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
                                         Icon(
                                             imageVector = Icons.Default.ChevronRight,
                                             contentDescription = "Go to Surah",
                                             tint = Color.White,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
