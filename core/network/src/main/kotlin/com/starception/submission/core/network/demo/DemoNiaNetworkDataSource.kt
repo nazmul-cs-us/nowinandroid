@@ -48,8 +48,25 @@ class DemoNiaNetworkDataSource @Inject constructor(
     override suspend fun getNewsResources(ids: List<String>?): List<NetworkNewsResource> =
         getDataFromJsonFile(NEWS_ASSET)
 
-    override suspend fun getTopicChangeList(after: Int?): List<NetworkChangeList> =
-        getTopics().mapToChangeList(NetworkTopic::id)
+    override suspend fun getTopicChangeList(after: Int?): List<NetworkChangeList> {
+        val topics = getTopics()
+        val currentTopicIds = topics.map { it.id }.toSet()
+        val currentTopics = topics.mapToChangeList(NetworkTopic::id)
+
+        // Generate delete entries for topics not in current JSON (1-20 range)
+        val allPossibleTopicIds = (1..20).map { it.toString() }.toSet()
+        val deletedTopicIds = allPossibleTopicIds - currentTopicIds
+
+        val deleteEntries = deletedTopicIds.mapIndexed { index, id ->
+            NetworkChangeList(
+                id = id,
+                changeListVersion = currentTopics.size + index,
+                isDelete = true,
+            )
+        }
+
+        return currentTopics + deleteEntries
+    }
 
     override suspend fun getNewsResourceChangeList(after: Int?): List<NetworkChangeList> =
         getNewsResources().mapToChangeList(NetworkNewsResource::id)
