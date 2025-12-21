@@ -1945,7 +1945,7 @@ private fun DuaShimmerLoadingContent(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "Quranic Dua",
+                            text = "Dua", // Generic text while loading
                             style = MaterialTheme.typography.titleLarge,
                             color = Color.White,
                             fontWeight = FontWeight.Bold
