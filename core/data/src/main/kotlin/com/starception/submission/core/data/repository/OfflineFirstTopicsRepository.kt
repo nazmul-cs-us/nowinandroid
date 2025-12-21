@@ -16,51 +16,34 @@
 
 package com.starception.submission.core.data.repository
 
+import com.starception.submission.core.contentdatabase.TopicsDao
 import com.starception.submission.core.data.Synchronizer
-import com.starception.submission.core.data.changeListSync
-import com.starception.submission.core.data.model.asEntity
-import com.starception.submission.core.database.dao.TopicDao
-import com.starception.submission.core.database.model.TopicEntity
-import com.starception.submission.core.database.model.asExternalModel
-import com.starception.submission.core.datastore.ChangeListVersions
+import com.starception.submission.core.data.model.asExternalModel
 import com.starception.submission.core.model.data.Topic
-import com.starception.submission.core.network.NiaNetworkDataSource
-import com.starception.submission.core.network.model.NetworkTopic
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 /**
- * Disk storage backed implementation of the [TopicsRepository].
- * Reads are exclusively from local storage to support offline access.
+ * Content database backed implementation of the [TopicsRepository].
+ * Reads from pre-populated topics.db in assets for offline access.
  */
 internal class OfflineFirstTopicsRepository @Inject constructor(
-    private val topicDao: TopicDao,
-    private val network: NiaNetworkDataSource,
+    private val topicsDao: TopicsDao,
 ) : TopicsRepository {
 
     override fun getTopics(): Flow<List<Topic>> =
-        topicDao.getTopicEntities()
-            .map { it.map(TopicEntity::asExternalModel) }
+        topicsDao.getAllTopicsFlow()
+            .map { entities -> entities.map { it.asExternalModel() } }
 
     override fun getTopic(id: String): Flow<Topic> =
-        topicDao.getTopicEntity(id).map { it.asExternalModel() }
+        topicsDao.getTopicByIdFlow(id.toIntOrNull() ?: 0)
+            .filterNotNull()
+            .map { it.asExternalModel() }
 
-    override suspend fun syncWith(synchronizer: Synchronizer): Boolean =
-        synchronizer.changeListSync(
-            versionReader = ChangeListVersions::topicVersion,
-            changeListFetcher = { currentVersion ->
-                network.getTopicChangeList(after = currentVersion)
-            },
-            versionUpdater = { latestVersion ->
-                copy(topicVersion = latestVersion)
-            },
-            modelDeleter = topicDao::deleteTopics,
-            modelUpdater = { changedIds ->
-                val networkTopics = network.getTopics(ids = changedIds)
-                topicDao.upsertTopics(
-                    entities = networkTopics.map(NetworkTopic::asEntity),
-                )
-            },
-        )
+    /**
+     * No network sync needed - data is pre-populated in content database.
+     */
+    override suspend fun syncWith(synchronizer: Synchronizer): Boolean = true
 }

@@ -16,131 +16,55 @@
 
 package com.starception.submission.core.data.repository
 
+import com.starception.submission.core.contentdatabase.NewsDao
+import com.starception.submission.core.contentdatabase.TopicsDao
 import com.starception.submission.core.data.Synchronizer
-import com.starception.submission.core.data.changeListSync
-import com.starception.submission.core.data.model.asEntity
-import com.starception.submission.core.data.model.topicCrossReferences
-import com.starception.submission.core.data.model.topicEntityShells
-import com.starception.submission.core.database.dao.NewsResourceDao
-import com.starception.submission.core.database.dao.TopicDao
-import com.starception.submission.core.database.model.PopulatedNewsResource
-import com.starception.submission.core.database.model.TopicEntity
-import com.starception.submission.core.database.model.asExternalModel
-import com.starception.submission.core.datastore.ChangeListVersions
-import com.starception.submission.core.datastore.NiaPreferencesDataSource
+import com.starception.submission.core.data.model.asExternalModel
 import com.starception.submission.core.model.data.NewsResource
-import com.starception.submission.core.network.NiaNetworkDataSource
-import com.starception.submission.core.network.model.NetworkNewsResource
-import com.starception.submission.core.notifications.Notifier
+import com.starception.submission.core.model.data.Topic
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
-// Heuristic value to optimize for serialization and deserialization cost on client and server
-// for each news resource batch.
-private const val SYNC_BATCH_SIZE = 40
-
 /**
- * Disk storage backed implementation of the [NewsRepository].
- * Reads are exclusively from local storage to support offline access.
+ * Content database backed implementation of the [NewsRepository].
+ * Reads from pre-populated news_resources.db in assets for offline access.
  */
 internal class OfflineFirstNewsRepository @Inject constructor(
-    private val niaPreferencesDataSource: NiaPreferencesDataSource,
-    private val newsResourceDao: NewsResourceDao,
-    private val topicDao: TopicDao,
-    private val network: NiaNetworkDataSource,
-    private val notifier: Notifier,
+    private val newsDao: NewsDao,
+    private val topicsDao: TopicsDao,
 ) : NewsRepository {
 
     override fun getNewsResources(
         query: NewsResourceQuery,
-    ): Flow<List<NewsResource>> = newsResourceDao.getNewsResources(
-        useFilterTopicIds = query.filterTopicIds != null,
-        filterTopicIds = query.filterTopicIds ?: emptySet(),
-        useFilterNewsIds = query.filterNewsIds != null,
-        filterNewsIds = query.filterNewsIds ?: emptySet(),
-    )
-        .map { it.map(PopulatedNewsResource::asExternalModel) }
+    ): Flow<List<NewsResource>> = newsDao.getAllNewsResourcesFlow()
+        .map { newsResources ->
+            // Build topics map for efficient lookup
+            val allTopics = topicsDao.getAllTopics()
+            val topicsMap: Map<Int, Topic> = allTopics.associate { it.id to it.asExternalModel() }
 
-    override suspend fun syncWith(synchronizer: Synchronizer): Boolean {
-        var isFirstSync = false
-        return synchronizer.changeListSync(
-            versionReader = ChangeListVersions::newsResourceVersion,
-            changeListFetcher = { currentVersion ->
-                isFirstSync = currentVersion <= 0
-                network.getNewsResourceChangeList(after = currentVersion)
-            },
-            versionUpdater = { latestVersion ->
-                copy(newsResourceVersion = latestVersion)
-            },
-            modelDeleter = newsResourceDao::deleteNewsResources,
-            modelUpdater = { changedIds ->
-                val userData = niaPreferencesDataSource.userData.first()
-                val hasOnboarded = userData.shouldHideOnboarding
-                val followedTopicIds = userData.followedTopics
+            // Convert to external model
+            var resources = newsResources.map { it.asExternalModel(topicsMap) }
 
-                val existingNewsResourceIdsThatHaveChanged = when {
-                    hasOnboarded -> newsResourceDao.getNewsResourceIds(
-                        useFilterTopicIds = true,
-                        filterTopicIds = followedTopicIds,
-                        useFilterNewsIds = true,
-                        filterNewsIds = changedIds.toSet(),
-                    )
-                        .first()
-                        .toSet()
-                    // No need to retrieve anything if notifications won't be sent
-                    else -> emptySet()
+            // Apply topic filter if specified
+            query.filterTopicIds?.let { filterIds ->
+                resources = resources.filter { resource ->
+                    resource.topics.any { topic -> topic.id in filterIds }
                 }
+            }
 
-                if (isFirstSync) {
-                    // When we first retrieve news, mark everything viewed, so that we aren't
-                    // overwhelmed with all historical news.
-                    niaPreferencesDataSource.setNewsResourcesViewed(changedIds, true)
+            // Apply news ID filter if specified
+            query.filterNewsIds?.let { filterIds ->
+                resources = resources.filter { resource ->
+                    resource.id in filterIds
                 }
+            }
 
-                // Obtain the news resources which have changed from the network and upsert them locally
-                changedIds.chunked(SYNC_BATCH_SIZE).forEach { chunkedIds ->
-                    val networkNewsResources = network.getNewsResources(ids = chunkedIds)
+            resources
+        }
 
-                    // Order of invocation matters to satisfy id and foreign key constraints!
-
-                    topicDao.insertOrIgnoreTopics(
-                        topicEntities = networkNewsResources
-                            .map(NetworkNewsResource::topicEntityShells)
-                            .flatten()
-                            .distinctBy(TopicEntity::id),
-                    )
-                    newsResourceDao.upsertNewsResources(
-                        newsResourceEntities = networkNewsResources.map(
-                            NetworkNewsResource::asEntity,
-                        ),
-                    )
-                    newsResourceDao.insertOrIgnoreTopicCrossRefEntities(
-                        newsResourceTopicCrossReferences = networkNewsResources
-                            .map(NetworkNewsResource::topicCrossReferences)
-                            .distinct()
-                            .flatten(),
-                    )
-                }
-
-                if (hasOnboarded) {
-                    val addedNewsResources = newsResourceDao.getNewsResources(
-                        useFilterTopicIds = true,
-                        filterTopicIds = followedTopicIds,
-                        useFilterNewsIds = true,
-                        filterNewsIds = changedIds.toSet() - existingNewsResourceIdsThatHaveChanged,
-                    )
-                        .first()
-                        .map(PopulatedNewsResource::asExternalModel)
-
-                    if (addedNewsResources.isNotEmpty()) {
-                        notifier.postNewsNotifications(
-                            newsResources = addedNewsResources,
-                        )
-                    }
-                }
-            },
-        )
-    }
+    /**
+     * No network sync needed - data is pre-populated in content database.
+     */
+    override suspend fun syncWith(synchronizer: Synchronizer): Boolean = true
 }
