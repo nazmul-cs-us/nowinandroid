@@ -492,17 +492,44 @@ fun parseDuaContent(content: String, quranReference: String? = null): ParsedDuaC
 
     for (part in parts) {
         val trimmedPart = part.trim()
+        // Handle both plain format and markdown format (with ** bold markers)
+        val cleanedPart = trimmedPart
+            .replace(Regex("^\\*\\*Arabic:\\*\\*\\s*"), "")
+            .replace(Regex("^\\*\\*Transliteration:\\*\\*\\s*"), "")
+            .replace(Regex("^\\*\\*Translation:\\*\\*\\s*"), "")
+
         when {
+            // Check for markdown format first: **Transliteration:**
+            trimmedPart.startsWith("**Transliteration:**") -> {
+                transliteration = trimmedPart.removePrefix("**Transliteration:**").trim()
+            }
+            // Check for markdown format: **Translation:**
+            trimmedPart.startsWith("**Translation:**") -> {
+                translation = trimmedPart.removePrefix("**Translation:**").trim()
+            }
+            // Check for plain format: Transliteration:
             trimmedPart.startsWith("Transliteration:") -> {
                 transliteration = trimmedPart.removePrefix("Transliteration:").trim()
             }
+            // Check for plain format: Translation:
             trimmedPart.startsWith("Translation:") -> {
                 translation = trimmedPart.removePrefix("Translation:").trim()
             }
+            // Skip **Arabic:** label and look for Arabic text in the next part
+            trimmedPart.startsWith("**Arabic:**") -> {
+                // Arabic text will be in the cleaned part or next iteration
+                val inlineArabic = trimmedPart.removePrefix("**Arabic:**").trim()
+                if (inlineArabic.any { it in '\u0600'..'\u06FF' || it in '\u0750'..'\u077F' }) {
+                    arabicText = inlineArabic
+                }
+            }
+            // Detect Arabic text by Unicode range
             trimmedPart.any { it in '\u0600'..'\u06FF' || it in '\u0750'..'\u077F' } && arabicText.isEmpty() -> {
                 arabicText = trimmedPart
             }
-            transliteration.isNotEmpty() && translation.isNotEmpty() -> {
+            // Collect explanation after main content
+            transliteration.isNotEmpty() && translation.isNotEmpty() &&
+                !trimmedPart.startsWith("**") -> {
                 if (explanation.isEmpty()) {
                     explanation = trimmedPart
                 } else {
@@ -600,16 +627,26 @@ fun DuaDetailScreen(
             ?: 1
     }
 
-    val initialPageIndex = remember(duasList, initialDuaNumber) {
+    // Find page index by news resource ID first (works for fortress_of_the_muslim duas)
+    // Fall back to dua number matching if ID not found
+    val initialPageIndex = remember(duasList, initialDuaNumber, initialNewsResourceId) {
         if (duasList.isNotEmpty()) {
+            // First try to find by news resource ID (for fortress_of_the_muslim and all duas)
+            if (initialNewsResourceId.isNotEmpty()) {
+                val indexById = duasList.indexOfFirst { it.id == initialNewsResourceId }
+                if (indexById >= 0) {
+                    return@remember indexById
+                }
+            }
+            // Fall back to dua number matching
             duasList.indexOfFirst { it.duaNumber == initialDuaNumber }.takeIf { it >= 0 } ?: 0
         } else {
             initialDuaNumber - 1
         }
     }
 
-    // Calculate initial page index - 0-based (dua #2 should be at index 1)
-    val targetPageIndex = (initialDuaNumber - 1).coerceAtLeast(0)
+    // Calculate initial page index - prefer ID-based lookup, fall back to number-based
+    val targetPageIndex = initialPageIndex.coerceAtLeast(0)
 
     // Pager state
     val pagerState = rememberPagerState(
@@ -625,11 +662,16 @@ fun DuaDetailScreen(
         }
     }
 
-    // Also scroll when duas load (in case index needs adjustment based on duaNumber field)
-    LaunchedEffect(duasList) {
+    // Also scroll when duas load (in case index needs adjustment based on ID or duaNumber field)
+    LaunchedEffect(duasList, initialNewsResourceId) {
         if (duasList.isNotEmpty()) {
-            val targetIndex = duasList.indexOfFirst { it.duaNumber == initialDuaNumber }.takeIf { it >= 0 }
-                ?: targetPageIndex.coerceIn(0, duasList.size - 1)
+            // First try to find by news resource ID
+            val indexById = if (initialNewsResourceId.isNotEmpty()) {
+                duasList.indexOfFirst { it.id == initialNewsResourceId }.takeIf { it >= 0 }
+            } else null
+            // Fall back to dua number matching
+            val indexByNumber = duasList.indexOfFirst { it.duaNumber == initialDuaNumber }.takeIf { it >= 0 }
+            val targetIndex = indexById ?: indexByNumber ?: targetPageIndex.coerceIn(0, duasList.size - 1)
             if (pagerState.currentPage != targetIndex) {
                 pagerState.scrollToPage(targetIndex)
             }
@@ -762,8 +804,16 @@ fun DuaDetailScreen(
 
                                             Spacer(modifier = Modifier.height(10.dp))
 
+                                            // Dynamic header: "Quranic Dua" for Quran-based duas, otherwise show category or "Dua"
+                                            val isQuranicDua = dua.surahNumber > 0 && dua.ayahNumber > 0
+                                            val headerText = if (isQuranicDua) {
+                                                "Quranic Dua"
+                                            } else {
+                                                "Dua" // For fortress_of_the_muslim and other duas
+                                            }
+
                                             Text(
-                                                text = "Quranic Dua",
+                                                text = headerText,
                                                 style = MaterialTheme.typography.titleLarge,
                                                 color = Color.White,
                                                 fontWeight = FontWeight.Bold,
@@ -771,15 +821,17 @@ fun DuaDetailScreen(
                                             )
                                         }
 
-                                        // Dua theme/title
+                                        // Dua theme/title - clean up various title formats
                                         val duaTheme = dua.title
                                             .replace(Regex("Quranic Dua \\d+:\\s*"), "")
                                             .replace(Regex("Dua #\\d+:\\s*"), "")
                                             .replace(Regex("Dua \\d+:\\s*"), "")
                                             .replace(Regex("\\s*\\(\\d+:\\d+\\)\\s*$"), "")
+                                            .replace(Regex("\\s*\\(\\d+/\\d+\\)\\s*$"), "") // Handle (1/3), (2/3) format
                                             .trim()
 
-                                        if (duaTheme.isNotEmpty() && duaTheme != dua.title) {
+                                        // Show theme for all duas that have a meaningful title
+                                        if (duaTheme.isNotEmpty()) {
                                             Text(
                                                 text = duaTheme,
                                                 style = MaterialTheme.typography.bodyLarge,
