@@ -1,14 +1,19 @@
 package com.starception.submission.settings
 
+import android.app.Application
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
+import com.starception.submission.prayer.service.PrayerNotificationServiceManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +33,8 @@ import javax.inject.Inject
 @HiltViewModel
 class UnifiedSettingsViewModel @Inject constructor(
     private val userDataRepository: UserDataRepository,
-    private val prayerSettingsRepository: PrayerSettingsRepository
+    private val prayerSettingsRepository: PrayerSettingsRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     companion object {
@@ -70,8 +76,13 @@ class UnifiedSettingsViewModel @Inject constructor(
     private val _autoDetectedCountryName = MutableStateFlow<String?>(null)
     val autoDetectedCountryName: StateFlow<String?> = _autoDetectedCountryName.asStateFlow()
 
+    // Notification preferences
+    private val _notificationPreferences = MutableStateFlow(PrayerNotificationPreferences())
+    val notificationPreferences: StateFlow<PrayerNotificationPreferences> = _notificationPreferences.asStateFlow()
+
     init {
         loadPrayerSettings()
+        loadNotificationPreferences()
     }
 
     private fun loadPrayerSettings() {
@@ -174,6 +185,32 @@ class UnifiedSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             prayerSettingsRepository.restoreToAutoDetected()
             loadPrayerSettings() // Reload after restore
+        }
+    }
+
+    // Notification preferences
+    private fun loadNotificationPreferences() {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "Loading notification preferences...")
+                val prefs = prayerSettingsRepository.getNotificationPreferences()
+                _notificationPreferences.value = prefs
+                Log.i(TAG, "Notification preferences loaded: enabled=${prefs.notificationsEnabled}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading notification preferences", e)
+            }
+        }
+    }
+
+    fun updateNotificationPreferences(preferences: PrayerNotificationPreferences) {
+        viewModelScope.launch {
+            _notificationPreferences.value = preferences
+            prayerSettingsRepository.updateNotificationPreferences(preferences, forceCommit = true)
+            Log.i(TAG, "Notification preferences updated")
+
+            // Trigger notification reschedule
+            PrayerNotificationServiceManager.rescheduleNotificationsWithNewSettings(context)
+            Log.i(TAG, "Triggered notification reschedule")
         }
     }
 }

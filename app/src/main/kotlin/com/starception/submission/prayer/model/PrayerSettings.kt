@@ -100,7 +100,21 @@ data class PrayerNotificationPreferences(
     val dhuhrNotificationEnabled: Boolean = true,   // Dhuhr notification toggle
     val asrNotificationEnabled: Boolean = true,     // Asr notification toggle
     val maghribNotificationEnabled: Boolean = true, // Maghrib notification toggle
-    val ishaNotificationEnabled: Boolean = true     // Isha notification toggle
+    val ishaNotificationEnabled: Boolean = true,    // Isha notification toggle
+
+    // PER-PRAYER PRIOR NOTIFICATION TIME (minutes before prayer to send reminder)
+    val fajrPriorMinutes: Int = 20,     // Minutes before Fajr to send reminder
+    val dhuhrPriorMinutes: Int = 20,    // Minutes before Dhuhr to send reminder
+    val asrPriorMinutes: Int = 20,      // Minutes before Asr to send reminder
+    val maghribPriorMinutes: Int = 20,  // Minutes before Maghrib to send reminder
+    val ishaPriorMinutes: Int = 20,     // Minutes before Isha to send reminder
+
+    // PER-PRAYER "GO TO MOSQUE" PHASE DURATION (minutes after prayer starts)
+    val fajrGoToMosqueDuration: Int = 20,     // Fajr go-to-mosque phase duration
+    val dhuhrGoToMosqueDuration: Int = 20,    // Dhuhr go-to-mosque phase duration
+    val asrGoToMosqueDuration: Int = 20,      // Asr go-to-mosque phase duration
+    val maghribGoToMosqueDuration: Int = 20,  // Maghrib go-to-mosque phase duration
+    val ishaGoToMosqueDuration: Int = 20      // Isha go-to-mosque phase duration
 ) {
     /**
      * Check if notifications are enabled for a specific prayer
@@ -116,6 +130,34 @@ data class PrayerNotificationPreferences(
             "maghrib" -> maghribNotificationEnabled
             "isha" -> ishaNotificationEnabled
             else -> false // Unknown prayer = no notification
+        }
+    }
+
+    /**
+     * Get prior notification minutes for a specific prayer
+     */
+    fun getPriorMinutesForPrayer(prayerName: String): Int {
+        return when (prayerName.lowercase()) {
+            "fajr" -> fajrPriorMinutes
+            "dhuhr" -> dhuhrPriorMinutes
+            "asr" -> asrPriorMinutes
+            "maghrib" -> maghribPriorMinutes
+            "isha" -> ishaPriorMinutes
+            else -> 20 // Default 20 minutes
+        }
+    }
+
+    /**
+     * Get "go to mosque" phase duration for a specific prayer
+     */
+    fun getGoToMosqueDurationForPrayer(prayerName: String): Int {
+        return when (prayerName.lowercase()) {
+            "fajr" -> fajrGoToMosqueDuration
+            "dhuhr" -> dhuhrGoToMosqueDuration
+            "asr" -> asrGoToMosqueDuration
+            "maghrib" -> maghribGoToMosqueDuration
+            "isha" -> ishaGoToMosqueDuration
+            else -> 20 // Default 20 minutes
         }
     }
 }

@@ -58,6 +58,9 @@ fun PrayerSettingsDialog(
     var settings by remember { mutableStateOf(PrayerSettings()) }
     var isLoading by remember { mutableStateOf(true) }
 
+    // Notification settings dialog state
+    var showNotificationSettings by remember { mutableStateOf(false) }
+
     // IMPORTANT: Get repository from Hilt singleton (not by direct instantiation)
     val repository = remember {
         val entryPoint = dagger.hilt.android.EntryPointAccessors.fromApplication(
@@ -319,15 +322,15 @@ fun PrayerSettingsDialog(
                 hasSettingsChanged = hasSettingsChanged,
                         onRestoreClick = {
                             Log.i("PrayerSettingsDialog", "🔄 ALGORITHM: Restore to auto-detected clicked")
-                            
+
                             // Enhanced haptic feedback for restore action
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            
+
                             // ALGORITHM: Use repository's restore method
                             GlobalScope.launch(Dispatchers.IO) {
                                 try {
                                     val success = repository.restoreToAutoDetected()
-                                    
+
                                     if (success) {
                                         // Get the restored settings and update UI
                                         val restoredSettings = repository.getCachedPrayerSettings()
@@ -347,12 +350,25 @@ fun PrayerSettingsDialog(
                                 }
                             }
                         },
+                        onNotificationSettingsClick = {
+                            Log.i("PrayerSettingsDialog", "🔔 Opening notification settings")
+                            showNotificationSettings = true
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
             }
         }
+
+    // Show notification settings dialog when requested
+    if (showNotificationSettings) {
+        NotificationSettingsDialog(
+            onDismiss = {
+                showNotificationSettings = false
+            }
+        )
     }
+}
 
 // ALGORITHM IMPLEMENTATION COMPLETE
 // The Prayer Settings now follow the specified algorithm:

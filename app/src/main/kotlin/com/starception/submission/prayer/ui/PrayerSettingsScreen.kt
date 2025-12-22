@@ -12,7 +12,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -72,7 +74,8 @@ fun PrayerSettingsScreen(
     modifier: Modifier = Modifier,
     showAsDialog: Boolean = false,
     hasSettingsChanged: Boolean = false,
-    onRestoreClick: () -> Unit = {}
+    onRestoreClick: () -> Unit = {},
+    onNotificationSettingsClick: () -> Unit = {}
 ) {
     // Log screen composition with auto-detection status
     PrayerSettingsLogger.logScreenComposition(settings.useGpsLocation)
@@ -109,6 +112,7 @@ fun PrayerSettingsScreen(
                 onBackClick = onBackClick,
                 hasSettingsChanged = hasSettingsChanged,
                 onRestoreClick = onRestoreClick,
+                onNotificationSettingsClick = onNotificationSettingsClick,
                 modifier = Modifier.fillMaxSize(),
                 showTopBar = true
             )
@@ -150,6 +154,7 @@ fun PrayerSettingsScreen(
                 onBackClick = onBackClick,
                 hasSettingsChanged = hasSettingsChanged,
                 onRestoreClick = onRestoreClick,
+                onNotificationSettingsClick = onNotificationSettingsClick,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
@@ -168,7 +173,8 @@ private fun PrayerSettingsContent(
     modifier: Modifier = Modifier,
     showTopBar: Boolean = false,
     hasSettingsChanged: Boolean = false,
-    onRestoreClick: () -> Unit = {}
+    onRestoreClick: () -> Unit = {},
+    onNotificationSettingsClick: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -280,8 +286,55 @@ private fun PrayerSettingsContent(
                 }
             )
         }
-        
-        
+
+        // Notification Settings Section
+        Card(
+            onClick = onNotificationSettingsClick,
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Column {
+                        Text(
+                            text = "Notification Settings",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Configure per-prayer notification timing",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Open notification settings",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         // Restore button moved to top of screen for better visibility
     }
 }

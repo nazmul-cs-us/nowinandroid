@@ -1018,21 +1018,24 @@ class PrayerNotificationService : Service() {
      * This calculates the progress percentage and determines which phase we're in.
      * 
      * PHASES EXPLAINED:
-     * - GO_TO_MOSQUE (0-20 minutes): Time to prepare and go to mosque
-     * - BEST_TIME (20 minutes to halfway): Optimal time for prayer
+     * - GO_TO_MOSQUE (configurable per-prayer): Time to prepare and go to mosque
+     * - BEST_TIME (after go-to-mosque to halfway): Optimal time for prayer
      * - MAKE_TIME (halfway to end): Ensure you make time for prayer
-     * 
-     * EDIT THESE VALUES TO:
-     * - Change phase durations (currently 20 minutes for first phase)
-     * - Modify phase logic
-     * - Adjust progress calculation
+     *
+     * Phase durations are configurable per-prayer in notification settings.
      */
     private fun calculatePrayerProgress(currentPrayer: PrayerTime, nextPrayer: PrayerTime?): PrayerProgress {
         val now = LocalTime.now()
         val prayerStart = currentPrayer.time
+
+        // Get per-prayer go-to-mosque duration from settings (configurable by user)
+        val goToMosqueDuration = prayerSettingsRepository.getNotificationPreferences()
+            .getGoToMosqueDurationForPrayer(currentPrayer.name)
+
         Log.d(TAG, "=== CALCULATING PRAYER PROGRESS ===")
         Log.d(TAG, "Current time: $now")
         Log.d(TAG, "Current prayer: ${currentPrayer.name} at $prayerStart")
+        Log.d(TAG, "Go-to-mosque duration: ${goToMosqueDuration}min (from settings)")
         Log.d(TAG, "Next prayer: ${nextPrayer?.name ?: "None"} at ${nextPrayer?.time ?: "N/A"}")
 
         // CROSS-MIDNIGHT FIX: Detect when we've crossed midnight (Isha → Fajr overnight period)
@@ -1074,23 +1077,24 @@ class PrayerNotificationService : Service() {
 
             // Determine phase based on elapsed time (cross-midnight is always MAKE_TIME since Isha passed hours ago)
             val progressPhase = when {
-                elapsedMinutes < 20 -> PrayerPhase.GO_TO_MOSQUE
+                elapsedMinutes < goToMosqueDuration -> PrayerPhase.GO_TO_MOSQUE
                 elapsedMinutes < (totalDuration / 2) -> PrayerPhase.BEST_TIME
                 else -> PrayerPhase.MAKE_TIME
             }
 
             // Calculate progress percentage using 3-segment logic
+            val goToMosquePercent = 20f // First segment is always 0-20% of progress bar
             val progressPercentage = when (progressPhase) {
                 PrayerPhase.GO_TO_MOSQUE -> {
-                    val segmentProgress = (elapsedMinutes.toFloat() / 20f).coerceIn(0f, 1f)
-                    (segmentProgress * 20f).coerceIn(0f, 20f)
+                    val segmentProgress = (elapsedMinutes.toFloat() / goToMosqueDuration.toFloat()).coerceIn(0f, 1f)
+                    (segmentProgress * goToMosquePercent).coerceIn(0f, goToMosquePercent)
                 }
                 PrayerPhase.BEST_TIME -> {
                     val halfway = totalDuration / 2
-                    val segmentElapsed = (elapsedMinutes - 20).coerceAtLeast(0)
-                    val segmentDuration = (halfway - 20).coerceAtLeast(1)
+                    val segmentElapsed = (elapsedMinutes - goToMosqueDuration).coerceAtLeast(0)
+                    val segmentDuration = (halfway - goToMosqueDuration).coerceAtLeast(1)
                     val segmentProgress = (segmentElapsed.toFloat() / segmentDuration.toFloat()).coerceIn(0f, 1f)
-                    (20f + segmentProgress * 40f).coerceIn(20f, 60f)
+                    (goToMosquePercent + segmentProgress * 40f).coerceIn(goToMosquePercent, 60f)
                 }
                 PrayerPhase.MAKE_TIME -> {
                     val halfway = totalDuration / 2
@@ -1243,30 +1247,31 @@ class PrayerNotificationService : Service() {
             remainingMinutes = Duration.between(now, prayerEnd).toMinutes()
         }
         
-        // PHASE DETERMINATION - Edit these conditions to change when phases switch
+        // PHASE DETERMINATION - Uses per-prayer go-to-mosque duration from settings
         val progressPhase = when {
-            elapsedMinutes < 20 -> PrayerPhase.GO_TO_MOSQUE    // First 20 minutes: Go to mosque
-            elapsedMinutes < (totalDuration / 2) -> PrayerPhase.BEST_TIME    // 20min to halfway: Best time
+            elapsedMinutes < goToMosqueDuration -> PrayerPhase.GO_TO_MOSQUE    // First N minutes: Go to mosque
+            elapsedMinutes < (totalDuration / 2) -> PrayerPhase.BEST_TIME    // N min to halfway: Best time
             else -> PrayerPhase.MAKE_TIME    // Halfway to end: Make time
         }
-        
+
         // 3-SEGMENT PROGRESS CALCULATION to match notification segments
-        // Segment 1 (Go to Mosque): 0-20% = First 20 minutes
-        // Segment 2 (Best Time): 20-60% = 20min to halfway point  
+        // Segment 1 (Go to Mosque): 0-20% = First goToMosqueDuration minutes
+        // Segment 2 (Best Time): 20-60% = goToMosqueDuration to halfway point
         // Segment 3 (Make Time): 60-100% = Halfway to end
+        val goToMosquePercent = 20f // First segment is always 0-20% of progress bar
         val progressPercentage = when (progressPhase) {
             PrayerPhase.GO_TO_MOSQUE -> {
-                // First 20 minutes maps to 0-20% progress
-                val segmentProgress = (elapsedMinutes.toFloat() / 20f).coerceIn(0f, 1f)
-                (segmentProgress * 20f).coerceIn(0f, 20f)
+                // First goToMosqueDuration minutes maps to 0-20% progress
+                val segmentProgress = (elapsedMinutes.toFloat() / goToMosqueDuration.toFloat()).coerceIn(0f, 1f)
+                (segmentProgress * goToMosquePercent).coerceIn(0f, goToMosquePercent)
             }
             PrayerPhase.BEST_TIME -> {
-                // From 20 minutes to halfway point maps to 20-60% progress
+                // From goToMosqueDuration to halfway point maps to 20-60% progress
                 val halfway = totalDuration / 2
-                val segmentElapsed = (elapsedMinutes - 20).coerceAtLeast(0)
-                val segmentDuration = (halfway - 20).coerceAtLeast(1) // Avoid division by zero
+                val segmentElapsed = (elapsedMinutes - goToMosqueDuration).coerceAtLeast(0)
+                val segmentDuration = (halfway - goToMosqueDuration).coerceAtLeast(1) // Avoid division by zero
                 val segmentProgress = (segmentElapsed.toFloat() / segmentDuration.toFloat()).coerceIn(0f, 1f)
-                (20f + segmentProgress * 40f).coerceIn(20f, 60f)
+                (goToMosquePercent + segmentProgress * 40f).coerceIn(goToMosquePercent, 60f)
             }
             PrayerPhase.MAKE_TIME -> {
                 // From halfway to end maps to 60-100% progress
@@ -1353,17 +1358,13 @@ class PrayerNotificationService : Service() {
     
     /**
      * PRAYER PHASES: The three stages of prayer time
-     * 
+     *
      * These phases determine the notification message and color.
-     * 
-     * EDIT THESE TO:
-     * - Add new phases
-     * - Change phase names
-     * - Modify phase behavior in calculatePrayerProgress()
+     * Phase durations are configurable per-prayer in notification settings.
      */
     private enum class PrayerPhase {
-        GO_TO_MOSQUE,    // 0-20 minutes: Go to mosque (Blue color in progress bar)
-        BEST_TIME,       // 20+ minutes to halfway: Best time for prayer (Green color)
+        GO_TO_MOSQUE,    // 0-N minutes (configurable): Go to mosque (Blue color in progress bar)
+        BEST_TIME,       // N minutes to halfway: Best time for prayer (Green color)
         MAKE_TIME        // Halfway+: Make time for prayer (Yellow color)
     }
     
