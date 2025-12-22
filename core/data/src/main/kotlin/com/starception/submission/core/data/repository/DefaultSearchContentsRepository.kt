@@ -16,45 +16,62 @@
 
 package com.starception.submission.core.data.repository
 
-import com.starception.submission.core.database.dao.NewsResourceDao
+import com.starception.submission.core.contentdatabase.NewsDao
+import com.starception.submission.core.contentdatabase.NewsResourceWithTopics
+import com.starception.submission.core.contentdatabase.TopicEntity
+import com.starception.submission.core.contentdatabase.TopicsDao
 import com.starception.submission.core.database.dao.NewsResourceFtsDao
-import com.starception.submission.core.database.dao.TopicDao
 import com.starception.submission.core.database.dao.TopicFtsDao
-import com.starception.submission.core.database.model.PopulatedNewsResource
-import com.starception.submission.core.database.model.asExternalModel
-import com.starception.submission.core.database.model.asFtsEntity
+import com.starception.submission.core.database.model.NewsResourceFtsEntity
+import com.starception.submission.core.database.model.TopicFtsEntity
+import com.starception.submission.core.model.data.NewsResource
 import com.starception.submission.core.model.data.SearchResult
+import com.starception.submission.core.model.data.Topic
 import com.starception.submission.core.network.Dispatcher
 import com.starception.submission.core.network.NiaDispatchers.IO
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Instant
 import javax.inject.Inject
 
 internal class DefaultSearchContentsRepository @Inject constructor(
-    private val newsResourceDao: NewsResourceDao,
     private val newsResourceFtsDao: NewsResourceFtsDao,
-    private val topicDao: TopicDao,
     private val topicFtsDao: TopicFtsDao,
+    private val contentNewsDao: NewsDao,
+    private val contentTopicsDao: TopicsDao,
     @Dispatcher(IO) private val ioDispatcher: CoroutineDispatcher,
 ) : SearchContentsRepository {
 
     override suspend fun populateFtsData() {
         withContext(ioDispatcher) {
-            newsResourceFtsDao.insertAll(
-                newsResourceDao.getNewsResources(
-                    useFilterTopicIds = false,
-                    useFilterNewsIds = false,
+            // Populate FTS from content database (pre-populated asset database)
+            val newsResources = contentNewsDao.getAllNewsResources()
+            val ftsEntities = newsResources.map { entity ->
+                NewsResourceFtsEntity(
+                    newsResourceId = entity.id.toString(),
+                    title = entity.title,
+                    content = entity.content ?: "",
                 )
-                    .first()
-                    .map(PopulatedNewsResource::asFtsEntity),
-            )
-            topicFtsDao.insertAll(topicDao.getOneOffTopicEntities().map { it.asFtsEntity() })
+            }
+            newsResourceFtsDao.insertAll(ftsEntities)
+
+            // Populate topics FTS from content database
+            val topics = contentTopicsDao.getAllTopics()
+            val topicFtsEntities = topics.map { entity ->
+                TopicFtsEntity(
+                    topicId = entity.id.toString(),
+                    name = entity.name,
+                    shortDescription = entity.shortDescription ?: "",
+                    longDescription = entity.longDescription ?: "",
+                )
+            }
+            topicFtsDao.insertAll(topicFtsEntities)
         }
     }
 
@@ -64,20 +81,33 @@ internal class DefaultSearchContentsRepository @Inject constructor(
         val newsResourceIds = newsResourceFtsDao.searchAllNewsResources("*$searchQuery*")
         val topicIds = topicFtsDao.searchAllTopics("*$searchQuery*")
 
+        // Convert FTS IDs (strings) to ints and fetch from content database
         val newsResourcesFlow = newsResourceIds
-            .mapLatest { it.toSet() }
+            .mapLatest { ids -> ids.mapNotNull { it.toIntOrNull() } }
             .distinctUntilChanged()
-            .flatMapLatest {
-                newsResourceDao.getNewsResources(useFilterNewsIds = true, filterNewsIds = it)
+            .flatMapLatest { ids ->
+                if (ids.isEmpty()) {
+                    flowOf(emptyList())
+                } else {
+                    contentNewsDao.getNewsResourcesByIdsFlow(ids)
+                }
             }
+
         val topicsFlow = topicIds
-            .mapLatest { it.toSet() }
+            .mapLatest { ids -> ids.mapNotNull { it.toIntOrNull() } }
             .distinctUntilChanged()
-            .flatMapLatest(topicDao::getTopicEntities)
+            .flatMapLatest { ids ->
+                if (ids.isEmpty()) {
+                    flowOf(emptyList())
+                } else {
+                    contentTopicsDao.getTopicsByIdsFlow(ids)
+                }
+            }
+
         return combine(newsResourcesFlow, topicsFlow) { newsResources, topics ->
             SearchResult(
                 topics = topics.map { it.asExternalModel() },
-                newsResources = newsResources.map { it.asExternalModel() },
+                newsResources = newsResources.map { it.asExternalModel(topics) },
             )
         }
     }
@@ -89,4 +119,51 @@ internal class DefaultSearchContentsRepository @Inject constructor(
         ) { newsResourceCount, topicsCount ->
             newsResourceCount + topicsCount
         }
+}
+
+/**
+ * Convert TopicEntity from content database to external Topic model
+ */
+private fun TopicEntity.asExternalModel(): Topic = Topic(
+    id = id.toString(),
+    name = name,
+    shortDescription = shortDescription ?: "",
+    longDescription = longDescription ?: "",
+    url = url ?: "",
+    imageUrl = imageUrl ?: "",
+)
+
+/**
+ * Convert NewsResourceWithTopics from content database to external NewsResource model
+ */
+private fun NewsResourceWithTopics.asExternalModel(allTopics: List<TopicEntity>): NewsResource {
+    // Parse comma-separated topic IDs and map to Topic models
+    val topicIdList = topicIds?.split(",")?.mapNotNull { it.trim().toIntOrNull() } ?: emptyList()
+    val matchedTopics = allTopics.filter { it.id in topicIdList }.map { it.asExternalModel() }
+
+    return NewsResource(
+        id = id.toString(),
+        title = title,
+        content = content ?: "",
+        url = url ?: "",
+        headerImageUrl = headerImageUrl,
+        publishDate = parsePublishDate(publishDate),
+        type = type ?: "",
+        topics = matchedTopics,
+    )
+}
+
+/**
+ * Parse publish date string to Instant
+ */
+private fun parsePublishDate(dateString: String?): Instant {
+    if (dateString.isNullOrBlank()) {
+        return Instant.DISTANT_PAST
+    }
+    return try {
+        Instant.parse(dateString)
+    } catch (e: Exception) {
+        // Try common date format patterns
+        Instant.DISTANT_PAST
+    }
 }

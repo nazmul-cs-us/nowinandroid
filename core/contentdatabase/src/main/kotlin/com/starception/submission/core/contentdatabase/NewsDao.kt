@@ -109,6 +109,19 @@ interface NewsDao {
     """)
     suspend fun searchNewsResources(query: String, limit: Int = 100): List<NewsResourceWithTopics>
 
+    @Query("""
+        SELECT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
+               n.publish_date as publishDate, n.type, n.is_system as isSystem,
+               n.is_user_created as isUserCreated, n.source,
+               GROUP_CONCAT(nt.topic_id) as topicIds
+        FROM news_resources n
+        LEFT JOIN news_topics nt ON n.id = nt.news_id
+        WHERE n.id IN (:ids)
+        GROUP BY n.id
+        ORDER BY n.id ASC
+    """)
+    fun getNewsResourcesByIdsFlow(ids: List<Int>): Flow<List<NewsResourceWithTopics>>
+
     @Query("SELECT COUNT(*) FROM news_resources")
     suspend fun getNewsResourceCount(): Int
 

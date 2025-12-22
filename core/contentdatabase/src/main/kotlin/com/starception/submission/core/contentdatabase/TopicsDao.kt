@@ -32,6 +32,9 @@ interface TopicsDao {
     @Query("SELECT * FROM topics WHERE id IN (:ids)")
     suspend fun getTopicsByIds(ids: List<Int>): List<TopicEntity>
 
+    @Query("SELECT * FROM topics WHERE id IN (:ids) ORDER BY id ASC")
+    fun getTopicsByIdsFlow(ids: List<Int>): Flow<List<TopicEntity>>
+
     @Query("SELECT * FROM topics WHERE is_system = 1 ORDER BY id ASC")
     suspend fun getSystemTopics(): List<TopicEntity>
 
