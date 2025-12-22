@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +30,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppearanceSection
+import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
 
@@ -44,6 +46,7 @@ fun UnifiedSettingsScreen(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val showRestoreOption by viewModel.showRestoreOption.collectAsStateWithLifecycle()
     val autoDetectedCountryName by viewModel.autoDetectedCountryName.collectAsStateWithLifecycle()
+    val notificationPreferences by viewModel.notificationPreferences.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -112,6 +115,21 @@ fun UnifiedSettingsScreen(
                             autoDetectedCountryName = autoDetectedCountryName,
                             onSettingsChange = viewModel::updatePrayerSettings,
                             onRestoreClick = viewModel::restoreAutoDetectedSettings
+                        )
+                    }
+                }
+
+                // Notifications Section
+                item {
+                    SettingsSection(
+                        title = "Notifications",
+                        icon = Icons.Outlined.Notifications,
+                        isExpanded = expandedSections.contains("notifications"),
+                        onToggleExpanded = { viewModel.toggleSection("notifications") }
+                    ) {
+                        NotificationsSection(
+                            preferences = notificationPreferences,
+                            onPreferencesChanged = viewModel::updateNotificationPreferences
                         )
                     }
                 }

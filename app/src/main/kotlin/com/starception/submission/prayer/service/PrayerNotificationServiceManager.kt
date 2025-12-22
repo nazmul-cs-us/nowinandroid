@@ -48,6 +48,89 @@ class PrayerNotificationServiceManager @Inject constructor(
     
     companion object {
         private const val TAG = "PrayerNotificationServiceManager"
+
+        /**
+         * Reschedule notifications when settings change
+         * This is a static helper that can be called from UI without needing the full singleton
+         */
+        fun rescheduleNotificationsWithNewSettings(context: Context) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    Log.d(TAG, "🔄 Rescheduling notifications due to settings change")
+
+                    // Get repository from Hilt
+                    val entryPoint = dagger.hilt.android.EntryPointAccessors.fromApplication(
+                        context.applicationContext,
+                        com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                    )
+                    val repository = entryPoint.prayerSettingsRepository()
+                    val notificationPrefs = repository.getNotificationPreferences()
+
+                    // Cancel existing scheduled notifications
+                    PrayerNotificationScheduler.cancelAllPrayerNotifications(context)
+
+                    // Only reschedule if notifications are enabled
+                    if (notificationPrefs.notificationsEnabled) {
+                        // Get prayer times from repository
+                        val settings = repository.getSettings()
+                        val location = settings.location
+
+                        if (location != null) {
+                            // Use the calculator entry point
+                            val calculatorService = entryPoint.prayerTimeCalculatorService()
+                            val today = LocalDate.now()
+                            val dayPrayerTimes = calculatorService.calculatePrayerTimes(
+                                date = today,
+                                location = location,
+                                settings = settings
+                            )
+
+                            if (dayPrayerTimes != null) {
+                                val formatter = DateTimeFormatter.ofPattern("h:mm a")
+                                val offsets = settings.timeOffsets
+
+                                // Build prayer times map with offsets applied
+                                val prayerTimes = mapOf(
+                                    "Fajr" to applyOffsetToTime(dayPrayerTimes.fajr, offsets.fajr).format(formatter),
+                                    "Dhuhr" to applyOffsetToTime(dayPrayerTimes.dhuhr, offsets.dhuhr).format(formatter),
+                                    "Asr" to applyOffsetToTime(dayPrayerTimes.asr, offsets.asr).format(formatter),
+                                    "Maghrib" to applyOffsetToTime(dayPrayerTimes.maghrib, offsets.maghrib).format(formatter),
+                                    "Isha" to applyOffsetToTime(dayPrayerTimes.isha, offsets.isha).format(formatter)
+                                )
+
+                                // Get per-prayer reminder minutes and schedule
+                                prayerTimes.forEach { (prayerName, prayerTime) ->
+                                    val reminderMinutes = notificationPrefs.getPriorMinutesForPrayer(prayerName)
+                                    PrayerNotificationScheduler.schedulePrayerNotification(
+                                        context = context,
+                                        prayerName = prayerName,
+                                        prayerTime = prayerTime,
+                                        reminderMinutes = reminderMinutes
+                                    )
+                                }
+
+                                Log.d(TAG, "✅ Rescheduled notifications with new settings")
+                            }
+                        }
+                    } else {
+                        Log.d(TAG, "🔕 Notifications disabled, not rescheduling")
+                    }
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Failed to reschedule notifications", e)
+                }
+            }
+        }
+
+        /**
+         * Helper to apply time offset (duplicated to avoid dependency on private function)
+         */
+        private fun applyOffsetToTime(baseTime: LocalTime, offsetMinutes: Int): LocalTime {
+            if (offsetMinutes == 0) return baseTime
+            val adjustedDateTime = LocalDateTime.of(LocalDate.now(), baseTime)
+                .plusMinutes(offsetMinutes.toLong())
+            return adjustedDateTime.toLocalTime()
+        }
     }
     
     /**

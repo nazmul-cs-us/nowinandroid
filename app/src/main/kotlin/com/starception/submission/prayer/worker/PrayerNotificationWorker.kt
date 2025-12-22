@@ -62,29 +62,44 @@ class PrayerNotificationWorker @AssistedInject constructor(
         const val PRAYER_NAME_KEY = "prayer_name"
         const val PRAYER_TIME_KEY = "prayer_time"
         const val NOTIFICATION_TYPE_KEY = "notification_type"
+        const val PRIOR_MINUTES_KEY = "prior_minutes"
 
         // Notification types
         const val TYPE_PRAYER_TIME = "prayer_time"
         const val TYPE_REMINDER = "reminder"
+
+        // Default prior minutes (fallback)
+        const val DEFAULT_PRIOR_MINUTES = 20
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "🕌 PrayerNotificationWorker started")
-            
+
             val prayerName = inputData.getString(PRAYER_NAME_KEY) ?: "Prayer"
             val prayerTime = inputData.getString(PRAYER_TIME_KEY) ?: ""
             val notificationType = inputData.getString(NOTIFICATION_TYPE_KEY) ?: TYPE_PRAYER_TIME
-            
-            Log.d(TAG, "Processing notification: $prayerName at $prayerTime (type: $notificationType)")
-            
-            // Create notification channel
-            createNotificationChannel()
-            
+
+            // Get prior minutes from input data, or fetch from settings
+            val priorMinutes = inputData.getInt(PRIOR_MINUTES_KEY, -1).let { inputMinutes ->
+                if (inputMinutes > 0) {
+                    inputMinutes
+                } else {
+                    // Fetch from notification preferences
+                    prayerSettingsRepository.getNotificationPreferences()
+                        .getPriorMinutesForPrayer(prayerName)
+                }
+            }
+
+            Log.d(TAG, "Processing notification: $prayerName at $prayerTime (type: $notificationType, prior: ${priorMinutes}min)")
+
+            // Create notification channel with dynamic description
+            createNotificationChannel(priorMinutes)
+
             // Show the notification
             when (notificationType) {
                 TYPE_PRAYER_TIME -> showPrayerTimeNotification(prayerName, prayerTime)
-                TYPE_REMINDER -> showPrayerReminderNotification(prayerName, prayerTime)
+                TYPE_REMINDER -> showPrayerReminderNotification(prayerName, prayerTime, priorMinutes)
             }
             
             // Schedule next prayer if this is a prayer time notification
@@ -101,7 +116,7 @@ class PrayerNotificationWorker @AssistedInject constructor(
         }
     }
 
-    private fun createNotificationChannel() {
+    private fun createNotificationChannel(priorMinutes: Int = DEFAULT_PRIOR_MINUTES) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = applicationContext
                 .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -132,7 +147,7 @@ class PrayerNotificationWorker @AssistedInject constructor(
                 REMINDER_CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "20-minute reminders before prayer times"
+                description = "Reminders before prayer times (configurable timing)"
                 enableLights(true)
                 enableVibration(true)
                 setSound(null, null)  // No sound for reminders
@@ -209,15 +224,15 @@ class PrayerNotificationWorker @AssistedInject constructor(
         }
     }
 
-    private fun showPrayerReminderNotification(prayerName: String, prayerTime: String) {
+    private fun showPrayerReminderNotification(prayerName: String, prayerTime: String, priorMinutes: Int = DEFAULT_PRIOR_MINUTES) {
         // Create large icon from app launcher icon
         val largeIcon = ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
 
         val notification = NotificationCompat.Builder(applicationContext, REMINDER_CHANNEL_ID)  // Use reminder channel
-            .setContentTitle("$prayerName in 20 min")
+            .setContentTitle("$prayerName in $priorMinutes min")
             .setContentText("Starts at $prayerTime")
             .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("$prayerName Prayer in 20 minutes\n\n" +
+                .bigText("$prayerName Prayer in $priorMinutes minutes\n\n" +
                         "Time: $prayerTime\n"))
             .setSmallIcon(R.drawable.ic_prayer)
             .setLargeIcon(largeIcon)
@@ -231,8 +246,8 @@ class PrayerNotificationWorker @AssistedInject constructor(
         val notificationManager = applicationContext
             .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID + 1, notification)
-        
-        Log.d(TAG, "📱 Posted prayer reminder notification: $prayerName at $prayerTime")
+
+        Log.d(TAG, "📱 Posted prayer reminder notification: $prayerName at $prayerTime ($priorMinutes min before)")
     }
 
     private suspend fun scheduleNextPrayerNotification() {
