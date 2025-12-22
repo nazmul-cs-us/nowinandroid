@@ -2,12 +2,20 @@ package com.starception.submission.feature.dua
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,6 +39,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Language
@@ -47,6 +57,11 @@ import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Notes
+import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.outlined.LibraryBooks
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
@@ -119,7 +134,12 @@ data class DuaItem(
     val duaNumber: Int,
     val surahNumber: Int = 0,  // Extracted from quranReference for database lookup
     val ayahNumber: Int = 0,   // Extracted from quranReference for database lookup
-    val surahName: String = "" // Surah name fetched from database (e.g., "Al-Baqarah")
+    val surahName: String = "", // Surah name fetched from database (e.g., "Al-Baqarah")
+    val context: String = "",  // When/why to recite (before the dua)
+    val instruction: String = "",  // Special instructions (e.g., "Recite 3 times")
+    val note: String = "",  // Additional scholarly notes
+    val postContext: String = "",  // Context after the dua text
+    val reference: String = ""  // Hadith references
 )
 
 /**
@@ -130,7 +150,12 @@ data class ParsedDuaContent(
     val transliteration: String,
     val translation: String,
     val explanation: String,
-    val quranReference: String?
+    val quranReference: String?,
+    val context: String = "",  // When/why to recite (before the dua)
+    val instruction: String = "",  // Special instructions (e.g., "Recite 3 times")
+    val note: String = "",  // Additional scholarly notes
+    val postContext: String = "",  // Context after the dua text
+    val reference: String = ""  // Hadith references
 )
 
 /**
@@ -386,48 +411,69 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
     private fun loadAllDuas(context: Context) {
         viewModelScope.launch {
             try {
-                // Phase 1: Parse JSON on IO thread and emit immediately (fast)
+                // Phase 1: Load from news_resources.db on IO thread
                 val sortedDuas = withContext(Dispatchers.IO) {
-                    val inputStream = context.assets.open("news.json")
-                    val reader = BufferedReader(InputStreamReader(inputStream))
-                    val jsonString = reader.readText()
-                    reader.close()
-
-                    val jsonArray = JSONArray(jsonString)
                     val duas = mutableListOf<DuaItem>()
 
-                    for (i in 0 until jsonArray.length()) {
-                        val item = jsonArray.getJSONObject(i)
-                        val type = item.optString("type", "")
+                    // Open news_resources.db from assets
+                    val dbPath = context.getDatabasePath("news_resources_temp.db")
+                    if (dbPath.exists()) dbPath.delete()
 
-                        if (type.contains("Dua", ignoreCase = true)) {
-                            val content = item.optString("content", "")
-                            val quranRef = item.optString("quranReference", "")
-                            val parsed = parseDuaContent(content, quranRef.ifEmpty { null })
-                            val title = item.optString("title", "")
-                            val duaNumber = Regex("#(\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
-                                ?: Regex("Dua (\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
-                                ?: (duas.size + 1)
-
-                            // Parse the Quran reference for database lookup
-                            val (surahNumber, ayahNumber) = parseQuranReference(quranRef.ifEmpty { null })
-
-                            duas.add(
-                                DuaItem(
-                                    id = item.optString("id", ""),
-                                    title = title,
-                                    arabicText = parsed.arabicText,
-                                    transliteration = parsed.transliteration,
-                                    translation = parsed.translation,
-                                    explanation = parsed.explanation,
-                                    quranReference = quranRef.ifEmpty { null },
-                                    duaNumber = duaNumber,
-                                    surahNumber = surahNumber,
-                                    ayahNumber = ayahNumber
-                                )
-                            )
+                    context.assets.open("databases/news_resources.db").use { inputStream ->
+                        dbPath.parentFile?.mkdirs()
+                        java.io.FileOutputStream(dbPath).use { outputStream ->
+                            inputStream.copyTo(outputStream)
                         }
                     }
+
+                    val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+                        dbPath.absolutePath,
+                        null,
+                        android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+                    )
+
+                    val cursor = db.rawQuery(
+                        "SELECT id, title, content, type FROM news_resources WHERE type LIKE '%Dua%'",
+                        null
+                    )
+
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getInt(0).toString()
+                        val title = cursor.getString(1) ?: ""
+                        val content = cursor.getString(2) ?: ""
+                        val type = cursor.getString(3) ?: ""
+
+                        val parsed = parseDuaContent(content, null)
+                        val duaNumber = Regex("#(\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                            ?: Regex("Dua (\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                            ?: Regex("\\((\\d+)/\\d+\\)").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                            ?: (duas.size + 1)
+
+                        duas.add(
+                            DuaItem(
+                                id = id,
+                                title = title,
+                                arabicText = parsed.arabicText,
+                                transliteration = parsed.transliteration,
+                                translation = parsed.translation,
+                                explanation = parsed.explanation,
+                                quranReference = null,
+                                duaNumber = duaNumber,
+                                surahNumber = 0,
+                                ayahNumber = 0,
+                                surahName = "",
+                                context = parsed.context,
+                                instruction = parsed.instruction,
+                                note = parsed.note,
+                                postContext = parsed.postContext,
+                                reference = parsed.reference
+                            )
+                        )
+                    }
+
+                    cursor.close()
+                    db.close()
+                    dbPath.delete()
 
                     duas.sortedBy { it.duaNumber }
                 }
@@ -489,47 +535,63 @@ fun parseDuaContent(content: String, quranReference: String? = null): ParsedDuaC
     var transliteration = ""
     var translation = ""
     var explanation = ""
+    var context = ""
+    var instruction = ""
+    var note = ""
+    var postContext = ""
+    var reference = ""
 
     for (part in parts) {
         val trimmedPart = part.trim()
-        // Handle both plain format and markdown format (with ** bold markers)
-        val cleanedPart = trimmedPart
-            .replace(Regex("^\\*\\*Arabic:\\*\\*\\s*"), "")
-            .replace(Regex("^\\*\\*Transliteration:\\*\\*\\s*"), "")
-            .replace(Regex("^\\*\\*Translation:\\*\\*\\s*"), "")
 
         when {
-            // Check for markdown format first: **Transliteration:**
-            trimmedPart.startsWith("**Transliteration:**") -> {
-                transliteration = trimmedPart.removePrefix("**Transliteration:**").trim()
+            // Context - when/why to recite
+            trimmedPart.startsWith("**Context:**") -> {
+                context = trimmedPart.removePrefix("**Context:**").trim()
             }
-            // Check for markdown format: **Translation:**
-            trimmedPart.startsWith("**Translation:**") -> {
-                translation = trimmedPart.removePrefix("**Translation:**").trim()
+            // Instruction - special instructions
+            trimmedPart.startsWith("**Instruction:**") -> {
+                instruction = trimmedPart.removePrefix("**Instruction:**").trim()
             }
-            // Check for plain format: Transliteration:
-            trimmedPart.startsWith("Transliteration:") -> {
-                transliteration = trimmedPart.removePrefix("Transliteration:").trim()
-            }
-            // Check for plain format: Translation:
-            trimmedPart.startsWith("Translation:") -> {
-                translation = trimmedPart.removePrefix("Translation:").trim()
-            }
-            // Skip **Arabic:** label and look for Arabic text in the next part
+            // Arabic text
             trimmedPart.startsWith("**Arabic:**") -> {
-                // Arabic text will be in the cleaned part or next iteration
                 val inlineArabic = trimmedPart.removePrefix("**Arabic:**").trim()
-                if (inlineArabic.any { it in '\u0600'..'\u06FF' || it in '\u0750'..'\u077F' }) {
+                if (inlineArabic.isNotEmpty()) {
                     arabicText = inlineArabic
                 }
             }
-            // Detect Arabic text by Unicode range
+            // Transliteration
+            trimmedPart.startsWith("**Transliteration:**") -> {
+                transliteration = trimmedPart.removePrefix("**Transliteration:**").trim()
+            }
+            trimmedPart.startsWith("Transliteration:") -> {
+                transliteration = trimmedPart.removePrefix("Transliteration:").trim()
+            }
+            // Translation
+            trimmedPart.startsWith("**Translation:**") -> {
+                translation = trimmedPart.removePrefix("**Translation:**").trim()
+            }
+            trimmedPart.startsWith("Translation:") -> {
+                translation = trimmedPart.removePrefix("Translation:").trim()
+            }
+            // Note - scholarly notes
+            trimmedPart.startsWith("**Note:**") -> {
+                note = trimmedPart.removePrefix("**Note:**").trim()
+            }
+            // Additional Context / Post Context
+            trimmedPart.startsWith("**Additional Context:**") -> {
+                postContext = trimmedPart.removePrefix("**Additional Context:**").trim()
+            }
+            // Reference - hadith sources
+            trimmedPart.startsWith("**Reference:**") -> {
+                reference = trimmedPart.removePrefix("**Reference:**").trim()
+            }
+            // Detect Arabic text by Unicode range (fallback)
             trimmedPart.any { it in '\u0600'..'\u06FF' || it in '\u0750'..'\u077F' } && arabicText.isEmpty() -> {
                 arabicText = trimmedPart
             }
-            // Collect explanation after main content
-            transliteration.isNotEmpty() && translation.isNotEmpty() &&
-                !trimmedPart.startsWith("**") -> {
+            // Collect explanation (text not matching any marker)
+            translation.isNotEmpty() && !trimmedPart.startsWith("**") && trimmedPart.isNotEmpty() -> {
                 if (explanation.isEmpty()) {
                     explanation = trimmedPart
                 } else {
@@ -544,7 +606,12 @@ fun parseDuaContent(content: String, quranReference: String? = null): ParsedDuaC
         transliteration = transliteration,
         translation = translation,
         explanation = explanation,
-        quranReference = quranReference
+        quranReference = quranReference,
+        context = context,
+        instruction = instruction,
+        note = note,
+        postContext = postContext,
+        reference = reference
     )
 }
 
@@ -850,27 +917,43 @@ fun DuaDetailScreen(
                                 }
                             }
 
-                        // Arabic Text Card
+                        // Context section - When/why to recite (before the dua)
+                        if (dua.context.isNotEmpty()) {
+                            item {
+                                CollapsibleDuaSection(
+                                    title = "Context",
+                                    accentColor = Color(0xFF4CAF50), // Green accent
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                    initiallyExpanded = true
+                                ) {
+                                    Text(
+                                        text = dua.context,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 15.sp,
+                                            lineHeight = 24.sp
+                                        ),
+                                        color = Color(0xFF5D5D5D)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Arabic Text Card - Cream/beige background, centered text
                         if (dua.arabicText.isNotEmpty()) {
                             item {
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                                        .shadow(
-                                            elevation = 8.dp,
-                                            shape = RoundedCornerShape(24.dp),
-                                            ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                        ),
-                                    shape = RoundedCornerShape(24.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    tonalElevation = 2.dp
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color(0xFFF8F5F0), // Cream/beige background
+                                    tonalElevation = 0.dp,
+                                    shadowElevation = 1.dp
                                 ) {
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 20.dp, vertical = 28.dp),
+                                            .padding(horizontal = 24.dp, vertical = 40.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         val tajweedAnnotations = if (showTajweed && dua.surahNumber > 0 && dua.ayahNumber > 0) {
@@ -884,24 +967,24 @@ fun DuaDetailScreen(
                                                 text = dua.arabicText,
                                                 annotations = tajweedAnnotations,
                                                 defaultStyle = androidx.compose.ui.text.SpanStyle(
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                    color = Color(0xFF3D3D3D) // Dark gray text
                                                 )
                                             )
                                             Text(
                                                 text = annotatedText,
                                                 fontFamily = arabicFontFamily,
-                                                fontSize = 34.sp,
-                                                lineHeight = 56.sp,
+                                                fontSize = 32.sp,
+                                                lineHeight = 54.sp,
                                                 textAlign = TextAlign.Center
                                             )
                                         } else {
                                             Text(
                                                 text = dua.arabicText,
                                                 fontFamily = arabicFontFamily,
-                                                fontSize = 34.sp,
-                                                lineHeight = 56.sp,
+                                                fontSize = 32.sp,
+                                                lineHeight = 54.sp,
                                                 textAlign = TextAlign.Center,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                color = Color(0xFF3D3D3D) // Dark gray text
                                             )
                                         }
                                     }
@@ -909,71 +992,152 @@ fun DuaDetailScreen(
                             }
                         }
 
-                        // Transliteration
+                        // Instruction section - Special instructions (e.g., "Recite 3 times")
+                        if (dua.instruction.isNotEmpty()) {
+                            item {
+                                CollapsibleDuaSection(
+                                    title = "Instruction",
+                                    accentColor = Color(0xFFE91E63), // Pink/red accent
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                    initiallyExpanded = true
+                                ) {
+                                    Text(
+                                        text = dua.instruction,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 15.sp,
+                                            lineHeight = 24.sp,
+                                            fontWeight = FontWeight.Medium
+                                        ),
+                                        color = Color(0xFF5D5D5D)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Transliteration - Collapsible section with left accent
                         if (dua.transliteration.isNotEmpty()) {
                             item {
-                                DuaSectionCard(
-                                    icon = Icons.Outlined.RecordVoiceOver,
+                                CollapsibleDuaSection(
                                     title = "Transliteration",
-                                    iconTint = MaterialTheme.colorScheme.secondary,
-                                    backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
-                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                    accentColor = Color(0xFF9E9E9E), // Gray accent
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                    initiallyExpanded = true
                                 ) {
                                     Text(
                                         text = dua.transliteration,
                                         style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontSize = 16.sp,
-                                            lineHeight = 26.sp,
+                                            fontSize = 17.sp,
+                                            lineHeight = 28.sp,
                                             fontStyle = FontStyle.Italic
                                         ),
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        color = Color(0xFF5D5D5D) // Medium gray
                                     )
                                 }
                             }
                         }
 
-                        // Translation
+                        // Translation - Collapsible section with left accent
                         if (dua.translation.isNotEmpty()) {
                             item {
-                                DuaSectionCard(
-                                    icon = Icons.Outlined.Translate,
+                                CollapsibleDuaSection(
                                     title = "Translation",
-                                    iconTint = MaterialTheme.colorScheme.tertiary,
-                                    backgroundColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
-                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                    accentColor = Color(0xFF9E9E9E), // Gray accent
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                    initiallyExpanded = true
                                 ) {
                                     Text(
                                         text = dua.translation,
                                         style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontSize = 15.sp,
-                                            lineHeight = 24.sp
+                                            fontSize = 17.sp,
+                                            lineHeight = 28.sp,
+                                            fontStyle = FontStyle.Italic
                                         ),
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                        color = Color(0xFF5D5D5D) // Medium gray
                                     )
                                 }
                             }
                         }
 
-                        // Explanation
+                        // Explanation - Collapsible section
                         if (dua.explanation.isNotEmpty()) {
                             item {
-                                DuaSectionCard(
-                                    icon = Icons.Outlined.Lightbulb,
+                                CollapsibleDuaSection(
                                     title = "Explanation",
-                                    iconTint = MaterialTheme.colorScheme.primary,
-                                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                    accentColor = Color(0xFF8BC34A), // Light green accent
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                    initiallyExpanded = false
                                 ) {
                                     Text(
                                         text = dua.explanation,
                                         style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontSize = 14.sp,
-                                            lineHeight = 22.sp
+                                            fontSize = 15.sp,
+                                            lineHeight = 24.sp
                                         ),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = Color(0xFF5D5D5D)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Note section - Additional scholarly notes
+                        if (dua.note.isNotEmpty()) {
+                            item {
+                                CollapsibleDuaSection(
+                                    title = "Note",
+                                    accentColor = Color(0xFFFF9800), // Orange accent
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                    initiallyExpanded = false
+                                ) {
+                                    Text(
+                                        text = dua.note,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 14.sp,
+                                            lineHeight = 22.sp,
+                                            fontStyle = FontStyle.Italic
+                                        ),
+                                        color = Color(0xFF5D5D5D)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Post Context section - Additional context after the dua
+                        if (dua.postContext.isNotEmpty()) {
+                            item {
+                                CollapsibleDuaSection(
+                                    title = "Additional Context",
+                                    accentColor = Color(0xFF2196F3), // Blue accent
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                    initiallyExpanded = false
+                                ) {
+                                    Text(
+                                        text = dua.postContext,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 15.sp,
+                                            lineHeight = 24.sp
+                                        ),
+                                        color = Color(0xFF5D5D5D)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Reference section - Hadith sources
+                        if (dua.reference.isNotEmpty()) {
+                            item {
+                                CollapsibleDuaSection(
+                                    title = "Reference",
+                                    accentColor = Color(0xFF9C27B0), // Purple accent
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                    initiallyExpanded = false
+                                ) {
+                                    Text(
+                                        text = dua.reference,
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontSize = 13.sp,
+                                            lineHeight = 20.sp
+                                        ),
+                                        color = Color(0xFF757575)
                                     )
                                 }
                             }
@@ -1211,122 +1375,60 @@ fun DuaDetailScreen(
                 )
             }
 
-            // Bottom navigation bar - Enhanced Material 3 Design
-            Surface(
+            // Bottom indicator - Clean "Dua X of Y" design matching screenshot
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.BottomCenter),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 4.dp,
-                shadowElevation = 12.dp
+                    .align(Alignment.BottomCenter)
+                    .background(Color(0xFFFAF8F5)) // Light cream background
+                    .padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column {
-                    // Progress indicator at top
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left line
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(3.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .weight(1f)
+                            .height(1.dp)
+                            .background(Color(0xFFD0D0D0))
+                    )
+
+                    // Center text: "Dua X of Y"
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(fraction = (currentPage + 1).toFloat() / totalDuas.toFloat())
-                                .height(3.dp)
-                                .background(
-                                    brush = Brush.horizontalGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.primary,
-                                            MaterialTheme.colorScheme.tertiary
-                                        )
-                                    )
-                                )
+                        Text(
+                            text = "Dua ",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color(0xFF9E9E9E)
+                        )
+                        Text(
+                            text = "${currentPage + 1}",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF3D3D3D)
+                        )
+                        Text(
+                            text = " of $totalDuas",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color(0xFF9E9E9E)
                         )
                     }
 
-                    Row(
+                    // Right line
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Previous button - Enhanced with circular navigation
-                        FilledIconButton(
-                            onClick = {
-                                if (hasPrevious) {
-                                    scope.launch {
-                                        // Wrap to last page when at first page
-                                        val targetPage = if (currentPage == 0) totalDuas - 1 else currentPage - 1
-                                        pagerState.animateScrollToPage(targetPage)
-                                    }
-                                }
-                            },
-                            enabled = hasPrevious,
-                            modifier = Modifier.size(50.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronLeft,
-                                contentDescription = "Previous Dua",
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-
-                        // Center indicator - Enhanced with badge style
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = "${currentPage + 1}",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = " / $totalDuas",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        // Next button - Enhanced with circular navigation
-                        FilledIconButton(
-                            onClick = {
-                                if (hasNext) {
-                                    scope.launch {
-                                        // Wrap to first page when at last page
-                                        val targetPage = if (currentPage == totalDuas - 1) 0 else currentPage + 1
-                                        pagerState.animateScrollToPage(targetPage)
-                                    }
-                                }
-                            },
-                            enabled = hasNext,
-                            modifier = Modifier.size(50.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = "Next Dua",
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
+                            .weight(1f)
+                            .height(1.dp)
+                            .background(Color(0xFFD0D0D0))
+                    )
                 }
             }
         }
@@ -1519,7 +1621,112 @@ private fun DuaPageContent(
 }
 
 /**
- * Reusable section card component with icon header
+ * Collapsible section card component with left accent border
+ * Matches the clean, minimal design with expand/collapse functionality
+ */
+@Composable
+private fun CollapsibleDuaSection(
+    title: String,
+    accentColor: Color,
+    modifier: Modifier = Modifier,
+    initiallyExpanded: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(initiallyExpanded) }
+    val rotationAngle by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "chevronRotation"
+    )
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        shadowElevation = 2.dp
+    ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            // Left accent border
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .background(accentColor)
+                    .then(
+                        if (isExpanded) {
+                            Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
+                        } else {
+                            Modifier.height(56.dp)
+                        }
+                    )
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 0.dp)
+            ) {
+                // Header row - clickable to expand/collapse
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isExpanded = !isExpanded }
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .rotate(rotationAngle)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .rotate(rotationAngle)
+                    )
+                }
+
+                // Expandable content
+                AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    ) {
+                        content()
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Reusable section card component with icon header (legacy - for backwards compatibility)
  */
 @Composable
 private fun DuaSectionCard(
@@ -1531,55 +1738,13 @@ private fun DuaSectionCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 4.dp,
-                shape = RoundedCornerShape(20.dp),
-                ambientColor = Color.Black.copy(alpha = 0.08f),
-                spotColor = Color.Black.copy(alpha = 0.05f)
-            ),
-        shape = RoundedCornerShape(20.dp),
-        color = backgroundColor,
-        tonalElevation = 1.dp
+    CollapsibleDuaSection(
+        title = title,
+        accentColor = iconTint,
+        modifier = modifier,
+        initiallyExpanded = true
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp)
-        ) {
-            // Header with icon
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 12.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = iconTint.copy(alpha = 0.15f),
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = iconTint,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = contentColor,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.5.sp
-                )
-            }
-            // Content
-            content()
-        }
+        content()
     }
 }
 
