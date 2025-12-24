@@ -83,7 +83,7 @@ fun NiaNavHost(
                 onBackClick = navController::popBackStack,
                 onTopicClick = navController::navigateToTopic,
                 onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
-                onDuaClick = { userNewsResource ->
+                onDuaClick = { userNewsResource, topicId ->
                     val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
                         ?.groupValues?.get(1)?.toIntOrNull()
                         ?: Regex("Dua (\\d+)").find(userNewsResource.title)
@@ -94,7 +94,8 @@ fun NiaNavHost(
                         content = userNewsResource.content,
                         quranReference = null,
                         duaNumber = duaNumber,
-                        newsResourceId = userNewsResource.id
+                        newsResourceId = userNewsResource.id,
+                        topicId = topicId
                     )
                 },
             )
@@ -162,7 +163,7 @@ fun NiaNavHost(
         )
         interestsListDetailScreen(
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
-            onDuaClick = { userNewsResource ->
+            onDuaClick = { userNewsResource, topicId ->
                 val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
                     ?.groupValues?.get(1)?.toIntOrNull()
                     ?: Regex("Dua (\\d+)").find(userNewsResource.title)
@@ -173,7 +174,8 @@ fun NiaNavHost(
                     content = userNewsResource.content,
                     quranReference = null,
                     duaNumber = duaNumber,
-                    newsResourceId = userNewsResource.id
+                    newsResourceId = userNewsResource.id,
+                    topicId = topicId
                 )
             },
         )

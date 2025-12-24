@@ -232,29 +232,29 @@ data class PrayerSettings(
     }
 
     /**
-     * Convert to separate preference classes
+     * Convert to calculation settings only (does NOT touch notification preferences)
+     * Use this instead of toSeparatePreferences() to avoid resetting notification settings
      */
-    fun toSeparatePreferences(): Triple<PrayerCalculationSettings, PrayerLocationPreferences, PrayerNotificationPreferences> {
-        return Triple(
-            PrayerCalculationSettings(
-                calculationMethod = calculationMethod,
-                asrMadhhab = asrMadhhab,
-                highLatitudeAdjustment = highLatitudeAdjustment,
-                customFajrAngle = customFajrAngle,
-                customIshaAngle = customIshaAngle,
-                customIshaDelay = customIshaDelay,
-                customMaghribOffset = customMaghribOffset,
-                timeOffsets = timeOffsets
-            ),
-            PrayerLocationPreferences(
-                location = location,
-                useGpsLocation = useGpsLocation
-            ),
-            PrayerNotificationPreferences(
-                notificationsEnabled = notificationsEnabled,
-                notificationSound = notificationSound,
-                vibrationEnabled = vibrationEnabled
-            )
+    fun toCalculationSettings(): PrayerCalculationSettings {
+        return PrayerCalculationSettings(
+            calculationMethod = calculationMethod,
+            asrMadhhab = asrMadhhab,
+            highLatitudeAdjustment = highLatitudeAdjustment,
+            customFajrAngle = customFajrAngle,
+            customIshaAngle = customIshaAngle,
+            customIshaDelay = customIshaDelay,
+            customMaghribOffset = customMaghribOffset,
+            timeOffsets = timeOffsets
+        )
+    }
+
+    /**
+     * Convert to location preferences only
+     */
+    fun toLocationPreferences(): PrayerLocationPreferences {
+        return PrayerLocationPreferences(
+            location = location,
+            useGpsLocation = useGpsLocation
         )
     }
 }

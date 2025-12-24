@@ -212,7 +212,7 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
             // Load Tajweed data
             loadTajweedData()
         }
-        loadAllDuas(context)
+        // Don't load duas here - let the composable control loading based on topicId
     }
 
     /**
@@ -406,6 +406,105 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                 ""
             }
         }
+    }
+
+    /**
+     * Load duas filtered by topic ID
+     */
+    fun loadDuasByTopic(context: Context, topicId: String) {
+        android.util.Log.d("DuaDetailViewModel", "🔍 loadDuasByTopic called with topicId='$topicId'")
+        if (topicId.isEmpty()) {
+            android.util.Log.d("DuaDetailViewModel", "⚠️ topicId is empty, loading all duas")
+            loadAllDuas(context)
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val sortedDuas = withContext(Dispatchers.IO) {
+                    val duas = mutableListOf<DuaItem>()
+
+                    val dbPath = context.getDatabasePath("news_resources_topic_temp.db")
+                    if (dbPath.exists()) dbPath.delete()
+
+                    context.assets.open("databases/news_resources.db").use { inputStream ->
+                        dbPath.parentFile?.mkdirs()
+                        java.io.FileOutputStream(dbPath).use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                    }
+
+                    val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+                        dbPath.absolutePath,
+                        null,
+                        android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+                    )
+
+                    // Query duas filtered by topic
+                    val cursor = db.rawQuery(
+                        """SELECT nr.id, nr.title, nr.content, nr.type
+                           FROM news_resources nr
+                           INNER JOIN news_topics nt ON nr.id = nt.news_id
+                           WHERE nt.topic_id = ? AND nr.type LIKE '%Dua%'""",
+                        arrayOf(topicId)
+                    )
+
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getInt(0).toString()
+                        val title = cursor.getString(1) ?: ""
+                        val content = cursor.getString(2) ?: ""
+
+                        val parsed = parseDuaContent(content, null)
+                        val duaNumber = Regex("#(\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                            ?: Regex("Dua (\\d+)").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                            ?: Regex("\\((\\d+)/\\d+\\)").find(title)?.groupValues?.get(1)?.toIntOrNull()
+                            ?: (duas.size + 1)
+
+                        duas.add(
+                            DuaItem(
+                                id = id,
+                                title = title,
+                                arabicText = parsed.arabicText,
+                                transliteration = parsed.transliteration,
+                                translation = parsed.translation,
+                                explanation = parsed.explanation,
+                                quranReference = null,
+                                duaNumber = duaNumber,
+                                surahNumber = 0,
+                                ayahNumber = 0,
+                                surahName = "",
+                                context = parsed.context,
+                                instruction = parsed.instruction,
+                                note = parsed.note,
+                                postContext = parsed.postContext,
+                                reference = parsed.reference
+                            )
+                        )
+                    }
+
+                    cursor.close()
+                    db.close()
+                    dbPath.delete()
+
+                    duas.sortedBy { it.duaNumber }
+                }
+
+                android.util.Log.d("DuaDetailViewModel", "✅ Loaded ${sortedDuas.size} duas for topic")
+                baseDuas = sortedDuas
+                _allDuas.value = sortedDuas
+            } catch (e: Exception) {
+                android.util.Log.e("DuaDetailViewModel", "❌ Error loading duas by topic", e)
+                e.printStackTrace()
+                // Fall back to loading all duas
+                loadAllDuas(context)
+            }
+        }
+    }
+
+    /**
+     * Public method to load all duas (called from composable when no topicId)
+     */
+    fun loadAllDuasPublic(context: Context) {
+        loadAllDuas(context)
     }
 
     private fun loadAllDuas(context: Context) {
@@ -641,7 +740,8 @@ fun DuaDetailScreen(
     onNavigateToSurah: ((surahNumber: Int, ayahNumber: Int) -> Unit)? = null,
     initialNewsResourceId: String = "",
     isNiaBookmarked: (newsResourceId: String) -> Boolean = { false },
-    onToggleNiaBookmark: (newsResourceId: String) -> Unit = {}
+    onToggleNiaBookmark: (newsResourceId: String) -> Unit = {},
+    topicId: String = ""
 ) {
     val context = LocalContext.current
     val viewModel = remember { DuaDetailViewModel(context) }
@@ -682,9 +782,22 @@ fun DuaDetailScreen(
         else -> "??"
     }
 
-    // Load all duas from ViewModel
+    // Load duas - either filtered by topic or all duas
+    LaunchedEffect(topicId) {
+        android.util.Log.d("DuaDetailScreen", "🔍 LaunchedEffect topicId='$topicId'")
+        if (topicId.isNotEmpty()) {
+            android.util.Log.d("DuaDetailScreen", "📂 Loading duas for topic: $topicId")
+            viewModel.loadDuasByTopic(context, topicId)
+        } else {
+            android.util.Log.d("DuaDetailScreen", "📂 Loading ALL duas (no topicId)")
+            viewModel.loadAllDuasPublic(context)
+        }
+    }
+
+    // Use the passed allDuas list if provided (e.g., from a topic), otherwise load all duas from ViewModel
+    // This ensures "Dua X of Y" shows the correct count for the topic, not all 322 duas
     val loadedDuas by viewModel.allDuas.collectAsState()
-    val duasList = if (loadedDuas.isNotEmpty()) loadedDuas else allDuas
+    val duasList = if (allDuas.isNotEmpty()) allDuas else loadedDuas
 
     // Find initial page index based on dua number from title
     // Handle both formats: "Dua #2" and "Quranic Dua 2: Make us Muslims"

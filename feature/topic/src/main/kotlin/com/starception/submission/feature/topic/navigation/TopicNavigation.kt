@@ -40,7 +40,7 @@ fun NavGraphBuilder.topicScreen(
     onBackClick: () -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
-    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
 ) {
     composable<TopicRoute> { entry ->
         val id = entry.toRoute<TopicRoute>().id
@@ -49,7 +49,7 @@ fun NavGraphBuilder.topicScreen(
             onBackClick = onBackClick,
             onTopicClick = onTopicClick,
             onSurahClick = onSurahClick,
-            onDuaClick = onDuaClick,
+            onDuaClick = { userNewsResource -> onDuaClick(userNewsResource, id) },
             viewModel = hiltViewModel<TopicViewModel, TopicViewModel.Factory>(
                 key = id,
             ) { factory ->

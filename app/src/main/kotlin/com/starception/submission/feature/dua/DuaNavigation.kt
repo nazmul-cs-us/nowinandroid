@@ -16,6 +16,7 @@ import java.net.URLEncoder
  * @param quranReference Optional Quran reference (e.g., "2:127")
  * @param duaNumber The dua number (1-40 for Quranic duas)
  * @param newsResourceId The NiA news resource ID for bookmark sync (128 for dua 1, 129 for dua 2, etc.)
+ * @param topicId Optional topic ID to filter duas for "Dua X of Y" display
  */
 @Serializable
 data class DuaDetailRoute(
@@ -23,7 +24,8 @@ data class DuaDetailRoute(
     val content: String,
     val quranReference: String? = null,
     val duaNumber: Int = 1,
-    val newsResourceId: String = ""
+    val newsResourceId: String = "",
+    val topicId: String = ""
 )
 
 /**
@@ -35,6 +37,7 @@ fun NavController.navigateToDuaDetail(
     quranReference: String? = null,
     duaNumber: Int = 1,
     newsResourceId: String = "",
+    topicId: String = "",
     navOptions: NavOptions? = null
 ) {
     val encodedContent = URLEncoder.encode(content, "UTF-8")
@@ -48,7 +51,8 @@ fun NavController.navigateToDuaDetail(
             content = encodedContent,
             quranReference = encodedRef,
             duaNumber = duaNumber,
-            newsResourceId = resourceId
+            newsResourceId = resourceId,
+            topicId = topicId
         ),
         navOptions = navOptions
     )
@@ -81,7 +85,8 @@ fun NavGraphBuilder.duaDetailScreen(
             onNavigateToSurah = onNavigateToSurah,
             initialNewsResourceId = newsResourceId,
             isNiaBookmarked = isBookmarked,
-            onToggleNiaBookmark = onToggleBookmark
+            onToggleNiaBookmark = onToggleBookmark,
+            topicId = route.topicId
         )
     }
 }

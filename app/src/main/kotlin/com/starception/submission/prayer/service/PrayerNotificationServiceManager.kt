@@ -98,9 +98,18 @@ class PrayerNotificationServiceManager @Inject constructor(
                                     "Isha" to applyOffsetToTime(dayPrayerTimes.isha, offsets.isha).format(formatter)
                                 )
 
+                                // Log all prior notification settings for debugging
+                                Log.d(TAG, "📋 Prior notification settings:")
+                                Log.d(TAG, "   Fajr: ${notificationPrefs.fajrPriorMinutes} min")
+                                Log.d(TAG, "   Dhuhr: ${notificationPrefs.dhuhrPriorMinutes} min")
+                                Log.d(TAG, "   Asr: ${notificationPrefs.asrPriorMinutes} min")
+                                Log.d(TAG, "   Maghrib: ${notificationPrefs.maghribPriorMinutes} min")
+                                Log.d(TAG, "   Isha: ${notificationPrefs.ishaPriorMinutes} min")
+
                                 // Get per-prayer reminder minutes and schedule
                                 prayerTimes.forEach { (prayerName, prayerTime) ->
                                     val reminderMinutes = notificationPrefs.getPriorMinutesForPrayer(prayerName)
+                                    Log.d(TAG, "⏰ Scheduling $prayerName at $prayerTime with $reminderMinutes min prior reminder")
                                     PrayerNotificationScheduler.schedulePrayerNotification(
                                         context = context,
                                         prayerName = prayerName,
