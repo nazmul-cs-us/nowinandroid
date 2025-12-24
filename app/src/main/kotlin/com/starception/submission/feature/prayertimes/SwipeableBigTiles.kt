@@ -1047,12 +1047,16 @@ fun SwipeableBigTiles(
     }
 
     // Request Activity Recognition permission and ensure detection is running when on Smart Tracking tile (page 1)
+    // Also track tile focus for sound/vibration notification suppression
     LaunchedEffect(pagerState.currentPage) {
         val actualPage = pagerState.currentPage % 4
 
         if (actualPage == 1) {
             // User is on Smart Tracking tile - ensure detection is running
             android.util.Log.i("SmartTracking", "📍 User on Smart Tracking tile")
+
+            // Mark tile as in focus - enables activity change notifications
+            com.starception.submission.util.ActivityTracker.setSmartActivityTileInFocus(true)
 
             // Request permission if needed
             if (!hasActivityPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -1062,6 +1066,9 @@ fun SwipeableBigTiles(
 
             // Ensure detection is initialized and running (in case it stopped)
             com.starception.submission.util.ActivityTracker.initialize(context, startDetectionNow = true)
+        } else {
+            // User swiped away from Smart Tracking tile - disable notifications
+            com.starception.submission.util.ActivityTracker.setSmartActivityTileInFocus(false)
         }
     }
 
