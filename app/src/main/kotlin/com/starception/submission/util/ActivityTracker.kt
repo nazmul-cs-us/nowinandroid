@@ -70,6 +70,23 @@ object ActivityTracker {
     private var isAppInForeground = false
     private var lifecycleObserverRegistered = false
 
+    // Smart Activity tile focus tracking - only play sound/vibration when tile is visible
+    private var isSmartActivityTileInFocus = false
+
+    /**
+     * Set whether the Smart Activity tile is currently visible/in focus
+     * When not in focus, sound/vibration notifications are suppressed
+     */
+    fun setSmartActivityTileInFocus(inFocus: Boolean) {
+        isSmartActivityTileInFocus = inFocus
+        Log.d("ActivityTracker", "📍 Smart Activity tile ${if (inFocus) "IN FOCUS" else "OUT OF FOCUS"} - notifications ${if (inFocus) "enabled" else "suppressed"}")
+    }
+
+    /**
+     * Check if Smart Activity tile is currently in focus
+     */
+    fun isSmartActivityTileInFocus(): Boolean = isSmartActivityTileInFocus
+
     // Callback for activity change (used to update notification immediately)
     private var activityChangeCallback: ((String) -> Unit)? = null
     
@@ -441,12 +458,20 @@ object ActivityTracker {
     
     /**
      * Play notification when activity changes (based on selected mode)
-     * Only plays sound/vibration when app is in foreground to avoid disturbing user
+     * Only plays sound/vibration when:
+     * 1. App is in foreground
+     * 2. Smart Activity tile is currently visible/in focus
      */
     private fun playActivityChangeBeep() {
         // Skip sound/vibration when app is in background
         if (!isAppInForeground) {
             Log.d("ActivityTracker", "🔕 Activity changed but app in BACKGROUND - suppressing sound/vibration")
+            return
+        }
+
+        // Skip sound/vibration when Smart Activity tile is not in focus
+        if (!isSmartActivityTileInFocus) {
+            Log.d("ActivityTracker", "🔕 Activity changed but Smart Activity tile NOT IN FOCUS - suppressing sound/vibration")
             return
         }
 

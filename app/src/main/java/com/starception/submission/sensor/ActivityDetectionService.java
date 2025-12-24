@@ -175,6 +175,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     // Hysteresis: Make activities "sticky" to prevent rapid flipping
     // Reduced from 3 to 2 for faster response while still preventing false positives
     private static final int STABLE_DETECTION_COUNT = 2; // Need 2 consecutive detections (4 seconds)
+    private static final int DRIVING_STABLE_COUNT = 3; // Driving needs 3 consecutive detections (6 seconds) to prevent GPS noise false positives
     private int consecutiveDetectionCount = 0;
     private ActivityType lastDetectedActivity = ActivityType.UNKNOWN;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -475,9 +476,12 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         }
         
         // Don't change activity unless we have stable detections OR immediate transitions
-        boolean isStableDetection = (consecutiveDetectionCount >= STABLE_DETECTION_COUNT);
-        boolean isImmediateTransition = (detectedActivity == ActivityType.DRIVING || 
-                                         (currentActivity == ActivityType.STATIONARY && detectedActivity != ActivityType.WALKING));
+        // IMPROVED: Driving needs more consecutive detections to prevent GPS noise false positives
+        int requiredCount = (detectedActivity == ActivityType.DRIVING) ? DRIVING_STABLE_COUNT : STABLE_DETECTION_COUNT;
+        boolean isStableDetection = (consecutiveDetectionCount >= requiredCount);
+        // IMPROVED: Driving now also requires stable detection to prevent GPS noise false positives
+        // Only STATIONARY transitions are immediate (user clearly stopped moving)
+        boolean isImmediateTransition = (currentActivity == ActivityType.STATIONARY && detectedActivity != ActivityType.WALKING);
         
         // IMPROVED: Require confirmation for WALKING to prevent false positives
         boolean needsConfirmation = (detectedActivity == ActivityType.WALKING && maxSpeed < 0.1);
@@ -908,7 +912,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     /**
      * Calculate confidence score for DRIVING
      * High speed is the strongest indicator, but also check for vehicle vibration patterns
-     * IMPROVED: Avoid false positives from GPS noise when variance suggests walking
+     * IMPROVED: Avoid false positives from GPS noise when variance suggests walking or phone handling
      */
     private float calculateDrivingConfidence(double maxSpeed, double accelVariance, double avgGyro, double linearAccel) {
         float confidence = 0f;
@@ -916,14 +920,32 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         // Check if variance suggests walking (should NOT be driving)
         boolean hasWalkingVariance = accelVariance >= WALKING_VARIANCE_MIN && accelVariance < WALKING_VARIANCE_MAX;
 
-        // Speed is primary indicator (most reliable)
+        // Check if variance suggests phone handling (moderate movement, not passive vehicle)
+        boolean hasPhoneHandlingVariance = accelVariance > 0.1 && accelVariance < WALKING_VARIANCE_MIN;
+
+        // Check for high gyro indicating active phone use (tilting, rotating)
+        boolean hasActivePhoneUse = avgGyro > 0.3;
+
+        // Speed is primary indicator (most reliable) - but ONLY if other sensors agree
         if (maxSpeed > DRIVING_SPEED_THRESHOLD) {
-            confidence = 0.9f; // Very high confidence
-        } else if (maxSpeed > 4.0) { // 14 km/h - could be biking or slow driving
-            // But if variance suggests walking, GPS is probably wrong
+            // High speed detected, but check if it makes sense with other sensors
             if (hasWalkingVariance) {
-                confidence = 0.1f; // Low confidence - likely GPS noise
-                logDebug("Driving: GPS speed " + String.format("%.1f", maxSpeed) + " but variance suggests walking");
+                // Walking variance + high GPS speed = GPS is wrong (e.g., GPS drift)
+                confidence = 0.2f;
+                logDebug("Driving: High GPS speed but walking variance detected - likely GPS error");
+            } else if (hasActivePhoneUse && hasPhoneHandlingVariance) {
+                // Active phone use + high GPS speed = GPS error while using phone
+                confidence = 0.3f;
+                logDebug("Driving: High GPS speed but active phone handling detected");
+            } else {
+                // Low variance + high speed = actually driving
+                confidence = 0.9f;
+            }
+        } else if (maxSpeed > 4.0) { // 14 km/h - could be biking or slow driving
+            // But if variance suggests walking or phone use, GPS is probably wrong
+            if (hasWalkingVariance || hasActivePhoneUse) {
+                confidence = 0.05f; // Very low confidence - likely GPS noise
+                logDebug("Driving: Moderate GPS speed " + String.format("%.1f", maxSpeed) + " but variance/gyro suggests not driving");
             } else {
                 confidence = 0.3f;
             }
@@ -938,12 +960,15 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
 
         // If variance is in walking range, reduce driving confidence significantly
         if (hasWalkingVariance) {
-            confidence -= 0.3f;
+            confidence -= 0.4f; // Increased from 0.3 to 0.4
         }
 
         // Reduce confidence if high gyro (vehicles have minimal rotation)
-        if (avgGyro > 1.0) {
-            confidence -= 0.2f;
+        // Phone in hand typically has higher gyro than phone in car mount
+        if (avgGyro > 0.5) {
+            confidence -= 0.3f; // Increased from 0.2 to 0.3
+        } else if (avgGyro > 1.0) {
+            confidence -= 0.4f;
         }
 
         return Math.max(0f, Math.min(1f, confidence));
@@ -1325,12 +1350,34 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     @Override
     public void onLocationChanged(Location location) {
         if (!isRunning.get()) return;
-        
+
+        // IMPROVED: Only trust GPS speed if accuracy is good
+        // Poor GPS accuracy can cause false high speed readings
+        float accuracy = location.getAccuracy();
+        float speed = location.getSpeed();
+
+        // Filter out unreliable GPS readings
+        if (accuracy > 50) {
+            logDebug("GPS accuracy poor (" + String.format("%.0f", accuracy) + "m) - ignoring speed");
+            speed = 0; // Don't trust speed from inaccurate GPS
+        }
+
+        // Also filter if speed is reported but location.hasSpeed() is false
+        if (!location.hasSpeed()) {
+            speed = 0;
+        }
+
+        // Log for debugging
+        if (speed > 0) {
+            logDebug(String.format("GPS: speed=%.1f m/s (%.0f km/h), accuracy=%.0fm",
+                    speed, speed * 3.6, accuracy));
+        }
+
         long timestamp = System.currentTimeMillis();
         locationData.offer(new LocationData(
             location.getLatitude(),
             location.getLongitude(),
-            location.getSpeed(),
+            speed,
             timestamp
         ));
     }
