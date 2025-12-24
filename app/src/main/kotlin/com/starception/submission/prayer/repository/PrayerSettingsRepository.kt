@@ -822,38 +822,38 @@ class PrayerSettingsRepository @Inject constructor(
 
     /**
      * LEGACY UPDATE SETTINGS - For backward compatibility
+     * NOTE: This method only updates calculation and location settings.
+     * It does NOT touch notification preferences to prevent resetting them.
      *
      * @deprecated Use updateCalculationSettings(), updateLocationPreferences(), and updateNotificationPreferences() instead
      */
     @Deprecated("Use separate preference update methods instead")
     fun updateSettings(settings: PrayerSettings, forceCommit: Boolean = false) {
         Log.i(TAG, "")
-        Log.i(TAG, "📝 REPOSITORY UPDATE SETTINGS OPERATION")
+        Log.i(TAG, "📝 REPOSITORY UPDATE SETTINGS OPERATION (NOTIFICATION-SAFE)")
         Log.i(TAG, "=".repeat(80))
         Log.i(TAG, "🔄 Processing user settings update from UI...")
         val startTime = System.currentTimeMillis()
-        
+
         Log.i(TAG, "📊 Settings to save:")
         Log.i(TAG, "  - Calculation Method: ${settings.calculationMethod.name}")
         Log.i(TAG, "  - Asr Madhhab: ${settings.asrMadhhab.name}")
         Log.i(TAG, "  - Custom Fajr Angle: ${settings.customFajrAngle}°")
         Log.i(TAG, "  - Custom Isha Angle: ${settings.customIshaAngle}°")
-        Log.i(TAG, "  - Method Auto-Detected: ${settings.isMethodAutoDetected}")
-        Log.i(TAG, "  - Madhhab Auto-Detected: ${settings.isMadhhabAutoDetected}")
-        Log.i(TAG, "  - Country: ${settings.autoDetectedCountryName}")
         Log.i(TAG, "  - Force Commit: $forceCommit")
-        
-        Log.i(TAG, "🔄 Converting legacy settings to separate preference structures...")
-        val (calculation, location, notification) = settings.toSeparatePreferences()
-        
+
+        // Use safe conversion methods that don't touch notifications
+        val calculation = settings.toCalculationSettings()
+        val location = settings.toLocationPreferences()
+
         Log.i(TAG, "💾 Saving calculation settings...")
         updateCalculationSettings(calculation, forceCommit)
 
         Log.i(TAG, "💾 Saving location preferences...")
         updateLocationPreferences(location, forceCommit)
 
-        Log.i(TAG, "💾 Saving notification preferences...")
-        updateNotificationPreferences(notification, forceCommit)
+        // NOTE: NOT updating notification preferences to prevent resetting them!
+        Log.i(TAG, "⏭️ Skipping notification preferences (preserving existing settings)")
 
         // ALGORITHM: Also save to cached_prayer_settings for restore comparison
         Log.i(TAG, "")
@@ -863,44 +863,15 @@ class PrayerSettingsRepository @Inject constructor(
         val cacheTime = System.currentTimeMillis() - cacheStartTime
         Log.i(TAG, "✅ Cached prayer settings saved successfully (${cacheTime}ms)")
 
-        // Verify what was actually saved
-        Log.i(TAG, "")
-        Log.i(TAG, "🔍 VERIFICATION: Reading back saved settings")
-        val verifyStartTime = System.currentTimeMillis()
-        val savedSettings = getCachedPrayerSettings()
-        val verifyTime = System.currentTimeMillis() - verifyStartTime
-        if (savedSettings != null) {
-            Log.i(TAG, "✅ VERIFICATION SUCCESSFUL (${verifyTime}ms)")
-            Log.i(TAG, "📋 VERIFIED SAVED SETTINGS:")
-            Log.i(TAG, "   🕌 Method: ${savedSettings.calculationMethod.displayName}")
-            Log.i(TAG, "   🤲 Madhhab: ${savedSettings.asrMadhhab.displayName}")
-            Log.i(TAG, "   🌅 Fajr Angle: ${savedSettings.customFajrAngle ?: "default"}")
-            Log.i(TAG, "   🌙 Isha Angle: ${savedSettings.customIshaAngle ?: "default"}")
-            Log.i(TAG, "   ⏰ Isha Delay: ${savedSettings.customIshaDelay ?: "default"}")
-        } else {
-            Log.e(TAG, "❌ VERIFICATION FAILED: Could not read back saved settings")
-        }
-
-        // Check restore option status after save
-        Log.i(TAG, "")
-        Log.i(TAG, "🔄 RESTORE OPTION CHECK: Evaluating if restore button should show")
-        val restoreCheckStart = System.currentTimeMillis()
-        val shouldShowRestore = shouldShowRestoreOption()
-        val restoreCheckTime = System.currentTimeMillis() - restoreCheckStart
-        Log.i(TAG, "🎯 RESTORE DECISION: ${if (shouldShowRestore) "SHOW" else "HIDE"} restore button (${restoreCheckTime}ms)")
-
         val totalTime = System.currentTimeMillis() - startTime
         Log.i(TAG, "")
         Log.i(TAG, "✅ SETTINGS UPDATE OPERATION COMPLETED")
         Log.i(TAG, "⏱️ Total operation time: ${totalTime}ms")
-        Log.i(TAG, "🎯 All settings have been persisted to SharedPreferences")
         Log.i(TAG, "📊 OPERATION SUMMARY:")
         Log.i(TAG, "   ✅ Calculation settings saved")
         Log.i(TAG, "   ✅ Location preferences saved")
-        Log.i(TAG, "   ✅ Notification preferences saved")
+        Log.i(TAG, "   ⏭️ Notification preferences preserved (not touched)")
         Log.i(TAG, "   ✅ Cached prayer settings updated")
-        Log.i(TAG, "   ✅ Settings verified successfully")
-        Log.i(TAG, "   ✅ Restore option evaluated: ${if (shouldShowRestore) "SHOW" else "HIDE"}")
         Log.i(TAG, "=".repeat(80))
         Log.i(TAG, "")
     }
@@ -1957,13 +1928,16 @@ class PrayerSettingsRepository @Inject constructor(
         Log.i(TAG, "✅ Settings overwritten in preferences (${saveTime}ms)")
         Log.i(TAG, "   📄 Storage: JSON format in SharedPreferences")
         Log.i(TAG, "   🔑 Key: current_settings_json")
-        
+
         // CRITICAL: Save to calculation_settings_json so it persists across app restarts
+        // NOTE: Only update calculation and location, NOT notification preferences!
         Log.i(TAG, "")
         Log.i(TAG, "💾 STEP 3b: Save to calculation_settings_json for persistence")
-        val (calculation, location, notification) = autoDetectedSettings.toSeparatePreferences()
+        val calculation = autoDetectedSettings.toCalculationSettings()
+        val location = autoDetectedSettings.toLocationPreferences()
         saveCalculationSettings(calculation)
         Log.i(TAG, "✅ Calculation settings saved to calculation_settings_json")
+        Log.i(TAG, "⏭️ Notification preferences preserved (not touched by restore)")
 
         // Update reactive flows
         Log.i(TAG, "")
@@ -1971,12 +1945,12 @@ class PrayerSettingsRepository @Inject constructor(
         _settingsFlow.value = autoDetectedSettings
         _settingsFlow.tryEmit(autoDetectedSettings)
 
-        // Update separate preference flows with already-extracted values
+        // Update separate preference flows - EXCEPT notification preferences!
         _calculationSettingsFlow.value = calculation
         _calculationSettingsFlow.tryEmit(calculation)
         _locationPreferencesFlow.value = location
-        _notificationPreferencesFlow.value = notification
-        Log.i(TAG, "✅ All reactive flows updated - UI will receive restored values")
+        // NOTE: NOT updating _notificationPreferencesFlow to preserve user's notification settings
+        Log.i(TAG, "✅ Calculation and location flows updated - notification settings preserved")
 
         // VERIFY FLOW EMISSION: Log the exact values emitted
         Log.i(TAG, "")
@@ -2571,32 +2545,66 @@ class PrayerSettingsRepository @Inject constructor(
     
     /**
      * LOAD ALL SETTINGS: Load separate preference types or migrate from legacy
+     *
+     * IMPORTANT: This function preserves existing preferences when doing partial migration.
+     * If only some preferences are missing, we keep existing ones and only fill in gaps.
+     * This prevents notification settings from being reset when location/calculation changes.
      */
     private fun loadAllSettings() {
         android.util.Log.w("PrayerSettingsRepository", "🔥 LOAD ALL SETTINGS CALLED")
-        
+
         // Try loading separate preferences first
         val calculationSettings = loadCalculationSettings()
         val locationPreferences = loadLocationPreferences()
         val notificationPreferences = loadNotificationPreferences()
-        
+
+        android.util.Log.w("PrayerSettingsRepository", "📊 Load results: calc=${calculationSettings != null}, loc=${locationPreferences != null}, notif=${notificationPreferences != null}")
+
         if (calculationSettings != null && locationPreferences != null && notificationPreferences != null) {
-            // All separate preferences exist
+            // All preferences exist - use them directly
+            android.util.Log.w("PrayerSettingsRepository", "✅ All preferences loaded successfully")
             _calculationSettingsFlow.value = calculationSettings
             _locationPreferencesFlow.value = locationPreferences
             _notificationPreferencesFlow.value = notificationPreferences
             _settingsFlow.value = combineToLegacySettings(calculationSettings, locationPreferences, notificationPreferences)
         } else {
-            // Try migrating from legacy combined settings
-            val legacySettings = loadLegacySettings()
-            if (legacySettings != null) {
-                android.util.Log.w("PrayerSettingsRepository", "🔄 Migrating from legacy settings")
-                migrateToSeparatePreferences(legacySettings)
-            } else {
-                android.util.Log.w("PrayerSettingsRepository", "🔄 No settings found, running initialization")
-                val initializedSettings = initializeSettings()
-                migrateToSeparatePreferences(initializedSettings)
+            // FRESH INSTALL: Some preferences missing, use defaults for missing ones
+            android.util.Log.w("PrayerSettingsRepository", "🆕 Some preferences missing - using defaults for missing ones")
+
+            // Use existing preferences if available, otherwise use defaults
+            val finalCalcSettings = calculationSettings ?: run {
+                android.util.Log.w("PrayerSettingsRepository", "📝 Calculation settings missing - using defaults")
+                getDefaultCalculationSettings()
             }
+
+            val finalLocPrefs = locationPreferences ?: run {
+                android.util.Log.w("PrayerSettingsRepository", "📝 Location preferences missing - using defaults")
+                getDefaultLocationPreferences()
+            }
+
+            val finalNotificationPrefs = notificationPreferences ?: run {
+                android.util.Log.w("PrayerSettingsRepository", "📝 Notification preferences missing - using defaults")
+                getDefaultNotificationPreferences()
+            }
+
+            // Save any missing preferences
+            if (calculationSettings == null) {
+                saveCalculationSettings(finalCalcSettings)
+            }
+            if (locationPreferences == null) {
+                saveLocationPreferences(finalLocPrefs)
+            }
+            if (notificationPreferences == null) {
+                saveNotificationPreferences(finalNotificationPrefs)
+            }
+
+            // Update flows
+            _calculationSettingsFlow.value = finalCalcSettings
+            _locationPreferencesFlow.value = finalLocPrefs
+            _notificationPreferencesFlow.value = finalNotificationPrefs
+            _settingsFlow.value = combineToLegacySettings(finalCalcSettings, finalLocPrefs, finalNotificationPrefs)
+
+            android.util.Log.w("PrayerSettingsRepository", "✅ Preferences initialized successfully")
         }
     }
     
@@ -2608,24 +2616,6 @@ class PrayerSettingsRepository @Inject constructor(
         _locationPreferencesFlow.value = getDefaultLocationPreferences()
         _notificationPreferencesFlow.value = getDefaultNotificationPreferences()
         _settingsFlow.value = getDefaultSettings()
-    }
-    
-    /**
-     * MIGRATE TO SEPARATE PREFERENCES: Convert legacy settings to separate preferences
-     */
-    private fun migrateToSeparatePreferences(legacySettings: PrayerSettings) {
-        val (calculation, location, notification) = legacySettings.toSeparatePreferences()
-        
-        saveCalculationSettings(calculation)
-        saveLocationPreferences(location)
-        saveNotificationPreferences(notification)
-        
-        _calculationSettingsFlow.value = calculation
-        _locationPreferencesFlow.value = location
-        _notificationPreferencesFlow.value = notification
-        _settingsFlow.value = legacySettings
-        
-        android.util.Log.w("PrayerSettingsRepository", "✅ Migration completed")
     }
     
     /**
@@ -2702,22 +2692,7 @@ class PrayerSettingsRepository @Inject constructor(
             null
         }
     }
-    
-    private fun loadLegacySettings(): PrayerSettings? {
-        return try {
-            val settingsJson = prefs.getString(KEY_CURRENT_SETTINGS_JSON, null)
-            logPrefReadJson(KEY_CURRENT_SETTINGS_JSON, settingsJson, "legacy settings")
-            if (settingsJson != null) {
-                json.decodeFromString<PrayerSettings>(settingsJson)
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("PrayerSettingsRepository", "Error loading legacy settings", e)
-            null
-        }
-    }
-    
+
     /**
      * SAVE INDIVIDUAL PREFERENCE TYPES
      */

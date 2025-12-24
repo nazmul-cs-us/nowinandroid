@@ -67,7 +67,7 @@ import kotlin.math.max
 
 fun NavGraphBuilder.interestsListDetailScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
-    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
 ) {
     composable<InterestsRoute> {
         InterestsListDetailScreen(
@@ -82,7 +82,7 @@ internal fun InterestsListDetailScreen(
     viewModel: Interests2PaneViewModel = hiltViewModel(),
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
-    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
 ) {
     val selectedTopicId by viewModel.selectedTopicId.collectAsStateWithLifecycle()
     InterestsListDetailScreen(
@@ -101,7 +101,7 @@ internal fun InterestsListDetailScreen(
     onTopicClick: (String) -> Unit,
     windowAdaptiveInfo: WindowAdaptiveInfo,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
-    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
 ) {
     val listDetailNavigator = rememberListDetailPaneScaffoldNavigator(
         scaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo),
@@ -219,7 +219,7 @@ internal fun InterestsListDetailScreen(
                                     },
                                     onTopicClick = ::onTopicClickShowDetailPane,
                                     onSurahClick = onSurahClick,
-                                    onDuaClick = onDuaClick,
+                                    onDuaClick = { userNewsResource -> onDuaClick(userNewsResource, route.id) },
                                     viewModel = hiltViewModel<TopicViewModel, TopicViewModel.Factory>(
                                         key = route.id,
                                     ) { factory ->
