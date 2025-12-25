@@ -5,15 +5,25 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.duadatabase.DuaDatabase
+import com.starception.submission.core.quranicduas.QuranicDuaDatabase
+import com.starception.submission.core.sync.DatabaseSyncHelper
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.newsdatabase.NewsDatabase
+import com.starception.submission.core.topicsdatabase.TopicsDatabase
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.prayer.service.PrayerNotificationServiceManager
+import com.starception.submission.settings.components.DatabaseDisplayInfo
+import com.starception.submission.settings.components.DeveloperSettingsState
+import com.starception.submission.settings.components.RefreshResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +32,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -80,9 +91,14 @@ class UnifiedSettingsViewModel @Inject constructor(
     private val _notificationPreferences = MutableStateFlow(PrayerNotificationPreferences())
     val notificationPreferences: StateFlow<PrayerNotificationPreferences> = _notificationPreferences.asStateFlow()
 
+    // Developer settings state
+    private val _developerSettings = MutableStateFlow(DeveloperSettingsState())
+    val developerSettings: StateFlow<DeveloperSettingsState> = _developerSettings.asStateFlow()
+
     init {
         loadPrayerSettings()
         loadNotificationPreferences()
+        loadDatabaseInfo()
     }
 
     private fun loadPrayerSettings() {
@@ -211,6 +227,330 @@ class UnifiedSettingsViewModel @Inject constructor(
             // Trigger notification reschedule
             PrayerNotificationServiceManager.rescheduleNotificationsWithNewSettings(context)
             Log.i(TAG, "Triggered notification reschedule")
+        }
+    }
+
+    // ============= Developer Settings =============
+
+    /**
+     * Load database info for developer display
+     */
+    private fun loadDatabaseInfo() {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Loading database info...")
+                withContext(Dispatchers.IO) {
+                    val newsInfo = NewsDatabase.getDatabaseInfo(context)
+                    val topicsInfo = TopicsDatabase.getDatabaseInfo(context)
+                    val duasInfo = DuaDatabase.getDatabaseInfo(context)
+                    val quranicDuasInfo = QuranicDuaDatabase.getDatabaseInfo(context)
+
+                    _developerSettings.value = _developerSettings.value.copy(
+                        newsInfo = DatabaseDisplayInfo(
+                            name = newsInfo.name,
+                            itemCount = newsInfo.itemCount,
+                            itemLabel = "news items",
+                            lastModified = newsInfo.lastModified,
+                            sizeBytes = newsInfo.sizeBytes
+                        ),
+                        topicsInfo = DatabaseDisplayInfo(
+                            name = topicsInfo.name,
+                            itemCount = topicsInfo.itemCount,
+                            itemLabel = "topics",
+                            lastModified = topicsInfo.lastModified,
+                            sizeBytes = topicsInfo.sizeBytes
+                        ),
+                        duasInfo = DatabaseDisplayInfo(
+                            name = duasInfo.name,
+                            itemCount = duasInfo.duaCount,
+                            itemLabel = "duas",
+                            lastModified = duasInfo.lastModified,
+                            sizeBytes = duasInfo.sizeBytes
+                        ),
+                        quranicDuasInfo = DatabaseDisplayInfo(
+                            name = quranicDuasInfo.name,
+                            itemCount = quranicDuasInfo.itemCount,
+                            itemLabel = "duas",
+                            lastModified = quranicDuasInfo.lastModified,
+                            sizeBytes = quranicDuasInfo.sizeBytes
+                        )
+                    )
+                }
+                Log.d(TAG, "Database info loaded successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading database info", e)
+            }
+        }
+    }
+
+    /**
+     * Refresh the News database from assets
+     */
+    fun refreshNewsDatabase() {
+        viewModelScope.launch {
+            try {
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = true,
+                    refreshingDatabase = "news",
+                    lastRefreshResult = null
+                )
+
+                val success = withContext(Dispatchers.IO) {
+                    NewsDatabase.refreshFromAssets(context)
+                }
+
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = false,
+                    refreshingDatabase = null,
+                    lastRefreshResult = RefreshResult(
+                        databaseName = "News",
+                        success = success,
+                        message = if (success) "News database refreshed successfully" else "Failed to refresh News database"
+                    )
+                )
+
+                // Reload database info
+                loadDatabaseInfo()
+
+                // Clear result after delay
+                delay(3000)
+                _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error refreshing news database", e)
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = false,
+                    refreshingDatabase = null,
+                    lastRefreshResult = RefreshResult(
+                        databaseName = "News",
+                        success = false,
+                        message = "Error: ${e.message}"
+                    )
+                )
+            }
+        }
+    }
+
+    /**
+     * Refresh the Topics database from assets
+     */
+    fun refreshTopicsDatabase() {
+        viewModelScope.launch {
+            try {
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = true,
+                    refreshingDatabase = "topics",
+                    lastRefreshResult = null
+                )
+
+                val success = withContext(Dispatchers.IO) {
+                    TopicsDatabase.refreshFromAssets(context)
+                }
+
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = false,
+                    refreshingDatabase = null,
+                    lastRefreshResult = RefreshResult(
+                        databaseName = "Topics",
+                        success = success,
+                        message = if (success) "Topics database refreshed successfully" else "Failed to refresh Topics database"
+                    )
+                )
+
+                // Reload database info
+                loadDatabaseInfo()
+
+                // Clear result after delay
+                delay(3000)
+                _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error refreshing topics database", e)
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = false,
+                    refreshingDatabase = null,
+                    lastRefreshResult = RefreshResult(
+                        databaseName = "Topics",
+                        success = false,
+                        message = "Error: ${e.message}"
+                    )
+                )
+            }
+        }
+    }
+
+    /**
+     * Refresh the Duas database from assets
+     */
+    fun refreshDuasDatabase() {
+        viewModelScope.launch {
+            try {
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = true,
+                    refreshingDatabase = "duas",
+                    lastRefreshResult = null
+                )
+
+                val success = withContext(Dispatchers.IO) {
+                    DuaDatabase.refreshFromAssets(context)
+                }
+
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = false,
+                    refreshingDatabase = null,
+                    lastRefreshResult = RefreshResult(
+                        databaseName = "Duas",
+                        success = success,
+                        message = if (success) "Duas database refreshed successfully" else "Failed to refresh Duas database"
+                    )
+                )
+
+                // Reload database info
+                loadDatabaseInfo()
+
+                // Clear result after delay
+                delay(3000)
+                _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error refreshing duas database", e)
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = false,
+                    refreshingDatabase = null,
+                    lastRefreshResult = RefreshResult(
+                        databaseName = "Duas",
+                        success = false,
+                        message = "Error: ${e.message}"
+                    )
+                )
+            }
+        }
+    }
+
+    /**
+     * Refresh the Quranic Duas database from assets
+     */
+    fun refreshQuranicDuasDatabase() {
+        viewModelScope.launch {
+            try {
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = true,
+                    refreshingDatabase = "quranic_duas",
+                    lastRefreshResult = null
+                )
+
+                val success = withContext(Dispatchers.IO) {
+                    QuranicDuaDatabase.refreshFromAssets(context)
+                }
+
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = false,
+                    refreshingDatabase = null,
+                    lastRefreshResult = RefreshResult(
+                        databaseName = "Quranic Duas",
+                        success = success,
+                        message = if (success) "Quranic Duas database refreshed successfully" else "Failed to refresh Quranic Duas database"
+                    )
+                )
+
+                // Reload database info
+                loadDatabaseInfo()
+
+                // Clear result after delay
+                delay(3000)
+                _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error refreshing Quranic Duas database", e)
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = false,
+                    refreshingDatabase = null,
+                    lastRefreshResult = RefreshResult(
+                        databaseName = "Quranic Duas",
+                        success = false,
+                        message = "Error: ${e.message}"
+                    )
+                )
+            }
+        }
+    }
+
+    /**
+     * Refresh all databases from assets
+     */
+    fun refreshAllDatabases() {
+        viewModelScope.launch {
+            try {
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = true,
+                    refreshingDatabase = "all",
+                    lastRefreshResult = null
+                )
+
+                data class RefreshResults(
+                    val news: Boolean,
+                    val topics: Boolean,
+                    val duas: Boolean,
+                    val quranicDuas: Boolean,
+                    val syncResult: com.starception.submission.core.sync.SyncResult?
+                )
+
+                val results = withContext(Dispatchers.IO) {
+                    // First refresh all databases from assets
+                    val newsSuccess = NewsDatabase.refreshFromAssets(context)
+                    val topicsSuccess = TopicsDatabase.refreshFromAssets(context)
+                    val duasSuccess = DuaDatabase.refreshFromAssets(context)
+                    val quranicDuasSuccess = QuranicDuaDatabase.refreshFromAssets(context)
+
+                    // Then sync duas to news database
+                    val syncResult = if (duasSuccess && quranicDuasSuccess && newsSuccess) {
+                        DatabaseSyncHelper.syncDuasToNews(context)
+                    } else {
+                        null
+                    }
+
+                    RefreshResults(newsSuccess, topicsSuccess, duasSuccess, quranicDuasSuccess, syncResult)
+                }
+
+                val allSuccess = results.news && results.topics && results.duas && results.quranicDuas
+                val syncInfo = results.syncResult?.let { " | Synced: ${it.quranicDuasSynced + it.fortressDuasSynced} duas" } ?: ""
+                val message = buildString {
+                    append("News: ${if (results.news) "OK" else "FAILED"}")
+                    append(" | Topics: ${if (results.topics) "OK" else "FAILED"}")
+                    append(" | Duas: ${if (results.duas) "OK" else "FAILED"}")
+                    append(" | Quranic: ${if (results.quranicDuas) "OK" else "FAILED"}")
+                    append(syncInfo)
+                }
+
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = false,
+                    refreshingDatabase = null,
+                    lastRefreshResult = RefreshResult(
+                        databaseName = "All",
+                        success = allSuccess,
+                        message = if (allSuccess) "All databases refreshed successfully" else message
+                    )
+                )
+
+                // Reload database info
+                loadDatabaseInfo()
+
+                // Clear result after delay
+                delay(3000)
+                _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error refreshing all databases", e)
+                _developerSettings.value = _developerSettings.value.copy(
+                    isRefreshing = false,
+                    refreshingDatabase = null,
+                    lastRefreshResult = RefreshResult(
+                        databaseName = "All",
+                        success = false,
+                        message = "Error: ${e.message}"
+                    )
+                )
+            }
         }
     }
 }

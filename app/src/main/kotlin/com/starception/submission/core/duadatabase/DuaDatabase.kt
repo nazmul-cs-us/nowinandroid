@@ -111,5 +111,66 @@ abstract class DuaDatabase : RoomDatabase() {
             INSTANCE = null
             android.util.Log.d(TAG, "🔒 Dua database closed")
         }
+
+        /**
+         * Refresh database from assets
+         * Closes current database, deletes it, and re-creates from assets
+         * @return true if refresh was successful, false otherwise
+         */
+        fun refreshFromAssets(context: Context): Boolean {
+            return try {
+                android.util.Log.d(TAG, "🔄 Starting dua database refresh...")
+
+                // Close existing database
+                closeDatabase()
+
+                // Delete the database file
+                val deleted = context.deleteDatabase(DATABASE_NAME)
+                android.util.Log.d(TAG, "🗑️ Database file deleted: $deleted")
+
+                // Re-initialize (Room will copy from assets)
+                getInstance(context)
+
+                android.util.Log.d(TAG, "✅ Dua database refresh completed successfully")
+                true
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "❌ Failed to refresh dua database", e)
+                false
+            }
+        }
+
+        /**
+         * Get database info for developer display
+         */
+        fun getDatabaseInfo(context: Context): DuaDatabaseInfo {
+            return try {
+                val db = getInstance(context)
+                val (chapterCount, duaCount) = kotlinx.coroutines.runBlocking {
+                    Pair(db.duaDao().getChapterCount(), db.duaDao().getInvocationCount())
+                }
+                val dbFile = context.getDatabasePath(DATABASE_NAME)
+                DuaDatabaseInfo(
+                    name = "Fortress of the Muslim",
+                    chapterCount = chapterCount,
+                    duaCount = duaCount,
+                    lastModified = dbFile.lastModified(),
+                    sizeBytes = dbFile.length()
+                )
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "❌ Error getting database info", e)
+                DuaDatabaseInfo(name = "Fortress of the Muslim", chapterCount = 0, duaCount = 0, lastModified = 0L, sizeBytes = 0L)
+            }
+        }
     }
 }
+
+/**
+ * Database info for developer display
+ */
+data class DuaDatabaseInfo(
+    val name: String,
+    val chapterCount: Int,
+    val duaCount: Int,
+    val lastModified: Long,
+    val sizeBytes: Long
+)
