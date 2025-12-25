@@ -53,10 +53,10 @@ data class DuaChapterEntity(
             entity = DuaChapterEntity::class,
             parentColumns = ["id"],
             childColumns = ["chapter_id"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.NO_ACTION
         )
     ],
-    indices = [Index(value = ["chapter_id"])]
+    indices = [Index(name = "idx_invocations_chapter", value = ["chapter_id"])]
 )
 data class DuaInvocationEntity(
     @PrimaryKey(autoGenerate = true)
@@ -107,10 +107,10 @@ data class DuaInvocationEntity(
             entity = DuaChapterEntity::class,
             parentColumns = ["id"],
             childColumns = ["chapter_id"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.NO_ACTION
         )
     ],
-    indices = [Index(value = ["chapter_id"])]
+    indices = [Index(name = "idx_footnotes_chapter", value = ["chapter_id"])]
 )
 data class DuaFootnoteEntity(
     @PrimaryKey(autoGenerate = true)

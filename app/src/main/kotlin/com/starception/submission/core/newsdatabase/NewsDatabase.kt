@@ -8,7 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Room Database for News Resources
- * Pre-populated from assets/databases/news_resources.db
+ * Pre-populated from assets/databases/news.db
  *
  * Features:
  * - 436 news resources (114 Quran, 322 Duas)
@@ -29,7 +29,7 @@ abstract class NewsDatabase : RoomDatabase() {
     abstract fun newsDao(): NewsDao
 
     companion object {
-        private const val DATABASE_NAME = "news_resources.db"
+        private const val DATABASE_NAME = "news.db"
         private const val TAG = "NewsDatabase"
 
         @Volatile
@@ -108,5 +108,64 @@ abstract class NewsDatabase : RoomDatabase() {
             INSTANCE = null
             android.util.Log.d(TAG, "News database closed")
         }
+
+        /**
+         * Refresh database from assets
+         * Closes current database, deletes it, and re-creates from assets
+         * @return true if refresh was successful, false otherwise
+         */
+        fun refreshFromAssets(context: Context): Boolean {
+            return try {
+                android.util.Log.d(TAG, "Starting news database refresh...")
+
+                // Close existing database
+                closeDatabase()
+
+                // Delete the database file
+                val deleted = context.deleteDatabase(DATABASE_NAME)
+                android.util.Log.d(TAG, "Database file deleted: $deleted")
+
+                // Re-initialize (Room will copy from assets)
+                getInstance(context)
+
+                android.util.Log.d(TAG, "News database refresh completed successfully")
+                true
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Failed to refresh news database", e)
+                false
+            }
+        }
+
+        /**
+         * Get database info for developer display
+         */
+        fun getDatabaseInfo(context: Context): DatabaseInfo {
+            return try {
+                val db = getInstance(context)
+                val count = kotlinx.coroutines.runBlocking {
+                    db.newsDao().getNewsResourceCount()
+                }
+                val dbFile = context.getDatabasePath(DATABASE_NAME)
+                DatabaseInfo(
+                    name = "News",
+                    itemCount = count,
+                    lastModified = dbFile.lastModified(),
+                    sizeBytes = dbFile.length()
+                )
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Error getting database info", e)
+                DatabaseInfo(name = "News", itemCount = 0, lastModified = 0L, sizeBytes = 0L)
+            }
+        }
     }
 }
+
+/**
+ * Database info for developer display
+ */
+data class DatabaseInfo(
+    val name: String,
+    val itemCount: Int,
+    val lastModified: Long,
+    val sizeBytes: Long
+)

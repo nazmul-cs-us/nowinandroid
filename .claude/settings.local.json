@@ -246,7 +246,9 @@
       "Bash(for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27)",
       "Bash(do adb -s 4B221FDAP002T6 shell input swipe 1000 700 200 700 80)",
       "Bash(for i in 1 2 3)",
-      "Bash(cut:*)"
+      "Bash(cut:*)",
+      "Bash(# First fix topics.db sqlite3 /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/assets/databases/topics.db \"\".dump\"\" && \\\\ cat /tmp/topics_dump.sql)",
+      "Bash(# Fix news.db sqlite3 /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/assets/databases/news.db \"\".dump\"\" && \\\\ cat /tmp/news_dump.sql)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
@@ -30,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppearanceSection
+import com.starception.submission.settings.components.DeveloperSettingsSection
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
@@ -47,6 +49,7 @@ fun UnifiedSettingsScreen(
     val showRestoreOption by viewModel.showRestoreOption.collectAsStateWithLifecycle()
     val autoDetectedCountryName by viewModel.autoDetectedCountryName.collectAsStateWithLifecycle()
     val notificationPreferences by viewModel.notificationPreferences.collectAsStateWithLifecycle()
+    val developerSettings by viewModel.developerSettings.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -143,6 +146,25 @@ fun UnifiedSettingsScreen(
                         onToggleExpanded = { viewModel.toggleSection("about") }
                     ) {
                         AboutSection()
+                    }
+                }
+
+                // Developer Section
+                item {
+                    SettingsSection(
+                        title = "Developer Options",
+                        icon = Icons.Outlined.Code,
+                        isExpanded = expandedSections.contains("developer"),
+                        onToggleExpanded = { viewModel.toggleSection("developer") }
+                    ) {
+                        DeveloperSettingsSection(
+                            state = developerSettings,
+                            onRefreshNews = viewModel::refreshNewsDatabase,
+                            onRefreshTopics = viewModel::refreshTopicsDatabase,
+                            onRefreshDuas = viewModel::refreshDuasDatabase,
+                            onRefreshQuranicDuas = viewModel::refreshQuranicDuasDatabase,
+                            onRefreshAll = viewModel::refreshAllDatabases
+                        )
                     }
                 }
             }
