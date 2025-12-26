@@ -3,9 +3,9 @@ package com.starception.submission.core.sync
 import android.content.Context
 import android.util.Log
 import com.starception.submission.core.duadatabase.DuaDatabase
-import com.starception.submission.core.newsdatabase.NewsDatabase
-import com.starception.submission.core.newsdatabase.NewsResourceEntity
-import com.starception.submission.core.newsdatabase.NewsTopicCrossRef
+import com.starception.submission.core.contentdatabase.NewsDatabase
+import com.starception.submission.core.contentdatabase.NewsResourceEntity
+import com.starception.submission.core.contentdatabase.NewsTopicCrossRef
 import com.starception.submission.core.quranicduas.QuranicDuaDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
