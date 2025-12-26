@@ -338,7 +338,30 @@ fun NewsResourceMetaData(
 fun NewsResourceShortDescription(
     newsResourceShortDescription: String,
 ) {
-    Text(newsResourceShortDescription, style = MaterialTheme.typography.bodyLarge)
+    // Check if content contains Arabic text (Unicode range 0600-06FF)
+    val containsArabic = newsResourceShortDescription.any { it in '\u0600'..'\u06FF' }
+
+    // Get selected Arabic font from SharedPreferences if content contains Arabic
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val arabicFontFamily = if (containsArabic) {
+        val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
+        val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+        getArabicFontFamilyForSelection(selectedFont)
+    } else {
+        null
+    }
+
+    Text(
+        text = newsResourceShortDescription,
+        style = if (containsArabic && arabicFontFamily != null) {
+            MaterialTheme.typography.bodyLarge.copy(
+                fontFamily = arabicFontFamily,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+            )
+        } else {
+            MaterialTheme.typography.bodyLarge
+        }
+    )
 }
 
 @Composable
