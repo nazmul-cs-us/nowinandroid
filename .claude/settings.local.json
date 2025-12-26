@@ -260,7 +260,8 @@
       "Bash(do sips -g pixelWidth -g pixelHeight \"/Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-$dir/ic_notif_phone.png\")",
       "Bash(do echo \"$dir activity:\")",
       "Bash(for:*)",
-      "Bash(do echo -n \"$ts -> \")"
+      "Bash(do echo -n \"$ts -> \")",
+      "WebFetch(domain:sunnah.com)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
