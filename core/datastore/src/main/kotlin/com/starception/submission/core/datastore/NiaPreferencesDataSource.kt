@@ -95,6 +95,7 @@ class NiaPreferencesDataSource @Inject constructor(
                 },
                 useDynamicColor = it.useDynamicColor,
                 shouldHideOnboarding = it.shouldHideOnboarding,
+                newsResourceLastOpenedTimes = it.newsResourceLastOpenedTimestampsMap,
             )
         }
 
@@ -254,11 +255,14 @@ class NiaPreferencesDataSource @Inject constructor(
     }
 
     suspend fun setNewsResourcesViewed(newsResourceIds: List<String>, viewed: Boolean) {
+        val currentTimeMillis = System.currentTimeMillis()
         userPreferences.updateData { prefs ->
             prefs.copy {
                 newsResourceIds.forEach { id ->
                     if (viewed) {
                         viewedNewsResourceIds.put(id, true)
+                        // Also store the timestamp when the resource was last opened
+                        newsResourceLastOpenedTimestamps.put(id, currentTimeMillis)
                     } else {
                         viewedNewsResourceIds.remove(id)
                     }

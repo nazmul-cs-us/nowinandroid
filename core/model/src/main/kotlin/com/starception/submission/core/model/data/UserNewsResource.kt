@@ -33,6 +33,7 @@ data class UserNewsResource internal constructor(
     val followableTopics: List<FollowableTopic>,
     val isSaved: Boolean,
     val hasBeenViewed: Boolean,
+    val lastOpenedTimeMillis: Long? = null,
 ) {
     constructor(newsResource: NewsResource, userData: UserData) : this(
         id = newsResource.id,
@@ -50,6 +51,7 @@ data class UserNewsResource internal constructor(
         },
         isSaved = newsResource.id in userData.bookmarkedNewsResources,
         hasBeenViewed = newsResource.id in userData.viewedNewsResources,
+        lastOpenedTimeMillis = userData.newsResourceLastOpenedTimes[newsResource.id],
     )
 }
 
