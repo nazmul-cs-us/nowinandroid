@@ -1527,10 +1527,26 @@ fun DuaDetailScreen(
                     } else {
                         initialNewsResourceId
                     }
-                    IconButton(onClick = { onToggleNiaBookmark(currentDuaNewsResourceId) }) {
+
+                    // Use remembered state that syncs with parent's bookmark status
+                    var localBookmarkState by remember(currentDuaNewsResourceId) {
+                        mutableStateOf(isNiaBookmarked(currentDuaNewsResourceId))
+                    }
+
+                    // Sync with parent when it changes
+                    val parentBookmarkState = isNiaBookmarked(currentDuaNewsResourceId)
+                    LaunchedEffect(parentBookmarkState) {
+                        localBookmarkState = parentBookmarkState
+                    }
+
+                    IconButton(onClick = {
+                        onToggleNiaBookmark(currentDuaNewsResourceId)
+                        // Optimistically update local state for immediate UI feedback
+                        localBookmarkState = !localBookmarkState
+                    }) {
                         Icon(
-                            imageVector = if (isNiaBookmarked(currentDuaNewsResourceId)) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                            contentDescription = if (isNiaBookmarked(currentDuaNewsResourceId)) "Remove Bookmark" else "Add Bookmark",
+                            imageVector = if (localBookmarkState) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                            contentDescription = if (localBookmarkState) "Remove Bookmark" else "Add Bookmark",
                             tint = Color.White
                         )
                     }

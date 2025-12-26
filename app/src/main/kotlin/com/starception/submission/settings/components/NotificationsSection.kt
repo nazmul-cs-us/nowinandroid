@@ -5,13 +5,17 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,12 +27,13 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,8 +43,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 
 /**
@@ -240,6 +251,7 @@ private fun CollapsibleSubSection(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SliderItem(
     prayerName: String,
@@ -248,10 +260,14 @@ private fun SliderItem(
     modifier: Modifier = Modifier,
     onValueChange: (Int) -> Unit
 ) {
+    val hapticFeedback = LocalHapticFeedback.current
+    var previousValue by remember { mutableStateOf(value) }
+    val interactionSource = remember { MutableInteractionSource() }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -259,34 +275,63 @@ private fun SliderItem(
             text = prayerName,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.width(60.dp)
+            modifier = Modifier.width(70.dp),
+            maxLines = 1
         )
 
         Slider(
             value = value.toFloat(),
-            onValueChange = { onValueChange(it.toInt()) },
+            onValueChange = { newValue ->
+                val newIntValue = newValue.toInt()
+                // Trigger haptic feedback on each minute change
+                if (newIntValue != previousValue) {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    previousValue = newIntValue
+                }
+                onValueChange(newIntValue)
+            },
             valueRange = 0f..maxValue.toFloat(),
-            modifier = Modifier.weight(1f)
-        )
-
-        Surface(
-            color = if (value > 0)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = RoundedCornerShape(6.dp)
-        ) {
-            Text(
-                text = if (value == 0) "Off" else "${value}m",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                color = if (value > 0)
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+            modifier = Modifier.weight(1f),
+            interactionSource = interactionSource,
+            thumb = {
+                // Custom thumb with value label
+                Box(
+                    modifier = Modifier
+                        .height(28.dp)
+                        .shadow(
+                            elevation = 4.dp,
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (value > 0)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                        )
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (value == 0) "Off" else "${value}m",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            lineHeight = 14.sp
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = if (value > 0)
+                            MaterialTheme.colorScheme.onPrimary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            },
+            colors = SliderDefaults.colors(
+                activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
             )
-        }
+        )
     }
 }
 
