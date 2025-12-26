@@ -426,7 +426,7 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                     val dbPath = context.getDatabasePath("news_resources_topic_temp.db")
                     if (dbPath.exists()) dbPath.delete()
 
-                    context.assets.open("databases/news_resources.db").use { inputStream ->
+                    context.assets.open("databases/news.db").use { inputStream ->
                         dbPath.parentFile?.mkdirs()
                         java.io.FileOutputStream(dbPath).use { outputStream ->
                             inputStream.copyTo(outputStream)
@@ -518,7 +518,7 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                     val dbPath = context.getDatabasePath("news_resources_temp.db")
                     if (dbPath.exists()) dbPath.delete()
 
-                    context.assets.open("databases/news_resources.db").use { inputStream ->
+                    context.assets.open("databases/news.db").use { inputStream ->
                         dbPath.parentFile?.mkdirs()
                         java.io.FileOutputStream(dbPath).use { outputStream ->
                             inputStream.copyTo(outputStream)
@@ -1283,14 +1283,6 @@ fun DuaDetailScreen(
                                 .fillMaxWidth()
                                 .height(64.dp) // Standard toolbar height
                                 .align(Alignment.TopCenter)
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(
-                                            DuaGradientColors[0],
-                                            DuaGradientColors[1]
-                                        )
-                                    )
-                                )
                         ) {
                             Row(
                                 modifier = Modifier

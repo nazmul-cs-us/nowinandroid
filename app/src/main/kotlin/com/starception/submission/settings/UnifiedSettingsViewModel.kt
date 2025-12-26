@@ -10,7 +10,7 @@ import com.starception.submission.core.quranicduas.QuranicDuaDatabase
 import com.starception.submission.core.sync.DatabaseSyncHelper
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
-import com.starception.submission.core.newsdatabase.NewsDatabase
+import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.topicsdatabase.TopicsDatabase
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
