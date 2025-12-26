@@ -459,6 +459,12 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                             ?: Regex("\\((\\d+)/\\d+\\)").find(title)?.groupValues?.get(1)?.toIntOrNull()
                             ?: (duas.size + 1)
 
+                        // Parse Quran reference from title (e.g., "(2:127)" -> surah=2, ayah=127)
+                        val quranRefMatch = Regex("\\((\\d+):(\\d+)\\)").find(title)
+                        val surahNum = quranRefMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                        val ayahNum = quranRefMatch?.groupValues?.get(2)?.toIntOrNull() ?: 0
+                        val quranRef = if (surahNum > 0 && ayahNum > 0) "$surahNum:$ayahNum" else null
+
                         duas.add(
                             DuaItem(
                                 id = id,
@@ -467,10 +473,10 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                                 transliteration = parsed.transliteration,
                                 translation = parsed.translation,
                                 explanation = parsed.explanation,
-                                quranReference = null,
+                                quranReference = quranRef,
                                 duaNumber = duaNumber,
-                                surahNumber = 0,
-                                ayahNumber = 0,
+                                surahNumber = surahNum,
+                                ayahNumber = ayahNum,
                                 surahName = "",
                                 context = parsed.context,
                                 instruction = parsed.instruction,
@@ -548,6 +554,12 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                             ?: Regex("\\((\\d+)/\\d+\\)").find(title)?.groupValues?.get(1)?.toIntOrNull()
                             ?: (duas.size + 1)
 
+                        // Parse Quran reference from title (e.g., "(2:127)" -> surah=2, ayah=127)
+                        val quranRefMatch = Regex("\\((\\d+):(\\d+)\\)").find(title)
+                        val surahNum = quranRefMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                        val ayahNum = quranRefMatch?.groupValues?.get(2)?.toIntOrNull() ?: 0
+                        val quranRef = if (surahNum > 0 && ayahNum > 0) "$surahNum:$ayahNum" else null
+
                         duas.add(
                             DuaItem(
                                 id = id,
@@ -556,10 +568,10 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                                 transliteration = parsed.transliteration,
                                 translation = parsed.translation,
                                 explanation = parsed.explanation,
-                                quranReference = null,
+                                quranReference = quranRef,
                                 duaNumber = duaNumber,
-                                surahNumber = 0,
-                                ayahNumber = 0,
+                                surahNumber = surahNum,
+                                ayahNumber = ayahNum,
                                 surahName = "",
                                 context = parsed.context,
                                 instruction = parsed.instruction,

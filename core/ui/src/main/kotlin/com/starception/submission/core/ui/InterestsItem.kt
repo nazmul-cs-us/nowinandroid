@@ -33,8 +33,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.component.DynamicAsyncImage
+import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaIconToggleButton
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.designsystem.theme.NiaTheme
@@ -52,15 +54,49 @@ fun InterestsItem(
     description: String = "",
     isSelected: Boolean = false,
 ) {
+    // Check if name or description contains Arabic text
+    val nameContainsArabic = name.any { it in '\u0600'..'\u06FF' }
+    val descriptionContainsArabic = description.any { it in '\u0600'..'\u06FF' }
+
+    // Get selected Arabic font from SharedPreferences
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val arabicFontFamily = if (nameContainsArabic || descriptionContainsArabic) {
+        val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
+        val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+        getArabicFontFamilyForInterests(selectedFont)
+    } else {
+        null
+    }
+
     ListItem(
         leadingContent = {
             InterestsIcon(topicImageUrl, iconModifier.size(48.dp))
         },
         headlineContent = {
-            Text(text = name)
+            Text(
+                text = name,
+                style = if (nameContainsArabic && arabicFontFamily != null) {
+                    MaterialTheme.typography.bodyLarge.copy(
+                        fontFamily = arabicFontFamily,
+                        fontWeight = FontWeight.Normal
+                    )
+                } else {
+                    MaterialTheme.typography.bodyLarge
+                }
+            )
         },
         supportingContent = {
-            Text(text = description)
+            Text(
+                text = description,
+                style = if (descriptionContainsArabic && arabicFontFamily != null) {
+                    MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = arabicFontFamily,
+                        fontWeight = FontWeight.Normal
+                    )
+                } else {
+                    MaterialTheme.typography.bodyMedium
+                }
+            )
         },
         trailingContent = {
             NiaIconToggleButton(
@@ -203,5 +239,18 @@ private fun InterestsCardSelectedPreview() {
                 isSelected = true,
             )
         }
+    }
+}
+
+// Helper function to get Arabic font family based on user selection
+@Composable
+private fun getArabicFontFamilyForInterests(selectedFont: String): androidx.compose.ui.text.font.FontFamily {
+    return when (selectedFont) {
+        "pdms_saleem" -> QuranFonts.PDMSSaleem
+        "noor_e_hidayat" -> QuranFonts.NoorEHidayat
+        "thabit" -> QuranFonts.Thabit
+        "uthmani_script" -> QuranFonts.UthmanicScript
+        "indopak_script" -> QuranFonts.IndoPakScript
+        else -> QuranFonts.PDMSSaleem
     }
 }
