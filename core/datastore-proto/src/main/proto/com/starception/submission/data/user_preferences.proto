@@ -49,5 +49,8 @@ message UserPreferences {
 
     bool use_dynamic_color = 19;
 
-    // NEXT AVAILABLE ID: 21
+    // Stores the last opened timestamp (epoch millis) for each news resource
+    map<string, int64> news_resource_last_opened_timestamps = 21;
+
+    // NEXT AVAILABLE ID: 22
 }

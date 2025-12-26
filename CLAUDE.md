@@ -372,6 +372,23 @@ All cards in the app follow a consistent design pattern:
 - **Performance Optimization**: Efficient Canvas drawing with proper invalidation and minimal recomposition
 - **Accessibility**: Haptic feedback integration for enhanced user experience
 
+### Notification Settings Slider (December 2025)
+- **Custom Slider Thumb with Value Display**: Professional slider design showing the value directly on the thumb
+  - **Value on Thumb**: Minutes value (e.g., "15m", "20m", "Off") displayed on the slider thumb instead of separate badge
+  - **Stadium-Shaped Pill**: Fully rounded corners (14dp radius) with fixed 28dp height for consistent appearance
+  - **Shadow Effect**: 4dp elevation shadow for depth and visual polish
+  - **Primary Color Theming**: Uses `MaterialTheme.colorScheme.primary` for active state, `surfaceContainerHighest` for off state
+  - **Haptic Feedback**: TextHandleMove haptic feedback on each minute change for precise tactile control
+  - **Centered Typography**: Properly centered text with adjusted line height for perfect vertical alignment
+  - **Track Styling**: Semi-transparent active track with `primary.copy(alpha = 0.4f)` for visual continuity
+  - **Location**: `app/src/main/kotlin/com/starception/submission/settings/components/NotificationsSection.kt`
+
+#### Technical Implementation
+- **ExperimentalMaterial3Api**: Uses custom thumb composable with `SliderDefaults.colors()`
+- **MutableInteractionSource**: Tracks slider interaction state
+- **Previous Value Tracking**: Compares values to trigger haptic only on actual changes
+- **Single-Line Prayer Names**: 70dp width with `maxLines = 1` to prevent text wrapping (fixes "Maghrib" display)
+
 ### Qibla Compass Enhancements
 - **Removed Time Display**: Eliminated remaining prayer time text from Qibla compass components to prevent visual clutter
   - Updated `QiblaCompass.kt` and `CompassProgressIndicator.kt` to remove `timeText` parameter and display

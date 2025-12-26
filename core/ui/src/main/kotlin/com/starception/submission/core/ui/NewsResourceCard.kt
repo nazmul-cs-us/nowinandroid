@@ -161,7 +161,11 @@ fun NewsResourceCardExpanded(
                             )
                             Spacer(modifier = Modifier.size(6.dp))
                         }
-                        NewsResourceMetaData(userNewsResource.publishDate, userNewsResource.type)
+                        NewsResourceMetaData(
+                            publishDate = userNewsResource.publishDate,
+                            resourceType = userNewsResource.type,
+                            lastOpenedTimeMillis = userNewsResource.lastOpenedTimeMillis,
+                        )
                     }
                     Spacer(modifier = Modifier.height(14.dp))
                     NewsResourceShortDescription(userNewsResource.content)
@@ -318,18 +322,52 @@ fun dateFormatted(publishDate: Instant): String = DateTimeFormatter
     .withZone(LocalTimeZone.current.toJavaZoneId())
     .format(publishDate.toJavaInstant())
 
+/**
+ * Formats a timestamp to relative time string (e.g., "2 minutes ago", "3 days ago")
+ */
+@Composable
+fun formatRelativeTime(timestampMillis: Long): String {
+    val now = System.currentTimeMillis()
+    val diffMillis = now - timestampMillis
+    val diffSeconds = diffMillis / 1000
+    val diffMinutes = diffSeconds / 60
+    val diffHours = diffMinutes / 60
+    val diffDays = diffHours / 24
+
+    return when {
+        diffSeconds < 60 -> "Just now"
+        diffMinutes < 60 -> "$diffMinutes min ago"
+        diffHours < 24 -> "$diffHours hr ago"
+        diffDays < 7 -> "$diffDays day${if (diffDays > 1) "s" else ""} ago"
+        else -> dateFormatted(kotlinx.datetime.Instant.fromEpochMilliseconds(timestampMillis))
+    }
+}
+
 @Composable
 fun NewsResourceMetaData(
     publishDate: Instant,
     resourceType: String,
+    lastOpenedTimeMillis: Long? = null,
 ) {
-    val formattedDate = dateFormatted(publishDate)
-    Text(
+    // If lastOpenedTimeMillis is available, show relative time; otherwise show publish date
+    val displayText = if (lastOpenedTimeMillis != null) {
+        val relativeTime = formatRelativeTime(lastOpenedTimeMillis)
+        if (resourceType.isNotBlank()) {
+            "Opened $relativeTime • $resourceType"
+        } else {
+            "Opened $relativeTime"
+        }
+    } else {
+        val formattedDate = dateFormatted(publishDate)
         if (resourceType.isNotBlank()) {
             stringResource(R.string.core_ui_card_meta_data_text, formattedDate, resourceType)
         } else {
             formattedDate
-        },
+        }
+    }
+
+    Text(
+        displayText,
         style = MaterialTheme.typography.labelSmall,
     )
 }
