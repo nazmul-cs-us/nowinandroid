@@ -250,7 +250,17 @@
       "Bash(# First fix topics.db sqlite3 /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/assets/databases/topics.db \"\".dump\"\" && \\\\ cat /tmp/topics_dump.sql)",
       "Bash(# Fix news.db sqlite3 /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/assets/databases/news.db \"\".dump\"\" && \\\\ cat /tmp/news_dump.sql)",
       "Bash(do adb -s 4B221FDAP002T6 shell input swipe 640 2000 640 600 200)",
-      "Bash(# Dump UI hierarchy to find clickable elements adb -s 4B221FDAP002T6 shell uiautomator dump /sdcard/ui_dump.xml adb -s 4B221FDAP002T6 pull /sdcard/ui_dump.xml /tmp/ui_dump.xml grep -i \"\"clickable=\\\\\"\"true\\\\\"\"\"\" /tmp/ui_dump.xml)"
+      "Bash(# Dump UI hierarchy to find clickable elements adb -s 4B221FDAP002T6 shell uiautomator dump /sdcard/ui_dump.xml adb -s 4B221FDAP002T6 pull /sdcard/ui_dump.xml /tmp/ui_dump.xml grep -i \"\"clickable=\\\\\"\"true\\\\\"\"\"\" /tmp/ui_dump.xml)",
+      "Bash(for dir in mdpi hdpi xhdpi xxhdpi xxxhdpi)",
+      "Bash(do echo \"$dir:\" sips -g pixelWidth -g pixelHeight \"/Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-$dir/ic_activity_still.png\")",
+      "Bash(for f in /Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-*/ic_notif_still.png)",
+      "Bash(do echo \"$dir:\")",
+      "Bash(do sips -g pixelWidth -g pixelHeight \"/Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-$dir/ic_activity_phone.png\")",
+      "Bash(done echo \"\" echo \"Notification phone icons:\")",
+      "Bash(do sips -g pixelWidth -g pixelHeight \"/Users/smarterai/Documents/GitHub/nowinandroid/app/src/main/res/drawable-$dir/ic_notif_phone.png\")",
+      "Bash(do echo \"$dir activity:\")",
+      "Bash(for:*)",
+      "Bash(do echo -n \"$ts -> \")"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
