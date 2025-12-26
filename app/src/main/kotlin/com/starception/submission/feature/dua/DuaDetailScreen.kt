@@ -1262,137 +1262,13 @@ fun DuaDetailScreen(
                         }
                     }
 
-                        // Fixed toolbar at top - transparent with animated Surah reference
-                        val toolbarAlpha by androidx.compose.animation.core.animateFloatAsState(
-                            targetValue = if (showTitleInToolbar.value) 1f else 0f,
-                            animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
-                            label = "toolbarAlpha"
-                        )
-
-                        // Get Surah display info for toolbar
+                        // Get surah display name for floating pill
                         val surahDisplayName = if (dua.surahName.isNotEmpty()) {
                             dua.surahName
                         } else if (dua.surahNumber > 0) {
                             "Surah ${dua.surahNumber}"
                         } else {
                             ""
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(64.dp) // Standard toolbar height
-                                .align(Alignment.TopCenter)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Back button
-                                IconButton(onClick = onBackClick) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Back",
-                                        tint = Color.White
-                                    )
-                                }
-
-                                // Spacer for center (Surah pill is a floating overlay that pins next to back button)
-                                Spacer(modifier = Modifier.weight(1f))
-
-                                // Right side toolbar buttons - matching SurahDetailScreen spacing
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    // Translation button
-                                    Surface(
-                                        onClick = { showTranslationDialog = true },
-                                        modifier = Modifier.size(40.dp),
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Color.White.copy(alpha = 0.12f),
-                                        contentColor = Color.White
-                                    ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center,
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Language,
-                                                contentDescription = "Translation",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Text(
-                                                text = translationCode,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = Color.White,
-                                                fontSize = 8.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(Modifier.width(8.dp))
-
-                                    // Font selection button
-                                    Surface(
-                                        onClick = { showFontDialog = true },
-                                        modifier = Modifier.size(40.dp),
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Color.White.copy(alpha = 0.12f),
-                                        contentColor = Color.White
-                                    ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center,
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.TextFormat,
-                                                contentDescription = "Font selection",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Text(
-                                                text = fontDisplay,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = Color.White,
-                                                fontSize = 8.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(Modifier.width(4.dp))
-
-                                    // Tajweed toggle button
-                                    IconButton(onClick = { viewModel.toggleTajweed() }) {
-                                        Icon(
-                                            imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
-                                            contentDescription = if (showTajweed) "Disable Tajweed colors" else "Enable Tajweed colors",
-                                            tint = Color.White
-                                        )
-                                    }
-
-                                    // Bookmark button
-                                    IconButton(
-                                        onClick = {
-                                            onToggleNiaBookmark(currentNewsResourceId)
-                                            isBookmarked = !isBookmarked
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                                            contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
-                                            tint = Color.White
-                                        )
-                                    }
-                                }
-                            }
                         }
 
                         // Floating Surah pill that animates from header to toolbar (pins next to back arrow)
@@ -1534,6 +1410,118 @@ fun DuaDetailScreen(
                             .height(1.dp)
                             .background(Color(0xFFD0D0D0))
                     )
+                }
+            }
+
+            // Fixed toolbar at top - always visible with gradient background (matches SurahDetailScreen style)
+            Surface(
+                color = DuaGradientColors[0],
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Back button
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Translation button with language indicator (matches SurahDetailScreen)
+                    Surface(
+                        onClick = { showTranslationDialog = true },
+                        modifier = Modifier.size(40.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color.White.copy(alpha = 0.12f),
+                        contentColor = Color.White
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Language,
+                                contentDescription = "Translation",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = translationCode,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Font selection button with font hint (matches SurahDetailScreen)
+                    Surface(
+                        onClick = { showFontDialog = true },
+                        modifier = Modifier.size(40.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color.White.copy(alpha = 0.12f),
+                        contentColor = Color.White
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.TextFormat,
+                                contentDescription = "Font selection",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = fontDisplay,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    // Tajweed toggle button
+                    IconButton(onClick = { viewModel.toggleTajweed() }) {
+                        Icon(
+                            imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                            contentDescription = if (showTajweed) "Disable Tajweed" else "Enable Tajweed",
+                            tint = Color.White
+                        )
+                    }
+
+                    // Bookmark button - uses current page's news resource ID
+                    val currentDuaNewsResourceId = if (duasList.isNotEmpty() && currentPage < duasList.size) {
+                        duasList[currentPage].id
+                    } else {
+                        initialNewsResourceId
+                    }
+                    IconButton(onClick = { onToggleNiaBookmark(currentDuaNewsResourceId) }) {
+                        Icon(
+                            imageVector = if (isNiaBookmarked(currentDuaNewsResourceId)) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                            contentDescription = if (isNiaBookmarked(currentDuaNewsResourceId)) "Remove Bookmark" else "Add Bookmark",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         }
