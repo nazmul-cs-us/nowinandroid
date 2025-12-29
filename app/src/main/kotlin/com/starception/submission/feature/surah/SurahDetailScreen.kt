@@ -84,6 +84,8 @@ import android.os.Build
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
+import com.starception.submission.core.designsystem.component.NiaTopicTag
+import java.util.Locale
 
 /**
  * Helper function to convert font name to FontFamily
@@ -1535,7 +1537,7 @@ private fun AlbumHeader(
                     )
                 )
         ) {
-            // Topic chips on the gradient overlay
+            // Topic chips on the gradient overlay - using NiaTopicTag for consistency with news cards
             if (topics.isNotEmpty()) {
                 Row(
                     modifier = Modifier
@@ -1543,25 +1545,17 @@ private fun AlbumHeader(
                         .align(Alignment.BottomStart)
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     topics.forEach { topic ->
-                        SuggestionChip(
+                        NiaTopicTag(
+                            followed = false,
                             onClick = { onTopicClick(topic.id) },
-                            label = {
+                            text = {
                                 Text(
-                                    text = topic.name,
-                                    style = MaterialTheme.typography.labelSmall
+                                    text = topic.name.uppercase(Locale.getDefault())
                                 )
-                            },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                                labelColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                enabled = true,
-                                borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                            )
+                            }
                         )
                     }
                 }

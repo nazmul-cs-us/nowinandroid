@@ -25,7 +25,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DuaFootnoteEntity::class,
         HadithReferenceEntity::class
     ],
-    version = 1,
+    version = 5,
     exportSchema = false
 )
 abstract class DuaDatabase : RoomDatabase() {

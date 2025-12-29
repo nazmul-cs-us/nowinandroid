@@ -100,22 +100,12 @@ data class DuaInvocationEntity(
 /**
  * Hadith reference entity linking invocations to hadith collections
  * Contains reference information to lookup hadith in separate databases
+ *
+ * Note: ForeignKey and Index constraints exist in the pre-packaged SQLite database
+ * but are NOT defined here to avoid Room schema validation issues.
+ * Room's fallbackToDestructiveMigration() will use the pre-packaged database as-is.
  */
-@Entity(
-    tableName = "hadith_references",
-    foreignKeys = [
-        ForeignKey(
-            entity = DuaInvocationEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["invocation_id"],
-            onDelete = ForeignKey.NO_ACTION
-        )
-    ],
-    indices = [
-        Index(name = "idx_refs_invocation", value = ["invocation_id"]),
-        Index(name = "idx_refs_collection", value = ["collection_id"])
-    ]
-)
+@Entity(tableName = "hadith_references")
 data class HadithReferenceEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
