@@ -42,6 +42,12 @@ interface TopicsDao {
     fun getTopicByIdFlow(topicId: Int): Flow<TopicEntity?>
 
     /**
+     * Get topics by list of IDs
+     */
+    @Query("SELECT * FROM topics WHERE id IN (:ids)")
+    suspend fun getTopicsByIds(ids: List<Int>): List<TopicEntity>
+
+    /**
      * Get system topics only (pre-installed)
      */
     @Query("SELECT * FROM topics WHERE is_system = 1 ORDER BY id ASC")

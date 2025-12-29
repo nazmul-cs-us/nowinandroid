@@ -261,7 +261,13 @@
       "Bash(do echo \"$dir activity:\")",
       "Bash(for:*)",
       "Bash(do echo -n \"$ts -> \")",
-      "WebFetch(domain:sunnah.com)"
+      "WebFetch(domain:sunnah.com)",
+      "Bash(xxd:*)",
+      "Bash(# Pull the app''s internal database and check adb -s 4B221FDAP002T6 shell \"\"run-as com.starception.submission.demo.debug cat /data/data/com.starception.submission.demo.debug/databases/news.db\"\" && sqlite3 /tmp/news_device.db \"\"SELECT content FROM news_resources WHERE content LIKE ''%Ayat%He%'' LIMIT 1\"\")",
+      "Bash(do adb -s 4B221FDAP002T6 shell input swipe 640 1800 640 800 200)",
+      "Bash(echo:*)",
+      "Bash(# Dump UI and find the dua card adb -s 4B221FDAP002T6 shell uiautomator dump /sdcard/ui4.xml adb -s 4B221FDAP002T6 pull /sdcard/ui4.xml /tmp/ui4.xml grep -E \"\"Supplication|Al-Istikharah\"\" /tmp/ui4.xml)",
+      "Bash(do sleep 2)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

@@ -284,7 +284,8 @@ class UnifiedSettingsViewModel @Inject constructor(
     }
 
     /**
-     * Refresh the News database from assets
+     * Refresh the News database by regenerating from source databases
+     * (quran.db, fortress_of_the_muslim.db, quranic_duas.db)
      */
     fun refreshNewsDatabase() {
         viewModelScope.launch {
@@ -295,8 +296,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                     lastRefreshResult = null
                 )
 
-                val success = withContext(Dispatchers.IO) {
-                    NewsDatabase.refreshFromAssets(context)
+                val result = withContext(Dispatchers.IO) {
+                    NewsDatabase.regenerateFromSources(context)
                 }
 
                 _developerSettings.value = _developerSettings.value.copy(
@@ -304,8 +305,12 @@ class UnifiedSettingsViewModel @Inject constructor(
                     refreshingDatabase = null,
                     lastRefreshResult = RefreshResult(
                         databaseName = "News",
-                        success = success,
-                        message = if (success) "News database refreshed successfully" else "Failed to refresh News database"
+                        success = result.success,
+                        message = if (result.success) {
+                            "Regenerated: ${result.surahCount} Surahs, ${result.quranicDuaCount} Quranic Duas, ${result.fortressDuaCount} Fortress Duas (${result.durationMs}ms)"
+                        } else {
+                            "Failed: ${result.error}"
+                        }
                     )
                 )
 
@@ -313,7 +318,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                 loadDatabaseInfo()
 
                 // Clear result after delay
-                delay(3000)
+                delay(5000)
                 _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
 
             } catch (e: Exception) {
@@ -476,7 +481,7 @@ class UnifiedSettingsViewModel @Inject constructor(
     }
 
     /**
-     * Refresh all databases from assets
+     * Refresh all databases - regenerates news.db from source databases
      */
     fun refreshAllDatabases() {
         viewModelScope.launch {
@@ -488,38 +493,39 @@ class UnifiedSettingsViewModel @Inject constructor(
                 )
 
                 data class RefreshResults(
-                    val news: Boolean,
-                    val topics: Boolean,
-                    val duas: Boolean,
-                    val quranicDuas: Boolean,
-                    val syncResult: com.starception.submission.core.sync.SyncResult?
+                    val topicsSuccess: Boolean,
+                    val duasSuccess: Boolean,
+                    val quranicDuasSuccess: Boolean,
+                    val newsRegenResult: com.starception.submission.core.contentdatabase.RegenerationResult
                 )
 
                 val results = withContext(Dispatchers.IO) {
-                    // First refresh all databases from assets
-                    val newsSuccess = NewsDatabase.refreshFromAssets(context)
+                    // First refresh source databases from assets
                     val topicsSuccess = TopicsDatabase.refreshFromAssets(context)
                     val duasSuccess = DuaDatabase.refreshFromAssets(context)
                     val quranicDuasSuccess = QuranicDuaDatabase.refreshFromAssets(context)
 
-                    // Then sync duas to news database
-                    val syncResult = if (duasSuccess && quranicDuasSuccess && newsSuccess) {
-                        DatabaseSyncHelper.syncDuasToNews(context)
-                    } else {
-                        null
-                    }
+                    // Then regenerate news.db from all source databases
+                    // This creates Surahs, Quranic Duas, and Fortress Duas
+                    val newsRegenResult = NewsDatabase.regenerateFromSources(context)
 
-                    RefreshResults(newsSuccess, topicsSuccess, duasSuccess, quranicDuasSuccess, syncResult)
+                    RefreshResults(topicsSuccess, duasSuccess, quranicDuasSuccess, newsRegenResult)
                 }
 
-                val allSuccess = results.news && results.topics && results.duas && results.quranicDuas
-                val syncInfo = results.syncResult?.let { " | Synced: ${it.quranicDuasSynced + it.fortressDuasSynced} duas" } ?: ""
-                val message = buildString {
-                    append("News: ${if (results.news) "OK" else "FAILED"}")
-                    append(" | Topics: ${if (results.topics) "OK" else "FAILED"}")
-                    append(" | Duas: ${if (results.duas) "OK" else "FAILED"}")
-                    append(" | Quranic: ${if (results.quranicDuas) "OK" else "FAILED"}")
-                    append(syncInfo)
+                val allSuccess = results.topicsSuccess && results.duasSuccess &&
+                    results.quranicDuasSuccess && results.newsRegenResult.success
+
+                val message = if (allSuccess) {
+                    "All refreshed: ${results.newsRegenResult.surahCount} Surahs, " +
+                    "${results.newsRegenResult.quranicDuaCount} Quranic Duas, " +
+                    "${results.newsRegenResult.fortressDuaCount} Fortress Duas"
+                } else {
+                    buildString {
+                        append("Topics: ${if (results.topicsSuccess) "OK" else "FAILED"}")
+                        append(" | Duas: ${if (results.duasSuccess) "OK" else "FAILED"}")
+                        append(" | Quranic: ${if (results.quranicDuasSuccess) "OK" else "FAILED"}")
+                        append(" | News: ${if (results.newsRegenResult.success) "OK" else "FAILED"}")
+                    }
                 }
 
                 _developerSettings.value = _developerSettings.value.copy(
@@ -528,7 +534,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                     lastRefreshResult = RefreshResult(
                         databaseName = "All",
                         success = allSuccess,
-                        message = if (allSuccess) "All databases refreshed successfully" else message
+                        message = message
                     )
                 )
 
@@ -536,7 +542,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                 loadDatabaseInfo()
 
                 // Clear result after delay
-                delay(3000)
+                delay(5000)
                 _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
 
             } catch (e: Exception) {

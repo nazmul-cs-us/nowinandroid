@@ -272,6 +272,82 @@ interface DuaDao {
      */
     @Query("SELECT * FROM chapters WHERE id < :currentChapterId ORDER BY id DESC LIMIT 1")
     suspend fun getPreviousChapter(currentChapterId: Int): DuaChapterEntity?
+
+    // ============= Hadith Reference Queries =============
+
+    /**
+     * Get all hadith references for an invocation
+     */
+    @Query("SELECT * FROM hadith_references WHERE invocation_id = :invocationId ORDER BY id ASC")
+    suspend fun getHadithReferencesForInvocation(invocationId: Int): List<HadithReferenceEntity>
+
+    /**
+     * Get all hadith references for an invocation as Flow
+     */
+    @Query("SELECT * FROM hadith_references WHERE invocation_id = :invocationId ORDER BY id ASC")
+    fun getHadithReferencesForInvocationFlow(invocationId: Int): Flow<List<HadithReferenceEntity>>
+
+    /**
+     * Get hadith reference by ID
+     */
+    @Query("SELECT * FROM hadith_references WHERE id = :referenceId")
+    suspend fun getHadithReferenceById(referenceId: Int): HadithReferenceEntity?
+
+    /**
+     * Get all hadith references
+     */
+    @Query("SELECT * FROM hadith_references ORDER BY collection_name ASC, hadith_number ASC")
+    suspend fun getAllHadithReferences(): List<HadithReferenceEntity>
+
+    /**
+     * Get hadith references by collection name
+     */
+    @Query("SELECT * FROM hadith_references WHERE collection_name = :collectionName ORDER BY hadith_number ASC")
+    suspend fun getHadithReferencesByCollection(collectionName: String): List<HadithReferenceEntity>
+
+    /**
+     * Get total hadith reference count
+     */
+    @Query("SELECT COUNT(*) FROM hadith_references")
+    suspend fun getHadithReferenceCount(): Int
+
+    /**
+     * Get count of hadith references for an invocation
+     */
+    @Query("SELECT COUNT(*) FROM hadith_references WHERE invocation_id = :invocationId")
+    suspend fun getHadithReferenceCountForInvocation(invocationId: Int): Int
+
+    /**
+     * Get unique collection names
+     */
+    @Query("SELECT DISTINCT collection_name FROM hadith_references WHERE collection_name IS NOT NULL ORDER BY collection_name ASC")
+    suspend fun getUniqueCollectionNames(): List<String>
+
+    /**
+     * Find invocation by chapter title and position
+     * This is used to map news_resources dua IDs to fortress_of_the_muslim invocation IDs
+     * for hadith reference lookup
+     */
+    @Query("""
+        SELECT i.* FROM invocations i
+        INNER JOIN chapters c ON i.chapter_id = c.id
+        WHERE LOWER(c.title) = LOWER(:chapterTitle) AND i.position = :position
+        LIMIT 1
+    """)
+    suspend fun getInvocationByChapterAndPosition(chapterTitle: String, position: Int): DuaInvocationEntity?
+
+    /**
+     * Get hadith references by chapter title and position
+     * This combines the lookup of invocation ID and hadith references in one query
+     */
+    @Query("""
+        SELECT hr.* FROM hadith_references hr
+        INNER JOIN invocations i ON hr.invocation_id = i.id
+        INNER JOIN chapters c ON i.chapter_id = c.id
+        WHERE LOWER(c.title) = LOWER(:chapterTitle) AND i.position = :position
+        ORDER BY hr.id ASC
+    """)
+    suspend fun getHadithReferencesByChapterAndPosition(chapterTitle: String, position: Int): List<HadithReferenceEntity>
 }
 
 // ============= Data Classes for Query Results =============

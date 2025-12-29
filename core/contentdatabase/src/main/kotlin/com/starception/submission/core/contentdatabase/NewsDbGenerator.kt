@@ -1,0 +1,717 @@
+package com.starception.submission.core.contentdatabase
+
+import android.content.Context
+import android.database.sqlite.SQLiteDatabase
+import android.util.Log
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+/**
+ * Generates news.db from source databases (quran.db, fortress_of_the_muslim.db, quranic_duas.db)
+ *
+ * This class reads content from source databases and creates/updates news_resources
+ * and news_topics tables in news.db. Run this when source databases are updated
+ * to regenerate news content.
+ *
+ * Topic IDs:
+ * - 7: Holy Quran (Surahs)
+ * - 11: Quranic Duas
+ * - 21-37: Fortress of the Muslim categories
+ */
+object NewsDbGenerator {
+    private const val TAG = "NewsDbGenerator"
+
+    // Topic IDs
+    private const val TOPIC_HOLY_QURAN = 7
+    private const val TOPIC_QURANIC_DUAS = 11
+    private const val TOPIC_MORNING_EVENING = 21
+    private const val TOPIC_PRAYER = 22
+    private const val TOPIC_HOME_DAILY = 23
+    private const val TOPIC_FOOD_DRINK = 24
+    private const val TOPIC_TRAVEL = 25
+    private const val TOPIC_PROTECTION = 26
+    private const val TOPIC_DISTRESS_ANXIETY = 27
+    private const val TOPIC_HEALTH_SICKNESS = 28
+    private const val TOPIC_SOCIAL_ETIQUETTE = 29
+    private const val TOPIC_DEATH_FUNERAL = 30
+    private const val TOPIC_WEATHER_NATURE = 31
+    private const val TOPIC_HAJJ_UMRAH = 32
+    private const val TOPIC_FORGIVENESS_REPENTANCE = 33
+    private const val TOPIC_GUIDANCE_FAITH = 34
+    private const val TOPIC_REMEMBRANCE_DHIKR = 35
+    private const val TOPIC_FAMILY_MARRIAGE = 36
+    private const val TOPIC_SACRIFICE_WORSHIP = 37
+
+    // Fortress chapter to topic mapping
+    private val CHAPTER_TO_TOPIC = mapOf(
+        // Morning & Evening (21)
+        27 to TOPIC_MORNING_EVENING, 28 to TOPIC_MORNING_EVENING, 29 to TOPIC_MORNING_EVENING,
+        30 to TOPIC_MORNING_EVENING, 31 to TOPIC_MORNING_EVENING,
+
+        // Prayer (22)
+        12 to TOPIC_PRAYER, 13 to TOPIC_PRAYER, 14 to TOPIC_PRAYER, 15 to TOPIC_PRAYER,
+        16 to TOPIC_PRAYER, 17 to TOPIC_PRAYER, 18 to TOPIC_PRAYER, 19 to TOPIC_PRAYER,
+        20 to TOPIC_PRAYER, 21 to TOPIC_PRAYER, 22 to TOPIC_PRAYER, 23 to TOPIC_PRAYER,
+        24 to TOPIC_PRAYER, 25 to TOPIC_PRAYER, 32 to TOPIC_PRAYER, 33 to TOPIC_PRAYER,
+
+        // Home & Daily (23)
+        1 to TOPIC_HOME_DAILY, 2 to TOPIC_HOME_DAILY, 3 to TOPIC_HOME_DAILY, 4 to TOPIC_HOME_DAILY,
+        5 to TOPIC_HOME_DAILY, 6 to TOPIC_HOME_DAILY, 7 to TOPIC_HOME_DAILY, 8 to TOPIC_HOME_DAILY,
+        9 to TOPIC_HOME_DAILY, 10 to TOPIC_HOME_DAILY, 11 to TOPIC_HOME_DAILY,
+
+        // Food & Drink (24)
+        69 to TOPIC_FOOD_DRINK, 70 to TOPIC_FOOD_DRINK, 71 to TOPIC_FOOD_DRINK,
+        72 to TOPIC_FOOD_DRINK, 73 to TOPIC_FOOD_DRINK,
+
+        // Travel (25)
+        95 to TOPIC_TRAVEL, 96 to TOPIC_TRAVEL, 97 to TOPIC_TRAVEL, 98 to TOPIC_TRAVEL,
+        99 to TOPIC_TRAVEL, 100 to TOPIC_TRAVEL, 101 to TOPIC_TRAVEL, 102 to TOPIC_TRAVEL,
+        103 to TOPIC_TRAVEL, 104 to TOPIC_TRAVEL, 105 to TOPIC_TRAVEL,
+
+        // Protection (26)
+        38 to TOPIC_PROTECTION, 39 to TOPIC_PROTECTION, 45 to TOPIC_PROTECTION,
+        88 to TOPIC_PROTECTION, 125 to TOPIC_PROTECTION, 128 to TOPIC_PROTECTION,
+        36 to TOPIC_PROTECTION, 37 to TOPIC_PROTECTION,
+
+        // Distress & Anxiety (27)
+        34 to TOPIC_DISTRESS_ANXIETY, 35 to TOPIC_DISTRESS_ANXIETY, 43 to TOPIC_DISTRESS_ANXIETY,
+        46 to TOPIC_DISTRESS_ANXIETY, 41 to TOPIC_DISTRESS_ANXIETY, 82 to TOPIC_DISTRESS_ANXIETY,
+        83 to TOPIC_DISTRESS_ANXIETY, 106 to TOPIC_DISTRESS_ANXIETY, 126 to TOPIC_DISTRESS_ANXIETY,
+
+        // Health & Sickness (28)
+        49 to TOPIC_HEALTH_SICKNESS, 50 to TOPIC_HEALTH_SICKNESS, 51 to TOPIC_HEALTH_SICKNESS,
+        124 to TOPIC_HEALTH_SICKNESS,
+
+        // Social & Etiquette (29)
+        77 to TOPIC_SOCIAL_ETIQUETTE, 78 to TOPIC_SOCIAL_ETIQUETTE, 84 to TOPIC_SOCIAL_ETIQUETTE,
+        85 to TOPIC_SOCIAL_ETIQUETTE, 86 to TOPIC_SOCIAL_ETIQUETTE, 87 to TOPIC_SOCIAL_ETIQUETTE,
+        107 to TOPIC_SOCIAL_ETIQUETTE, 108 to TOPIC_SOCIAL_ETIQUETTE, 109 to TOPIC_SOCIAL_ETIQUETTE,
+        110 to TOPIC_SOCIAL_ETIQUETTE, 111 to TOPIC_SOCIAL_ETIQUETTE, 112 to TOPIC_SOCIAL_ETIQUETTE,
+        113 to TOPIC_SOCIAL_ETIQUETTE, 114 to TOPIC_SOCIAL_ETIQUETTE,
+
+        // Death & Funeral (30)
+        52 to TOPIC_DEATH_FUNERAL, 53 to TOPIC_DEATH_FUNERAL, 54 to TOPIC_DEATH_FUNERAL,
+        55 to TOPIC_DEATH_FUNERAL, 56 to TOPIC_DEATH_FUNERAL, 57 to TOPIC_DEATH_FUNERAL,
+        58 to TOPIC_DEATH_FUNERAL, 59 to TOPIC_DEATH_FUNERAL, 60 to TOPIC_DEATH_FUNERAL,
+
+        // Weather & Nature (31)
+        61 to TOPIC_WEATHER_NATURE, 62 to TOPIC_WEATHER_NATURE, 63 to TOPIC_WEATHER_NATURE,
+        64 to TOPIC_WEATHER_NATURE, 65 to TOPIC_WEATHER_NATURE, 66 to TOPIC_WEATHER_NATURE,
+        67 to TOPIC_WEATHER_NATURE, 76 to TOPIC_WEATHER_NATURE,
+
+        // Hajj & Umrah (32)
+        115 to TOPIC_HAJJ_UMRAH, 116 to TOPIC_HAJJ_UMRAH, 117 to TOPIC_HAJJ_UMRAH,
+        118 to TOPIC_HAJJ_UMRAH, 119 to TOPIC_HAJJ_UMRAH, 120 to TOPIC_HAJJ_UMRAH,
+        121 to TOPIC_HAJJ_UMRAH,
+
+        // Forgiveness & Repentance (33)
+        44 to TOPIC_FORGIVENESS_REPENTANCE, 129 to TOPIC_FORGIVENESS_REPENTANCE,
+
+        // Guidance & Faith (34)
+        26 to TOPIC_GUIDANCE_FAITH, 40 to TOPIC_GUIDANCE_FAITH, 42 to TOPIC_GUIDANCE_FAITH,
+
+        // Remembrance & Dhikr (35)
+        130 to TOPIC_REMEMBRANCE_DHIKR, 131 to TOPIC_REMEMBRANCE_DHIKR, 132 to TOPIC_REMEMBRANCE_DHIKR,
+
+        // Family & Marriage (36)
+        47 to TOPIC_FAMILY_MARRIAGE, 48 to TOPIC_FAMILY_MARRIAGE, 79 to TOPIC_FAMILY_MARRIAGE,
+        80 to TOPIC_FAMILY_MARRIAGE, 81 to TOPIC_FAMILY_MARRIAGE,
+
+        // Sacrifice & Worship (37)
+        68 to TOPIC_SACRIFICE_WORSHIP, 74 to TOPIC_SACRIFICE_WORSHIP, 75 to TOPIC_SACRIFICE_WORSHIP,
+        127 to TOPIC_SACRIFICE_WORSHIP, 122 to TOPIC_SACRIFICE_WORSHIP, 123 to TOPIC_SACRIFICE_WORSHIP,
+        89 to TOPIC_SACRIFICE_WORSHIP, 90 to TOPIC_SACRIFICE_WORSHIP, 91 to TOPIC_SACRIFICE_WORSHIP,
+        92 to TOPIC_SACRIFICE_WORSHIP, 93 to TOPIC_SACRIFICE_WORSHIP, 94 to TOPIC_SACRIFICE_WORSHIP
+    )
+
+    /**
+     * Regenerate news.db from source databases
+     * @param context Application context
+     * @return RegenerationResult with counts and status
+     */
+    fun regenerateNewsDb(context: Context): RegenerationResult {
+        Log.d(TAG, "Starting news.db regeneration...")
+        val startTime = System.currentTimeMillis()
+
+        return try {
+            // Close existing news database
+            NewsDatabase.closeDatabase()
+
+            // Create new database file
+            val newsDbPath = context.getDatabasePath("news.db")
+            if (newsDbPath.exists()) {
+                newsDbPath.delete()
+                Log.d(TAG, "Deleted existing news.db")
+            }
+
+            // Create directory if needed
+            newsDbPath.parentFile?.mkdirs()
+
+            // Create and populate the database
+            val db = SQLiteDatabase.openOrCreateDatabase(newsDbPath, null)
+
+            try {
+                createSchema(db)
+
+                var surahCount = 0
+                var quranicDuaCount = 0
+                var fortressCount = 0
+                var topicMappings = 0
+
+                // Generate from quran.db
+                val quranResult = generateSurahs(context, db, startId = 2001)
+                surahCount = quranResult.first
+                topicMappings += quranResult.second
+
+                // Generate from quranic_duas.db
+                val quranicResult = generateQuranicDuas(context, db, startId = 101)
+                quranicDuaCount = quranicResult.first
+                topicMappings += quranicResult.second
+
+                // Generate from fortress_of_the_muslim.db
+                val fortressResult = generateFortressDuas(context, db, startId = 1001)
+                fortressCount = fortressResult.first
+                topicMappings += fortressResult.second
+
+                db.close()
+
+                val duration = System.currentTimeMillis() - startTime
+                Log.d(TAG, "News.db regeneration completed in ${duration}ms")
+                Log.d(TAG, "Generated: $surahCount Surahs, $quranicDuaCount Quranic Duas, $fortressCount Fortress Duas")
+                Log.d(TAG, "Total topic mappings: $topicMappings")
+
+                RegenerationResult(
+                    success = true,
+                    surahCount = surahCount,
+                    quranicDuaCount = quranicDuaCount,
+                    fortressDuaCount = fortressCount,
+                    topicMappings = topicMappings,
+                    durationMs = duration
+                )
+            } catch (e: Exception) {
+                db.close()
+                throw e
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to regenerate news.db", e)
+            RegenerationResult(
+                success = false,
+                error = e.message
+            )
+        }
+    }
+
+    private fun createSchema(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS news_resources (
+                id INTEGER NOT NULL PRIMARY KEY,
+                title TEXT NOT NULL,
+                content TEXT,
+                url TEXT,
+                header_image_url TEXT,
+                publish_date TEXT,
+                type TEXT,
+                is_system INTEGER NOT NULL DEFAULT 1,
+                is_user_created INTEGER NOT NULL DEFAULT 0,
+                source TEXT,
+                created_at TEXT,
+                updated_at TEXT
+            )
+        """)
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS news_topics (
+                news_id INTEGER NOT NULL,
+                topic_id INTEGER NOT NULL,
+                PRIMARY KEY (news_id, topic_id)
+            )
+        """)
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS android_metadata (locale TEXT)
+        """)
+        db.execSQL("INSERT INTO android_metadata VALUES ('en_US')")
+
+        Log.d(TAG, "Schema created successfully")
+    }
+
+    private fun generateSurahs(context: Context, newsDb: SQLiteDatabase, startId: Int): Pair<Int, Int> {
+        Log.d(TAG, "Generating Surahs from quran.db...")
+
+        val quranDbPath = getAssetDbPath(context, "quran.db") ?: return Pair(0, 0)
+        val quranDb = SQLiteDatabase.openDatabase(quranDbPath, null, SQLiteDatabase.OPEN_READONLY)
+
+        var count = 0
+        var mappings = 0
+        val now = getCurrentTimestamp()
+
+        try {
+            val cursor = quranDb.rawQuery(
+                "SELECT number, name_en, name_en_translation, name_ar, type, total_verses FROM surahs ORDER BY number",
+                null
+            )
+
+            while (cursor.moveToNext()) {
+                val number = cursor.getInt(0)
+                val nameEn = cursor.getString(1) ?: ""
+                val nameTranslation = cursor.getString(2) ?: ""
+                val nameAr = cursor.getString(3) ?: ""
+                val type = cursor.getString(4) ?: "Meccan"
+                val totalVerses = cursor.getInt(5)
+
+                val newsId = startId + number - 1
+                val ordinal = getOrdinal(number)
+
+                val title = "Surah $number: $nameEn ($nameTranslation)"
+                val content = """**Arabic:** $nameAr
+
+**Type:** $type
+
+**Verses:** $totalVerses
+
+Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal chapter of the Holy Quran with $totalVerses verses."""
+
+                newsDb.execSQL(
+                    """INSERT INTO news_resources (id, title, content, type, is_system, created_at, updated_at)
+                       VALUES (?, ?, ?, 'Surah 📖', 1, ?, ?)""",
+                    arrayOf(newsId, title, content, now, now)
+                )
+
+                newsDb.execSQL(
+                    "INSERT INTO news_topics (news_id, topic_id) VALUES (?, ?)",
+                    arrayOf(newsId, TOPIC_HOLY_QURAN)
+                )
+
+                count++
+                mappings++
+            }
+
+            cursor.close()
+        } finally {
+            quranDb.close()
+        }
+
+        Log.d(TAG, "Generated $count Surahs")
+        return Pair(count, mappings)
+    }
+
+    private fun generateQuranicDuas(context: Context, newsDb: SQLiteDatabase, startId: Int): Pair<Int, Int> {
+        Log.d(TAG, "Generating Quranic Duas from quranic_duas.db...")
+
+        val duaDbPath = getAssetDbPath(context, "quranic_duas.db") ?: return Pair(0, 0)
+        val duaDb = SQLiteDatabase.openDatabase(duaDbPath, null, SQLiteDatabase.OPEN_READONLY)
+
+        var count = 0
+        var mappings = 0
+        val now = getCurrentTimestamp()
+
+        try {
+            val cursor = duaDb.rawQuery(
+                "SELECT dua_number, title, surah_reference, arabic, transliteration, translation, explanation FROM quranic_duas ORDER BY dua_number",
+                null
+            )
+
+            while (cursor.moveToNext()) {
+                val duaNumber = cursor.getInt(0)
+                val title = cursor.getString(1) ?: ""
+                val surahRef = cursor.getString(2)
+                val arabic = cursor.getString(3)
+                val transliteration = cursor.getString(4)
+                val translation = cursor.getString(5)
+                val explanation = cursor.getString(6)
+
+                val newsId = startId + duaNumber - 1
+
+                val contentParts = mutableListOf<String>()
+                if (!arabic.isNullOrBlank()) contentParts.add("**Arabic:**\n$arabic")
+                if (!transliteration.isNullOrBlank()) contentParts.add("**Transliteration:**\n$transliteration")
+                if (!translation.isNullOrBlank()) contentParts.add("**Translation:**\n$translation")
+                if (!explanation.isNullOrBlank()) contentParts.add("**Explanation:**\n$explanation")
+
+                val content = contentParts.joinToString("\n\n")
+                var fullTitle = "Quranic Dua $duaNumber: $title"
+                if (!surahRef.isNullOrBlank()) {
+                    fullTitle += " ($surahRef)"
+                }
+
+                newsDb.execSQL(
+                    """INSERT INTO news_resources (id, title, content, type, is_system, created_at, updated_at)
+                       VALUES (?, ?, ?, 'Dua 🤲', 1, ?, ?)""",
+                    arrayOf(newsId, fullTitle, content, now, now)
+                )
+
+                newsDb.execSQL(
+                    "INSERT INTO news_topics (news_id, topic_id) VALUES (?, ?)",
+                    arrayOf(newsId, TOPIC_QURANIC_DUAS)
+                )
+
+                count++
+                mappings++
+            }
+
+            cursor.close()
+        } finally {
+            duaDb.close()
+        }
+
+        Log.d(TAG, "Generated $count Quranic Duas")
+        return Pair(count, mappings)
+    }
+
+    private fun generateFortressDuas(context: Context, newsDb: SQLiteDatabase, startId: Int): Pair<Int, Int> {
+        Log.d(TAG, "Generating Fortress of the Muslim duas...")
+
+        val fortressDbPath = getAssetDbPath(context, "fortress_of_the_muslim.db") ?: return Pair(0, 0)
+        val fortressDb = SQLiteDatabase.openDatabase(fortressDbPath, null, SQLiteDatabase.OPEN_READONLY)
+
+        var count = 0
+        var mappings = 0
+        var newsId = startId
+        val now = getCurrentTimestamp()
+
+        try {
+            val cursor = fortressDb.rawQuery(
+                """SELECT c.id, c.title, i.id, i.position, i.arabic, i.transliteration,
+                   i.translation, i.context, i.instruction, i.note, i.post_context
+                   FROM chapters c
+                   JOIN invocations i ON c.id = i.chapter_id
+                   ORDER BY c.id, i.position""",
+                null
+            )
+
+            while (cursor.moveToNext()) {
+                val chapterId = cursor.getInt(0)
+                val chapterTitle = cursor.getString(1) ?: ""
+                // val invId = cursor.getInt(2)
+                val position = cursor.getInt(3)
+                val arabic = cursor.getString(4)
+                val transliteration = cursor.getString(5)
+                val translation = cursor.getString(6)
+                val contextText = cursor.getString(7)
+                val instruction = cursor.getString(8)
+                val note = cursor.getString(9)
+                val postContext = cursor.getString(10)
+
+                val contentParts = mutableListOf<String>()
+                if (!contextText.isNullOrBlank()) contentParts.add("**Context:**\n$contextText")
+                if (!arabic.isNullOrBlank()) contentParts.add("**Arabic:**\n$arabic")
+                if (!transliteration.isNullOrBlank()) contentParts.add("**Transliteration:**\n$transliteration")
+                if (!translation.isNullOrBlank()) contentParts.add("**Translation:**\n$translation")
+                if (!instruction.isNullOrBlank()) contentParts.add("**Instruction:**\n$instruction")
+                if (!note.isNullOrBlank()) contentParts.add("**Note:**\n$note")
+                if (!postContext.isNullOrBlank()) contentParts.add("**Additional Context:**\n$postContext")
+
+                val content = contentParts.joinToString("\n\n")
+                val title = "$chapterTitle: Dua $position"
+
+                newsDb.execSQL(
+                    """INSERT INTO news_resources (id, title, content, type, is_system, created_at, updated_at)
+                       VALUES (?, ?, ?, 'Dua 🤲', 1, ?, ?)""",
+                    arrayOf(newsId, title, content, now, now)
+                )
+
+                // Map to topic based on chapter
+                val topicId = CHAPTER_TO_TOPIC[chapterId]
+                if (topicId != null) {
+                    newsDb.execSQL(
+                        "INSERT INTO news_topics (news_id, topic_id) VALUES (?, ?)",
+                        arrayOf(newsId, topicId)
+                    )
+                    mappings++
+                }
+
+                newsId++
+                count++
+            }
+
+            cursor.close()
+        } finally {
+            fortressDb.close()
+        }
+
+        Log.d(TAG, "Generated $count Fortress duas")
+        return Pair(count, mappings)
+    }
+
+    /**
+     * Copy asset database to a readable location and return the path
+     */
+    private fun getAssetDbPath(context: Context, dbName: String): String? {
+        return try {
+            val cacheDir = File(context.cacheDir, "temp_dbs")
+            cacheDir.mkdirs()
+
+            val outFile = File(cacheDir, dbName)
+
+            // Always copy fresh from assets
+            context.assets.open("databases/$dbName").use { input ->
+                outFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+
+            outFile.absolutePath
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to copy asset database: $dbName", e)
+            null
+        }
+    }
+
+    private fun getOrdinal(n: Int): String {
+        val suffix = when {
+            n in 11..13 -> "th"
+            n % 10 == 1 -> "st"
+            n % 10 == 2 -> "nd"
+            n % 10 == 3 -> "rd"
+            else -> "th"
+        }
+        return "$n$suffix"
+    }
+
+    private fun getCurrentTimestamp(): String {
+        return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(Date())
+    }
+
+    /**
+     * Regenerate news database using Room DAO
+     * This works with the existing singleton database connection
+     */
+    suspend fun regenerateWithRoom(context: Context, dao: NewsDao): RegenerationResult {
+        Log.d(TAG, "Starting news.db regeneration with Room...")
+        val startTime = System.currentTimeMillis()
+
+        return try {
+            // Clear existing data
+            dao.deleteAllNewsTopics()
+            dao.deleteAllNewsResources()
+            Log.d(TAG, "Cleared existing news data")
+
+            val now = getCurrentTimestamp()
+            val newsResources = mutableListOf<NewsResourceEntity>()
+            val crossRefs = mutableListOf<NewsTopicCrossRef>()
+
+            var surahCount = 0
+            var quranicDuaCount = 0
+            var fortressCount = 0
+
+            // Generate Surahs
+            val quranDbPath = getAssetDbPath(context, "quran.db")
+            if (quranDbPath != null) {
+                val quranDb = SQLiteDatabase.openDatabase(quranDbPath, null, SQLiteDatabase.OPEN_READONLY)
+                try {
+                    val cursor = quranDb.rawQuery(
+                        "SELECT number, name_en, name_en_translation, name_ar, type, total_verses FROM surahs ORDER BY number",
+                        null
+                    )
+                    while (cursor.moveToNext()) {
+                        val number = cursor.getInt(0)
+                        val nameEn = cursor.getString(1) ?: ""
+                        val nameTranslation = cursor.getString(2) ?: ""
+                        val nameAr = cursor.getString(3) ?: ""
+                        val type = cursor.getString(4) ?: "Meccan"
+                        val totalVerses = cursor.getInt(5)
+
+                        val newsId = 2001 + number - 1
+                        val ordinal = getOrdinal(number)
+
+                        val title = "Surah $number: $nameEn ($nameTranslation)"
+                        val content = """**Arabic:** $nameAr
+
+**Type:** $type
+
+**Verses:** $totalVerses
+
+Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal chapter of the Holy Quran with $totalVerses verses."""
+
+                        newsResources.add(NewsResourceEntity(
+                            id = newsId,
+                            title = title,
+                            content = content,
+                            url = "",
+                            headerImageUrl = null,
+                            publishDate = now,
+                            type = "Surah 📖",
+                            isSystem = 1,
+                            isUserCreated = 0,
+                            source = null,
+                            createdAt = now,
+                            updatedAt = now
+                        ))
+                        crossRefs.add(NewsTopicCrossRef(newsId, TOPIC_HOLY_QURAN))
+                        surahCount++
+                    }
+                    cursor.close()
+                } finally {
+                    quranDb.close()
+                }
+                Log.d(TAG, "Generated $surahCount Surahs")
+            }
+
+            // Generate Quranic Duas
+            val duaDbPath = getAssetDbPath(context, "quranic_duas.db")
+            if (duaDbPath != null) {
+                val duaDb = SQLiteDatabase.openDatabase(duaDbPath, null, SQLiteDatabase.OPEN_READONLY)
+                try {
+                    val cursor = duaDb.rawQuery(
+                        "SELECT dua_number, title, surah_reference, arabic, transliteration, translation, explanation FROM quranic_duas ORDER BY dua_number",
+                        null
+                    )
+                    while (cursor.moveToNext()) {
+                        val duaNumber = cursor.getInt(0)
+                        val title = cursor.getString(1) ?: ""
+                        val surahRef = cursor.getString(2)
+                        val arabic = cursor.getString(3)
+                        val transliteration = cursor.getString(4)
+                        val translation = cursor.getString(5)
+                        val explanation = cursor.getString(6)
+
+                        val newsId = 101 + duaNumber - 1
+
+                        val contentParts = mutableListOf<String>()
+                        if (!arabic.isNullOrBlank()) contentParts.add("**Arabic:**\n$arabic")
+                        if (!transliteration.isNullOrBlank()) contentParts.add("**Transliteration:**\n$transliteration")
+                        if (!translation.isNullOrBlank()) contentParts.add("**Translation:**\n$translation")
+                        if (!explanation.isNullOrBlank()) contentParts.add("**Explanation:**\n$explanation")
+
+                        val content = contentParts.joinToString("\n\n")
+                        var fullTitle = "Quranic Dua $duaNumber: $title"
+                        if (!surahRef.isNullOrBlank()) {
+                            fullTitle += " ($surahRef)"
+                        }
+
+                        newsResources.add(NewsResourceEntity(
+                            id = newsId,
+                            title = fullTitle,
+                            content = content,
+                            url = "",
+                            headerImageUrl = null,
+                            publishDate = now,
+                            type = "Dua 🤲",
+                            isSystem = 1,
+                            isUserCreated = 0,
+                            source = null,
+                            createdAt = now,
+                            updatedAt = now
+                        ))
+                        crossRefs.add(NewsTopicCrossRef(newsId, TOPIC_QURANIC_DUAS))
+                        quranicDuaCount++
+                    }
+                    cursor.close()
+                } finally {
+                    duaDb.close()
+                }
+                Log.d(TAG, "Generated $quranicDuaCount Quranic Duas")
+            }
+
+            // Generate Fortress Duas
+            val fortressDbPath = getAssetDbPath(context, "fortress_of_the_muslim.db")
+            if (fortressDbPath != null) {
+                val fortressDb = SQLiteDatabase.openDatabase(fortressDbPath, null, SQLiteDatabase.OPEN_READONLY)
+                var newsId = 1001
+                try {
+                    val cursor = fortressDb.rawQuery(
+                        """SELECT c.id, c.title, i.id, i.position, i.arabic, i.transliteration,
+                           i.translation, i.context, i.instruction, i.note, i.post_context
+                           FROM chapters c
+                           JOIN invocations i ON c.id = i.chapter_id
+                           ORDER BY c.id, i.position""",
+                        null
+                    )
+                    while (cursor.moveToNext()) {
+                        val chapterId = cursor.getInt(0)
+                        val chapterTitle = cursor.getString(1) ?: ""
+                        val position = cursor.getInt(3)
+                        val arabic = cursor.getString(4)
+                        val transliteration = cursor.getString(5)
+                        val translation = cursor.getString(6)
+                        val contextText = cursor.getString(7)
+                        val instruction = cursor.getString(8)
+                        val note = cursor.getString(9)
+                        val postContext = cursor.getString(10)
+
+                        val contentParts = mutableListOf<String>()
+                        if (!contextText.isNullOrBlank()) contentParts.add("**Context:**\n$contextText")
+                        if (!arabic.isNullOrBlank()) contentParts.add("**Arabic:**\n$arabic")
+                        if (!transliteration.isNullOrBlank()) contentParts.add("**Transliteration:**\n$transliteration")
+                        if (!translation.isNullOrBlank()) contentParts.add("**Translation:**\n$translation")
+                        if (!instruction.isNullOrBlank()) contentParts.add("**Instruction:**\n$instruction")
+                        if (!note.isNullOrBlank()) contentParts.add("**Note:**\n$note")
+                        if (!postContext.isNullOrBlank()) contentParts.add("**Additional Context:**\n$postContext")
+
+                        val content = contentParts.joinToString("\n\n")
+                        val title = "$chapterTitle: Dua $position"
+
+                        newsResources.add(NewsResourceEntity(
+                            id = newsId,
+                            title = title,
+                            content = content,
+                            url = "",
+                            headerImageUrl = null,
+                            publishDate = now,
+                            type = "Dua 🤲",
+                            isSystem = 1,
+                            isUserCreated = 0,
+                            source = null,
+                            createdAt = now,
+                            updatedAt = now
+                        ))
+
+                        val topicId = CHAPTER_TO_TOPIC[chapterId]
+                        if (topicId != null) {
+                            crossRefs.add(NewsTopicCrossRef(newsId, topicId))
+                        }
+
+                        newsId++
+                        fortressCount++
+                    }
+                    cursor.close()
+                } finally {
+                    fortressDb.close()
+                }
+                Log.d(TAG, "Generated $fortressCount Fortress duas")
+            }
+
+            // Insert all data via Room
+            dao.insertNewsResources(newsResources)
+            dao.insertNewsTopicCrossRefs(crossRefs)
+
+            val duration = System.currentTimeMillis() - startTime
+            Log.d(TAG, "News.db regeneration completed in ${duration}ms")
+            Log.d(TAG, "Generated: $surahCount Surahs, $quranicDuaCount Quranic Duas, $fortressCount Fortress Duas")
+            Log.d(TAG, "Total topic mappings: ${crossRefs.size}")
+
+            RegenerationResult(
+                success = true,
+                surahCount = surahCount,
+                quranicDuaCount = quranicDuaCount,
+                fortressDuaCount = fortressCount,
+                topicMappings = crossRefs.size,
+                durationMs = duration
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to regenerate news.db with Room", e)
+            RegenerationResult(
+                success = false,
+                error = e.message
+            )
+        }
+    }
+}
+
+/**
+ * Result of news.db regeneration
+ */
+data class RegenerationResult(
+    val success: Boolean,
+    val surahCount: Int = 0,
+    val quranicDuaCount: Int = 0,
+    val fortressDuaCount: Int = 0,
+    val topicMappings: Int = 0,
+    val durationMs: Long = 0,
+    val error: String? = null
+) {
+    val totalNewsResources: Int
+        get() = surahCount + quranicDuaCount + fortressDuaCount
+}

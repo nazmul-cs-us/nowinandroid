@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -115,6 +116,7 @@ fun SurahDetailScreen(
     newsResourceId: String? = null, // News resource ID for bookmark tracking
     scrollToAyah: Int = 0, // Optional: scroll to specific ayah number (0 = no scroll)
     onBackClick: () -> Unit,
+    onTopicClick: (String) -> Unit = {}, // Navigate to topic detail screen
     viewModel: SurahDetailViewModel = hiltViewModel(),
     quranRepository: QuranRepository = hiltViewModel<QuranRepositoryHolder>().repository,
     userDataRepository: UserDataRepository = hiltViewModel<UserDataRepositoryHolder>().repository
@@ -248,6 +250,12 @@ fun SurahDetailScreen(
         } else {
             android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "⚠️ NO_NEWS_ID | surah=$surahNumber | bookmark disabled")
         }
+    }
+
+    // Load topics for this news resource
+    val topics by viewModel.topics.collectAsState()
+    LaunchedEffect(newsResourceId) {
+        viewModel.loadTopicsForNewsResource(newsResourceId)
     }
 
     val availableTranslations = remember { viewModel.getAvailableTranslations() }
@@ -541,6 +549,8 @@ fun SurahDetailScreen(
                             ).show()
                         }
                     },
+                    topics = topics,
+                    onTopicClick = onTopicClick,
                     modifier = Modifier
                 )
             }
@@ -1029,6 +1039,8 @@ private fun AlbumPlayerContent(
     onWordStudyClick: (Int) -> Unit = {},
     onTafseerClick: (Int) -> Unit = {},
     onPlayAyahClick: (Int) -> Unit = {},
+    topics: List<com.starception.submission.core.topicsdatabase.Topic> = emptyList(),
+    onTopicClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Use current playing surah/ayahs if available, otherwise use original
@@ -1078,7 +1090,11 @@ private fun AlbumPlayerContent(
                     .wrapContentHeight()
             ) {
                 Column {
-                    AlbumHeader(surah = surah)
+                    AlbumHeader(
+                        surah = surah,
+                        topics = topics,
+                        onTopicClick = onTopicClick
+                    )
 
                     // Fixed-height container to prevent FAB position jump during transitions
                     Box(
@@ -1472,7 +1488,11 @@ private fun BottomSheetOption(
 }
 
 @Composable
-private fun AlbumHeader(surah: Surah) {
+private fun AlbumHeader(
+    surah: Surah,
+    topics: List<com.starception.submission.core.topicsdatabase.Topic> = emptyList(),
+    onTopicClick: (String) -> Unit = {}
+) {
     // Album cover images (using cover resources from Fragment)
     val coverImages = remember {
         listOf(
@@ -1500,7 +1520,7 @@ private fun AlbumHeader(surah: Surah) {
             contentScale = ContentScale.Crop
         )
 
-        // Gradient overlay at bottom
+        // Gradient overlay at bottom with topic chips
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1514,7 +1534,39 @@ private fun AlbumHeader(surah: Surah) {
                         )
                     )
                 )
-        )
+        ) {
+            // Topic chips on the gradient overlay
+            if (topics.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomStart)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    topics.forEach { topic ->
+                        SuggestionChip(
+                            onClick = { onTopicClick(topic.id) },
+                            label = {
+                                Text(
+                                    text = topic.name,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            },
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            border = SuggestionChipDefaults.suggestionChipBorder(
+                                enabled = true,
+                                borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

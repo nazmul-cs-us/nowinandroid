@@ -157,6 +157,15 @@ interface NewsDao {
     @Query("DELETE FROM news_resources WHERE is_user_created = 1")
     suspend fun deleteAllUserNewsResources()
 
+    @Query("DELETE FROM news_resources")
+    suspend fun deleteAllNewsResources()
+
+    @Query("DELETE FROM news_topics")
+    suspend fun deleteAllNewsTopics()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNewsResources(newsResources: List<NewsResourceEntity>)
+
     @Query("SELECT COALESCE(MAX(id), 9999) + 1 FROM news_resources WHERE id >= 10000")
     suspend fun getNextUserNewsResourceId(): Int
 
