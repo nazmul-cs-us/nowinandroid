@@ -37,6 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -100,6 +101,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -131,6 +133,7 @@ import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.duadatabase.DuaDatabase
 import com.starception.submission.core.duadatabase.HadithReference
 import com.starception.submission.core.duadatabase.toHadithReference
+import com.starception.submission.core.qurandatabase.QuranDatabase
 
 /**
  * Data class representing a complete Dua
@@ -247,6 +250,35 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
     fun getTajweedAnnotations(surahNumber: Int, ayahNumber: Int): List<TajweedAnnotation> {
         val key = "$surahNumber:$ayahNumber"
         return tajweedData?.get(key) ?: emptyList()
+    }
+
+    // Cache for surah names to avoid repeated database lookups
+    private val surahNameCache = mutableMapOf<Int, String>()
+
+    /**
+     * Get surah name by number from database
+     * Returns the English name (e.g., "Al-Baqara") or fallback to "Surah X"
+     */
+    suspend fun getSurahName(surahNumber: Int): String {
+        // Check cache first
+        surahNameCache[surahNumber]?.let { return it }
+
+        return withContext(Dispatchers.IO) {
+            try {
+                val db = QuranDatabase.getInstance(context)
+                val surah = db.quranDao().getSurahByNumber(surahNumber)
+                val name: String = if (surah?.nameEnglish?.isNotEmpty() == true) {
+                    surah.nameEnglish
+                } else {
+                    "Surah $surahNumber"
+                }
+                surahNameCache[surahNumber] = name
+                name
+            } catch (e: Exception) {
+                android.util.Log.e("DuaDetailViewModel", "Error looking up surah name for $surahNumber", e)
+                "Surah $surahNumber"
+            }
+        }
     }
 
     /**
@@ -1091,15 +1123,20 @@ fun DuaDetailScreen(
                                             )
                                         }
 
-                                        // Topic chips - using NiaTopicTag for consistency with news cards
-                                        if (topics.isNotEmpty()) {
+                                        // Topic chips and Surah pill in a single row - using NiaTopicTag for consistency
+                                        val hasTopics = topics.isNotEmpty()
+                                        val hasSurahRef = dua.surahNumber > 0 && dua.ayahNumber > 0
+
+                                        if (hasTopics || hasSurahRef) {
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .horizontalScroll(rememberScrollState()),
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
+                                                // Topic chips
                                                 topics.forEach { topic ->
                                                     NiaTopicTag(
                                                         followed = false,
@@ -1111,12 +1148,33 @@ fun DuaDetailScreen(
                                                         }
                                                     )
                                                 }
-                                            }
-                                        }
 
-                                        // Space for floating Surah pill overlay
-                                        if (dua.surahNumber > 0 && dua.ayahNumber > 0) {
-                                            Spacer(modifier = Modifier.height(50.dp))
+                                                // Surah/Ayah navigation chip - lookup surah name from database
+                                                if (hasSurahRef) {
+                                                    // Look up surah name from database
+                                                    var surahName by remember { mutableStateOf(dua.surahName.ifEmpty { "Surah ${dua.surahNumber}" }) }
+
+                                                    LaunchedEffect(dua.surahNumber) {
+                                                        if (dua.surahName.isEmpty()) {
+                                                            surahName = viewModel.getSurahName(dua.surahNumber)
+                                                        }
+                                                    }
+
+                                                    val surahDisplayName = "$surahName:${dua.ayahNumber}"
+
+                                                    NiaTopicTag(
+                                                        followed = false,
+                                                        onClick = { onNavigateToSurah?.invoke(dua.surahNumber, dua.ayahNumber) },
+                                                        text = {
+                                                            Text(
+                                                                text = surahDisplayName.uppercase(Locale.getDefault()),
+                                                                textDecoration = TextDecoration.Underline
+                                                            )
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(16.dp))
                                         }
                                     }
                                 }
@@ -1414,86 +1472,6 @@ fun DuaDetailScreen(
                         }
                     }
 
-                        // Get surah display name for floating pill
-                        val surahDisplayName = if (dua.surahName.isNotEmpty()) {
-                            dua.surahName
-                        } else if (dua.surahNumber > 0) {
-                            "Surah ${dua.surahNumber}"
-                        } else {
-                            ""
-                        }
-
-                        // Floating Surah pill that animates from header to toolbar (pins next to back arrow)
-                        if (dua.surahNumber > 0 && dua.ayahNumber > 0 && surahDisplayName.isNotEmpty()) {
-                            val density = androidx.compose.ui.platform.LocalDensity.current
-
-                            // Header position (where pill starts - centered) and toolbar position (next to back button)
-                            val headerY = with(density) { 230.dp.toPx() }
-                            val toolbarY = with(density) { 10.dp.toPx() } // Vertically centered in 64dp toolbar
-
-                            // Get current scroll offset
-                            val scrollOffset = if (lazyListState.firstVisibleItemIndex == 0) {
-                                lazyListState.firstVisibleItemScrollOffset.toFloat()
-                            } else {
-                                headerY // Max scroll - pill should be at toolbar position
-                            }
-
-                            // Calculate pill Y position: starts at headerY, moves up with scroll, stops at toolbarY
-                            val pillY = (headerY - scrollOffset).coerceAtLeast(toolbarY)
-
-                            // Progress: 0 = header position, 1 = toolbar position
-                            val progress = ((headerY - pillY) / (headerY - toolbarY)).coerceIn(0f, 1f)
-
-                            // X offset: at progress=0 (header) = 0 (centered), at progress=1 (toolbar) = move left
-                            // Move left by half the screen width minus back button position to align next to back
-                            val xOffset = with(density) { (-100.dp * progress).toPx() }
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .offset(
-                                        x = with(density) { xOffset.toDp() },
-                                        y = with(density) { pillY.toDp() }
-                                    ),
-                                contentAlignment = Alignment.TopCenter
-                            ) {
-                                Surface(
-                                    onClick = { onNavigateToSurah?.invoke(dua.surahNumber, dua.ayahNumber) },
-                                    shape = RoundedCornerShape(18.dp),
-                                    color = Color.White.copy(alpha = 0.2f),
-                                    contentColor = Color.White
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                                    ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            Text(
-                                                text = surahDisplayName,
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = Color.White,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                            Text(
-                                                text = "Ayah ${dua.ayahNumber}",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = Color.White.copy(alpha = 0.8f),
-                                                fontSize = 10.sp
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Icon(
-                                            imageVector = Icons.Default.ChevronRight,
-                                            contentDescription = "Go to Surah",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             } else {
