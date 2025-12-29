@@ -100,6 +100,40 @@ fun PrayerTimesSection(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Custom Angles Section
+        SectionLabel("Custom Angles (degrees)")
+        CustomAnglesGrid(
+            fajrAngle = prayerSettings.customFajrAngle,
+            ishaAngle = prayerSettings.customIshaAngle,
+            defaultFajrAngle = prayerSettings.calculationMethod.fajrAngle,
+            defaultIshaAngle = prayerSettings.calculationMethod.ishaAngle,
+            onFajrAngleChange = { angle ->
+                onSettingsChange(prayerSettings.copy(customFajrAngle = angle))
+            },
+            onIshaAngleChange = { angle ->
+                onSettingsChange(prayerSettings.copy(customIshaAngle = angle))
+            }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Advanced Overrides Section
+        SectionLabel("Advanced Overrides")
+        AdvancedOverridesGrid(
+            ishaDelay = prayerSettings.customIshaDelay,
+            maghribOffset = prayerSettings.customMaghribOffset,
+            defaultIshaDelay = prayerSettings.calculationMethod.ishaDelay,
+            defaultMaghribOffset = prayerSettings.calculationMethod.maghribOffset,
+            onIshaDelayChange = { delay ->
+                onSettingsChange(prayerSettings.copy(customIshaDelay = delay))
+            },
+            onMaghribOffsetChange = { offset ->
+                onSettingsChange(prayerSettings.copy(customMaghribOffset = offset))
+            }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Time Offsets Section
         SectionLabel("Time Adjustments (minutes)")
         TimeOffsetsGrid(
@@ -346,6 +380,159 @@ private fun OffsetField(
             }
         },
         label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+        singleLine = true,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun CustomAnglesGrid(
+    fajrAngle: Double?,
+    ishaAngle: Double?,
+    defaultFajrAngle: Double,
+    defaultIshaAngle: Double?,
+    onFajrAngleChange: (Double?) -> Unit,
+    onIshaAngleChange: (Double?) -> Unit
+) {
+    // Use 18.0 as fallback for Isha if method uses time-based delay instead of angle
+    val effectiveDefaultIshaAngle = defaultIshaAngle ?: 18.0
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AngleField(
+                label = "Fajr",
+                value = fajrAngle,
+                defaultValue = defaultFajrAngle,
+                onValueChange = onFajrAngleChange,
+                modifier = Modifier.weight(1f)
+            )
+            AngleField(
+                label = "Isha",
+                value = ishaAngle,
+                defaultValue = effectiveDefaultIshaAngle,
+                onValueChange = onIshaAngleChange,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Text(
+            text = "Leave empty to use method defaults (Fajr: ${defaultFajrAngle}°, Isha: ${effectiveDefaultIshaAngle}°)",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun AngleField(
+    label: String,
+    value: Double?,
+    defaultValue: Double,
+    onValueChange: (Double?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var textValue by remember(value) {
+        mutableStateOf(value?.toString() ?: "")
+    }
+
+    OutlinedTextField(
+        value = textValue,
+        onValueChange = { newValue ->
+            // Allow empty, or valid decimal numbers
+            if (newValue.isEmpty() || newValue == "." || newValue.toDoubleOrNull() != null) {
+                textValue = newValue
+                val doubleValue = newValue.toDoubleOrNull()
+                onValueChange(doubleValue)
+            }
+        },
+        label = {
+            Text(
+                text = if (value == null) "$label (${defaultValue}°)" else label,
+                style = MaterialTheme.typography.labelSmall
+            )
+        },
+        placeholder = { Text("${defaultValue}°") },
+        singleLine = true,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun AdvancedOverridesGrid(
+    ishaDelay: Int?,
+    maghribOffset: Int?,
+    defaultIshaDelay: Int?,
+    defaultMaghribOffset: Int,
+    onIshaDelayChange: (Int?) -> Unit,
+    onMaghribOffsetChange: (Int?) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MinuteField(
+                label = "Isha Delay",
+                value = ishaDelay,
+                defaultValue = defaultIshaDelay,
+                onValueChange = onIshaDelayChange,
+                hint = "min after Maghrib",
+                modifier = Modifier.weight(1f)
+            )
+            MinuteField(
+                label = "Maghrib Offset",
+                value = maghribOffset,
+                defaultValue = defaultMaghribOffset,
+                onValueChange = onMaghribOffsetChange,
+                hint = "min after sunset",
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Text(
+            text = buildString {
+                append("Isha delay: minutes after Maghrib (used by Umm al-Qura). ")
+                append("Maghrib offset: minutes after sunset (used by some Shia methods).")
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun MinuteField(
+    label: String,
+    value: Int?,
+    defaultValue: Int?,
+    onValueChange: (Int?) -> Unit,
+    hint: String,
+    modifier: Modifier = Modifier
+) {
+    var textValue by remember(value) {
+        mutableStateOf(value?.toString() ?: "")
+    }
+
+    val displayDefault = defaultValue?.toString() ?: "N/A"
+
+    OutlinedTextField(
+        value = textValue,
+        onValueChange = { newValue ->
+            // Allow empty, minus sign, or valid integers
+            if (newValue.isEmpty() || newValue == "-" || newValue.toIntOrNull() != null) {
+                textValue = newValue
+                val intValue = newValue.toIntOrNull()
+                onValueChange(intValue)
+            }
+        },
+        label = {
+            Text(
+                text = if (value == null) "$label ($displayDefault)" else label,
+                style = MaterialTheme.typography.labelSmall
+            )
+        },
+        placeholder = { Text(hint) },
         singleLine = true,
         modifier = modifier
     )

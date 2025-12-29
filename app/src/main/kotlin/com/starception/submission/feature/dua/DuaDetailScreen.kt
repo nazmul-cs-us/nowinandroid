@@ -1160,15 +1160,14 @@ fun DuaDetailScreen(
                                                         }
                                                     }
 
-                                                    val surahDisplayName = "$surahName:${dua.ayahNumber}"
+                                                    val surahDisplayName = "$surahName #${dua.ayahNumber}"
 
                                                     NiaTopicTag(
                                                         followed = false,
                                                         onClick = { onNavigateToSurah?.invoke(dua.surahNumber, dua.ayahNumber) },
                                                         text = {
                                                             Text(
-                                                                text = surahDisplayName.uppercase(Locale.getDefault()),
-                                                                textDecoration = TextDecoration.Underline
+                                                                text = surahDisplayName.uppercase(Locale.getDefault())
                                                             )
                                                         }
                                                     )

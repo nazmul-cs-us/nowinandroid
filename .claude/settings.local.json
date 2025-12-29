@@ -267,7 +267,12 @@
       "Bash(do adb -s 4B221FDAP002T6 shell input swipe 640 1800 640 800 200)",
       "Bash(echo:*)",
       "Bash(# Dump UI and find the dua card adb -s 4B221FDAP002T6 shell uiautomator dump /sdcard/ui4.xml adb -s 4B221FDAP002T6 pull /sdcard/ui4.xml /tmp/ui4.xml grep -E \"\"Supplication|Al-Istikharah\"\" /tmp/ui4.xml)",
-      "Bash(do sleep 2)"
+      "Bash(do sleep 2)",
+      "Bash(do adb -s 4B221FDAP002T6 shell input swipe 360 1500 360 400 300)",
+      "Bash(# Check AlAdhan API for Dubai using method 16 \\(Dubai/UAE IACAD\\) curl -s \"\"https://api.aladhan.com/v1/timings/29-12-2025?latitude=25.2048&longitude=55.2708&method=16\"\" | python3 -m json.tool)",
+      "Bash(# Try to access the IACAD API endpoint curl -s \"\"https://www.iacad.gov.ae/api/PublicApi/GeIntegrationResult\"\" | python3 -m json.tool)",
+      "Bash(# Check the AlAdhan API documentation for method 16 \\(Dubai\\) curl -s \"\"https://api.aladhan.com/v1/methods\"\" | python3 -m json.tool)",
+      "Bash(# Check the AlAdhan API documentation for all methods curl -s \"\"https://api.aladhan.com/v1/methods\"\" | python3 -c \"\"import sys, json; data=json.load\\(sys.stdin\\); print\\(json.dumps\\(data.get\\(''data'', {}\\), indent=2\\)\\)\"\")"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
