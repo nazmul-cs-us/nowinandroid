@@ -9,9 +9,9 @@
     "AE": {
       "name": "United Arab Emirates",
       "calculationMethod": "UAE_IACAD",
-      "madhhab": "Maliki",
+      "madhhab": "Shafi",
       "coordinates": { "latitude": 25.2048, "longitude": 55.2708 },
-      "timeOffsets": { "fajr": -2, "sunrise": -3, "dhuhr": 1, "asr": -3, "maghrib": 1, "isha": -3 }
+      "timeOffsets": { "fajr": 2, "sunrise": 3, "dhuhr": 5, "asr": 2, "maghrib": 5, "isha": 2 }
     },
     "AF": {
       "name": "Afghanistan",
