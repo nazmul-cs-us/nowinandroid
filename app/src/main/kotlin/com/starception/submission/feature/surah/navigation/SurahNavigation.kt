@@ -25,7 +25,8 @@ fun NavController.navigateToSurah(
 }
 
 fun NavGraphBuilder.surahScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onTopicClick: (String) -> Unit = {}
 ) {
     composable<SurahRoute> { backStackEntry ->
         val surahRoute = backStackEntry.toRoute<SurahRoute>()
@@ -34,7 +35,8 @@ fun NavGraphBuilder.surahScreen(
             surahNumber = surahRoute.surahNumber,
             newsResourceId = surahRoute.newsResourceId,
             scrollToAyah = surahRoute.scrollToAyah,
-            onBackClick = onBackClick
+            onBackClick = onBackClick,
+            onTopicClick = onTopicClick
         )
     }
 }

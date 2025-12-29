@@ -22,7 +22,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DuaMetadataEntity::class,
         DuaChapterEntity::class,
         DuaInvocationEntity::class,
-        DuaFootnoteEntity::class
+        DuaFootnoteEntity::class,
+        HadithReferenceEntity::class
     ],
     version = 1,
     exportSchema = false
@@ -97,6 +98,14 @@ abstract class DuaDatabase : RoomDatabase() {
                     android.util.Log.d(TAG, "📝 Total Footnotes: $count")
                 }
                 footnoteCursor.close()
+
+                // Count hadith references
+                val hadithCursor = db.query("SELECT COUNT(*) FROM hadith_references")
+                if (hadithCursor.moveToFirst()) {
+                    val count = hadithCursor.getInt(0)
+                    android.util.Log.d(TAG, "📖 Total Hadith References: $count")
+                }
+                hadithCursor.close()
 
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "❌ Error logging database info", e)

@@ -191,12 +191,12 @@ fun LazyStaggeredGridScope.newsFeed(
 fun extractSurahNumber(title: String, url: String, type: String): Int? {
     android.util.Log.d("SurahExtract", "🔍 Checking: title='$title', url='$url', type='$type'")
 
-    // First check if it's a Quran type
-    if (type.contains("Quran", ignoreCase = true)) {
+    // First check if it's a Quran or Surah type
+    if (type.contains("Quran", ignoreCase = true) || type.contains("Surah", ignoreCase = true)) {
         // Try to extract from title pattern "Surah N:"
         val titleRegex = Regex("Surah\\s+(\\d+):")
         titleRegex.find(title)?.groupValues?.get(1)?.toIntOrNull()?.let {
-            android.util.Log.d("SurahExtract", "✅ Found Surah $it from title (Quran type)")
+            android.util.Log.d("SurahExtract", "✅ Found Surah $it from title (Quran/Surah type)")
             return it
         }
     }

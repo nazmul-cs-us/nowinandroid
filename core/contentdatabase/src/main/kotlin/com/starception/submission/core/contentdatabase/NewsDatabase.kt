@@ -102,6 +102,36 @@ abstract class NewsDatabase : RoomDatabase() {
         }
 
         /**
+         * Regenerate news.db from source databases (quran.db, fortress_of_the_muslim.db, quranic_duas.db)
+         * Uses Room DAO to update the existing database, which works with singleton injected instances.
+         *
+         * @param context Application context
+         * @return RegenerationResult with success status and counts
+         */
+        suspend fun regenerateFromSources(context: Context): RegenerationResult {
+            Log.d(TAG, "Starting news database regeneration from sources...")
+
+            return try {
+                val db = getInstance(context)
+                val dao = db.newsDao()
+
+                // Use the generator to create entities and insert via Room
+                val result = NewsDbGenerator.regenerateWithRoom(context, dao)
+
+                if (result.success) {
+                    Log.d(TAG, "News database regenerated successfully: ${result.totalNewsResources} resources")
+                } else {
+                    Log.e(TAG, "News database regeneration failed: ${result.error}")
+                }
+
+                result
+            } catch (e: Exception) {
+                Log.e(TAG, "Error regenerating news database", e)
+                RegenerationResult(success = false, error = e.message)
+            }
+        }
+
+        /**
          * Get database info for developer display
          */
         fun getDatabaseInfo(context: Context): DatabaseInfo {

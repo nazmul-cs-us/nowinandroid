@@ -65,7 +65,9 @@ fun NavGraphBuilder.duaDetailScreen(
     onBackClick: () -> Unit,
     onNavigateToSurah: ((surahNumber: Int, ayahNumber: Int) -> Unit)? = null,
     isBookmarked: (newsResourceId: String) -> Boolean = { false },
-    onToggleBookmark: (newsResourceId: String) -> Unit = {}
+    onToggleBookmark: (newsResourceId: String) -> Unit = {},
+    onTopicClick: (String) -> Unit = {},
+    onHadithClick: ((collectionName: String, hadithNumber: Int, databaseFile: String) -> Unit)? = null
 ) {
     composable<DuaDetailRoute> { backStackEntry ->
         val route = backStackEntry.toRoute<DuaDetailRoute>()
@@ -86,7 +88,9 @@ fun NavGraphBuilder.duaDetailScreen(
             initialNewsResourceId = newsResourceId,
             isNiaBookmarked = isBookmarked,
             onToggleNiaBookmark = onToggleBookmark,
-            topicId = route.topicId
+            topicId = route.topicId,
+            onTopicClick = onTopicClick,
+            onHadithClick = onHadithClick
         )
     }
 }

@@ -98,6 +98,49 @@ data class DuaInvocationEntity(
 )
 
 /**
+ * Hadith reference entity linking invocations to hadith collections
+ * Contains reference information to lookup hadith in separate databases
+ */
+@Entity(
+    tableName = "hadith_references",
+    foreignKeys = [
+        ForeignKey(
+            entity = DuaInvocationEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["invocation_id"],
+            onDelete = ForeignKey.NO_ACTION
+        )
+    ],
+    indices = [
+        Index(name = "idx_refs_invocation", value = ["invocation_id"]),
+        Index(name = "idx_refs_collection", value = ["collection_id"])
+    ]
+)
+data class HadithReferenceEntity(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Int,
+
+    @ColumnInfo(name = "invocation_id")
+    val invocationId: Int,
+
+    @ColumnInfo(name = "collection_id")
+    val collectionId: Int?,
+
+    @ColumnInfo(name = "collection_name")
+    val collectionName: String?,
+
+    @ColumnInfo(name = "hadith_number")
+    val hadithNumber: Int?,
+
+    @ColumnInfo(name = "reference_str")
+    val referenceStr: String?,
+
+    @ColumnInfo(name = "database_file")
+    val databaseFile: String?
+)
+
+/**
  * Footnote entity for term definitions and additional notes
  */
 @Entity(
@@ -202,6 +245,36 @@ data class DuaBookMetadata(
     val publisher: String?
 )
 
+/**
+ * Domain model for hadith reference
+ */
+data class HadithReference(
+    val id: Int,
+    val invocationId: Int,
+    val collectionId: Int?,
+    val collectionName: String?,
+    val hadithNumber: Int?,
+    val referenceStr: String?,
+    val databaseFile: String?
+) {
+    /**
+     * Get display name for the reference (e.g., "Bukhari #113")
+     */
+    val displayName: String
+        get() = buildString {
+            if (!collectionName.isNullOrEmpty()) {
+                append(collectionName)
+                if (hadithNumber != null) {
+                    append(" #$hadithNumber")
+                }
+            } else if (!referenceStr.isNullOrEmpty()) {
+                append(referenceStr)
+            } else {
+                append("Hadith Reference")
+            }
+        }
+}
+
 // ============= Extension Functions =============
 
 fun DuaChapterEntity.toDuaChapter(duaCount: Int = 0) = DuaChapter(
@@ -245,4 +318,14 @@ fun DuaMetadataEntity.toDuaBookMetadata() = DuaBookMetadata(
     title = title,
     subtitle = subtitle,
     publisher = publisher
+)
+
+fun HadithReferenceEntity.toHadithReference() = HadithReference(
+    id = id,
+    invocationId = invocationId,
+    collectionId = collectionId,
+    collectionName = collectionName,
+    hadithNumber = hadithNumber,
+    referenceStr = referenceStr,
+    databaseFile = databaseFile
 )

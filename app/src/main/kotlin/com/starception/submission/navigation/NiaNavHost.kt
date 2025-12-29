@@ -34,6 +34,8 @@ import com.starception.submission.feature.surah.navigation.navigateToSurah
 import com.starception.submission.feature.surah.navigation.surahScreen
 import com.starception.submission.feature.dua.duaDetailScreen
 import com.starception.submission.feature.dua.navigateToDuaDetail
+import com.starception.submission.feature.hadith.hadithDetailScreen
+import com.starception.submission.feature.hadith.navigateToHadithDetail
 import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.settings.navigation.settingsScreen
 import com.starception.submission.ui.NiaAppState
@@ -69,12 +71,15 @@ fun NiaNavHost(
                     ?: Regex("#(\\d+)").find(userNewsResource.title)
                         ?.groupValues?.get(1)?.toIntOrNull()
                     ?: 1
+                // Get the first topic ID to show correct "Dua X of Y" count
+                val topicId = userNewsResource.followableTopics.firstOrNull()?.topic?.id ?: ""
                 navController.navigateToDuaDetail(
                     title = userNewsResource.title,
                     content = userNewsResource.content,
                     quranReference = null,
                     duaNumber = duaNumber,
-                    newsResourceId = userNewsResource.id  // Pass the NiA news resource ID for bookmark sync
+                    newsResourceId = userNewsResource.id,
+                    topicId = topicId
                 )
             },
         ) {
@@ -101,7 +106,8 @@ fun NiaNavHost(
             )
             // Surah screen nested within For You section
             surahScreen(
-                onBackClick = navController::popBackStack
+                onBackClick = navController::popBackStack,
+                onTopicClick = navController::navigateToTopic
             )
             // Dua detail screen nested within For You section
             duaDetailScreen(
@@ -114,6 +120,10 @@ fun NiaNavHost(
                 },
                 onToggleBookmark = { newsResourceId ->
                     mainViewModel?.toggleNewsResourceBookmark(newsResourceId)
+                },
+                onTopicClick = navController::navigateToTopic,
+                onHadithClick = { collectionName, hadithNumber, databaseFile ->
+                    navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
                 }
             )
         }
@@ -128,18 +138,22 @@ fun NiaNavHost(
                     ?: Regex("#(\\d+)").find(userNewsResource.title)
                         ?.groupValues?.get(1)?.toIntOrNull()
                     ?: 1
+                // Get the first topic ID to show correct "Dua X of Y" count
+                val topicId = userNewsResource.followableTopics.firstOrNull()?.topic?.id ?: ""
                 navController.navigateToDuaDetail(
                     title = userNewsResource.title,
                     content = userNewsResource.content,
                     quranReference = null,
                     duaNumber = duaNumber,
-                    newsResourceId = userNewsResource.id  // Pass the NiA news resource ID for bookmark sync
+                    newsResourceId = userNewsResource.id,
+                    topicId = topicId
                 )
             },
         ) {
             // Surah screen nested within Bookmarks section
             surahScreen(
-                onBackClick = navController::popBackStack
+                onBackClick = navController::popBackStack,
+                onTopicClick = navController::navigateToTopic
             )
             // Dua detail screen nested within Bookmarks section
             duaDetailScreen(
@@ -152,6 +166,10 @@ fun NiaNavHost(
                 },
                 onToggleBookmark = { newsResourceId ->
                     mainViewModel?.toggleNewsResourceBookmark(newsResourceId)
+                },
+                onTopicClick = navController::navigateToTopic,
+                onHadithClick = { collectionName, hadithNumber, databaseFile ->
+                    navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
                 }
             )
         }
@@ -184,10 +202,15 @@ fun NiaNavHost(
         )
         // Surah screen accessible from Prayer Times (Noble Quran tile)
         surahScreen(
-            onBackClick = navController::popBackStack
+            onBackClick = navController::popBackStack,
+            onTopicClick = navController::navigateToTopic
         )
         // Unified Settings screen
         settingsScreen(
+            onBackClick = navController::popBackStack
+        )
+        // Hadith detail screen
+        hadithDetailScreen(
             onBackClick = navController::popBackStack
         )
     }

@@ -8,6 +8,10 @@ import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.Surah
 import com.starception.submission.core.qurandatabase.QuranTranslationHelper
 import com.starception.submission.core.qurandatabase.QuranTranslationRepository
+import com.starception.submission.core.topicsdatabase.Topic
+import com.starception.submission.core.topicsdatabase.TopicsDatabase
+import com.starception.submission.core.topicsdatabase.toTopic
+import com.starception.submission.core.contentdatabase.NewsDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +26,10 @@ class SurahDetailViewModel @Inject constructor(
     private val quranEnhancedRepository: com.starception.submission.core.qurandatabase.QuranEnhancedRepository,
     private val tajweedRepository: com.starception.submission.feature.surah.tajweed.TajweedRepository
 ) : ViewModel() {
+
+    // Topics for the current news resource
+    private val _topics = MutableStateFlow<List<Topic>>(emptyList())
+    val topics: StateFlow<List<Topic>> = _topics.asStateFlow()
 
     private val prefs: SharedPreferences = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
 
@@ -371,6 +379,45 @@ class SurahDetailViewModel @Inject constructor(
                 android.util.Log.d("SurahDetailVM", "📗 Loaded Tajweed for surah $surahNumber: ${annotations.size} ayahs")
             } catch (e: Exception) {
                 android.util.Log.e("SurahDetailVM", "❌ Error loading Tajweed: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Load topics for a news resource
+     * @param newsResourceId The ID of the news resource (can be string from navigation)
+     */
+    fun loadTopicsForNewsResource(newsResourceId: String?) {
+        if (newsResourceId == null) {
+            _topics.value = emptyList()
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val newsId = newsResourceId.toIntOrNull() ?: return@launch
+
+                // Get topic IDs for this news resource
+                val newsDao = NewsDatabase.getInstance(context).newsDao()
+                val topicIds = newsDao.getTopicIdsForNews(newsId)
+
+                android.util.Log.d("SurahDetailVM", "📚 Found ${topicIds.size} topics for news resource $newsId")
+
+                if (topicIds.isEmpty()) {
+                    _topics.value = emptyList()
+                    return@launch
+                }
+
+                // Get topic details
+                val topicsDao = TopicsDatabase.getInstance(context).topicsDao()
+                val topicEntities = topicsDao.getTopicsByIds(topicIds)
+
+                _topics.value = topicEntities.map { it.toTopic() }
+                android.util.Log.d("SurahDetailVM", "📚 Loaded topics: ${_topics.value.map { it.name }}")
+
+            } catch (e: Exception) {
+                android.util.Log.e("SurahDetailVM", "❌ Error loading topics: ${e.message}", e)
+                _topics.value = emptyList()
             }
         }
     }
