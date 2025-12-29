@@ -122,6 +122,8 @@ import java.io.InputStreamReader
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
+import com.starception.submission.core.designsystem.component.NiaTopicTag
+import java.util.Locale
 import com.starception.submission.core.topicsdatabase.Topic
 import com.starception.submission.core.topicsdatabase.TopicsDatabase
 import com.starception.submission.core.topicsdatabase.toTopic
@@ -1089,33 +1091,24 @@ fun DuaDetailScreen(
                                             )
                                         }
 
-                                        // Topic chips
+                                        // Topic chips - using NiaTopicTag for consistency with news cards
                                         if (topics.isNotEmpty()) {
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .horizontalScroll(rememberScrollState()),
-                                                horizontalArrangement = Arrangement.Center
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)
                                             ) {
                                                 topics.forEach { topic ->
-                                                    SuggestionChip(
+                                                    NiaTopicTag(
+                                                        followed = false,
                                                         onClick = { onTopicClick(topic.id) },
-                                                        label = {
+                                                        text = {
                                                             Text(
-                                                                text = topic.name,
-                                                                style = MaterialTheme.typography.labelSmall
+                                                                text = topic.name.uppercase(Locale.getDefault())
                                                             )
-                                                        },
-                                                        colors = SuggestionChipDefaults.suggestionChipColors(
-                                                            containerColor = Color.White.copy(alpha = 0.25f),
-                                                            labelColor = Color.White
-                                                        ),
-                                                        border = SuggestionChipDefaults.suggestionChipBorder(
-                                                            enabled = true,
-                                                            borderColor = Color.White.copy(alpha = 0.4f)
-                                                        ),
-                                                        modifier = Modifier.padding(horizontal = 4.dp)
+                                                        }
                                                     )
                                                 }
                                             }
@@ -1335,32 +1328,34 @@ fun DuaDetailScreen(
                         }
 
                         // Reference section - Hadith sources with clickable chips
-                        if (dua.reference.isNotEmpty()) {
-                            item {
-                                // State for loaded hadith references
-                                var hadithReferences by remember { mutableStateOf<List<HadithReference>>(emptyList()) }
+                        // Always try to load hadith references for fortress_of_the_muslim duas
+                        item {
+                            // State for loaded hadith references
+                            var hadithReferences by remember { mutableStateOf<List<HadithReference>>(emptyList()) }
 
-                                // Load hadith references by parsing title to get chapter and position
-                                // Titles follow pattern: "When waking up: Dua 1", "In the morning and evening: Dua 2"
-                                LaunchedEffect(dua.title) {
-                                    try {
-                                        // Try to parse title to extract chapter name and dua number
-                                        val titleParts = dua.title.split(": Dua ")
-                                        if (titleParts.size == 2) {
-                                            val chapterTitle = titleParts[0].trim()
-                                            val position = titleParts[1].trim().toIntOrNull() ?: 1
-                                            val duaDb = DuaDatabase.getInstance(context)
-                                            val refs = duaDb.duaDao().getHadithReferencesByChapterAndPosition(chapterTitle, position)
-                                            hadithReferences = refs.map { it.toHadithReference() }
-                                            android.util.Log.d("DuaDetailScreen", "📖 Loaded ${hadithReferences.size} hadith references for '$chapterTitle' position $position")
-                                        } else {
-                                            android.util.Log.d("DuaDetailScreen", "📖 Title format not matching: ${dua.title}")
-                                        }
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("DuaDetailScreen", "❌ Error loading hadith references", e)
+                            // Load hadith references by parsing title to get chapter and position
+                            // Titles follow pattern: "When waking up: Dua 1", "In the morning and evening: Dua 2"
+                            LaunchedEffect(dua.title) {
+                                try {
+                                    // Try to parse title to extract chapter name and dua number
+                                    val titleParts = dua.title.split(": Dua ")
+                                    if (titleParts.size == 2) {
+                                        val chapterTitle = titleParts[0].trim()
+                                        val position = titleParts[1].trim().toIntOrNull() ?: 1
+                                        val duaDb = DuaDatabase.getInstance(context)
+                                        val refs = duaDb.duaDao().getHadithReferencesByChapterAndPosition(chapterTitle, position)
+                                        hadithReferences = refs.map { it.toHadithReference() }
+                                        android.util.Log.d("DuaDetailScreen", "📖 Loaded ${hadithReferences.size} hadith references for '$chapterTitle' position $position")
+                                    } else {
+                                        android.util.Log.d("DuaDetailScreen", "📖 Title format not matching: ${dua.title}")
                                     }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("DuaDetailScreen", "❌ Error loading hadith references", e)
                                 }
+                            }
 
+                            // Show Reference section if we have reference text OR hadith references
+                            if (dua.reference.isNotEmpty() || hadithReferences.isNotEmpty()) {
                                 CollapsibleDuaSection(
                                     title = "Reference",
                                     accentColor = Color(0xFF9C27B0), // Purple accent
@@ -1378,18 +1373,19 @@ fun DuaDetailScreen(
                                             color = Color(0xFF757575)
                                         )
 
-                                        // Show clickable hadith reference chips if available
+                                        // Show clickable hadith reference chips if available - using NiaTopicTag for consistency
                                         if (hadithReferences.isNotEmpty() && onHadithClick != null) {
                                             Spacer(modifier = Modifier.height(12.dp))
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .horizontalScroll(rememberScrollState()),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                                             ) {
                                                 hadithReferences.forEach { ref ->
                                                     if (ref.databaseFile != null && ref.hadithNumber != null) {
-                                                        SuggestionChip(
+                                                        NiaTopicTag(
+                                                            followed = false,
                                                             onClick = {
                                                                 onHadithClick(
                                                                     ref.collectionName ?: "Hadith",
@@ -1397,20 +1393,11 @@ fun DuaDetailScreen(
                                                                     ref.databaseFile
                                                                 )
                                                             },
-                                                            label = {
+                                                            text = {
                                                                 Text(
-                                                                    text = ref.displayName,
-                                                                    style = MaterialTheme.typography.labelSmall
+                                                                    text = ref.displayName.uppercase(Locale.getDefault())
                                                                 )
-                                                            },
-                                                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                                                containerColor = Color(0xFF9C27B0).copy(alpha = 0.12f),
-                                                                labelColor = Color(0xFF9C27B0)
-                                                            ),
-                                                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                                                enabled = true,
-                                                                borderColor = Color(0xFF9C27B0).copy(alpha = 0.3f)
-                                                            )
+                                                            }
                                                         )
                                                     }
                                                 }
