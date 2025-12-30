@@ -291,17 +291,17 @@ private fun HadithContent(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Collection badge
+                // Collection badge - same style as Hadith number chip
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White.copy(alpha = 0.2f),
                     modifier = Modifier.padding(end = 16.dp)
                 ) {
                     Text(
                         text = collectionName,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         color = Color.White,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
             }
