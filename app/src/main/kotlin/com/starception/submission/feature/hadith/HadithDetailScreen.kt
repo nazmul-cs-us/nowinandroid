@@ -20,19 +20,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.hadithdatabase.Hadith
 import com.starception.submission.core.hadithdatabase.HadithRepository
+import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.feature.surah.QuranFonts
 
 // Gradient colors for hadith header - earthy tones
@@ -77,15 +85,37 @@ fun HadithDetailScreen(
 ) {
     val context = LocalContext.current
     val repository = remember { HadithRepository.getInstance(context) }
+    val translationService = remember { TranslationService.getInstance(context) }
 
     var hadith by remember { mutableStateOf<Hadith?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
+    // Translation state
+    var translatedArabic by remember { mutableStateOf<String?>(null) }
+    var translatedText by remember { mutableStateOf<String?>(null) }
+    var translatedElaboration by remember { mutableStateOf<String?>(null) }
+    var isTranslating by remember { mutableStateOf(false) }
+    var selectedLanguage by remember { mutableStateOf(translationService.getSelectedLanguage()) }
+    var selectedProvider by remember { mutableStateOf(translationService.getSelectedProvider()) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+
+    // Available translations
+    val availableTranslations = listOf("en", "ar", "bn", "zh", "es", "fr", "id", "ru", "sv", "tr", "ur")
+
+    // Available providers
+    val availableProviders = listOf(
+        "auto" to "Auto (Reverso → Google)",
+        "google" to "Google Translate",
+        "reverso" to "Reverso"
+    )
+
     // Load hadith
     LaunchedEffect(databaseFile, hadithNumber) {
         isLoading = true
         error = null
+        translatedText = null
+        translatedElaboration = null
         try {
             hadith = repository.getHadith(databaseFile, hadithNumber)
             if (hadith == null) {
@@ -96,6 +126,62 @@ fun HadithDetailScreen(
             android.util.Log.e("HadithDetailScreen", "Error loading hadith", e)
         }
         isLoading = false
+    }
+
+    // Translate content when hadith is loaded or settings change
+    // The translation service handles all cases including Arabic → English
+    LaunchedEffect(hadith, selectedLanguage, selectedProvider) {
+        val currentHadith = hadith ?: return@LaunchedEffect
+
+        // Skip translation only for transliteration (no API support)
+        if (selectedLanguage == "transliteration") {
+            translatedArabic = null  // Show original Arabic
+            translatedText = currentHadith.textPlain
+            translatedElaboration = currentHadith.elaboration
+            return@LaunchedEffect
+        }
+
+        // If Arabic is selected, show original Arabic text without translation
+        if (selectedLanguage == "ar") {
+            translatedArabic = null  // Show original Arabic
+            translatedText = currentHadith.textPlain
+            translatedElaboration = currentHadith.elaboration
+            return@LaunchedEffect
+        }
+
+        isTranslating = true
+        try {
+            // Translate Arabic hadith text (main hadith)
+            if (!currentHadith.textArabic.isNullOrEmpty()) {
+                translatedArabic = translationService.translate(currentHadith.textArabic!!, selectedLanguage)
+                android.util.Log.d("HadithDetailScreen", "Translated textArabic to $selectedLanguage")
+            } else {
+                translatedArabic = null
+            }
+
+            // Translate textPlain (Translation section)
+            if (!currentHadith.textPlain.isNullOrEmpty()) {
+                translatedText = translationService.translate(currentHadith.textPlain!!, selectedLanguage)
+                android.util.Log.d("HadithDetailScreen", "Translated textPlain to $selectedLanguage")
+            } else {
+                translatedText = null
+            }
+
+            // Translate elaboration (Explanation section)
+            if (!currentHadith.elaboration.isNullOrEmpty()) {
+                translatedElaboration = translationService.translate(currentHadith.elaboration!!, selectedLanguage)
+                android.util.Log.d("HadithDetailScreen", "Translated elaboration to $selectedLanguage")
+            } else {
+                translatedElaboration = null
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("HadithDetailScreen", "Translation error", e)
+            // Fall back to original text
+            translatedArabic = null
+            translatedText = currentHadith.textPlain
+            translatedElaboration = currentHadith.elaboration
+        }
+        isTranslating = false
     }
 
     Scaffold(
@@ -118,11 +204,135 @@ fun HadithDetailScreen(
                         hadith = hadith!!,
                         collectionName = collectionName,
                         hadithNumber = hadithNumber,
-                        onBackClick = onBackClick
+                        onBackClick = onBackClick,
+                        translatedArabic = translatedArabic,
+                        translatedText = translatedText,
+                        translatedElaboration = translatedElaboration,
+                        isTranslating = isTranslating,
+                        selectedLanguage = selectedLanguage,
+                        onLanguageClick = { showLanguageDialog = true }
                     )
                 }
             }
         }
+    }
+
+    // Language selection dialog
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text("Translation Settings") },
+            text = {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 450.dp)
+                ) {
+                    // Provider section
+                    item {
+                        Text(
+                            text = "Translation Provider",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    items(availableProviders) { (providerCode, providerName) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedProvider = providerCode
+                                    translationService.setSelectedProvider(providerCode)
+                                    // Clear cache to force re-translation with new provider
+                                    translationService.clearCache()
+                                    translatedText = null
+                                    translatedElaboration = null
+                                }
+                                .padding(vertical = 6.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = providerCode == selectedProvider,
+                                onClick = {
+                                    selectedProvider = providerCode
+                                    translationService.setSelectedProvider(providerCode)
+                                    translationService.clearCache()
+                                    translatedText = null
+                                    translatedElaboration = null
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = providerName,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+
+                    // Divider
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // Language section
+                    item {
+                        Text(
+                            text = "Target Language",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    items(availableTranslations) { langCode ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (langCode != selectedLanguage) {
+                                        // Clear cache to force re-translation
+                                        translationService.clearCache()
+                                        translatedText = null
+                                        translatedElaboration = null
+                                        selectedLanguage = langCode
+                                    }
+                                    showLanguageDialog = false
+                                }
+                                .padding(vertical = 6.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = langCode == selectedLanguage,
+                                onClick = {
+                                    if (langCode != selectedLanguage) {
+                                        translationService.clearCache()
+                                        translatedText = null
+                                        translatedElaboration = null
+                                        selectedLanguage = langCode
+                                    }
+                                    showLanguageDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = getLanguageName(langCode),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text("Done")
+                }
+            }
+        )
     }
 }
 
@@ -131,7 +341,13 @@ private fun HadithContent(
     hadith: Hadith,
     collectionName: String,
     hadithNumber: Int,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    translatedArabic: String? = null,
+    translatedText: String? = null,
+    translatedElaboration: String? = null,
+    isTranslating: Boolean = false,
+    selectedLanguage: String = "en",
+    onLanguageClick: () -> Unit = {}
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -208,7 +424,7 @@ private fun HadithContent(
                 }
             }
 
-            // Arabic Text Card
+            // Arabic Text Card with optional translation
             if (hadith.textArabic.isNotEmpty()) {
                 item {
                     Surface(
@@ -225,6 +441,7 @@ private fun HadithContent(
                                 .padding(horizontal = 24.dp, vertical = 32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
+                            // Original Arabic text
                             Text(
                                 text = hadith.textArabic,
                                 fontFamily = QuranFonts.PDMSSaleem,
@@ -233,30 +450,103 @@ private fun HadithContent(
                                 textAlign = TextAlign.Center,
                                 color = Color(0xFF3D3D3D)
                             )
+
+                            // Show translated Arabic text when available
+                            if (translatedArabic != null && selectedLanguage != "ar") {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(1.dp)
+                                        .background(Color(0xFFE0D5C5))
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // Language label
+                                Text(
+                                    text = "Hadith (${getLanguageName(selectedLanguage)})",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color(0xFF8D6E63),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Translated text
+                                Text(
+                                    text = translatedArabic,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontSize = 16.sp,
+                                        lineHeight = 26.sp
+                                    ),
+                                    textAlign = TextAlign.Center,
+                                    color = Color(0xFF5D5D5D)
+                                )
+                            } else if (isTranslating && selectedLanguage != "ar") {
+                                // Loading indicator while translating
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(1.dp)
+                                        .background(Color(0xFFE0D5C5))
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    repeat(2) { index ->
+                                        val widthFraction = if (index == 0) 0.9f else 0.7f
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(widthFraction)
+                                                .height(14.dp)
+                                                .background(
+                                                    Color(0xFFE0D5C5),
+                                                    RoundedCornerShape(4.dp)
+                                                )
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            // English Translation
+            // Translation section - shows translated text based on selected language
             if (!hadith.textPlain.isNullOrEmpty()) {
                 item {
+                    val displayText = translatedText ?: hadith.textPlain!!
+                    val sectionTitle = if (selectedLanguage != "en" && selectedLanguage != "transliteration") {
+                        "Translation (${getLanguageName(selectedLanguage)})"
+                    } else {
+                        "Translation"
+                    }
                     HadithSectionCard(
-                        title = "Translation",
+                        title = sectionTitle,
                         accentColor = Color(0xFF8D6E63), // Brown accent
-                        content = hadith.textPlain!!
+                        content = displayText,
+                        isLoading = isTranslating && translatedText == null
                     )
                 }
             }
 
-            // Elaboration/Explanation
+            // Elaboration/Explanation section - shows translated elaboration
             if (!hadith.elaboration.isNullOrEmpty()) {
                 item {
+                    val displayText = translatedElaboration ?: hadith.elaboration!!
+                    val sectionTitle = if (selectedLanguage != "en" && selectedLanguage != "transliteration") {
+                        "Explanation (${getLanguageName(selectedLanguage)})"
+                    } else {
+                        "Explanation"
+                    }
                     HadithSectionCard(
-                        title = "Explanation",
+                        title = sectionTitle,
                         accentColor = Color(0xFF6D4C41), // Dark brown accent
-                        content = hadith.elaboration!!,
-                        isExpanded = false
+                        content = displayText,
+                        isExpanded = false,
+                        isLoading = isTranslating && translatedElaboration == null
                     )
                 }
             }
@@ -291,6 +581,15 @@ private fun HadithContent(
 
                 Spacer(modifier = Modifier.weight(1f))
 
+                // Language selector button
+                IconButton(onClick = onLanguageClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Language,
+                        contentDescription = "Select Translation Language",
+                        tint = Color.White
+                    )
+                }
+
                 // Collection badge - same style as Hadith number chip
                 Surface(
                     shape = RoundedCornerShape(20.dp),
@@ -309,12 +608,33 @@ private fun HadithContent(
     }
 }
 
+/**
+ * Get display name for a language code
+ */
+private fun getLanguageName(code: String): String {
+    return when (code) {
+        "ar" -> "Arabic"
+        "bn" -> "Bengali"
+        "zh" -> "Chinese"
+        "en" -> "English"
+        "es" -> "Spanish"
+        "fr" -> "French"
+        "id" -> "Indonesian"
+        "ru" -> "Russian"
+        "sv" -> "Swedish"
+        "tr" -> "Turkish"
+        "ur" -> "Urdu"
+        else -> code.uppercase()
+    }
+}
+
 @Composable
 private fun HadithSectionCard(
     title: String,
     accentColor: Color,
     content: String,
-    isExpanded: Boolean = true
+    isExpanded: Boolean = true,
+    isLoading: Boolean = false
 ) {
     Surface(
         modifier = Modifier
@@ -339,23 +659,63 @@ private fun HadithSectionCard(
                     .weight(1f)
                     .padding(16.dp)
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (isLoading) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        // Simple loading indicator
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = content,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 15.sp,
-                        lineHeight = 24.sp
-                    ),
-                    color = Color(0xFF5D5D5D)
-                )
+                if (isLoading) {
+                    // Shimmer loading effect for text
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        repeat(3) { index ->
+                            val widthFraction = when (index) {
+                                0 -> 1f
+                                1 -> 0.85f
+                                else -> 0.6f
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(widthFraction)
+                                    .height(14.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        RoundedCornerShape(4.dp)
+                                    )
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = content,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 15.sp,
+                            lineHeight = 24.sp
+                        ),
+                        color = Color(0xFF5D5D5D)
+                    )
+                }
             }
         }
     }
