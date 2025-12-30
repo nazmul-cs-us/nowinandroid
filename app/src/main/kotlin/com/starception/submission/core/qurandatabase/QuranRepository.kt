@@ -436,5 +436,146 @@ class QuranRepository @Inject constructor(
             emptyList()
         }
     }
+
+    // ============= Ayah Note Operations =============
+
+    /**
+     * Add a note to an ayah
+     * @param surahNumber The surah number (1-114)
+     * @param ayahNumber The ayah number within the surah
+     * @param noteText The note text content
+     * @return The ID of the inserted note, or -1 on failure
+     */
+    suspend fun addAyahNote(surahNumber: Int, ayahNumber: Int, noteText: String): Long = withContext(Dispatchers.IO) {
+        try {
+            Log.d("QuranRepository_NOTE", "📝 ADD | surah=$surahNumber | ayah=$ayahNumber | text='${noteText.take(50)}...'")
+            val note = AyahNoteEntity(
+                surahNumber = surahNumber,
+                ayahNumber = ayahNumber,
+                noteText = noteText
+            )
+            val id = quranDao.insertAyahNote(note)
+            Log.d("QuranRepository_NOTE", "✅ ADDED | id=$id | surah=$surahNumber | ayah=$ayahNumber")
+            id
+        } catch (e: Exception) {
+            Log.e(TAG, "Error adding note for ayah $surahNumber:$ayahNumber", e)
+            -1L
+        }
+    }
+
+    /**
+     * Update an existing ayah note
+     * @param note The note entity to update
+     */
+    suspend fun updateAyahNote(note: AyahNoteEntity) = withContext(Dispatchers.IO) {
+        try {
+            Log.d("QuranRepository_NOTE", "📝 UPDATE | id=${note.id} | surah=${note.surahNumber} | ayah=${note.ayahNumber}")
+            val updatedNote = note.copy(updatedAt = System.currentTimeMillis())
+            quranDao.updateAyahNote(updatedNote)
+            Log.d("QuranRepository_NOTE", "✅ UPDATED | id=${note.id}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating note ${note.id}", e)
+        }
+    }
+
+    /**
+     * Delete an ayah note
+     * @param note The note entity to delete
+     */
+    suspend fun deleteAyahNote(note: AyahNoteEntity) = withContext(Dispatchers.IO) {
+        try {
+            Log.d("QuranRepository_NOTE", "🗑️ DELETE | id=${note.id} | surah=${note.surahNumber} | ayah=${note.ayahNumber}")
+            quranDao.deleteAyahNote(note)
+            Log.d("QuranRepository_NOTE", "✅ DELETED | id=${note.id}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting note ${note.id}", e)
+        }
+    }
+
+    /**
+     * Get all notes for a specific ayah
+     * @param surahNumber The surah number (1-114)
+     * @param ayahNumber The ayah number within the surah
+     * @return List of notes for the ayah
+     */
+    suspend fun getNotesForAyah(surahNumber: Int, ayahNumber: Int): List<AyahNoteEntity> = withContext(Dispatchers.IO) {
+        try {
+            val notes = quranDao.getNotesForAyah(surahNumber, ayahNumber)
+            Log.d("QuranRepository_NOTE", "📖 GET_FOR_AYAH | surah=$surahNumber | ayah=$ayahNumber | count=${notes.size}")
+            notes
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting notes for ayah $surahNumber:$ayahNumber", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Get all notes for a surah (reactive flow)
+     * @param surahNumber The surah number (1-114)
+     * @return Flow of notes for the surah
+     */
+    fun getNotesForSurah(surahNumber: Int): Flow<List<AyahNoteEntity>> {
+        return quranDao.getNotesForSurah(surahNumber)
+    }
+
+    /**
+     * Get ayah numbers that have notes in a surah (reactive flow for UI indicators)
+     * @param surahNumber The surah number (1-114)
+     * @return Flow of Set of ayah numbers with notes
+     */
+    fun getAyahsWithNotesInSurah(surahNumber: Int): Flow<Set<Int>> {
+        return quranDao.getAyahNumbersWithNotes(surahNumber).map { it.toSet() }
+    }
+
+    /**
+     * Get all ayah notes (reactive flow)
+     * @return Flow of all notes ordered by most recently updated
+     */
+    fun getAllNotes(): Flow<List<AyahNoteEntity>> {
+        return quranDao.getAllNotes()
+    }
+
+    /**
+     * Get all ayah notes (one-time read for FTS indexing)
+     * @return List of all notes
+     */
+    suspend fun getAllNotesOnce(): List<AyahNoteEntity> = withContext(Dispatchers.IO) {
+        try {
+            val notes = quranDao.getAllNotesOnce()
+            Log.d("QuranRepository_NOTE", "📖 GET_ALL | count=${notes.size}")
+            notes
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting all notes", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Check if an ayah has any notes
+     * @param surahNumber The surah number (1-114)
+     * @param ayahNumber The ayah number within the surah
+     * @return True if the ayah has at least one note
+     */
+    suspend fun hasAyahNote(surahNumber: Int, ayahNumber: Int): Boolean = withContext(Dispatchers.IO) {
+        try {
+            quranDao.hasAyahNote(surahNumber, ayahNumber)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking if ayah has note $surahNumber:$ayahNumber", e)
+            false
+        }
+    }
+
+    /**
+     * Get total count of notes
+     * @return Number of notes in the database
+     */
+    suspend fun getNoteCount(): Int = withContext(Dispatchers.IO) {
+        try {
+            quranDao.getNoteCount()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting note count", e)
+            0
+        }
+    }
 }
 

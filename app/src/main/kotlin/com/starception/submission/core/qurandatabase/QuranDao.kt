@@ -1,10 +1,12 @@
 package com.starception.submission.core.qurandatabase
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -207,5 +209,73 @@ interface QuranDao {
      */
     @Query("SELECT * FROM favourite_ayahs WHERE surah_number = :surahNumber ORDER BY ayah_number ASC")
     suspend fun getFavouriteAyahsForSurah(surahNumber: Int): List<FavouriteAyahEntity>
+
+    // ============= Ayah Note Operations =============
+
+    /**
+     * Insert a new ayah note
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAyahNote(note: AyahNoteEntity): Long
+
+    /**
+     * Update an existing ayah note
+     */
+    @Update
+    suspend fun updateAyahNote(note: AyahNoteEntity)
+
+    /**
+     * Delete an ayah note
+     */
+    @Delete
+    suspend fun deleteAyahNote(note: AyahNoteEntity)
+
+    /**
+     * Get all notes for a specific ayah
+     */
+    @Query("SELECT * FROM ayah_notes WHERE surah_number = :surahNumber AND ayah_number = :ayahNumber ORDER BY updated_at DESC")
+    suspend fun getNotesForAyah(surahNumber: Int, ayahNumber: Int): List<AyahNoteEntity>
+
+    /**
+     * Get all notes for a specific surah (reactive)
+     */
+    @Query("SELECT * FROM ayah_notes WHERE surah_number = :surahNumber ORDER BY ayah_number ASC, updated_at DESC")
+    fun getNotesForSurah(surahNumber: Int): Flow<List<AyahNoteEntity>>
+
+    /**
+     * Get all ayah notes ordered by most recently updated
+     */
+    @Query("SELECT * FROM ayah_notes ORDER BY updated_at DESC")
+    fun getAllNotes(): Flow<List<AyahNoteEntity>>
+
+    /**
+     * Get all ayah notes (one-time read)
+     */
+    @Query("SELECT * FROM ayah_notes ORDER BY updated_at DESC")
+    suspend fun getAllNotesOnce(): List<AyahNoteEntity>
+
+    /**
+     * Get distinct ayah numbers that have notes in a surah (reactive)
+     */
+    @Query("SELECT DISTINCT ayah_number FROM ayah_notes WHERE surah_number = :surahNumber")
+    fun getAyahNumbersWithNotes(surahNumber: Int): Flow<List<Int>>
+
+    /**
+     * Check if an ayah has any notes
+     */
+    @Query("SELECT EXISTS(SELECT 1 FROM ayah_notes WHERE surah_number = :surahNumber AND ayah_number = :ayahNumber LIMIT 1)")
+    suspend fun hasAyahNote(surahNumber: Int, ayahNumber: Int): Boolean
+
+    /**
+     * Delete all notes for a specific ayah
+     */
+    @Query("DELETE FROM ayah_notes WHERE surah_number = :surahNumber AND ayah_number = :ayahNumber")
+    suspend fun deleteAllNotesForAyah(surahNumber: Int, ayahNumber: Int)
+
+    /**
+     * Get note count
+     */
+    @Query("SELECT COUNT(*) FROM ayah_notes")
+    suspend fun getNoteCount(): Int
 }
 

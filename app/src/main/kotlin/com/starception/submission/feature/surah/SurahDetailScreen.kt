@@ -1051,6 +1051,7 @@ private fun AlbumPlayerContent(
 
     val quranRepository = hiltViewModel<QuranRepositoryHolder>().repository
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
 
     // Bottom sheet state for ayah options
     var selectedAyahForOptions by remember { mutableStateOf<Int?>(null) }
@@ -1064,6 +1065,24 @@ private fun AlbumPlayerContent(
     LaunchedEffect(surah.number) {
         favouriteAyahs = quranRepository.getFavouriteAyahsForSurah(surah.number)
         android.util.Log.d("QuranAlbumPlayer_FAVOURITE", "📥 LOADED | surah=${surah.number} | count=${favouriteAyahs.size} | ayahs=$favouriteAyahs")
+    }
+
+    // Track ayahs with notes - for showing note indicator
+    var ayahsWithNotes by remember { mutableStateOf(setOf<Int>()) }
+
+    // Note state - integrated into bottom sheet (no separate dialog)
+    var bottomSheetNoteMode by remember { mutableStateOf(false) } // true = show notes, false = show menu
+    var noteText by remember { mutableStateOf("") }
+    var editingNote by remember { mutableStateOf<com.starception.submission.core.qurandatabase.AyahNoteEntity?>(null) }
+    var existingNotes by remember { mutableStateOf<List<com.starception.submission.core.qurandatabase.AyahNoteEntity>>(emptyList()) }
+    var showDeleteNoteConfirmation by remember { mutableStateOf<com.starception.submission.core.qurandatabase.AyahNoteEntity?>(null) }
+
+    // Load ayahs with notes for this surah
+    LaunchedEffect(surah.number) {
+        quranRepository.getAyahsWithNotesInSurah(surah.number).collect { notes ->
+            ayahsWithNotes = notes
+            android.util.Log.d("QuranAlbumPlayer_NOTE", "📥 LOADED | surah=${surah.number} | count=${notes.size} | ayahs=$notes")
+        }
     }
 
     // Calculate total items for scrollbar state
@@ -1238,6 +1257,7 @@ private fun AlbumPlayerContent(
                 showTajweed = showTajweed,
                 tajweedAnnotations = tajweedAnnotations[ayah.numberInSurah],
                 isFavourite = ayah.numberInSurah in favouriteAyahs,
+                hasNote = ayah.numberInSurah in ayahsWithNotes,
                 onClick = { onAyahClick(ayah) },
                 onLongPress = {
                     selectedAyahForOptions = ayah.numberInSurah
@@ -1281,7 +1301,7 @@ private fun AlbumPlayerContent(
             ),
         )
 
-    // Material Design 3 Expressive Bottom Sheet for Ayah options
+    // Material Design 3 Expressive Bottom Sheet for Ayah options (with integrated notes)
     if (showBottomSheet && selectedAyahForOptions != null) {
         val selectedAyah = ayahs.find { it.numberInSurah == selectedAyahForOptions }
         val context = LocalContext.current
@@ -1290,6 +1310,10 @@ private fun AlbumPlayerContent(
             onDismissRequest = {
                 showBottomSheet = false
                 selectedAyahForOptions = null
+                bottomSheetNoteMode = false
+                noteText = ""
+                editingNote = null
+                existingNotes = emptyList()
             },
             sheetState = sheetState,
             containerColor = Color.Transparent,
@@ -1326,123 +1350,252 @@ private fun AlbumPlayerContent(
                             Spacer(modifier = Modifier.height(12.dp))
                         }
 
-                        // Content with padding
+                        // Content with padding - switches between menu and notes mode
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 24.dp, vertical = 16.dp)
                         ) {
-                // Actions list
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    BottomSheetOption(
-                        icon = Icons.Default.PlayArrow,
-                        title = "Play Ayah",
-                        description = "",
-                        containerColor = Color.Transparent,
-                        contentColor = Color.Transparent,
-                        onClick = {
-                            selectedAyahForOptions?.let { ayahNumber ->
-                                onPlayAyahClick(ayahNumber)
-                            }
-                            showBottomSheet = false
-                        }
-                    )
-
-                    BottomSheetOption(
-                        icon = if (selectedAyahForOptions in favouriteAyahs) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        title = if (selectedAyahForOptions in favouriteAyahs) "Remove Favourite" else "Add Favourite",
-                        description = "",
-                        containerColor = Color.Transparent,
-                        contentColor = Color.Transparent,
-                        onClick = {
-                            selectedAyahForOptions?.let { ayahNumber ->
-                                val isFavourite = ayahNumber in favouriteAyahs
-                                val newFavouriteStatus = !isFavourite
-
-                                // Update database
-                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                                    quranRepository.setAyahFavourite(surah.number, ayahNumber, newFavouriteStatus)
-
-                                    // Update UI state
-                                    favouriteAyahs = if (newFavouriteStatus) {
-                                        favouriteAyahs + ayahNumber
+                            // Animated content switch between menu and notes
+                            AnimatedContent(
+                                targetState = bottomSheetNoteMode,
+                                transitionSpec = {
+                                    if (targetState) {
+                                        // Entering notes mode
+                                        slideInHorizontally { it } + fadeIn() togetherWith
+                                            slideOutHorizontally { -it } + fadeOut()
                                     } else {
-                                        favouriteAyahs - ayahNumber
+                                        // Returning to menu
+                                        slideInHorizontally { -it } + fadeIn() togetherWith
+                                            slideOutHorizontally { it } + fadeOut()
                                     }
+                                },
+                                label = "BottomSheetContent"
+                            ) { isNoteMode ->
+                                if (isNoteMode) {
+                                    // Notes UI integrated into bottom sheet
+                                    BottomSheetNotesContent(
+                                        surahNumber = surah.number,
+                                        ayahNumber = selectedAyahForOptions!!,
+                                        surahName = surah.nameEnglish,
+                                        existingNotes = existingNotes,
+                                        noteText = noteText,
+                                        editingNote = editingNote,
+                                        onNoteTextChange = { noteText = it },
+                                        onEditNote = { note ->
+                                            editingNote = note
+                                            noteText = note.noteText
+                                        },
+                                        onCancelEdit = {
+                                            editingNote = null
+                                            noteText = ""
+                                        },
+                                        onSaveNote = {
+                                            if (noteText.isNotBlank()) {
+                                                scope.launch {
+                                                    if (editingNote != null) {
+                                                        quranRepository.updateAyahNote(
+                                                            editingNote!!.copy(
+                                                                noteText = noteText.trim(),
+                                                                updatedAt = System.currentTimeMillis()
+                                                            )
+                                                        )
+                                                    } else {
+                                                        quranRepository.addAyahNote(surah.number, selectedAyahForOptions!!, noteText.trim())
+                                                    }
+                                                    // Refresh notes list
+                                                    existingNotes = quranRepository.getNotesForAyah(surah.number, selectedAyahForOptions!!)
+                                                    noteText = ""
+                                                    editingNote = null
+                                                }
+                                            }
+                                        },
+                                        onDeleteNote = { note ->
+                                            showDeleteNoteConfirmation = note
+                                        },
+                                        onBack = {
+                                            bottomSheetNoteMode = false
+                                            noteText = ""
+                                            editingNote = null
+                                        }
+                                    )
+                                } else {
+                                    // Actions list (menu mode)
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        BottomSheetOption(
+                                            icon = Icons.Default.PlayArrow,
+                                            title = "Play Ayah",
+                                            description = "",
+                                            containerColor = Color.Transparent,
+                                            contentColor = Color.Transparent,
+                                            onClick = {
+                                                selectedAyahForOptions?.let { ayahNumber ->
+                                                    onPlayAyahClick(ayahNumber)
+                                                }
+                                                showBottomSheet = false
+                                            }
+                                        )
 
-                                    val action = if (newFavouriteStatus) "added to" else "removed from"
-                                    android.widget.Toast.makeText(context, "Ayah $ayahNumber $action favourites", android.widget.Toast.LENGTH_SHORT).show()
+                                        BottomSheetOption(
+                                            icon = if (selectedAyahForOptions in favouriteAyahs) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                            title = if (selectedAyahForOptions in favouriteAyahs) "Remove Favourite" else "Add Favourite",
+                                            description = "",
+                                            containerColor = Color.Transparent,
+                                            contentColor = Color.Transparent,
+                                            onClick = {
+                                                selectedAyahForOptions?.let { ayahNumber ->
+                                                    val isFavourite = ayahNumber in favouriteAyahs
+                                                    val newFavouriteStatus = !isFavourite
+
+                                                    // Update database
+                                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                                        quranRepository.setAyahFavourite(surah.number, ayahNumber, newFavouriteStatus)
+
+                                                        // Update UI state
+                                                        favouriteAyahs = if (newFavouriteStatus) {
+                                                            favouriteAyahs + ayahNumber
+                                                        } else {
+                                                            favouriteAyahs - ayahNumber
+                                                        }
+
+                                                        val action = if (newFavouriteStatus) "added to" else "removed from"
+                                                        android.widget.Toast.makeText(context, "Ayah $ayahNumber $action favourites", android.widget.Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                                showBottomSheet = false
+                                            }
+                                        )
+
+                                        // Add Note option - now switches to notes mode in same sheet
+                                        val hasExistingNote = selectedAyahForOptions?.let { it in ayahsWithNotes } == true
+                                        BottomSheetOption(
+                                            icon = if (hasExistingNote) Icons.Default.Edit else Icons.Default.NoteAdd,
+                                            title = if (hasExistingNote) "View Note" else "Add Note",
+                                            description = "",
+                                            containerColor = Color.Transparent,
+                                            contentColor = Color.Transparent,
+                                            onClick = {
+                                                // Load existing notes for this ayah
+                                                scope.launch {
+                                                    selectedAyahForOptions?.let { ayahNum ->
+                                                        existingNotes = quranRepository.getNotesForAyah(surah.number, ayahNum)
+                                                    }
+                                                }
+                                                // Switch to notes mode in same sheet
+                                                bottomSheetNoteMode = true
+                                            }
+                                        )
+
+                                        BottomSheetOption(
+                                            icon = Icons.Default.ContentCopy,
+                                            title = "Copy",
+                                            description = "",
+                                            containerColor = Color.Transparent,
+                                            contentColor = Color.Transparent,
+                                            onClick = {
+                                                selectedAyah?.let { ayah ->
+                                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                                    val clip = android.content.ClipData.newPlainText("Ayah", ayah.text)
+                                                    clipboard.setPrimaryClip(clip)
+                                                    android.widget.Toast.makeText(context, "Ayah copied", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                                showBottomSheet = false
+                                            }
+                                        )
+
+                                        BottomSheetOption(
+                                            icon = Icons.Default.Share,
+                                            title = "Share",
+                                            description = "",
+                                            containerColor = Color.Transparent,
+                                            contentColor = Color.Transparent,
+                                            onClick = {
+                                                selectedAyah?.let { ayah ->
+                                                    val shareText = "${surah.nameEnglish} ${selectedAyahForOptions}\n\n${ayah.text}"
+                                                    val shareIntent = android.content.Intent().apply {
+                                                        action = android.content.Intent.ACTION_SEND
+                                                        type = "text/plain"
+                                                        putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                                    }
+                                                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Ayah"))
+                                                }
+                                                showBottomSheet = false
+                                            }
+                                        )
+
+                                        BottomSheetOption(
+                                            icon = Icons.Default.MenuBook,
+                                            title = "Tafseer",
+                                            description = "",
+                                            containerColor = Color.Transparent,
+                                            contentColor = Color.Transparent,
+                                            onClick = {
+                                                onTafseerClick(selectedAyahForOptions!!)
+                                                showBottomSheet = false
+                                            }
+                                        )
+
+                                        BottomSheetOption(
+                                            icon = Icons.Default.Book,
+                                            title = "Word Study",
+                                            description = "",
+                                            containerColor = Color.Transparent,
+                                            contentColor = Color.Transparent,
+                                            onClick = {
+                                                onWordStudyClick(selectedAyahForOptions!!)
+                                                showBottomSheet = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
-                            showBottomSheet = false
-                        }
-                    )
-
-                    BottomSheetOption(
-                        icon = Icons.Default.ContentCopy,
-                        title = "Copy",
-                        description = "",
-                        containerColor = Color.Transparent,
-                        contentColor = Color.Transparent,
-                        onClick = {
-                            selectedAyah?.let { ayah ->
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("Ayah", ayah.text)
-                                clipboard.setPrimaryClip(clip)
-                                android.widget.Toast.makeText(context, "Ayah copied", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                            showBottomSheet = false
-                        }
-                    )
-
-                    BottomSheetOption(
-                        icon = Icons.Default.Share,
-                        title = "Share",
-                        description = "",
-                        containerColor = Color.Transparent,
-                        contentColor = Color.Transparent,
-                        onClick = {
-                            selectedAyah?.let { ayah ->
-                                val shareText = "${surah.nameEnglish} ${selectedAyahForOptions}\n\n${ayah.text}"
-                                val shareIntent = android.content.Intent().apply {
-                                    action = android.content.Intent.ACTION_SEND
-                                    type = "text/plain"
-                                    putExtra(android.content.Intent.EXTRA_TEXT, shareText)
-                                }
-                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Ayah"))
-                            }
-                            showBottomSheet = false
-                        }
-                    )
-
-                    BottomSheetOption(
-                        icon = Icons.Default.MenuBook,
-                        title = "Tafseer",
-                        description = "",
-                        containerColor = Color.Transparent,
-                        contentColor = Color.Transparent,
-                        onClick = {
-                            onTafseerClick(selectedAyahForOptions!!)
-                            showBottomSheet = false
-                        }
-                    )
-
-                    BottomSheetOption(
-                        icon = Icons.Default.Book,
-                        title = "Word Study",
-                        description = "",
-                        containerColor = Color.Transparent,
-                        contentColor = Color.Transparent,
-                        onClick = {
-                            onWordStudyClick(selectedAyahForOptions!!)
-                            showBottomSheet = false
-                        }
-                    )
-                }
                         }
                     }
                 }
             }
+        }
+
+        // Delete confirmation dialog for notes
+        if (showDeleteNoteConfirmation != null) {
+            AlertDialog(
+                onDismissRequest = { showDeleteNoteConfirmation = null },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                },
+                title = { Text("Delete Note?") },
+                text = { Text("This note will be permanently removed.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showDeleteNoteConfirmation?.let { note ->
+                                scope.launch {
+                                    quranRepository.deleteAyahNote(note)
+                                    existingNotes = quranRepository.getNotesForAyah(surah.number, selectedAyahForOptions!!)
+                                    if (editingNote?.id == note.id) {
+                                        editingNote = null
+                                        noteText = ""
+                                    }
+                                }
+                            }
+                            showDeleteNoteConfirmation = null
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Delete")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteNoteConfirmation = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
     }
@@ -1485,6 +1638,292 @@ private fun BottomSheetOption(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
+        }
+    }
+}
+
+/**
+ * Notes content integrated into bottom sheet
+ * Shows note input field and existing notes list
+ */
+@Composable
+private fun BottomSheetNotesContent(
+    surahNumber: Int,
+    ayahNumber: Int,
+    surahName: String,
+    existingNotes: List<com.starception.submission.core.qurandatabase.AyahNoteEntity>,
+    noteText: String,
+    editingNote: com.starception.submission.core.qurandatabase.AyahNoteEntity?,
+    onNoteTextChange: (String) -> Unit,
+    onEditNote: (com.starception.submission.core.qurandatabase.AyahNoteEntity) -> Unit,
+    onCancelEdit: () -> Unit,
+    onSaveNote: () -> Unit,
+    onDeleteNote: (com.starception.submission.core.qurandatabase.AyahNoteEntity) -> Unit,
+    onBack: () -> Unit
+) {
+    val dateFormat = remember { java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault()) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Header with back button and title
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (editingNote != null) "Edit Note" else "Notes",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "$surahName - Ayah $ayahNumber",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Note input field
+        OutlinedTextField(
+            value = noteText,
+            onValueChange = onNoteTextChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 80.dp, max = 120.dp),
+            placeholder = {
+                Text(
+                    "Write your thoughts...",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            },
+            textStyle = MaterialTheme.typography.bodyMedium,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+            )
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Action buttons row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (editingNote != null) {
+                TextButton(onClick = onCancelEdit) {
+                    Text("Cancel")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
+            FilledTonalButton(
+                onClick = onSaveNote,
+                enabled = noteText.isNotBlank(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = if (editingNote != null) Icons.Default.Check else Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    if (editingNote != null) "Update" else "Save",
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        // Existing notes list
+        if (existingNotes.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Section header with icon
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Notes,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Your Notes",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(22.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "${existingNotes.size}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 220.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                existingNotes.forEach { note ->
+                    val isEditing = editingNote?.id == note.id
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (isEditing)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceContainerLow,
+                        tonalElevation = if (isEditing) 4.dp else 1.dp,
+                        shadowElevation = if (isEditing) 2.dp else 0.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(
+                                width = 1.dp,
+                                color = if (isEditing)
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                else
+                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Note icon on the left
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isEditing)
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                else
+                                    MaterialTheme.colorScheme.secondaryContainer,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Description,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = if (isEditing)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                            }
+
+                            // Note content
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = note.noteText,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (isEditing)
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    else
+                                        MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                // Timestamp with icon
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(12.dp),
+                                        tint = MaterialTheme.colorScheme.outline
+                                    )
+                                    Text(
+                                        text = dateFormat.format(java.util.Date(note.updatedAt)),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
+
+                            // Action buttons - tonal style
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                FilledTonalIconButton(
+                                    onClick = { onEditNote(note) },
+                                    modifier = Modifier.size(32.dp),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = if (isEditing)
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                        else
+                                            MaterialTheme.colorScheme.surfaceContainerHighest
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = if (isEditing)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                FilledTonalIconButton(
+                                    onClick = { onDeleteNote(note) },
+                                    modifier = Modifier.size(32.dp),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1822,6 +2261,7 @@ private fun AyahTrackItem(
     showTajweed: Boolean = false,
     tajweedAnnotations: List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>? = null,
     isFavourite: Boolean = false,
+    hasNote: Boolean = false,
     onClick: () -> Unit,
     onLongPress: () -> Unit = {},
     onDoubleTap: () -> Unit = {}
@@ -1869,21 +2309,46 @@ private fun AyahTrackItem(
                 }
             } else {
                 // Show circular badge with number for non-favourited ayahs
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize()
+                // Stack note indicator on top-right if ayah has notes
+                Box {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(40.dp)
                     ) {
-                        Text(
-                            text = ayah.numberInSurah.toString(),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Text(
+                                text = ayah.numberInSurah.toString(),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    // Note indicator badge
+                    if (hasNote) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .align(Alignment.TopEnd)
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Has note",
+                                    tint = MaterialTheme.colorScheme.onTertiary,
+                                    modifier = Modifier.size(10.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }

@@ -19,9 +19,10 @@ import java.io.FileOutputStream
         AyahEntity::class,
         JuzEntity::class,
         HizbEntity::class,
-        FavouriteAyahEntity::class
+        FavouriteAyahEntity::class,
+        AyahNoteEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
     autoMigrations = []
 )
@@ -63,6 +64,35 @@ abstract class QuranDatabase : RoomDatabase() {
         }
 
         /**
+         * Migration from version 2 to 3: Add ayah_notes table
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                android.util.Log.d("QuranDatabase", "🔄 Migrating database from version 2 to 3...")
+
+                // Create ayah_notes table for user notes
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS ayah_notes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        surah_number INTEGER NOT NULL,
+                        ayah_number INTEGER NOT NULL,
+                        note_text TEXT NOT NULL,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    )
+                """.trimIndent())
+
+                // Create index on surah_number and ayah_number for fast lookups
+                database.execSQL("""
+                    CREATE INDEX IF NOT EXISTS idx_note_surah_ayah
+                    ON ayah_notes (surah_number, ayah_number)
+                """.trimIndent())
+
+                android.util.Log.d("QuranDatabase", "✅ Migration completed: ayah_notes table created")
+            }
+        }
+
+        /**
          * Get the singleton instance of QuranDatabase
          */
         fun getInstance(context: Context): QuranDatabase {
@@ -73,7 +103,7 @@ abstract class QuranDatabase : RoomDatabase() {
                     DATABASE_NAME
                 )
                     .createFromAsset("databases/$DATABASE_NAME") // Load from assets
-                    .addMigrations(MIGRATION_1_2) // Add migration instead of destructive migration
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3) // Add migrations for schema updates
                     .setJournalMode(JournalMode.TRUNCATE) // Simplify for pre-packaged DB
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
