@@ -1416,12 +1416,13 @@ private fun NextPrayerTile(
                     // Dynamic compass size based on orientation
                     val compassSize = if (isLandscape) 85.dp else 120.dp
 
-                    // Wrap compass in a centered container for proper alignment
+                    // Wrap compass - pushed to right edge to give more room for text
                     Box(
                         modifier = Modifier
                             .then(if (isLandscape) Modifier.fillMaxHeight() else Modifier)
-                            .wrapContentSize(Alignment.Center),
-                        contentAlignment = Alignment.Center
+                            .wrapContentSize(Alignment.CenterEnd)
+                            .offset(x = if (isLandscape) 4.dp else 12.dp),  // Push compass closer to right edge
+                        contentAlignment = Alignment.CenterEnd
                     ) {
                         Box(
                             modifier = Modifier

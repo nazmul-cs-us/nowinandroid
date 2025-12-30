@@ -219,3 +219,34 @@ data class FavouriteAyahEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+/**
+ * Ayah Note entity for storing user's personal notes on ayahs
+ * Notes are searchable from the main search bar
+ */
+@Entity(
+    tableName = "ayah_notes",
+    indices = [
+        Index(value = ["surah_number", "ayah_number"], name = "idx_note_surah_ayah")
+    ]
+)
+data class AyahNoteEntity(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Int = 0,
+
+    @ColumnInfo(name = "surah_number")
+    val surahNumber: Int,
+
+    @ColumnInfo(name = "ayah_number")
+    val ayahNumber: Int,
+
+    @ColumnInfo(name = "note_text")
+    val noteText: String,
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long = System.currentTimeMillis(),
+
+    @ColumnInfo(name = "updated_at")
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
