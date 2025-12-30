@@ -72,7 +72,6 @@ import com.starception.submission.core.designsystem.component.scrollbar.scrollba
 import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.core.qurandatabase.Surah
-import com.starception.submission.feature.quran.QuranPlayerViewModel
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.feature.quran.AudioLanguage
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -147,15 +146,6 @@ fun SurahDetailScreen(
         }
     }
 
-    val playerViewModel = remember { QuranPlayerViewModel(context) }
-
-    // Properly clean up the ViewModel when composable leaves composition
-    DisposableEffect(Unit) {
-        onDispose {
-            // Manually call cleanup to unbind service connection
-            playerViewModel.cleanup()
-        }
-    }
     val uiState by viewModel.uiState.collectAsState()
     val currentTranslation by viewModel.currentTranslation.collectAsState()
     val scrollState = rememberLazyListState()
@@ -2050,17 +2040,12 @@ private fun AlbumInfoCard(
 
 @Composable
 private fun InfoChip(text: String) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        tonalElevation = 2.dp
+    NiaTopicTag(
+        followed = true,
+        onClick = {},
+        enabled = false
     ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
-        )
+        Text(text = text.uppercase(Locale.getDefault()))
     }
 }
 
@@ -2079,7 +2064,7 @@ private fun MusicPlayerControls(
     onCollapse: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // Dark player controls matching reference design
+    // Player controls using theme colors for visibility of floating surah name overlay
     // Tap anywhere to collapse back to AlbumInfoCard with FAB
     Surface(
         modifier = modifier
@@ -2092,8 +2077,9 @@ private fun MusicPlayerControls(
                 // Tap anywhere collapses to AlbumInfoCard
                 onCollapse()
             },
-        color = Color.Black
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
+        val contentColor = MaterialTheme.colorScheme.onSurface
         Column(
             modifier = Modifier.padding(vertical = 12.dp)
         ) {
@@ -2103,14 +2089,14 @@ private fun MusicPlayerControls(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(2.dp),
-                color = Color.White,
-                trackColor = Color.Gray.copy(alpha = 0.3f),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
 
             // Spacer for the floating Surah name overlay (names are handled by the overlay)
             Spacer(Modifier.height(72.dp))
 
-            // Playback controls - minimal style matching reference
+            // Playback controls - using theme colors
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2126,7 +2112,7 @@ private fun MusicPlayerControls(
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
-                        tint = Color.White,
+                        tint = contentColor,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -2139,7 +2125,7 @@ private fun MusicPlayerControls(
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
-                        tint = Color.White,
+                        tint = contentColor,
                         modifier = Modifier.size(40.dp)
                     )
                 }
@@ -2152,7 +2138,7 @@ private fun MusicPlayerControls(
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next",
-                        tint = Color.White,
+                        tint = contentColor,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -2171,7 +2157,7 @@ private fun MusicPlayerControls(
                 Icon(
                     imageVector = Icons.Default.VolumeDown,
                     contentDescription = "Volume down",
-                    tint = Color.White,
+                    tint = contentColor,
                     modifier = Modifier.size(24.dp)
                 )
 
@@ -2180,16 +2166,16 @@ private fun MusicPlayerControls(
                     onValueChange = onVolumeChange,
                     modifier = Modifier.weight(1f),
                     colors = SliderDefaults.colors(
-                        thumbColor = Color.White,
-                        activeTrackColor = Color.White,
-                        inactiveTrackColor = Color.Gray.copy(alpha = 0.3f)
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 )
 
                 Icon(
                     imageVector = Icons.Default.VolumeUp,
                     contentDescription = "Volume up",
-                    tint = Color.White,
+                    tint = contentColor,
                     modifier = Modifier.size(24.dp)
                 )
             }
