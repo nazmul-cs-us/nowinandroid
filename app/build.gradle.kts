@@ -115,6 +115,10 @@ dependencies {
     // Media support for playback controls
     implementation("androidx.media:media:1.7.0")
 
+    // Media3 ExoPlayer for video splash screen
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+
     // Android Auto support
     implementation(libs.androidx.car.app)
 
