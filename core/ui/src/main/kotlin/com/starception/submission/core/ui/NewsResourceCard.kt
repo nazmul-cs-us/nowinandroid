@@ -124,10 +124,8 @@ fun NewsResourceCardExpanded(
             .testTag("newsResourceCard:${userNewsResource.id}"),
     ) {
         Column {
-            if (!userNewsResource.headerImageUrl.isNullOrEmpty()) {
-                Row {
-                    NewsResourceHeaderImage(userNewsResource.headerImageUrl)
-                }
+            Row {
+                NewsResourceHeaderImage(userNewsResource.headerImageUrl)
             }
             Box(
                 modifier = Modifier.padding(16.dp),
@@ -184,7 +182,8 @@ fun NewsResourceCardExpanded(
 fun NewsResourceHeaderImage(
     headerImageUrl: String?,
 ) {
-    var isLoading by remember { mutableStateOf(true) }
+    val hasValidUrl = !headerImageUrl.isNullOrEmpty()
+    var isLoading by remember { mutableStateOf(hasValidUrl) }
     var isError by remember { mutableStateOf(false) }
     val imageLoader = rememberAsyncImagePainter(
         model = headerImageUrl,
@@ -200,7 +199,7 @@ fun NewsResourceHeaderImage(
             .height(180.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (isLoading) {
+        if (isLoading && hasValidUrl) {
             // Display a progress bar while loading
             CircularProgressIndicator(
                 modifier = Modifier
@@ -215,7 +214,7 @@ fun NewsResourceHeaderImage(
                 .fillMaxWidth()
                 .height(180.dp),
             contentScale = ContentScale.Crop,
-            painter = if (isError.not() && !isLocalInspection) {
+            painter = if (hasValidUrl && isError.not() && !isLocalInspection) {
                 imageLoader
             } else {
                 painterResource(drawable.core_designsystem_ic_placeholder_default)
