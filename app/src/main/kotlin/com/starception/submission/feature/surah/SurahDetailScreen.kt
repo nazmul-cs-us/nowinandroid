@@ -119,10 +119,11 @@ fun SurahDetailScreen(
     scrollToAyah: Int = 0, // Optional: scroll to specific ayah number (0 = no scroll)
     onBackClick: () -> Unit,
     onTopicClick: (String) -> Unit = {}, // Navigate to topic detail screen
-    viewModel: SurahDetailViewModel = hiltViewModel(),
-    quranRepository: QuranRepository = hiltViewModel<QuranRepositoryHolder>().repository,
-    userDataRepository: UserDataRepository = hiltViewModel<UserDataRepositoryHolder>().repository
+    viewModel: SurahDetailViewModel = hiltViewModel()
 ) {
+    // Get repositories from ViewModel holders (moved from parameters to reduce bytecode complexity)
+    val quranRepository: QuranRepository = hiltViewModel<QuranRepositoryHolder>().repository
+    val userDataRepository: UserDataRepository = hiltViewModel<UserDataRepositoryHolder>().repository
     val context = LocalContext.current
 
     // Audio permission state for runtime permission request

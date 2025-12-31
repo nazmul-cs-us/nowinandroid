@@ -36,6 +36,17 @@
         <!-- Removed splash screen attributes to disable splash screen system -->
     </style>
 
+    <!-- Video splash screen theme - fullscreen with white background -->
+    <style name="Theme.Nia.VideoSplash" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+    </style>
+
     <!-- Material Components theme for View-based layouts -->
     <style name="Theme.Nia.Material" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorPrimary">@android:color/black</item>

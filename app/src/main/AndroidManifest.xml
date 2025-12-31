@@ -73,14 +73,22 @@
         android:theme="@style/Theme.Nia.Splash">
         <profileable android:shell="true" tools:targetApi="q" />
 
+        <!-- Video Splash Screen Activity -->
         <activity
-            android:name=".MainActivity"
-            android:configChanges="uiMode"
-            android:exported="true">
+            android:name=".VideoSplashActivity"
+            android:configChanges="orientation|screenSize"
+            android:exported="true"
+            android:theme="@style/Theme.Nia.VideoSplash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="uiMode"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 
