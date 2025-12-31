@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -498,11 +499,11 @@ fun SurahDetailScreen(
                     onCollapseMusicPlayer = { showMusicPlayer = false },
                     onWordStudyClick = { ayahNumber ->
                         viewModel.loadWordStudy(surahNumber, ayahNumber)
-                        showWordStudyDialog = true
+                        // Don't show dialog - data is shown in bottom sheet
                     },
                     onTafseerClick = { ayahNumber ->
                         viewModel.loadTafseer(surahNumber, ayahNumber)
-                        showTafseerDialog = true
+                        // Don't show dialog - data is shown in bottom sheet
                     },
                     onPlayAyahClick = { ayahNumber ->
                         val service = playbackService
@@ -543,6 +544,10 @@ fun SurahDetailScreen(
                     },
                     topics = topics,
                     onTopicClick = onTopicClick,
+                    tafseerData = tafseerData,
+                    wordStudyData = wordStudyData,
+                    selectedTafseerBook = selectedTafseerBook,
+                    onTafseerBookSelected = { book -> viewModel.selectTafseerBook(book) },
                     modifier = Modifier
                 )
             }
@@ -1033,6 +1038,10 @@ private fun AlbumPlayerContent(
     onPlayAyahClick: (Int) -> Unit = {},
     topics: List<com.starception.submission.core.topicsdatabase.Topic> = emptyList(),
     onTopicClick: (String) -> Unit = {},
+    tafseerData: com.starception.submission.core.qurandatabase.QuranAyahTafseer? = null,
+    wordStudyData: com.starception.submission.core.qurandatabase.AyahMeaningsItem? = null,
+    selectedTafseerBook: String = "saadi",
+    onTafseerBookSelected: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Use current playing surah/ayahs if available, otherwise use original
@@ -1060,8 +1069,8 @@ private fun AlbumPlayerContent(
     // Track ayahs with notes - for showing note indicator
     var ayahsWithNotes by remember { mutableStateOf(setOf<Int>()) }
 
-    // Note state - integrated into bottom sheet (no separate dialog)
-    var bottomSheetNoteMode by remember { mutableStateOf(false) } // true = show notes, false = show menu
+    // Bottom sheet mode - supports menu, notes, tafseer, word study
+    var bottomSheetMode by remember { mutableStateOf("menu") } // "menu", "notes", "tafseer", "wordstudy"
     var noteText by remember { mutableStateOf("") }
     var editingNote by remember { mutableStateOf<com.starception.submission.core.qurandatabase.AyahNoteEntity?>(null) }
     var existingNotes by remember { mutableStateOf<List<com.starception.submission.core.qurandatabase.AyahNoteEntity>>(emptyList()) }
@@ -1300,7 +1309,7 @@ private fun AlbumPlayerContent(
             onDismissRequest = {
                 showBottomSheet = false
                 selectedAyahForOptions = null
-                bottomSheetNoteMode = false
+                bottomSheetMode = "menu"
                 noteText = ""
                 editingNote = null
                 existingNotes = emptyList()
@@ -1340,18 +1349,18 @@ private fun AlbumPlayerContent(
                             Spacer(modifier = Modifier.height(12.dp))
                         }
 
-                        // Content with padding - switches between menu and notes mode
+                        // Content with padding - switches between menu, notes, tafseer, wordstudy modes
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 24.dp, vertical = 16.dp)
                         ) {
-                            // Animated content switch between menu and notes
+                            // Animated content switch between modes
                             AnimatedContent(
-                                targetState = bottomSheetNoteMode,
+                                targetState = bottomSheetMode,
                                 transitionSpec = {
-                                    if (targetState) {
-                                        // Entering notes mode
+                                    if (targetState != "menu") {
+                                        // Entering sub-mode
                                         slideInHorizontally { it } + fadeIn() togetherWith
                                             slideOutHorizontally { -it } + fadeOut()
                                     } else {
@@ -1361,8 +1370,9 @@ private fun AlbumPlayerContent(
                                     }
                                 },
                                 label = "BottomSheetContent"
-                            ) { isNoteMode ->
-                                if (isNoteMode) {
+                            ) { mode ->
+                                when (mode) {
+                                    "notes" -> {
                                     // Notes UI integrated into bottom sheet
                                     BottomSheetNotesContent(
                                         surahNumber = surah.number,
@@ -1404,12 +1414,59 @@ private fun AlbumPlayerContent(
                                             showDeleteNoteConfirmation = note
                                         },
                                         onBack = {
-                                            bottomSheetNoteMode = false
+                                            bottomSheetMode = "menu"
                                             noteText = ""
                                             editingNote = null
                                         }
                                     )
-                                } else {
+                                    }
+                                    "tafseer" -> {
+                                        // Tafseer content in bottom sheet - use passed-in data
+                                        tafseerData?.let { data ->
+                                            BottomSheetTafseerContent(
+                                                tafseerData = data,
+                                                selectedTafseerBook = selectedTafseerBook,
+                                                selectedArabicFont = selectedArabicFont,
+                                                onTafseerBookSelected = onTafseerBookSelected,
+                                                onBack = {
+                                                    bottomSheetMode = "menu"
+                                                }
+                                            )
+                                        } ?: run {
+                                            // Show loading indicator while data is being fetched
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(32.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                CircularProgressIndicator()
+                                            }
+                                        }
+                                    }
+                                    "wordstudy" -> {
+                                        // Word Study content in bottom sheet - use passed-in data
+                                        wordStudyData?.let { data ->
+                                            BottomSheetWordStudyContent(
+                                                wordStudyData = data,
+                                                selectedArabicFont = selectedArabicFont,
+                                                onBack = {
+                                                    bottomSheetMode = "menu"
+                                                }
+                                            )
+                                        } ?: run {
+                                            // Show loading indicator while data is being fetched
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(32.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                CircularProgressIndicator()
+                                            }
+                                        }
+                                    }
+                                    else -> {
                                     // Actions list (menu mode)
                                     Column(modifier = Modifier.fillMaxWidth()) {
                                         BottomSheetOption(
@@ -1472,7 +1529,7 @@ private fun AlbumPlayerContent(
                                                     }
                                                 }
                                                 // Switch to notes mode in same sheet
-                                                bottomSheetNoteMode = true
+                                                bottomSheetMode = "notes"
                                             }
                                         )
 
@@ -1520,8 +1577,11 @@ private fun AlbumPlayerContent(
                                             containerColor = Color.Transparent,
                                             contentColor = Color.Transparent,
                                             onClick = {
-                                                onTafseerClick(selectedAyahForOptions!!)
-                                                showBottomSheet = false
+                                                // Load tafseer via callback and switch to tafseer mode
+                                                selectedAyahForOptions?.let { ayahNum ->
+                                                    onTafseerClick(ayahNum)
+                                                }
+                                                bottomSheetMode = "tafseer"
                                             }
                                         )
 
@@ -1532,10 +1592,14 @@ private fun AlbumPlayerContent(
                                             containerColor = Color.Transparent,
                                             contentColor = Color.Transparent,
                                             onClick = {
-                                                onWordStudyClick(selectedAyahForOptions!!)
-                                                showBottomSheet = false
+                                                // Load word study via callback and switch to wordstudy mode
+                                                selectedAyahForOptions?.let { ayahNum ->
+                                                    onWordStudyClick(ayahNum)
+                                                }
+                                                bottomSheetMode = "wordstudy"
                                             }
                                         )
+                                    }
                                     }
                                 }
                             }
@@ -1636,6 +1700,7 @@ private fun BottomSheetOption(
  * Notes content integrated into bottom sheet
  * Shows note input field and existing notes list
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun BottomSheetNotesContent(
     surahNumber: Int,
@@ -1652,6 +1717,7 @@ private fun BottomSheetNotesContent(
     onBack: () -> Unit
 ) {
     val dateFormat = remember { java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault()) }
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -1724,7 +1790,10 @@ private fun BottomSheetNotesContent(
             }
 
             FilledTonalButton(
-                onClick = onSaveNote,
+                onClick = {
+                    keyboardController?.hide()
+                    onSaveNote()
+                },
                 enabled = noteText.isNotBlank(),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -1911,6 +1980,397 @@ private fun BottomSheetNotesContent(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Tafseer content for bottom sheet - Professional design
+ */
+@Composable
+private fun BottomSheetTafseerContent(
+    tafseerData: com.starception.submission.core.qurandatabase.QuranAyahTafseer,
+    selectedTafseerBook: String,
+    selectedArabicFont: String,
+    onTafseerBookSelected: (String) -> Unit,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Professional header with icon badge
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Back button
+            FilledTonalIconButton(
+                onClick = onBack,
+                modifier = Modifier.size(40.dp),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Title with icon
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.MenuBook,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "Tafseer",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "${tafseerData.surahNameArabic} · Ayah ${tafseerData.ayahNumber}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontFamily = getArabicFontFamilyForSelection(selectedArabicFont)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Elegant Arabic Ayah card with subtle gradient border
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = 1.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = tafseerData.ayahText,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                        fontSize = 22.sp,
+                        lineHeight = 40.sp,
+                        fontWeight = FontWeight.Normal
+                    ),
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Modern segmented button style tabs
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(
+                    "saadi" to "As-Sa'di",
+                    "moysar" to "Al-Moyassar",
+                    "baghawi" to "Al-Baghawi"
+                ).forEach { (code, name) ->
+                    val isSelected = selectedTafseerBook == code
+                    Surface(
+                        onClick = { onTafseerBookSelected(code) },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            Color.Transparent,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (isSelected)
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Tafseer content in styled card
+        val tafseerText = when (selectedTafseerBook) {
+            "saadi" -> tafseerData.tafseerSaadi
+            "moysar" -> tafseerData.tafseerMoysar
+            "baghawi" -> tafseerData.tafseerBaghawi
+            else -> ""
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 280.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (tafseerText.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = tafseerText,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                            fontSize = 15.sp,
+                            lineHeight = 26.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(14.dp)
+                    )
+                }
+            }
+
+            if (tafseerData.ayahMeanings.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lightbulb,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.tertiary
+                            )
+                            Text(
+                                text = "Word Meanings",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = tafseerData.ayahMeanings,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                                lineHeight = 22.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Word Study content for bottom sheet - Professional design
+ */
+@Composable
+private fun BottomSheetWordStudyContent(
+    wordStudyData: com.starception.submission.core.qurandatabase.AyahMeaningsItem,
+    selectedArabicFont: String,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Professional header with icon badge
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Back button
+            FilledTonalIconButton(
+                onClick = onBack,
+                modifier = Modifier.size(40.dp),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Title with icon
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Book,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "Word Study",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Ayah ${wordStudyData.ayahNumber}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Elegant Arabic Ayah card with subtle gradient border
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = 1.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = wordStudyData.ayahText,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                        fontSize = 22.sp,
+                        lineHeight = 40.sp,
+                        fontWeight = FontWeight.Normal
+                    ),
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Word meanings in styled card
+        if (wordStudyData.meanings.isNotEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lightbulb,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.tertiary
+                        )
+                        Text(
+                            text = "Word Meanings",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 250.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = wordStudyData.meanings,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                                fontSize = 15.sp,
+                                lineHeight = 26.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
                     }
                 }
             }
