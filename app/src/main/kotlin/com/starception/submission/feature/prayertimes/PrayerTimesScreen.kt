@@ -274,6 +274,7 @@ private fun getSelectedArabicFontFamily(context: Context): androidx.compose.ui.t
 fun PrayerTimesScreen(
     modifier: Modifier = Modifier,
     onSurahClick: (Int) -> Unit = {},
+    onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> }
 ) {
     val screenContext = LocalContext.current
     
@@ -1628,7 +1629,8 @@ fun PrayerTimesScreen(
                                 },
                                 timeOffsets = storedOffsets,
                                 isLandscape = true,
-                                onSurahClick = onSurahClick
+                                onSurahClick = onSurahClick,
+                                onSurahClickWithAyah = onSurahClickWithAyah
                             )
                         }
 
@@ -1841,7 +1843,8 @@ fun PrayerTimesScreen(
                         showCompassPopup = true
                     },
                     timeOffsets = storedOffsets,
-                    onSurahClick = onSurahClick
+                    onSurahClick = onSurahClick,
+                    onSurahClickWithAyah = onSurahClickWithAyah
                 )
                 }
 

@@ -52,7 +52,9 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -101,17 +103,36 @@ internal fun SearchRoute(
     onInterestsClick: () -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onNoteClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    searchNotes: suspend (String) -> List<SearchNote> = { emptyList() },
     modifier: Modifier = Modifier,
     searchViewModel: SearchViewModel = hiltViewModel(),
 ) {
     val recentSearchQueriesUiState by searchViewModel.recentSearchQueriesUiState.collectAsStateWithLifecycle()
     val searchResultUiState by searchViewModel.searchResultUiState.collectAsStateWithLifecycle()
     val searchQuery by searchViewModel.searchQuery.collectAsStateWithLifecycle()
+
+    // Search notes when query changes
+    var notes by remember { mutableStateOf<List<SearchNote>>(emptyList()) }
+    LaunchedEffect(searchQuery) {
+        notes = if (searchQuery.trim().length >= 2) {
+            searchNotes(searchQuery)
+        } else {
+            emptyList()
+        }
+    }
+
+    // Combine notes with search result
+    val enrichedSearchResultUiState = when (val state = searchResultUiState) {
+        is SearchResultUiState.Success -> state.copy(notes = notes)
+        else -> searchResultUiState
+    }
+
     SearchScreen(
         modifier = modifier,
         searchQuery = searchQuery,
         recentSearchesUiState = recentSearchQueriesUiState,
-        searchResultUiState = searchResultUiState,
+        searchResultUiState = enrichedSearchResultUiState,
         onSearchQueryChanged = searchViewModel::onSearchQueryChanged,
         onSearchTriggered = searchViewModel::onSearchTriggered,
         onClearRecentSearches = searchViewModel::clearRecentSearches,
@@ -122,6 +143,7 @@ internal fun SearchRoute(
         onInterestsClick = onInterestsClick,
         onTopicClick = onTopicClick,
         onSurahClick = onSurahClick,
+        onNoteClick = onNoteClick,
     )
 }
 
@@ -141,6 +163,7 @@ internal fun SearchScreen(
     onInterestsClick: () -> Unit = {},
     onTopicClick: (String) -> Unit = {},
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onNoteClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
 ) {
     TrackScreenViewEvent(screenName = "Search")
     Column(modifier = modifier) {
@@ -169,6 +192,13 @@ internal fun SearchScreen(
                         recentSearchQueries = recentSearchesUiState.recentQueries.map { it.query },
                     )
                 }
+                // Show suggested verses when search is empty
+                SuggestedVersesBody(
+                    suggestedVerses = SuggestedVerses.verses,
+                    onVerseClick = { verse ->
+                        onNoteClick(verse.surahNumber, verse.ayahNumber)
+                    },
+                )
             }
 
             is SearchResultUiState.Success -> {
@@ -192,12 +222,15 @@ internal fun SearchScreen(
                         searchQuery = searchQuery,
                         topics = searchResultUiState.topics,
                         newsResources = searchResultUiState.newsResources,
+                        notes = searchResultUiState.notes,
+                        suggestedVerses = SuggestedVerses.search(searchQuery),
                         onSearchTriggered = onSearchTriggered,
                         onTopicClick = onTopicClick,
                         onNewsResourcesCheckedChanged = onNewsResourcesCheckedChanged,
                         onNewsResourceViewed = onNewsResourceViewed,
                         onFollowButtonClick = onFollowButtonClick,
                         onSurahClick = onSurahClick,
+                        onNoteClick = onNoteClick,
                     )
                 }
             }
@@ -290,12 +323,15 @@ private fun SearchResultBody(
     searchQuery: String,
     topics: List<FollowableTopic>,
     newsResources: List<UserNewsResource>,
+    notes: List<SearchNote> = emptyList(),
+    suggestedVerses: List<SuggestedVerse> = emptyList(),
     onSearchTriggered: (String) -> Unit,
     onTopicClick: (String) -> Unit,
     onNewsResourcesCheckedChanged: (String, Boolean) -> Unit,
     onNewsResourceViewed: (String) -> Unit,
     onFollowButtonClick: (String, Boolean) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onNoteClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
 ) {
     val state = rememberLazyStaggeredGridState()
     Box(
@@ -373,8 +409,70 @@ private fun SearchResultBody(
                     },
                 )
             }
+
+            // Notes section
+            if (notes.isNotEmpty()) {
+                item(
+                    span = StaggeredGridItemSpan.FullLine,
+                ) {
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                                append("My Notes")
+                            }
+                        },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+
+                notes.forEach { note ->
+                    item(
+                        key = "note-${note.id}",
+                        span = StaggeredGridItemSpan.FullLine,
+                    ) {
+                        NoteSearchItem(
+                            note = note,
+                            onClick = {
+                                onSearchTriggered(searchQuery)
+                                onNoteClick(note.surahNumber, note.ayahNumber)
+                            },
+                        )
+                    }
+                }
+            }
+
+            // Suggested verses section
+            if (suggestedVerses.isNotEmpty()) {
+                item(
+                    span = StaggeredGridItemSpan.FullLine,
+                ) {
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                                append("Suggested Verses")
+                            }
+                        },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+
+                suggestedVerses.forEach { verse ->
+                    item(
+                        key = "verse-${verse.surahNumber}-${verse.ayahNumber}",
+                        span = StaggeredGridItemSpan.FullLine,
+                    ) {
+                        SuggestedVerseItem(
+                            verse = verse,
+                            onClick = {
+                                onSearchTriggered(searchQuery)
+                                onNoteClick(verse.surahNumber, verse.ayahNumber)
+                            },
+                        )
+                    }
+                }
+            }
         }
-        val itemsAvailable = topics.size + newsResources.size
+        val itemsAvailable = topics.size + newsResources.size + notes.size + suggestedVerses.size
         val scrollbarState = state.scrollbarState(
             itemsAvailable = itemsAvailable,
         )
@@ -552,6 +650,138 @@ private fun SearchTextField(
     )
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+}
+
+@Composable
+private fun NoteSearchItem(
+    note: SearchNote,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        // Surah:Ayah badge
+        Text(
+            text = "${note.surahNumber}:${note.ayahNumber}",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .padding(top = 2.dp),
+        )
+
+        // Note text
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = note.noteText,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Tap to go to ayah",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SuggestedVersesBody(
+    suggestedVerses: List<SuggestedVerse>,
+    onVerseClick: (SuggestedVerse) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = buildAnnotatedString {
+                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                    append("Popular Verses")
+                }
+            },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        LazyColumn(modifier = Modifier.padding(horizontal = 16.dp)) {
+            items(suggestedVerses) { verse ->
+                SuggestedVerseItem(
+                    verse = verse,
+                    onClick = { onVerseClick(verse) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuggestedVerseItem(
+    verse: SuggestedVerse,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        // Surah:Ayah badge
+        Text(
+            text = "${verse.surahNumber}:${verse.ayahNumber}",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+
+        // Verse info
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = verse.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = verse.arabicName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = verse.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+
+        // Category badge
+        Text(
+            text = verse.category,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 

@@ -17,8 +17,12 @@
 package com.starception.submission.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
+import com.starception.submission.core.qurandatabase.QuranRepository
+import com.starception.submission.feature.search.SearchNote
 import androidx.navigation.compose.composable
 import com.starception.submission.MainActivityViewModel
 import com.starception.submission.feature.bookmarks.navigation.bookmarksSection
@@ -56,6 +60,8 @@ fun NiaNavHost(
     mainViewModel: MainActivityViewModel? = null,
 ) {
     val navController = appState.navController
+    val context = LocalContext.current
+    val quranRepository = remember { QuranRepository(context) }
     NavHost(
         navController = navController,
         startDestination = PrayerTimesRoute,
@@ -178,6 +184,20 @@ fun NiaNavHost(
             onInterestsClick = { appState.navigateToTopLevelDestination(INTERESTS) },
             onTopicClick = navController::navigateToTopic,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
+            onNoteClick = { surahNumber, ayahNumber ->
+                navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber)
+            },
+            searchNotes = { query ->
+                quranRepository.searchNotes(query).map { note ->
+                    SearchNote(
+                        id = note.id,
+                        surahNumber = note.surahNumber,
+                        ayahNumber = note.ayahNumber,
+                        noteText = note.noteText,
+                        updatedAt = note.updatedAt
+                    )
+                }
+            },
         )
         interestsListDetailScreen(
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
@@ -198,7 +218,8 @@ fun NiaNavHost(
             },
         )
         prayerTimesScreen(
-            onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) }
+            onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
+            onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) }
         )
         // Surah screen accessible from Prayer Times (Noble Quran tile)
         surahScreen(

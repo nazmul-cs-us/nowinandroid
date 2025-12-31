@@ -277,5 +277,17 @@ interface QuranDao {
      */
     @Query("SELECT COUNT(*) FROM ayah_notes")
     suspend fun getNoteCount(): Int
+
+    /**
+     * Search notes by text content
+     */
+    @Query("SELECT * FROM ayah_notes WHERE note_text LIKE '%' || :query || '%' ORDER BY updated_at DESC")
+    suspend fun searchNotes(query: String): List<AyahNoteEntity>
+
+    /**
+     * Search notes by text content (reactive)
+     */
+    @Query("SELECT * FROM ayah_notes WHERE note_text LIKE '%' || :query || '%' ORDER BY updated_at DESC")
+    fun searchNotesFlow(query: String): Flow<List<AyahNoteEntity>>
 }
 
