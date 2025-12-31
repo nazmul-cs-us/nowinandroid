@@ -577,5 +577,30 @@ class QuranRepository @Inject constructor(
             0
         }
     }
+
+    /**
+     * Search notes by text content
+     * @param query The search query
+     * @return List of notes matching the query
+     */
+    suspend fun searchNotes(query: String): List<AyahNoteEntity> = withContext(Dispatchers.IO) {
+        try {
+            val notes = quranDao.searchNotes(query)
+            Log.d("QuranRepository_NOTE", "🔍 SEARCH | query='$query' | count=${notes.size}")
+            notes
+        } catch (e: Exception) {
+            Log.e(TAG, "Error searching notes for '$query'", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Search notes by text content (reactive flow)
+     * @param query The search query
+     * @return Flow of notes matching the query
+     */
+    fun searchNotesFlow(query: String): Flow<List<AyahNoteEntity>> {
+        return quranDao.searchNotesFlow(query)
+    }
 }
 

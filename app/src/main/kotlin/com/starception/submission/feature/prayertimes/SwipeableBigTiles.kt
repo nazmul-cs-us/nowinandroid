@@ -191,6 +191,8 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.starception.submission.core.designsystem.theme.QuranFonts
+import com.starception.submission.core.qurandatabase.QuranRepository
+import com.starception.submission.core.qurandatabase.AyahNoteEntity
 
 
 
@@ -1012,7 +1014,8 @@ fun SwipeableBigTiles(
     onCompassClick: () -> Unit,
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
     isLandscape: Boolean = false,
-    onSurahClick: (Int) -> Unit = {}
+    onSurahClick: (Int) -> Unit = {},
+    onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> }
 ) {
     // Swipeable Big Tiles - HorizontalPager with 3 tiles and infinite scroll
     val pagerState = rememberPagerState(
@@ -1128,7 +1131,8 @@ fun SwipeableBigTiles(
                     getDailyStatsMessage = getDailyStatsMessage,
                     getPrayed = getPrayed,
                     isLandscape = isLandscape,
-                    onSurahClick = onSurahClick
+                    onSurahClick = onSurahClick,
+                    onSurahClickWithAyah = onSurahClickWithAyah
                 )
                 3 -> QiblaGlobeTile(
                     prayerTimes = prayerTimes
@@ -2004,13 +2008,17 @@ private fun DailyStatsTile(
     getDailyStatsMessage: () -> String,
     getPrayed: () -> Int = { 0 },
     isLandscape: Boolean = false,
-    onSurahClick: (Int) -> Unit = {}
+    onSurahClick: (Int) -> Unit = {},
+    onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> }
 ) {
     val view = LocalView.current
     val context = LocalContext.current
     val viewModel: QuranPlayerViewModel = viewModel {
         QuranPlayerViewModel(context)
     }
+
+    // QuranRepository for notes search
+    val quranRepository = remember { QuranRepository(context) }
 
     var showSurahList by remember { mutableStateOf(false) }
     
@@ -2037,6 +2045,21 @@ private fun DailyStatsTile(
         if (showSurahList) {
             // Search query state
             var searchQuery by remember { mutableStateOf("") }
+
+            // Notes search state
+            var filteredNotes by remember { mutableStateOf<List<AyahNoteEntity>>(emptyList()) }
+            var isSearchingNotes by remember { mutableStateOf(false) }
+
+            // Search notes when query changes
+            LaunchedEffect(searchQuery) {
+                if (searchQuery.isBlank()) {
+                    filteredNotes = emptyList()
+                } else {
+                    isSearchingNotes = true
+                    filteredNotes = quranRepository.searchNotes(searchQuery)
+                    isSearchingNotes = false
+                }
+            }
 
             // Filter surahs based on search query
             val filteredSurahs = remember(searchQuery) {
@@ -2150,8 +2173,10 @@ private fun DailyStatsTile(
 
                 // Results count
                 if (searchQuery.isNotEmpty()) {
+                    val totalResults = filteredSurahs.size + filteredNotes.size
             Text(
-                        text = "${filteredSurahs.size} result${if (filteredSurahs.size != 1) "s" else ""}",
+                        text = "${totalResults} result${if (totalResults != 1) "s" else ""}" +
+                            if (filteredNotes.isNotEmpty()) " (${filteredNotes.size} note${if (filteredNotes.size != 1) "s" else ""})" else "",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         modifier = Modifier.padding(bottom = 2.dp)
@@ -2273,6 +2298,77 @@ private fun DailyStatsTile(
                                         )
                                         .padding(horizontal = 6.dp, vertical = 3.dp)
                                 )
+                            }
+                        }
+                    }
+
+                    // Notes section - show matching notes when searching
+                    if (filteredNotes.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "My Notes",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            )
+                        }
+                        items(filteredNotes, key = { "note_${it.id}" }) { note ->
+                            Surface(
+                                onClick = {
+                                    view.performHapticFeedback(
+                                        HapticFeedbackConstants.CONTEXT_CLICK,
+                                        HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                                    )
+                                    // Navigate to Surah with specific ayah
+                                    showSurahList = false
+                                    onSurahClickWithAyah(note.surahNumber, note.ayahNumber)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    // Ayah reference badge
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                    ) {
+                                        Text(
+                                            text = "${note.surahNumber}:${note.ayahNumber}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                        )
+                                    }
+
+                                    // Note text preview
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = note.noteText,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+
+                                    // Note icon
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = "Go to ayah",
+                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
                     }

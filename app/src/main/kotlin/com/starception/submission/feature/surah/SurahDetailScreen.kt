@@ -190,6 +190,15 @@ fun SurahDetailScreen(
     var showWordStudyDialog by remember { mutableStateOf(false) }
     var showTafseerDialog by remember { mutableStateOf(false) }
 
+    // Tafseer translation states
+    val tafseerTranslationLanguage by viewModel.tafseerTranslationLanguage.collectAsState()
+    val tafseerTranslationProvider by viewModel.tafseerTranslationProvider.collectAsState()
+    val translatedTafseerSaadi by viewModel.translatedTafseerSaadi.collectAsState()
+    val translatedTafseerMoysar by viewModel.translatedTafseerMoysar.collectAsState()
+    val translatedTafseerBaghawi by viewModel.translatedTafseerBaghawi.collectAsState()
+    val translatedWordMeanings by viewModel.translatedWordMeanings.collectAsState()
+    val isTafseerTranslating by viewModel.isTafseerTranslating.collectAsState()
+
     // Bismillah display state from ViewModel (based on database content)
     val showBismillahRow by viewModel.showBismillahRow.collectAsState()
 
@@ -548,6 +557,19 @@ fun SurahDetailScreen(
                     wordStudyData = wordStudyData,
                     selectedTafseerBook = selectedTafseerBook,
                     onTafseerBookSelected = { book -> viewModel.selectTafseerBook(book) },
+                    // Tafseer translation
+                    tafseerTranslationLanguage = tafseerTranslationLanguage,
+                    tafseerTranslationProvider = tafseerTranslationProvider,
+                    translatedTafseerSaadi = translatedTafseerSaadi,
+                    translatedTafseerMoysar = translatedTafseerMoysar,
+                    translatedTafseerBaghawi = translatedTafseerBaghawi,
+                    translatedWordMeanings = translatedWordMeanings,
+                    isTafseerTranslating = isTafseerTranslating,
+                    availableTafseerTranslations = viewModel.getAvailableTafseerTranslations(),
+                    availableTafseerProviders = viewModel.getAvailableTafseerProviders(),
+                    onTafseerLanguageChange = { lang -> viewModel.changeTafseerTranslationLanguage(lang) },
+                    onTafseerProviderChange = { provider -> viewModel.changeTafseerTranslationProvider(provider) },
+                    getTafseerTranslationName = { code -> viewModel.getTafseerTranslationName(code) },
                     modifier = Modifier
                 )
             }
@@ -1042,6 +1064,19 @@ private fun AlbumPlayerContent(
     wordStudyData: com.starception.submission.core.qurandatabase.AyahMeaningsItem? = null,
     selectedTafseerBook: String = "saadi",
     onTafseerBookSelected: (String) -> Unit = {},
+    // Tafseer translation parameters
+    tafseerTranslationLanguage: String = "ar",
+    tafseerTranslationProvider: String = "auto",
+    translatedTafseerSaadi: String? = null,
+    translatedTafseerMoysar: String? = null,
+    translatedTafseerBaghawi: String? = null,
+    translatedWordMeanings: String? = null,
+    isTafseerTranslating: Boolean = false,
+    availableTafseerTranslations: List<String> = emptyList(),
+    availableTafseerProviders: List<Pair<String, String>> = emptyList(),
+    onTafseerLanguageChange: (String) -> Unit = {},
+    onTafseerProviderChange: (String) -> Unit = {},
+    getTafseerTranslationName: (String) -> String = { it },
     modifier: Modifier = Modifier
 ) {
     // Use current playing surah/ayahs if available, otherwise use original
@@ -1428,6 +1463,19 @@ private fun AlbumPlayerContent(
                                                 selectedTafseerBook = selectedTafseerBook,
                                                 selectedArabicFont = selectedArabicFont,
                                                 onTafseerBookSelected = onTafseerBookSelected,
+                                                // Translation parameters
+                                                selectedLanguage = tafseerTranslationLanguage,
+                                                selectedProvider = tafseerTranslationProvider,
+                                                translatedSaadi = translatedTafseerSaadi,
+                                                translatedMoysar = translatedTafseerMoysar,
+                                                translatedBaghawi = translatedTafseerBaghawi,
+                                                translatedWordMeanings = translatedWordMeanings,
+                                                isTranslating = isTafseerTranslating,
+                                                availableLanguages = availableTafseerTranslations,
+                                                availableProviders = availableTafseerProviders,
+                                                onLanguageChange = onTafseerLanguageChange,
+                                                onProviderChange = onTafseerProviderChange,
+                                                getLanguageName = getTafseerTranslationName,
                                                 onBack = {
                                                     bottomSheetMode = "menu"
                                                 }
@@ -1988,7 +2036,7 @@ private fun BottomSheetNotesContent(
 }
 
 /**
- * Tafseer content for bottom sheet - Professional design
+ * Tafseer content for bottom sheet - Professional design with translation support
  */
 @Composable
 private fun BottomSheetTafseerContent(
@@ -1996,12 +2044,27 @@ private fun BottomSheetTafseerContent(
     selectedTafseerBook: String,
     selectedArabicFont: String,
     onTafseerBookSelected: (String) -> Unit,
+    // Translation parameters
+    selectedLanguage: String = "ar",
+    selectedProvider: String = "auto",
+    translatedSaadi: String? = null,
+    translatedMoysar: String? = null,
+    translatedBaghawi: String? = null,
+    translatedWordMeanings: String? = null,
+    isTranslating: Boolean = false,
+    availableLanguages: List<String> = emptyList(),
+    availableProviders: List<Pair<String, String>> = emptyList(),
+    onLanguageChange: (String) -> Unit = {},
+    onProviderChange: (String) -> Unit = {},
+    getLanguageName: (String) -> String = { it },
     onBack: () -> Unit
 ) {
+    var showLanguageDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
-        // Professional header with icon badge
+        // Professional header with icon badge and language selector
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -2056,6 +2119,40 @@ private fun BottomSheetTafseerContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontFamily = getArabicFontFamilyForSelection(selectedArabicFont)
                     )
+                }
+            }
+
+            // Language selector button
+            Surface(
+                onClick = { showLanguageDialog = true },
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.height(36.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Language,
+                        contentDescription = "Select Language",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = selectedLanguage.uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    if (isTranslating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
                 }
             }
         }
@@ -2145,12 +2242,29 @@ private fun BottomSheetTafseerContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Tafseer content in styled card
-        val tafseerText = when (selectedTafseerBook) {
+        // Get the appropriate text - translated or original
+        val originalText = when (selectedTafseerBook) {
             "saadi" -> tafseerData.tafseerSaadi
             "moysar" -> tafseerData.tafseerMoysar
             "baghawi" -> tafseerData.tafseerBaghawi
             else -> ""
+        }
+
+        val displayText = if (selectedLanguage != "ar") {
+            when (selectedTafseerBook) {
+                "saadi" -> translatedSaadi ?: originalText
+                "moysar" -> translatedMoysar ?: originalText
+                "baghawi" -> translatedBaghawi ?: originalText
+                else -> originalText
+            }
+        } else {
+            originalText
+        }
+
+        val displayWordMeanings = if (selectedLanguage != "ar" && translatedWordMeanings != null) {
+            translatedWordMeanings
+        } else {
+            tafseerData.ayahMeanings
         }
 
         Column(
@@ -2160,26 +2274,56 @@ private fun BottomSheetTafseerContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (tafseerText.isNotEmpty()) {
+            if (displayText.isNotEmpty()) {
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = tafseerText,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
-                            fontSize = 15.sp,
-                            lineHeight = 26.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(14.dp)
-                    )
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        // Show language indicator when translated
+                        if (selectedLanguage != "ar") {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Translate,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = getLanguageName(selectedLanguage),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                if (isTranslating) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(12.dp),
+                                        strokeWidth = 1.5.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = displayText,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = if (selectedLanguage == "ar") getArabicFontFamilyForSelection(selectedArabicFont) else null,
+                                fontSize = 15.sp,
+                                lineHeight = 26.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
                 }
             }
 
-            if (tafseerData.ayahMeanings.isNotEmpty()) {
+            if (displayWordMeanings.isNotEmpty()) {
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
@@ -2205,9 +2349,9 @@ private fun BottomSheetTafseerContent(
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = tafseerData.ayahMeanings,
+                            text = displayWordMeanings,
                             style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                                fontFamily = if (selectedLanguage == "ar") getArabicFontFamilyForSelection(selectedArabicFont) else null,
                                 lineHeight = 22.sp
                             ),
                             color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -2216,6 +2360,110 @@ private fun BottomSheetTafseerContent(
                 }
             }
         }
+    }
+
+    // Language and Provider selection dialog
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text("Translation Settings") },
+            text = {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 450.dp)
+                ) {
+                    // Provider section
+                    item {
+                        Text(
+                            text = "Translation Provider",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    items(
+                        items = availableProviders,
+                        key = { it.first }
+                    ) { (providerCode, providerName) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onProviderChange(providerCode)
+                                }
+                                .padding(vertical = 6.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = providerCode == selectedProvider,
+                                onClick = { onProviderChange(providerCode) }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = providerName,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+
+                    // Divider
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // Language section
+                    item {
+                        Text(
+                            text = "Target Language",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    items(
+                        items = availableLanguages,
+                        key = { it }
+                    ) { langCode ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onLanguageChange(langCode)
+                                    showLanguageDialog = false
+                                }
+                                .padding(vertical = 6.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = langCode == selectedLanguage,
+                                onClick = {
+                                    onLanguageChange(langCode)
+                                    showLanguageDialog = false
+                                }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = getLanguageName(langCode),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text("Done")
+                }
+            }
+        )
     }
 }
 

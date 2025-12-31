@@ -12,6 +12,7 @@ import com.starception.submission.core.topicsdatabase.Topic
 import com.starception.submission.core.topicsdatabase.TopicsDatabase
 import com.starception.submission.core.topicsdatabase.toTopic
 import com.starception.submission.core.contentdatabase.NewsDatabase
+import com.starception.submission.core.translation.TranslationService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -329,6 +330,8 @@ class SurahDetailViewModel @Inject constructor(
 
     // ============= Enhanced Database Features (Word Study & Tafseer) =============
 
+    private val translationService = TranslationService.getInstance(context)
+
     private val _wordStudyData = MutableStateFlow<com.starception.submission.core.qurandatabase.AyahMeaningsItem?>(null)
     val wordStudyData: StateFlow<com.starception.submission.core.qurandatabase.AyahMeaningsItem?> = _wordStudyData.asStateFlow()
 
@@ -337,6 +340,32 @@ class SurahDetailViewModel @Inject constructor(
 
     private val _selectedTafseerBook = MutableStateFlow("saadi")
     val selectedTafseerBook: StateFlow<String> = _selectedTafseerBook.asStateFlow()
+
+    // Tafseer translation states
+    private val _tafseerTranslationLanguage = MutableStateFlow(
+        prefs.getString("tafseer_translation_lang", "ar") ?: "ar"
+    )
+    val tafseerTranslationLanguage: StateFlow<String> = _tafseerTranslationLanguage.asStateFlow()
+
+    private val _tafseerTranslationProvider = MutableStateFlow(
+        translationService.getSelectedProvider()
+    )
+    val tafseerTranslationProvider: StateFlow<String> = _tafseerTranslationProvider.asStateFlow()
+
+    private val _translatedTafseerSaadi = MutableStateFlow<String?>(null)
+    val translatedTafseerSaadi: StateFlow<String?> = _translatedTafseerSaadi.asStateFlow()
+
+    private val _translatedTafseerMoysar = MutableStateFlow<String?>(null)
+    val translatedTafseerMoysar: StateFlow<String?> = _translatedTafseerMoysar.asStateFlow()
+
+    private val _translatedTafseerBaghawi = MutableStateFlow<String?>(null)
+    val translatedTafseerBaghawi: StateFlow<String?> = _translatedTafseerBaghawi.asStateFlow()
+
+    private val _translatedWordMeanings = MutableStateFlow<String?>(null)
+    val translatedWordMeanings: StateFlow<String?> = _translatedWordMeanings.asStateFlow()
+
+    private val _isTafseerTranslating = MutableStateFlow(false)
+    val isTafseerTranslating: StateFlow<Boolean> = _isTafseerTranslating.asStateFlow()
 
     fun loadWordStudy(surahNumber: Int, ayahNumber: Int) {
         viewModelScope.launch {
@@ -349,11 +378,65 @@ class SurahDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val tafseer = quranEnhancedRepository.getTafseerForAyah(surahNumber, ayahNumber)
             _tafseerData.value = tafseer
+            // Clear previous translations
+            _translatedTafseerSaadi.value = null
+            _translatedTafseerMoysar.value = null
+            _translatedTafseerBaghawi.value = null
+            _translatedWordMeanings.value = null
+            // Translate if language is not Arabic
+            if (_tafseerTranslationLanguage.value != "ar" && tafseer != null) {
+                translateTafseer(tafseer, _tafseerTranslationLanguage.value)
+            }
         }
     }
 
     fun selectTafseerBook(book: String) {
         _selectedTafseerBook.value = book
+    }
+
+    fun changeTafseerTranslationLanguage(languageCode: String) {
+        viewModelScope.launch {
+            _tafseerTranslationLanguage.value = languageCode
+            prefs.edit().putString("tafseer_translation_lang", languageCode).apply()
+
+            // If Arabic, clear translations
+            if (languageCode == "ar") {
+                _translatedTafseerSaadi.value = null
+                _translatedTafseerMoysar.value = null
+                _translatedTafseerBaghawi.value = null
+                _translatedWordMeanings.value = null
+                return@launch
+            }
+
+            // Translate current tafseer data
+            _tafseerData.value?.let { tafseer ->
+                translateTafseer(tafseer, languageCode)
+            }
+        }
+    }
+
+    private fun translateTafseer(tafseer: com.starception.submission.core.qurandatabase.QuranAyahTafseer, targetLang: String) {
+        viewModelScope.launch {
+            _isTafseerTranslating.value = true
+            try {
+                // Translate all three tafseer texts and word meanings
+                if (tafseer.tafseerSaadi.isNotEmpty()) {
+                    _translatedTafseerSaadi.value = translationService.translate(tafseer.tafseerSaadi, targetLang)
+                }
+                if (tafseer.tafseerMoysar.isNotEmpty()) {
+                    _translatedTafseerMoysar.value = translationService.translate(tafseer.tafseerMoysar, targetLang)
+                }
+                if (tafseer.tafseerBaghawi.isNotEmpty()) {
+                    _translatedTafseerBaghawi.value = translationService.translate(tafseer.tafseerBaghawi, targetLang)
+                }
+                if (tafseer.ayahMeanings.isNotEmpty()) {
+                    _translatedWordMeanings.value = translationService.translate(tafseer.ayahMeanings, targetLang)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SurahDetailVM", "Tafseer translation error", e)
+            }
+            _isTafseerTranslating.value = false
+        }
     }
 
     fun clearWordStudy() {
@@ -362,6 +445,55 @@ class SurahDetailViewModel @Inject constructor(
 
     fun clearTafseer() {
         _tafseerData.value = null
+        _translatedTafseerSaadi.value = null
+        _translatedTafseerMoysar.value = null
+        _translatedTafseerBaghawi.value = null
+        _translatedWordMeanings.value = null
+    }
+
+    fun getAvailableTafseerTranslations(): List<String> = listOf(
+        "ar", "en", "bn", "zh", "es", "fr", "id", "ru", "sv", "tr", "ur"
+    )
+
+    fun getTafseerTranslationName(code: String): String = when (code) {
+        "ar" -> "Arabic (Original)"
+        "en" -> "English"
+        "bn" -> "Bengali"
+        "zh" -> "Chinese"
+        "es" -> "Spanish"
+        "fr" -> "French"
+        "id" -> "Indonesian"
+        "ru" -> "Russian"
+        "sv" -> "Swedish"
+        "tr" -> "Turkish"
+        "ur" -> "Urdu"
+        else -> code.uppercase()
+    }
+
+    fun getAvailableTafseerProviders(): List<Pair<String, String>> = listOf(
+        "auto" to "Auto (Reverso → Google)",
+        "google" to "Google Translate",
+        "reverso" to "Reverso"
+    )
+
+    fun changeTafseerTranslationProvider(providerCode: String) {
+        viewModelScope.launch {
+            _tafseerTranslationProvider.value = providerCode
+            translationService.setSelectedProvider(providerCode)
+            // Clear cache to force re-translation with new provider
+            translationService.clearCache()
+            _translatedTafseerSaadi.value = null
+            _translatedTafseerMoysar.value = null
+            _translatedTafseerBaghawi.value = null
+            _translatedWordMeanings.value = null
+
+            // Re-translate if not Arabic
+            if (_tafseerTranslationLanguage.value != "ar") {
+                _tafseerData.value?.let { tafseer ->
+                    translateTafseer(tafseer, _tafseerTranslationLanguage.value)
+                }
+            }
+        }
     }
 
     // Tajweed methods

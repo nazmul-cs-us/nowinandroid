@@ -20,6 +20,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
+import com.starception.submission.feature.search.SearchNote
 import com.starception.submission.feature.search.SearchRoute
 import kotlinx.serialization.Serializable
 
@@ -33,6 +34,8 @@ fun NavGraphBuilder.searchScreen(
     onInterestsClick: () -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onNoteClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    searchNotes: suspend (String) -> List<SearchNote> = { emptyList() },
 ) {
     // TODO: Handle back stack for each top-level destination. At the moment each top-level
     // destination may have own search screen's back stack.
@@ -42,6 +45,8 @@ fun NavGraphBuilder.searchScreen(
             onInterestsClick = onInterestsClick,
             onTopicClick = onTopicClick,
             onSurahClick = onSurahClick,
+            onNoteClick = onNoteClick,
+            searchNotes = searchNotes,
         )
     }
 }
