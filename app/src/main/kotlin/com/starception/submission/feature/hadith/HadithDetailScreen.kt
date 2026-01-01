@@ -67,6 +67,7 @@ import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.feature.surah.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.ui.DynamicSkyHeader
+import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.core.ui.getCurrentSkyPeriod
 import com.starception.submission.core.ui.getSkyColors
 import java.util.Locale
@@ -92,6 +93,9 @@ fun HadithDetailScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Enable immersive full-screen mode (hides status bar)
+    ImmersiveFullScreenEffect()
+
     val context = LocalContext.current
     val repository = remember { HadithRepository.getInstance(context) }
     val translationService = remember { TranslationService.getInstance(context) }
@@ -371,12 +375,12 @@ private fun HadithContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(280.dp)
+                        .height(340.dp) // Taller header for full-screen immersive experience
                 ) {
                     // Dynamic sky background based on time of day
                     DynamicSkyHeader(
                         modifier = Modifier.fillMaxSize(),
-                        height = 280.dp,
+                        height = 340.dp,
                         period = skyPeriod
                     )
                     // Semi-transparent overlay for text readability
@@ -389,7 +393,7 @@ private fun HadithContent(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 16.dp)
-                            .padding(top = 80.dp, bottom = 16.dp),
+                            .padding(top = 100.dp, bottom = 16.dp), // More top padding for immersive toolbar
                         verticalArrangement = Arrangement.SpaceEvenly,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -583,7 +587,7 @@ private fun HadithContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .statusBarsPadding()
+                .padding(top = 16.dp) // Extra top padding for immersive mode
         ) {
             Row(
                 modifier = Modifier
@@ -814,12 +818,12 @@ private fun HadithShimmerLoading(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(280.dp)
+                    .height(340.dp) // Match taller header
             ) {
                 // Dynamic sky background based on time of day
                 DynamicSkyHeader(
                     modifier = Modifier.fillMaxSize(),
-                    height = 280.dp,
+                    height = 340.dp,
                     period = skyPeriod
                 )
                 // Semi-transparent overlay
@@ -832,7 +836,7 @@ private fun HadithShimmerLoading(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp)
-                        .padding(top = 80.dp),
+                        .padding(top = 100.dp), // Match taller header padding
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Icon placeholder
@@ -880,7 +884,7 @@ private fun HadithShimmerLoading(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding()
+                .padding(top = 16.dp) // Extra top padding for immersive mode
         ) {
             Row(
                 modifier = Modifier

@@ -78,6 +78,7 @@ import com.starception.submission.feature.quran.AudioLanguage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import javax.inject.Inject
 import android.Manifest
 import android.os.Build
@@ -121,6 +122,9 @@ fun SurahDetailScreen(
     onTopicClick: (String) -> Unit = {}, // Navigate to topic detail screen
     viewModel: SurahDetailViewModel = hiltViewModel()
 ) {
+    // Enable immersive full-screen mode (hides status bar)
+    ImmersiveFullScreenEffect()
+
     // Get repositories from ViewModel holders (moved from parameters to reduce bytecode complexity)
     val quranRepository: QuranRepository = hiltViewModel<QuranRepositoryHolder>().repository
     val userDataRepository: UserDataRepository = hiltViewModel<UserDataRepositoryHolder>().repository
@@ -905,7 +909,7 @@ private fun AlbumPlayerTopBar(
         tonalElevation = (4 * collapseProgress).dp, // Smooth elevation transition
         modifier = modifier
             .fillMaxWidth()
-            .statusBarsPadding()
+            .padding(top = 16.dp) // Extra top padding for immersive mode
     ) {
         Row(
             modifier = Modifier

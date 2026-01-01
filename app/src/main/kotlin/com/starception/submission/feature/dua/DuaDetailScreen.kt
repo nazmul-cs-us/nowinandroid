@@ -139,6 +139,7 @@ import com.starception.submission.core.duadatabase.HadithReference
 import com.starception.submission.core.duadatabase.toHadithReference
 import com.starception.submission.core.qurandatabase.QuranDatabase
 import com.starception.submission.core.ui.DynamicSkyHeader
+import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.core.ui.getCurrentSkyPeriod
 import com.starception.submission.core.ui.getSkyColors
 
@@ -808,6 +809,9 @@ fun DuaDetailScreen(
     onTopicClick: (String) -> Unit = {},
     onHadithClick: ((collectionName: String, hadithNumber: Int, databaseFile: String) -> Unit)? = null
 ) {
+    // Enable immersive full-screen mode (hides status bar)
+    ImmersiveFullScreenEffect()
+
     val context = LocalContext.current
     val viewModel = remember { DuaDetailViewModel(context) }
     val selectedFont by viewModel.selectedArabicFont.collectAsState()
@@ -1047,12 +1051,12 @@ fun DuaDetailScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(284.dp) // 64dp toolbar + 220dp content
+                                        .height(340.dp) // Taller header for full-screen immersive experience
                                 ) {
                                     // Dynamic sky background based on time of day
                                     DynamicSkyHeader(
                                         modifier = Modifier.fillMaxSize(),
-                                        height = 284.dp,
+                                        height = 340.dp,
                                         period = skyPeriod
                                     )
                                     // Semi-transparent overlay for text readability
@@ -1068,7 +1072,7 @@ fun DuaDetailScreen(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .padding(horizontal = 16.dp)
-                                            .padding(top = 80.dp, bottom = 12.dp), // 80dp = 64dp toolbar + 16dp spacing
+                                            .padding(top = 100.dp, bottom = 16.dp), // More top padding for immersive toolbar
                                         verticalArrangement = Arrangement.SpaceEvenly,
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
@@ -1567,7 +1571,7 @@ fun DuaDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .statusBarsPadding()
+                    .padding(top = 16.dp) // Extra top padding for immersive mode
             ) {
                 Row(
                     modifier = Modifier
@@ -2346,12 +2350,12 @@ private fun DuaShimmerLoadingContent(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(284.dp)
+                    .height(340.dp) // Match taller header
             ) {
                 // Dynamic sky background based on time of day
                 DynamicSkyHeader(
                     modifier = Modifier.fillMaxSize(),
-                    height = 284.dp,
+                    height = 340.dp,
                     period = skyPeriod
                 )
                 // Semi-transparent overlay for text readability
@@ -2364,7 +2368,7 @@ private fun DuaShimmerLoadingContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp)
-                        .padding(top = 80.dp, bottom = 12.dp),
+                        .padding(top = 100.dp, bottom = 12.dp), // Match taller header padding
                     verticalArrangement = Arrangement.SpaceEvenly,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -2500,12 +2504,13 @@ private fun DuaShimmerLoadingContent(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
                 .align(Alignment.TopCenter)
+                .padding(top = 16.dp) // Extra top padding for immersive mode
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .height(64.dp)
                     .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

@@ -813,3 +813,32 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
         )
     }
 }
+
+/**
+ * Composable effect that enables immersive full-screen mode by hiding the status bar.
+ * The status bar is restored when leaving the screen.
+ *
+ * Usage: Call this at the top of your screen composable to enable immersive mode.
+ */
+@Composable
+fun ImmersiveFullScreenEffect() {
+    val view = androidx.compose.ui.platform.LocalView.current
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val window = (view.context as? android.app.Activity)?.window
+        val insetsController = window?.let {
+            androidx.core.view.WindowCompat.getInsetsController(it, view)
+        }
+
+        // Hide status bar for immersive experience
+        insetsController?.apply {
+            hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+
+        onDispose {
+            // Restore status bar when leaving the screen
+            insetsController?.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        }
+    }
+}
