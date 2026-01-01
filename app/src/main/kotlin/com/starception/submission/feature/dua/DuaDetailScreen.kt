@@ -30,6 +30,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -134,10 +138,9 @@ import com.starception.submission.core.duadatabase.DuaDatabase
 import com.starception.submission.core.duadatabase.HadithReference
 import com.starception.submission.core.duadatabase.toHadithReference
 import com.starception.submission.core.qurandatabase.QuranDatabase
-import androidx.compose.foundation.Image
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import com.starception.submission.core.designsystem.R as DesignSystemR
+import com.starception.submission.core.ui.DynamicSkyHeader
+import com.starception.submission.core.ui.getCurrentSkyPeriod
+import com.starception.submission.core.ui.getSkyColors
 
 /**
  * Data class representing a complete Dua
@@ -988,8 +991,9 @@ fun DuaDetailScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surface
-    ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+    ) { _ ->
+        // Don't apply paddingValues - let content scroll under transparent toolbar like SurahDetailScreen
+        Box(modifier = Modifier.fillMaxSize()) {
             android.util.Log.d("DuaScreen", "📦 BOX: duasList.isEmpty=${duasList.isEmpty()}")
 
             // Show shimmer loading state while data loads
@@ -1029,31 +1033,33 @@ fun DuaDetailScreen(
                         }
 
                         // Each page has its own LazyColumn with header + content
+                        // Use contentPadding for status bar like SurahDetailScreen to allow full scroll
                         LazyColumn(
                             state = lazyListState,
+                            contentPadding = WindowInsets.statusBars.asPaddingValues(),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(bottom = 72.dp) // Space for bottom navigation
                         ) {
-                            // Header with placeholder image - scrollable, extends behind toolbar
+                            // Header with dynamic sky - scrollable, extends behind toolbar
                             item {
+                                val skyPeriod = getCurrentSkyPeriod()
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(284.dp) // 64dp toolbar + 220dp content
                                 ) {
-                                    // Background placeholder image
-                                    Image(
-                                        painter = painterResource(DesignSystemR.drawable.core_designsystem_ic_placeholder_detail),
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
+                                    // Dynamic sky background based on time of day
+                                    DynamicSkyHeader(
+                                        modifier = Modifier.fillMaxSize(),
+                                        height = 284.dp,
+                                        period = skyPeriod
                                     )
                                     // Semi-transparent overlay for text readability
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .background(Color.Black.copy(alpha = 0.3f))
+                                            .background(Color.Black.copy(alpha = 0.2f))
                                     )
                                     android.util.Log.d("DuaHeader", "🎨 GRADIENT BOX RENDERING - dua.title='${dua.title}' arabicText.length=${dua.arabicText.length}")
 
@@ -1556,13 +1562,12 @@ fun DuaDetailScreen(
                 }
             }
 
-            // Fixed toolbar at top - solid color to match header
+            // Fixed toolbar at top - transparent to show sky through
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .height(64.dp)
-                    .background(Color(0xFF9C5DA0)) // Solid purple matching placeholder tones
+                    .statusBarsPadding()
             ) {
                 Row(
                     modifier = Modifier
@@ -2015,24 +2020,24 @@ private fun SingleDuaContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Header with placeholder image - matches the pager header style
+        // Header with dynamic sky - matches the pager header style
+        val skyPeriod = getCurrentSkyPeriod()
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp) // Shorter for fallback (no toolbar overlap needed)
         ) {
-            // Background placeholder image
-            Image(
-                painter = painterResource(DesignSystemR.drawable.core_designsystem_ic_placeholder_detail),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+            // Dynamic sky background based on time of day
+            DynamicSkyHeader(
+                modifier = Modifier.fillMaxSize(),
+                height = 220.dp,
+                period = skyPeriod
             )
             // Semi-transparent overlay for text readability
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f))
+                    .background(Color.Black.copy(alpha = 0.2f))
             )
             Column(
                 modifier = Modifier
@@ -2336,24 +2341,24 @@ private fun DuaShimmerLoadingContent(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header with placeholder image - shown immediately with shimmer placeholders
+            // Header with dynamic sky - shown immediately with shimmer placeholders
+            val skyPeriod = getCurrentSkyPeriod()
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(284.dp)
             ) {
-                // Background placeholder image
-                Image(
-                    painter = painterResource(DesignSystemR.drawable.core_designsystem_ic_placeholder_detail),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                // Dynamic sky background based on time of day
+                DynamicSkyHeader(
+                    modifier = Modifier.fillMaxSize(),
+                    height = 284.dp,
+                    period = skyPeriod
                 )
                 // Semi-transparent overlay for text readability
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.3f))
+                        .background(Color.Black.copy(alpha = 0.2f))
                 )
                 Column(
                     modifier = Modifier
@@ -2491,13 +2496,12 @@ private fun DuaShimmerLoadingContent(
             }
         }
 
-        // Toolbar overlay - solid color to match header
+        // Toolbar overlay - transparent to show sky through
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp)
                 .align(Alignment.TopCenter)
-                .background(Color(0xFF9C5DA0)) // Solid purple matching placeholder tones
         ) {
             Row(
                 modifier = Modifier
