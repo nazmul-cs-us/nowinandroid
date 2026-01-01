@@ -18,6 +18,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
@@ -62,11 +66,10 @@ import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.feature.surah.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.core.ui.DynamicSkyHeader
+import com.starception.submission.core.ui.getCurrentSkyPeriod
+import com.starception.submission.core.ui.getSkyColors
 import java.util.Locale
-import androidx.compose.foundation.Image
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import com.starception.submission.core.designsystem.R as DesignSystemR
 
 // Gradient colors for hadith header - earthy tones
 private val HadithGradientColors = listOf(
@@ -193,8 +196,9 @@ fun HadithDetailScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surface
-    ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+    ) { _ ->
+        // Don't apply paddingValues - let content scroll under transparent toolbar like SurahDetailScreen
+        Box(modifier = Modifier.fillMaxSize()) {
             when {
                 isLoading -> {
                     HadithShimmerLoading(onBackClick = onBackClick)
@@ -356,28 +360,30 @@ private fun HadithContent(
     onLanguageClick: () -> Unit = {}
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
+        // Use contentPadding for status bar like SurahDetailScreen to allow full scroll
         LazyColumn(
+            contentPadding = WindowInsets.statusBars.asPaddingValues(),
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header with placeholder image
+            // Header with dynamic sky
             item {
+                val skyPeriod = getCurrentSkyPeriod()
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(280.dp)
                 ) {
-                    // Background placeholder image
-                    Image(
-                        painter = painterResource(DesignSystemR.drawable.core_designsystem_ic_placeholder_detail),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                    // Dynamic sky background based on time of day
+                    DynamicSkyHeader(
+                        modifier = Modifier.fillMaxSize(),
+                        height = 280.dp,
+                        period = skyPeriod
                     )
                     // Semi-transparent overlay for text readability
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.3f))
+                            .background(Color.Black.copy(alpha = 0.2f))
                     )
                     Column(
                         modifier = Modifier
@@ -572,13 +578,12 @@ private fun HadithContent(
             }
         }
 
-        // Fixed toolbar at top - solid color to match header
+        // Fixed toolbar at top - transparent to show sky through
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .height(64.dp)
-                .background(Color(0xFF9C5DA0)) // Solid purple matching placeholder tones
+                .statusBarsPadding()
         ) {
             Row(
                 modifier = Modifier
@@ -800,26 +805,28 @@ private fun HadithShimmerLoading(
         label = "shimmerOffset"
     )
 
+    val skyPeriod = getCurrentSkyPeriod()
+    val skyColors = getSkyColors(skyPeriod)
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header shimmer with placeholder image
+            // Header shimmer with dynamic sky
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(280.dp)
             ) {
-                // Background placeholder image
-                Image(
-                    painter = painterResource(DesignSystemR.drawable.core_designsystem_ic_placeholder_detail),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                // Dynamic sky background based on time of day
+                DynamicSkyHeader(
+                    modifier = Modifier.fillMaxSize(),
+                    height = 280.dp,
+                    period = skyPeriod
                 )
                 // Semi-transparent overlay
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.3f))
+                        .background(Color.Black.copy(alpha = 0.2f))
                 )
                 Column(
                     modifier = Modifier
@@ -869,12 +876,11 @@ private fun HadithShimmerLoading(
             }
         }
 
-        // Back button toolbar - solid color to match header
+        // Back button toolbar - transparent to show sky through
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
-                .background(Color(0xFF9C5DA0)) // Solid purple matching placeholder tones
+                .statusBarsPadding()
         ) {
             Row(
                 modifier = Modifier
