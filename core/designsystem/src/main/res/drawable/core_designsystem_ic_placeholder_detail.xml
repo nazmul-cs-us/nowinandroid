@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright 2022 The Android Open Source Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<!-- Taller version of placeholder for detail screen headers (Dua, Hadith) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="360dp"
+    android:height="300dp"
+    android:viewportWidth="360"
+    android:viewportHeight="300">
+
+  <!-- Background -->
+  <path
+      android:pathData="M0,0h360v300h-360z"
+      android:fillColor="#FCFCFC"/>
+  <path
+      android:pathData="M0,0h360v300h-360z"
+      android:fillColor="#7E7576"
+      android:fillAlpha="0.02"/>
+  <path
+      android:pathData="M0,0h360v300h-360z"
+      android:fillColor="#8C4190"
+      android:fillAlpha="0.11"/>
+
+  <!-- Top left pink/coral gradient circles -->
+  <path
+      android:pathData="M-30,60 A90,90 0,1 1,150 60 A90,90 0,1 1,-30 60z"
+      android:fillType="evenOdd">
+    <aapt:attr name="android:fillColor">
+      <gradient
+          android:startY="0"
+          android:startX="60"
+          android:endY="150"
+          android:endX="60"
+          android:type="linear">
+        <item android:offset="0" android:color="#FFFFA8FF"/>
+        <item android:offset="1" android:color="#FFFF8B5E"/>
+      </gradient>
+    </aapt:attr>
+  </path>
+
+  <!-- Middle decorative shape - three connected circles -->
+  <path
+      android:pathData="M50,180a45,45 0,0 1,90 0,45 45,0 0,1 90,0"
+      android:fillType="evenOdd">
+    <aapt:attr name="android:fillColor">
+      <gradient
+          android:startY="135"
+          android:startX="95"
+          android:endY="225"
+          android:endX="185"
+          android:type="linear">
+        <item android:offset="0" android:color="#FFFFA8FF"/>
+        <item android:offset="1" android:color="#FFFF8B5E"/>
+      </gradient>
+    </aapt:attr>
+  </path>
+
+  <!-- Blue outline rounded rectangle - repositioned for taller layout -->
+  <path
+      android:pathData="M180,200h140a25,25 0,0 1,25 25,25 25,0 0,1 -25,25H180a25,25 0,0 1,-25 -25,25 25,0 0,1 25,-25z"
+      android:strokeWidth="2"
+      android:fillColor="#00000000"
+      android:strokeColor="#5DD4FB"/>
+
+  <!-- Starburst/sun shape - repositioned -->
+  <path
+      android:strokeWidth="1"
+      android:pathData="M300,120V85l-7.3,34.27 7.29,-34.27 -14.25,32 14.24,-32 -20.6,28.34 20.6,-28.35L273.97,108.53l26.03,-23.44L269.67,102.6l30.34,-17.52 -33.32,10.83 33.31,-10.83 -34.84,3.65 34.84,-3.66 -34.84,-3.67 34.84,3.66 -33.31,-10.83 33.32,10.82 -30.34,-17.52 30.34,17.52 -26.03,-23.45 26.04,23.44 -20.6,-28.34 20.6,28.34 -14.25,-32 14.26,32 -7.28,-34.27 7.29,34.26V50v35.03l7.29,-34.26 -7.28,34.27 14.25,-32 -14.24,32 20.6,-28.34 -20.6,28.34 26.04,-23.44 -26.03,23.45 30.34,-17.52 -30.34,17.52 33.32,-10.82 -33.32,10.83 34.84,-3.66 -34.84,3.67 34.84,3.66 -34.84,-3.65 33.32,10.83 -33.32,-10.83 30.34,17.52L300.07,85.1l26.03,23.44 -26.04,-23.44 20.6,28.35 -20.6,-28.34 14.24,32 -14.25,-32 7.28,34.27 -7.29,-34.27v35.04Z"
+      android:strokeLineJoin="round"
+      android:fillColor="#00000000"
+      android:strokeColor="#FF8B5E"/>
+
+  <!-- Bottom left pink circle -->
+  <path
+      android:pathData="M40,290h0.77a30,30 89.06,0 0,30 -30,30 30,89.06 0,0 -30,-30h-0.77A30,30 89.06,0 0,10 260,30 30,89.06 0,0 40,290z"
+      android:fillColor="#FFA8FF"/>
+
+  <!-- Additional decorative element - small coral circle top right -->
+  <path
+      android:pathData="M320,40m-25,0a25,25 0,1 1,50 0a25,25 0,1 1,-50 0"
+      android:fillColor="#FF8B5E"
+      android:fillAlpha="0.6"/>
+
+  <!-- Small pink accent bottom right -->
+  <path
+      android:pathData="M340,270m-20,0a20,20 0,1 1,40 0a20,20 0,1 1,-40 0"
+      android:fillColor="#FFA8FF"
+      android:fillAlpha="0.5"/>
+</vector>

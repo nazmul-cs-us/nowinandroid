@@ -61,6 +61,12 @@ import com.starception.submission.core.hadithdatabase.Hadith
 import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.feature.surah.QuranFonts
+import com.starception.submission.core.designsystem.component.NiaTopicTag
+import java.util.Locale
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.starception.submission.core.designsystem.R as DesignSystemR
 
 // Gradient colors for hadith header - earthy tones
 private val HadithGradientColors = listOf(
@@ -353,16 +359,26 @@ private fun HadithContent(
         LazyColumn(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Gradient Header
+            // Header with placeholder image
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(280.dp)
-                        .background(
-                            brush = Brush.linearGradient(colors = HadithGradientColors)
-                        )
                 ) {
+                    // Background placeholder image
+                    Image(
+                        painter = painterResource(DesignSystemR.drawable.core_designsystem_ic_placeholder_detail),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    // Semi-transparent overlay for text readability
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f))
+                    )
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -398,18 +414,17 @@ private fun HadithContent(
                             letterSpacing = 0.5.sp
                         )
 
-                        // Hadith number
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color.White.copy(alpha = 0.2f)
-                        ) {
-                            Text(
-                                text = "Hadith #$hadithNumber",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
-                        }
+                        // Hadith number - using NiaTopicTag for consistency with Dua detail
+                        NiaTopicTag(
+                            followed = false,
+                            onClick = { },
+                            enabled = true,
+                            text = {
+                                Text(
+                                    text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
+                                )
+                            }
+                        )
 
                         // Author
                         if (hadith.author.isNotEmpty()) {
@@ -557,12 +572,13 @@ private fun HadithContent(
             }
         }
 
-        // Fixed toolbar at top
-        Surface(
-            color = HadithGradientColors[0],
+        // Fixed toolbar at top - solid color to match header
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
+                .height(64.dp)
+                .background(Color(0xFF9C5DA0)) // Solid purple matching placeholder tones
         ) {
             Row(
                 modifier = Modifier
@@ -590,17 +606,17 @@ private fun HadithContent(
                     )
                 }
 
-                // Collection badge - same style as Hadith number chip
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.White.copy(alpha = 0.2f),
-                    modifier = Modifier.padding(end = 16.dp)
-                ) {
-                    Text(
-                        text = collectionName,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                // Collection badge - using NiaTopicTag for consistency with Dua detail
+                Box(modifier = Modifier.padding(end = 16.dp)) {
+                    NiaTopicTag(
+                        followed = false,
+                        onClick = { },
+                        enabled = true,
+                        text = {
+                            Text(
+                                text = collectionName.uppercase(Locale.getDefault())
+                            )
+                        }
                     )
                 }
             }
@@ -786,15 +802,25 @@ private fun HadithShimmerLoading(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header shimmer
+            // Header shimmer with placeholder image
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(280.dp)
-                    .background(
-                        brush = Brush.linearGradient(colors = HadithGradientColors)
-                    )
             ) {
+                // Background placeholder image
+                Image(
+                    painter = painterResource(DesignSystemR.drawable.core_designsystem_ic_placeholder_detail),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                // Semi-transparent overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f))
+                )
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -843,10 +869,12 @@ private fun HadithShimmerLoading(
             }
         }
 
-        // Back button
-        Surface(
-            color = HadithGradientColors[0],
-            modifier = Modifier.fillMaxWidth()
+        // Back button toolbar - solid color to match header
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .background(Color(0xFF9C5DA0)) // Solid purple matching placeholder tones
         ) {
             Row(
                 modifier = Modifier
