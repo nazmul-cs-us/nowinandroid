@@ -134,6 +134,10 @@ import com.starception.submission.core.duadatabase.DuaDatabase
 import com.starception.submission.core.duadatabase.HadithReference
 import com.starception.submission.core.duadatabase.toHadithReference
 import com.starception.submission.core.qurandatabase.QuranDatabase
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.starception.submission.core.designsystem.R as DesignSystemR
 
 /**
  * Data class representing a complete Dua
@@ -1031,16 +1035,26 @@ fun DuaDetailScreen(
                                 .fillMaxSize()
                                 .padding(bottom = 72.dp) // Space for bottom navigation
                         ) {
-                            // Gradient Header content - scrollable, extends behind toolbar
+                            // Header with placeholder image - scrollable, extends behind toolbar
                             item {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(284.dp) // 64dp toolbar + 220dp content
-                                        .background(
-                                            brush = Brush.linearGradient(colors = DuaGradientColors)
-                                        )
                                 ) {
+                                    // Background placeholder image
+                                    Image(
+                                        painter = painterResource(DesignSystemR.drawable.core_designsystem_ic_placeholder_detail),
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                    // Semi-transparent overlay for text readability
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.3f))
+                                    )
                                     android.util.Log.d("DuaHeader", "🎨 GRADIENT BOX RENDERING - dua.title='${dua.title}' arabicText.length=${dua.arabicText.length}")
 
                                     // Header content only (positioned below toolbar area)
@@ -1542,12 +1556,13 @@ fun DuaDetailScreen(
                 }
             }
 
-            // Fixed toolbar at top - always visible with gradient background (matches SurahDetailScreen style)
-            Surface(
-                color = DuaGradientColors[0],
+            // Fixed toolbar at top - solid color to match header
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
+                    .height(64.dp)
+                    .background(Color(0xFF9C5DA0)) // Solid purple matching placeholder tones
             ) {
                 Row(
                     modifier = Modifier
@@ -2000,15 +2015,25 @@ private fun SingleDuaContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Gradient Header - matches the pager header style
+        // Header with placeholder image - matches the pager header style
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp) // Shorter for fallback (no toolbar overlap needed)
-                .background(
-                    brush = Brush.linearGradient(colors = DuaGradientColors)
-                )
         ) {
+            // Background placeholder image
+            Image(
+                painter = painterResource(DesignSystemR.drawable.core_designsystem_ic_placeholder_detail),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            // Semi-transparent overlay for text readability
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f))
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -2311,15 +2336,25 @@ private fun DuaShimmerLoadingContent(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Gradient header - shown immediately with shimmer placeholders
+            // Header with placeholder image - shown immediately with shimmer placeholders
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(284.dp)
-                    .background(
-                        brush = Brush.linearGradient(colors = DuaGradientColors)
-                    )
             ) {
+                // Background placeholder image
+                Image(
+                    painter = painterResource(DesignSystemR.drawable.core_designsystem_ic_placeholder_detail),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                // Semi-transparent overlay for text readability
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f))
+                )
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -2456,17 +2491,13 @@ private fun DuaShimmerLoadingContent(
             }
         }
 
-        // Toolbar overlay - always visible
+        // Toolbar overlay - solid color to match header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp)
                 .align(Alignment.TopCenter)
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(DuaGradientColors[0], DuaGradientColors[1])
-                    )
-                )
+                .background(Color(0xFF9C5DA0)) // Solid purple matching placeholder tones
         ) {
             Row(
                 modifier = Modifier
