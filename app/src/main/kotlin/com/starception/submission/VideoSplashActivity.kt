@@ -18,8 +18,10 @@ package com.starception.submission
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.annotation.OptIn
 import androidx.core.view.WindowCompat
@@ -59,14 +61,26 @@ class VideoSplashActivity : ComponentActivity() {
         // Keep screen on during splash
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // Create PlayerView programmatically
+        // Create PlayerView programmatically with padding to shrink video
         playerView = PlayerView(this).apply {
             useController = false  // Hide playback controls
             resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT  // Fit video without cropping
             setBackgroundColor(android.graphics.Color.WHITE)  // White background to match video
             setOnClickListener { navigateToMain() }  // Tap to skip
         }
-        setContentView(playerView)
+
+        // Wrap PlayerView in a FrameLayout with horizontal padding (10% on each side = 80% width)
+        val container = FrameLayout(this).apply {
+            setBackgroundColor(android.graphics.Color.WHITE)
+            val horizontalPadding = (resources.displayMetrics.widthPixels * 0.10f).toInt()
+            setPadding(horizontalPadding, 0, horizontalPadding, 0)
+            addView(playerView, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER
+            ))
+        }
+        setContentView(container)
 
         // Set window background to white
         window.decorView.setBackgroundColor(android.graphics.Color.WHITE)

@@ -909,7 +909,8 @@ private fun AlbumPlayerTopBar(
         tonalElevation = (4 * collapseProgress).dp, // Smooth elevation transition
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 16.dp) // Extra top padding for immersive mode
+            .statusBarsPadding() // Account for status bar/punch hole
+            .padding(top = 56.dp) // Extra top padding to show more sky
     ) {
         Row(
             modifier = Modifier

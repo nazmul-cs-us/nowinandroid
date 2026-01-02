@@ -771,15 +771,23 @@ object GoogleSampleNotificationManager {
 
     /**
      * Convert vector drawable to bitmap for notification large icon
+     * Icon is drawn at 1/2 size centered in the canvas with padding around it
+     * This makes the icon appear smaller since Android scales the entire bitmap to fit
      */
     private fun vectorToBitmap(drawable: Drawable): Bitmap {
+        // Keep full canvas size but draw icon at 1/2 size centered
+        val canvasSize = drawable.intrinsicWidth.coerceAtLeast(drawable.intrinsicHeight).coerceAtLeast(1)
+        val iconSize = (canvasSize / 2)
+        val padding = (canvasSize - iconSize) / 2
+
         val bitmap = Bitmap.createBitmap(
-            drawable.intrinsicWidth.coerceAtLeast(1),
-            drawable.intrinsicHeight.coerceAtLeast(1),
+            canvasSize,
+            canvasSize,
             Bitmap.Config.ARGB_8888
         )
         val canvas = Canvas(bitmap)
-        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        // Draw icon centered with padding
+        drawable.setBounds(padding, padding, padding + iconSize, padding + iconSize)
         drawable.draw(canvas)
         return bitmap
     }

@@ -68,7 +68,7 @@ import com.starception.submission.feature.surah.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.ui.DynamicSkyHeader
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
-import com.starception.submission.core.ui.getCurrentSkyPeriod
+import com.starception.submission.core.ui.getCurrentSkyPeriodForTheme
 import com.starception.submission.core.ui.getSkyColors
 import java.util.Locale
 
@@ -199,7 +199,7 @@ fun HadithDetailScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = Color.Transparent  // Transparent to let sky extend to top
     ) { _ ->
         // Don't apply paddingValues - let content scroll under transparent toolbar like SurahDetailScreen
         Box(modifier = Modifier.fillMaxSize()) {
@@ -364,23 +364,22 @@ private fun HadithContent(
     onLanguageClick: () -> Unit = {}
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // Use contentPadding for status bar like SurahDetailScreen to allow full scroll
+        // No status bar padding - immersive mode hides status bar
         LazyColumn(
-            contentPadding = WindowInsets.statusBars.asPaddingValues(),
             modifier = Modifier.fillMaxSize()
         ) {
             // Header with dynamic sky
             item {
-                val skyPeriod = getCurrentSkyPeriod()
+                val skyPeriod = getCurrentSkyPeriodForTheme()
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(340.dp) // Taller header for full-screen immersive experience
+                        .height(420.dp) // Taller header for full-screen immersive experience
                 ) {
                     // Dynamic sky background based on time of day
                     DynamicSkyHeader(
                         modifier = Modifier.fillMaxSize(),
-                        height = 340.dp,
+                        height = 420.dp,
                         period = skyPeriod
                     )
                     // Semi-transparent overlay for text readability
@@ -389,32 +388,15 @@ private fun HadithContent(
                             .fillMaxSize()
                             .background(Color.Black.copy(alpha = 0.2f))
                     )
+                    // Header content positioned at bottom to show more sky artwork
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 16.dp)
-                            .padding(top = 100.dp, bottom = 16.dp), // More top padding for immersive toolbar
-                        verticalArrangement = Arrangement.SpaceEvenly,
+                            .padding(top = 100.dp, bottom = 4.dp), // Position content at very bottom
+                        verticalArrangement = Arrangement.Bottom,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Icon
-                        Surface(
-                            modifier = Modifier.size(56.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            color = Color.White.copy(alpha = 0.25f)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.MenuBook,
-                                    contentDescription = "Hadith",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
                         // Collection name
                         Text(
                             text = hadith.collectionNameEnglish.ifEmpty { collectionName },
@@ -423,6 +405,8 @@ private fun HadithContent(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp
                         )
+
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         // Hadith number - using NiaTopicTag for consistency with Dua detail
                         NiaTopicTag(
@@ -438,6 +422,7 @@ private fun HadithContent(
 
                         // Author
                         if (hadith.author.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "Compiled by ${hadith.author}",
                                 style = MaterialTheme.typography.bodySmall,
@@ -587,7 +572,8 @@ private fun HadithContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .padding(top = 16.dp) // Extra top padding for immersive mode
+                .statusBarsPadding() // Account for status bar/punch hole
+                .padding(top = 56.dp) // Extra top padding to clear camera punch hole and show more sky
         ) {
             Row(
                 modifier = Modifier
@@ -809,7 +795,7 @@ private fun HadithShimmerLoading(
         label = "shimmerOffset"
     )
 
-    val skyPeriod = getCurrentSkyPeriod()
+    val skyPeriod = getCurrentSkyPeriodForTheme()
     val skyColors = getSkyColors(skyPeriod)
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -818,12 +804,12 @@ private fun HadithShimmerLoading(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(340.dp) // Match taller header
+                    .height(420.dp) // Match taller header
             ) {
                 // Dynamic sky background based on time of day
                 DynamicSkyHeader(
                     modifier = Modifier.fillMaxSize(),
-                    height = 340.dp,
+                    height = 420.dp,
                     period = skyPeriod
                 )
                 // Semi-transparent overlay
@@ -832,30 +818,32 @@ private fun HadithShimmerLoading(
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.2f))
                 )
+                // Header content positioned at bottom to show more sky artwork
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp)
-                        .padding(top = 100.dp), // Match taller header padding
+                        .padding(top = 100.dp, bottom = 4.dp), // Position content at very bottom
+                    verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Icon placeholder
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .background(
-                                Color.White.copy(alpha = 0.2f),
-                                RoundedCornerShape(16.dp)
-                            )
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    // Title placeholder
+                    // Collection name placeholder
                     Box(
                         modifier = Modifier
                             .size(width = 150.dp, height = 24.dp)
                             .background(
                                 Color.White.copy(alpha = 0.2f),
                                 RoundedCornerShape(12.dp)
+                            )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // Hadith number placeholder
+                    Box(
+                        modifier = Modifier
+                            .size(width = 100.dp, height = 36.dp)
+                            .background(
+                                Color.White.copy(alpha = 0.15f),
+                                RoundedCornerShape(18.dp)
                             )
                     )
                 }
@@ -884,7 +872,8 @@ private fun HadithShimmerLoading(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp) // Extra top padding for immersive mode
+                .statusBarsPadding() // Account for status bar/punch hole
+                .padding(top = 56.dp) // Extra top padding to match main toolbar
         ) {
             Row(
                 modifier = Modifier
