@@ -30,7 +30,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -40,6 +42,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import java.util.Calendar
 import kotlin.math.PI
 import kotlin.math.cos
@@ -74,6 +77,21 @@ fun getCurrentSkyPeriod(): SkyTimePeriod {
         in 18..19 -> SkyTimePeriod.MAGHRIB
         in 20..21 -> SkyTimePeriod.ISHA
         else -> SkyTimePeriod.NIGHT
+    }
+}
+
+/**
+ * Composable version that returns NIGHT when dark mode is enabled,
+ * otherwise returns the time-based sky period.
+ * This respects both system dark mode AND app's own dark mode setting from Settings -> Appearance.
+ */
+@Composable
+fun getCurrentSkyPeriodForTheme(): SkyTimePeriod {
+    val isDarkMode = LocalDarkTheme.current
+    return if (isDarkMode) {
+        SkyTimePeriod.NIGHT
+    } else {
+        getCurrentSkyPeriod()
     }
 }
 
@@ -152,6 +170,7 @@ data class Star(
 
 /**
  * Shooting star data class for falling star animation
+ * Now supports dynamic regeneration for varied positions
  */
 data class ShootingStar(
     val startX: Float,
@@ -159,8 +178,25 @@ data class ShootingStar(
     val angle: Float,  // Angle in radians
     val length: Float,
     val speed: Float,  // Animation speed multiplier
-    val delay: Float   // Delay before appearing (0-1)
+    val delay: Float,  // Delay before appearing (0-1)
+    val seed: Int = 0  // Seed for this shooting star instance
 )
+
+/**
+ * Generate a shooting star with random position based on seed
+ */
+private fun generateShootingStar(seed: Int): ShootingStar {
+    val random = Random(seed)
+    return ShootingStar(
+        startX = random.nextFloat() * 0.8f + 0.1f, // 10% to 90% of width
+        startY = random.nextFloat() * 0.25f + 0.15f, // 15% to 40% of height (below toolbar)
+        angle = (random.nextFloat() * 0.6f + 0.2f) * PI.toFloat(), // Varied downward angles
+        length = random.nextFloat() * 0.1f + 0.05f,
+        speed = random.nextFloat() * 0.4f + 0.7f,
+        delay = random.nextFloat(),
+        seed = seed
+    )
+}
 
 /**
  * Dynamic Sky Header that changes based on time of day
@@ -186,18 +222,13 @@ fun DynamicSkyHeader(
         }
     }
 
-    // Generate shooting stars
-    val shootingStars = remember {
-        val random = Random(123)
-        List(3) {
-            ShootingStar(
-                startX = random.nextFloat() * 0.6f + 0.2f, // Middle 60% of screen
-                startY = random.nextFloat() * 0.3f + 0.05f, // Upper portion
-                angle = (random.nextFloat() * 0.5f + 0.3f) * PI.toFloat(), // Downward angle
-                length = random.nextFloat() * 0.08f + 0.06f,
-                speed = random.nextFloat() * 0.5f + 0.8f,
-                delay = random.nextFloat()
-            )
+    // Generate multiple sets of shooting stars with different seeds
+    // Each set appears at different times during the animation cycle
+    val shootingStarSets = remember {
+        List(3) { setIndex -> // 3 sets of shooting stars
+            List(2) { starIndex -> // 2 stars per set
+                generateShootingStar(42 + setIndex * 100 + starIndex * 37)
+            }
         }
     }
 
@@ -213,12 +244,12 @@ fun DynamicSkyHeader(
         label = "twinkle"
     )
 
-    // Shooting star animation
+    // Shooting star animation - smooth continuous animation
     val shootingStarProgress by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
+            animation = tween(8000, easing = LinearEasing), // Slower for smoother movement
             repeatMode = RepeatMode.Restart
         ),
         label = "shootingStar"
@@ -258,7 +289,12 @@ fun DynamicSkyHeader(
             }
 
             // Draw shooting stars for all periods (subtle during day, prominent at night)
-            drawShootingStars(shootingStars, canvasWidth, canvasHeight, shootingStarProgress, period)
+            // Each set appears at staggered intervals (0-33%, 33-66%, 66-100% of cycle)
+            shootingStarSets.forEachIndexed { setIndex, starSet ->
+                val setOffset = setIndex / 3f // 0, 0.33, 0.66
+                val adjustedProgress = (shootingStarProgress + setOffset) % 1f
+                drawShootingStars(starSet, canvasWidth, canvasHeight, adjustedProgress, period)
+            }
 
             // Draw celestial body (sun or moon)
             drawCelestialBody(canvasWidth, canvasHeight, period)
@@ -407,59 +443,61 @@ private fun DrawScope.drawShootingStars(
 }
 
 private fun DrawScope.drawCelestialBody(width: Float, height: Float, period: SkyTimePeriod) {
+    // NOTE: Toolbar occupies top ~25% of header (100dp out of 420dp)
+    // Celestial bodies should be positioned at 40%+ height to avoid overlap
     when (period) {
         SkyTimePeriod.SUNRISE -> {
             // Rising sun near horizon
             drawSun(
-                center = Offset(width * 0.5f, height * 0.75f),
+                center = Offset(width * 0.5f, height * 0.72f),
                 radius = width * 0.08f,
                 glowRadius = width * 0.15f
             )
         }
         SkyTimePeriod.MORNING -> {
-            // Sun rising higher
+            // Sun rising higher - moved lower to avoid toolbar
             drawSun(
-                center = Offset(width * 0.7f, height * 0.35f),
-                radius = width * 0.07f,
-                glowRadius = width * 0.12f
+                center = Offset(width * 0.8f, height * 0.48f),
+                radius = width * 0.065f,
+                glowRadius = width * 0.11f
             )
         }
         SkyTimePeriod.DAY -> {
-            // Sun high in sky
+            // Sun in sky - moved to safe zone below toolbar
             drawSun(
-                center = Offset(width * 0.75f, height * 0.2f),
-                radius = width * 0.06f,
-                glowRadius = width * 0.1f
+                center = Offset(width * 0.85f, height * 0.42f),
+                radius = width * 0.055f,
+                glowRadius = width * 0.09f
             )
         }
         SkyTimePeriod.ASR -> {
-            // Sun descending
+            // Sun descending - positioned to right side, below toolbar
             drawSun(
-                center = Offset(width * 0.3f, height * 0.4f),
-                radius = width * 0.07f,
-                glowRadius = width * 0.12f
+                center = Offset(width * 0.2f, height * 0.52f),
+                radius = width * 0.065f,
+                glowRadius = width * 0.11f
             )
         }
         SkyTimePeriod.MAGHRIB -> {
-            // Setting sun
+            // Setting sun near horizon
             drawSun(
-                center = Offset(width * 0.5f, height * 0.8f),
+                center = Offset(width * 0.5f, height * 0.75f),
                 radius = width * 0.09f,
                 glowRadius = width * 0.18f,
                 isSettingSun = true
             )
         }
         SkyTimePeriod.ISHA, SkyTimePeriod.NIGHT -> {
-            // Crescent moon
+            // Crescent moon - moved lower to avoid toolbar
             drawCrescentMoon(
-                center = Offset(width * 0.75f, height * 0.25f),
-                radius = width * 0.06f
+                center = Offset(width * 0.82f, height * 0.42f),
+                radius = width * 0.055f
             )
         }
         SkyTimePeriod.FAJR -> {
-            // Fading moon
+            // Fading moon - moved lower to avoid toolbar
             drawCrescentMoon(
-                center = Offset(width * 0.2f, height * 0.3f),
+                center = Offset(width * 0.18f, height * 0.45f),
                 radius = width * 0.05f,
                 alpha = 0.6f
             )
@@ -549,268 +587,279 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
         SkyTimePeriod.NIGHT, SkyTimePeriod.ISHA -> Color(0xFF080810)
         SkyTimePeriod.FAJR -> Color(0xFF151525)
         SkyTimePeriod.MAGHRIB -> Color(0xFF251515)
-        else -> Color(0xFF152515).copy(alpha = 0.35f)
+        else -> Color(0xFF1a1a1a)
     }
 
     val silhouetteAlpha = when (period) {
-        SkyTimePeriod.DAY, SkyTimePeriod.MORNING -> 0.22f
-        SkyTimePeriod.ASR -> 0.32f
+        SkyTimePeriod.DAY, SkyTimePeriod.MORNING -> 0.35f
+        SkyTimePeriod.ASR -> 0.45f
         else -> 1f
     }
 
-    val baseY = height * 0.94f
+    // ===== AL MASJID-E-NABAWI ACCURATE SILHOUETTE =====
+    // Based on actual architecture: 10 minarets, Green Dome, 24 sliding domes, Ottoman style
+    // Reference: https://en.wikipedia.org/wiki/Prophet's_Mosque
+
+    // Position silhouette in bottom portion only - leave top 55% clear for sky/content
+    val baseY = height * 1.0f  // At very bottom
+    val silhouetteTopLimit = height * 0.55f  // Silhouette stays below this line
     val centerX = width * 0.5f
 
-    // ===== BACKGROUND LAYER - Distant cityscape =====
-    val distantPath = Path().apply {
-        moveTo(0f, baseY - height * 0.02f)
-        // Gentle hills/buildings in background
-        lineTo(width * 0.1f, baseY - height * 0.05f)
-        lineTo(width * 0.15f, baseY - height * 0.03f)
-        lineTo(width * 0.25f, baseY - height * 0.06f)
-        lineTo(width * 0.35f, baseY - height * 0.04f)
-        lineTo(width * 0.45f, baseY - height * 0.02f)
-        lineTo(width * 0.55f, baseY - height * 0.02f)
-        lineTo(width * 0.65f, baseY - height * 0.04f)
-        lineTo(width * 0.75f, baseY - height * 0.06f)
-        lineTo(width * 0.85f, baseY - height * 0.03f)
-        lineTo(width * 0.9f, baseY - height * 0.05f)
-        lineTo(width, baseY - height * 0.02f)
-        lineTo(width, height)
-        lineTo(0f, height)
-        close()
-    }
-    drawPath(
-        path = distantPath,
-        color = silhouetteColor.copy(alpha = silhouetteAlpha * 0.5f),
-        style = Fill
-    )
-
-    // ===== MAIN MOSQUE STRUCTURE =====
-    val mosquePath = Path().apply {
-        // ===== LEFT TALL MINARET =====
-        val leftMinaretX = width * 0.12f
-        val minaretWidth = width * 0.025f
-        val leftMinaretHeight = height * 0.38f
-
-        // Minaret body with taper
-        moveTo(leftMinaretX - minaretWidth * 1.2f, baseY)
-        lineTo(leftMinaretX - minaretWidth, baseY - leftMinaretHeight * 0.7f)
-        // Upper balcony
-        lineTo(leftMinaretX - minaretWidth * 1.5f, baseY - leftMinaretHeight * 0.7f)
-        lineTo(leftMinaretX - minaretWidth * 1.5f, baseY - leftMinaretHeight * 0.72f)
-        lineTo(leftMinaretX - minaretWidth * 0.8f, baseY - leftMinaretHeight * 0.72f)
-        lineTo(leftMinaretX - minaretWidth * 0.7f, baseY - leftMinaretHeight * 0.95f)
-        // Pointed cap with finial
-        quadraticBezierTo(
-            leftMinaretX, baseY - leftMinaretHeight - height * 0.03f,
-            leftMinaretX + minaretWidth * 0.7f, baseY - leftMinaretHeight * 0.95f
-        )
-        lineTo(leftMinaretX + minaretWidth * 0.8f, baseY - leftMinaretHeight * 0.72f)
-        lineTo(leftMinaretX + minaretWidth * 1.5f, baseY - leftMinaretHeight * 0.72f)
-        lineTo(leftMinaretX + minaretWidth * 1.5f, baseY - leftMinaretHeight * 0.7f)
-        lineTo(leftMinaretX + minaretWidth, baseY - leftMinaretHeight * 0.7f)
-        lineTo(leftMinaretX + minaretWidth * 1.2f, baseY)
-        close()
-
-        // ===== LEFT SECONDARY DOME =====
-        val leftDomeX = width * 0.26f
-        val smallDomeWidth = width * 0.07f
-        val smallDomeHeight = height * 0.10f
-        val smallDomeBase = height * 0.05f
-
-        moveTo(leftDomeX - smallDomeWidth, baseY)
-        lineTo(leftDomeX - smallDomeWidth, baseY - smallDomeBase)
-        cubicTo(
-            leftDomeX - smallDomeWidth, baseY - smallDomeBase - smallDomeHeight * 0.5f,
-            leftDomeX - smallDomeWidth * 0.3f, baseY - smallDomeBase - smallDomeHeight,
-            leftDomeX, baseY - smallDomeBase - smallDomeHeight - height * 0.01f
-        )
-        cubicTo(
-            leftDomeX + smallDomeWidth * 0.3f, baseY - smallDomeBase - smallDomeHeight,
-            leftDomeX + smallDomeWidth, baseY - smallDomeBase - smallDomeHeight * 0.5f,
-            leftDomeX + smallDomeWidth, baseY - smallDomeBase
-        )
-        lineTo(leftDomeX + smallDomeWidth, baseY)
-        close()
-
-        // ===== MAIN CENTRAL DOME =====
-        val mainDomeWidth = width * 0.15f
-        val mainDomeHeight = height * 0.25f
-        val mainDomeBase = height * 0.10f
-
-        moveTo(centerX - mainDomeWidth - width * 0.02f, baseY)
-        lineTo(centerX - mainDomeWidth - width * 0.02f, baseY - mainDomeBase * 0.5f)
-        lineTo(centerX - mainDomeWidth, baseY - mainDomeBase * 0.5f)
-        lineTo(centerX - mainDomeWidth, baseY - mainDomeBase)
-        // Elegant onion dome curve
-        cubicTo(
-            centerX - mainDomeWidth * 0.95f, baseY - mainDomeBase - mainDomeHeight * 0.4f,
-            centerX - mainDomeWidth * 0.35f, baseY - mainDomeBase - mainDomeHeight * 1.05f,
-            centerX, baseY - mainDomeBase - mainDomeHeight - height * 0.015f
-        )
-        cubicTo(
-            centerX + mainDomeWidth * 0.35f, baseY - mainDomeBase - mainDomeHeight * 1.05f,
-            centerX + mainDomeWidth * 0.95f, baseY - mainDomeBase - mainDomeHeight * 0.4f,
-            centerX + mainDomeWidth, baseY - mainDomeBase
-        )
-        lineTo(centerX + mainDomeWidth, baseY - mainDomeBase * 0.5f)
-        lineTo(centerX + mainDomeWidth + width * 0.02f, baseY - mainDomeBase * 0.5f)
-        lineTo(centerX + mainDomeWidth + width * 0.02f, baseY)
-        close()
-
-        // ===== RIGHT SECONDARY DOME =====
-        val rightDomeX = width * 0.74f
-
-        moveTo(rightDomeX - smallDomeWidth, baseY)
-        lineTo(rightDomeX - smallDomeWidth, baseY - smallDomeBase)
-        cubicTo(
-            rightDomeX - smallDomeWidth, baseY - smallDomeBase - smallDomeHeight * 0.5f,
-            rightDomeX - smallDomeWidth * 0.3f, baseY - smallDomeBase - smallDomeHeight,
-            rightDomeX, baseY - smallDomeBase - smallDomeHeight - height * 0.01f
-        )
-        cubicTo(
-            rightDomeX + smallDomeWidth * 0.3f, baseY - smallDomeBase - smallDomeHeight,
-            rightDomeX + smallDomeWidth, baseY - smallDomeBase - smallDomeHeight * 0.5f,
-            rightDomeX + smallDomeWidth, baseY - smallDomeBase
-        )
-        lineTo(rightDomeX + smallDomeWidth, baseY)
-        close()
-
-        // ===== RIGHT TALL MINARET =====
-        val rightMinaretX = width * 0.88f
-
-        moveTo(rightMinaretX - minaretWidth * 1.2f, baseY)
-        lineTo(rightMinaretX - minaretWidth, baseY - leftMinaretHeight * 0.7f)
-        lineTo(rightMinaretX - minaretWidth * 1.5f, baseY - leftMinaretHeight * 0.7f)
-        lineTo(rightMinaretX - minaretWidth * 1.5f, baseY - leftMinaretHeight * 0.72f)
-        lineTo(rightMinaretX - minaretWidth * 0.8f, baseY - leftMinaretHeight * 0.72f)
-        lineTo(rightMinaretX - minaretWidth * 0.7f, baseY - leftMinaretHeight * 0.95f)
-        quadraticBezierTo(
-            rightMinaretX, baseY - leftMinaretHeight - height * 0.03f,
-            rightMinaretX + minaretWidth * 0.7f, baseY - leftMinaretHeight * 0.95f
-        )
-        lineTo(rightMinaretX + minaretWidth * 0.8f, baseY - leftMinaretHeight * 0.72f)
-        lineTo(rightMinaretX + minaretWidth * 1.5f, baseY - leftMinaretHeight * 0.72f)
-        lineTo(rightMinaretX + minaretWidth * 1.5f, baseY - leftMinaretHeight * 0.7f)
-        lineTo(rightMinaretX + minaretWidth, baseY - leftMinaretHeight * 0.7f)
-        lineTo(rightMinaretX + minaretWidth * 1.2f, baseY)
-        close()
-
-        // ===== GROUND/BASE =====
+    // ===== MAIN BUILDING BASE - Extended horizontal Ottoman structure =====
+    val buildingBaseHeight = height * 0.08f
+    val buildingPath = Path().apply {
         moveTo(0f, baseY)
+        lineTo(0f, baseY - buildingBaseHeight)
+        lineTo(width, baseY - buildingBaseHeight)
         lineTo(width, baseY)
-        lineTo(width, height)
-        lineTo(0f, height)
         close()
     }
-
     drawPath(
-        path = mosquePath,
+        path = buildingPath,
         color = silhouetteColor.copy(alpha = silhouetteAlpha),
         style = Fill
     )
 
-    // ===== ARCHED WINDOWS ON MAIN STRUCTURE =====
+    // ===== MINARETS - 6 visible from this angle (cylindrical top, octagonal middle, square base) =====
+    val minaretWidth = width * 0.016f
+    val minaretHeight = height * 0.38f
+
+    // Draw 6 minarets across the width
+    val minaretPositions = listOf(
+        width * 0.02f to minaretHeight,
+        width * 0.15f to minaretHeight * 0.85f,
+        width * 0.30f to minaretHeight * 0.9f,
+        width * 0.70f to minaretHeight * 0.9f,
+        width * 0.85f to minaretHeight * 0.85f,
+        width * 0.98f to minaretHeight
+    )
+
+    minaretPositions.forEach { (x, h) ->
+        val minaretPath = Path().apply {
+            drawMinaretAccurate(this, x, baseY - buildingBaseHeight, minaretWidth, h)
+        }
+        drawPath(
+            path = minaretPath,
+            color = silhouetteColor.copy(alpha = silhouetteAlpha),
+            style = Fill
+        )
+    }
+
+    // ===== SLIDING DOMES ROW - 24 domes on flat roof (showing ~8 visible) =====
+    val smallDomeWidth = width * 0.04f
+    val smallDomeHeight = height * 0.055f
+
+    for (i in 0..7) {
+        val domeX = width * 0.08f + i * width * 0.11f
+        // Skip where Green Dome is
+        if (domeX < centerX - width * 0.12f || domeX > centerX + width * 0.08f) {
+            val domePath = Path().apply {
+                moveTo(domeX - smallDomeWidth, baseY - buildingBaseHeight)
+                quadraticBezierTo(
+                    domeX, baseY - buildingBaseHeight - smallDomeHeight,
+                    domeX + smallDomeWidth, baseY - buildingBaseHeight
+                )
+                close()
+            }
+            drawPath(
+                path = domePath,
+                color = silhouetteColor.copy(alpha = silhouetteAlpha),
+                style = Fill
+            )
+        }
+    }
+
+    // ===== THE FAMOUS GREEN DOME - South-east corner, painted green since 1837 =====
+    val greenDomeX = centerX - width * 0.02f
+    val greenDomeWidth = width * 0.11f
+    val greenDomeHeight = height * 0.16f
+    val greenDomeBaseHeight = height * 0.04f
+
+    // Draw green dome base (drum)
+    val greenDomeBasePath = Path().apply {
+        moveTo(greenDomeX - greenDomeWidth, baseY - buildingBaseHeight)
+        lineTo(greenDomeX - greenDomeWidth, baseY - buildingBaseHeight - greenDomeBaseHeight)
+        lineTo(greenDomeX + greenDomeWidth, baseY - buildingBaseHeight - greenDomeBaseHeight)
+        lineTo(greenDomeX + greenDomeWidth, baseY - buildingBaseHeight)
+        close()
+    }
+    drawPath(
+        path = greenDomeBasePath,
+        color = silhouetteColor.copy(alpha = silhouetteAlpha),
+        style = Fill
+    )
+
+    // Draw the actual GREEN dome with color!
+    val greenDomeColor = Color(0xFF228B22)  // Forest green - the actual green dome color
+    val greenDomePath = Path().apply {
+        val domeBottom = baseY - buildingBaseHeight - greenDomeBaseHeight
+        moveTo(greenDomeX - greenDomeWidth, domeBottom)
+        // Semi-circular dome shape (not onion)
+        cubicTo(
+            greenDomeX - greenDomeWidth, domeBottom - greenDomeHeight * 0.8f,
+            greenDomeX - greenDomeWidth * 0.3f, domeBottom - greenDomeHeight,
+            greenDomeX, domeBottom - greenDomeHeight
+        )
+        cubicTo(
+            greenDomeX + greenDomeWidth * 0.3f, domeBottom - greenDomeHeight,
+            greenDomeX + greenDomeWidth, domeBottom - greenDomeHeight * 0.8f,
+            greenDomeX + greenDomeWidth, domeBottom
+        )
+        close()
+    }
+    // Draw green dome with actual green color
+    val greenDomeAlpha = when (period) {
+        SkyTimePeriod.NIGHT, SkyTimePeriod.ISHA -> 0.7f
+        SkyTimePeriod.FAJR -> 0.6f
+        SkyTimePeriod.MAGHRIB -> 0.75f
+        else -> 0.85f
+    }
+    drawPath(
+        path = greenDomePath,
+        color = greenDomeColor.copy(alpha = greenDomeAlpha),
+        style = Fill
+    )
+
+    // ===== SECONDARY DOME (smaller, next to green dome) =====
+    val secondDomeX = centerX + width * 0.18f
+    val secondDomeWidth = width * 0.07f
+    val secondDomeHeight = height * 0.10f
+
+    val secondDomePath = Path().apply {
+        moveTo(secondDomeX - secondDomeWidth, baseY - buildingBaseHeight)
+        quadraticBezierTo(
+            secondDomeX, baseY - buildingBaseHeight - secondDomeHeight,
+            secondDomeX + secondDomeWidth, baseY - buildingBaseHeight
+        )
+        close()
+    }
+    drawPath(
+        path = secondDomePath,
+        color = silhouetteColor.copy(alpha = silhouetteAlpha),
+        style = Fill
+    )
+
+    // ===== FINIAL AND CRESCENT ON GREEN DOME =====
+    val greenDomeTop = baseY - buildingBaseHeight - greenDomeBaseHeight - greenDomeHeight
+
+    // Gold finial pole
+    val poleColor = Color(0xFFFFD700)
+    drawLine(
+        color = poleColor.copy(alpha = greenDomeAlpha),
+        start = Offset(greenDomeX, greenDomeTop),
+        end = Offset(greenDomeX, greenDomeTop - height * 0.03f),
+        strokeWidth = width * 0.004f
+    )
+
+    // Gold crescent on top
+    drawCircle(
+        color = poleColor.copy(alpha = greenDomeAlpha),
+        radius = width * 0.012f,
+        center = Offset(greenDomeX, greenDomeTop - height * 0.04f)
+    )
+    // Crescent cutout
+    drawCircle(
+        color = greenDomeColor.copy(alpha = greenDomeAlpha),
+        radius = width * 0.009f,
+        center = Offset(greenDomeX + width * 0.004f, greenDomeTop - height * 0.042f)
+    )
+
+    // ===== MINARET CRESCENTS =====
+    val crescentColor = Color(0xFFFFD700)
+    val crescentAlpha = when (period) {
+        SkyTimePeriod.NIGHT, SkyTimePeriod.ISHA -> 0.8f
+        SkyTimePeriod.FAJR -> 0.5f
+        else -> 0.6f
+    }
+
+    minaretPositions.forEach { (x, h) ->
+        val minaretTop = baseY - buildingBaseHeight - h - height * 0.02f
+        drawCircle(
+            color = crescentColor.copy(alpha = crescentAlpha),
+            radius = width * 0.006f,
+            center = Offset(x, minaretTop)
+        )
+    }
+
+    // ===== ARCHED WINDOWS (lit at night) =====
     val windowColor = when (period) {
-        SkyTimePeriod.NIGHT, SkyTimePeriod.ISHA -> Color(0xFFFFE082).copy(alpha = 0.4f) // Warm light
-        SkyTimePeriod.FAJR -> Color(0xFFFFE082).copy(alpha = 0.2f)
-        SkyTimePeriod.MAGHRIB -> Color(0xFFFF8A65).copy(alpha = 0.3f)
+        SkyTimePeriod.NIGHT, SkyTimePeriod.ISHA -> Color(0xFFFFE082).copy(alpha = 0.5f)
+        SkyTimePeriod.FAJR -> Color(0xFFFFE082).copy(alpha = 0.3f)
+        SkyTimePeriod.MAGHRIB -> Color(0xFFFF8A65).copy(alpha = 0.4f)
         else -> Color.Transparent
     }
 
     if (windowColor != Color.Transparent) {
-        // Left window
-        drawArc(
-            color = windowColor,
-            startAngle = 180f,
-            sweepAngle = 180f,
-            useCenter = true,
-            topLeft = Offset(centerX - width * 0.12f, baseY - height * 0.08f),
-            size = androidx.compose.ui.geometry.Size(width * 0.04f, height * 0.04f)
-        )
-        // Center window
-        drawArc(
-            color = windowColor,
-            startAngle = 180f,
-            sweepAngle = 180f,
-            useCenter = true,
-            topLeft = Offset(centerX - width * 0.02f, baseY - height * 0.09f),
-            size = androidx.compose.ui.geometry.Size(width * 0.04f, height * 0.05f)
-        )
-        // Right window
-        drawArc(
-            color = windowColor,
-            startAngle = 180f,
-            sweepAngle = 180f,
-            useCenter = true,
-            topLeft = Offset(centerX + width * 0.08f, baseY - height * 0.08f),
-            size = androidx.compose.ui.geometry.Size(width * 0.04f, height * 0.04f)
-        )
+        for (i in 0..8) {
+            val windowX = width * 0.08f + i * width * 0.1f
+            drawArc(
+                color = windowColor,
+                startAngle = 180f,
+                sweepAngle = 180f,
+                useCenter = true,
+                topLeft = Offset(windowX - width * 0.012f, baseY - height * 0.055f),
+                size = androidx.compose.ui.geometry.Size(width * 0.024f, height * 0.025f)
+            )
+        }
     }
+}
 
-    // ===== FINIALS AND CRESCENTS =====
-    val mainDomeTop = baseY - height * 0.10f - height * 0.25f - height * 0.015f
-    val leftMinaretTop = baseY - height * 0.38f - height * 0.03f
-    val rightMinaretTop = leftMinaretTop
+// Helper function to draw accurate minaret (cylindrical top, octagonal middle, square base)
+private fun drawMinaretAccurate(path: Path, x: Float, baseY: Float, width: Float, height: Float) {
+    path.apply {
+        // Square base (bottom third)
+        val baseWidth = width * 1.4f
+        moveTo(x - baseWidth, baseY)
+        lineTo(x - baseWidth, baseY - height * 0.35f)
 
-    // Finial poles
-    val poleColor = silhouetteColor.copy(alpha = silhouetteAlpha)
-    drawLine(
-        color = poleColor,
-        start = Offset(centerX, mainDomeTop),
-        end = Offset(centerX, mainDomeTop - height * 0.04f),
-        strokeWidth = width * 0.004f
-    )
+        // Transition to octagonal middle
+        lineTo(x - width * 1.1f, baseY - height * 0.35f)
+        lineTo(x - width * 0.9f, baseY - height * 0.65f)
 
-    // Crescent colors
-    val crescentColor = if (period == SkyTimePeriod.DAY || period == SkyTimePeriod.MORNING || period == SkyTimePeriod.ASR) {
-        silhouetteColor.copy(alpha = silhouetteAlpha)
-    } else {
-        Color(0xFFFFD700).copy(alpha = 0.9f)
+        // Balcony
+        lineTo(x - width * 1.3f, baseY - height * 0.65f)
+        lineTo(x - width * 1.3f, baseY - height * 0.68f)
+        lineTo(x - width * 0.7f, baseY - height * 0.68f)
+
+        // Cylindrical top section tapering to point
+        lineTo(x - width * 0.5f, baseY - height * 0.92f)
+        lineTo(x, baseY - height - height * 0.05f)  // Pointed top
+        lineTo(x + width * 0.5f, baseY - height * 0.92f)
+
+        // Right side (mirror)
+        lineTo(x + width * 0.7f, baseY - height * 0.68f)
+        lineTo(x + width * 1.3f, baseY - height * 0.68f)
+        lineTo(x + width * 1.3f, baseY - height * 0.65f)
+        lineTo(x + width * 0.9f, baseY - height * 0.65f)
+        lineTo(x + width * 1.1f, baseY - height * 0.35f)
+        lineTo(x + baseWidth, baseY - height * 0.35f)
+        lineTo(x + baseWidth, baseY)
+        close()
     }
+}
 
-    // Main dome crescent
-    drawCircle(
-        color = crescentColor,
-        radius = width * 0.016f,
-        center = Offset(centerX, mainDomeTop - height * 0.05f)
-    )
-    if (period != SkyTimePeriod.DAY && period != SkyTimePeriod.MORNING && period != SkyTimePeriod.ASR) {
-        drawCircle(
-            color = silhouetteColor,
-            radius = width * 0.012f,
-            center = Offset(centerX + width * 0.006f, mainDomeTop - height * 0.052f)
-        )
-    }
-
-    // Minaret crescents (night only)
-    if (period == SkyTimePeriod.NIGHT || period == SkyTimePeriod.ISHA || period == SkyTimePeriod.FAJR) {
-        val minaretCrescentAlpha = if (period == SkyTimePeriod.FAJR) 0.5f else 0.8f
-        // Left minaret
-        drawCircle(
-            color = Color(0xFFFFD700).copy(alpha = minaretCrescentAlpha),
-            radius = width * 0.007f,
-            center = Offset(width * 0.12f, leftMinaretTop - height * 0.01f)
-        )
-        // Right minaret
-        drawCircle(
-            color = Color(0xFFFFD700).copy(alpha = minaretCrescentAlpha),
-            radius = width * 0.007f,
-            center = Offset(width * 0.88f, rightMinaretTop - height * 0.01f)
-        )
-
-        // Small dome finials
-        drawCircle(
-            color = Color(0xFFFFD700).copy(alpha = minaretCrescentAlpha * 0.6f),
-            radius = width * 0.005f,
-            center = Offset(width * 0.26f, baseY - height * 0.05f - height * 0.10f - height * 0.02f)
-        )
-        drawCircle(
-            color = Color(0xFFFFD700).copy(alpha = minaretCrescentAlpha * 0.6f),
-            radius = width * 0.005f,
-            center = Offset(width * 0.74f, baseY - height * 0.05f - height * 0.10f - height * 0.02f)
-        )
+// Helper function to draw a minaret
+private fun drawMinaret(path: Path, x: Float, baseY: Float, width: Float, height: Float) {
+    path.apply {
+        // Minaret body with slight taper
+        moveTo(x - width * 1.1f, baseY)
+        lineTo(x - width * 0.9f, baseY - height * 0.65f)
+        // Balcony
+        lineTo(x - width * 1.3f, baseY - height * 0.65f)
+        lineTo(x - width * 1.3f, baseY - height * 0.68f)
+        lineTo(x - width * 0.7f, baseY - height * 0.68f)
+        // Upper section
+        lineTo(x - width * 0.6f, baseY - height * 0.92f)
+        // Pointed top
+        lineTo(x, baseY - height - height * 0.08f)
+        lineTo(x + width * 0.6f, baseY - height * 0.92f)
+        // Right side
+        lineTo(x + width * 0.7f, baseY - height * 0.68f)
+        lineTo(x + width * 1.3f, baseY - height * 0.68f)
+        lineTo(x + width * 1.3f, baseY - height * 0.65f)
+        lineTo(x + width * 0.9f, baseY - height * 0.65f)
+        lineTo(x + width * 1.1f, baseY)
+        close()
     }
 }
 

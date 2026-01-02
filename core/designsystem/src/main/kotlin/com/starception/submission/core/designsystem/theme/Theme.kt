@@ -28,10 +28,17 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.model.data.ThemeBrand
+
+/**
+ * CompositionLocal to provide dark theme state to child composables.
+ * This reflects the actual app theme setting (not just system setting).
+ */
+val LocalDarkTheme = compositionLocalOf { false }
 
 /**
  * Light default theme color scheme
@@ -330,6 +337,7 @@ fun NiaTheme(
     }
     // Composition locals
     CompositionLocalProvider(
+        LocalDarkTheme provides darkTheme,
         LocalGradientColors provides gradientColors,
         LocalBackgroundTheme provides backgroundTheme,
         LocalTintTheme provides tintTheme,

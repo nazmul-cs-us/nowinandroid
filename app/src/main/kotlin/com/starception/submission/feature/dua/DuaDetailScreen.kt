@@ -140,7 +140,7 @@ import com.starception.submission.core.duadatabase.toHadithReference
 import com.starception.submission.core.qurandatabase.QuranDatabase
 import com.starception.submission.core.ui.DynamicSkyHeader
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
-import com.starception.submission.core.ui.getCurrentSkyPeriod
+import com.starception.submission.core.ui.getCurrentSkyPeriodForTheme
 import com.starception.submission.core.ui.getSkyColors
 
 /**
@@ -994,7 +994,7 @@ fun DuaDetailScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = Color.Transparent  // Transparent to let sky extend to top
     ) { _ ->
         // Don't apply paddingValues - let content scroll under transparent toolbar like SurahDetailScreen
         Box(modifier = Modifier.fillMaxSize()) {
@@ -1037,26 +1037,25 @@ fun DuaDetailScreen(
                         }
 
                         // Each page has its own LazyColumn with header + content
-                        // Use contentPadding for status bar like SurahDetailScreen to allow full scroll
+                        // No status bar padding - immersive mode hides status bar
                         LazyColumn(
                             state = lazyListState,
-                            contentPadding = WindowInsets.statusBars.asPaddingValues(),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(bottom = 72.dp) // Space for bottom navigation
                         ) {
                             // Header with dynamic sky - scrollable, extends behind toolbar
                             item {
-                                val skyPeriod = getCurrentSkyPeriod()
+                                val skyPeriod = getCurrentSkyPeriodForTheme()
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(340.dp) // Taller header for full-screen immersive experience
+                                        .height(420.dp) // Taller header for full-screen immersive experience
                                 ) {
                                     // Dynamic sky background based on time of day
                                     DynamicSkyHeader(
                                         modifier = Modifier.fillMaxSize(),
-                                        height = 340.dp,
+                                        height = 420.dp,
                                         period = skyPeriod
                                     )
                                     // Semi-transparent overlay for text readability
@@ -1067,55 +1066,34 @@ fun DuaDetailScreen(
                                     )
                                     android.util.Log.d("DuaHeader", "🎨 GRADIENT BOX RENDERING - dua.title='${dua.title}' arabicText.length=${dua.arabicText.length}")
 
-                                    // Header content only (positioned below toolbar area)
+                                    // Header content positioned at bottom to show more sky artwork
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .padding(horizontal = 16.dp)
-                                            .padding(top = 100.dp, bottom = 16.dp), // More top padding for immersive toolbar
-                                        verticalArrangement = Arrangement.SpaceEvenly,
+                                            .padding(top = 100.dp, bottom = 4.dp), // Position content at very bottom
+                                        verticalArrangement = Arrangement.Bottom,
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         android.util.Log.d("DuaHeader", "📦 HEADER COLUMN RENDERING")
 
-                                        // Icon and Title group
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            // Dua icon - glassmorphism style
-                                            Surface(
-                                                modifier = Modifier.size(56.dp),
-                                                shape = RoundedCornerShape(16.dp),
-                                                color = Color.White.copy(alpha = 0.25f)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.AutoStories,
-                                                        contentDescription = "Dua",
-                                                        tint = Color.White,
-                                                        modifier = Modifier.size(28.dp)
-                                                    )
-                                                }
-                                            }
-
-                                            Spacer(modifier = Modifier.height(12.dp))
-
-                                            // Dynamic header: "Quranic Dua" for Quran-based duas, otherwise show category or "Dua"
-                                            val isQuranicDua = dua.surahNumber > 0 && dua.ayahNumber > 0
-                                            val headerText = if (isQuranicDua) {
-                                                "Quranic Dua"
-                                            } else {
-                                                "Dua" // For fortress_of_the_muslim and other duas
-                                            }
-
-                                            Text(
-                                                text = headerText,
-                                                style = MaterialTheme.typography.titleLarge,
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Bold,
-                                                letterSpacing = 0.5.sp
-                                            )
+                                        // Dynamic header: "Quranic Dua" for Quran-based duas, otherwise show category or "Dua"
+                                        val isQuranicDua = dua.surahNumber > 0 && dua.ayahNumber > 0
+                                        val headerText = if (isQuranicDua) {
+                                            "Quranic Dua"
+                                        } else {
+                                            "Dua" // For fortress_of_the_muslim and other duas
                                         }
+
+                                        Text(
+                                            text = headerText,
+                                            style = MaterialTheme.typography.titleLarge,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 0.5.sp
+                                        )
+
+                                        Spacer(modifier = Modifier.height(8.dp))
 
                                         // Dua theme/title - clean up various title formats
                                         // Filter out Arabic characters to prevent Arabic text from appearing in header
@@ -1571,7 +1549,8 @@ fun DuaDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .padding(top = 16.dp) // Extra top padding for immersive mode
+                    .statusBarsPadding() // Account for status bar/punch hole
+                    .padding(top = 56.dp) // Extra top padding to clear camera punch hole and show more sky
             ) {
                 Row(
                     modifier = Modifier
@@ -2025,7 +2004,7 @@ private fun SingleDuaContent(
             .verticalScroll(rememberScrollState())
     ) {
         // Header with dynamic sky - matches the pager header style
-        val skyPeriod = getCurrentSkyPeriod()
+        val skyPeriod = getCurrentSkyPeriodForTheme()
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2346,16 +2325,16 @@ private fun DuaShimmerLoadingContent(
             modifier = Modifier.fillMaxSize()
         ) {
             // Header with dynamic sky - shown immediately with shimmer placeholders
-            val skyPeriod = getCurrentSkyPeriod()
+            val skyPeriod = getCurrentSkyPeriodForTheme()
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(340.dp) // Match taller header
+                    .height(420.dp) // Match taller header
             ) {
                 // Dynamic sky background based on time of day
                 DynamicSkyHeader(
                     modifier = Modifier.fillMaxSize(),
-                    height = 340.dp,
+                    height = 420.dp,
                     period = skyPeriod
                 )
                 // Semi-transparent overlay for text readability
@@ -2364,45 +2343,23 @@ private fun DuaShimmerLoadingContent(
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.2f))
                 )
+                // Header content positioned at bottom to show more sky artwork
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp)
-                        .padding(top = 100.dp, bottom = 12.dp), // Match taller header padding
-                    verticalArrangement = Arrangement.SpaceEvenly,
+                        .padding(top = 100.dp, bottom = 4.dp), // Position content at very bottom
+                    verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        // Icon - glassmorphism style (actual content, not shimmer)
-                        Box(contentAlignment = Alignment.Center) {
-                            Surface(
-                                modifier = Modifier.size(52.dp),
-                                shape = RoundedCornerShape(14.dp),
-                                color = Color.White.copy(alpha = 0.08f)
-                            ) {}
-                            Surface(
-                                modifier = Modifier.size(44.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color.White.copy(alpha = 0.18f)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.AutoStories,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "Dua", // Generic text while loading
-                            style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Text(
+                        text = "Dua", // Generic text while loading
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Shimmer placeholder for dua theme title
                     Box(
@@ -2415,14 +2372,16 @@ private fun DuaShimmerLoadingContent(
                             )
                     )
 
-                    // Shimmer placeholder for Surah reference pill
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Shimmer placeholder for topic/Surah reference pill
                     Box(
                         modifier = Modifier
                             .width(140.dp)
-                            .height(44.dp)
+                            .height(36.dp)
                             .background(
                                 color = Color.White.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(22.dp)
+                                shape = RoundedCornerShape(18.dp)
                             )
                     )
                 }
@@ -2505,7 +2464,8 @@ private fun DuaShimmerLoadingContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .padding(top = 16.dp) // Extra top padding for immersive mode
+                .statusBarsPadding() // Account for status bar/punch hole
+                .padding(top = 56.dp) // Extra top padding to match main toolbar
         ) {
             Row(
                 modifier = Modifier
