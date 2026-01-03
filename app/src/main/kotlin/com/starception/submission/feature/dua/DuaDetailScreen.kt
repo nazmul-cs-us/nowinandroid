@@ -1067,32 +1067,19 @@ fun DuaDetailScreen(
                                     )
                                     android.util.Log.d("DuaHeader", "🎨 GRADIENT BOX RENDERING - dua.title='${dua.title}' arabicText.length=${dua.arabicText.length}")
 
-                                    // Header content positioned at bottom to show more sky artwork
+                                    // Header content positioned at bottom to show more sky artwork and masjid
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .padding(horizontal = 16.dp)
-                                            .padding(top = 100.dp, bottom = 4.dp), // Position content at very bottom
+                                            .offset(y = 17.dp), // Push text lower into content area
                                         verticalArrangement = Arrangement.Bottom,
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         android.util.Log.d("DuaHeader", "📦 HEADER COLUMN RENDERING")
 
-                                        // Dynamic header: "Quranic Dua" for Quran-based duas, otherwise show category or "Dua"
-                                        val isQuranicDua = dua.surahNumber > 0 && dua.ayahNumber > 0
-                                        val headerText = if (isQuranicDua) {
-                                            "Quranic Dua"
-                                        } else {
-                                            "Dua" // For fortress_of_the_muslim and other duas
-                                        }
-
-                                        Text(
-                                            text = headerText,
-                                            style = MaterialTheme.typography.titleLarge,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 0.5.sp
-                                        )
+                                        // Spacer to push text down and show more masjid
+                                        Spacer(modifier = Modifier.weight(1f))
 
                                         Spacer(modifier = Modifier.height(8.dp))
 
@@ -1122,7 +1109,7 @@ fun DuaDetailScreen(
                                                 color = Color.White.copy(alpha = 0.9f),
                                                 fontWeight = FontWeight.Medium,
                                                 textAlign = TextAlign.Center,
-                                                maxLines = 2
+                                                maxLines = 1
                                             )
                                         }
 
