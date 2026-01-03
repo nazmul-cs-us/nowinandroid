@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.filled.TextFormat
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CheckCircleOutline
@@ -1550,7 +1551,7 @@ fun DuaDetailScreen(
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
                     .statusBarsPadding() // Account for status bar/punch hole
-                    .padding(top = 56.dp) // Extra top padding to clear camera punch hole and show more sky
+                    .padding(top = 52.dp) // Extra top padding to clear camera punch hole and show more sky
             ) {
                 Row(
                     modifier = Modifier
@@ -1667,6 +1668,18 @@ fun DuaDetailScreen(
                         Icon(
                             imageVector = if (localBookmarkState) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
                             contentDescription = if (localBookmarkState) "Remove Bookmark" else "Add Bookmark",
+                            tint = Color.White
+                        )
+                    }
+
+                    // More options button (vertical dots)
+                    IconButton(
+                        onClick = { /* Menu action */ },
+                        modifier = Modifier.offset(x = (-8).dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "More options",
                             tint = Color.White
                         )
                     }
@@ -2465,19 +2478,31 @@ private fun DuaShimmerLoadingContent(
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
                 .statusBarsPadding() // Account for status bar/punch hole
-                .padding(top = 56.dp) // Extra top padding to match main toolbar
+                .padding(top = 52.dp) // Extra top padding to match main toolbar
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp)
                     .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 IconButton(onClick = onBackClick) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
+                        tint = Color.White
+                    )
+                }
+
+                IconButton(
+                    onClick = { /* Menu action */ },
+                    modifier = Modifier.offset(x = (-8).dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "More options",
                         tint = Color.White
                     )
                 }

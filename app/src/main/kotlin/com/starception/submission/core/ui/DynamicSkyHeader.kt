@@ -35,13 +35,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.starception.submission.R
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import java.util.Calendar
 import kotlin.math.PI
@@ -200,6 +207,7 @@ private fun generateShootingStar(seed: Int): ShootingStar {
 
 /**
  * Dynamic Sky Header that changes based on time of day
+ * Uses the Masjid-e-Nabawi silhouette from SVG vector drawable
  */
 @Composable
 fun DynamicSkyHeader(
@@ -208,6 +216,9 @@ fun DynamicSkyHeader(
     period: SkyTimePeriod = getCurrentSkyPeriod()
 ) {
     val skyColors = getSkyColors(period)
+
+    // Load the Masjid-e-Nabawi silhouette vector drawable
+    val silhouettePainter = painterResource(id = R.drawable.ic_masjid_nabawi_silhouette)
 
     // Generate consistent stars (using seed for reproducibility)
     val stars = remember {
@@ -299,8 +310,11 @@ fun DynamicSkyHeader(
             // Draw celestial body (sun or moon)
             drawCelestialBody(canvasWidth, canvasHeight, period)
 
-            // Draw landscape silhouette (mosque/hills)
-            drawLandscapeSilhouette(canvasWidth, canvasHeight, period)
+            // Draw landscape silhouette using vector drawable from SVG
+            drawMasjidSilhouette(silhouettePainter, canvasWidth, canvasHeight, period)
+
+            // Draw colored overlay elements (green dome, crescents, lit windows)
+            drawSilhouetteOverlays(canvasWidth, canvasHeight, period)
         }
     }
 }
@@ -580,6 +594,118 @@ private fun DrawScope.drawCrescentMoon(
         radius = radius * 0.85f,
         center = Offset(center.x + radius * 0.4f, center.y - radius * 0.1f)
     )
+}
+
+/**
+ * Draw the Masjid-e-Nabawi silhouette using the vector drawable from SVG
+ */
+private fun DrawScope.drawMasjidSilhouette(
+    painter: Painter,
+    width: Float,
+    height: Float,
+    period: SkyTimePeriod
+) {
+    // Determine silhouette color based on time period
+    val silhouetteColor = when (period) {
+        SkyTimePeriod.NIGHT, SkyTimePeriod.ISHA -> Color(0xFF080810)
+        SkyTimePeriod.FAJR -> Color(0xFF151525)
+        SkyTimePeriod.MAGHRIB -> Color(0xFF251515)
+        else -> Color(0xFF1a1a1a)
+    }
+
+    val silhouetteAlpha = when (period) {
+        SkyTimePeriod.DAY, SkyTimePeriod.MORNING -> 0.35f
+        SkyTimePeriod.ASR -> 0.45f
+        else -> 1f
+    }
+
+    // Calculate size to fit the silhouette at the bottom of the canvas
+    // The vector drawable has aspect ratio 240:162 (about 1.48:1)
+    // Use full width and calculate proportional height
+    val aspectRatio = 240f / 162f
+    val finalWidth = width
+    val finalHeight = finalWidth / aspectRatio
+
+    // Align to bottom, full width
+    val left = 0f
+    val top = height - finalHeight
+
+    // Draw the silhouette with tinting
+    translate(left = left, top = top) {
+        with(painter) {
+            draw(
+                size = Size(finalWidth, finalHeight),
+                colorFilter = ColorFilter.tint(
+                    color = silhouetteColor.copy(alpha = silhouetteAlpha),
+                    blendMode = BlendMode.SrcIn
+                )
+            )
+        }
+    }
+}
+
+/**
+ * Draw colored overlay elements on top of the silhouette
+ * (gold crescents, lit windows)
+ */
+private fun DrawScope.drawSilhouetteOverlays(
+    width: Float,
+    height: Float,
+    period: SkyTimePeriod
+) {
+    // Position calculations based on silhouette placement
+    val baseY = height  // At very bottom
+    val buildingBaseHeight = height * 0.08f
+
+    // ===== MINARET CRESCENTS =====
+    val minaretWidth = width * 0.016f
+    val minaretHeight = height * 0.38f
+    val minaretPositions = listOf(
+        width * 0.02f to minaretHeight,
+        width * 0.15f to minaretHeight * 0.85f,
+        width * 0.30f to minaretHeight * 0.9f,
+        width * 0.70f to minaretHeight * 0.9f,
+        width * 0.85f to minaretHeight * 0.85f,
+        width * 0.98f to minaretHeight
+    )
+
+    val crescentColor = Color(0xFFFFD700)
+    val crescentAlpha = when (period) {
+        SkyTimePeriod.NIGHT, SkyTimePeriod.ISHA -> 0.8f
+        SkyTimePeriod.FAJR -> 0.5f
+        else -> 0.6f
+    }
+
+    minaretPositions.forEach { (x, h) ->
+        val minaretTop = baseY - buildingBaseHeight - h - height * 0.02f
+        drawCircle(
+            color = crescentColor.copy(alpha = crescentAlpha),
+            radius = width * 0.006f,
+            center = Offset(x, minaretTop)
+        )
+    }
+
+    // ===== ARCHED WINDOWS (lit at night) =====
+    val windowColor = when (period) {
+        SkyTimePeriod.NIGHT, SkyTimePeriod.ISHA -> Color(0xFFFFE082).copy(alpha = 0.5f)
+        SkyTimePeriod.FAJR -> Color(0xFFFFE082).copy(alpha = 0.3f)
+        SkyTimePeriod.MAGHRIB -> Color(0xFFFF8A65).copy(alpha = 0.4f)
+        else -> Color.Transparent
+    }
+
+    if (windowColor != Color.Transparent) {
+        for (i in 0..8) {
+            val windowX = width * 0.08f + i * width * 0.1f
+            drawArc(
+                color = windowColor,
+                startAngle = 180f,
+                sweepAngle = 180f,
+                useCenter = true,
+                topLeft = Offset(windowX - width * 0.012f, baseY - height * 0.055f),
+                size = Size(width * 0.024f, height * 0.025f)
+            )
+        }
+    }
 }
 
 private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, period: SkyTimePeriod) {
