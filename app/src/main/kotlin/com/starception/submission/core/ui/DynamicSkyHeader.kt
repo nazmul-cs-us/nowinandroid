@@ -458,60 +458,60 @@ private fun DrawScope.drawShootingStars(
 
 private fun DrawScope.drawCelestialBody(width: Float, height: Float, period: SkyTimePeriod) {
     // NOTE: Toolbar occupies top ~25% of header (100dp out of 420dp)
-    // Celestial bodies should be positioned at 40%+ height to avoid overlap
+    // Celestial bodies positioned to avoid overlap with toolbar
     when (period) {
         SkyTimePeriod.SUNRISE -> {
             // Rising sun near horizon
             drawSun(
-                center = Offset(width * 0.5f, height * 0.72f),
+                center = Offset(width * 0.45f, height * 0.68f),
                 radius = width * 0.08f,
                 glowRadius = width * 0.15f
             )
         }
         SkyTimePeriod.MORNING -> {
-            // Sun rising higher - moved lower to avoid toolbar
+            // Sun rising higher - moved left and up
             drawSun(
-                center = Offset(width * 0.8f, height * 0.48f),
+                center = Offset(width * 0.72f, height * 0.38f),
                 radius = width * 0.065f,
                 glowRadius = width * 0.11f
             )
         }
         SkyTimePeriod.DAY -> {
-            // Sun in sky - moved to safe zone below toolbar
+            // Sun in sky - moved left and up
             drawSun(
-                center = Offset(width * 0.85f, height * 0.42f),
+                center = Offset(width * 0.75f, height * 0.32f),
                 radius = width * 0.055f,
                 glowRadius = width * 0.09f
             )
         }
         SkyTimePeriod.ASR -> {
-            // Sun descending - positioned to right side, below toolbar
+            // Sun descending - moved slightly left
             drawSun(
-                center = Offset(width * 0.2f, height * 0.52f),
+                center = Offset(width * 0.15f, height * 0.42f),
                 radius = width * 0.065f,
                 glowRadius = width * 0.11f
             )
         }
         SkyTimePeriod.MAGHRIB -> {
-            // Setting sun near horizon
+            // Setting sun near horizon - moved left
             drawSun(
-                center = Offset(width * 0.5f, height * 0.75f),
+                center = Offset(width * 0.45f, height * 0.70f),
                 radius = width * 0.09f,
                 glowRadius = width * 0.18f,
                 isSettingSun = true
             )
         }
         SkyTimePeriod.ISHA, SkyTimePeriod.NIGHT -> {
-            // Crescent moon - moved lower to avoid toolbar
+            // Crescent moon - moved left and up
             drawCrescentMoon(
-                center = Offset(width * 0.82f, height * 0.42f),
+                center = Offset(width * 0.72f, height * 0.32f),
                 radius = width * 0.055f
             )
         }
         SkyTimePeriod.FAJR -> {
-            // Fading moon - moved lower to avoid toolbar
+            // Fading moon - moved slightly left and up
             drawCrescentMoon(
-                center = Offset(width * 0.18f, height * 0.45f),
+                center = Offset(width * 0.12f, height * 0.35f),
                 radius = width * 0.05f,
                 alpha = 0.6f
             )
