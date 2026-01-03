@@ -1475,59 +1475,75 @@ fun DuaDetailScreen(
                 )
             }
 
-            // Bottom indicator - Clean "Dua X of Y" design with theme colors
-            Box(
+            // Bottom indicator - Swipe hint with arrows
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(vertical = 16.dp),
-                contentAlignment = Alignment.Center
+                    .align(Alignment.BottomCenter),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 32.dp),
-                    horizontalArrangement = Arrangement.Center,
+                        .padding(horizontal = 24.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left line
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant)
+                    // Left arrow hint
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = "Previous",
+                        tint = if (hasPrevious) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.size(24.dp)
                     )
 
-                    // Center text: "Dua X of Y"
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Center: Page indicator dots + text
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        // Dot indicators (show up to 5 dots)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val dotCount = minOf(totalDuas, 5)
+                            val startIndex = when {
+                                totalDuas <= 5 -> 0
+                                currentPage < 2 -> 0
+                                currentPage > totalDuas - 3 -> totalDuas - 5
+                                else -> currentPage - 2
+                            }
+                            repeat(dotCount) { index ->
+                                val actualIndex = startIndex + index
+                                Box(
+                                    modifier = Modifier
+                                        .size(if (actualIndex == currentPage) 8.dp else 6.dp)
+                                        .background(
+                                            color = if (actualIndex == currentPage)
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.outlineVariant,
+                                            shape = RoundedCornerShape(50)
+                                        )
+                                )
+                            }
+                        }
+                        // Text indicator
                         Text(
-                            text = "Dua ",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "${currentPage + 1}",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = " of $totalDuas",
-                            style = MaterialTheme.typography.bodyLarge,
+                            text = "${currentPage + 1} of $totalDuas",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
-                    // Right line
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant)
+                    // Right arrow hint
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Next",
+                        tint = if (hasNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
