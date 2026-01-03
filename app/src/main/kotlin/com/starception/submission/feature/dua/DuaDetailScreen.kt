@@ -1190,7 +1190,7 @@ fun DuaDetailScreen(
                             }
                         }
 
-                        // Arabic Text Card - Cream/beige background, centered text
+                        // Arabic Text Card - Theme-aware background
                         if (dua.arabicText.isNotEmpty()) {
                             item {
                                 Surface(
@@ -1198,7 +1198,7 @@ fun DuaDetailScreen(
                                         .fillMaxWidth()
                                         .padding(horizontal = 16.dp, vertical = 12.dp),
                                     shape = RoundedCornerShape(16.dp),
-                                    color = Color(0xFFF8F5F0), // Cream/beige background
+                                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
                                     tonalElevation = 0.dp,
                                     shadowElevation = 1.dp
                                 ) {
@@ -1219,7 +1219,7 @@ fun DuaDetailScreen(
                                                 text = dua.arabicText,
                                                 annotations = tajweedAnnotations,
                                                 defaultStyle = androidx.compose.ui.text.SpanStyle(
-                                                    color = Color(0xFF3D3D3D) // Dark gray text
+                                                    color = MaterialTheme.colorScheme.onSurface
                                                 )
                                             )
                                             Text(
@@ -1236,7 +1236,7 @@ fun DuaDetailScreen(
                                                 fontSize = 32.sp,
                                                 lineHeight = 54.sp,
                                                 textAlign = TextAlign.Center,
-                                                color = Color(0xFF3D3D3D) // Dark gray text
+                                                color = MaterialTheme.colorScheme.onSurface
                                             )
                                         }
                                     }
@@ -1475,12 +1475,12 @@ fun DuaDetailScreen(
                 )
             }
 
-            // Bottom indicator - Clean "Dua X of Y" design matching screenshot
+            // Bottom indicator - Clean "Dua X of Y" design with theme colors
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .background(Color(0xFFFAF8F5)) // Light cream background
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -1496,7 +1496,7 @@ fun DuaDetailScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(1.dp)
-                            .background(Color(0xFFD0D0D0))
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     )
 
                     // Center text: "Dua X of Y"
@@ -1507,18 +1507,18 @@ fun DuaDetailScreen(
                         Text(
                             text = "Dua ",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF9E9E9E)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = "${currentPage + 1}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF3D3D3D)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = " of $totalDuas",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF9E9E9E)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -1527,7 +1527,7 @@ fun DuaDetailScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(1.dp)
-                            .background(Color(0xFFD0D0D0))
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     )
                 }
             }
@@ -2064,12 +2064,12 @@ private fun SingleDuaContent(
                 .padding(bottom = 72.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Arabic Text Card - Cream background
+            // Arabic Text Card - Theme-aware background
             if (parsedContent.arabicText.isNotEmpty()) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFFF8F5F0), // Cream/beige background
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
                     shadowElevation = 1.dp
                 ) {
                     Column(
@@ -2084,7 +2084,7 @@ private fun SingleDuaContent(
                             fontSize = 32.sp,
                             lineHeight = 54.sp,
                             textAlign = TextAlign.Center,
-                            color = Color(0xFF3D3D3D)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
