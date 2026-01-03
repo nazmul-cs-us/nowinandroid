@@ -1546,12 +1546,12 @@ fun DuaDetailScreen(
             }
 
             // Fixed toolbar at top - transparent to show sky through
+            // Use fixed padding instead of statusBarsPadding() to prevent jump when immersive mode activates
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .statusBarsPadding() // Account for status bar/punch hole
-                    .padding(top = 52.dp) // Extra top padding to clear camera punch hole and show more sky
+                    .padding(top = 48.dp) // Fixed padding to clear camera punch hole area
             ) {
                 Row(
                     modifier = Modifier
@@ -2473,12 +2473,12 @@ private fun DuaShimmerLoadingContent(
         }
 
         // Toolbar overlay - transparent to show sky through
+        // Use fixed padding instead of statusBarsPadding() to prevent jump when immersive mode activates
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .statusBarsPadding() // Account for status bar/punch hole
-                .padding(top = 52.dp) // Extra top padding to match main toolbar
+                .padding(top = 48.dp) // Fixed padding to clear camera punch hole area
         ) {
             Row(
                 modifier = Modifier
