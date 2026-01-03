@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Translate
@@ -573,7 +575,7 @@ private fun HadithContent(
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
                 .statusBarsPadding() // Account for status bar/punch hole
-                .padding(top = 56.dp) // Extra top padding to clear camera punch hole and show more sky
+                .offset(y = (-8).dp) // Move toolbar higher
         ) {
             Row(
                 modifier = Modifier
@@ -602,16 +604,23 @@ private fun HadithContent(
                 }
 
                 // Collection badge - using NiaTopicTag for consistency with Dua detail
-                Box(modifier = Modifier.padding(end = 16.dp)) {
-                    NiaTopicTag(
-                        followed = false,
-                        onClick = { },
-                        enabled = true,
-                        text = {
-                            Text(
-                                text = collectionName.uppercase(Locale.getDefault())
-                            )
-                        }
+                NiaTopicTag(
+                    followed = false,
+                    onClick = { },
+                    enabled = true,
+                    text = {
+                        Text(
+                            text = collectionName.uppercase(Locale.getDefault())
+                        )
+                    }
+                )
+
+                // More options menu
+                IconButton(onClick = { /* TODO: More options */ }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "More options",
+                        tint = Color.White
                     )
                 }
             }
@@ -873,7 +882,7 @@ private fun HadithShimmerLoading(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding() // Account for status bar/punch hole
-                .padding(top = 56.dp) // Extra top padding to match main toolbar
+                .offset(y = (-8).dp) // Move toolbar higher
         ) {
             Row(
                 modifier = Modifier

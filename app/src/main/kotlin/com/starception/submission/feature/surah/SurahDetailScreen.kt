@@ -910,7 +910,7 @@ private fun AlbumPlayerTopBar(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding() // Account for status bar/punch hole
-            .padding(top = 56.dp) // Extra top padding to show more sky
+            .padding(top = 52.dp) // Extra top padding to show more sky (moved up 4dp)
     ) {
         Row(
             modifier = Modifier
