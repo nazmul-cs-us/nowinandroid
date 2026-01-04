@@ -1045,7 +1045,7 @@ fun DuaDetailScreen(
                         LazyColumn(
                             state = lazyListState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 72.dp) // Space for Vuesax pagination pill
+                            contentPadding = PaddingValues(bottom = 56.dp) // Space for Vuesax pagination pill
                         ) {
                             // Header with dynamic sky - scrollable, extends behind toolbar
                             item {
@@ -1553,7 +1553,7 @@ fun DuaDetailScreen(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = 12.dp), // Equal 12dp gap above and below pagination
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Expanded grid view for hidden pages (appears above pagination bar)
@@ -1637,8 +1637,8 @@ fun DuaDetailScreen(
                     tonalElevation = 2.dp
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Previous arrow - circular
