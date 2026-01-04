@@ -45,6 +45,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Translate
@@ -87,6 +89,7 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -1041,9 +1044,8 @@ fun DuaDetailScreen(
                         // No status bar padding - immersive mode hides status bar
                         LazyColumn(
                             state = lazyListState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(bottom = 72.dp) // Space for bottom navigation
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 72.dp) // Space for Vuesax pagination pill
                         ) {
                             // Header with dynamic sky - scrollable, extends behind toolbar
                             item {
@@ -1169,6 +1171,11 @@ fun DuaDetailScreen(
                                 }
                             }
 
+                        // Spacer between header and content cards
+                        item {
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+
                         // Context section - When/why to recite (before the dua)
                         if (dua.context.isNotEmpty()) {
                             item {
@@ -1190,55 +1197,47 @@ fun DuaDetailScreen(
                             }
                         }
 
-                        // Arabic Text Card - Theme-aware background
+                        // Arabic Text Card - Using CollapsibleDuaSection for consistent styling
                         if (dua.arabicText.isNotEmpty()) {
                             item {
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                                    tonalElevation = 0.dp,
-                                    shadowElevation = 1.dp
+                                CollapsibleDuaSection(
+                                    title = "Arabic",
+                                    accentColor = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                    initiallyExpanded = true
                                 ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 24.dp, vertical = 40.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        val tajweedAnnotations = if (showTajweed && dua.surahNumber > 0 && dua.ayahNumber > 0) {
-                                            viewModel.getTajweedAnnotations(dua.surahNumber, dua.ayahNumber)
-                                        } else {
-                                            emptyList()
-                                        }
+                                    val tajweedAnnotations = if (showTajweed && dua.surahNumber > 0 && dua.ayahNumber > 0) {
+                                        viewModel.getTajweedAnnotations(dua.surahNumber, dua.ayahNumber)
+                                    } else {
+                                        emptyList()
+                                    }
 
-                                        if (showTajweed && tajweedAnnotations.isNotEmpty()) {
-                                            val annotatedText = TajweedTextApplier.applyWithOverlap(
-                                                text = dua.arabicText,
-                                                annotations = tajweedAnnotations,
-                                                defaultStyle = androidx.compose.ui.text.SpanStyle(
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                            )
-                                            Text(
-                                                text = annotatedText,
-                                                fontFamily = arabicFontFamily,
-                                                fontSize = 32.sp,
-                                                lineHeight = 54.sp,
-                                                textAlign = TextAlign.Center
-                                            )
-                                        } else {
-                                            Text(
-                                                text = dua.arabicText,
-                                                fontFamily = arabicFontFamily,
-                                                fontSize = 32.sp,
-                                                lineHeight = 54.sp,
-                                                textAlign = TextAlign.Center,
+                                    if (showTajweed && tajweedAnnotations.isNotEmpty()) {
+                                        val annotatedText = TajweedTextApplier.applyWithOverlap(
+                                            text = dua.arabicText,
+                                            annotations = tajweedAnnotations,
+                                            defaultStyle = androidx.compose.ui.text.SpanStyle(
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
-                                        }
+                                        )
+                                        Text(
+                                            text = annotatedText,
+                                            fontFamily = arabicFontFamily,
+                                            fontSize = 32.sp,
+                                            lineHeight = 54.sp,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    } else {
+                                        Text(
+                                            text = dua.arabicText,
+                                            fontFamily = arabicFontFamily,
+                                            fontSize = 32.sp,
+                                            lineHeight = 54.sp,
+                                            textAlign = TextAlign.Center,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
                                     }
                                 }
                             }
@@ -1282,7 +1281,9 @@ fun DuaDetailScreen(
                                             lineHeight = 28.sp,
                                             fontStyle = FontStyle.Italic
                                         ),
-                                        color = Color(0xFF5D5D5D) // Medium gray
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
                                     )
                                 }
                             }
@@ -1304,7 +1305,9 @@ fun DuaDetailScreen(
                                             lineHeight = 28.sp,
                                             fontStyle = FontStyle.Italic
                                         ),
-                                        color = Color(0xFF5D5D5D) // Medium gray
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
                                     )
                                 }
                             }
@@ -1475,76 +1478,168 @@ fun DuaDetailScreen(
                 )
             }
 
-            // Bottom indicator - Swipe hint with arrows
+            // Bottom indicator - Vuesax-style pagination with numbered buttons
+            val coroutineScope = rememberCoroutineScope()
+
+            // Calculate which page numbers to show (max 5 numbers + ellipsis)
+            val maxVisible = 5
+            val pageNumbers = remember(currentPage, totalDuas) {
+                buildList {
+                    when {
+                        totalDuas <= maxVisible + 2 -> {
+                            // Show all pages if total is small
+                            for (i in 0 until totalDuas) add(i)
+                        }
+                        currentPage < maxVisible - 1 -> {
+                            // Near start: show first pages + ellipsis + last
+                            for (i in 0 until maxVisible) add(i)
+                            add(-1) // ellipsis
+                            add(totalDuas - 1)
+                        }
+                        currentPage > totalDuas - maxVisible -> {
+                            // Near end: show first + ellipsis + last pages
+                            add(0)
+                            add(-1) // ellipsis
+                            for (i in totalDuas - maxVisible until totalDuas) add(i)
+                        }
+                        else -> {
+                            // Middle: show first + ellipsis + current context + ellipsis + last
+                            add(0)
+                            add(-1) // ellipsis
+                            add(currentPage - 1)
+                            add(currentPage)
+                            add(currentPage + 1)
+                            add(-2) // ellipsis
+                            add(totalDuas - 1)
+                        }
+                    }
+                }
+            }
+
+            // Vuesax Circle Pagination - Clean circular buttons
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter),
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp)
+                    .shadow(
+                        elevation = 16.dp,
+                        shape = RoundedCornerShape(50),
+                        ambientColor = Color.Black.copy(alpha = 0.1f),
+                        spotColor = Color.Black.copy(alpha = 0.15f)
+                    ),
+                shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 1.dp
+                tonalElevation = 2.dp
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left arrow hint
-                    Icon(
-                        imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = "Previous",
-                        tint = if (hasPrevious) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                        modifier = Modifier.size(24.dp)
-                    )
-
-                    // Center: Page indicator dots + text
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    // Previous arrow - circular
+                    Surface(
+                        onClick = {
+                            if (hasPrevious) {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(currentPage - 1)
+                                }
+                            }
+                        },
+                        modifier = Modifier.size(36.dp),
+                        shape = RoundedCornerShape(50),
+                        color = if (hasPrevious) MaterialTheme.colorScheme.primaryContainer
+                               else MaterialTheme.colorScheme.surfaceContainerHigh
                     ) {
-                        // Dot indicators (show up to 5 dots)
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val dotCount = minOf(totalDuas, 5)
-                            val startIndex = when {
-                                totalDuas <= 5 -> 0
-                                currentPage < 2 -> 0
-                                currentPage > totalDuas - 3 -> totalDuas - 5
-                                else -> currentPage - 2
-                            }
-                            repeat(dotCount) { index ->
-                                val actualIndex = startIndex + index
-                                Box(
-                                    modifier = Modifier
-                                        .size(if (actualIndex == currentPage) 8.dp else 6.dp)
-                                        .background(
-                                            color = if (actualIndex == currentPage)
-                                                MaterialTheme.colorScheme.primary
-                                            else
-                                                MaterialTheme.colorScheme.outlineVariant,
-                                            shape = RoundedCornerShape(50)
-                                        )
-                                )
-                            }
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.Default.ChevronLeft,
+                                contentDescription = "Previous",
+                                tint = if (hasPrevious) MaterialTheme.colorScheme.onPrimaryContainer
+                                      else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
-                        // Text indicator
-                        Text(
-                            text = "${currentPage + 1} of $totalDuas",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
 
-                    // Right arrow hint
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "Next",
-                        tint = if (hasNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    // Circular page buttons
+                    pageNumbers.forEach { pageIndex ->
+                        if (pageIndex < 0) {
+                            // Ellipsis
+                            Text(
+                                text = "•••",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.padding(horizontal = 2.dp)
+                            )
+                        } else {
+                            val isActive = pageIndex == currentPage
+                            // Animated scale for active
+                            val scale by animateFloatAsState(
+                                targetValue = if (isActive) 1.15f else 1f,
+                                animationSpec = tween(durationMillis = 200),
+                                label = "scale"
+                            )
+                            Surface(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(pageIndex)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                                    .then(
+                                        if (isActive) Modifier.shadow(
+                                            elevation = 6.dp,
+                                            shape = RoundedCornerShape(50),
+                                            ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                        ) else Modifier
+                                    ),
+                                shape = RoundedCornerShape(50),
+                                color = if (isActive) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.surfaceContainerHigh
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Text(
+                                        text = "${pageIndex + 1}",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isActive) MaterialTheme.colorScheme.onPrimary
+                                               else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Next arrow - circular
+                    Surface(
+                        onClick = {
+                            if (hasNext) {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(currentPage + 1)
+                                }
+                            }
+                        },
+                        modifier = Modifier.size(36.dp),
+                        shape = RoundedCornerShape(50),
+                        color = if (hasNext) MaterialTheme.colorScheme.primaryContainer
+                               else MaterialTheme.colorScheme.surfaceContainerHigh
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = "Next",
+                                tint = if (hasNext) MaterialTheme.colorScheme.onPrimaryContainer
+                                      else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -2080,29 +2175,22 @@ private fun SingleDuaContent(
                 .padding(bottom = 72.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Arabic Text Card - Theme-aware background
+            // Arabic Text Card - Using CollapsibleDuaSection for consistent styling
             if (parsedContent.arabicText.isNotEmpty()) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    shadowElevation = 1.dp
+                CollapsibleDuaSection(
+                    title = "Arabic",
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    initiallyExpanded = true
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 40.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = parsedContent.arabicText,
-                            fontFamily = arabicFontFamily,
-                            fontSize = 32.sp,
-                            lineHeight = 54.sp,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                    Text(
+                        text = parsedContent.arabicText,
+                        fontFamily = arabicFontFamily,
+                        fontSize = 32.sp,
+                        lineHeight = 54.sp,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 
