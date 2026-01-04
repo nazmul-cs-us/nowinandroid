@@ -1481,6 +1481,9 @@ fun DuaDetailScreen(
             // Bottom indicator - Vuesax-style pagination with numbered buttons
             val coroutineScope = rememberCoroutineScope()
 
+            // State for expanded ellipsis (-1 = left ellipsis, -2 = right ellipsis, 0 = none)
+            var expandedEllipsis by remember { mutableStateOf(0) }
+
             // Calculate which page numbers to show (max 5 numbers + ellipsis)
             val maxVisible = 5
             val pageNumbers = remember(currentPage, totalDuas) {
@@ -1505,139 +1508,257 @@ fun DuaDetailScreen(
                         else -> {
                             // Middle: show first + ellipsis + current context + ellipsis + last
                             add(0)
-                            add(-1) // ellipsis
+                            add(-1) // ellipsis (left)
                             add(currentPage - 1)
                             add(currentPage)
                             add(currentPage + 1)
-                            add(-2) // ellipsis
+                            add(-2) // ellipsis (right)
                             add(totalDuas - 1)
                         }
                     }
                 }
             }
 
-            // Vuesax Circle Pagination - Clean circular buttons
-            Surface(
+            // Calculate hidden page ranges for each ellipsis
+            // Find the index of ellipsis in pageNumbers to determine what pages it hides
+            val leftEllipsisRange = remember(currentPage, totalDuas, pageNumbers) {
+                val ellipsisIndex = pageNumbers.indexOf(-1)
+                if (ellipsisIndex >= 0) {
+                    // Get the page before ellipsis and after ellipsis
+                    val pageBefore = if (ellipsisIndex > 0) pageNumbers[ellipsisIndex - 1] else -1
+                    val pageAfter = if (ellipsisIndex < pageNumbers.size - 1) pageNumbers[ellipsisIndex + 1] else -1
+
+                    if (pageBefore >= 0 && pageAfter >= 0) {
+                        // Hidden pages are between pageBefore and pageAfter (exclusive)
+                        ((pageBefore + 1) until pageAfter).toList()
+                    } else emptyList()
+                } else emptyList()
+            }
+
+            val rightEllipsisRange = remember(currentPage, totalDuas, pageNumbers) {
+                val ellipsisIndex = pageNumbers.indexOf(-2)
+                if (ellipsisIndex >= 0) {
+                    // Get the page before ellipsis and after ellipsis
+                    val pageBefore = if (ellipsisIndex > 0) pageNumbers[ellipsisIndex - 1] else -1
+                    val pageAfter = if (ellipsisIndex < pageNumbers.size - 1) pageNumbers[ellipsisIndex + 1] else -1
+
+                    if (pageBefore >= 0 && pageAfter >= 0) {
+                        // Hidden pages are between pageBefore and pageAfter (exclusive)
+                        ((pageBefore + 1) until pageAfter).toList()
+                    } else emptyList()
+                } else emptyList()
+            }
+
+            // Vuesax Circle Pagination - Clean circular buttons with inline grid expansion
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 16.dp)
-                    .shadow(
-                        elevation = 16.dp,
-                        shape = RoundedCornerShape(50),
-                        ambientColor = Color.Black.copy(alpha = 0.1f),
-                        spotColor = Color.Black.copy(alpha = 0.15f)
-                    ),
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 2.dp
+                    .padding(bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Expanded grid view for hidden pages (appears above pagination bar)
+                val activeHiddenPages = when (expandedEllipsis) {
+                    -1 -> leftEllipsisRange
+                    -2 -> rightEllipsisRange
+                    else -> emptyList()
+                }
+
+                AnimatedVisibility(
+                    visible = expandedEllipsis != 0 && activeHiddenPages.isNotEmpty(),
+                    enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+                    exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
                 ) {
-                    // Previous arrow - circular
                     Surface(
-                        onClick = {
-                            if (hasPrevious) {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(currentPage - 1)
-                                }
-                            }
-                        },
-                        modifier = Modifier.size(36.dp),
-                        shape = RoundedCornerShape(50),
-                        color = if (hasPrevious) MaterialTheme.colorScheme.primaryContainer
-                               else MaterialTheme.colorScheme.surfaceContainerHigh
+                        modifier = Modifier
+                            .padding(bottom = 8.dp)
+                            .shadow(
+                                elevation = 8.dp,
+                                shape = RoundedCornerShape(16.dp),
+                                ambientColor = Color.Black.copy(alpha = 0.1f),
+                                spotColor = Color.Black.copy(alpha = 0.15f)
+                            ),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 2.dp
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronLeft,
-                                contentDescription = "Previous",
-                                tint = if (hasPrevious) MaterialTheme.colorScheme.onPrimaryContainer
-                                      else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-
-                    // Circular page buttons
-                    pageNumbers.forEach { pageIndex ->
-                        if (pageIndex < 0) {
-                            // Ellipsis
-                            Text(
-                                text = "•••",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                modifier = Modifier.padding(horizontal = 2.dp)
-                            )
-                        } else {
-                            val isActive = pageIndex == currentPage
-                            // Animated scale for active
-                            val scale by animateFloatAsState(
-                                targetValue = if (isActive) 1.15f else 1f,
-                                animationSpec = tween(durationMillis = 200),
-                                label = "scale"
-                            )
-                            Surface(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(pageIndex)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .graphicsLayer {
-                                        scaleX = scale
-                                        scaleY = scale
-                                    }
-                                    .then(
-                                        if (isActive) Modifier.shadow(
-                                            elevation = 6.dp,
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Split pages into rows of 4
+                            activeHiddenPages.chunked(4).forEach { rowPages ->
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    rowPages.forEach { page ->
+                                        val isActive = page == currentPage
+                                        Surface(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    pagerState.animateScrollToPage(page)
+                                                }
+                                                expandedEllipsis = 0
+                                            },
+                                            modifier = Modifier.size(36.dp),
                                             shape = RoundedCornerShape(50),
-                                            ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                        ) else Modifier
-                                    ),
-                                shape = RoundedCornerShape(50),
-                                color = if (isActive) MaterialTheme.colorScheme.primary
-                                       else MaterialTheme.colorScheme.surfaceContainerHigh
-                            ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Text(
-                                        text = "${pageIndex + 1}",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isActive) MaterialTheme.colorScheme.onPrimary
-                                               else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                            color = if (isActive) MaterialTheme.colorScheme.primary
+                                                   else MaterialTheme.colorScheme.surfaceContainerHigh
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                                Text(
+                                                    text = "${page + 1}",
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isActive) MaterialTheme.colorScheme.onPrimary
+                                                           else MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                }
 
-                    // Next arrow - circular
-                    Surface(
-                        onClick = {
-                            if (hasNext) {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(currentPage + 1)
+                // Main pagination bar
+                Surface(
+                    modifier = Modifier
+                        .shadow(
+                            elevation = 16.dp,
+                            shape = RoundedCornerShape(50),
+                            ambientColor = Color.Black.copy(alpha = 0.1f),
+                            spotColor = Color.Black.copy(alpha = 0.15f)
+                        ),
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Previous arrow - circular
+                        Surface(
+                            onClick = {
+                                if (hasPrevious) {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(currentPage - 1)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.size(36.dp),
+                            shape = RoundedCornerShape(50),
+                            color = if (hasPrevious) MaterialTheme.colorScheme.primaryContainer
+                                   else MaterialTheme.colorScheme.surfaceContainerHigh
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    imageVector = Icons.Default.ChevronLeft,
+                                    contentDescription = "Previous",
+                                    tint = if (hasPrevious) MaterialTheme.colorScheme.onPrimaryContainer
+                                          else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        // Circular page buttons
+                        pageNumbers.forEach { pageIndex ->
+                            if (pageIndex < 0) {
+                                // Ellipsis - clickable to expand inline grid
+                                val ellipsisId = pageIndex // -1 or -2
+                                val isExpanded = expandedEllipsis == ellipsisId
+
+                                Surface(
+                                    onClick = {
+                                        expandedEllipsis = if (isExpanded) 0 else ellipsisId
+                                    },
+                                    modifier = Modifier.size(36.dp),
+                                    shape = RoundedCornerShape(50),
+                                    color = if (isExpanded) MaterialTheme.colorScheme.primaryContainer
+                                           else MaterialTheme.colorScheme.surfaceContainerHigh
+                                ) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Text(
+                                            text = "•••",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (isExpanded) MaterialTheme.colorScheme.onPrimaryContainer
+                                                   else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                }
+                            } else {
+                                val isActive = pageIndex == currentPage
+                                // Animated scale for active
+                                val scale by animateFloatAsState(
+                                    targetValue = if (isActive) 1.15f else 1f,
+                                    animationSpec = tween(durationMillis = 200),
+                                    label = "scale"
+                                )
+                                Surface(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(pageIndex)
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .graphicsLayer {
+                                            scaleX = scale
+                                            scaleY = scale
+                                        }
+                                        .then(
+                                            if (isActive) Modifier.shadow(
+                                                elevation = 6.dp,
+                                                shape = RoundedCornerShape(50),
+                                                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                                                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                            ) else Modifier
+                                        ),
+                                    shape = RoundedCornerShape(50),
+                                    color = if (isActive) MaterialTheme.colorScheme.primary
+                                           else MaterialTheme.colorScheme.surfaceContainerHigh
+                                ) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Text(
+                                            text = "${pageIndex + 1}",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isActive) MaterialTheme.colorScheme.onPrimary
+                                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
-                        },
-                        modifier = Modifier.size(36.dp),
-                        shape = RoundedCornerShape(50),
-                        color = if (hasNext) MaterialTheme.colorScheme.primaryContainer
-                               else MaterialTheme.colorScheme.surfaceContainerHigh
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = "Next",
-                                tint = if (hasNext) MaterialTheme.colorScheme.onPrimaryContainer
-                                      else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                modifier = Modifier.size(20.dp)
-                            )
+                        }
+
+                        // Next arrow - circular
+                        Surface(
+                            onClick = {
+                                if (hasNext) {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(currentPage + 1)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.size(36.dp),
+                            shape = RoundedCornerShape(50),
+                            color = if (hasNext) MaterialTheme.colorScheme.primaryContainer
+                                   else MaterialTheme.colorScheme.surfaceContainerHigh
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = "Next",
+                                    tint = if (hasNext) MaterialTheme.colorScheme.onPrimaryContainer
+                                          else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 }
