@@ -1265,17 +1265,17 @@ fun DuaDetailScreen(
                             }
                         }
 
-                        // Transliteration - Collapsible section with left accent
-                        if (dua.transliteration.isNotEmpty()) {
+                        // Translation - Collapsible section with left accent
+                        if (dua.translation.isNotEmpty()) {
                             item {
                                 CollapsibleDuaSection(
-                                    title = "Transliteration",
+                                    title = "Translation",
                                     accentColor = Color(0xFF9E9E9E), // Gray accent
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                                     initiallyExpanded = true
                                 ) {
                                     Text(
-                                        text = dua.transliteration,
+                                        text = dua.translation,
                                         style = MaterialTheme.typography.bodyLarge.copy(
                                             fontSize = 17.sp,
                                             lineHeight = 28.sp,
@@ -1289,17 +1289,17 @@ fun DuaDetailScreen(
                             }
                         }
 
-                        // Translation - Collapsible section with left accent
-                        if (dua.translation.isNotEmpty()) {
+                        // Transliteration - Collapsible section with left accent
+                        if (dua.transliteration.isNotEmpty()) {
                             item {
                                 CollapsibleDuaSection(
-                                    title = "Translation",
+                                    title = "Transliteration",
                                     accentColor = Color(0xFF9E9E9E), // Gray accent
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                                     initiallyExpanded = true
                                 ) {
                                     Text(
-                                        text = dua.translation,
+                                        text = dua.transliteration,
                                         style = MaterialTheme.typography.bodyLarge.copy(
                                             fontSize = 17.sp,
                                             lineHeight = 28.sp,
