@@ -291,7 +291,10 @@ fun PrayerTimesScreen(
     
     // SHARED STATE - Only one tile can be in edit mode at a time
     var currentEditingTile by remember { mutableStateOf<String?>(null) }
-    
+
+    // SHARED STATE - Track which prayer card has swipe actions revealed (iOS-style)
+    var revealedPrayerCard by remember { mutableStateOf<String?>(null) }
+
     // Track tile editing state changes
     LaunchedEffect(currentEditingTile) {
         android.util.Log.i("PrayerTimesScreen", "🔄 TILE EDITING STATE CHANGED")
@@ -843,7 +846,10 @@ fun PrayerTimesScreen(
         modifier: Modifier = Modifier,
         onShowPopup: (String) -> Unit = {},
         suggestion: com.starception.submission.prayer.model.PrayerTimeSuggestion? = null,
-        onApplySuggestion: ((String, Int) -> Unit)? = null
+        onApplySuggestion: ((String, Int) -> Unit)? = null,
+        // iOS-style swipe-to-reveal state
+        isRevealed: Boolean = false,
+        onRevealChange: (Boolean) -> Unit = {}
     ) {
         // Check if this specific card is in edit mode
         val isInEditMode = currentEditingTile == prayerName
@@ -1008,80 +1014,110 @@ fun PrayerTimesScreen(
             }
             }
         } else {
-            // Show regular small card with long-press detection
-            // Using Card with border instead of shadow - shadows cause navigation artifacts
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                        "Current" -> MaterialTheme.colorScheme.tertiaryContainer
-                        "Next" -> MaterialTheme.colorScheme.primaryContainer
-                        else -> MaterialTheme.colorScheme.surfaceVariant
+            // Show regular small card with iOS-style swipe-to-reveal actions
+            // Swipe left to reveal +/- buttons for adjusting prayer time
+            com.starception.submission.feature.prayertimes.components.SwipeToRevealCard(
+                prayerName = prayerName,
+                currentOffset = currentOffset,
+                isRevealed = isRevealed,
+                onRevealChange = { revealed ->
+                    if (revealed) {
+                        // Close any other revealed card and reveal this one
+                        onRevealChange(true)
+                    } else {
+                        onRevealChange(false)
                     }
-                ),
-                border = BorderStroke(
-                    1.5.dp,
-                    when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                        "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f)
-                        "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                },
+                onOffsetChange = { newOffset ->
+                    // Save the new offset to prayer settings
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            val entryPoint = EntryPointAccessors.fromApplication(
+                                screenContext.applicationContext,
+                                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                            )
+                            val repository = entryPoint.prayerSettingsRepository()
+                            repository.updateSinglePrayerOffset(prayerName, newOffset)
+                            android.util.Log.d("PrayerCard", "⏱️ SWIPE ACTION: $prayerName offset -> $newOffset minutes")
+                        } catch (e: Exception) {
+                            android.util.Log.e("PrayerCard", "❌ Failed to save offset adjustment", e)
+                        }
                     }
-                ),
+                },
+                onResetOffset = {
+                    // Reset to auto-detected default offset
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            val entryPoint = EntryPointAccessors.fromApplication(
+                                screenContext.applicationContext,
+                                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                            )
+                            val repository = entryPoint.prayerSettingsRepository()
+                            val defaultOffset = repository.getDefaultPrayerOffset(prayerName)
+                            repository.updateSinglePrayerOffset(prayerName, defaultOffset)
+                            android.util.Log.d("PrayerCard", "🔄 RESET: $prayerName offset -> $defaultOffset minutes (default)")
+                        } catch (e: Exception) {
+                            android.util.Log.e("PrayerCard", "❌ Failed to reset offset", e)
+                        }
+                    }
+                },
                 modifier = modifier
                     .graphicsLayer(
                         scaleX = scale,
                         scaleY = scale
                     )
             ) {
-                // Layered Box structure: background layer for long-press, foreground layer for content
-                Box(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // Background layer - invisible but handles tap gestures for the whole card
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(prayerName, currentOffset) {
-                                detectTapGestures(
-                                    onDoubleTap = {
-                                        android.util.Log.d("PrayerCard", "👆👆 DOUBLE TAP detected on $prayerName card!")
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                // Card content inside SwipeToRevealCard
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                            "Current" -> MaterialTheme.colorScheme.tertiaryContainer
+                            "Next" -> MaterialTheme.colorScheme.primaryContainer
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
+                    ),
+                    border = BorderStroke(
+                        1.5.dp,
+                        when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
+                            "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f)
+                            "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                        }
+                    ),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(prayerName, currentOffset) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    android.util.Log.d("PrayerCard", "👆👆 DOUBLE TAP detected on $prayerName card!")
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
 
-                                        // Reset to auto-detected default offset (not 0)
-                                        CoroutineScope(Dispatchers.IO).launch {
-                                            try {
-                                                val entryPoint = EntryPointAccessors.fromApplication(
-                                                    screenContext.applicationContext,
-                                                    com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
-                                                )
-                                                val repository = entryPoint.prayerSettingsRepository()
+                                    // Reset to auto-detected default offset
+                                    CoroutineScope(Dispatchers.IO).launch {
+                                        try {
+                                            val entryPoint = EntryPointAccessors.fromApplication(
+                                                screenContext.applicationContext,
+                                                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                                            )
+                                            val repository = entryPoint.prayerSettingsRepository()
+                                            val defaultOffset = repository.getDefaultPrayerOffset(prayerName)
 
-                                                // Get the default offset from auto-detected settings
-                                                val defaultOffset = repository.getDefaultPrayerOffset(prayerName)
-
-                                                if (currentOffset != defaultOffset) {
-                                                    repository.updateSinglePrayerOffset(prayerName, defaultOffset)
-                                                    android.util.Log.d("PrayerCard", "✅ RESET: $prayerName offset -> $defaultOffset minutes (auto-detected default)")
-                                                } else {
-                                                    android.util.Log.d("PrayerCard", "ℹ️ $prayerName already at default offset: $defaultOffset")
-                                                }
-                                            } catch (e: Exception) {
-                                                android.util.Log.e("PrayerCard", "❌ Failed to reset offset", e)
+                                            if (currentOffset != defaultOffset) {
+                                                repository.updateSinglePrayerOffset(prayerName, defaultOffset)
+                                                android.util.Log.d("PrayerCard", "✅ RESET: $prayerName offset -> $defaultOffset minutes (default)")
+                                            } else {
+                                                android.util.Log.d("PrayerCard", "ℹ️ $prayerName already at default offset: $defaultOffset")
                                             }
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("PrayerCard", "❌ Failed to reset offset", e)
                                         }
-                                    },
-                                    onLongPress = {
-                                        // Long press disabled - use swipe to adjust instead
-                                        android.util.Log.d("PrayerCard", "ℹ️ Long press disabled on $prayerName card - use swipe to adjust")
-                                    },
-                                    onTap = {
-                                        android.util.Log.d("PrayerCard", "👆 Regular tap detected on $prayerName card")
                                     }
-                                )
-                            }
-                    )
-
-                    // Foreground layer - actual content with IconButton that gets click priority
+                                }
+                            )
+                        }
+                ) {
+                    // Card content
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -1182,100 +1218,11 @@ fun PrayerTimesScreen(
                                 Pair(String.format("%d:%02d", hour12, adjusted.minute), period)
                             } ?: Pair("", "")
 
-                            // Scroll accumulator for time adjustment
-                            var scrollAccumulator by remember { mutableFloatStateOf(0f) }
-                            val scrollThreshold = 15f // pixels per minute (faster adjustment)
-
-                            // Time display with separated AM/PM and offset - NOW WITH GESTURES
-                            // Using draggable for swipe (first) and combinedClickable for taps (second)
-                            // Key insight: draggable only triggers on significant movement, allowing taps to work
+                            // Time display - NO direct gestures, use swipe-to-reveal instead
                             Row(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.Bottom,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    // DRAG GESTURE FIRST - Uses higher-level draggable API that plays nicely with clicks
-                                    .draggable(
-                                        orientation = Orientation.Horizontal,
-                                        state = rememberDraggableState { delta ->
-                                            // Accumulate swipe amount
-                                            scrollAccumulator += delta
-
-                                            // Calculate how many minutes to adjust
-                                            val minutesToAdjust = (scrollAccumulator / scrollThreshold).toInt()
-
-                                            if (minutesToAdjust != 0) {
-                                                // Swipe right (positive) = add minutes, swipe left (negative) = subtract minutes
-                                                val newOffset = currentOffset + minutesToAdjust
-
-                                                // Haptic feedback for each minute change
-                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-
-                                                // Save the adjustment immediately
-                                                CoroutineScope(Dispatchers.IO).launch {
-                                                    try {
-                                                        val entryPoint = EntryPointAccessors.fromApplication(
-                                                            screenContext.applicationContext,
-                                                            com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
-                                                        )
-                                                        val repository = entryPoint.prayerSettingsRepository()
-                                                        repository.updateSinglePrayerOffset(prayerName, newOffset)
-                                                        android.util.Log.d("PrayerCard", "👉 SWIPE: $prayerName offset -> $newOffset minutes")
-                                                    } catch (e: Exception) {
-                                                        android.util.Log.e("PrayerCard", "❌ Failed to save swipe adjustment", e)
-                                                    }
-                                                }
-
-                                                // Reset accumulator for the consumed amount
-                                                scrollAccumulator -= minutesToAdjust * scrollThreshold
-                                            }
-                                        },
-                                        onDragStarted = {
-                                            scrollAccumulator = 0f
-                                        },
-                                        onDragStopped = {
-                                            scrollAccumulator = 0f
-                                        }
-                                    )
-                                    // TAP GESTURES SECOND - combinedClickable handles double-click and long-click
-                                    .combinedClickable(
-                                        onClick = {
-                                            // Single tap does nothing (avoids accidental triggers)
-                                            android.util.Log.d("PrayerCard", "👆 SINGLE TAP on $prayerName (no action)")
-                                        },
-                                        onDoubleClick = {
-                                            // Double-tap to reset offset to the stored default offset
-                                            android.util.Log.d("PrayerCard", "👆👆 DOUBLE TAP detected on $prayerName!")
-                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-
-                                            // Get the default offset from auto-detected settings
-                                            CoroutineScope(Dispatchers.IO).launch {
-                                                try {
-                                                    val entryPoint = EntryPointAccessors.fromApplication(
-                                                        screenContext.applicationContext,
-                                                        com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
-                                                    )
-                                                    val repository = entryPoint.prayerSettingsRepository()
-
-                                                    // Get the default offset from auto-detected settings
-                                                    val defaultOffset = repository.getDefaultPrayerOffset(prayerName)
-
-                                                    if (currentOffset != defaultOffset) {
-                                                        repository.updateSinglePrayerOffset(prayerName, defaultOffset)
-                                                        android.util.Log.d("PrayerCard", "✅ RESET: $prayerName offset -> $defaultOffset minutes (default)")
-                                                    } else {
-                                                        android.util.Log.d("PrayerCard", "ℹ️ $prayerName already at default offset: $defaultOffset")
-                                                    }
-                                                } catch (e: Exception) {
-                                                    android.util.Log.e("PrayerCard", "❌ Failed to reset offset", e)
-                                                }
-                                            }
-                                        },
-                                        onLongClick = {
-                                            // Long press disabled - use swipe to adjust instead
-                                            android.util.Log.d("PrayerCard", "ℹ️ Long press disabled on $prayerName time area - use swipe to adjust")
-                                        }
-                                    )
+                                modifier = Modifier.fillMaxWidth()
                             ) {
                                 val baseColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                                     "Current" -> MaterialTheme.colorScheme.tertiary
@@ -1319,9 +1266,8 @@ fun PrayerTimesScreen(
                                 )
                             }
                         }
+                    }
                 }
-                
-            }
             }
         }
     }
@@ -1740,7 +1686,9 @@ fun PrayerTimesScreen(
                                         .height(landscapeTileHeight),
                                     onShowPopup = { prayerName -> popupDialState = prayerName },
                                     suggestion = getSuggestionFor(orderedPrayers[i]),
-                                    onApplySuggestion = applySuggestion
+                                    onApplySuggestion = applySuggestion,
+                                    isRevealed = revealedPrayerCard == orderedPrayers[i],
+                                    onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[i] else null }
                                 )
 
                                 // Second card in row (if exists)
@@ -1774,7 +1722,9 @@ fun PrayerTimesScreen(
                                             .height(landscapeTileHeight),
                                         onShowPopup = { prayerName -> popupDialState = prayerName },
                                         suggestion = getSuggestionFor(orderedPrayers[i + 1]),
-                                        onApplySuggestion = applySuggestion
+                                        onApplySuggestion = applySuggestion,
+                                        isRevealed = revealedPrayerCard == orderedPrayers[i + 1],
+                                        onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[i + 1] else null }
                                     )
                                 } else {
                                     Spacer(modifier = Modifier.weight(1f))
@@ -1891,7 +1841,7 @@ fun PrayerTimesScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Swipe prayer time to adjust · Tap ✨ for AI",
+                                text = "Swipe ← adjust · Swipe → reset",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
                             )
@@ -2032,7 +1982,9 @@ fun PrayerTimesScreen(
                                 android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                             },
                             suggestion = getSuggestionFor(orderedPrayers[0]),
-                            onApplySuggestion = applySuggestion
+                            onApplySuggestion = applySuggestion,
+                            isRevealed = revealedPrayerCard == orderedPrayers[0],
+                            onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[0] else null }
                         )
                     }
 
@@ -2072,7 +2024,9 @@ fun PrayerTimesScreen(
                                 android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                             },
                             suggestion = getSuggestionFor(orderedPrayers[1]),
-                            onApplySuggestion = applySuggestion
+                            onApplySuggestion = applySuggestion,
+                            isRevealed = revealedPrayerCard == orderedPrayers[1],
+                            onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[1] else null }
                         )
                     }
                 }
@@ -2127,7 +2081,9 @@ fun PrayerTimesScreen(
                                 android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                             },
                             suggestion = getSuggestionFor(orderedPrayers[2]),
-                            onApplySuggestion = applySuggestion
+                            onApplySuggestion = applySuggestion,
+                            isRevealed = revealedPrayerCard == orderedPrayers[2],
+                            onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[2] else null }
                         )
                     }
 
@@ -2167,7 +2123,9 @@ fun PrayerTimesScreen(
                                 android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                             },
                             suggestion = getSuggestionFor(orderedPrayers[3]),
-                            onApplySuggestion = applySuggestion
+                            onApplySuggestion = applySuggestion,
+                            isRevealed = revealedPrayerCard == orderedPrayers[3],
+                            onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[3] else null }
                         )
                     }
                 }
@@ -2258,7 +2216,9 @@ fun PrayerTimesScreen(
                                     android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                                 },
                                 suggestion = getSuggestionFor(orderedPrayers[4]),
-                                onApplySuggestion = applySuggestion
+                                onApplySuggestion = applySuggestion,
+                                isRevealed = revealedPrayerCard == orderedPrayers[4],
+                                onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[4] else null }
                             )
                         }
 
@@ -2305,7 +2265,9 @@ fun PrayerTimesScreen(
                                     android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
                                 },
                                 suggestion = getSuggestionFor(orderedPrayers[5]),
-                                onApplySuggestion = applySuggestion
+                                onApplySuggestion = applySuggestion,
+                                isRevealed = revealedPrayerCard == orderedPrayers[5],
+                                onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[5] else null }
                             )
                         }
                     }

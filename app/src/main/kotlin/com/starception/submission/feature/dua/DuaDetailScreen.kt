@@ -104,6 +104,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -824,6 +826,10 @@ fun DuaDetailScreen(
     val arabicFontFamily = getArabicFontFamilyForDua(selectedFont)
     val scope = rememberCoroutineScope()
 
+    // Landscape detection
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     // Topics state for displaying in header
     var topics by remember { mutableStateOf<List<Topic>>(emptyList()) }
 
@@ -1050,15 +1056,16 @@ fun DuaDetailScreen(
                             // Header with dynamic sky - scrollable, extends behind toolbar
                             item {
                                 val skyPeriod = getCurrentSkyPeriodForTheme()
+                                val headerHeight = if (isLandscape) 200.dp else 420.dp
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(420.dp) // Taller header for full-screen immersive experience
+                                        .height(headerHeight)
                                 ) {
                                     // Dynamic sky background based on time of day
                                     DynamicSkyHeader(
                                         modifier = Modifier.fillMaxSize(),
-                                        height = 420.dp,
+                                        height = headerHeight,
                                         period = skyPeriod
                                     )
                                     // Semi-transparent overlay for text readability
@@ -1073,8 +1080,8 @@ fun DuaDetailScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .padding(horizontal = 16.dp)
-                                            .offset(y = 17.dp), // Push text lower into content area
+                                            .padding(horizontal = if (isLandscape) 24.dp else 16.dp)
+                                            .offset(y = if (isLandscape) 8.dp else 17.dp),
                                         verticalArrangement = Arrangement.Bottom,
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {

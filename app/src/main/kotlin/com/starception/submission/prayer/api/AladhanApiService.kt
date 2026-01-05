@@ -149,6 +149,7 @@ class AladhanApiService @Inject constructor() {
      * 12 - Union Organization islamic de France
      * 13 - Diyanet İşleri Başkanlığı, Turkey
      * 14 - Spiritual Administration of Muslims of Russia
+     * 16 - Dubai (18.2° Fajr, 18.2° Isha) - UAE IACAD method
      */
     private fun getAladhanMethodCode(method: CalculationMethod): Int {
         return when (method) {
@@ -159,7 +160,7 @@ class AladhanApiService @Inject constructor() {
             CalculationMethod.UMM_AL_QURA -> 4
             CalculationMethod.EGYPTIAN_AUTHORITY -> 5
             CalculationMethod.INSTITUTE_OF_GEOPHYSICS_TEHRAN -> 7
-            CalculationMethod.UAE_IACAD -> 8 // Gulf Region method
+            CalculationMethod.UAE_IACAD -> 16 // Dubai method (18.2°/18.2°) - matches local UAE_IACAD calculation
             CalculationMethod.MUIS -> 11
         }
     }
