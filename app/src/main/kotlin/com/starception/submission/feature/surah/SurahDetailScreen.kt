@@ -130,6 +130,10 @@ fun SurahDetailScreen(
     val userDataRepository: UserDataRepository = hiltViewModel<UserDataRepositoryHolder>().repository
     val context = LocalContext.current
 
+    // Landscape detection
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
     // Audio permission state for runtime permission request
     val audioPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         rememberPermissionState(permission = Manifest.permission.READ_MEDIA_AUDIO)
@@ -575,6 +579,7 @@ fun SurahDetailScreen(
                     onTafseerLanguageChange = { lang -> viewModel.changeTafseerTranslationLanguage(lang) },
                     onTafseerProviderChange = { provider -> viewModel.changeTafseerTranslationProvider(provider) },
                     getTafseerTranslationName = { code -> viewModel.getTafseerTranslationName(code) },
+                    isLandscape = isLandscape,
                     modifier = Modifier
                 )
             }
@@ -638,10 +643,11 @@ fun SurahDetailScreen(
         if (uiState is SurahDetailUiState.Success) {
             val surah = (uiState as SurahDetailUiState.Success).surah
             val density = LocalDensity.current
-            val configuration = LocalConfiguration.current
+            val localConfig = LocalConfiguration.current
+            val localIsLandscape = localConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
             // Calculate positions once (stable values)
-            val albumHeaderHeight = configuration.screenWidthDp
+            val albumHeaderHeight = if (localIsLandscape) 200 else localConfig.screenWidthDp
             val headerYPx = with(density) { (albumHeaderHeight + 24).dp.toPx() }
             val toolbarYPx = with(density) { 16.dp.toPx() }  // Moved down for better vertical centering in toolbar
             val startXPx = with(density) { 24.dp.toPx() }
@@ -763,12 +769,13 @@ fun SurahDetailScreen(
         }
 
         // Floating action toolbar - draggable hint icon (vertical only, sticks to edges)
-        val configuration = LocalConfiguration.current
-        val density = LocalDensity.current
-        val screenWidth = configuration.screenWidthDp.dp
-        val albumHeaderHeight = screenWidth // AlbumHeader is square (aspectRatio 1f)
-        val baseVerticalOffset = albumHeaderHeight + 40.dp // Position closer to bottom of album image
-        val baseVerticalOffsetPx = with(density) { baseVerticalOffset.toPx() }
+        val toolbarConfig = LocalConfiguration.current
+        val toolbarDensity = LocalDensity.current
+        val toolbarIsLandscape = toolbarConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val screenWidth = toolbarConfig.screenWidthDp.dp
+        val albumHeaderHeightDp = if (toolbarIsLandscape) 200.dp else screenWidth // Limited height in landscape
+        val baseVerticalOffset = albumHeaderHeightDp + 40.dp // Position closer to bottom of album image
+        val baseVerticalOffsetPx = with(toolbarDensity) { baseVerticalOffset.toPx() }
 
         var toolbarOffsetY by remember { mutableStateOf(0f) }
         var isOnRightSide by remember { mutableStateOf(false) }
@@ -1083,6 +1090,7 @@ private fun AlbumPlayerContent(
     onTafseerLanguageChange: (String) -> Unit = {},
     onTafseerProviderChange: (String) -> Unit = {},
     getTafseerTranslationName: (String) -> String = { it },
+    isLandscape: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // Use current playing surah/ayahs if available, otherwise use original
@@ -1154,14 +1162,15 @@ private fun AlbumPlayerContent(
                     AlbumHeader(
                         surah = surah,
                         topics = topics,
-                        onTopicClick = onTopicClick
+                        onTopicClick = onTopicClick,
+                        isLandscape = isLandscape
                     )
 
                     // Fixed-height container to prevent FAB position jump during transitions
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(196.dp) // Fixed height matches original AlbumInfoCard
+                            .height(if (isLandscape) 140.dp else 196.dp) // Reduced height in landscape
                     ) {
                         // Professional animated transition between AlbumInfoCard and MusicPlayerControls
                         // Using AnimatedContent for smooth fade + slide transitions
@@ -2636,7 +2645,8 @@ private fun BottomSheetWordStudyContent(
 private fun AlbumHeader(
     surah: Surah,
     topics: List<com.starception.submission.core.topicsdatabase.Topic> = emptyList(),
-    onTopicClick: (String) -> Unit = {}
+    onTopicClick: (String) -> Unit = {},
+    isLandscape: Boolean = false
 ) {
     // Album cover images (using cover resources from Fragment)
     val coverImages = remember {
@@ -2655,7 +2665,13 @@ private fun AlbumHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1f) // Square album cover
+            .then(
+                if (isLandscape) {
+                    Modifier.height(200.dp) // Limited height in landscape
+                } else {
+                    Modifier.aspectRatio(1f) // Square album cover in portrait
+                }
+            )
     ) {
         // Album cover image
         Image(

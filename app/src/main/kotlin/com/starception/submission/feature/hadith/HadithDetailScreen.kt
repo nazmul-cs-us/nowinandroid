@@ -57,6 +57,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -101,6 +103,10 @@ fun HadithDetailScreen(
     val context = LocalContext.current
     val repository = remember { HadithRepository.getInstance(context) }
     val translationService = remember { TranslationService.getInstance(context) }
+
+    // Landscape detection
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     var hadith by remember { mutableStateOf<Hadith?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -207,7 +213,7 @@ fun HadithDetailScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             when {
                 isLoading -> {
-                    HadithShimmerLoading(onBackClick = onBackClick)
+                    HadithShimmerLoading(onBackClick = onBackClick, isLandscape = isLandscape)
                 }
                 error != null -> {
                     HadithErrorContent(
@@ -226,7 +232,8 @@ fun HadithDetailScreen(
                         translatedElaboration = translatedElaboration,
                         isTranslating = isTranslating,
                         selectedLanguage = selectedLanguage,
-                        onLanguageClick = { showLanguageDialog = true }
+                        onLanguageClick = { showLanguageDialog = true },
+                        isLandscape = isLandscape
                     )
                 }
             }
@@ -363,7 +370,8 @@ private fun HadithContent(
     translatedElaboration: String? = null,
     isTranslating: Boolean = false,
     selectedLanguage: String = "en",
-    onLanguageClick: () -> Unit = {}
+    onLanguageClick: () -> Unit = {},
+    isLandscape: Boolean = false
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // No status bar padding - immersive mode hides status bar
@@ -373,15 +381,16 @@ private fun HadithContent(
             // Header with dynamic sky
             item {
                 val skyPeriod = getCurrentSkyPeriodForTheme()
+                val headerHeight = if (isLandscape) 200.dp else 420.dp
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(420.dp) // Taller header for full-screen immersive experience
+                        .height(headerHeight)
                 ) {
                     // Dynamic sky background based on time of day
                     DynamicSkyHeader(
                         modifier = Modifier.fillMaxSize(),
-                        height = 420.dp,
+                        height = headerHeight,
                         period = skyPeriod
                     )
                     // Semi-transparent overlay for text readability
@@ -394,8 +403,8 @@ private fun HadithContent(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 16.dp)
-                            .padding(top = 100.dp, bottom = 4.dp), // Position content at very bottom
+                            .padding(horizontal = if (isLandscape) 24.dp else 16.dp)
+                            .padding(top = if (isLandscape) 60.dp else 100.dp, bottom = 4.dp), // Position content at very bottom
                         verticalArrangement = Arrangement.Bottom,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -444,7 +453,7 @@ private fun HadithContent(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         shape = RoundedCornerShape(16.dp),
-                        color = Color(0xFFF8F5F0), // Cream background
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
                         shadowElevation = 1.dp
                     ) {
                         Column(
@@ -460,7 +469,7 @@ private fun HadithContent(
                                 fontSize = 26.sp,
                                 lineHeight = 48.sp,
                                 textAlign = TextAlign.Center,
-                                color = Color(0xFF3D3D3D)
+                                color = MaterialTheme.colorScheme.onSurface
                             )
 
                             // Show translated Arabic text when available
@@ -470,7 +479,7 @@ private fun HadithContent(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(1.dp)
-                                        .background(Color(0xFFE0D5C5))
+                                        .background(MaterialTheme.colorScheme.outlineVariant)
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -478,7 +487,7 @@ private fun HadithContent(
                                 Text(
                                     text = "Hadith (${getLanguageName(selectedLanguage)})",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = Color(0xFF8D6E63),
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -491,7 +500,7 @@ private fun HadithContent(
                                         lineHeight = 26.sp
                                     ),
                                     textAlign = TextAlign.Center,
-                                    color = Color(0xFF5D5D5D)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             } else if (isTranslating && selectedLanguage != "ar") {
                                 // Loading indicator while translating
@@ -500,7 +509,7 @@ private fun HadithContent(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(1.dp)
-                                        .background(Color(0xFFE0D5C5))
+                                        .background(MaterialTheme.colorScheme.outlineVariant)
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Column(
@@ -514,7 +523,7 @@ private fun HadithContent(
                                                 .fillMaxWidth(widthFraction)
                                                 .height(14.dp)
                                                 .background(
-                                                    Color(0xFFE0D5C5),
+                                                    MaterialTheme.colorScheme.surfaceVariant,
                                                     RoundedCornerShape(4.dp)
                                                 )
                                         )
@@ -537,7 +546,7 @@ private fun HadithContent(
                     }
                     HadithSectionCard(
                         title = sectionTitle,
-                        accentColor = Color(0xFF8D6E63), // Brown accent
+                        accentColor = MaterialTheme.colorScheme.primary,
                         content = displayText,
                         isLoading = isTranslating && translatedText == null
                     )
@@ -555,7 +564,7 @@ private fun HadithContent(
                     }
                     HadithSectionCard(
                         title = sectionTitle,
-                        accentColor = Color(0xFF6D4C41), // Dark brown accent
+                        accentColor = MaterialTheme.colorScheme.secondary,
                         content = displayText,
                         isExpanded = false,
                         isLoading = isTranslating && translatedElaboration == null
@@ -733,7 +742,7 @@ private fun HadithSectionCard(
                             fontSize = 15.sp,
                             lineHeight = 24.sp
                         ),
-                        color = Color(0xFF5D5D5D)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -791,7 +800,8 @@ private fun HadithErrorContent(
 
 @Composable
 private fun HadithShimmerLoading(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    isLandscape: Boolean = false
 ) {
     val transition = rememberInfiniteTransition(label = "shimmer")
     val shimmerOffset = transition.animateFloat(
@@ -806,6 +816,7 @@ private fun HadithShimmerLoading(
 
     val skyPeriod = getCurrentSkyPeriodForTheme()
     val skyColors = getSkyColors(skyPeriod)
+    val headerHeight = if (isLandscape) 200.dp else 420.dp
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -813,12 +824,12 @@ private fun HadithShimmerLoading(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(420.dp) // Match taller header
+                    .height(headerHeight) // Match taller header
             ) {
                 // Dynamic sky background based on time of day
                 DynamicSkyHeader(
                     modifier = Modifier.fillMaxSize(),
-                    height = 420.dp,
+                    height = headerHeight,
                     period = skyPeriod
                 )
                 // Semi-transparent overlay
@@ -831,8 +842,8 @@ private fun HadithShimmerLoading(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 100.dp, bottom = 4.dp), // Position content at very bottom
+                        .padding(horizontal = if (isLandscape) 24.dp else 16.dp)
+                        .padding(top = if (isLandscape) 60.dp else 100.dp, bottom = 4.dp), // Position content at very bottom
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
