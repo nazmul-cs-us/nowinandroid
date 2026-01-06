@@ -323,19 +323,21 @@ class AstronomicalCalculator @Inject constructor() {
             val epsilon = Math.toRadians(23.439 - 0.0000004 * n)
             
             val ra = atan2(cos(epsilon) * sin(lambdaSun), cos(lambdaSun))
-            
+
             // Normalize right ascension to 0-360 degrees
             var raDegrees = Math.toDegrees(ra)
             if (raDegrees < 0) raDegrees += 360.0
-            
-            // Calculate equation of time with proper normalization
-            var eot = (raDegrees / 15.0 - l / 15.0)
-            
+
+            // Calculate equation of time: EqT = Mean Solar Time - Apparent Solar Time
+            // Formula from praytimes.org: eqt = q/15 - RA (both in hours)
+            // Where q (mean longitude) = l, and RA is right ascension in hours
+            var eotHours = (l / 15.0 - raDegrees / 15.0)  // FIXED: Correct sign (l - RA, not RA - l)
+
             // Normalize to [-12, +12] hours range
-            while (eot > 12.0) eot -= 24.0
-            while (eot < -12.0) eot += 24.0
-            
-            val result = eot * 4.0 // Convert to minutes
+            while (eotHours > 12.0) eotHours -= 24.0
+            while (eotHours < -12.0) eotHours += 24.0
+
+            val result = eotHours * 60.0 // FIXED: Convert hours to minutes (multiply by 60, not 4)
             
             val inputs = mapOf(
                 "julianDay" to julianDay,
@@ -343,7 +345,7 @@ class AstronomicalCalculator @Inject constructor() {
                 "meanLongitude" to "${l}°",
                 "meanAnomaly" to "${Math.toDegrees(g)}°",
                 "rightAscension" to "${raDegrees}°",
-                "equationOfTimeHours" to "${eot}h"
+                "equationOfTimeHours" to "${eotHours}h"
             )
             
             logCalculation("EQUATION_OF_TIME", inputs, "${result} minutes")
