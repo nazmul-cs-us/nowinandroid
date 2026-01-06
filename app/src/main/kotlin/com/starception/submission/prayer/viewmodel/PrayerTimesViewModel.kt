@@ -846,8 +846,32 @@ class PrayerTimesViewModel @Inject constructor(
                     null
                 },
                 // Apply country-specific time offsets for official prayer time matching
+                // FIX: Also apply country offsets if current offsets are all zeros and country has non-zero defaults
+                // This ensures existing users get correct UAE IACAD offsets (+3 for dhuhr, asr, maghrib)
                 timeOffsets = if (shouldAutoUpdate && locationBasedSettings.isAutoDetected && locationBasedSettings.timeOffsets != null) {
                     locationBasedSettings.timeOffsets.toPrayerTimeOffsets()
+                } else if (locationBasedSettings.isAutoDetected && locationBasedSettings.timeOffsets != null) {
+                    // Check if current offsets are all zeros (default) and country has non-zero offsets
+                    val currentOffsetsAllZero = currentSettings.timeOffsets.fajr == 0 &&
+                                                 currentSettings.timeOffsets.sunrise == 0 &&
+                                                 currentSettings.timeOffsets.dhuhr == 0 &&
+                                                 currentSettings.timeOffsets.asr == 0 &&
+                                                 currentSettings.timeOffsets.maghrib == 0 &&
+                                                 currentSettings.timeOffsets.isha == 0
+                    val countryHasOffsets = locationBasedSettings.timeOffsets.fajr != 0 ||
+                                            locationBasedSettings.timeOffsets.sunrise != 0 ||
+                                            locationBasedSettings.timeOffsets.dhuhr != 0 ||
+                                            locationBasedSettings.timeOffsets.asr != 0 ||
+                                            locationBasedSettings.timeOffsets.maghrib != 0 ||
+                                            locationBasedSettings.timeOffsets.isha != 0
+
+                    if (currentOffsetsAllZero && countryHasOffsets) {
+                        android.util.Log.i("PrayerTimesViewModel", "🎯 APPLYING COUNTRY DEFAULT OFFSETS: User has all-zero offsets but country ${locationBasedSettings.countryCode} has defaults")
+                        android.util.Log.i("PrayerTimesViewModel", "   Country offsets: Fajr=${locationBasedSettings.timeOffsets.fajr}, Dhuhr=${locationBasedSettings.timeOffsets.dhuhr}, Asr=${locationBasedSettings.timeOffsets.asr}, Maghrib=${locationBasedSettings.timeOffsets.maghrib}, Isha=${locationBasedSettings.timeOffsets.isha}")
+                        locationBasedSettings.timeOffsets.toPrayerTimeOffsets()
+                    } else {
+                        currentSettings.timeOffsets
+                    }
                 } else {
                     currentSettings.timeOffsets
                 }
