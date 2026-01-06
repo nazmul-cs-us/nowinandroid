@@ -171,7 +171,7 @@ fun SwipeToRevealCard(
             .clip(RoundedCornerShape(24.dp))
     ) {
         // LEFT SIDE: Reset button (only show when swiping right FROM COLLAPSED state, or revealed on reset side)
-        // Don't show when swiping to collapse the +/- side
+        // Matching the new vertical style of +/- side
         val showResetSide = (swipeOffset > 0 && !isRevealed) || (isRevealed && revealedSide == "reset")
         if (showResetSide) {
             // Track swipe on the Reset area for easy collapse
@@ -183,7 +183,7 @@ fun SwipeToRevealCard(
                     .width(resetRevealedWidth)
                     .align(Alignment.CenterStart)
                     .clip(RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp))
-                    .background(color = MaterialTheme.colorScheme.tertiaryContainer)
+                    .background(color = MaterialTheme.colorScheme.surfaceContainerHigh)
                     .pointerInput(isRevealed, revealedSide) {
                         // Enable swipe left on Reset area to collapse
                         if (isRevealed && revealedSide == "reset") {
@@ -210,37 +210,59 @@ fun SwipeToRevealCard(
                                 }
                             }
                         }
-                    }
-                    .clickable {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onResetOffset()
-                        Log.d("SwipeToReveal", "🔄 Reset $prayerName to default")
-                        // Auto-collapse after reset
-                        coroutineScope.launch {
-                            delay(autoCollapseDelayMs)
-                            onRevealChange(false)
-                        }
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // Vertical layout matching the +/- side style
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 8.dp, horizontal = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_reset_settings),
-                        contentDescription = "Reset to default",
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    // Reset label on top
                     Text(
                         text = "Reset",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold
                         ),
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+
+                    Text(
+                        text = "to default",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Reset button in a pill shape
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.errorContainer)
+                            .clickable {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onResetOffset()
+                                Log.d("SwipeToReveal", "🔄 Reset $prayerName to default")
+                                // Auto-collapse after reset
+                                coroutineScope.launch {
+                                    delay(autoCollapseDelayMs)
+                                    onRevealChange(false)
+                                }
+                            }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_reset_settings),
+                            contentDescription = "Reset to default",
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
         }
