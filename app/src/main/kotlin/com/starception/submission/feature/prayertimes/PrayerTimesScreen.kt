@@ -1841,7 +1841,7 @@ fun PrayerTimesScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Swipe ← adjust · Swipe → reset",
+                                text = "← Swipe left to adjust · Swipe right to reset →",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
                             )
