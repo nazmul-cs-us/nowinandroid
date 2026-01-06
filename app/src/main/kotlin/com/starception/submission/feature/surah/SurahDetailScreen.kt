@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -649,7 +650,7 @@ fun SurahDetailScreen(
             // Calculate positions once (stable values)
             val albumHeaderHeight = if (localIsLandscape) 200 else localConfig.screenWidthDp
             val headerYPx = with(density) { (albumHeaderHeight + 24).dp.toPx() }
-            val toolbarYPx = with(density) { 16.dp.toPx() }  // Moved down for better vertical centering in toolbar
+            val toolbarYPx = with(density) { 68.dp.toPx() }  // Stop below toolbar (52dp padding + 16dp offset)
             val startXPx = with(density) { 24.dp.toPx() }
             val endXPx = with(density) { 56.dp.toPx() }
 
@@ -2773,7 +2774,7 @@ private fun InfoChip(text: String) {
     NiaTopicTag(
         followed = true,
         onClick = {},
-        enabled = false
+        enabled = true  // Changed from false to true for better visibility
     ) {
         Text(text = text.uppercase(Locale.getDefault()))
     }
