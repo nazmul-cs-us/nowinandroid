@@ -91,6 +91,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import kotlin.math.atan2
 import kotlin.math.sqrt
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 // ============================================================================
 // UI SENSOR FOR DYNAMIC HIGHLIGHT (from AndroidLiquidGlass)
@@ -269,6 +271,7 @@ fun InteractivePrayerDial(
     }
 
     val hapticFeedback = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
     var lastAngle by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
     var accumulatedAngle by remember { mutableStateOf(0f) }
@@ -873,27 +876,35 @@ fun InteractivePrayerDial(
                                         },
                                         onDragEnd = {
                                             // Check if swipe reached threshold
-                                            when {
-                                                swipeOffset < -swipeThreshold -> {
-                                                    // Swipe left - Undo/Reset to ORIGINAL value when dial was opened
-                                                    Log.d("InteractiveDial", "↶ SWIPE LEFT - RESET - Prayer: $prayerName")
-                                                    Log.d("InteractiveDial", "   Resetting to original offset: $originalOffset minutes")
-                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    currentAdjustment = originalOffset
-                                                    onTimeAdjusted(originalOffset)
-                                                    baseAdjustment = originalOffset
-                                                    accumulatedAngle = 0f
+                                            coroutineScope.launch {
+                                                when {
+                                                    swipeOffset < -swipeThreshold -> {
+                                                        // Swipe left - Undo/Reset to ORIGINAL value when dial was opened
+                                                        Log.d("InteractiveDial", "↶ SWIPE LEFT - RESET - Prayer: $prayerName")
+                                                        Log.d("InteractiveDial", "   Resetting to original offset: $originalOffset minutes")
+                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        currentAdjustment = originalOffset
+                                                        onTimeAdjusted(originalOffset)
+                                                        baseAdjustment = originalOffset
+                                                        accumulatedAngle = 0f
+
+                                                        // Animate back smoothly
+                                                        delay(200) // Wait for animation
+                                                    }
+                                                    swipeOffset > swipeThreshold -> {
+                                                        // Swipe right - Save
+                                                        Log.d("InteractiveDial", "✓ SWIPE RIGHT - SAVE - Prayer: $prayerName, Adjustment: ${currentAdjustment}m")
+                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+
+                                                        // Let the swipe animation complete before closing
+                                                        delay(200) // Wait for animation to complete
+                                                        onSaveAdjustment(prayerName, currentAdjustment)
+                                                    }
                                                 }
-                                                swipeOffset > swipeThreshold -> {
-                                                    // Swipe right - Save
-                                                    Log.d("InteractiveDial", "✓ SWIPE RIGHT - SAVE - Prayer: $prayerName, Adjustment: ${currentAdjustment}m")
-                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    onSaveAdjustment(prayerName, currentAdjustment)
-                                                }
+                                                // Reset swipe state after animation completes
+                                                isSwipingHorizontally = false
+                                                swipeOffset = 0f
                                             }
-                                            // Reset swipe state
-                                            isSwipingHorizontally = false
-                                            swipeOffset = 0f
                                         }
                                     ) { change, dragAmount ->
                                         // Update swipe offset within bounds

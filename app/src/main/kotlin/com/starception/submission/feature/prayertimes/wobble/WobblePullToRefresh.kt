@@ -10,6 +10,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -24,6 +25,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.abs
 
 /**
  * Data class to hold wobble state and configuration
@@ -52,6 +55,9 @@ fun WobblePullToRefresh(
     val maxDragDistance = with(LocalDensity.current) { 400.dp.toPx() }
     var dragDistance by remember { mutableStateOf(0f) }
     var lastHapticDistance by remember { mutableStateOf(0f) }  // Track last haptic trigger distance
+    var isVerticalDrag by remember { mutableStateOf(false) }  // Track if gesture is vertical
+    var initialDragX by remember { mutableStateOf(0f) }
+    var initialDragY by remember { mutableStateOf(0f) }
 
     // Animated drag distance with spring physics
     val dragDistanceAnimated by animateFloatAsState(
@@ -61,10 +67,10 @@ fun WobblePullToRefresh(
             stiffness = Spring.StiffnessMedium
         )
     )
-    
+
     // Calculate wobble intensity
     val wobbleIntensity = (dragDistanceAnimated / maxDragDistance).coerceIn(0f, 1f)
-    
+
     // Create wobble state for content
     val wobbleState = WobbleState(
         dragDistance = dragDistanceAnimated,
@@ -72,54 +78,93 @@ fun WobblePullToRefresh(
         maxDragDistance = maxDragDistance,
         wobbleIntensity = wobbleIntensity
     )
-    
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .draggable(
-                onDragStopped = {
-                    // Check if we should trigger refresh
-                    if (dragDistance > 150f && !isRefreshing) {
-                        android.util.Log.d("WobblePullToRefresh", "✅ TRIGGERING REFRESH (dragDistance=$dragDistance > 150f)")
-                        // Final haptic feedback for refresh trigger
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onRefresh()
-                    } else {
-                        android.util.Log.w("WobblePullToRefresh", "❌ NOT TRIGGERING REFRESH (dragDistance=$dragDistance, isRefreshing=$isRefreshing)")
-                    }
-
-                    // Reset states
-                    dragDistance = 0f
-                    lastHapticDistance = 0f
-                },
-                orientation = Orientation.Vertical,
-                state = rememberDraggableState { delta ->
-                    // Don't allow dragging while refreshing
-                    if (isRefreshing) {
-                        return@rememberDraggableState
-                    }
-
-                    dragDistance += delta
-
-                    // Only allow drag down
-                    if (dragDistance < 0f) {
+            .pointerInput(isRefreshing) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        // Record initial position to determine drag direction
+                        initialDragX = offset.x
+                        initialDragY = offset.y
+                        isVerticalDrag = false
                         dragDistance = 0f
                         lastHapticDistance = 0f
-                        return@rememberDraggableState
+                    },
+                    onDragEnd = {
+                        // Only trigger refresh if it was a vertical drag
+                        if (isVerticalDrag && dragDistance > 150f && !isRefreshing) {
+                            android.util.Log.d("WobblePullToRefresh", "✅ TRIGGERING REFRESH (dragDistance=$dragDistance > 150f)")
+                            // Final haptic feedback for refresh trigger
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onRefresh()
+                        } else {
+                            android.util.Log.w("WobblePullToRefresh", "❌ NOT TRIGGERING REFRESH (isVertical=$isVerticalDrag, dragDistance=$dragDistance, isRefreshing=$isRefreshing)")
+                        }
+
+                        // Reset states
+                        dragDistance = 0f
+                        lastHapticDistance = 0f
+                        isVerticalDrag = false
+                    },
+                    onDragCancel = {
+                        // Reset states on cancel
+                        dragDistance = 0f
+                        lastHapticDistance = 0f
+                        isVerticalDrag = false
                     }
-                    if (dragDistance >= maxDragDistance) {
-                        dragDistance = maxDragDistance
+                ) { change, dragAmount ->
+                    // Don't allow dragging while refreshing
+                    if (isRefreshing) {
+                        return@detectDragGestures
                     }
 
-                    // Progressive haptic feedback - trigger every 50 pixels with strong feedback
-                    val hapticInterval = 50f
-                    if (dragDistance - lastHapticDistance >= hapticInterval) {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        lastHapticDistance = dragDistance - (dragDistance % hapticInterval)
-                        android.util.Log.d("WobblePullToRefresh", "📳 Strong progressive haptic at ${dragDistance.toInt()}px")
+                    val deltaX = dragAmount.x
+                    val deltaY = dragAmount.y
+
+                    // Determine if this is a vertical or horizontal gesture
+                    // Only set isVerticalDrag if we haven't determined direction yet AND we have enough movement
+                    if (!isVerticalDrag && dragDistance < 10f) {
+                        val absX = abs(deltaX)
+                        val absY = abs(deltaY)
+
+                        // Only consider it vertical if Y movement is significantly more than X
+                        // Use a 2:1 ratio - vertical must be at least 2x horizontal
+                        if (absY > absX * 2f && absY > 5f) {
+                            isVerticalDrag = true
+                            android.util.Log.d("WobblePullToRefresh", "🔽 Detected VERTICAL drag (Y: $absY > X: $absX)")
+                        } else if (absX > absY && absX > 5f) {
+                            // This is a horizontal swipe - don't interfere
+                            android.util.Log.d("WobblePullToRefresh", "↔️ Detected HORIZONTAL drag - ignoring (X: $absX > Y: $absY)")
+                            return@detectDragGestures
+                        }
+                    }
+
+                    // Only process vertical drags
+                    if (isVerticalDrag) {
+                        dragDistance += deltaY
+
+                        // Only allow drag down
+                        if (dragDistance < 0f) {
+                            dragDistance = 0f
+                            lastHapticDistance = 0f
+                            return@detectDragGestures
+                        }
+                        if (dragDistance >= maxDragDistance) {
+                            dragDistance = maxDragDistance
+                        }
+
+                        // Progressive haptic feedback - trigger every 50 pixels with strong feedback
+                        val hapticInterval = 50f
+                        if (dragDistance - lastHapticDistance >= hapticInterval) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            lastHapticDistance = dragDistance - (dragDistance % hapticInterval)
+                            android.util.Log.d("WobblePullToRefresh", "📳 Strong progressive haptic at ${dragDistance.toInt()}px")
+                        }
                     }
                 }
-            )
+            }
     ) {
         content(wobbleState)
     }

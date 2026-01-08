@@ -992,6 +992,9 @@ fun PrayerTimesScreen(
                                     android.util.Log.d("PrayerTimesScreen", "   💾 Saved $prayerName offset: $finalAdjustment minutes")
                                     android.util.Log.d("PrayerTimesScreen", "   🔄 Flow-based recomposition will trigger automatically")
 
+                                    // Wait for swipe animation and tile scale animation to complete smoothly
+                                    delay(250) // Give time for animations to finish
+
                                     // Exit edit mode after successful saving
                                     onEditingTileChange(null)
                                     android.util.Log.d("PrayerTimesScreen", "🚪 Exited edit mode - returning to tile view")
