@@ -1,109 +1,82 @@
 package com.starception.submission.automotive
 
+import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
-import androidx.car.app.model.CarIcon
-import androidx.car.app.model.CarColor
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
-import androidx.lifecycle.lifecycleScope
-import com.starception.submission.R
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlin.math.*
 
 /**
- * Simple Android Auto Qibla compass screen
+ * Android Auto Qibla compass screen
+ *
+ * Shows the direction to the Holy Kaaba in Makkah from the user's current location.
+ * Uses the app's existing location data to calculate accurate Qibla direction.
+ *
+ * Features:
+ * - Qibla direction in degrees and compass direction (N, NE, E, etc.)
+ * - Distance to Makkah in kilometers
+ * - Turn direction guidance
+ * - Current location display
  */
-class QiblaCompassScreen(carContext: CarContext) : Screen(carContext) {
+class QiblaCompassScreen(
+    carContext: CarContext,
+    private val dataProvider: AutomotivePrayerDataProvider
+) : Screen(carContext) {
 
-    data class QiblaInfo(
-        val direction: Double,
-        val distance: Double,
-        val compassDirection: String,
-        val locationName: String
-    )
+    companion object {
+        private const val TAG = "QiblaCompassScreen"
+    }
 
-    private val _qiblaDirection = MutableStateFlow<QiblaInfo?>(null)
-    private val qiblaDirection: StateFlow<QiblaInfo?> = _qiblaDirection.asStateFlow()
+    // Coroutine scope for async data loading
+    private val screenScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    private val _isLoading = MutableStateFlow(true)
-    private val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-
-    // Kaaba coordinates
-    private val kaabaLatitude = 21.4225
-    private val kaabaLongitude = 39.8262
+    // Current Qibla data state
+    private var qiblaInfo: AutomotivePrayerDataProvider.QiblaInfo? = null
+    private var isLoading = true
+    private var errorMessage: String? = null
 
     init {
-        calculateQiblaDirection()
+        loadQiblaDirection()
     }
 
     override fun onGetTemplate(): Template {
         val itemListBuilder = ItemList.Builder()
 
-        if (isLoading.value) {
-            itemListBuilder.addItem(
-                Row.Builder()
-                    .setTitle("🧭 Calculating Qibla Direction...")
-                    .addText("Determining direction to Holy Kaaba in Makkah")
-                    .build()
-            )
-        } else {
-            qiblaDirection.value?.let { qibla ->
-                // Main Qibla direction
+        when {
+            isLoading -> {
                 itemListBuilder.addItem(
                     Row.Builder()
-                        .setTitle("🕋 Qibla Direction")
-                        .addText("${qibla.compassDirection} (${qibla.direction.toInt()}°)")
+                        .setTitle("🧭 Calculating Qibla Direction...")
+                        .addText("Determining direction to Holy Kaaba in Makkah")
                         .build()
                 )
+            }
 
-                // Distance to Makkah
+            errorMessage != null -> {
                 itemListBuilder.addItem(
                     Row.Builder()
-                        .setTitle("📏 Distance to Makkah")
-                        .addText("${String.format("%.0f", qibla.distance)} km")
+                        .setTitle("⚠️ Unable to Calculate Qibla")
+                        .addText(errorMessage ?: "Unknown error")
                         .build()
                 )
+                itemListBuilder.addItem(
+                    Row.Builder()
+                        .setTitle("Tap Refresh to try again")
+                        .build()
+                )
+            }
 
-                // Directional guidance
-                val guidance = getDirectionalGuidance(qibla.direction)
-                itemListBuilder.addItem(
-                    Row.Builder()
-                        .setTitle("🧭 Turn Direction")
-                        .addText(guidance)
-                        .build()
-                )
-
-                // Prayer reminder
-                itemListBuilder.addItem(
-                    Row.Builder()
-                        .setTitle("🤲 For Prayer")
-                        .addText("Face this direction during Salah")
-                        .build()
-                )
-
-                // Location info
-                itemListBuilder.addItem(
-                    Row.Builder()
-                        .setTitle("📍 Your Location")
-                        .addText(qibla.locationName)
-                        .build()
-                )
-
-            } ?: run {
-                itemListBuilder.addItem(
-                    Row.Builder()
-                        .setTitle("⚠️ Qibla Direction Unavailable")
-                        .addText("Unable to calculate direction to Makkah")
-                        .build()
-                )
+            qiblaInfo != null -> {
+                buildQiblaInfoList(itemListBuilder, qiblaInfo!!)
             }
         }
 
@@ -116,7 +89,7 @@ class QiblaCompassScreen(carContext: CarContext) : Screen(carContext) {
                     .addAction(
                         Action.Builder()
                             .setTitle("🔄 Refresh")
-                            .setOnClickListener { calculateQiblaDirection() }
+                            .setOnClickListener { loadQiblaDirection() }
                             .build()
                     )
                     .build()
@@ -124,82 +97,102 @@ class QiblaCompassScreen(carContext: CarContext) : Screen(carContext) {
             .build()
     }
 
-    private fun calculateQiblaDirection() {
-        lifecycleScope.launch {
-            _isLoading.value = true
-            
-            kotlinx.coroutines.delay(500) // Simulate calculation
-            
-            // Use sample location (New York)
-            val userLatitude = 40.7128
-            val userLongitude = -74.0060
-
-            val direction = calculateBearing(
-                userLatitude, userLongitude,
-                kaabaLatitude, kaabaLongitude
+    private fun buildQiblaInfoList(
+        builder: ItemList.Builder,
+        qibla: AutomotivePrayerDataProvider.QiblaInfo
+    ) {
+        // Check if we have valid location
+        if (qibla.latitude == 0.0 && qibla.longitude == 0.0) {
+            builder.addItem(
+                Row.Builder()
+                    .setTitle("📍 Location Required")
+                    .addText("Please ensure location is enabled in the main app")
+                    .build()
             )
-
-            val distance = calculateDistance(
-                userLatitude, userLongitude,
-                kaabaLatitude, kaabaLongitude
-            )
-
-            val compassDirection = getCompassDirection(direction)
-
-            _qiblaDirection.value = QiblaInfo(
-                direction = direction,
-                distance = distance,
-                compassDirection = compassDirection,
-                locationName = "New York, USA"
-            )
-
-            _isLoading.value = false
-            invalidate()
+            return
         }
+
+        // Main Qibla direction
+        builder.addItem(
+            Row.Builder()
+                .setTitle("🕋 Qibla Direction")
+                .addText("${qibla.compassDirection} (${qibla.direction.toInt()}°)")
+                .build()
+        )
+
+        // Distance to Makkah
+        builder.addItem(
+            Row.Builder()
+                .setTitle("📏 Distance to Makkah")
+                .addText("${String.format("%.0f", qibla.distance)} km")
+                .build()
+        )
+
+        // Directional guidance
+        val guidance = getDirectionalGuidance(qibla.direction)
+        builder.addItem(
+            Row.Builder()
+                .setTitle("🧭 Turn Direction")
+                .addText(guidance)
+                .build()
+        )
+
+        // Prayer reminder
+        builder.addItem(
+            Row.Builder()
+                .setTitle("🤲 For Prayer")
+                .addText("Face this direction during Salah")
+                .build()
+        )
+
+        // Separator
+        builder.addItem(
+            Row.Builder()
+                .setTitle("─────────────────────")
+                .build()
+        )
+
+        // Location info
+        builder.addItem(
+            Row.Builder()
+                .setTitle("📍 Your Location")
+                .addText(qibla.locationName)
+                .build()
+        )
+
+        // Coordinates (for reference)
+        builder.addItem(
+            Row.Builder()
+                .setTitle("🌐 Coordinates")
+                .addText("${String.format("%.4f", qibla.latitude)}°, ${String.format("%.4f", qibla.longitude)}°")
+                .build()
+        )
     }
 
-    private fun calculateBearing(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val lat1Rad = Math.toRadians(lat1)
-        val lat2Rad = Math.toRadians(lat2)
-        val deltaLonRad = Math.toRadians(lon2 - lon1)
+    private fun loadQiblaDirection() {
+        Log.i(TAG, "🧭 Loading Qibla direction for Android Auto")
+        isLoading = true
+        errorMessage = null
+        invalidate()
 
-        val x = sin(deltaLonRad) * cos(lat2Rad)
-        val y = cos(lat1Rad) * sin(lat2Rad) - sin(lat1Rad) * cos(lat2Rad) * cos(deltaLonRad)
+        screenScope.launch {
+            try {
+                val info = dataProvider.getQiblaInfo()
+                qiblaInfo = info
+                isLoading = false
+                errorMessage = null
 
-        val bearingRad = atan2(x, y)
-        val bearingDeg = Math.toDegrees(bearingRad)
+                Log.i(TAG, "✅ Qibla calculated: ${info.direction.toInt()}° ${info.compassDirection}")
+                Log.i(TAG, "📍 Location: ${info.locationName}")
+                Log.i(TAG, "📏 Distance: ${info.distance.toInt()} km")
 
-        return (bearingDeg + 360) % 360
-    }
-
-    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val earthRadius = 6371.0 // Earth's radius in kilometers
-
-        val lat1Rad = Math.toRadians(lat1)
-        val lat2Rad = Math.toRadians(lat2)
-        val deltaLatRad = Math.toRadians(lat2 - lat1)
-        val deltaLonRad = Math.toRadians(lon2 - lon1)
-
-        val a = sin(deltaLatRad / 2) * sin(deltaLatRad / 2) +
-                cos(lat1Rad) * cos(lat2Rad) *
-                sin(deltaLonRad / 2) * sin(deltaLonRad / 2)
-
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-
-        return earthRadius * c
-    }
-
-    private fun getCompassDirection(bearing: Double): String {
-        return when {
-            bearing >= 337.5 || bearing < 22.5 -> "North"
-            bearing < 67.5 -> "Northeast"
-            bearing < 112.5 -> "East"
-            bearing < 157.5 -> "Southeast"
-            bearing < 202.5 -> "South"
-            bearing < 247.5 -> "Southwest"
-            bearing < 292.5 -> "West"
-            bearing < 337.5 -> "Northwest"
-            else -> "North"
+                invalidate()
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error calculating Qibla direction", e)
+                isLoading = false
+                errorMessage = "Could not calculate Qibla direction"
+                invalidate()
+            }
         }
     }
 
@@ -217,5 +210,4 @@ class QiblaCompassScreen(carContext: CarContext) : Screen(carContext) {
         }
     }
 
-    // Removed styled text for simplicity
 }
