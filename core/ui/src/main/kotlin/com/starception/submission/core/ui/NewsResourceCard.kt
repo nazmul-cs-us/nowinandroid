@@ -24,6 +24,7 @@ import android.view.View
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -183,10 +184,21 @@ fun NewsResourceHeaderImage(
     headerImageUrl: String?,
 ) {
     val hasValidUrl = !headerImageUrl.isNullOrEmpty()
-    var isLoading by remember { mutableStateOf(hasValidUrl) }
+
+    // Check if this is a drawable resource reference
+    val isDrawableResource = headerImageUrl?.startsWith("drawable://") == true
+    val drawableResId = if (isDrawableResource) {
+        when (headerImageUrl?.substringAfter("drawable://")) {
+            "masjid_al_haram" -> com.starception.submission.core.designsystem.R.drawable.masjid_al_haram
+            "masjid_al_nawabi" -> com.starception.submission.core.designsystem.R.drawable.masjid_al_nawabi
+            else -> null
+        }
+    } else null
+
+    var isLoading by remember { mutableStateOf(hasValidUrl && !isDrawableResource) }
     var isError by remember { mutableStateOf(false) }
     val imageLoader = rememberAsyncImagePainter(
-        model = headerImageUrl,
+        model = if (isDrawableResource) null else headerImageUrl,
         onState = { state ->
             isLoading = state is AsyncImagePainter.State.Loading
             isError = state is AsyncImagePainter.State.Error
@@ -196,7 +208,8 @@ fun NewsResourceHeaderImage(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp),
+            .height(180.dp)
+            .background(if (isDrawableResource) MaterialTheme.colorScheme.surfaceContainerLow else Color.Transparent),
         contentAlignment = Alignment.Center,
     ) {
         if (isLoading && hasValidUrl) {
@@ -213,8 +226,12 @@ fun NewsResourceHeaderImage(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(180.dp),
-            contentScale = ContentScale.Crop,
-            painter = if (hasValidUrl && isError.not() && !isLocalInspection) {
+            contentScale = if (isDrawableResource) ContentScale.Fit else ContentScale.Crop,
+            alignment = Alignment.Center,
+            painter = if (isDrawableResource && drawableResId != null) {
+                // Load drawable resource directly
+                painterResource(drawableResId)
+            } else if (hasValidUrl && isError.not() && !isLocalInspection) {
                 imageLoader
             } else {
                 painterResource(drawable.core_designsystem_ic_placeholder_default)

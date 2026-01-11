@@ -264,6 +264,13 @@ object NewsDbGenerator {
                 val newsId = startId + number - 1
                 val ordinal = getOrdinal(number)
 
+                // Set mosque image based on revelation type
+                val mosqueImage = when (type) {
+                    "Meccan" -> "drawable://masjid_al_haram"
+                    "Medinan" -> "drawable://masjid_al_nawabi"
+                    else -> "drawable://masjid_al_haram" // Default to Makkah
+                }
+
                 val title = "Surah $number: $nameEn ($nameTranslation)"
                 val content = """**Arabic:** $nameAr
 
@@ -274,9 +281,9 @@ object NewsDbGenerator {
 Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal chapter of the Holy Quran with $totalVerses verses."""
 
                 newsDb.execSQL(
-                    """INSERT INTO news_resources (id, title, content, type, is_system, created_at, updated_at)
-                       VALUES (?, ?, ?, 'Surah 📖', 1, ?, ?)""",
-                    arrayOf(newsId, title, content, now, now)
+                    """INSERT INTO news_resources (id, title, content, header_image_url, type, is_system, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, 'Surah 📖', 1, ?, ?)""",
+                    arrayOf(newsId, title, content, mosqueImage, now, now)
                 )
 
                 newsDb.execSQL(
@@ -336,10 +343,13 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                     fullTitle += " ($surahRef)"
                 }
 
+                // Use Masjid Al-Nawabi for all Quranic Duas
+                val mosqueImage = "drawable://masjid_al_nawabi"
+
                 newsDb.execSQL(
-                    """INSERT INTO news_resources (id, title, content, type, is_system, created_at, updated_at)
-                       VALUES (?, ?, ?, 'Dua 🤲', 1, ?, ?)""",
-                    arrayOf(newsId, fullTitle, content, now, now)
+                    """INSERT INTO news_resources (id, title, content, header_image_url, type, is_system, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, 'Dua 🤲', 1, ?, ?)""",
+                    arrayOf(newsId, fullTitle, content, mosqueImage, now, now)
                 )
 
                 newsDb.execSQL(
@@ -406,10 +416,13 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                 val content = contentParts.joinToString("\n\n")
                 val title = "$chapterTitle: Dua $position"
 
+                // Use Masjid Al-Nawabi for all Fortress of the Muslim duas
+                val mosqueImage = "drawable://masjid_al_nawabi"
+
                 newsDb.execSQL(
-                    """INSERT INTO news_resources (id, title, content, type, is_system, created_at, updated_at)
-                       VALUES (?, ?, ?, 'Dua 🤲', 1, ?, ?)""",
-                    arrayOf(newsId, title, content, now, now)
+                    """INSERT INTO news_resources (id, title, content, header_image_url, type, is_system, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, 'Dua 🤲', 1, ?, ?)""",
+                    arrayOf(newsId, title, content, mosqueImage, now, now)
                 )
 
                 // Map to topic based on chapter
@@ -516,6 +529,13 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                         val newsId = 2001 + number - 1
                         val ordinal = getOrdinal(number)
 
+                        // Set mosque image based on revelation type
+                        val mosqueImage = when (type) {
+                            "Meccan" -> "drawable://masjid_al_haram"
+                            "Medinan" -> "drawable://masjid_al_nawabi"
+                            else -> "drawable://masjid_al_haram" // Default to Makkah
+                        }
+
                         val title = "Surah $number: $nameEn ($nameTranslation)"
                         val content = """**Arabic:** $nameAr
 
@@ -530,7 +550,7 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                             title = title,
                             content = content,
                             url = "",
-                            headerImageUrl = null,
+                            headerImageUrl = mosqueImage,
                             publishDate = now,
                             type = "Surah 📖",
                             isSystem = 1,
@@ -581,12 +601,15 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                             fullTitle += " ($surahRef)"
                         }
 
+                        // Use Masjid Al-Nawabi for all Quranic Duas
+                        val mosqueImage = "drawable://masjid_al_nawabi"
+
                         newsResources.add(NewsResourceEntity(
                             id = newsId,
                             title = fullTitle,
                             content = content,
                             url = "",
-                            headerImageUrl = null,
+                            headerImageUrl = mosqueImage,
                             publishDate = now,
                             type = "Dua 🤲",
                             isSystem = 1,
@@ -643,12 +666,15 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                         val content = contentParts.joinToString("\n\n")
                         val title = "$chapterTitle: Dua $position"
 
+                        // Use Masjid Al-Nawabi for all Fortress of the Muslim duas
+                        val mosqueImage = "drawable://masjid_al_nawabi"
+
                         newsResources.add(NewsResourceEntity(
                             id = newsId,
                             title = title,
                             content = content,
                             url = "",
-                            headerImageUrl = null,
+                            headerImageUrl = mosqueImage,
                             publishDate = now,
                             type = "Dua 🤲",
                             isSystem = 1,

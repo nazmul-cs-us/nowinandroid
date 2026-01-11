@@ -2649,19 +2649,14 @@ private fun AlbumHeader(
     onTopicClick: (String) -> Unit = {},
     isLandscape: Boolean = false
 ) {
-    // Album cover images (using cover resources from Fragment)
-    val coverImages = remember {
-        listOf(
-            R.drawable.album_ellen_qin_unsplash,
-            R.drawable.album_jean_philippe_delberghe_unsplash,
-            R.drawable.album_karina_vorozheeva_unsplash,
-            R.drawable.album_amy_shamblen_unsplash,
-            R.drawable.album_pawel_czerwinski_unsplash,
-            R.drawable.album_david_clode_unsplash
-        )
+    // Use mosque image based on revelation type
+    val mosqueImage = remember(surah.revelationType) {
+        when (surah.revelationType) {
+            "Meccan" -> R.drawable.masjid_al_haram
+            "Medinan" -> R.drawable.masjid_al_nawabi
+            else -> R.drawable.masjid_al_haram // Default to Makkah
+        }
     }
-
-    val coverIndex = (surah.number - 1) % coverImages.size
 
     Box(
         modifier = Modifier
@@ -2673,13 +2668,15 @@ private fun AlbumHeader(
                     Modifier.aspectRatio(1f) // Square album cover in portrait
                 }
             )
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
-        // Album cover image
+        // Album cover image - shows appropriate mosque based on revelation location
         Image(
-            painter = painterResource(coverImages[coverIndex]),
-            contentDescription = "Album cover for ${surah.nameEnglish}",
+            painter = painterResource(mosqueImage),
+            contentDescription = "Mosque cover for ${surah.nameEnglish} (${surah.revelationType})",
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.Center
         )
 
         // Gradient overlay at bottom with topic chips
