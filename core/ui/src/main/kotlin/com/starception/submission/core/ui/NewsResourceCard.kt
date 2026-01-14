@@ -136,10 +136,9 @@ fun NewsResourceCardExpanded(
                 )
             }
             Box(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Column {
-                    Spacer(modifier = Modifier.height(12.dp))
                     Row {
                         NewsResourceTitle(
                             userNewsResource.title,
@@ -216,25 +215,34 @@ fun NewsResourceHeaderImage(
     // Track the card's position for parallax effect
     var cardYPosition by remember { mutableStateOf(0f) }
     val density = androidx.compose.ui.platform.LocalDensity.current
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
 
-    // Parallax configuration:
-    // - Container (visible): 200dp
-    // - Image (full): 250dp
-    // - Extra image height: 50dp that can be revealed via parallax
-    // - Start showing TOP 80%, end showing BOTTOM 80% when scrolled
-    val containerHeightDp = 200f
-    val imageHeightDp = 250f
-    val parallaxRangeDp = imageHeightDp - containerHeightDp // 50dp total travel
+    // Professional parallax configuration:
+    // - Show 100% of image initially
+    // - Create parallax ILLUSION using scale and subtle translation
+    // - Scale: 1.0 -> 1.08 (zoom in as user scrolls)
+    // - Translation: subtle vertical shift for depth perception
+    val containerHeightDp = 240f
+
+    // Smooth easing function for professional feel
+    fun easeInOutCubic(x: Float): Float {
+        return if (x < 0.5f) {
+            4f * x * x * x
+        } else {
+            1f - (-2f * x + 2f).let { it * it * it } / 2f
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(containerHeightDp.dp)
-            .clipToBounds() // Clip overflow content
+            .clipToBounds()
             .onGloballyPositioned { coordinates ->
                 cardYPosition = coordinates.positionInRoot().y
             },
-        contentAlignment = Alignment.TopCenter, // Start from TOP
+        contentAlignment = Alignment.Center,
     ) {
         if (isLoading && hasValidUrl) {
             CircularProgressIndicator(
@@ -245,27 +253,37 @@ fun NewsResourceHeaderImage(
             )
         }
 
+        // Calculate parallax progress based on screen position
+        val normalizedPosition = (cardYPosition / screenHeightPx).coerceIn(0f, 1f)
+        // Convert to -1 to +1 range centered at middle of screen
+        val centeredProgress = (normalizedPosition - 0.5f) * 2f
+        val easedProgress = easeInOutCubic(kotlin.math.abs(centeredProgress)) * kotlin.math.sign(centeredProgress)
+
         Image(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(imageHeightDp.dp)
+                .height(containerHeightDp.dp)
                 .graphicsLayer {
-                    // Convert dp to pixels for graphicsLayer
-                    val parallaxRangePx = with(density) { parallaxRangeDp.dp.toPx() }
+                    // Parallax ILLUSION effects:
 
-                    // Parallax effect:
-                    // - With TopCenter alignment, image starts showing TOP
-                    // - As card scrolls up (Y decreases/goes negative), translate image UP to show BOTTOM
-                    // - Normalize based on screen scroll position
-                    val screenHeightPx = 2000f // Approximate screen height in pixels
-                    val normalizedProgress = (cardYPosition / screenHeightPx).coerceIn(0f, 1f)
+                    // 1. Scale effect: zoom in as card moves toward center of screen
+                    // At edges: 1.0, at center: 1.08 (8% zoom)
+                    val scaleValue = 1f + (1f - kotlin.math.abs(centeredProgress)) * 0.08f
+                    scaleX = scaleValue
+                    scaleY = scaleValue
 
-                    // At top of screen (progress=0): translationY = 0 (show top)
-                    // At bottom/scrolled (progress=1): translationY = -parallaxRangePx (show bottom)
-                    translationY = -normalizedProgress * parallaxRangePx
+                    // 2. Subtle vertical translation for depth (moves opposite to scroll)
+                    // Creates illusion of layers moving at different speeds
+                    val maxTranslation = with(density) { 15.dp.toPx() }
+                    translationY = -easedProgress * maxTranslation
+
+                    // 3. Subtle alpha variation for atmospheric depth
+                    alpha = 0.95f + (1f - kotlin.math.abs(centeredProgress)) * 0.05f
+
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f)
                 },
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.TopCenter,
+            contentScale = ContentScale.FillWidth,
+            alignment = Alignment.Center,
             painter = if (isDrawableResource && drawableResId != null) {
                 painterResource(drawableResId)
             } else if (hasValidUrl && isError.not() && !isLocalInspection) {
@@ -274,6 +292,22 @@ fun NewsResourceHeaderImage(
                 painterResource(drawable.core_designsystem_ic_placeholder_default)
             },
             contentDescription = null,
+        )
+
+        // Subtle gradient overlay at bottom for depth
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.15f)
+                        )
+                    )
+                )
         )
     }
 }
