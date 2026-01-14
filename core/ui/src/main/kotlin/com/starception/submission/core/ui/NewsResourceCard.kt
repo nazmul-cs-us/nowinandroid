@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -55,7 +56,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropTransferData
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -77,6 +81,7 @@ import com.starception.submission.core.model.data.FollowableTopic
 import com.starception.submission.core.model.data.NewsResource
 import com.starception.submission.core.model.data.UserNewsResource
 import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toJavaZoneId
 import java.time.format.DateTimeFormatter
@@ -126,7 +131,9 @@ fun NewsResourceCardExpanded(
     ) {
         Column {
             Row {
-                NewsResourceHeaderImage(userNewsResource.headerImageUrl)
+                NewsResourceHeaderImage(
+                    headerImageUrl = userNewsResource.headerImageUrl
+                )
             }
             Box(
                 modifier = Modifier.padding(16.dp),
@@ -205,15 +212,31 @@ fun NewsResourceHeaderImage(
         },
     )
     val isLocalInspection = LocalInspectionMode.current
+
+    // Track the card's position for parallax effect
+    var cardYPosition by remember { mutableStateOf(0f) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+
+    // Parallax configuration:
+    // - Container (visible): 200dp
+    // - Image (full): 250dp
+    // - Extra image height: 50dp that can be revealed via parallax
+    // - Start showing TOP 80%, end showing BOTTOM 80% when scrolled
+    val containerHeightDp = 200f
+    val imageHeightDp = 250f
+    val parallaxRangeDp = imageHeightDp - containerHeightDp // 50dp total travel
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp)
-            .background(if (isDrawableResource) MaterialTheme.colorScheme.surfaceContainerLow else Color.Transparent),
-        contentAlignment = Alignment.Center,
+            .height(containerHeightDp.dp)
+            .clipToBounds() // Clip overflow content
+            .onGloballyPositioned { coordinates ->
+                cardYPosition = coordinates.positionInRoot().y
+            },
+        contentAlignment = Alignment.TopCenter, // Start from TOP
     ) {
         if (isLoading && hasValidUrl) {
-            // Display a progress bar while loading
             CircularProgressIndicator(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -225,19 +248,31 @@ fun NewsResourceHeaderImage(
         Image(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(180.dp),
-            contentScale = if (isDrawableResource) ContentScale.Fit else ContentScale.Crop,
-            alignment = Alignment.Center,
+                .height(imageHeightDp.dp)
+                .graphicsLayer {
+                    // Convert dp to pixels for graphicsLayer
+                    val parallaxRangePx = with(density) { parallaxRangeDp.dp.toPx() }
+
+                    // Parallax effect:
+                    // - With TopCenter alignment, image starts showing TOP
+                    // - As card scrolls up (Y decreases/goes negative), translate image UP to show BOTTOM
+                    // - Normalize based on screen scroll position
+                    val screenHeightPx = 2000f // Approximate screen height in pixels
+                    val normalizedProgress = (cardYPosition / screenHeightPx).coerceIn(0f, 1f)
+
+                    // At top of screen (progress=0): translationY = 0 (show top)
+                    // At bottom/scrolled (progress=1): translationY = -parallaxRangePx (show bottom)
+                    translationY = -normalizedProgress * parallaxRangePx
+                },
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
             painter = if (isDrawableResource && drawableResId != null) {
-                // Load drawable resource directly
                 painterResource(drawableResId)
             } else if (hasValidUrl && isError.not() && !isLocalInspection) {
                 imageLoader
             } else {
                 painterResource(drawable.core_designsystem_ic_placeholder_default)
             },
-            // TODO b/226661685: Investigate using alt text of  image to populate content description
-            // decorative image,
             contentDescription = null,
         )
     }
@@ -335,7 +370,7 @@ fun NotificationDot(
 fun dateFormatted(publishDate: Instant): String = DateTimeFormatter
     .ofLocalizedDate(FormatStyle.MEDIUM)
     .withLocale(Locale.getDefault())
-    .withZone(LocalTimeZone.current.toJavaZoneId())
+    .withZone(TimeZone.currentSystemDefault().toJavaZoneId())
     .format(publishDate.toJavaInstant())
 
 /**
