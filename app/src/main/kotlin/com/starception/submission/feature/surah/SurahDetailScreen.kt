@@ -1158,12 +1158,11 @@ private fun AlbumPlayerContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .wrapContentHeight()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh) // Eliminate white gap
             ) {
                 Column {
                     AlbumHeader(
                         surah = surah,
-                        topics = topics,
-                        onTopicClick = onTopicClick,
                         isLandscape = isLandscape
                     )
 
@@ -1229,7 +1228,9 @@ private fun AlbumPlayerContent(
                                 AlbumInfoCard(
                                     surah = displaySurah,
                                     selectedArabicFont = selectedArabicFont,
-                                    collapseProgress = collapseProgress
+                                    collapseProgress = collapseProgress,
+                                    topics = topics,
+                                    onTopicClick = onTopicClick
                                 )
                             }
                         }
@@ -2645,8 +2646,6 @@ private fun BottomSheetWordStudyContent(
 @Composable
 private fun AlbumHeader(
     surah: Surah,
-    topics: List<com.starception.submission.core.topicsdatabase.Topic> = emptyList(),
-    onTopicClick: (String) -> Unit = {},
     isLandscape: Boolean = false
 ) {
     // Use mosque image based on revelation type
@@ -2668,56 +2667,17 @@ private fun AlbumHeader(
                     Modifier.aspectRatio(1f) // Square album cover in portrait
                 }
             )
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh) // Match info card background
     ) {
         // Album cover image - shows appropriate mosque based on revelation location
         Image(
             painter = painterResource(mosqueImage),
             contentDescription = "Mosque cover for ${surah.nameEnglish} (${surah.revelationType})",
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit,
+            contentScale = ContentScale.Crop,
             alignment = Alignment.Center
         )
 
-        // Gradient overlay at bottom with topic chips
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(100.dp)
-                .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-                        )
-                    )
-                )
-        ) {
-            // Topic chips on the gradient overlay - using NiaTopicTag for consistency with news cards
-            if (topics.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomStart)
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    topics.forEach { topic ->
-                        NiaTopicTag(
-                            followed = false,
-                            onClick = { onTopicClick(topic.id) },
-                            text = {
-                                Text(
-                                    text = topic.name.uppercase(Locale.getDefault())
-                                )
-                            }
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -2725,7 +2685,9 @@ private fun AlbumHeader(
 private fun AlbumInfoCard(
     surah: Surah,
     selectedArabicFont: String,
-    collapseProgress: Float = 0f
+    collapseProgress: Float = 0f,
+    topics: List<com.starception.submission.core.topicsdatabase.Topic> = emptyList(),
+    onTopicClick: (String) -> Unit = {}
 ) {
     // Use MaterialTheme.colorScheme for automatic theme support
     // NOTE: Surah names are now handled by the floating overlay for smooth scroll transition
@@ -2755,12 +2717,30 @@ private fun AlbumInfoCard(
                 Spacer(Modifier.height(12.dp))
             }
 
-            // Surah info chips
+            // Surah info chips with HOLY QURAN tag on right
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                InfoChip(text = "${surah.ayahCount} Ayahs")
-                InfoChip(text = surah.revelationType)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    InfoChip(text = "${surah.ayahCount} Ayahs")
+                    InfoChip(text = surah.revelationType)
+                }
+                // HOLY QURAN tag on the right - use topic from list if available
+                if (topics.isNotEmpty()) {
+                    topics.forEach { topic ->
+                        NiaTopicTag(
+                            followed = false,
+                            onClick = { onTopicClick(topic.id) },
+                            text = {
+                                Text(text = topic.name.uppercase(Locale.getDefault()))
+                            }
+                        )
+                    }
+                }
             }
         }
     }
