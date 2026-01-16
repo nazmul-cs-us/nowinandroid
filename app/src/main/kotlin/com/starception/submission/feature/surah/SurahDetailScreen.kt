@@ -675,7 +675,6 @@ fun SurahDetailScreen(
 
             Box(
                 modifier = Modifier
-                    .statusBarsPadding()
                     .graphicsLayer {
                         translationX = xOffsetPx
                         translationY = namesYPx
@@ -918,8 +917,7 @@ private fun AlbumPlayerTopBar(
         tonalElevation = (4 * collapseProgress).dp, // Smooth elevation transition
         modifier = modifier
             .fillMaxWidth()
-            .statusBarsPadding() // Account for status bar/punch hole
-            .padding(top = 52.dp) // Extra top padding to show more sky (moved up 4dp)
+            .padding(top = 52.dp) // Fixed top padding (status bar is hidden by ImmersiveFullScreenEffect)
     ) {
         Row(
             modifier = Modifier
@@ -1150,7 +1148,7 @@ private fun AlbumPlayerContent(
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
             state = scrollState,
-            contentPadding = WindowInsets.statusBars.asPaddingValues(),
+            contentPadding = PaddingValues(top = 0.dp), // No padding needed (status bar is hidden)
             modifier = Modifier.fillMaxSize()
         ) {
         // Album Header with either FAB+Info Card OR Music Player Controls
