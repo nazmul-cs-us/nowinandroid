@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.*
@@ -2700,45 +2701,53 @@ private fun AlbumInfoCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center
+                .padding(horizontal = 24.dp)
+                .padding(top = 16.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Spacer for the floating Surah name overlay (names are now positioned as overlay)
+            // Top section: Spacer for floating overlay (item 3: Al-Fatihah / الفاتحة)
             Spacer(Modifier.height(56.dp))
 
-            // Surah meaning (translation of the name)
-            if (surah.nameTranslation.isNotBlank()) {
-                Text(
-                    text = "\"${surah.nameTranslation}\"",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(Modifier.height(12.dp))
-            }
-
-            // Surah info chips with HOLY QURAN tag on right
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    InfoChip(text = "${surah.ayahCount} Ayahs")
-                    InfoChip(text = surah.revelationType)
+            // Bottom section: Translation + Chips grouped together (items 4 & 5)
+            Column {
+                // Item 4: Translation
+                if (surah.nameTranslation.isNotBlank()) {
+                    Text(
+                        text = "\"${surah.nameTranslation}\"",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
-                // HOLY QURAN tag on the right - use topic from list if available
-                if (topics.isNotEmpty()) {
-                    topics.forEach { topic ->
-                        NiaTopicTag(
-                            followed = true,
-                            onClick = { onTopicClick(topic.id) },
-                            text = {
-                                Text(text = topic.name.uppercase(Locale.getDefault()))
-                            }
-                        )
+
+                // Small gap between translation and chips
+                Spacer(Modifier.height(6.dp))
+
+                // Item 5: Chips row - 7 AYAHS, MECCAN on left | HOLY QURAN on right
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left side - Info chips
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        InfoChip(text = "${surah.ayahCount} Ayahs")
+                        InfoChip(text = surah.revelationType)
+                    }
+
+                    // Right side - HOLY QURAN tag
+                    if (topics.isNotEmpty()) {
+                        topics.forEach { topic ->
+                            NiaTopicTag(
+                                followed = true,
+                                onClick = { onTopicClick(topic.id) },
+                                text = {
+                                    Text(text = topic.name.uppercase(Locale.getDefault()))
+                                }
+                            )
+                        }
                     }
                 }
             }
