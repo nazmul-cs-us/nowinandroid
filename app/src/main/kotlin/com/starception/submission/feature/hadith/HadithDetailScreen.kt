@@ -75,6 +75,14 @@ import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.core.ui.getCurrentSkyPeriodForTheme
 import com.starception.submission.core.ui.getSkyColors
 import java.util.Locale
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.lazy.rememberLazyListState
+import com.starception.submission.R
 
 // Gradient colors for hadith header - earthy tones
 private val HadithGradientColors = listOf(
@@ -375,71 +383,108 @@ private fun HadithContent(
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // No status bar padding - immersive mode hides status bar
+        val lazyListState = rememberLazyListState()
         LazyColumn(
+            state = lazyListState,
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header with dynamic sky
+            // Header with Masjid al-Nawabi image - with parallax effect
             item {
-                val skyPeriod = getCurrentSkyPeriodForTheme()
-                val headerHeight = if (isLandscape) 200.dp else 420.dp
+                // Calculate parallax progress based on scroll
+                val scrollOffset = lazyListState.firstVisibleItemScrollOffset.toFloat()
+                val headerHeightPx = with(LocalDensity.current) {
+                    if (isLandscape) 200.dp.toPx() else 400.dp.toPx()
+                }
+                val parallaxProgress = (scrollOffset / headerHeightPx).coerceIn(0f, 1f)
+
+                // Easing function for smooth parallax
+                fun easeOutCubic(x: Float): Float = 1f - (1f - x).let { it * it * it }
+                val easedProgress = easeOutCubic(parallaxProgress)
+                val centeredProgress = (easedProgress - 0.5f) * 2f
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(headerHeight)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
-                    // Dynamic sky background based on time of day
-                    DynamicSkyHeader(
-                        modifier = Modifier.fillMaxSize(),
-                        height = headerHeight,
-                        period = skyPeriod
-                    )
-                    // Semi-transparent overlay for text readability
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.2f))
-                    )
-                    // Header content positioned at bottom to show more sky artwork
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = if (isLandscape) 24.dp else 16.dp)
-                            .padding(top = if (isLandscape) 60.dp else 100.dp, bottom = 4.dp), // Position content at very bottom
-                        verticalArrangement = Arrangement.Bottom,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Collection name
-                        Text(
-                            text = hadith.collectionNameEnglish.ifEmpty { collectionName },
-                            style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        )
+                    Column {
+                        // Album-style header image with parallax
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    if (isLandscape) {
+                                        Modifier.height(200.dp)
+                                    } else {
+                                        Modifier.aspectRatio(1f)
+                                    }
+                                )
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.masjid_al_nawabi),
+                                contentDescription = "Masjid al-Nawabi",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        // Scale effect: 1.0 -> 1.08 zoom
+                                        val scaleValue = 1f + (1f - kotlin.math.abs(centeredProgress)) * 0.08f
+                                        scaleX = scaleValue
+                                        scaleY = scaleValue
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                                        // Subtle vertical translation
+                                        val maxTranslation = 15.dp.toPx()
+                                        translationY = -easedProgress * maxTranslation
 
-                        // Hadith number - using NiaTopicTag for consistency with Dua detail
-                        NiaTopicTag(
-                            followed = false,
-                            onClick = { },
-                            enabled = true,
-                            text = {
+                                        // Alpha variation
+                                        alpha = 0.95f + (1f - kotlin.math.abs(centeredProgress)) * 0.05f
+                                    },
+                                contentScale = ContentScale.Crop,
+                                alignment = Alignment.Center
+                            )
+                        }
+
+                        // Info card below header
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 16.dp)
+                        ) {
+                            Column {
+                                // Collection name
                                 Text(
-                                    text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
+                                    text = hadith.collectionNameEnglish.ifEmpty { collectionName },
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+
+                                // Author
+                                if (hadith.author.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Compiled by ${hadith.author}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontStyle = FontStyle.Italic
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Hadith number chip
+                                NiaTopicTag(
+                                    followed = true,
+                                    onClick = { },
+                                    enabled = true,
+                                    text = {
+                                        Text(
+                                            text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
+                                        )
+                                    }
                                 )
                             }
-                        )
-
-                        // Author
-                        if (hadith.author.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Compiled by ${hadith.author}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontStyle = FontStyle.Italic
-                            )
                         }
                     }
                 }
