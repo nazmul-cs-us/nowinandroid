@@ -113,7 +113,19 @@ fun NiaNavHost(
             // Surah screen nested within For You section
             surahScreen(
                 onBackClick = navController::popBackStack,
-                onTopicClick = navController::navigateToTopic
+                onTopicClick = navController::navigateToTopic,
+                onNavigateToPreviousSurah = { currentSurahNumber ->
+                    if (currentSurahNumber > 1) {
+                        navController.popBackStack()
+                        navController.navigateToSurah(currentSurahNumber - 1, null)
+                    }
+                },
+                onNavigateToNextSurah = { currentSurahNumber ->
+                    if (currentSurahNumber < 114) {
+                        navController.popBackStack()
+                        navController.navigateToSurah(currentSurahNumber + 1, null)
+                    }
+                }
             )
             // Dua detail screen nested within For You section
             duaDetailScreen(
@@ -159,7 +171,19 @@ fun NiaNavHost(
             // Surah screen nested within Bookmarks section
             surahScreen(
                 onBackClick = navController::popBackStack,
-                onTopicClick = navController::navigateToTopic
+                onTopicClick = navController::navigateToTopic,
+                onNavigateToPreviousSurah = { currentSurahNumber ->
+                    if (currentSurahNumber > 1) {
+                        navController.popBackStack()
+                        navController.navigateToSurah(currentSurahNumber - 1, null)
+                    }
+                },
+                onNavigateToNextSurah = { currentSurahNumber ->
+                    if (currentSurahNumber < 114) {
+                        navController.popBackStack()
+                        navController.navigateToSurah(currentSurahNumber + 1, null)
+                    }
+                }
             )
             // Dua detail screen nested within Bookmarks section
             duaDetailScreen(
@@ -224,7 +248,19 @@ fun NiaNavHost(
         // Surah screen accessible from Prayer Times (Noble Quran tile)
         surahScreen(
             onBackClick = navController::popBackStack,
-            onTopicClick = navController::navigateToTopic
+            onTopicClick = navController::navigateToTopic,
+            onNavigateToPreviousSurah = { currentSurahNumber ->
+                if (currentSurahNumber > 1) {
+                    navController.popBackStack()
+                    navController.navigateToSurah(currentSurahNumber - 1, null)
+                }
+            },
+            onNavigateToNextSurah = { currentSurahNumber ->
+                if (currentSurahNumber < 114) {
+                    navController.popBackStack()
+                    navController.navigateToSurah(currentSurahNumber + 1, null)
+                }
+            }
         )
         // Unified Settings screen
         settingsScreen(

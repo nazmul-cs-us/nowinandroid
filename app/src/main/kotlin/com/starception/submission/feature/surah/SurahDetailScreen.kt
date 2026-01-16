@@ -91,6 +91,46 @@ import com.starception.submission.core.designsystem.component.NiaTopicTag
 import java.util.Locale
 
 /**
+ * Container that handles swipe gestures for surah navigation
+ */
+@Composable
+private fun SurahSwipeContainer(
+    surahNumber: Int,
+    onNavigateToPreviousSurah: () -> Unit,
+    onNavigateToNextSurah: () -> Unit,
+    content: @Composable BoxScope.() -> Unit
+) {
+    var swipeOffsetX by remember { mutableStateOf(0f) }
+    val swipeThreshold = 150f
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .pointerInput(surahNumber) {
+                detectDragGestures(
+                    onDragStart = { swipeOffsetX = 0f },
+                    onDragEnd = {
+                        when {
+                            swipeOffsetX > swipeThreshold && surahNumber > 1 -> onNavigateToPreviousSurah()
+                            swipeOffsetX < -swipeThreshold && surahNumber < 114 -> onNavigateToNextSurah()
+                        }
+                        swipeOffsetX = 0f
+                    },
+                    onDragCancel = { swipeOffsetX = 0f },
+                    onDrag = { change, dragAmount ->
+                        swipeOffsetX += dragAmount.x
+                        if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y) * 1.5f) {
+                            change.consume()
+                        }
+                    }
+                )
+            },
+        content = content
+    )
+}
+
+/**
  * Helper function to convert font name to FontFamily
  */
 internal fun getArabicFontFamilyForSelection(selectedFont: String): androidx.compose.ui.text.font.FontFamily {
@@ -122,6 +162,8 @@ fun SurahDetailScreen(
     scrollToAyah: Int = 0, // Optional: scroll to specific ayah number (0 = no scroll)
     onBackClick: () -> Unit,
     onTopicClick: (String) -> Unit = {}, // Navigate to topic detail screen
+    onNavigateToPreviousSurah: () -> Unit = {}, // Navigate to previous surah (swipe right)
+    onNavigateToNextSurah: () -> Unit = {}, // Navigate to next surah (swipe left)
     viewModel: SurahDetailViewModel = hiltViewModel()
 ) {
     // Enable immersive full-screen mode (hides status bar)
@@ -422,12 +464,14 @@ fun SurahDetailScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
+    SurahSwipeContainer(
+        surahNumber = surahNumber,
+        onNavigateToPreviousSurah = onNavigateToPreviousSurah,
+        onNavigateToNextSurah = onNavigateToNextSurah
     ) {
         Scaffold(
-            topBar = {}
+            topBar = {},
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ) { paddingValues ->
         when (val state = uiState) {
             is SurahDetailUiState.Loading -> {
