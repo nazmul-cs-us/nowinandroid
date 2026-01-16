@@ -48,6 +48,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Brush
@@ -1197,6 +1198,13 @@ private fun AlbumPlayerContent(
         ) {
         // Album Header with either FAB+Info Card OR Music Player Controls
         item {
+            // Calculate scroll offset for parallax effect
+            val parallaxScrollOffset = if (scrollState.firstVisibleItemIndex == 0) {
+                scrollState.firstVisibleItemScrollOffset
+            } else {
+                0
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1206,7 +1214,8 @@ private fun AlbumPlayerContent(
                 Column {
                     AlbumHeader(
                         surah = surah,
-                        isLandscape = isLandscape
+                        isLandscape = isLandscape,
+                        scrollOffset = parallaxScrollOffset
                     )
 
                     // Fixed-height container to prevent FAB position jump during transitions
@@ -2689,7 +2698,8 @@ private fun BottomSheetWordStudyContent(
 @Composable
 private fun AlbumHeader(
     surah: Surah,
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    scrollOffset: Int = 0 // Scroll offset for parallax effect
 ) {
     // Use mosque image based on revelation type
     val mosqueImage = remember(surah.revelationType) {
@@ -2699,6 +2709,9 @@ private fun AlbumHeader(
             else -> R.drawable.masjid_al_haram // Default to Makkah
         }
     }
+
+    // Parallax factor - image moves at 0.4x the scroll speed for depth effect
+    val parallaxOffset = scrollOffset * 0.4f
 
     Box(
         modifier = Modifier
@@ -2711,16 +2724,21 @@ private fun AlbumHeader(
                 }
             )
             .background(MaterialTheme.colorScheme.surfaceContainerHigh) // Match info card background
+            .clipToBounds() // Clip the image so parallax doesn't overflow
     ) {
-        // Album cover image - shows appropriate mosque based on revelation location
+        // Album cover image with parallax effect
         Image(
             painter = painterResource(mosqueImage),
             contentDescription = "Mosque cover for ${surah.nameEnglish} (${surah.revelationType})",
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(1.3f) // Make image taller to allow parallax movement
+                .graphicsLayer {
+                    translationY = parallaxOffset
+                },
             contentScale = ContentScale.Crop,
             alignment = Alignment.Center
         )
-
     }
 }
 
