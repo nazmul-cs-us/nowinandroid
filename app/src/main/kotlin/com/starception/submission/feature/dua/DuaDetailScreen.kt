@@ -148,6 +148,12 @@ import com.starception.submission.core.ui.DynamicSkyHeader
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.core.ui.getCurrentSkyPeriodForTheme
 import com.starception.submission.core.ui.getSkyColors
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.platform.LocalDensity
+import com.starception.submission.R
 
 /**
  * Data class representing a complete Dua
@@ -1053,126 +1059,141 @@ fun DuaDetailScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(bottom = 56.dp) // Space for Vuesax pagination pill
                         ) {
-                            // Header with dynamic sky - scrollable, extends behind toolbar
+                            // Header with Masjid al-Nawabi image - with parallax effect
                             item {
-                                val skyPeriod = getCurrentSkyPeriodForTheme()
-                                val headerHeight = if (isLandscape) 200.dp else 420.dp
+                                // Calculate parallax progress based on scroll
+                                val scrollOffset = lazyListState.firstVisibleItemScrollOffset.toFloat()
+                                val headerHeightPx = with(LocalDensity.current) {
+                                    if (isLandscape) 200.dp.toPx() else 400.dp.toPx()
+                                }
+                                val parallaxProgress = (scrollOffset / headerHeightPx).coerceIn(0f, 1f)
+
+                                // Easing function for smooth parallax
+                                fun easeOutCubic(x: Float): Float = 1f - (1f - x).let { it * it * it }
+                                val easedProgress = easeOutCubic(parallaxProgress)
+                                val centeredProgress = (easedProgress - 0.5f) * 2f
+
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(headerHeight)
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                 ) {
-                                    // Dynamic sky background based on time of day
-                                    DynamicSkyHeader(
-                                        modifier = Modifier.fillMaxSize(),
-                                        height = headerHeight,
-                                        period = skyPeriod
-                                    )
-                                    // Semi-transparent overlay for text readability
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(Color.Black.copy(alpha = 0.2f))
-                                    )
-                                    android.util.Log.d("DuaHeader", "🎨 GRADIENT BOX RENDERING - dua.title='${dua.title}' arabicText.length=${dua.arabicText.length}")
+                                    Column {
+                                        // Album-style header image with parallax
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .then(
+                                                    if (isLandscape) {
+                                                        Modifier.height(200.dp)
+                                                    } else {
+                                                        Modifier.aspectRatio(1f)
+                                                    }
+                                                )
+                                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                        ) {
+                                            Image(
+                                                painter = painterResource(R.drawable.masjid_al_nawabi),
+                                                contentDescription = "Masjid al-Nawabi",
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .graphicsLayer {
+                                                        // Scale effect: 1.0 -> 1.08 zoom
+                                                        val scaleValue = 1f + (1f - kotlin.math.abs(centeredProgress)) * 0.08f
+                                                        scaleX = scaleValue
+                                                        scaleY = scaleValue
 
-                                    // Header content positioned at bottom to show more sky artwork and masjid
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(horizontal = if (isLandscape) 24.dp else 16.dp)
-                                            .offset(y = if (isLandscape) 8.dp else 17.dp),
-                                        verticalArrangement = Arrangement.Bottom,
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        android.util.Log.d("DuaHeader", "📦 HEADER COLUMN RENDERING")
+                                                        // Subtle vertical translation
+                                                        val maxTranslation = 15.dp.toPx()
+                                                        translationY = -easedProgress * maxTranslation
 
-                                        // Spacer to push text down and show more masjid
-                                        Spacer(modifier = Modifier.weight(1f))
-
-                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                        // Dua theme/title - clean up various title formats
-                                        // Filter out Arabic characters to prevent Arabic text from appearing in header
-                                        val duaTheme = dua.title
-                                            .replace(Regex("Quranic Dua \\d+:\\s*"), "")
-                                            .replace(Regex("Dua #\\d+:\\s*"), "")
-                                            .replace(Regex("Dua \\d+:\\s*"), "")
-                                            .replace(Regex("\\s*\\(\\d+:\\d+\\)\\s*$"), "")
-                                            .replace(Regex("\\s*\\(\\d+/\\d+\\)\\s*$"), "") // Handle (1/3), (2/3) format
-                                            .trim()
-                                            .let { theme ->
-                                                // Remove any Arabic characters (Unicode range 0600-06FF and 0750-077F)
-                                                if (theme.any { it in '\u0600'..'\u06FF' || it in '\u0750'..'\u077F' }) {
-                                                    "" // Don't show Arabic in header - it should be in the Arabic card below
-                                                } else {
-                                                    theme
-                                                }
-                                            }
-
-                                        // Show theme for all duas that have a meaningful English title
-                                        if (duaTheme.isNotEmpty()) {
-                                            Text(
-                                                text = duaTheme,
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                color = Color.White.copy(alpha = 0.9f),
-                                                fontWeight = FontWeight.Medium,
-                                                textAlign = TextAlign.Center,
-                                                maxLines = 1
+                                                        // Alpha variation
+                                                        alpha = 0.95f + (1f - kotlin.math.abs(centeredProgress)) * 0.05f
+                                                    },
+                                                contentScale = ContentScale.Crop,
+                                                alignment = Alignment.Center
                                             )
                                         }
 
-                                        // Topic chips and Surah pill in a single row - using NiaTopicTag for consistency
-                                        val hasTopics = topics.isNotEmpty()
-                                        val hasSurahRef = dua.surahNumber > 0 && dua.ayahNumber > 0
-
-                                        if (hasTopics || hasSurahRef) {
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .horizontalScroll(rememberScrollState()),
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                // Topic chips
-                                                topics.forEach { topic ->
-                                                    NiaTopicTag(
-                                                        followed = false,
-                                                        onClick = { onTopicClick(topic.id) },
-                                                        text = {
-                                                            Text(
-                                                                text = topic.name.uppercase(Locale.getDefault())
-                                                            )
-                                                        }
-                                                    )
-                                                }
-
-                                                // Surah/Ayah navigation chip - lookup surah name from database
-                                                if (hasSurahRef) {
-                                                    // Look up surah name from database
-                                                    var surahName by remember { mutableStateOf(dua.surahName.ifEmpty { "Surah ${dua.surahNumber}" }) }
-
-                                                    LaunchedEffect(dua.surahNumber) {
-                                                        if (dua.surahName.isEmpty()) {
-                                                            surahName = viewModel.getSurahName(dua.surahNumber)
+                                        // Info card below header
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 24.dp, vertical = 16.dp)
+                                        ) {
+                                            Column {
+                                                // Dua title
+                                                val duaTitle = dua.title
+                                                    .replace(Regex("Quranic Dua \\d+:\\s*"), "")
+                                                    .replace(Regex("Dua #\\d+:\\s*"), "")
+                                                    .replace(Regex("Dua \\d+:\\s*"), "")
+                                                    .replace(Regex("\\s*\\(\\d+:\\d+\\)\\s*$"), "")
+                                                    .replace(Regex("\\s*\\(\\d+/\\d+\\)\\s*$"), "")
+                                                    .trim()
+                                                    .let { title ->
+                                                        if (title.any { it in '\u0600'..'\u06FF' || it in '\u0750'..'\u077F' }) {
+                                                            "Dua"
+                                                        } else {
+                                                            title.ifEmpty { "Dua" }
                                                         }
                                                     }
 
-                                                    val surahDisplayName = "$surahName #${dua.ayahNumber}"
+                                                Text(
+                                                    text = duaTitle,
+                                                    style = MaterialTheme.typography.headlineMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 2
+                                                )
 
-                                                    NiaTopicTag(
-                                                        followed = false,
-                                                        onClick = { onNavigateToSurah?.invoke(dua.surahNumber, dua.ayahNumber) },
-                                                        text = {
-                                                            Text(
-                                                                text = surahDisplayName.uppercase(Locale.getDefault())
+                                                Spacer(modifier = Modifier.height(12.dp))
+
+                                                // Chips row with topics on right
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    // Left side - Surah reference chip if available
+                                                    Row(
+                                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                    ) {
+                                                        if (dua.surahNumber > 0 && dua.ayahNumber > 0) {
+                                                            var surahName by remember { mutableStateOf(dua.surahName.ifEmpty { "Surah ${dua.surahNumber}" }) }
+                                                            LaunchedEffect(dua.surahNumber) {
+                                                                if (dua.surahName.isEmpty()) {
+                                                                    surahName = viewModel.getSurahName(dua.surahNumber)
+                                                                }
+                                                            }
+                                                            NiaTopicTag(
+                                                                followed = true,
+                                                                onClick = { onNavigateToSurah?.invoke(dua.surahNumber, dua.ayahNumber) },
+                                                                text = {
+                                                                    Text(text = "$surahName:${dua.ayahNumber}".uppercase(Locale.getDefault()))
+                                                                }
                                                             )
                                                         }
-                                                    )
+                                                    }
+
+                                                    // Right side - Topic tags
+                                                    if (topics.isNotEmpty()) {
+                                                        Row(
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        ) {
+                                                            topics.forEach { topic ->
+                                                                NiaTopicTag(
+                                                                    followed = true,
+                                                                    onClick = { onTopicClick(topic.id) },
+                                                                    text = {
+                                                                        Text(text = topic.name.uppercase(Locale.getDefault()))
+                                                                    }
+                                                                )
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
-                                            Spacer(modifier = Modifier.height(16.dp))
                                         }
                                     }
                                 }

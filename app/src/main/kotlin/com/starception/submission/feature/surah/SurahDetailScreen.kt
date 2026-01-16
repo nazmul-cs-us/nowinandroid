@@ -2733,7 +2733,7 @@ private fun AlbumInfoCard(
                 if (topics.isNotEmpty()) {
                     topics.forEach { topic ->
                         NiaTopicTag(
-                            followed = false,
+                            followed = true,
                             onClick = { onTopicClick(topic.id) },
                             text = {
                                 Text(text = topic.name.uppercase(Locale.getDefault()))
