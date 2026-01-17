@@ -178,4 +178,17 @@ interface NewsDao {
         val crossRefs = topicIds.map { NewsTopicCrossRef(newsResource.id, it) }
         insertNewsTopicCrossRefs(crossRefs)
     }
+
+    /**
+     * Gets the news resource ID for a surah by looking for content with surah reference
+     * News resources for surahs typically have content like "surah:1" or "Surah 1"
+     */
+    @Query("""
+        SELECT id FROM news_resources
+        WHERE content LIKE '%surah:' || :surahNumber || '%'
+           OR content LIKE '%Surah ' || :surahNumber || '%'
+           OR title LIKE '%Surah ' || :surahNumber || '%'
+        LIMIT 1
+    """)
+    suspend fun getNewsResourceIdForSurah(surahNumber: Int): Int?
 }

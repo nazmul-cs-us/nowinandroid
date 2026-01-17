@@ -1120,7 +1120,8 @@ fun DuaDetailScreen(
                                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(horizontal = 24.dp, vertical = 16.dp)
+                                                .padding(horizontal = 24.dp)
+                                                .padding(top = 12.dp, bottom = 8.dp)
                                         ) {
                                             // Load hadith references for header display
                                             var headerHadithRefs by remember { mutableStateOf<List<HadithReference>>(emptyList()) }
@@ -1144,8 +1145,10 @@ fun DuaDetailScreen(
                                                 }
                                             }
 
-                                            Column {
-                                                // Dua title
+                                            Column(
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                // Dua title - cleaned and formatted
                                                 val duaTitle = dua.title
                                                     .replace(Regex("Quranic Dua \\d+:\\s*"), "")
                                                     .replace(Regex("Dua #\\d+:\\s*"), "")
@@ -1161,26 +1164,46 @@ fun DuaDetailScreen(
                                                         }
                                                     }
 
-                                                Text(
-                                                    text = duaTitle,
-                                                    style = MaterialTheme.typography.headlineMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    maxLines = 2
-                                                )
+                                                // Group 1: Title + Arabic subtitle
+                                                Column(
+                                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = duaTitle,
+                                                        style = MaterialTheme.typography.headlineSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                        maxLines = 2,
+                                                        lineHeight = 28.sp
+                                                    )
 
-                                                Spacer(modifier = Modifier.height(12.dp))
+                                                    // Arabic subtitle using selected font
+                                                    if (dua.arabicText.isNotBlank()) {
+                                                        val arabicPreview = dua.arabicText.split("\n").firstOrNull()?.take(60) ?: ""
+                                                        if (arabicPreview.isNotBlank()) {
+                                                            Text(
+                                                                text = arabicPreview + if (arabicPreview.length >= 60) "..." else "",
+                                                                style = MaterialTheme.typography.bodyLarge,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                maxLines = 1,
+                                                                fontFamily = arabicFontFamily,
+                                                                fontSize = 16.sp
+                                                            )
+                                                        }
+                                                    }
+                                                }
 
-                                                // Chips row with topics on right
+                                                // Group 2: Hadith references (scrollable left) + Topic tag (fixed right)
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    // Left side - Surah reference OR Hadith reference chips
+                                                    // Left side - Surah reference OR Hadith reference chips (scrollable, takes remaining space)
                                                     Row(
                                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .horizontalScroll(rememberScrollState())
                                                     ) {
                                                         if (dua.surahNumber > 0 && dua.ayahNumber > 0) {
                                                             // Quranic dua - show Surah reference
@@ -1225,20 +1248,20 @@ fun DuaDetailScreen(
                                                         }
                                                     }
 
-                                                    // Right side - Topic tags
+                                                    // Right side - Topic tag (fixed, single line, never wraps)
                                                     if (topics.isNotEmpty()) {
-                                                        Row(
-                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                        ) {
-                                                            topics.forEach { topic ->
-                                                                NiaTopicTag(
-                                                                    followed = true,
-                                                                    onClick = { onTopicClick(topic.id) },
-                                                                    text = {
-                                                                        Text(text = topic.name.uppercase(Locale.getDefault()))
-                                                                    }
-                                                                )
-                                                            }
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        topics.take(1).forEach { topic -> // Show only first topic to ensure single line
+                                                            NiaTopicTag(
+                                                                followed = true,
+                                                                onClick = { onTopicClick(topic.id) },
+                                                                text = {
+                                                                    Text(
+                                                                        text = topic.name.uppercase(Locale.getDefault()),
+                                                                        maxLines = 1
+                                                                    )
+                                                                }
+                                                            )
                                                         }
                                                     }
                                                 }

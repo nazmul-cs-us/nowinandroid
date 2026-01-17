@@ -553,6 +553,31 @@ class SurahDetailViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Loads topics for a surah - all surahs belong to "Holy Quran" topic
+     * This is used when navigating via swipe where newsResourceId is not available
+     * @param surahNumber The surah number (1-114)
+     */
+    fun loadTopicsForSurah(surahNumber: Int) {
+        viewModelScope.launch {
+            try {
+                // All surahs belong to "Holy Quran" topic
+                val topicsDao = TopicsDatabase.getInstance(context).topicsDao()
+                val quranTopic = topicsDao.getTopicByName("Holy Quran")
+                if (quranTopic != null) {
+                    _topics.value = listOf(quranTopic.toTopic())
+                    android.util.Log.d("SurahDetailVM", "📚 Using 'Holy Quran' topic for surah $surahNumber")
+                } else {
+                    _topics.value = emptyList()
+                    android.util.Log.d("SurahDetailVM", "📚 'Holy Quran' topic not found for surah $surahNumber")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SurahDetailVM", "❌ Error loading topics for surah: ${e.message}", e)
+                _topics.value = emptyList()
+            }
+        }
+    }
 }
 
 sealed interface SurahDetailUiState {
