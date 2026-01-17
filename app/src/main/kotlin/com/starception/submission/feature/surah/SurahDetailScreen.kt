@@ -308,10 +308,15 @@ fun SurahDetailScreen(
         }
     }
 
-    // Load topics for this news resource
+    // Load topics for this news resource or by surah number
     val topics by viewModel.topics.collectAsState()
-    LaunchedEffect(newsResourceId) {
-        viewModel.loadTopicsForNewsResource(newsResourceId)
+    LaunchedEffect(newsResourceId, surahNumber) {
+        if (newsResourceId != null) {
+            viewModel.loadTopicsForNewsResource(newsResourceId)
+        } else {
+            // When swiping, newsResourceId is null - load topics by surah number
+            viewModel.loadTopicsForSurah(surahNumber)
+        }
     }
 
     val availableTranslations = remember { viewModel.getAvailableTranslations() }
@@ -2798,7 +2803,7 @@ private fun AlbumInfoCard(
                         InfoChip(text = surah.revelationType)
                     }
 
-                    // Right side - HOLY QURAN tag
+                    // Right side - Topic tags
                     if (topics.isNotEmpty()) {
                         topics.forEach { topic ->
                             NiaTopicTag(

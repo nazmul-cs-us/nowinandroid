@@ -72,6 +72,12 @@ interface TopicsDao {
     suspend fun searchTopics(query: String): List<TopicEntity>
 
     /**
+     * Get topic by exact name (case-insensitive)
+     */
+    @Query("SELECT * FROM topics WHERE LOWER(name) = LOWER(:name) LIMIT 1")
+    suspend fun getTopicByName(name: String): TopicEntity?
+
+    /**
      * Get topic count
      */
     @Query("SELECT COUNT(*) FROM topics")
