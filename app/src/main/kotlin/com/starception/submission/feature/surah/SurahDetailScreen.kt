@@ -2752,8 +2752,9 @@ private fun AlbumInfoCard(
 ) {
     // Use MaterialTheme.colorScheme for automatic theme support
     // NOTE: Surah names are now handled by the floating overlay for smooth scroll transition
+    // Using surfaceContainer for better contrast with ayah background (surfaceContainerHigh)
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight() // Fill parent Box container (196dp)
