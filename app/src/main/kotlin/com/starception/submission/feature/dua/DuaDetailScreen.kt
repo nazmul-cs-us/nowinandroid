@@ -1122,6 +1122,28 @@ fun DuaDetailScreen(
                                                 .fillMaxWidth()
                                                 .padding(horizontal = 24.dp, vertical = 16.dp)
                                         ) {
+                                            // Load hadith references for header display
+                                            var headerHadithRefs by remember { mutableStateOf<List<HadithReference>>(emptyList()) }
+                                            LaunchedEffect(dua.title) {
+                                                if (dua.surahNumber <= 0 || dua.ayahNumber <= 0) {
+                                                    // Only load for non-Quranic duas
+                                                    try {
+                                                        // Parse title to extract chapter name and dua number
+                                                        // Titles follow pattern: "When waking up: Dua 1"
+                                                        val titleParts = dua.title.split(": Dua ")
+                                                        if (titleParts.size == 2) {
+                                                            val chapterTitle = titleParts[0].trim()
+                                                            val position = titleParts[1].trim().toIntOrNull() ?: 1
+                                                            val duaDb = DuaDatabase.getInstance(context)
+                                                            val refs = duaDb.duaDao().getHadithReferencesByChapterAndPosition(chapterTitle, position)
+                                                            headerHadithRefs = refs.map { it.toHadithReference() }
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        android.util.Log.e("DuaDetailScreen", "Error loading header hadith refs", e)
+                                                    }
+                                                }
+                                            }
+
                                             Column {
                                                 // Dua title
                                                 val duaTitle = dua.title
@@ -1155,11 +1177,13 @@ fun DuaDetailScreen(
                                                     horizontalArrangement = Arrangement.SpaceBetween,
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    // Left side - Surah reference chip if available
+                                                    // Left side - Surah reference OR Hadith reference chips
                                                     Row(
-                                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                        modifier = Modifier.horizontalScroll(rememberScrollState())
                                                     ) {
                                                         if (dua.surahNumber > 0 && dua.ayahNumber > 0) {
+                                                            // Quranic dua - show Surah reference
                                                             var surahName by remember { mutableStateOf(dua.surahName.ifEmpty { "Surah ${dua.surahNumber}" }) }
                                                             LaunchedEffect(dua.surahNumber) {
                                                                 if (dua.surahName.isEmpty()) {
@@ -1173,6 +1197,31 @@ fun DuaDetailScreen(
                                                                     Text(text = "$surahName:${dua.ayahNumber}".uppercase(Locale.getDefault()))
                                                                 }
                                                             )
+                                                        } else if (headerHadithRefs.isNotEmpty()) {
+                                                            // Non-Quranic dua - show Hadith references
+                                                            headerHadithRefs.forEach { ref ->
+                                                                val refText = buildString {
+                                                                    append(ref.collectionName ?: "Hadith")
+                                                                    if (ref.hadithNumber != null) {
+                                                                        append(":${ref.hadithNumber}")
+                                                                    }
+                                                                }
+                                                                NiaTopicTag(
+                                                                    followed = false,
+                                                                    onClick = {
+                                                                        if (ref.databaseFile != null && ref.hadithNumber != null && onHadithClick != null) {
+                                                                            onHadithClick(
+                                                                                ref.collectionName ?: "Hadith",
+                                                                                ref.hadithNumber,
+                                                                                ref.databaseFile
+                                                                            )
+                                                                        }
+                                                                    },
+                                                                    text = {
+                                                                        Text(text = refText.uppercase(Locale.getDefault()))
+                                                                    }
+                                                                )
+                                                            }
                                                         }
                                                     }
 
