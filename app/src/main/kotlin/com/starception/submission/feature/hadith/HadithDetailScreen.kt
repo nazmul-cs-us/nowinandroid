@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -82,6 +83,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import com.starception.submission.R
 
 // Gradient colors for hadith header - earthy tones
@@ -103,6 +106,8 @@ fun HadithDetailScreen(
     hadithNumber: Int,
     databaseFile: String,
     onBackClick: () -> Unit,
+    onNavigateToPreviousHadith: () -> Unit = {},
+    onNavigateToNextHadith: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Enable immersive full-screen mode (hides status bar)
@@ -218,7 +223,11 @@ fun HadithDetailScreen(
         containerColor = Color.Transparent  // Transparent to let sky extend to top
     ) { _ ->
         // Don't apply paddingValues - let content scroll under transparent toolbar like SurahDetailScreen
-        Box(modifier = Modifier.fillMaxSize()) {
+        HadithSwipeContainer(
+            hadithNumber = hadithNumber,
+            onNavigateToPreviousHadith = onNavigateToPreviousHadith,
+            onNavigateToNextHadith = onNavigateToNextHadith
+        ) {
             when {
                 isLoading -> {
                     HadithShimmerLoading(onBackClick = onBackClick, isLandscape = isLandscape)
@@ -956,4 +965,53 @@ private fun HadithShimmerLoading(
             }
         }
     }
+}
+
+/**
+ * Swipe container for hadith navigation
+ * Swipe right to go to previous hadith, swipe left to go to next hadith
+ */
+@Composable
+private fun HadithSwipeContainer(
+    hadithNumber: Int,
+    onNavigateToPreviousHadith: () -> Unit,
+    onNavigateToNextHadith: () -> Unit,
+    content: @Composable BoxScope.() -> Unit
+) {
+    var swipeOffsetX by remember { mutableStateOf(0f) }
+    val swipeThreshold = 150f
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .pointerInput(hadithNumber) {
+                detectDragGestures(
+                    onDragStart = {
+                        swipeOffsetX = 0f
+                    },
+                    onDragEnd = {
+                        when {
+                            // Swipe right - go to previous hadith (if not first)
+                            swipeOffsetX > swipeThreshold && hadithNumber > 1 -> {
+                                onNavigateToPreviousHadith()
+                            }
+                            // Swipe left - go to next hadith
+                            swipeOffsetX < -swipeThreshold -> {
+                                onNavigateToNextHadith()
+                            }
+                        }
+                        swipeOffsetX = 0f
+                    },
+                    onDragCancel = {
+                        swipeOffsetX = 0f
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        swipeOffsetX += dragAmount.x
+                    }
+                )
+            },
+        content = content
+    )
 }

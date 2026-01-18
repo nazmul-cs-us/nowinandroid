@@ -47,7 +47,9 @@ fun NavController.navigateToHadithDetail(
  * Add Hadith detail screen to navigation graph
  */
 fun NavGraphBuilder.hadithDetailScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onNavigateToPreviousHadith: (collectionName: String, currentHadithNumber: Int, databaseFile: String) -> Unit = { _, _, _ -> },
+    onNavigateToNextHadith: (collectionName: String, currentHadithNumber: Int, databaseFile: String) -> Unit = { _, _, _ -> }
 ) {
     composable<HadithDetailRoute> { backStackEntry ->
         val route = backStackEntry.toRoute<HadithDetailRoute>()
@@ -58,7 +60,13 @@ fun NavGraphBuilder.hadithDetailScreen(
             collectionName = decodedCollection,
             hadithNumber = route.hadithNumber,
             databaseFile = decodedDbFile,
-            onBackClick = onBackClick
+            onBackClick = onBackClick,
+            onNavigateToPreviousHadith = {
+                onNavigateToPreviousHadith(decodedCollection, route.hadithNumber, decodedDbFile)
+            },
+            onNavigateToNextHadith = {
+                onNavigateToNextHadith(decodedCollection, route.hadithNumber, decodedDbFile)
+            }
         )
     }
 }

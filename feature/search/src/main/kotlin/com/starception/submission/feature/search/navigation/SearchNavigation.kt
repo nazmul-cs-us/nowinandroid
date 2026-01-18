@@ -20,6 +20,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
+import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.feature.search.SearchNote
 import com.starception.submission.feature.search.SearchRoute
 import kotlinx.serialization.Serializable
@@ -34,6 +35,7 @@ fun NavGraphBuilder.searchScreen(
     onInterestsClick: () -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onNoteClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     searchNotes: suspend (String) -> List<SearchNote> = { emptyList() },
 ) {
@@ -45,6 +47,7 @@ fun NavGraphBuilder.searchScreen(
             onInterestsClick = onInterestsClick,
             onTopicClick = onTopicClick,
             onSurahClick = onSurahClick,
+            onDuaClick = onDuaClick,
             onNoteClick = onNoteClick,
             searchNotes = searchNotes,
         )

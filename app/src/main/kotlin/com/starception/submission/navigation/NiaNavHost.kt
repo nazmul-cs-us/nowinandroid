@@ -268,7 +268,17 @@ fun NiaNavHost(
         )
         // Hadith detail screen
         hadithDetailScreen(
-            onBackClick = navController::popBackStack
+            onBackClick = navController::popBackStack,
+            onNavigateToPreviousHadith = { collectionName, currentHadithNumber, databaseFile ->
+                if (currentHadithNumber > 1) {
+                    navController.popBackStack()
+                    navController.navigateToHadithDetail(collectionName, currentHadithNumber - 1, databaseFile)
+                }
+            },
+            onNavigateToNextHadith = { collectionName, currentHadithNumber, databaseFile ->
+                navController.popBackStack()
+                navController.navigateToHadithDetail(collectionName, currentHadithNumber + 1, databaseFile)
+            }
         )
     }
 }
