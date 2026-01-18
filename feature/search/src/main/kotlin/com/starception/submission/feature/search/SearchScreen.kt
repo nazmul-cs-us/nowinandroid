@@ -103,6 +103,7 @@ internal fun SearchRoute(
     onInterestsClick: () -> Unit,
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onNoteClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     searchNotes: suspend (String) -> List<SearchNote> = { emptyList() },
     modifier: Modifier = Modifier,
