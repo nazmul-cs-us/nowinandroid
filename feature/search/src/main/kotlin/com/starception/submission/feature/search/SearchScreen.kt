@@ -28,8 +28,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -43,6 +45,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridS
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,10 +54,12 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -112,6 +117,7 @@ internal fun SearchRoute(
     val recentSearchQueriesUiState by searchViewModel.recentSearchQueriesUiState.collectAsStateWithLifecycle()
     val searchResultUiState by searchViewModel.searchResultUiState.collectAsStateWithLifecycle()
     val searchQuery by searchViewModel.searchQuery.collectAsStateWithLifecycle()
+    val paginationState by searchViewModel.paginationState.collectAsStateWithLifecycle()
 
     // Search notes when query changes
     var notes by remember { mutableStateOf<List<SearchNote>>(emptyList()) }
@@ -134,6 +140,7 @@ internal fun SearchRoute(
         searchQuery = searchQuery,
         recentSearchesUiState = recentSearchQueriesUiState,
         searchResultUiState = enrichedSearchResultUiState,
+        paginationState = paginationState,
         onSearchQueryChanged = searchViewModel::onSearchQueryChanged,
         onSearchTriggered = searchViewModel::onSearchTriggered,
         onClearRecentSearches = searchViewModel::clearRecentSearches,
@@ -146,6 +153,7 @@ internal fun SearchRoute(
         onSurahClick = onSurahClick,
         onDuaClick = onDuaClick,
         onNoteClick = onNoteClick,
+        onLoadMore = searchViewModel::loadMoreResults,
     )
 }
 
@@ -155,6 +163,7 @@ internal fun SearchScreen(
     searchQuery: String = "",
     recentSearchesUiState: RecentSearchQueriesUiState = RecentSearchQueriesUiState.Loading,
     searchResultUiState: SearchResultUiState = SearchResultUiState.Loading,
+    paginationState: PaginationState = PaginationState(),
     onSearchQueryChanged: (String) -> Unit = {},
     onSearchTriggered: (String) -> Unit = {},
     onClearRecentSearches: () -> Unit = {},
@@ -167,6 +176,7 @@ internal fun SearchScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onNoteClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    onLoadMore: () -> Unit = {},
 ) {
     TrackScreenViewEvent(screenName = "Search")
     Column(modifier = modifier) {
@@ -227,6 +237,7 @@ internal fun SearchScreen(
                         newsResources = searchResultUiState.newsResources,
                         notes = searchResultUiState.notes,
                         suggestedVerses = SuggestedVerses.search(searchQuery),
+                        paginationState = paginationState,
                         onSearchTriggered = onSearchTriggered,
                         onTopicClick = onTopicClick,
                         onNewsResourcesCheckedChanged = onNewsResourcesCheckedChanged,
@@ -235,6 +246,7 @@ internal fun SearchScreen(
                         onSurahClick = onSurahClick,
                         onDuaClick = onDuaClick,
                         onNoteClick = onNoteClick,
+                        onLoadMore = onLoadMore,
                     )
                 }
             }
@@ -329,6 +341,7 @@ private fun SearchResultBody(
     newsResources: List<UserNewsResource>,
     notes: List<SearchNote> = emptyList(),
     suggestedVerses: List<SuggestedVerse> = emptyList(),
+    paginationState: PaginationState = PaginationState(),
     onSearchTriggered: (String) -> Unit,
     onTopicClick: (String) -> Unit,
     onNewsResourcesCheckedChanged: (String, Boolean) -> Unit,
@@ -337,8 +350,27 @@ private fun SearchResultBody(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onNoteClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    onLoadMore: () -> Unit = {},
 ) {
     val state = rememberLazyStaggeredGridState()
+
+    // Detect when user scrolls near bottom to trigger load more
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val lastVisibleItem = state.layoutInfo.visibleItemsInfo.lastOrNull()
+                ?: return@derivedStateOf false
+            val totalItems = state.layoutInfo.totalItemsCount
+            // Load more when within 3 items of the end
+            lastVisibleItem.index >= totalItems - 3
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore, paginationState.isLoading, paginationState.hasMoreResults) {
+        if (shouldLoadMore && !paginationState.isLoading && paginationState.hasMoreResults) {
+            onLoadMore()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize(),
@@ -478,8 +510,48 @@ private fun SearchResultBody(
                     }
                 }
             }
+
+            // Loading indicator for pagination
+            if (paginationState.isLoading) {
+                item(
+                    key = "loading-indicator",
+                    span = StaggeredGridItemSpan.FullLine,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            strokeWidth = 3.dp,
+                        )
+                    }
+                }
+            }
+
+            // Show "no more results" message when all results are loaded
+            if (!paginationState.hasMoreResults && newsResources.isNotEmpty()) {
+                item(
+                    key = "end-of-results",
+                    span = StaggeredGridItemSpan.FullLine,
+                ) {
+                    Text(
+                        text = "All results loaded",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                    )
+                }
+            }
         }
-        val itemsAvailable = topics.size + newsResources.size + notes.size + suggestedVerses.size
+        val itemsAvailable = topics.size + newsResources.size + notes.size + suggestedVerses.size +
+            (if (paginationState.isLoading) 1 else 0) +
+            (if (!paginationState.hasMoreResults && newsResources.isNotEmpty()) 1 else 0)
         val scrollbarState = state.scrollbarState(
             itemsAvailable = itemsAvailable,
         )
