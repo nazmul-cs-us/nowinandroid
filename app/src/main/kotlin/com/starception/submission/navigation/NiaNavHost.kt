@@ -208,6 +208,20 @@ fun NiaNavHost(
             onInterestsClick = { appState.navigateToTopLevelDestination(INTERESTS) },
             onTopicClick = navController::navigateToTopic,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
+            onDuaClick = { userNewsResource ->
+                val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
+                    ?.groupValues?.get(1)?.toIntOrNull()
+                    ?: Regex("Dua (\\d+)").find(userNewsResource.title)
+                        ?.groupValues?.get(1)?.toIntOrNull()
+                    ?: 1
+                navController.navigateToDuaDetail(
+                    title = userNewsResource.title,
+                    content = userNewsResource.content,
+                    quranReference = null,
+                    duaNumber = duaNumber,
+                    newsResourceId = userNewsResource.id,
+                )
+            },
             onNoteClick = { surahNumber, ayahNumber ->
                 navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber)
             },
