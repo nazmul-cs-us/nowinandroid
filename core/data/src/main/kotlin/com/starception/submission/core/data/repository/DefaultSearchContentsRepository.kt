@@ -75,15 +75,22 @@ internal class DefaultSearchContentsRepository @Inject constructor(
         }
     }
 
+    /**
+     * Reactive search using Flows - uses first page of paginated results for efficiency.
+     * This maintains backward compatibility while being efficient.
+     */
     override fun searchContents(searchQuery: String): Flow<SearchResult> {
-        // Surround the query by asterisks to match the query when it's in the middle of
-        // a word
-        val newsResourceIds = newsResourceFtsDao.searchAllNewsResources("*$searchQuery*")
-        val topicIds = topicFtsDao.searchAllTopics("*$searchQuery*")
+        val ftsQuery = "*$searchQuery*"
 
-        // Convert FTS IDs (strings) to ints and fetch from content database
+        // Use paginated approach with first page only for Flow-based search
+        val newsResourceIds = newsResourceFtsDao.searchAllNewsResources(ftsQuery)
+        val topicIds = topicFtsDao.searchAllTopics(ftsQuery)
+
         val newsResourcesFlow = newsResourceIds
-            .mapLatest { ids -> ids.mapNotNull { it.toIntOrNull() } }
+            .mapLatest { ids ->
+                ids.mapNotNull { it.toIntOrNull() }
+                    .take(SearchContentsRepository.DEFAULT_PAGE_SIZE)
+            }
             .distinctUntilChanged()
             .flatMapLatest { ids ->
                 if (ids.isEmpty()) {
@@ -94,7 +101,10 @@ internal class DefaultSearchContentsRepository @Inject constructor(
             }
 
         val topicsFlow = topicIds
-            .mapLatest { ids -> ids.mapNotNull { it.toIntOrNull() } }
+            .mapLatest { ids ->
+                ids.mapNotNull { it.toIntOrNull() }
+                    .take(SearchContentsRepository.DEFAULT_PAGE_SIZE)
+            }
             .distinctUntilChanged()
             .flatMapLatest { ids ->
                 if (ids.isEmpty()) {
@@ -111,6 +121,58 @@ internal class DefaultSearchContentsRepository @Inject constructor(
             )
         }
     }
+
+    /**
+     * Efficient paginated search - fetches only the requested page of results.
+     * Use this for infinite scroll / load more functionality.
+     */
+    override suspend fun searchContentsPaginated(
+        searchQuery: String,
+        page: Int,
+        pageSize: Int,
+    ): SearchResult = withContext(ioDispatcher) {
+        val ftsQuery = "*$searchQuery*"
+        val offset = page * pageSize
+
+        // Fetch paginated IDs from FTS tables
+        val newsResourceIds = newsResourceFtsDao
+            .searchNewsResourcesPaginated(ftsQuery, pageSize, offset)
+            .mapNotNull { it.toIntOrNull() }
+
+        val topicIds = topicFtsDao
+            .searchTopicsPaginated(ftsQuery, pageSize, offset)
+            .mapNotNull { it.toIntOrNull() }
+
+        // Fetch actual data from content database
+        val newsResources = if (newsResourceIds.isNotEmpty()) {
+            contentNewsDao.getNewsResourcesByIds(newsResourceIds)
+        } else {
+            emptyList()
+        }
+
+        val topics = if (topicIds.isNotEmpty()) {
+            contentTopicsDao.getTopicsByIds(topicIds)
+        } else {
+            emptyList()
+        }
+
+        SearchResult(
+            topics = topics.map { it.asExternalModel() },
+            newsResources = newsResources.map { it.asExternalModel(topics) },
+        )
+    }
+
+    /**
+     * Get the total count of search results for pagination UI.
+     */
+    override suspend fun getSearchResultsCount(searchQuery: String): SearchResultsCount =
+        withContext(ioDispatcher) {
+            val ftsQuery = "*$searchQuery*"
+            SearchResultsCount(
+                newsResourcesCount = newsResourceFtsDao.getSearchResultCount(ftsQuery),
+                topicsCount = topicFtsDao.getSearchResultCount(ftsQuery),
+            )
+        }
 
     override fun getSearchContentsCount(): Flow<Int> =
         combine(

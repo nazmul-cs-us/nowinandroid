@@ -27,15 +27,20 @@ import com.starception.submission.core.data.repository.SearchContentsRepository
 import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.core.domain.GetRecentSearchQueriesUseCase
 import com.starception.submission.core.domain.GetSearchContentsUseCase
+import com.starception.submission.core.model.data.NewsResource
+import com.starception.submission.core.model.data.Topic
 import com.starception.submission.core.model.data.UserSearchResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -52,26 +57,37 @@ class SearchViewModel @Inject constructor(
 
     val searchQuery = savedStateHandle.getStateFlow(key = SEARCH_QUERY, initialValue = "")
 
+    // Pagination state
+    private val _paginationState = MutableStateFlow(PaginationState())
+    val paginationState: StateFlow<PaginationState> = _paginationState.asStateFlow()
+
     val searchResultUiState: StateFlow<SearchResultUiState> =
         searchContentsRepository.getSearchContentsCount()
             .flatMapLatest { totalCount ->
+                android.util.Log.d("SearchViewModel", "🔍 FTS total count: $totalCount")
                 if (totalCount < SEARCH_MIN_FTS_ENTITY_COUNT) {
+                    android.util.Log.w("SearchViewModel", "⚠️ Search not ready - FTS count ($totalCount) < $SEARCH_MIN_FTS_ENTITY_COUNT")
                     flowOf(SearchResultUiState.SearchNotReady)
                 } else {
                     searchQuery.flatMapLatest { query ->
                         if (query.trim().length < SEARCH_QUERY_MIN_LENGTH) {
                             flowOf(SearchResultUiState.EmptyQuery)
                         } else {
+                            android.util.Log.d("SearchViewModel", "🔎 Searching for: '$query'")
                             getSearchContentsUseCase(query)
                                 // Not using .asResult() here, because it emits Loading state every
                                 // time the user types a letter in the search box, which flickers the screen.
                                 .map<UserSearchResult, SearchResultUiState> { data ->
+                                    android.util.Log.d("SearchViewModel", "📊 Search results: topics=${data.topics.size}, newsResources=${data.newsResources.size}")
                                     SearchResultUiState.Success(
                                         topics = data.topics,
                                         newsResources = data.newsResources,
                                     )
                                 }
-                                .catch { emit(SearchResultUiState.LoadFailed) }
+                                .catch {
+                                    android.util.Log.e("SearchViewModel", "❌ Search failed", it)
+                                    emit(SearchResultUiState.LoadFailed)
+                                }
                         }
                     }
                 }
@@ -92,6 +108,7 @@ class SearchViewModel @Inject constructor(
 
     fun onSearchQueryChanged(query: String) {
         savedStateHandle[SEARCH_QUERY] = query
+        resetPaginationState() // Reset pagination when query changes
     }
 
     /**
@@ -132,6 +149,51 @@ class SearchViewModel @Inject constructor(
             userDataRepository.setNewsResourceViewed(newsResourceId, viewed)
         }
     }
+
+    /**
+     * Load more search results (pagination).
+     * Call this when user scrolls to the bottom of the list.
+     */
+    fun loadMoreResults() {
+        val currentQuery = searchQuery.value
+        if (currentQuery.isBlank() || _paginationState.value.isLoading || !_paginationState.value.hasMoreResults) {
+            return
+        }
+
+        viewModelScope.launch {
+            _paginationState.update { it.copy(isLoading = true) }
+            try {
+                val nextPage = _paginationState.value.currentPage + 1
+                val newResults = searchContentsRepository.searchContentsPaginated(
+                    searchQuery = currentQuery,
+                    page = nextPage,
+                    pageSize = PAGE_SIZE,
+                )
+
+                val hasMore = newResults.newsResources.isNotEmpty() || newResults.topics.isNotEmpty()
+
+                _paginationState.update { state ->
+                    state.copy(
+                        currentPage = nextPage,
+                        isLoading = false,
+                        hasMoreResults = hasMore,
+                        additionalNewsResources = state.additionalNewsResources + newResults.newsResources,
+                        additionalTopics = state.additionalTopics + newResults.topics,
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SearchViewModel", "Failed to load more results", e)
+                _paginationState.update { it.copy(isLoading = false, error = e.message) }
+            }
+        }
+    }
+
+    /**
+     * Reset pagination state when search query changes.
+     */
+    private fun resetPaginationState() {
+        _paginationState.value = PaginationState()
+    }
 }
 
 private fun AnalyticsHelper.logEventSearchTriggered(query: String) =
@@ -148,3 +210,20 @@ private const val SEARCH_QUERY_MIN_LENGTH = 2
 /** Minimum number of the fts table's entity count where it's considered as search is not ready */
 private const val SEARCH_MIN_FTS_ENTITY_COUNT = 1
 private const val SEARCH_QUERY = "searchQuery"
+
+/** Page size for paginated search results */
+private const val PAGE_SIZE = 20
+
+/**
+ * State for pagination in search results.
+ * Stores raw NewsResource and Topic data - these should be combined with UserData at the UI layer
+ * to create UserNewsResource and FollowableTopic for display.
+ */
+data class PaginationState(
+    val currentPage: Int = 0,
+    val isLoading: Boolean = false,
+    val hasMoreResults: Boolean = true,
+    val additionalNewsResources: List<NewsResource> = emptyList(),
+    val additionalTopics: List<Topic> = emptyList(),
+    val error: String? = null,
+)
