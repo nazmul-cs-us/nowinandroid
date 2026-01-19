@@ -67,6 +67,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
@@ -102,6 +106,7 @@ fun NewsResourceCardExpanded(
     onClick: () -> Unit,
     onTopicClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    searchQuery: String = "",
 ) {
     val clickActionLabel = stringResource(R.string.core_ui_card_tap_action)
     val sharingLabel = stringResource(R.string.core_ui_feed_sharing)
@@ -141,7 +146,8 @@ fun NewsResourceCardExpanded(
                 Column {
                     Row {
                         NewsResourceTitle(
-                            userNewsResource.title,
+                            newsResourceTitle = userNewsResource.title,
+                            searchQuery = searchQuery,
                             modifier = Modifier
                                 .fillMaxWidth((.8f))
                                 .dragAndDropSource { _ ->
@@ -173,7 +179,10 @@ fun NewsResourceCardExpanded(
                         )
                     }
                     Spacer(modifier = Modifier.height(14.dp))
-                    NewsResourceShortDescription(userNewsResource.content)
+                    NewsResourceShortDescription(
+                        newsResourceShortDescription = userNewsResource.content,
+                        searchQuery = searchQuery,
+                    )
                     Spacer(modifier = Modifier.height(12.dp))
                     NewsResourceTopics(
                         topics = userNewsResource.followableTopics,
@@ -316,6 +325,7 @@ fun NewsResourceHeaderImage(
 fun NewsResourceTitle(
     newsResourceTitle: String,
     modifier: Modifier = Modifier,
+    searchQuery: String = "",
 ) {
     // Check if title contains Arabic text (Unicode range 0600-06FF)
     val containsArabic = newsResourceTitle.any { it in '\u0600'..'\u06FF' }
@@ -330,8 +340,15 @@ fun NewsResourceTitle(
         null
     }
 
+    val highlightColor = MaterialTheme.colorScheme.tertiary
+    val highlightedText = if (searchQuery.isNotBlank()) {
+        highlightText(newsResourceTitle, searchQuery, highlightColor)
+    } else {
+        AnnotatedString(newsResourceTitle)
+    }
+
     Text(
-        text = newsResourceTitle,
+        text = highlightedText,
         style = if (containsArabic && arabicFontFamily != null) {
             MaterialTheme.typography.headlineSmall.copy(
                 fontFamily = arabicFontFamily,
@@ -460,6 +477,7 @@ fun NewsResourceMetaData(
 @Composable
 fun NewsResourceShortDescription(
     newsResourceShortDescription: String,
+    searchQuery: String = "",
 ) {
     // Check if content contains Arabic text (Unicode range 0600-06FF)
     val containsArabic = newsResourceShortDescription.any { it in '\u0600'..'\u06FF' }
@@ -474,8 +492,15 @@ fun NewsResourceShortDescription(
         null
     }
 
+    val highlightColor = MaterialTheme.colorScheme.tertiary
+    val highlightedText = if (searchQuery.isNotBlank()) {
+        highlightText(newsResourceShortDescription, searchQuery, highlightColor)
+    } else {
+        AnnotatedString(newsResourceShortDescription)
+    }
+
     Text(
-        text = newsResourceShortDescription,
+        text = highlightedText,
         style = if (containsArabic && arabicFontFamily != null) {
             MaterialTheme.typography.bodyLarge.copy(
                 fontFamily = arabicFontFamily,
@@ -485,6 +510,46 @@ fun NewsResourceShortDescription(
             MaterialTheme.typography.bodyLarge
         }
     )
+}
+
+/**
+ * Highlights all occurrences of [query] in [text] with the specified [highlightColor].
+ * Matching is case-insensitive.
+ */
+private fun highlightText(
+    text: String,
+    query: String,
+    highlightColor: Color,
+): AnnotatedString {
+    if (query.isBlank()) return AnnotatedString(text)
+
+    return buildAnnotatedString {
+        val lowerText = text.lowercase()
+        val lowerQuery = query.lowercase()
+        var startIndex = 0
+
+        while (startIndex < text.length) {
+            val matchIndex = lowerText.indexOf(lowerQuery, startIndex)
+            if (matchIndex == -1) {
+                // No more matches, append the rest of the text
+                append(text.substring(startIndex))
+                break
+            } else {
+                // Append text before match
+                append(text.substring(startIndex, matchIndex))
+                // Append highlighted match
+                withStyle(
+                    SpanStyle(
+                        background = highlightColor.copy(alpha = 0.3f),
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    )
+                ) {
+                    append(text.substring(matchIndex, matchIndex + query.length))
+                }
+                startIndex = matchIndex + query.length
+            }
+        }
+    }
 }
 
 @Composable

@@ -59,6 +59,7 @@ fun LazyStaggeredGridScope.newsFeed(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> }, // surahNumber, newsResourceId
     onDuaClick: (UserNewsResource) -> Unit = { _ -> }, // Dua news resource
     onNewsClick: ((UserNewsResource) -> Unit)? = null,
+    searchQuery: String = "", // Search query for highlighting
 ) {
     when (feedState) {
         NewsFeedUiState.Loading -> Unit
@@ -124,6 +125,7 @@ fun LazyStaggeredGridScope.newsFeed(
                 NewsResourceCardExpanded(
                     userNewsResource = userNewsResource,
                     isBookmarked = userNewsResource.isSaved,
+                    searchQuery = searchQuery,
                     onClick = {
                         android.util.Log.d("NewsFeedClick", "📱 Card clicked: title='${userNewsResource.title}', surahNumber=$surahNumber, isDua=$isDuaItem")
                         onExpandedCardClick()

@@ -34,5 +34,37 @@ interface SearchContentsRepository {
      */
     fun searchContents(searchQuery: String): Flow<SearchResult>
 
+    /**
+     * Paginated search for contents.
+     * @param searchQuery The search query
+     * @param page Page number (0-indexed)
+     * @param pageSize Number of items per page
+     * @return SearchResult with paginated results
+     */
+    suspend fun searchContentsPaginated(
+        searchQuery: String,
+        page: Int = 0,
+        pageSize: Int = DEFAULT_PAGE_SIZE,
+    ): SearchResult
+
+    /**
+     * Get total count of search results for a query.
+     */
+    suspend fun getSearchResultsCount(searchQuery: String): SearchResultsCount
+
     fun getSearchContentsCount(): Flow<Int>
+
+    companion object {
+        const val DEFAULT_PAGE_SIZE = 20
+    }
+}
+
+/**
+ * Holds the count of search results for news resources and topics.
+ */
+data class SearchResultsCount(
+    val newsResourcesCount: Int,
+    val topicsCount: Int,
+) {
+    val totalCount: Int get() = newsResourcesCount + topicsCount
 }

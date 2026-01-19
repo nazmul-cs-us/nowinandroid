@@ -413,6 +413,7 @@ private fun SearchResultBody(
                     onExpandedCardClick = {
                         onSearchTriggered(searchQuery)
                     },
+                    searchQuery = searchQuery,
                 )
             }
 

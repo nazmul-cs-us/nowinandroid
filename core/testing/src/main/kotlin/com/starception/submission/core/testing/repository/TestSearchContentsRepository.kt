@@ -17,12 +17,14 @@
 package com.starception.submission.core.testing.repository
 
 import com.starception.submission.core.data.repository.SearchContentsRepository
+import com.starception.submission.core.data.repository.SearchResultsCount
 import com.starception.submission.core.model.data.NewsResource
 import com.starception.submission.core.model.data.SearchResult
 import com.starception.submission.core.model.data.Topic
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import org.jetbrains.annotations.TestOnly
 
@@ -44,6 +46,27 @@ class TestSearchContentsRepository : SearchContentsRepository {
                 },
             )
         }
+
+    override suspend fun searchContentsPaginated(
+        searchQuery: String,
+        page: Int,
+        pageSize: Int,
+    ): SearchResult {
+        val allResults = searchContents(searchQuery).first()
+        val startIndex = page * pageSize
+        return SearchResult(
+            topics = allResults.topics.drop(startIndex).take(pageSize),
+            newsResources = allResults.newsResources.drop(startIndex).take(pageSize),
+        )
+    }
+
+    override suspend fun getSearchResultsCount(searchQuery: String): SearchResultsCount {
+        val allResults = searchContents(searchQuery).first()
+        return SearchResultsCount(
+            newsResourcesCount = allResults.newsResources.size,
+            topicsCount = allResults.topics.size,
+        )
+    }
 
     override fun getSearchContentsCount(): Flow<Int> = combine(cachedTopics, cachedNewsResources) { topics, news -> topics.size + news.size }
 

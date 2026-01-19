@@ -34,6 +34,25 @@ interface TopicFtsDao {
     @Query("SELECT topicId FROM topicsFts WHERE topicsFts MATCH :query")
     fun searchAllTopics(query: String): Flow<List<String>>
 
+    /**
+     * Paginated search for topics.
+     * @param query FTS search query
+     * @param limit Maximum number of results to return
+     * @param offset Number of results to skip
+     */
+    @Query("""
+        SELECT topicId FROM topicsFts
+        WHERE topicsFts MATCH :query
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun searchTopicsPaginated(query: String, limit: Int, offset: Int): List<String>
+
+    /**
+     * Get total count of search results for a query.
+     */
+    @Query("SELECT count(*) FROM topicsFts WHERE topicsFts MATCH :query")
+    suspend fun getSearchResultCount(query: String): Int
+
     @Query("SELECT count(*) FROM topicsFts")
     fun getCount(): Flow<Int>
 }

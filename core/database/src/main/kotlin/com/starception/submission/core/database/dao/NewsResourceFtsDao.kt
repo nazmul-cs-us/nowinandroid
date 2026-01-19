@@ -34,6 +34,25 @@ interface NewsResourceFtsDao {
     @Query("SELECT newsResourceId FROM newsResourcesFts WHERE newsResourcesFts MATCH :query")
     fun searchAllNewsResources(query: String): Flow<List<String>>
 
+    /**
+     * Paginated search for news resources.
+     * @param query FTS search query
+     * @param limit Maximum number of results to return
+     * @param offset Number of results to skip
+     */
+    @Query("""
+        SELECT newsResourceId FROM newsResourcesFts
+        WHERE newsResourcesFts MATCH :query
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun searchNewsResourcesPaginated(query: String, limit: Int, offset: Int): List<String>
+
+    /**
+     * Get total count of search results for a query.
+     */
+    @Query("SELECT count(*) FROM newsResourcesFts WHERE newsResourcesFts MATCH :query")
+    suspend fun getSearchResultCount(query: String): Int
+
     @Query("SELECT count(*) FROM newsResourcesFts")
     fun getCount(): Flow<Int>
 }

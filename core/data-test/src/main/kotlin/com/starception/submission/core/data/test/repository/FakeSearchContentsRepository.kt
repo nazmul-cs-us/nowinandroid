@@ -17,6 +17,7 @@
 package com.starception.submission.core.data.test.repository
 
 import com.starception.submission.core.data.repository.SearchContentsRepository
+import com.starception.submission.core.data.repository.SearchResultsCount
 import com.starception.submission.core.model.data.SearchResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -29,5 +30,15 @@ internal class FakeSearchContentsRepository @Inject constructor() : SearchConten
 
     override suspend fun populateFtsData() = Unit
     override fun searchContents(searchQuery: String): Flow<SearchResult> = flowOf()
+
+    override suspend fun searchContentsPaginated(
+        searchQuery: String,
+        page: Int,
+        pageSize: Int,
+    ): SearchResult = SearchResult(topics = emptyList(), newsResources = emptyList())
+
+    override suspend fun getSearchResultsCount(searchQuery: String): SearchResultsCount =
+        SearchResultsCount(newsResourcesCount = 0, topicsCount = 0)
+
     override fun getSearchContentsCount(): Flow<Int> = flowOf(1)
 }
