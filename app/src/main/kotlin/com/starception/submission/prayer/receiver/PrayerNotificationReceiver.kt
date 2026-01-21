@@ -39,8 +39,9 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             val prayerTime = intent.getStringExtra(PrayerNotificationWorker.PRAYER_TIME_KEY) ?: ""
             val notificationType = intent.getStringExtra(PrayerNotificationWorker.NOTIFICATION_TYPE_KEY)
                 ?: PrayerNotificationWorker.TYPE_PRAYER_TIME
+            val priorMinutes = intent.getIntExtra(PrayerNotificationWorker.PRIOR_MINUTES_KEY, PrayerNotificationWorker.DEFAULT_PRIOR_MINUTES)
 
-            Log.d(TAG, "Processing: $prayerName at $prayerTime (type: $notificationType)")
+            Log.d(TAG, "Processing: $prayerName at $prayerTime (type: $notificationType, priorMinutes: $priorMinutes)")
 
             // Log adhan fired with FileLogger
             FileLogger.logAdhanFired(
@@ -54,7 +55,7 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             )
 
             // Show notification directly (WorkManager has issues with Hilt)
-            showPrayerNotification(context, prayerName, prayerTime, notificationType)
+            showPrayerNotification(context, prayerName, prayerTime, notificationType, priorMinutes)
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ PrayerNotificationReceiver failed", e)
@@ -98,17 +99,18 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
         context: Context,
         prayerName: String,
         prayerTime: String,
-        notificationType: String
+        notificationType: String,
+        priorMinutes: Int = PrayerNotificationWorker.DEFAULT_PRIOR_MINUTES
     ) {
         try {
             // Create notification channel
             createNotificationChannel(context)
-            
+
             val notificationId = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) 2001 else 2002
-            
+
             // Create large icon from app launcher icon
             val largeIcon = ContextCompat.getDrawable(context, R.mipmap.ic_launcher)?.toBitmap()
-            
+
             val notification = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) {
                 // Prayer time notification - when it's actually prayer time
                 NotificationCompat.Builder(context, CHANNEL_ID)
@@ -128,12 +130,12 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     .setDefaults(NotificationCompat.DEFAULT_ALL)
                     .build()
             } else {
-                // Prayer reminder notification - 20 minutes before prayer
+                // Prayer reminder notification - X minutes before prayer (user configurable)
                 NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setContentTitle("$prayerName in 20 min")
+                    .setContentTitle("$prayerName in $priorMinutes min")
                     .setContentText("Starts at $prayerTime")
                     .setStyle(NotificationCompat.BigTextStyle()
-                        .bigText("$prayerName Prayer in 20 minutes\n\n" +
+                        .bigText("$prayerName Prayer in $priorMinutes minutes\n\n" +
                                 "Time: $prayerTime\n"))
                     .setSmallIcon(R.drawable.ic_prayer)
                     .setLargeIcon(largeIcon)
@@ -144,12 +146,12 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
                     .build()
             }
-            
+
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.notify(notificationId, notification)
-            
-            Log.d(TAG, "📱 Posted prayer notification: $prayerName ($notificationType) at $prayerTime")
-            
+
+            Log.d(TAG, "📱 Posted prayer notification: $prayerName ($notificationType) at $prayerTime (priorMinutes: $priorMinutes)")
+
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to show prayer notification", e)
         }

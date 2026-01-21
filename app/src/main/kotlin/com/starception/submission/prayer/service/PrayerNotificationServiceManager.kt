@@ -198,32 +198,48 @@ class PrayerNotificationServiceManager @Inject constructor(
     private suspend fun scheduleBackupNotifications() {
         try {
             Log.d(TAG, "📅 Scheduling backup notifications with REAL prayer times")
-            
+
             // Cancel any existing backup notifications
             PrayerNotificationScheduler.cancelAllPrayerNotifications(context)
-            
+
             // Get actual prayer times for today
             val prayerTimes = getPrayerTimesForToday()
-            
+
             if (prayerTimes.isEmpty()) {
                 Log.w(TAG, "⚠️ No prayer times available, cannot schedule backup notifications")
                 return
             }
-            
+
             Log.d(TAG, "📋 Prayer times retrieved:")
             prayerTimes.forEach { (name, time) ->
                 Log.d(TAG, "   $name: $time")
             }
-            
-            // Schedule all prayer notifications with 20-minute reminders
-            PrayerNotificationScheduler.scheduleAllPrayerNotifications(
-                context = context,
-                prayerTimes = prayerTimes,
-                reminderMinutes = 20
-            )
-            
+
+            // Get notification preferences for per-prayer reminder times
+            val notificationPrefs = prayerSettingsRepository.getNotificationPreferences()
+
+            // Log all prior notification settings for debugging
+            Log.d(TAG, "📋 Prior notification settings:")
+            Log.d(TAG, "   Fajr: ${notificationPrefs.fajrPriorMinutes} min")
+            Log.d(TAG, "   Dhuhr: ${notificationPrefs.dhuhrPriorMinutes} min")
+            Log.d(TAG, "   Asr: ${notificationPrefs.asrPriorMinutes} min")
+            Log.d(TAG, "   Maghrib: ${notificationPrefs.maghribPriorMinutes} min")
+            Log.d(TAG, "   Isha: ${notificationPrefs.ishaPriorMinutes} min")
+
+            // Schedule each prayer notification with its own reminder time
+            prayerTimes.forEach { (prayerName, prayerTime) ->
+                val reminderMinutes = notificationPrefs.getPriorMinutesForPrayer(prayerName)
+                Log.d(TAG, "⏰ Scheduling $prayerName at $prayerTime with $reminderMinutes min prior reminder")
+                PrayerNotificationScheduler.schedulePrayerNotification(
+                    context = context,
+                    prayerName = prayerName,
+                    prayerTime = prayerTime,
+                    reminderMinutes = reminderMinutes
+                )
+            }
+
             Log.d(TAG, "✅ Scheduled ${prayerTimes.size} backup prayer notifications")
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to schedule backup notifications", e)
         }
