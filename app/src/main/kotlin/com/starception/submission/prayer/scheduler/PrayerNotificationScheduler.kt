@@ -79,9 +79,10 @@ object PrayerNotificationScheduler {
                 prayerTime = prayerTime,
                 notificationTime = prayerDateTime,
                 notificationType = PrayerNotificationWorker.TYPE_PRAYER_TIME,
-                requestCode = getRequestCode(prayerName, "main")
+                requestCode = getRequestCode(prayerName, "main"),
+                priorMinutes = reminderMinutes
             )
-            
+
             // Schedule reminder notification if requested
             if (reminderMinutes > 0) {
                 val reminderTime = prayerDateTime.minusMinutes(reminderMinutes.toLong())
@@ -92,7 +93,8 @@ object PrayerNotificationScheduler {
                         prayerTime = prayerTime,
                         notificationTime = reminderTime,
                         notificationType = PrayerNotificationWorker.TYPE_REMINDER,
-                        requestCode = getRequestCode(prayerName, "reminder")
+                        requestCode = getRequestCode(prayerName, "reminder"),
+                        priorMinutes = reminderMinutes
                     )
                     Log.d(TAG, "⏰ Scheduled reminder for $prayerName ${reminderMinutes} minutes before")
                 }
@@ -216,26 +218,27 @@ object PrayerNotificationScheduler {
         prayerTime: String,
         notificationTime: LocalDateTime,
         notificationType: String,
-        requestCode: Int
+        requestCode: Int,
+        priorMinutes: Int = 20
     ) {
         val currentTime = LocalDateTime.now()
-        
+
         // Don't schedule notifications in the past
         if (notificationTime.isBefore(currentTime)) {
             Log.d(TAG, "⏭️ Skipping past notification: $prayerName at $prayerTime")
             return
         }
-        
+
         // Calculate delay in milliseconds
         val delayMillis = java.time.Duration.between(currentTime, notificationTime).toMillis()
-        
+
         if (delayMillis > 0) {
             // Use BOTH systems for maximum reliability
             // 1. WorkManager (good for reliability and constraints)
-            scheduleWithWorkManager(context, prayerName, prayerTime, notificationType, delayMillis)
-            
+            scheduleWithWorkManager(context, prayerName, prayerTime, notificationType, delayMillis, priorMinutes)
+
             // 2. AlarmManager (best for exact timing, works even in deep sleep)
-            scheduleWithAlarmManager(context, prayerName, prayerTime, notificationType, notificationTime, requestCode)
+            scheduleWithAlarmManager(context, prayerName, prayerTime, notificationType, notificationTime, requestCode, priorMinutes)
         }
     }
     
@@ -244,12 +247,14 @@ object PrayerNotificationScheduler {
         prayerName: String,
         prayerTime: String,
         notificationType: String,
-        delayMillis: Long
+        delayMillis: Long,
+        priorMinutes: Int = 20
     ) {
         val inputData = Data.Builder()
             .putString(PrayerNotificationWorker.PRAYER_NAME_KEY, prayerName)
             .putString(PrayerNotificationWorker.PRAYER_TIME_KEY, prayerTime)
             .putString(PrayerNotificationWorker.NOTIFICATION_TYPE_KEY, notificationType)
+            .putInt(PrayerNotificationWorker.PRIOR_MINUTES_KEY, priorMinutes)
             .build()
         
         val workRequest = OneTimeWorkRequestBuilder<PrayerNotificationWorker>()
@@ -278,11 +283,12 @@ object PrayerNotificationScheduler {
         prayerTime: String,
         notificationType: String,
         notificationTime: LocalDateTime,
-        requestCode: Int
+        requestCode: Int,
+        priorMinutes: Int = 20
     ) {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            
+
             // Check if we can schedule exact alarms (Android 12+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (!alarmManager.canScheduleExactAlarms()) {
@@ -292,8 +298,8 @@ object PrayerNotificationScheduler {
                     return
                 }
             }
-            
-            val intent = createNotificationIntent(context, prayerName, prayerTime, notificationType)
+
+            val intent = createNotificationIntent(context, prayerName, prayerTime, notificationType, priorMinutes)
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 requestCode,
@@ -343,12 +349,14 @@ object PrayerNotificationScheduler {
         context: Context,
         prayerName: String,
         prayerTime: String,
-        notificationType: String
+        notificationType: String,
+        priorMinutes: Int = 20
     ): Intent {
         return Intent(context, com.starception.submission.prayer.receiver.PrayerNotificationReceiver::class.java).apply {
             putExtra(PrayerNotificationWorker.PRAYER_NAME_KEY, prayerName)
             putExtra(PrayerNotificationWorker.PRAYER_TIME_KEY, prayerTime)
             putExtra(PrayerNotificationWorker.NOTIFICATION_TYPE_KEY, notificationType)
+            putExtra(PrayerNotificationWorker.PRIOR_MINUTES_KEY, priorMinutes)
         }
     }
     
