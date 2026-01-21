@@ -47,6 +47,7 @@ class PermissionManager(private val activity: FragmentActivity) {
         const val LOCATION_PERMISSION_REQUEST_CODE = 1001     // For location permissions
         const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002 // For notification permissions
         const val ACTIVITY_RECOGNITION_REQUEST_CODE = 1003    // For activity recognition permissions
+        const val BACKGROUND_LOCATION_REQUEST_CODE = 1004     // For background location permission
     }
     
     /**
@@ -105,14 +106,14 @@ class PermissionManager(private val activity: FragmentActivity) {
     
     /**
      * ACTIVITY RECOGNITION PERMISSION CHECKER: Verifies if activity recognition permission is granted
-     * 
+     *
      * Android 10+ requires explicit activity recognition permission to detect user activity changes.
      * This permission is needed for beep notifications when activity changes.
-     * 
+     *
      * VERSION HANDLING:
      * - Android 10+: Checks ACTIVITY_RECOGNITION permission
      * - Android 9 and below: Always returns true (no permission required)
-     * 
+     *
      * EDIT THIS TO:
      * - Add activity confidence level checking
      * - Include specific activity type permission handling
@@ -127,6 +128,30 @@ class PermissionManager(private val activity: FragmentActivity) {
         } else {
             // Pre-Android 10: No permission needed for activity recognition
             true
+        }
+    }
+
+    /**
+     * BACKGROUND LOCATION PERMISSION CHECKER: Verifies if background location permission is granted
+     *
+     * Android 10+ requires explicit background location permission to receive GPS updates
+     * when the app is in the background. This is CRITICAL for driving detection when app is closed.
+     *
+     * VERSION HANDLING:
+     * - Android 10+: Checks ACCESS_BACKGROUND_LOCATION permission
+     * - Android 9 and below: Always returns true (no permission required)
+     *
+     * IMPORTANT: This permission must be requested SEPARATELY after foreground location is granted.
+     */
+    fun isBackgroundLocationPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(
+                activity,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            // Pre-Android 10: Background location included with foreground permission
+            isLocationPermissionGranted()
         }
     }
     
@@ -197,16 +222,16 @@ class PermissionManager(private val activity: FragmentActivity) {
     
     /**
      * ACTIVITY RECOGNITION PERMISSION REQUESTER: Requests activity recognition permission from user
-     * 
+     *
      * Shows system permission dialog for activity recognition access.
      * This enables the app to detect when user's activity changes (walking, driving, etc.)
      * and provide beep notifications.
-     * 
+     *
      * PERMISSION FLOW:
      * 1. Check if permission already granted
      * 2. Show system permission dialog
      * 3. Handle user response in onRequestPermissionsResult
-     * 
+     *
      * EDIT THIS TO:
      * - Add permission rationale dialog before requesting
      * - Add custom permission explanation UI
@@ -220,6 +245,55 @@ class PermissionManager(private val activity: FragmentActivity) {
             )
         }
     }
+
+    /**
+     * BACKGROUND LOCATION PERMISSION REQUESTER: Requests background location permission
+     *
+     * IMPORTANT: This must be called AFTER foreground location permission is granted.
+     * Android requires a separate request for background location.
+     *
+     * This enables the app to receive GPS updates when in background, which is
+     * CRITICAL for driving detection when the app is closed.
+     *
+     * On Android 11+, this opens the app settings page where user must select
+     * "Allow all the time" for location access.
+     */
+    fun requestBackgroundLocationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isBackgroundLocationPermissionGranted()) {
+            if (isLocationPermissionGranted()) {
+                // Foreground location granted, now request background
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    // Android 11+: Must request separately and may need to open settings
+                    ActivityCompat.requestPermissions(
+                        activity,
+                        arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+                        BACKGROUND_LOCATION_REQUEST_CODE
+                    )
+                } else {
+                    // Android 10: Can request with foreground permissions
+                    ActivityCompat.requestPermissions(
+                        activity,
+                        arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+                        BACKGROUND_LOCATION_REQUEST_CODE
+                    )
+                }
+            } else {
+                // Request foreground location first
+                requestLocationPermission()
+            }
+        }
+    }
+
+    /**
+     * Open app settings for manual permission grant
+     * Useful when background location needs "Allow all the time" setting
+     */
+    fun openAppSettings() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = android.net.Uri.fromParts("package", activity.packageName, null)
+        }
+        activity.startActivity(intent)
+    }
     
     /**
      * Check and request all necessary permissions
@@ -228,13 +302,16 @@ class PermissionManager(private val activity: FragmentActivity) {
         // Request location permission if not granted
         if (!isLocationPermissionGranted()) {
             requestLocationPermission()
+        } else if (!isBackgroundLocationPermissionGranted()) {
+            // Foreground location granted, request background location for driving detection
+            requestBackgroundLocationPermission()
         }
-        
+
         // Request activity recognition permission if not granted
         if (!isActivityRecognitionPermissionGranted()) {
             requestActivityRecognitionPermission()
         }
-        
+
         // Note: Notification permission is NOT requested automatically on startup
         // It will be requested when the prayer times page is opened
     }
