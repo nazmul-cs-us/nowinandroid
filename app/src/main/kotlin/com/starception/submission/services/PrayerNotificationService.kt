@@ -149,8 +149,15 @@ class PrayerNotificationService : Service() {
             notificationManager = getSystemService(NotificationManager::class.java)
             Log.d(TAG, "✓ Live Update notification manager initialized separately from foreground service")
             
-            // TEMPORARILY DISABLED: Initialize activity recognition (causing ANR)
-            // initializeActivityRecognition()
+            // Initialize Google Play Services Activity Recognition (runs async to prevent ANR)
+            // This provides backup activity detection alongside sensor-based detection
+            serviceScope.launch(Dispatchers.IO) {
+                try {
+                    initializeActivityRecognitionAsync()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to initialize activity recognition: ${e.message}")
+                }
+            }
             
             // Initialize ActivityTracker with sensor-based detection
             try {
@@ -1446,38 +1453,117 @@ class PrayerNotificationService : Service() {
     }
     
     /**
-     * Initialize Activity Recognition
+     * Initialize Activity Recognition (ASYNC VERSION - prevents ANR)
+     *
+     * IMPORTANT: This function should be called from a coroutine on Dispatchers.IO
+     * to prevent ANR (Application Not Responding) issues.
+     *
+     * Google Play Services Activity Recognition provides reliable background activity
+     * detection that complements our sensor-based detection. It works even when sensors
+     * are throttled because it runs as part of Google Play Services.
      */
+    private suspend fun initializeActivityRecognitionAsync() {
+        try {
+            Log.d(TAG, "🚀 Initializing Google Play Services Activity Recognition (async)...")
+
+            // Initialize client on IO thread (safe)
+            activityRecognitionClient = ActivityRecognition.getClient(this)
+            Log.d(TAG, "✓ Activity recognition client created")
+
+            // Initialize tone generator lazily on main thread when needed
+            // Don't initialize here to avoid blocking
+            withContext(Dispatchers.Main) {
+                try {
+                    if (toneGenerator == null) {
+                        toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to initialize ToneGenerator: ${e.message}")
+                }
+            }
+
+            // Register receiver on main thread (required by Android)
+            withContext(Dispatchers.Main) {
+                try {
+                    activityReceiver = ActivityTransitionReceiver()
+                    val filter = IntentFilter(ACTIVITY_TRANSITION_ACTION)
+                    registerReceiver(activityReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                    Log.d(TAG, "✓ Activity transition receiver registered")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to register activity receiver: ${e.message}")
+                }
+            }
+
+            // Create pending intent for activity transitions
+            val intent = Intent(ACTIVITY_TRANSITION_ACTION).apply {
+                setPackage(packageName)
+            }
+            activityTransitionPendingIntent = PendingIntent.getBroadcast(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            Log.d(TAG, "✓ Activity transition PendingIntent created")
+
+            // Start activity recognition with timeout protection
+            startActivityRecognitionWithTimeout()
+
+            Log.d(TAG, "✅ Google Play Services Activity Recognition initialized successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to initialize activity recognition: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Legacy synchronous initialization (kept for compatibility, but prefer async version)
+     */
+    @Deprecated("Use initializeActivityRecognitionAsync() instead to prevent ANR")
     private fun initializeActivityRecognition() {
         try {
             activityRecognitionClient = ActivityRecognition.getClient(this)
-            
+
             // Initialize tone generator for beep notifications
             toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
-            
+
             // Create receiver for activity transitions
             activityReceiver = ActivityTransitionReceiver()
             val filter = IntentFilter(ACTIVITY_TRANSITION_ACTION)
             registerReceiver(activityReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            
+
             // Create pending intent for activity transitions
             // Note: Using explicit intent with component name for Android 14+ compatibility
             val intent = Intent(ACTIVITY_TRANSITION_ACTION).apply {
                 setPackage(packageName) // Make intent explicit for Android 14+ security requirements
             }
             activityTransitionPendingIntent = PendingIntent.getBroadcast(
-                this, 
-                0, 
-                intent, 
+                this,
+                0,
+                intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            
+
             // Start activity recognition
             startActivityRecognition()
-            
+
             Log.d(TAG, "✓ Activity recognition initialized successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize activity recognition: ${e.message}")
+        }
+    }
+
+    /**
+     * Start activity recognition with timeout protection
+     */
+    private suspend fun startActivityRecognitionWithTimeout() {
+        try {
+            withTimeout(5000L) { // 5 second timeout to prevent ANR
+                startActivityRecognition()
+            }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            Log.w(TAG, "⚠️ Activity recognition request timed out (5s) - will retry later")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error starting activity recognition: ${e.message}")
         }
     }
     

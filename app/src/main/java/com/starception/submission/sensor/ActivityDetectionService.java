@@ -12,7 +12,9 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
+import android.os.PowerManager;
 import androidx.core.content.ContextCompat;
 import android.util.Log;
 
@@ -183,6 +185,14 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     // Callbacks
     private ActivityChangeCallback callback;
     private Context context;
+
+    // Handler for sensor callbacks (critical for background operation)
+    private Handler sensorHandler;
+    private HandlerThread sensorHandlerThread;
+    private boolean useExternalHandler = false;
+
+    // WakeLock to prevent CPU from sleeping during detection
+    private PowerManager.WakeLock wakeLock;
     
     // Data structures for sensor data
     private static class AccelerometerData {
@@ -315,71 +325,139 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     }
     
     /**
-     * Start activity detection
+     * Start activity detection (uses internal HandlerThread for background operation)
      */
     public void startDetection(ActivityChangeCallback callback) {
+        startDetection(callback, null);
+    }
+
+    /**
+     * Start activity detection with external Handler for foreground service integration
+     *
+     * CRITICAL FOR BACKGROUND OPERATION:
+     * Android 9+ throttles sensor delivery for background apps. To receive continuous
+     * sensor updates when the app is closed, sensors must be registered with a Handler
+     * running on a thread associated with a foreground service.
+     *
+     * @param callback Callback for activity changes
+     * @param externalHandler Handler from foreground service (null to use internal HandlerThread)
+     */
+    public void startDetection(ActivityChangeCallback callback, Handler externalHandler) {
         if (!hasRequiredPermissions()) {
             Log.w(TAG, "Required permissions not granted for activity detection");
             return;
         }
-        
+
         if (isRunning.get()) {
             Log.w(TAG, "Activity detection already running");
             return;
         }
-        
+
         this.callback = callback;
         isRunning.set(true);
-        
+
         // Initialize timing variables
         lastActivityChange = System.currentTimeMillis();
-        
-        // Register sensor listeners
+
+        // Acquire partial wake lock to keep CPU running for sensor processing
+        acquireWakeLock();
+
+        // Setup sensor handler for background operation
+        if (externalHandler != null) {
+            // Use external handler from foreground service (best for background operation)
+            sensorHandler = externalHandler;
+            useExternalHandler = true;
+            Log.i(TAG, "✅ Using EXTERNAL handler from foreground service for sensor callbacks");
+        } else {
+            // Create internal HandlerThread (fallback)
+            sensorHandlerThread = new HandlerThread("ActivitySensorThread", Thread.MAX_PRIORITY);
+            sensorHandlerThread.start();
+            sensorHandler = new Handler(sensorHandlerThread.getLooper());
+            useExternalHandler = false;
+            Log.i(TAG, "⚠️ Using INTERNAL HandlerThread for sensor callbacks");
+        }
+
+        // Register sensor listeners with Handler for continuous background updates
         if (accelerometer != null) {
-            sensorManager.registerListener(this, accelerometer, SENSOR_DELAY_US);
-            Log.i(TAG, "Accelerometer registered");
+            sensorManager.registerListener(this, accelerometer, SENSOR_DELAY_US, sensorHandler);
+            Log.i(TAG, "Accelerometer registered with Handler");
         }
 
         if (gyroscope != null) {
-            sensorManager.registerListener(this, gyroscope, SENSOR_DELAY_US);
-            Log.i(TAG, "Gyroscope registered");
+            sensorManager.registerListener(this, gyroscope, SENSOR_DELAY_US, sensorHandler);
+            Log.i(TAG, "Gyroscope registered with Handler");
         }
 
-        // NEW: Register step counter for walking/running detection
+        // Register step counter for walking/running detection
         if (stepCounter != null) {
-            sensorManager.registerListener(this, stepCounter, SensorManager.SENSOR_DELAY_NORMAL);
-            Log.i(TAG, "Step Counter registered");
+            sensorManager.registerListener(this, stepCounter, SensorManager.SENSOR_DELAY_NORMAL, sensorHandler);
+            Log.i(TAG, "Step Counter registered with Handler");
         }
 
-        // NEW: Register step detector for real-time step events
+        // Register step detector for real-time step events
         if (stepDetector != null) {
-            sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_NORMAL);
-            Log.i(TAG, "Step Detector registered");
+            sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_NORMAL, sensorHandler);
+            Log.i(TAG, "Step Detector registered with Handler");
         }
 
-        // NEW: Register linear accelerometer (gravity-free acceleration)
+        // Register linear accelerometer (gravity-free acceleration)
         if (linearAccelerometer != null) {
-            sensorManager.registerListener(this, linearAccelerometer, SENSOR_DELAY_US);
-            Log.i(TAG, "Linear Accelerometer registered");
+            sensorManager.registerListener(this, linearAccelerometer, SENSOR_DELAY_US, sensorHandler);
+            Log.i(TAG, "Linear Accelerometer registered with Handler");
         }
-        
-        // Register location listener
+
+        // Register location listener with Looper for background updates
         try {
             locationManager.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER,
                 LOCATION_UPDATE_INTERVAL,
                 LOCATION_UPDATE_DISTANCE,
-                this
+                this,
+                sensorHandler.getLooper()
             );
-            Log.i(TAG, "GPS location updates registered");
+            Log.i(TAG, "GPS location updates registered with Handler Looper");
         } catch (SecurityException e) {
             Log.e(TAG, "Location permission not granted", e);
         }
-        
+
         // Start periodic analysis
         startPeriodicAnalysis();
-        
-        Log.i(TAG, "Activity detection started");
+
+        Log.i(TAG, "✅ Activity detection started (background-ready with Handler)");
+    }
+
+    /**
+     * Acquire partial wake lock to keep CPU running for sensor processing
+     */
+    private void acquireWakeLock() {
+        try {
+            PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            if (powerManager != null && wakeLock == null) {
+                wakeLock = powerManager.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK,
+                    "ActivityDetection::SensorWakeLock"
+                );
+                wakeLock.acquire(10 * 60 * 1000L); // 10 minutes max, will be re-acquired periodically
+                Log.i(TAG, "✅ WakeLock acquired for sensor processing");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to acquire WakeLock", e);
+        }
+    }
+
+    /**
+     * Release wake lock
+     */
+    private void releaseWakeLock() {
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+                wakeLock = null;
+                Log.i(TAG, "WakeLock released");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error releasing WakeLock", e);
+        }
     }
     
     /**
@@ -389,18 +467,30 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         if (!isRunning.get()) {
             return;
         }
-        
+
         isRunning.set(false);
-        
+
         // Unregister sensor listeners
         sensorManager.unregisterListener(this);
         locationManager.removeUpdates(this);
-        
+
+        // Release wake lock
+        releaseWakeLock();
+
+        // Clean up internal HandlerThread if we created one
+        if (!useExternalHandler && sensorHandlerThread != null) {
+            sensorHandlerThread.quitSafely();
+            sensorHandlerThread = null;
+            Log.i(TAG, "Internal HandlerThread stopped");
+        }
+        sensorHandler = null;
+        useExternalHandler = false;
+
         // Clear data
         accelData.clear();
         gyroData.clear();
         locationData.clear();
-        
+
         Log.i(TAG, "Activity detection stopped");
     }
     

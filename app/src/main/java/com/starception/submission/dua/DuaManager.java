@@ -4,6 +4,7 @@ import android.content.Context;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.util.Log;
 
@@ -41,6 +42,10 @@ public class DuaManager implements ActivityDetectionService.ActivityChangeCallba
     private MediaPlayer mediaPlayer;
     private ActivityDetectionService activityDetectionService;
     private Handler handler;
+
+    // Handler thread for sensor callbacks (critical for background operation)
+    private HandlerThread sensorHandlerThread;
+    private Handler sensorHandler;
 
     // Dua resources mapping - you can add actual audio files to res/raw/
     private Map<ActivityDetectionService.ActivityType, DuaInfo> duaMap;
@@ -131,14 +136,53 @@ public class DuaManager implements ActivityDetectionService.ActivityChangeCallba
     
     /**
      * Start activity detection and dua playing
+     * Uses internal HandlerThread for background sensor operation
      */
     public void start() {
-        if (activityDetectionService.hasRequiredPermissions()) {
-            activityDetectionService.startDetection(this);
-            Log.i(TAG, "DuaManager started with activity detection");
-        } else {
+        start(null);
+    }
+
+    /**
+     * Start activity detection with external Handler (for foreground service integration)
+     *
+     * CRITICAL FOR BACKGROUND OPERATION:
+     * Android 9+ throttles sensor delivery for background apps. To receive continuous
+     * sensor updates when the app is closed, sensors must be registered with a Handler
+     * running on a thread associated with a foreground service.
+     *
+     * @param externalHandler Handler from foreground service (null to use internal HandlerThread)
+     */
+    public void start(Handler externalHandler) {
+        if (!activityDetectionService.hasRequiredPermissions()) {
             Log.w(TAG, "Required permissions not available for activity detection");
+            return;
         }
+
+        Handler handlerToUse = externalHandler;
+
+        // If no external handler provided, create internal HandlerThread
+        if (handlerToUse == null) {
+            if (sensorHandlerThread == null) {
+                sensorHandlerThread = new HandlerThread("DuaManagerSensorThread", Thread.MAX_PRIORITY);
+                sensorHandlerThread.start();
+                sensorHandler = new Handler(sensorHandlerThread.getLooper());
+                Log.i(TAG, "✅ Created internal HandlerThread for sensor callbacks");
+            }
+            handlerToUse = sensorHandler;
+        } else {
+            Log.i(TAG, "✅ Using external Handler from foreground service");
+        }
+
+        // Start detection with handler for background operation
+        activityDetectionService.startDetection(this, handlerToUse);
+        Log.i(TAG, "✅ DuaManager started with background-ready activity detection");
+    }
+
+    /**
+     * Get the sensor handler (for external use if needed)
+     */
+    public Handler getSensorHandler() {
+        return sensorHandler;
     }
     
     /**
@@ -147,6 +191,15 @@ public class DuaManager implements ActivityDetectionService.ActivityChangeCallba
     public void stop() {
         activityDetectionService.stopDetection();
         stopCurrentDua();
+
+        // Clean up internal HandlerThread if we created one
+        if (sensorHandlerThread != null) {
+            sensorHandlerThread.quitSafely();
+            sensorHandlerThread = null;
+            sensorHandler = null;
+            Log.i(TAG, "Internal HandlerThread stopped");
+        }
+
         Log.i(TAG, "DuaManager stopped");
     }
     
