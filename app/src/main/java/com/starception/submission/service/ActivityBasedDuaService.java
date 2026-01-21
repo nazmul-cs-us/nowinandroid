@@ -7,6 +7,8 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.os.Build;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
@@ -34,6 +36,11 @@ public class ActivityBasedDuaService extends Service {
     private DuaManager duaManager;
     private boolean isServiceRunning = false;
     private NotificationManager notificationManager;
+
+    // HandlerThread for sensor callbacks - CRITICAL for background operation
+    // Android 9+ throttles sensors for background apps, but foreground service handlers work
+    private HandlerThread sensorHandlerThread;
+    private Handler sensorHandler;
     
     @Override
     public void onCreate() {
@@ -83,37 +90,72 @@ public class ActivityBasedDuaService extends Service {
     
     /**
      * Start activity detection and dua playing as foreground service
+     *
+     * CRITICAL FOR BACKGROUND SENSOR OPERATION:
+     * Android 9+ throttles sensor delivery for background apps. By creating a
+     * HandlerThread in this foreground service and passing its Handler to the
+     * sensor registration, we ensure sensors continue to deliver at full rate
+     * even when the app is closed.
      */
     private void startActivityDetection() {
         if (isServiceRunning) {
             Log.d(TAG, "Activity detection already running");
             return;
         }
-        
+
         if (duaManager.isRunning()) {
             Log.d(TAG, "DuaManager already running");
             isServiceRunning = true;
             return;
         }
-        
+
         try {
-            // Start as foreground service to prevent Android from killing it
+            // Start as foreground service FIRST to prevent Android from killing it
             Notification notification = createNotification("Monitoring activity...");
             startForeground(NOTIFICATION_ID, notification);
             Log.i(TAG, "✅ Started as foreground service");
-            
-            duaManager.start();
+
+            // Create HandlerThread for sensor callbacks WITHIN foreground service context
+            // This is CRITICAL for background sensor operation
+            if (sensorHandlerThread == null) {
+                sensorHandlerThread = new HandlerThread("ForegroundSensorThread", Thread.MAX_PRIORITY);
+                sensorHandlerThread.start();
+                sensorHandler = new Handler(sensorHandlerThread.getLooper());
+                Log.i(TAG, "✅ Created foreground service HandlerThread for sensors");
+            }
+
+            // Start DuaManager with our foreground service handler
+            // This ensures sensors are registered with foreground context
+            duaManager.start(sensorHandler);
             isServiceRunning = true;
-            Log.i(TAG, "Activity detection and dua playing started");
-            
+            Log.i(TAG, "✅ Activity detection started with foreground service handler");
+
             // Log current activity if available
             ActivityDetectionService.ActivityType currentActivity = duaManager.getCurrentActivity();
             Log.i(TAG, "Current detected activity: " + currentActivity);
-            
+
         } catch (Exception e) {
             Log.e(TAG, "Error starting activity detection", e);
+            cleanupHandlerThread();
             stopForeground(true);
             stopSelf();
+        }
+    }
+
+    /**
+     * Clean up HandlerThread resources
+     */
+    private void cleanupHandlerThread() {
+        if (sensorHandlerThread != null) {
+            sensorHandlerThread.quitSafely();
+            try {
+                sensorHandlerThread.join(1000); // Wait up to 1 second
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Interrupted while waiting for handler thread to stop");
+            }
+            sensorHandlerThread = null;
+            sensorHandler = null;
+            Log.i(TAG, "HandlerThread cleaned up");
         }
     }
     
@@ -125,27 +167,31 @@ public class ActivityBasedDuaService extends Service {
             Log.d(TAG, "Activity detection not running");
             return;
         }
-        
+
         try {
             duaManager.stop();
+            cleanupHandlerThread();
             isServiceRunning = false;
             stopForeground(true);
             Log.i(TAG, "Activity detection and dua playing stopped");
         } catch (Exception e) {
             Log.e(TAG, "Error stopping activity detection", e);
         }
-        
+
         stopSelf();
     }
     
     @Override
     public void onDestroy() {
         Log.i(TAG, "Service being destroyed");
-        
+
         if (duaManager != null) {
             duaManager.cleanup();
         }
-        
+
+        // Clean up HandlerThread
+        cleanupHandlerThread();
+
         stopForeground(true);
         isServiceRunning = false;
         super.onDestroy();
