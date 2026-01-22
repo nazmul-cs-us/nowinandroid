@@ -30,8 +30,9 @@ public class ActivityBasedDuaService extends Service {
     private static final String TAG = "ActivityBasedDuaService";
     private static final String ACTION_START_DETECTION = "com.starception.submission.START_ACTIVITY_DETECTION";
     private static final String ACTION_STOP_DETECTION = "com.starception.submission.STOP_ACTIVITY_DETECTION";
-    private static final String CHANNEL_ID = "activity_detection_channel";
-    private static final int NOTIFICATION_ID = 3001;
+    // Use same channel and ID as PrayerNotificationService to share one notification
+    private static final String CHANNEL_ID = "prayer_live_update_channel";
+    private static final int NOTIFICATION_ID = 1001;  // Same as PrayerNotificationService
     
     private DuaManager duaManager;
     private boolean isServiceRunning = false;
@@ -196,22 +197,53 @@ public class ActivityBasedDuaService extends Service {
         isServiceRunning = false;
         super.onDestroy();
     }
+
+    /**
+     * Called when the app is removed from recent tasks (user swipes it away)
+     * This ensures the service restarts to maintain activity detection
+     */
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        Log.w(TAG, "⚠️ App removed from recent tasks - scheduling service restart");
+
+        try {
+            // Schedule service restart using AlarmManager
+            Intent restartIntent = new Intent(getApplicationContext(), ActivityBasedDuaService.class);
+            restartIntent.setAction(ACTION_START_DETECTION);
+            restartIntent.setPackage(getPackageName());
+
+            PendingIntent restartPendingIntent = PendingIntent.getService(
+                getApplicationContext(),
+                3001,  // Unique request code
+                restartIntent,
+                PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE
+            );
+
+            android.app.AlarmManager alarmManager = (android.app.AlarmManager) getSystemService(ALARM_SERVICE);
+            if (alarmManager != null) {
+                // Restart in 1 second
+                alarmManager.set(
+                    android.app.AlarmManager.ELAPSED_REALTIME,
+                    android.os.SystemClock.elapsedRealtime() + 1000,
+                    restartPendingIntent
+                );
+                Log.i(TAG, "✅ Service restart scheduled for 1 second from now");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to schedule service restart: " + e.getMessage());
+        }
+
+        super.onTaskRemoved(rootIntent);
+    }
     
     /**
      * Create notification channel for Android O and above
+     * Note: Using same channel as PrayerNotificationService (prayer_live_update_channel)
+     * so we skip creation here - channel is already created by PrayerNotificationService
      */
     private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID,
-                "Activity Detection",
-                NotificationManager.IMPORTANCE_LOW
-            );
-            channel.setDescription("Monitors your activity for travel dua");
-            channel.setShowBadge(false);
-            notificationManager.createNotificationChannel(channel);
-            Log.d(TAG, "Notification channel created");
-        }
+        // Channel is created by PrayerNotificationService - skip duplicate creation
+        Log.d(TAG, "Using existing prayer_live_update_channel from PrayerNotificationService");
     }
     
     /**

@@ -50,12 +50,12 @@ object ActivityTracker {
     private val _phonePosition = MutableStateFlow("UNKNOWN")
     val phonePosition: StateFlow<String> = _phonePosition.asStateFlow()
 
-    private val _notificationMode = MutableStateFlow(NotificationMode.SPEAKER)
+    private val _notificationMode = MutableStateFlow(NotificationMode.MUTE)  // Default to silent mode
     val notificationMode: StateFlow<NotificationMode> = _notificationMode.asStateFlow()
 
     // Deprecated - kept for backwards compatibility
     @Deprecated("Use notificationMode instead", ReplaceWith("notificationMode"))
-    private val _isBeepEnabled = MutableStateFlow(true)
+    private val _isBeepEnabled = MutableStateFlow(false)  // Default false since MUTE is default
     @Deprecated("Use notificationMode instead", ReplaceWith("notificationMode"))
     val isBeepEnabled: StateFlow<Boolean> = _isBeepEnabled.asStateFlow()
     
@@ -607,17 +607,18 @@ object ActivityTracker {
     
     /**
      * Load saved notification mode from SharedPreferences
+     * Default is MUTE (silent mode) for new users
      */
     private fun loadNotificationMode(context: Context): NotificationMode {
         return try {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val modeName = prefs.getString(KEY_NOTIFICATION_MODE, NotificationMode.SPEAKER.name)
-            val mode = NotificationMode.valueOf(modeName ?: NotificationMode.SPEAKER.name)
+            val modeName = prefs.getString(KEY_NOTIFICATION_MODE, NotificationMode.MUTE.name)  // Default to silent
+            val mode = NotificationMode.valueOf(modeName ?: NotificationMode.MUTE.name)
             Log.d("ActivityTracker", "📥 Loaded notification mode from storage: $mode")
             mode
         } catch (e: Exception) {
             Log.e("ActivityTracker", "❌ Failed to load notification mode, using default: ${e.message}")
-            NotificationMode.SPEAKER
+            NotificationMode.MUTE  // Default to silent mode
         }
     }
     

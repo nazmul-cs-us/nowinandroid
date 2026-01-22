@@ -147,6 +147,7 @@
             android:name=".service.ActivityBasedDuaService"
             android:exported="false"
             android:enabled="true"
+            android:stopWithTask="false"
             android:foregroundServiceType="location" />
         
         <!-- Android Auto Car App Service -->
