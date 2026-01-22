@@ -371,4 +371,111 @@ class PermissionManager(private val activity: FragmentActivity) {
         val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
         activity.startActivity(intent)
     }
+
+    /**
+     * BATTERY OPTIMIZATION CHECKER: Checks if app is exempt from battery optimization
+     *
+     * Apps that are NOT exempt from battery optimization may be killed by Android
+     * when running in the background, which breaks activity detection and prayer notifications.
+     *
+     * IMPORTANT: This is CRITICAL for reliable background operation.
+     *
+     * @return true if app is exempt from battery optimization (unrestricted)
+     */
+    fun isBatteryOptimizationExempt(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = activity.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            powerManager.isIgnoringBatteryOptimizations(activity.packageName)
+        } else {
+            true // Battery optimization didn't exist before Android M
+        }
+    }
+
+    /**
+     * REQUEST BATTERY OPTIMIZATION EXEMPTION: Opens system dialog to disable battery optimization
+     *
+     * This is REQUIRED for reliable background activity detection and prayer notifications.
+     * Without this exemption, Android may kill the app's services when in background.
+     *
+     * NOTE: This uses ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS which shows a system dialog.
+     * Google Play allows this for apps that have legitimate background operation needs
+     * (like prayer time notifications).
+     */
+    @android.annotation.SuppressLint("BatteryLife")
+    fun requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isBatteryOptimizationExempt()) {
+            try {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = android.net.Uri.parse("package:${activity.packageName}")
+                }
+                activity.startActivity(intent)
+                android.util.Log.i("PermissionManager", "🔋 Requesting battery optimization exemption")
+            } catch (e: Exception) {
+                android.util.Log.e("PermissionManager", "❌ Failed to request battery exemption: ${e.message}")
+                // Fallback: Open battery settings manually
+                openBatterySettings()
+            }
+        }
+    }
+
+    /**
+     * Open battery optimization settings for manual configuration
+     */
+    fun openBatterySettings() {
+        try {
+            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+            activity.startActivity(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("PermissionManager", "❌ Failed to open battery settings: ${e.message}")
+        }
+    }
+
+    /**
+     * Check all critical permissions for background operation
+     * Returns a map of permission name to granted status
+     */
+    fun checkBackgroundOperationPermissions(): Map<String, Boolean> {
+        return mapOf(
+            "Location" to isLocationPermissionGranted(),
+            "Background Location" to isBackgroundLocationPermissionGranted(),
+            "Notifications" to isNotificationPermissionGranted(),
+            "Activity Recognition" to isActivityRecognitionPermissionGranted(),
+            "Battery Optimization Exempt" to isBatteryOptimizationExempt()
+        )
+    }
+
+    /**
+     * Request all permissions needed for reliable background operation
+     * Call this when user enables activity detection or prayer notifications
+     */
+    fun requestAllBackgroundPermissions() {
+        // Location permissions
+        if (!isLocationPermissionGranted()) {
+            requestLocationPermission()
+            return // Request one at a time for better UX
+        }
+
+        // Background location
+        if (!isBackgroundLocationPermissionGranted()) {
+            requestBackgroundLocationPermission()
+            return
+        }
+
+        // Activity recognition
+        if (!isActivityRecognitionPermissionGranted()) {
+            requestActivityRecognitionPermission()
+            return
+        }
+
+        // Notifications
+        if (!isNotificationPermissionGranted()) {
+            requestNotificationPermission()
+            return
+        }
+
+        // Battery optimization (most important for background reliability)
+        if (!isBatteryOptimizationExempt()) {
+            requestBatteryOptimizationExemption()
+        }
+    }
 }
