@@ -203,7 +203,12 @@ class PrayerNotificationService : Service() {
             // IMMEDIATE FOREGROUND START - but with proper notification now that dependencies are available
             Log.d(TAG, "Starting foreground service immediately - startId: $startId")
             startForeground(NOTIFICATION_ID, createInitialNotification())
-            
+
+            // Clear any old/legacy notifications that may be lingering
+            // ID 1003 was previously used for separate activity change notifications (now merged into main)
+            notificationManager.cancel(1003)
+            Log.d(TAG, "🧹 Cleared legacy activity notification (ID 1003)")
+
             // Mark service as running IMMEDIATELY
             isServiceRunning = true
             
@@ -1650,14 +1655,17 @@ class PrayerNotificationService : Service() {
                             if (previousActivity != currentActivity) {
                                 // Update ActivityTracker for UI components
                                 ActivityTracker.updateActivity(currentActivity)
-                                
+
                                 // Play beep notification
                                 playActivityChangeBeep()
-                                
+
                                 Log.i(TAG, "🔄 Activity changed from $previousActivity to $currentActivity")
-                                
-                                // Optionally send notification
-                                showActivityChangeNotification(currentActivity)
+
+                                // Activity is already shown in the main live update notification via:
+                                // 1. Large icon (activity icon in top-right corner)
+                                // 2. Emoji in shortCriticalText (e.g., "🚗 🕌 Go to Mosque")
+                                // No need for separate notification - it was causing duplicate notifications
+                                // showActivityChangeNotification(currentActivity) // REMOVED: Merged into main notification
                             }
                         }
                     }
@@ -1825,4 +1833,43 @@ class PrayerNotificationService : Service() {
     }
     
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /**
+     * Called when the app is removed from recent tasks (user swipes it away)
+     * This ensures the service restarts itself to maintain prayer notifications
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.w(TAG, "⚠️ App removed from recent tasks - scheduling service restart")
+        FileLogger.w(TAG, "App removed from recent tasks - scheduling service restart")
+
+        try {
+            // Schedule service restart using AlarmManager for reliability
+            val restartServiceIntent = Intent(applicationContext, PrayerNotificationService::class.java).apply {
+                setPackage(packageName)
+            }
+
+            val restartServicePendingIntent = PendingIntent.getService(
+                applicationContext,
+                1,
+                restartServiceIntent,
+                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            // Restart in 1 second
+            alarmManager.set(
+                android.app.AlarmManager.ELAPSED_REALTIME,
+                android.os.SystemClock.elapsedRealtime() + 1000,
+                restartServicePendingIntent
+            )
+
+            Log.i(TAG, "✅ Service restart scheduled for 1 second from now")
+            FileLogger.i(TAG, "Service restart scheduled via AlarmManager")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to schedule service restart: ${e.message}")
+            FileLogger.e(TAG, "Failed to schedule service restart: ${e.message}")
+        }
+
+        super.onTaskRemoved(rootIntent)
+    }
 }
