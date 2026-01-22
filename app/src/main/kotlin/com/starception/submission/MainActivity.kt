@@ -351,10 +351,13 @@ class MainActivity : FragmentActivity() {
                 prayerNotificationServiceManager.initializeNotificationSystem()
                 Log.d("MainActivity", "✅ Step 2: Notification system initialized")
                 
-                // Start activity detection service for dua playing
-                Log.d("MainActivity", "🎯 Step 3: Starting activity detection service...")
-                startActivityDetectionService()
-                Log.d("MainActivity", "✅ Step 3: Activity detection service started")
+                // Activity detection is now handled by PrayerNotificationService via Google Play Services
+                // ActivityBasedDuaService is DISABLED to prevent notification ID conflict (both used ID 1001)
+                // which was causing PrayerNotificationService to be killed when app is closed
+                // Log.d("MainActivity", "🎯 Step 3: Starting activity detection service...")
+                // startActivityDetectionService()
+                // Log.d("MainActivity", "✅ Step 3: Activity detection service started")
+                Log.d("MainActivity", "🎯 Step 3: Activity detection handled by PrayerNotificationService")
                 
                 Log.d("MainActivity", "🎉 Prayer notification system initialized successfully!")
                 Log.d("MainActivity", "   - Foreground service: Running")

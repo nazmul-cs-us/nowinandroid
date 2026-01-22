@@ -30,9 +30,10 @@ public class ActivityBasedDuaService extends Service {
     private static final String TAG = "ActivityBasedDuaService";
     private static final String ACTION_START_DETECTION = "com.starception.submission.START_ACTIVITY_DETECTION";
     private static final String ACTION_STOP_DETECTION = "com.starception.submission.STOP_ACTIVITY_DETECTION";
-    // Use same channel and ID as PrayerNotificationService to share one notification
-    private static final String CHANNEL_ID = "prayer_live_update_channel";
-    private static final int NOTIFICATION_ID = 1001;  // Same as PrayerNotificationService
+    // IMPORTANT: Use DIFFERENT notification ID from PrayerNotificationService (1001)
+    // Using same ID caused PrayerNotificationService to be killed when this service started
+    private static final String CHANNEL_ID = "activity_detection_channel";
+    private static final int NOTIFICATION_ID = 3001;  // Different from PrayerNotificationService (1001)
     
     private DuaManager duaManager;
     private boolean isServiceRunning = false;
@@ -238,12 +239,21 @@ public class ActivityBasedDuaService extends Service {
     
     /**
      * Create notification channel for Android O and above
-     * Note: Using same channel as PrayerNotificationService (prayer_live_update_channel)
-     * so we skip creation here - channel is already created by PrayerNotificationService
+     * NOTE: This service is DISABLED - activity detection is handled by PrayerNotificationService
+     * If re-enabled, this uses its own channel to avoid conflicts
      */
     private void createNotificationChannel() {
-        // Channel is created by PrayerNotificationService - skip duplicate creation
-        Log.d(TAG, "Using existing prayer_live_update_channel from PrayerNotificationService");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID,
+                "Activity Detection",
+                NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("Monitors your activity for travel dua");
+            channel.setShowBadge(false);
+            notificationManager.createNotificationChannel(channel);
+            Log.d(TAG, "Notification channel created");
+        }
     }
     
     /**
