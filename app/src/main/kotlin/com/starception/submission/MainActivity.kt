@@ -351,19 +351,19 @@ class MainActivity : FragmentActivity() {
                 prayerNotificationServiceManager.initializeNotificationSystem()
                 Log.d("MainActivity", "✅ Step 2: Notification system initialized")
                 
-                // Activity detection is now handled by PrayerNotificationService via Google Play Services
-                // ActivityBasedDuaService is DISABLED to prevent notification ID conflict (both used ID 1001)
-                // which was causing PrayerNotificationService to be killed when app is closed
-                // Log.d("MainActivity", "🎯 Step 3: Starting activity detection service...")
-                // startActivityDetectionService()
-                // Log.d("MainActivity", "✅ Step 3: Activity detection service started")
-                Log.d("MainActivity", "🎯 Step 3: Activity detection handled by PrayerNotificationService")
-                
+                // DISABLED: Activity detection now merged into PrayerNotificationService
+                // The sensor HandlerThread is created in PrayerNotificationService.onCreate() and passed
+                // to ActivityTracker via setSensorHandler() for reliable background sensor operation.
+                // This eliminates the need for a separate ActivityBasedDuaService.
+                // Previous approach had two foreground services, but sharing notification IDs caused issues.
+                // Now: Single unified foreground service with integrated activity detection.
+                Log.d("MainActivity", "🎯 Step 3: Activity detection integrated into prayer service (no separate service)")
+
                 Log.d("MainActivity", "🎉 Prayer notification system initialized successfully!")
-                Log.d("MainActivity", "   - Foreground service: Running")
+                Log.d("MainActivity", "   - Foreground service: Running (with integrated activity detection)")
                 Log.d("MainActivity", "   - Backup notifications: Scheduled")
                 Log.d("MainActivity", "   - Boot receiver: Ready")
-                Log.d("MainActivity", "   - Activity detection: Running")
+                Log.d("MainActivity", "   - Activity detection: Running (via PrayerNotificationService HandlerThread)")
             } catch (e: Exception) {
                 Log.e("MainActivity", "❌ Error starting prayer notification system", e)
                 e.printStackTrace()
