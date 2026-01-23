@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.starception.submission.sensor.ActivityDetectionService
 import com.starception.submission.config.ActivityDetectionConfig
+import com.starception.submission.config.TravelDuaSettings
 
 /**
  * Notification mode for activity changes
@@ -113,11 +114,16 @@ object ActivityTracker {
     private var lastDuaPlayTime: Long = 0L
     private var lastDrivingTime: Long = 0L
 
-    // Gap tolerance tracking - continue countdown if driving resumes within 5 minutes
+    // Gap tolerance tracking - continue countdown if driving resumes within gap tolerance
     private var drivingStopTime: Long = 0L  // When driving stopped
     private var accumulatedDrivingTime: Long = 0L  // Accumulated driving time in ms
     private var drivingStartTime: Long = 0L  // When current driving session started
-    private const val GAP_TOLERANCE_MILLIS = 5 * 60 * 1000L  // 5 minutes gap tolerance
+
+    // Travel dua settings (loaded from SharedPreferences, can be updated from settings screen)
+    private var travelDuaEnabled: Boolean = true
+    private var travelDuaCooldownMillis: Long = TravelDuaSettings.DEFAULT_COOLDOWN_MINUTES * 60 * 1000L
+    private var travelDuaPlaybackDelayMillis: Long = TravelDuaSettings.DEFAULT_PLAYBACK_DELAY_SECONDS * 1000L
+    private var travelDuaGapToleranceMillis: Long = TravelDuaSettings.DEFAULT_GAP_TOLERANCE_MINUTES * 60 * 1000L
 
     // Handler for delayed dua playback
     private val duaHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -173,6 +179,9 @@ object ActivityTracker {
             _notificationMode.value = savedMode
             _isBeepEnabled.value = (savedMode != NotificationMode.MUTE)
             Log.d("ActivityTracker", "📱 Loaded saved notification mode: $savedMode")
+
+            // Load saved travel dua settings
+            loadTravelDuaSettings(context)
 
             // Initialize ToneGenerator for beep sounds
             if (toneGenerator == null) {
@@ -290,20 +299,27 @@ object ActivityTracker {
 
         // ========== DRIVING STARTED ==========
         if (activity == "Driving" && oldActivity != "Driving") {
+            // Check if travel dua feature is enabled
+            if (!travelDuaEnabled) {
+                Log.d("ActivityTracker", "🚗 Travel dua disabled in settings")
+                lastDrivingTime = currentTime
+                return
+            }
+
             val timeSinceLastDua = currentTime - lastDuaPlayTime
             val gapSinceLastDriving = currentTime - drivingStopTime
 
-            // Check if dua cooldown has passed (5 minutes since last dua played)
-            if (timeSinceLastDua < ActivityDetectionConfig.DUA_COOLDOWN_MILLIS) {
-                Log.d("ActivityTracker", "🚗 Dua cooldown active - ${(ActivityDetectionConfig.DUA_COOLDOWN_MILLIS - timeSinceLastDua) / 1000}s remaining")
+            // Check if dua cooldown has passed
+            if (timeSinceLastDua < travelDuaCooldownMillis) {
+                Log.d("ActivityTracker", "🚗 Dua cooldown active - ${(travelDuaCooldownMillis - timeSinceLastDua) / 1000}s remaining")
                 lastDrivingTime = currentTime
                 return
             }
 
             // Check if this is a resume within gap tolerance (e.g., after traffic light)
-            if (drivingStopTime > 0 && gapSinceLastDriving < GAP_TOLERANCE_MILLIS && accumulatedDrivingTime > 0) {
+            if (drivingStopTime > 0 && gapSinceLastDriving < travelDuaGapToleranceMillis && accumulatedDrivingTime > 0) {
                 // RESUME: Continue countdown with accumulated time
-                val remainingTime = ActivityDetectionConfig.DUA_PLAYBACK_DELAY_MILLIS - accumulatedDrivingTime
+                val remainingTime = travelDuaPlaybackDelayMillis - accumulatedDrivingTime
                 if (remainingTime > 0) {
                     Log.i("ActivityTracker", "🚦 Driving resumed within ${gapSinceLastDriving / 1000}s gap - continuing countdown")
                     Log.i("ActivityTracker", "   Accumulated: ${accumulatedDrivingTime / 1000}s, Remaining: ${remainingTime / 1000}s")
@@ -314,12 +330,16 @@ object ActivityTracker {
                     Log.i("ActivityTracker", "🎵 Accumulated ${accumulatedDrivingTime / 1000}s driving - playing travel dua now!")
                     playDrivingAudio()
                     resetDrivingAccumulation()
+                    // Set driving start time since user is now driving
+                    drivingStartTime = currentTime
                 }
             } else {
-                // FRESH START: New driving session (gap > 5 minutes or first time)
-                Log.i("ActivityTracker", "🚗 New driving session started - scheduling travel dua in ${ActivityDetectionConfig.DUA_PLAYBACK_DELAY_SECONDS}s")
-                if (gapSinceLastDriving >= GAP_TOLERANCE_MILLIS && drivingStopTime > 0) {
-                    Log.d("ActivityTracker", "   Gap was ${gapSinceLastDriving / 1000}s (> 5min) - resetting accumulation")
+                // FRESH START: New driving session (gap exceeds tolerance or first time)
+                val delaySeconds = travelDuaPlaybackDelayMillis / 1000
+                Log.i("ActivityTracker", "🚗 New driving session started - scheduling travel dua in ${delaySeconds}s")
+                if (gapSinceLastDriving >= travelDuaGapToleranceMillis && drivingStopTime > 0) {
+                    val gapToleranceMinutes = travelDuaGapToleranceMillis / 60000
+                    Log.d("ActivityTracker", "   Gap was ${gapSinceLastDriving / 1000}s (> ${gapToleranceMinutes}min) - resetting accumulation")
                 }
                 resetDrivingAccumulation()
                 drivingStartTime = currentTime
@@ -336,8 +356,9 @@ object ActivityTracker {
             accumulatedDrivingTime += sessionDrivingTime
             drivingStopTime = currentTime
 
+            val delaySeconds = travelDuaPlaybackDelayMillis / 1000
             Log.i("ActivityTracker", "🛑 Driving stopped after ${sessionDrivingTime / 1000}s")
-            Log.i("ActivityTracker", "   Total accumulated: ${accumulatedDrivingTime / 1000}s / ${ActivityDetectionConfig.DUA_PLAYBACK_DELAY_SECONDS}s needed")
+            Log.i("ActivityTracker", "   Total accumulated: ${accumulatedDrivingTime / 1000}s / ${delaySeconds}s needed")
 
             // Cancel pending dua - we'll reschedule with remaining time if driving resumes
             cancelPendingDua()
@@ -557,7 +578,7 @@ object ActivityTracker {
      * Schedule driving dua with full delay - user must stay in driving mode
      */
     private fun scheduleDrivingDuaWithDelay() {
-        scheduleDrivingDuaWithRemainingTime(ActivityDetectionConfig.DUA_PLAYBACK_DELAY_MILLIS)
+        scheduleDrivingDuaWithRemainingTime(travelDuaPlaybackDelayMillis)
     }
 
     /**
@@ -579,6 +600,10 @@ object ActivityTracker {
                 Log.i("ActivityTracker", "✅ Total driving time: ${totalDrivingTime}s - playing travel dua now!")
                 playDrivingAudio()
                 resetDrivingAccumulation()  // Reset after playing
+                // IMPORTANT: Reset driving start time since user is still driving
+                // This prevents session time from becoming huge when they stop later
+                drivingStartTime = System.currentTimeMillis()
+                Log.d("ActivityTracker", "🔄 Reset driving start time for continued driving session")
             } else {
                 Log.w("ActivityTracker", "⏭️ Skipping travel dua - user stopped driving after ${actualDelay}s (current: ${_currentActivity.value})")
             }
@@ -624,7 +649,8 @@ object ActivityTracker {
                     // Set cooldown timestamp ONLY when dua actually plays
                     // This ensures if user stops driving before dua plays, they can retry
                     lastDuaPlayTime = System.currentTimeMillis()
-                    Log.d("ActivityTracker", "🎵 Playing travel dua audio (cooldown started: ${ActivityDetectionConfig.DUA_COOLDOWN_MINUTES}min)")
+                    val cooldownMinutes = travelDuaCooldownMillis / 60000
+                    Log.d("ActivityTracker", "🎵 Playing travel dua audio (cooldown started: ${cooldownMinutes}min)")
                 } else {
                     Log.e("ActivityTracker", "Failed to find travel_dua.wav in resources")
                 }
@@ -715,6 +741,53 @@ object ActivityTracker {
     fun getNotificationMode(): NotificationMode {
         return _notificationMode.value
     }
+
+    // ============= Travel Dua Settings =============
+
+    /**
+     * Load travel dua settings from SharedPreferences
+     * Called during initialization to restore user preferences
+     */
+    private fun loadTravelDuaSettings(context: Context) {
+        try {
+            val prefs = context.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
+            travelDuaEnabled = prefs.getBoolean(TravelDuaSettings.KEY_ENABLED, true)
+            val cooldownMinutes = prefs.getInt(TravelDuaSettings.KEY_COOLDOWN_MINUTES, TravelDuaSettings.DEFAULT_COOLDOWN_MINUTES)
+            val playbackDelaySeconds = prefs.getInt(TravelDuaSettings.KEY_PLAYBACK_DELAY_SECONDS, TravelDuaSettings.DEFAULT_PLAYBACK_DELAY_SECONDS)
+            val gapToleranceMinutes = prefs.getInt(TravelDuaSettings.KEY_GAP_TOLERANCE_MINUTES, TravelDuaSettings.DEFAULT_GAP_TOLERANCE_MINUTES)
+
+            travelDuaCooldownMillis = cooldownMinutes * 60 * 1000L
+            travelDuaPlaybackDelayMillis = playbackDelaySeconds * 1000L
+            travelDuaGapToleranceMillis = gapToleranceMinutes * 60 * 1000L
+
+            Log.i("ActivityTracker", "🚗 Travel dua settings loaded: enabled=$travelDuaEnabled, cooldown=${cooldownMinutes}min, delay=${playbackDelaySeconds}s, gap=${gapToleranceMinutes}min")
+        } catch (e: Exception) {
+            Log.e("ActivityTracker", "❌ Failed to load travel dua settings, using defaults: ${e.message}")
+        }
+    }
+
+    /**
+     * Update travel dua settings from the settings screen
+     * Called when user changes settings in UnifiedSettingsScreen
+     */
+    fun updateTravelDuaSettings(settings: TravelDuaSettings) {
+        travelDuaEnabled = settings.enabled
+        travelDuaCooldownMillis = settings.cooldownMillis
+        travelDuaPlaybackDelayMillis = settings.playbackDelayMillis
+        travelDuaGapToleranceMillis = settings.gapToleranceMillis
+
+        Log.i("ActivityTracker", "🚗 Travel dua settings updated: enabled=${settings.enabled}, cooldown=${settings.cooldownMinutes}min, delay=${settings.playbackDelaySeconds}s, gap=${settings.gapToleranceMinutes}min")
+
+        // Reset accumulation when settings change to avoid confusion
+        resetDrivingAccumulation()
+        cancelPendingDua()
+        Log.d("ActivityTracker", "🔄 Reset driving accumulation due to settings change")
+    }
+
+    /**
+     * Check if travel dua feature is enabled
+     */
+    fun isTravelDuaEnabled(): Boolean = travelDuaEnabled
 
     // Deprecated methods - kept for backwards compatibility
     /**
