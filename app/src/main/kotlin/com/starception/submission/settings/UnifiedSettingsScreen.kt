@@ -35,6 +35,7 @@ import com.starception.submission.settings.components.DeveloperSettingsSection
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
+import com.starception.submission.settings.components.TravelDuaSection
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +50,7 @@ fun UnifiedSettingsScreen(
     val showRestoreOption by viewModel.showRestoreOption.collectAsStateWithLifecycle()
     val autoDetectedCountryName by viewModel.autoDetectedCountryName.collectAsStateWithLifecycle()
     val notificationPreferences by viewModel.notificationPreferences.collectAsStateWithLifecycle()
+    val travelDuaSettings by viewModel.travelDuaSettings.collectAsStateWithLifecycle()
     val developerSettings by viewModel.developerSettings.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -133,6 +135,21 @@ fun UnifiedSettingsScreen(
                         NotificationsSection(
                             preferences = notificationPreferences,
                             onPreferencesChanged = viewModel::updateNotificationPreferences
+                        )
+                    }
+                }
+
+                // Travel Dua Section
+                item {
+                    SettingsSection(
+                        title = "Travel Dua",
+                        icon = Icons.Outlined.Schedule,
+                        isExpanded = expandedSections.contains("traveldua"),
+                        onToggleExpanded = { viewModel.toggleSection("traveldua") }
+                    ) {
+                        TravelDuaSection(
+                            settings = travelDuaSettings,
+                            onSettingsChanged = viewModel::updateTravelDuaSettings
                         )
                     }
                 }

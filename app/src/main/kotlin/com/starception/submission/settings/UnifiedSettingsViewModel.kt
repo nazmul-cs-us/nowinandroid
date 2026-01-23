@@ -12,9 +12,11 @@ import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.topicsdatabase.TopicsDatabase
+import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
+import com.starception.submission.util.ActivityTracker
 import com.starception.submission.prayer.service.PrayerNotificationServiceManager
 import com.starception.submission.settings.components.DatabaseDisplayInfo
 import com.starception.submission.settings.components.DeveloperSettingsState
@@ -91,6 +93,10 @@ class UnifiedSettingsViewModel @Inject constructor(
     private val _notificationPreferences = MutableStateFlow(PrayerNotificationPreferences())
     val notificationPreferences: StateFlow<PrayerNotificationPreferences> = _notificationPreferences.asStateFlow()
 
+    // Travel Dua settings
+    private val _travelDuaSettings = MutableStateFlow(TravelDuaSettings())
+    val travelDuaSettings: StateFlow<TravelDuaSettings> = _travelDuaSettings.asStateFlow()
+
     // Developer settings state
     private val _developerSettings = MutableStateFlow(DeveloperSettingsState())
     val developerSettings: StateFlow<DeveloperSettingsState> = _developerSettings.asStateFlow()
@@ -98,6 +104,7 @@ class UnifiedSettingsViewModel @Inject constructor(
     init {
         loadPrayerSettings()
         loadNotificationPreferences()
+        loadTravelDuaSettings()
         loadDatabaseInfo()
     }
 
@@ -227,6 +234,52 @@ class UnifiedSettingsViewModel @Inject constructor(
             // Trigger notification reschedule
             PrayerNotificationServiceManager.rescheduleNotificationsWithNewSettings(context)
             Log.i(TAG, "Triggered notification reschedule")
+        }
+    }
+
+    // ============= Travel Dua Settings =============
+
+    private fun loadTravelDuaSettings() {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "Loading travel dua settings...")
+                val prefs = context.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
+                val settings = TravelDuaSettings(
+                    enabled = prefs.getBoolean(TravelDuaSettings.KEY_ENABLED, true),
+                    cooldownMinutes = prefs.getInt(TravelDuaSettings.KEY_COOLDOWN_MINUTES, TravelDuaSettings.DEFAULT_COOLDOWN_MINUTES),
+                    playbackDelaySeconds = prefs.getInt(TravelDuaSettings.KEY_PLAYBACK_DELAY_SECONDS, TravelDuaSettings.DEFAULT_PLAYBACK_DELAY_SECONDS),
+                    gapToleranceMinutes = prefs.getInt(TravelDuaSettings.KEY_GAP_TOLERANCE_MINUTES, TravelDuaSettings.DEFAULT_GAP_TOLERANCE_MINUTES)
+                )
+                _travelDuaSettings.value = settings
+                Log.i(TAG, "Travel dua settings loaded: enabled=${settings.enabled}, cooldown=${settings.cooldownMinutes}min, delay=${settings.playbackDelaySeconds}s, gap=${settings.gapToleranceMinutes}min")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading travel dua settings", e)
+            }
+        }
+    }
+
+    fun updateTravelDuaSettings(settings: TravelDuaSettings) {
+        viewModelScope.launch {
+            try {
+                _travelDuaSettings.value = settings
+
+                // Save to SharedPreferences
+                val prefs = context.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putBoolean(TravelDuaSettings.KEY_ENABLED, settings.enabled)
+                    .putInt(TravelDuaSettings.KEY_COOLDOWN_MINUTES, settings.cooldownMinutes)
+                    .putInt(TravelDuaSettings.KEY_PLAYBACK_DELAY_SECONDS, settings.playbackDelaySeconds)
+                    .putInt(TravelDuaSettings.KEY_GAP_TOLERANCE_MINUTES, settings.gapToleranceMinutes)
+                    .apply()
+
+                Log.i(TAG, "Travel dua settings saved: enabled=${settings.enabled}, cooldown=${settings.cooldownMinutes}min, delay=${settings.playbackDelaySeconds}s, gap=${settings.gapToleranceMinutes}min")
+
+                // Update ActivityTracker with new settings
+                ActivityTracker.updateTravelDuaSettings(settings)
+                Log.i(TAG, "ActivityTracker updated with new travel dua settings")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving travel dua settings", e)
+            }
         }
     }
 
