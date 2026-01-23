@@ -81,6 +81,11 @@ class PrayerNotificationService : Service() {
     private var currentActivity: String = "UNKNOWN"
     private var activityReceiver: ActivityTransitionReceiver? = null
     private var toneGenerator: ToneGenerator? = null
+
+    // HandlerThread for sensor callbacks - CRITICAL for background activity detection
+    // Android 9+ throttles sensors for background apps, but foreground service handlers work
+    private var sensorHandlerThread: android.os.HandlerThread? = null
+    private var sensorHandler: android.os.Handler? = null
     
     companion object {
         private const val TAG = "PrayerNotificationService"
@@ -160,9 +165,24 @@ class PrayerNotificationService : Service() {
             }
             
             // Initialize ActivityTracker with sensor-based detection
+            // CRITICAL: Create HandlerThread for sensor callbacks FIRST
+            // This ensures sensors deliver updates even when app is in background (Android 9+)
             try {
+                // Create HandlerThread for sensor callbacks within foreground service context
+                if (sensorHandlerThread == null) {
+                    sensorHandlerThread = android.os.HandlerThread("ForegroundSensorThread", Thread.MAX_PRIORITY)
+                    sensorHandlerThread!!.start()
+                    sensorHandler = android.os.Handler(sensorHandlerThread!!.looper)
+                    Log.i(TAG, "✅ Created foreground service HandlerThread for sensor callbacks")
+                }
+
+                // Pass handler to ActivityTracker BEFORE starting detection
+                ActivityTracker.setSensorHandler(sensorHandler)
+                Log.d(TAG, "✓ Sensor handler passed to ActivityTracker")
+
+                // Now initialize ActivityTracker - it will use our foreground service handler
                 ActivityTracker.initialize(this, startDetectionNow = true)
-                Log.d(TAG, "✓ ActivityTracker initialized with sensor-based detection")
+                Log.d(TAG, "✓ ActivityTracker initialized with FOREGROUND SERVICE sensor handler (background-ready)")
 
                 // Register callback to update notification icon when activity changes
                 ActivityTracker.setActivityChangeCallback { newActivity ->
@@ -206,8 +226,10 @@ class PrayerNotificationService : Service() {
 
             // Clear any old/legacy notifications that may be lingering
             // ID 1003 was previously used for separate activity change notifications (now merged into main)
+            // ID 3001 was used by ActivityBasedDuaService (now merged into this service)
             notificationManager.cancel(1003)
-            Log.d(TAG, "🧹 Cleared legacy activity notification (ID 1003)")
+            notificationManager.cancel(3001)
+            Log.d(TAG, "🧹 Cleared legacy notifications (ID 1003 and 3001)")
 
             // Mark service as running IMMEDIATELY
             isServiceRunning = true
@@ -1816,12 +1838,23 @@ class PrayerNotificationService : Service() {
             // Stop ActivityTracker sensor detection and clear callback
             try {
                 ActivityTracker.setActivityChangeCallback(null)  // Clear callback first
+                ActivityTracker.setSensorHandler(null)  // Clear sensor handler
                 ActivityTracker.stopDetection()
                 Log.d(TAG, "✓ ActivityTracker detection stopped and callback cleared")
             } catch (e: Exception) {
                 Log.w(TAG, "Error stopping ActivityTracker", e)
             }
-            
+
+            // Clean up HandlerThread for sensor callbacks
+            try {
+                sensorHandlerThread?.quitSafely()
+                sensorHandlerThread = null
+                sensorHandler = null
+                Log.d(TAG, "✓ Sensor HandlerThread cleaned up")
+            } catch (e: Exception) {
+                Log.w(TAG, "Error cleaning up sensor HandlerThread", e)
+            }
+
             Log.d(TAG, "Modern service cleanup completed successfully")
             
         } catch (e: Exception) {

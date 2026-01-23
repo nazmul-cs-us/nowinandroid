@@ -66,6 +66,11 @@ object ActivityTracker {
     private var mediaPlayer: MediaPlayer? = null
     private var previousActivity: String = ""
 
+    // Handler for sensor callbacks from foreground service
+    // CRITICAL: Using a Handler from a foreground service ensures sensors deliver
+    // updates even when the app is in background (Android 9+ throttles background sensors)
+    private var sensorHandler: android.os.Handler? = null
+
     // Foreground state tracking - only play sound/vibration when app is visible
     private var isAppInForeground = false
     private var lifecycleObserverRegistered = false
@@ -86,6 +91,20 @@ object ActivityTracker {
      * Check if Smart Activity tile is currently in focus
      */
     fun isSmartActivityTileInFocus(): Boolean = isSmartActivityTileInFocus
+
+    /**
+     * Set the sensor handler from a foreground service
+     * CRITICAL FOR BACKGROUND OPERATION:
+     * Android 9+ throttles sensor delivery for background apps. By passing a Handler
+     * from a foreground service, sensors will continue to deliver at full rate
+     * even when the app is closed.
+     *
+     * @param handler Handler from foreground service's HandlerThread
+     */
+    fun setSensorHandler(handler: android.os.Handler?) {
+        sensorHandler = handler
+        Log.i("ActivityTracker", "🔧 Sensor handler ${if (handler != null) "SET from foreground service" else "CLEARED"}")
+    }
 
     // Callback for activity change (used to update notification immediately)
     private var activityChangeCallback: ((String) -> Unit)? = null
@@ -193,8 +212,8 @@ object ActivityTracker {
 
         // Check if we have required permissions
         if (activityDetectionService?.hasRequiredPermissions() == true) {
-            // Start activity detection with callback to update our state
-            activityDetectionService?.startDetection(object : ActivityDetectionService.ActivityChangeCallback {
+            // Create callback for activity changes
+            val callback = object : ActivityDetectionService.ActivityChangeCallback {
                 override fun onActivityChanged(
                     newActivity: ActivityDetectionService.ActivityType,
                     previousActivity: ActivityDetectionService.ActivityType
@@ -205,9 +224,19 @@ object ActivityTracker {
                     // Play beep sound when activity changes
                     playActivityChangeBeep()
                 }
-            })
+            }
+
+            // Start activity detection with handler for background operation
+            // If sensorHandler is set (from foreground service), sensors will work in background
+            if (sensorHandler != null) {
+                activityDetectionService?.startDetection(callback, sensorHandler)
+                Log.i("ActivityTracker", "🚀 Activity detection STARTED with FOREGROUND SERVICE handler (background-ready)")
+            } else {
+                // Fallback to internal handler (may not work reliably in background)
+                activityDetectionService?.startDetection(callback)
+                Log.w("ActivityTracker", "⚠️ Activity detection STARTED with INTERNAL handler (may not work in background)")
+            }
             _currentActivity.value = "Detecting..."
-            Log.i("ActivityTracker", "🚀 Activity detection STARTED (user on Smart Tracking tile)")
         } else {
             // Provide more specific feedback about which permissions are missing
             val missingPermissions = getMissingPermissions(context!!)
