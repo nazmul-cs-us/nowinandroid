@@ -69,7 +69,7 @@ class PrayerNotificationWorker @AssistedInject constructor(
         const val TYPE_REMINDER = "reminder"
 
         // Default prior minutes (fallback)
-        const val DEFAULT_PRIOR_MINUTES = 20
+        const val DEFAULT_PRIOR_MINUTES = 10
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {

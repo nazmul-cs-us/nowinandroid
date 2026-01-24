@@ -48,7 +48,7 @@ object PrayerNotificationScheduler {
         context: Context,
         prayerName: String,
         prayerTime: String,
-        reminderMinutes: Int = 20
+        reminderMinutes: Int = 10
     ) {
         try {
             Log.d(TAG, "📅 Scheduling prayer notification: $prayerName at $prayerTime")
@@ -113,7 +113,7 @@ object PrayerNotificationScheduler {
     fun scheduleAllPrayerNotifications(
         context: Context,
         prayerTimes: Map<String, String>,
-        reminderMinutes: Int = 20
+        reminderMinutes: Int = 10
     ) {
         Log.d(TAG, "📅 Scheduling all prayer notifications for today")
         
@@ -219,7 +219,7 @@ object PrayerNotificationScheduler {
         notificationTime: LocalDateTime,
         notificationType: String,
         requestCode: Int,
-        priorMinutes: Int = 20
+        priorMinutes: Int = 10
     ) {
         val currentTime = LocalDateTime.now()
 
@@ -248,7 +248,7 @@ object PrayerNotificationScheduler {
         prayerTime: String,
         notificationType: String,
         delayMillis: Long,
-        priorMinutes: Int = 20
+        priorMinutes: Int = 10
     ) {
         val inputData = Data.Builder()
             .putString(PrayerNotificationWorker.PRAYER_NAME_KEY, prayerName)
@@ -284,7 +284,7 @@ object PrayerNotificationScheduler {
         notificationType: String,
         notificationTime: LocalDateTime,
         requestCode: Int,
-        priorMinutes: Int = 20
+        priorMinutes: Int = 10
     ) {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -350,7 +350,7 @@ object PrayerNotificationScheduler {
         prayerName: String,
         prayerTime: String,
         notificationType: String,
-        priorMinutes: Int = 20
+        priorMinutes: Int = 10
     ): Intent {
         return Intent(context, com.starception.submission.prayer.receiver.PrayerNotificationReceiver::class.java).apply {
             putExtra(PrayerNotificationWorker.PRAYER_NAME_KEY, prayerName)
