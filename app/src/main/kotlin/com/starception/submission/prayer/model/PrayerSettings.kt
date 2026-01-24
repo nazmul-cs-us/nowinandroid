@@ -103,17 +103,17 @@ data class PrayerNotificationPreferences(
     val ishaNotificationEnabled: Boolean = true,    // Isha notification toggle
 
     // PER-PRAYER PRIOR NOTIFICATION TIME (minutes before prayer to send reminder)
-    val fajrPriorMinutes: Int = 20,     // Minutes before Fajr to send reminder
-    val dhuhrPriorMinutes: Int = 20,    // Minutes before Dhuhr to send reminder
-    val asrPriorMinutes: Int = 20,      // Minutes before Asr to send reminder
-    val maghribPriorMinutes: Int = 20,  // Minutes before Maghrib to send reminder
-    val ishaPriorMinutes: Int = 20,     // Minutes before Isha to send reminder
+    val fajrPriorMinutes: Int = 10,     // Minutes before Fajr to send reminder
+    val dhuhrPriorMinutes: Int = 10,    // Minutes before Dhuhr to send reminder
+    val asrPriorMinutes: Int = 10,      // Minutes before Asr to send reminder
+    val maghribPriorMinutes: Int = 10,  // Minutes before Maghrib to send reminder
+    val ishaPriorMinutes: Int = 10,     // Minutes before Isha to send reminder
 
     // PER-PRAYER "GO TO MOSQUE" PHASE DURATION (minutes after prayer starts)
     val fajrGoToMosqueDuration: Int = 20,     // Fajr go-to-mosque phase duration
     val dhuhrGoToMosqueDuration: Int = 20,    // Dhuhr go-to-mosque phase duration
     val asrGoToMosqueDuration: Int = 20,      // Asr go-to-mosque phase duration
-    val maghribGoToMosqueDuration: Int = 20,  // Maghrib go-to-mosque phase duration
+    val maghribGoToMosqueDuration: Int = 10,  // Maghrib go-to-mosque phase duration (shorter due to short window)
     val ishaGoToMosqueDuration: Int = 20      // Isha go-to-mosque phase duration
 ) {
     /**
@@ -143,7 +143,7 @@ data class PrayerNotificationPreferences(
             "asr" -> asrPriorMinutes
             "maghrib" -> maghribPriorMinutes
             "isha" -> ishaPriorMinutes
-            else -> 20 // Default 20 minutes
+            else -> 10 // Default 10 minutes
         }
     }
 
@@ -157,7 +157,7 @@ data class PrayerNotificationPreferences(
             "asr" -> asrGoToMosqueDuration
             "maghrib" -> maghribGoToMosqueDuration
             "isha" -> ishaGoToMosqueDuration
-            else -> 20 // Default 20 minutes
+            else -> 20 // Default 20 minutes for go-to-mosque phase
         }
     }
 }
