@@ -52,7 +52,13 @@ object GoogleSampleNotificationManager {
 
     const val CHANNEL_ID = "google_live_updates_channel_id"
     private const val CHANNEL_NAME = "Google Live Updates Test"
-    private const val NOTIFICATION_ID = 1001 // Must match PrayerNotificationService.NOTIFICATION_ID to replace foreground notification
+    const val NOTIFICATION_ID = 1001 // Must match PrayerNotificationService.NOTIFICATION_ID for foreground service
+
+    /**
+     * Get the notification ID used for Live Update notifications.
+     * This should be used with startForeground() in the service.
+     */
+    fun getNotificationId(): Int = NOTIFICATION_ID
 
     // SharedPreferences keys for persistent storage
     private const val PREFS_NAME = "adhan_tracker_prefs"
@@ -321,9 +327,16 @@ object GoogleSampleNotificationManager {
         android.util.Log.d("GoogleSampleNotificationManager", "Posted single test notification")
     }
     
+    /**
+     * Builds and returns a prayer notification WITHOUT posting it.
+     * The caller (PrayerNotificationService) should use startForeground() with this notification
+     * to maintain foreground service priority.
+     *
+     * @return The built Notification object ready for startForeground()
+     */
     @RequiresApi(35) // Android 16+ (BAKLAVA = 35)
-    fun postPrayerNotification(title: String, content: String, detailedMessage: String = "", progress: Int, prayerPhase: String = "", prayerName: String = "", prayerTime: String = "") {
-        android.util.Log.d("GoogleSampleNotificationManager", "Posting Progress-Centric prayer notification...")
+    fun buildPrayerNotification(title: String, content: String, detailedMessage: String = "", progress: Int, prayerPhase: String = "", prayerName: String = "", prayerTime: String = ""): android.app.Notification {
+        android.util.Log.d("GoogleSampleNotificationManager", "Building Progress-Centric prayer notification (for startForeground)...")
         
         // Store current prayer information for action buttons
         if (prayerName.isNotEmpty()) {
@@ -607,9 +620,25 @@ object GoogleSampleNotificationManager {
         }
         
         val notification = notificationBuilder.build()
-        
+
+        android.util.Log.d("GoogleSampleNotificationManager", "Built Progress-Centric prayer notification: $title - $shortCriticalText ($progress%)")
+        return notification
+    }
+
+    /**
+     * Legacy method that posts notification directly via notificationManager.notify()
+     * WARNING: This method removes FOREGROUND_SERVICE flag and should NOT be used
+     * for foreground service notifications. Use buildPrayerNotification() instead.
+     *
+     * @deprecated Use buildPrayerNotification() and startForeground() to maintain foreground service priority
+     */
+    @Deprecated("Use buildPrayerNotification() with startForeground() to maintain foreground service priority")
+    @RequiresApi(35)
+    fun postPrayerNotification(title: String, content: String, detailedMessage: String = "", progress: Int, prayerPhase: String = "", prayerName: String = "", prayerTime: String = "") {
+        android.util.Log.w("GoogleSampleNotificationManager", "⚠️ Using deprecated postPrayerNotification - this removes FOREGROUND_SERVICE flag!")
+        val notification = buildPrayerNotification(title, content, detailedMessage, progress, prayerPhase, prayerName, prayerTime)
         notificationManager.notify(NOTIFICATION_ID, notification)
-        android.util.Log.d("GoogleSampleNotificationManager", "Posted Progress-Centric prayer notification: $title - $shortCriticalText ($progress%)")
+        android.util.Log.d("GoogleSampleNotificationManager", "Posted notification via notify() - foreground priority may be lost!")
     }
     
     /**

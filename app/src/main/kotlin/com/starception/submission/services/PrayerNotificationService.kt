@@ -754,7 +754,10 @@ class PrayerNotificationService : Service() {
                     // ONLY use Google's proven Live Update system for Android 16+
                     if (Build.VERSION.SDK_INT >= 35) {
                         try {
-                            GoogleSampleNotificationManager.postPrayerNotification(
+                            // FIX: Build notification and use startForeground() to maintain foreground service priority
+                            // Previously using postPrayerNotification() which called notify() directly,
+                            // removing the FOREGROUND_SERVICE flag and causing OOM adj to spike to 915
+                            val liveUpdateNotification = GoogleSampleNotificationManager.buildPrayerNotification(
                                 title = title,
                                 content = content,
                                 detailedMessage = detailedMessage,
@@ -763,11 +766,15 @@ class PrayerNotificationService : Service() {
                                 prayerName = prayerName,
                                 prayerTime = prayerTime
                             )
-                            Log.d(TAG, "🧪 Posted SINGLE prayer notification via Google Live Update system with phase: $prayerPhase, real progress: ${progress}%")
 
-                            // Log notification update to file
+                            // Use startForeground() to update notification while maintaining foreground service priority
+                            // This keeps OOM adj at ~200 instead of 915, preventing system from killing the service
+                            startForeground(NOTIFICATION_ID, liveUpdateNotification)
+                            Log.d(TAG, "🧪 Updated foreground notification via startForeground() with phase: $prayerPhase, real progress: ${progress}%")
+
+                            // Log notification update to file - now using startForeground() to maintain priority
                             FileLogger.logPrayerEvent(
-                                event = "NOTIFICATION_POSTED",
+                                event = "FOREGROUND_NOTIFICATION_UPDATED",
                                 prayerName = prayerName,
                                 actualTime = java.time.LocalTime.now().toString(),
                                 details = mapOf(
@@ -775,7 +782,8 @@ class PrayerNotificationService : Service() {
                                     "progress" to progress,
                                     "title" to title,
                                     "content" to content,
-                                    "prayerTime" to prayerTime
+                                    "prayerTime" to prayerTime,
+                                    "method" to "startForeground"
                                 )
                             )
                         } catch (e: Exception) {
