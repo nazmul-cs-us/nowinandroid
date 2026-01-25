@@ -96,6 +96,7 @@ class NiaPreferencesDataSource @Inject constructor(
                 useDynamicColor = it.useDynamicColor,
                 shouldHideOnboarding = it.shouldHideOnboarding,
                 newsResourceLastOpenedTimes = it.newsResourceLastOpenedTimestampsMap,
+                topicOrder = it.topicOrderIdsList,
             )
         }
 
@@ -306,6 +307,32 @@ class NiaPreferencesDataSource @Inject constructor(
     suspend fun setShouldHideOnboarding(shouldHideOnboarding: Boolean) {
         userPreferences.updateData {
             it.copy { this.shouldHideOnboarding = shouldHideOnboarding }
+        }
+    }
+
+    suspend fun setTopicOrder(topicIds: List<String>) {
+        logDataStoreOperation(
+            operation = "SET_TOPIC_ORDER",
+            key = "topicOrderIds",
+            value = topicIds,
+            details = "Setting custom topic order with ${topicIds.size} topics"
+        )
+
+        try {
+            userPreferences.updateData {
+                it.copy {
+                    topicOrderIds.clear()
+                    topicOrderIds.addAll(topicIds)
+                }
+            }
+
+            verifyDataStoreWrite(
+                operation = "SET_TOPIC_ORDER",
+                expectedResult = "Topic order saved with ${topicIds.size} topics"
+            )
+        } catch (ioException: IOException) {
+            Log.e(TAG, "❌ DATASTORE ERROR: Failed to update topic order", ioException)
+            Log.e(TAG, "❌ Attempted to store: $topicIds")
         }
     }
 }

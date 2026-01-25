@@ -26,6 +26,7 @@ android {
 dependencies {
     implementation(projects.core.data)
     implementation(projects.core.domain)
+    implementation(libs.reorderable)
 
     testImplementation(projects.core.testing)
     testImplementation(libs.robolectric)

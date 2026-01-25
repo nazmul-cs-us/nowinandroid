@@ -112,6 +112,12 @@ class TestUserDataRepository : UserDataRepository {
         }
     }
 
+    override suspend fun setTopicOrder(topicIds: List<String>) {
+        currentUserData.let { current ->
+            _userData.tryEmit(current.copy(topicOrder = topicIds))
+        }
+    }
+
     /**
      * A test-only API to allow setting of user data directly.
      */

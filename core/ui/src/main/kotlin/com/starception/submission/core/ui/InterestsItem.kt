@@ -18,23 +18,28 @@ package com.starception.submission.core.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.starception.submission.core.designsystem.component.DynamicAsyncImage
 import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaIconToggleButton
@@ -53,6 +58,9 @@ fun InterestsItem(
     iconModifier: Modifier = Modifier,
     description: String = "",
     isSelected: Boolean = false,
+    isDraggable: Boolean = false,
+    isDragging: Boolean = false,
+    dragHandleModifier: Modifier = Modifier,
 ) {
     // Check if name or description contains Arabic text
     val nameContainsArabic = name.any { it in '\u0600'..'\u06FF' }
@@ -70,7 +78,19 @@ fun InterestsItem(
 
     ListItem(
         leadingContent = {
-            InterestsIcon(topicImageUrl, iconModifier.size(48.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isDraggable) {
+                    Icon(
+                        imageVector = NiaIcons.DragHandle,
+                        contentDescription = stringResource(id = string.core_ui_drag_handle_content_desc),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = dragHandleModifier
+                            .padding(end = 8.dp)
+                            .size(24.dp),
+                    )
+                }
+                InterestsIcon(topicImageUrl, iconModifier.size(48.dp))
+            }
         },
         headlineContent = {
             Text(
@@ -121,16 +141,21 @@ fun InterestsItem(
             )
         },
         colors = ListItemDefaults.colors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.surfaceVariant
-            } else {
-                Color.Transparent
+            containerColor = when {
+                isDragging -> MaterialTheme.colorScheme.primaryContainer
+                isSelected -> MaterialTheme.colorScheme.surfaceVariant
+                else -> Color.Transparent
             },
         ),
         modifier = modifier
             .semantics(mergeDescendants = true) {
                 selected = isSelected
             }
+            .graphicsLayer {
+                // Elevation effect when dragging
+                shadowElevation = if (isDragging) 8f else 0f
+            }
+            .zIndex(if (isDragging) 1f else 0f)
             .clickable(enabled = true, onClick = onClick),
     )
 }

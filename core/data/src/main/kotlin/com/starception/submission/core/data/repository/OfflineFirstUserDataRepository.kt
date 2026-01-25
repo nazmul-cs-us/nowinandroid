@@ -72,4 +72,8 @@ internal class OfflineFirstUserDataRepository @Inject constructor(
         niaPreferencesDataSource.setShouldHideOnboarding(shouldHideOnboarding)
         analyticsHelper.logOnboardingStateChanged(shouldHideOnboarding)
     }
+
+    override suspend fun setTopicOrder(topicIds: List<String>) {
+        niaPreferencesDataSource.setTopicOrder(topicIds)
+    }
 }

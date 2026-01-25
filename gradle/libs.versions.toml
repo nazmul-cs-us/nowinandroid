@@ -64,6 +64,7 @@ room = "2.7.2"
 secrets = "2.0.1"
 truth = "1.4.4"
 turbine = "1.2.0"
+reorderable = "2.4.3"
 
 [bundles]
 androidx-compose-ui-test = ["androidx-compose-ui-test", "androidx-compose-ui-testManifest"]
@@ -164,6 +165,7 @@ room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 
 # Dependencies of the included build-logic
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "androidGradlePlugin" }
