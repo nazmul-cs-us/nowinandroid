@@ -52,5 +52,8 @@ message UserPreferences {
     // Stores the last opened timestamp (epoch millis) for each news resource
     map<string, int64> news_resource_last_opened_timestamps = 21;
 
-    // NEXT AVAILABLE ID: 22
+    // Stores the user-defined order of topic IDs for the Interests page
+    repeated string topic_order_ids = 22;
+
+    // NEXT AVAILABLE ID: 23
 }

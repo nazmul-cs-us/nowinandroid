@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.Bookmarks
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Grid3x3
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
@@ -54,6 +55,7 @@ object NiaIcons {
     val BookmarksBorder = Icons.Outlined.Bookmarks
     val Check = Icons.Rounded.Check
     val Close = Icons.Rounded.Close
+    val DragHandle = Icons.Rounded.DragHandle
     val Grid3x3 = Icons.Rounded.Grid3x3
     val MoreVert = Icons.Default.MoreVert
     val Person = Icons.Rounded.Person

@@ -50,6 +50,7 @@ fun InterestsRoute(
             viewModel.onTopicClick(it)
             onTopicClick(it)
         },
+        onReorderComplete = viewModel::setTopicOrder,
         shouldHighlightSelectedTopic = shouldHighlightSelectedTopic,
         modifier = modifier,
     )
@@ -61,6 +62,7 @@ internal fun InterestsScreen(
     followTopic: (String, Boolean) -> Unit,
     onTopicClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onReorderComplete: ((newOrder: List<String>) -> Unit)? = null,
     shouldHighlightSelectedTopic: Boolean = false,
 ) {
     Column(
@@ -80,6 +82,8 @@ internal fun InterestsScreen(
                     onFollowButtonClick = followTopic,
                     selectedTopicId = uiState.selectedTopicId,
                     shouldHighlightSelectedTopic = shouldHighlightSelectedTopic,
+                    isDraggable = onReorderComplete != null,
+                    onReorderComplete = onReorderComplete,
                 )
 
             is InterestsUiState.Empty -> InterestsEmptyScreen()

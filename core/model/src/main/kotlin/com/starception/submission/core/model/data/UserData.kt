@@ -61,4 +61,5 @@ data class UserData(
     val useDynamicColor: Boolean,
     val shouldHideOnboarding: Boolean,
     val newsResourceLastOpenedTimes: Map<String, Long> = emptyMap(),
+    val topicOrder: List<String> = emptyList(),
 )

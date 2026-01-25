@@ -29,6 +29,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -49,11 +50,23 @@ class InterestsViewModel @Inject constructor(
         initialValue = interestsRoute.initialTopicId,
     )
 
+    // Custom order from persistent DataStore
+    private val customTopicOrder = userDataRepository.userData.map { it.topicOrder }
+
     val uiState: StateFlow<InterestsUiState> = combine(
         selectedTopicId,
         getFollowableTopics(sortBy = TopicSortField.NAME),
-        InterestsUiState::Interests,
-    ).stateIn(
+        customTopicOrder,
+    ) { selectedId, topics, customOrder ->
+        // Apply custom order if available, otherwise use default order
+        val orderedTopics = if (customOrder.isNotEmpty()) {
+            val orderMap = customOrder.withIndex().associate { it.value to it.index }
+            topics.sortedBy { orderMap[it.topic.id] ?: Int.MAX_VALUE }
+        } else {
+            topics
+        }
+        InterestsUiState.Interests(selectedId, orderedTopics)
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = InterestsUiState.Loading,
@@ -67,6 +80,16 @@ class InterestsViewModel @Inject constructor(
 
     fun onTopicClick(topicId: String?) {
         savedStateHandle[selectedTopicIdKey] = topicId
+    }
+
+    /**
+     * Sets the topic order directly from a list of topic IDs.
+     * Called when drag-and-drop reordering is complete.
+     */
+    fun setTopicOrder(newOrder: List<String>) {
+        viewModelScope.launch {
+            userDataRepository.setTopicOrder(newOrder)
+        }
     }
 }
 

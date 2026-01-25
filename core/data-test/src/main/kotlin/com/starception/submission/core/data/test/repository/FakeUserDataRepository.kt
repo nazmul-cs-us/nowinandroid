@@ -65,4 +65,8 @@ class FakeUserDataRepository @Inject constructor(
     override suspend fun setShouldHideOnboarding(shouldHideOnboarding: Boolean) {
         niaPreferencesDataSource.setShouldHideOnboarding(shouldHideOnboarding)
     }
+
+    override suspend fun setTopicOrder(topicIds: List<String>) {
+        niaPreferencesDataSource.setTopicOrder(topicIds)
+    }
 }

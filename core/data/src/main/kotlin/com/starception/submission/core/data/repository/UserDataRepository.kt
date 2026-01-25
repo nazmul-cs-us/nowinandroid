@@ -224,4 +224,19 @@ interface UserDataRepository {
      * @param shouldHideOnboarding True to hide onboarding, false to show
      */
     suspend fun setShouldHideOnboarding(shouldHideOnboarding: Boolean)
+
+    /**
+     * TOPIC ORDER: Sets the custom display order for topics in the Interests page
+     *
+     * This allows users to reorder topics via drag-and-drop, persisting their
+     * preferred arrangement across app restarts.
+     *
+     * BEHAVIOR:
+     * - Replaces existing order with new list
+     * - Empty list resets to default alphabetical order
+     * - Triggers userData Flow update
+     *
+     * @param topicIds Ordered list of topic IDs
+     */
+    suspend fun setTopicOrder(topicIds: List<String>)
 }
