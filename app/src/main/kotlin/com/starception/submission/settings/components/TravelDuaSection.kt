@@ -135,11 +135,25 @@ fun TravelDuaSection(
                     }
                 )
 
+                // Driving speed threshold setting
+                TravelDuaSliderItem(
+                    label = "Speed Threshold",
+                    description = "Min speed to detect driving (lower = more sensitive)",
+                    value = settings.drivingSpeedThresholdKmh,
+                    minValue = 10,
+                    maxValue = 40,
+                    unit = "km/h",
+                    onValueChange = { value ->
+                        onSettingsChanged(settings.copy(drivingSpeedThresholdKmh = value))
+                    }
+                )
+
                 // Info text
                 Text(
                     text = "The travel dua will play after driving continuously for ${settings.playbackDelaySeconds} seconds. " +
                             "Brief stops under ${settings.gapToleranceMinutes} minutes (like traffic lights) won't reset the timer. " +
-                            "After playing, the dua won't repeat for ${settings.cooldownMinutes} minutes.",
+                            "After playing, the dua won't repeat for ${settings.cooldownMinutes} minutes. " +
+                            "Driving is detected when speed exceeds ${settings.drivingSpeedThresholdKmh} km/h.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp)

@@ -31,12 +31,24 @@ data class TravelDuaSettings(
      * This handles traffic lights and brief stops
      * Default: 5 minutes
      */
-    val gapToleranceMinutes: Int = 5
+    val gapToleranceMinutes: Int = 5,
+
+    /**
+     * Minimum speed in km/h required to detect driving activity
+     * Lower values detect slower driving (traffic, parking lots)
+     * Higher values avoid false positives from GPS drift
+     * Default: 10 km/h (sensitive - detects slow driving in traffic/parking)
+     * Range: 10-40 km/h
+     */
+    val drivingSpeedThresholdKmh: Int = 10
 ) {
     // Computed properties for milliseconds
     val cooldownMillis: Long get() = cooldownMinutes * 60 * 1000L
     val playbackDelayMillis: Long get() = playbackDelaySeconds * 1000L
     val gapToleranceMillis: Long get() = gapToleranceMinutes * 60 * 1000L
+
+    // Computed property for speed threshold in m/s (used by ActivityDetectionService)
+    val drivingSpeedThresholdMps: Double get() = drivingSpeedThresholdKmh / 3.6
 
     companion object {
         // Keys for SharedPreferences
@@ -45,10 +57,12 @@ data class TravelDuaSettings(
         const val KEY_COOLDOWN_MINUTES = "travel_dua_cooldown_minutes"
         const val KEY_PLAYBACK_DELAY_SECONDS = "travel_dua_playback_delay_seconds"
         const val KEY_GAP_TOLERANCE_MINUTES = "travel_dua_gap_tolerance_minutes"
+        const val KEY_DRIVING_SPEED_THRESHOLD_KMH = "travel_dua_driving_speed_threshold_kmh"
 
         // Default values
         const val DEFAULT_COOLDOWN_MINUTES = 5
         const val DEFAULT_PLAYBACK_DELAY_SECONDS = 60
         const val DEFAULT_GAP_TOLERANCE_MINUTES = 5
+        const val DEFAULT_DRIVING_SPEED_THRESHOLD_KMH = 10
     }
 }

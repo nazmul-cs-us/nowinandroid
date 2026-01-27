@@ -248,10 +248,11 @@ class UnifiedSettingsViewModel @Inject constructor(
                     enabled = prefs.getBoolean(TravelDuaSettings.KEY_ENABLED, true),
                     cooldownMinutes = prefs.getInt(TravelDuaSettings.KEY_COOLDOWN_MINUTES, TravelDuaSettings.DEFAULT_COOLDOWN_MINUTES),
                     playbackDelaySeconds = prefs.getInt(TravelDuaSettings.KEY_PLAYBACK_DELAY_SECONDS, TravelDuaSettings.DEFAULT_PLAYBACK_DELAY_SECONDS),
-                    gapToleranceMinutes = prefs.getInt(TravelDuaSettings.KEY_GAP_TOLERANCE_MINUTES, TravelDuaSettings.DEFAULT_GAP_TOLERANCE_MINUTES)
+                    gapToleranceMinutes = prefs.getInt(TravelDuaSettings.KEY_GAP_TOLERANCE_MINUTES, TravelDuaSettings.DEFAULT_GAP_TOLERANCE_MINUTES),
+                    drivingSpeedThresholdKmh = prefs.getInt(TravelDuaSettings.KEY_DRIVING_SPEED_THRESHOLD_KMH, TravelDuaSettings.DEFAULT_DRIVING_SPEED_THRESHOLD_KMH)
                 )
                 _travelDuaSettings.value = settings
-                Log.i(TAG, "Travel dua settings loaded: enabled=${settings.enabled}, cooldown=${settings.cooldownMinutes}min, delay=${settings.playbackDelaySeconds}s, gap=${settings.gapToleranceMinutes}min")
+                Log.i(TAG, "Travel dua settings loaded: enabled=${settings.enabled}, cooldown=${settings.cooldownMinutes}min, delay=${settings.playbackDelaySeconds}s, gap=${settings.gapToleranceMinutes}min, speedThreshold=${settings.drivingSpeedThresholdKmh}km/h")
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading travel dua settings", e)
             }
@@ -270,9 +271,10 @@ class UnifiedSettingsViewModel @Inject constructor(
                     .putInt(TravelDuaSettings.KEY_COOLDOWN_MINUTES, settings.cooldownMinutes)
                     .putInt(TravelDuaSettings.KEY_PLAYBACK_DELAY_SECONDS, settings.playbackDelaySeconds)
                     .putInt(TravelDuaSettings.KEY_GAP_TOLERANCE_MINUTES, settings.gapToleranceMinutes)
+                    .putInt(TravelDuaSettings.KEY_DRIVING_SPEED_THRESHOLD_KMH, settings.drivingSpeedThresholdKmh)
                     .apply()
 
-                Log.i(TAG, "Travel dua settings saved: enabled=${settings.enabled}, cooldown=${settings.cooldownMinutes}min, delay=${settings.playbackDelaySeconds}s, gap=${settings.gapToleranceMinutes}min")
+                Log.i(TAG, "Travel dua settings saved: enabled=${settings.enabled}, cooldown=${settings.cooldownMinutes}min, delay=${settings.playbackDelaySeconds}s, gap=${settings.gapToleranceMinutes}min, speedThreshold=${settings.drivingSpeedThresholdKmh}km/h")
 
                 // Update ActivityTracker with new settings
                 ActivityTracker.updateTravelDuaSettings(settings)

@@ -776,7 +776,10 @@ object ActivityTracker {
         travelDuaPlaybackDelayMillis = settings.playbackDelayMillis
         travelDuaGapToleranceMillis = settings.gapToleranceMillis
 
-        Log.i("ActivityTracker", "🚗 Travel dua settings updated: enabled=${settings.enabled}, cooldown=${settings.cooldownMinutes}min, delay=${settings.playbackDelaySeconds}s, gap=${settings.gapToleranceMinutes}min")
+        Log.i("ActivityTracker", "🚗 Travel dua settings updated: enabled=${settings.enabled}, cooldown=${settings.cooldownMinutes}min, delay=${settings.playbackDelaySeconds}s, gap=${settings.gapToleranceMinutes}min, speedThreshold=${settings.drivingSpeedThresholdKmh}km/h")
+
+        // Update driving speed threshold in ActivityDetectionService
+        activityDetectionService?.updateDrivingSpeedThreshold(settings.drivingSpeedThresholdKmh)
 
         // Reset accumulation when settings change to avoid confusion
         resetDrivingAccumulation()
