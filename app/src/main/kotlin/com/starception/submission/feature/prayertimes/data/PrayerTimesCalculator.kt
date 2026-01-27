@@ -127,23 +127,27 @@ class PrayerTimesCalculator(private val context: Context) {
             android.util.Log.i(TAG, "✅ All required services obtained successfully")
             android.util.Log.i(TAG, "")
             
-            // STEP 2: Check cache first for instant results
+            // STEP 2: Check cache first for instant results (SKIP if forceGpsRefresh)
             android.util.Log.i(TAG, "🔄 STEP 2: CACHE VALIDATION")
-            android.util.Log.i(TAG, "Checking for cached prayer times to enable instant results")
-            val cachedData = cache.getCachedPrayerTimes()
-            if (cachedData != null) {
-                val (cachedPrayerTimes, cachedDate, cachedLocationName) = cachedData
-                android.util.Log.d("PrayerCalculation", "Found cached data: date=$cachedDate, location=$cachedLocationName")
-                if (cachedPrayerTimes != null && cachedLocationName != null) {
-                    android.util.Log.i(TAG, "🚀 CACHE HIT - INSTANT RETURN")
-                    android.util.Log.i(TAG, "📅 Cached Date: $cachedDate")
-                    android.util.Log.i(TAG, "🌍 Cached Location: $cachedLocationName")
-                    android.util.Log.d("PrayerCalculation", "Cached times: Fajr=${cachedPrayerTimes.fajr}, Dhuhr=${cachedPrayerTimes.dhuhr}, Asr=${cachedPrayerTimes.asr}, Maghrib=${cachedPrayerTimes.maghrib}, Isha=${cachedPrayerTimes.isha}")
-                    // Return cached data immediately - no waiting!
-                    return Pair(cachedPrayerTimes, cachedLocationName)
+            if (forceGpsRefresh) {
+                android.util.Log.i(TAG, "🔄 FORCE GPS REFRESH - Skipping cache to get fresh location")
+            } else {
+                android.util.Log.i(TAG, "Checking for cached prayer times to enable instant results")
+                val cachedData = cache.getCachedPrayerTimes()
+                if (cachedData != null) {
+                    val (cachedPrayerTimes, cachedDate, cachedLocationName) = cachedData
+                    android.util.Log.d("PrayerCalculation", "Found cached data: date=$cachedDate, location=$cachedLocationName")
+                    if (cachedPrayerTimes != null && cachedLocationName != null) {
+                        android.util.Log.i(TAG, "🚀 CACHE HIT - INSTANT RETURN")
+                        android.util.Log.i(TAG, "📅 Cached Date: $cachedDate")
+                        android.util.Log.i(TAG, "🌍 Cached Location: $cachedLocationName")
+                        android.util.Log.d("PrayerCalculation", "Cached times: Fajr=${cachedPrayerTimes.fajr}, Dhuhr=${cachedPrayerTimes.dhuhr}, Asr=${cachedPrayerTimes.asr}, Maghrib=${cachedPrayerTimes.maghrib}, Isha=${cachedPrayerTimes.isha}")
+                        // Return cached data immediately - no waiting!
+                        return Pair(cachedPrayerTimes, cachedLocationName)
+                    }
                 }
             }
-            android.util.Log.i(TAG, "💾 CACHE MISS - Proceeding with fresh calculation")
+            android.util.Log.i(TAG, "💾 CACHE MISS/SKIPPED - Proceeding with fresh calculation")
             android.util.Log.i(TAG, "")
             
             // STEP 3: Get user prayer settings (wait for proper loading)

@@ -1276,17 +1276,17 @@ fun PrayerTimesScreen(
     }
 
     // PRAYER TIMES CALCULATION ENGINE - Background calculation with 3-second location timeout
-    val calculatePrayerTimes: suspend () -> Unit = {
+    val calculatePrayerTimes: suspend (forceGpsRefresh: Boolean) -> Unit = { forceGpsRefresh ->
         try {
             // Run calculation on background thread to prevent UI blocking
             withContext(Dispatchers.Default) {
                 val calculator = PrayerTimesCalculator(screenContext)
                 // This uses our improved 3-second timeout system
-                val result = calculator.calculateDefaultPrayerTimes()
-                
+                val result = calculator.calculateDefaultPrayerTimes(forceGpsRefresh = forceGpsRefresh)
+
                 prayerTimes = result.first   // Calculated prayer times (or null if failed)
                 location = result.second     // Location name for display
-                
+
                 // CRITICAL: Always turn off loading after calculation completes
                 isLoading = false
             }
@@ -1345,10 +1345,10 @@ fun PrayerTimesScreen(
             isLoading = true  // Show loading if cache access fails
         }
         
-        // STEP 2: Update with fresh GPS data in background
-        android.util.Log.d("PrayerScreen", "STEP 2: Starting background GPS update...")
-        calculatePrayerTimes()
-        android.util.Log.d("PrayerScreen", "Background update completed")
+        // STEP 2: Update with fresh GPS data in background (auto-refresh on app open)
+        android.util.Log.d("PrayerScreen", "STEP 2: Starting background GPS update with fresh location...")
+        calculatePrayerTimes(true)  // forceGpsRefresh = true for auto-refresh on app open
+        android.util.Log.d("PrayerScreen", "Background update completed with fresh GPS location")
         
         // Note: calculatePrayerTimes() now handles turning off isLoading
     }
@@ -1356,8 +1356,8 @@ fun PrayerTimesScreen(
     // PERMISSION CHANGE HANDLER - Update data when permissions change
     LaunchedEffect(locationPermissionState.status) {
         android.util.Log.d("PrayerScreen", "Permission status changed, running background update...")
-        // Update in background - calculatePrayerTimes() handles loading state
-        calculatePrayerTimes()
+        // Update in background with fresh GPS - calculatePrayerTimes() handles loading state
+        calculatePrayerTimes(true)  // forceGpsRefresh = true when permission changes
     }
     
 
