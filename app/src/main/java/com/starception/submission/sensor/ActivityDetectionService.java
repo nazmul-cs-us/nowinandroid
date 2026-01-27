@@ -2,6 +2,7 @@ package com.starception.submission.sensor;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -82,7 +83,9 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     private static final double RUNNING_GYRO_MIN = 2.0; // Minimum gyro for running (more rotational movement)
     private static final double RUNNING_SPEED_MIN = 2.5; // m/s (~9 km/h, jogging/running speed)
 
-    private static final double DRIVING_SPEED_THRESHOLD = 6.5; // m/s (23 km/h) - increased to avoid false positives from GPS drift
+    // Dynamic driving speed threshold - loaded from user settings
+    // Default: 2.78 m/s (10 km/h) - can be adjusted in Travel Dua settings
+    private double drivingSpeedThreshold = 2.78; // m/s (10 km/h) default
     private static final double STATIONARY_VARIANCE_THRESHOLD = 0.15; // Slightly higher for better stability
     private static final double STATIONARY_ACCEL_THRESHOLD = 0.3; // Lower threshold for stationary
 
@@ -307,6 +310,36 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         Log.i(TAG, "  Step Counter: " + (stepCounter != null ? "✓" : "✗"));
         Log.i(TAG, "  Step Detector: " + (stepDetector != null ? "✓" : "✗"));
         Log.i(TAG, "  Linear Accelerometer: " + (linearAccelerometer != null ? "✓" : "✗"));
+
+        // Load driving speed threshold from user settings
+        loadDrivingSpeedThreshold();
+    }
+
+    /**
+     * Load the driving speed threshold from Travel Dua settings
+     * Call this to refresh the threshold when settings change
+     */
+    public void loadDrivingSpeedThreshold() {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences("travel_dua_settings", Context.MODE_PRIVATE);
+            int thresholdKmh = prefs.getInt("travel_dua_driving_speed_threshold_kmh", 10); // Default 10 km/h
+            drivingSpeedThreshold = thresholdKmh / 3.6; // Convert km/h to m/s
+            Log.i(TAG, "🚗 Driving speed threshold loaded: " + thresholdKmh + " km/h (" +
+                  String.format("%.2f", drivingSpeedThreshold) + " m/s)");
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to load driving speed threshold, using default: " + e.getMessage());
+            drivingSpeedThreshold = 2.78; // Default 10 km/h in m/s
+        }
+    }
+
+    /**
+     * Update the driving speed threshold directly (called from ActivityTracker when settings change)
+     * @param thresholdKmh Speed threshold in km/h
+     */
+    public void updateDrivingSpeedThreshold(int thresholdKmh) {
+        drivingSpeedThreshold = thresholdKmh / 3.6; // Convert km/h to m/s
+        Log.i(TAG, "🚗 Driving speed threshold updated: " + thresholdKmh + " km/h (" +
+              String.format("%.2f", drivingSpeedThreshold) + " m/s)");
     }
     
     /**
@@ -714,7 +747,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         // Log.d(TAG, String.format("  • Position: %s", position));
 
         // 1. High speed indicates DRIVING (most reliable indicator)
-        if (maxSpeed > DRIVING_SPEED_THRESHOLD) {
+        if (maxSpeed > drivingSpeedThreshold) {
             logDebug( "Detected: DRIVING (speed: " + String.format("%.2f", maxSpeed) + " m/s / " + String.format("%.1f", maxSpeed * 3.6) + " km/h)");
             return ActivityType.DRIVING;
         }
@@ -724,7 +757,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         // Must meet ALL criteria: high variance AND high gyro (OR high speed if GPS available)
         boolean hasRunningVariance = accelVariance >= RUNNING_VARIANCE_MIN;
         boolean hasRunningGyro = avgGyro >= RUNNING_GYRO_MIN;
-        boolean hasRunningSpeed = maxSpeed >= RUNNING_SPEED_MIN && maxSpeed < DRIVING_SPEED_THRESHOLD;
+        boolean hasRunningSpeed = maxSpeed >= RUNNING_SPEED_MIN && maxSpeed < drivingSpeedThreshold;
 
         // Running if: (high variance AND high gyro) OR (high speed with significant movement)
         if ((hasRunningVariance && hasRunningGyro) || (hasRunningSpeed && accelVariance >= RUNNING_VARIANCE_MIN)) {
@@ -1017,7 +1050,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         boolean hasActivePhoneUse = avgGyro > 0.3;
 
         // Speed is primary indicator (most reliable) - but ONLY if other sensors agree
-        if (maxSpeed > DRIVING_SPEED_THRESHOLD) {
+        if (maxSpeed > drivingSpeedThreshold) {
             // High speed detected, but check if it makes sense with other sensors
             if (hasWalkingVariance) {
                 // Walking variance + high GPS speed = GPS is wrong (e.g., GPS drift)
@@ -1102,7 +1135,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         }
 
         // Running speed confirmation (if GPS available) - REQUIRED for high confidence
-        if (maxSpeed >= RUNNING_SPEED_MIN && maxSpeed < DRIVING_SPEED_THRESHOLD) {
+        if (maxSpeed >= RUNNING_SPEED_MIN && maxSpeed < drivingSpeedThreshold) {
             confidence += 0.3f; // GPS confirms running speed
         } else if (maxSpeed > 0 && maxSpeed < RUNNING_SPEED_MIN) {
             // GPS shows walking speed, significantly reduce running confidence
