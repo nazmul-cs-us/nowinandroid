@@ -7,12 +7,14 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.hardware.GeomagneticField
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -23,6 +25,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.Path as ComposePath
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -133,7 +143,7 @@ fun QiblaGlobeView(
     var isUserInteracting by remember { mutableStateOf(false) }
     var lastInteractionTime by remember { mutableStateOf(0L) }
     var wasAlignedWithQibla by remember { mutableStateOf(false) }
-    var headingIndicator by remember { mutableStateOf<Polygon?>(null) }
+    var userMarkerPlacemark by remember { mutableStateOf<Placemark?>(null) }
     var isInForeground by remember { mutableStateOf(true) } // Track if app is in foreground for haptic control
 
     // Calculate magnetic declination for location
@@ -209,22 +219,14 @@ fun QiblaGlobeView(
                     val normalizedHeadingDiff = if (headingDiff > 180f) 360f - headingDiff else headingDiff
 
                     if (normalizedHeadingDiff > 1.5f) {
-                        // Update the heading state (used for overlay calculations)
+                        // Update the heading state
                         deviceHeading = newHeading
                         lastUpdatedHeading = newHeading
 
-                        qiblaLayerRef?.let { layer ->
-                            // Remove old heading indicator
-                            headingIndicator?.let { oldCone ->
-                                layer.removeRenderable(oldCone)
-                            }
-
-                            // Create new heading indicator with current heading
-                            val newCone = createHeadingIndicator(userLatitude, userLongitude, newHeading)
-                            layer.addRenderable(newCone)
-                            headingIndicator = newCone
-
-                            // Request redraw to show updated indicator
+                        // Update user marker with new heading shadow
+                        userMarkerPlacemark?.let { placemark ->
+                            val newBitmap = createUserMarkerWithHeadingShadow(newHeading)
+                            placemark.attributes.imageSource = ImageSource.fromBitmap(newBitmap)
                             worldWindowRef?.requestRedraw()
                         }
                     }
@@ -264,62 +266,81 @@ fun QiblaGlobeView(
         }
 
         // WorldWind globe view with lifecycle management
-        AndroidView(
-            factory = { ctx ->
-                val (worldWindow, qiblaLayer, headingCone) = createWorldWindow(
-                    context = ctx,
-                    userLat = userLatitude,
-                    userLon = userLongitude,
-                    makkahLat = makkahLatitude,
-                    makkahLon = makkahLongitude,
-                    viewWidth = tileWidthPx.toInt(),
-                    viewHeight = tileHeightPx.toInt(),
-                    onTouchStart = {
-                        isUserInteracting = true
-                        lastInteractionTime = System.currentTimeMillis()
-                    },
-                    onTouchEnd = {
-                        isUserInteracting = false
-                        lastInteractionTime = System.currentTimeMillis()
-                    }
-                )
-
-                // Store references for sensor updates
-                worldWindowRef = worldWindow
-                qiblaLayerRef = qiblaLayer
-                headingIndicator = headingCone
-
-                // Add lifecycle observer to properly manage GLSurfaceView
-                val observer = LifecycleEventObserver { _, event ->
-                    when (event) {
-                        Lifecycle.Event.ON_RESUME -> {
-                            isInForeground = true
-                            worldWindow.onResume()
-                        }
-                        Lifecycle.Event.ON_PAUSE -> {
-                            isInForeground = false
-                            worldWindow.onPause()
-                        }
-                        else -> {}
-                    }
-                }
-                lifecycleOwner.lifecycle.addObserver(observer)
-
-                worldWindow
-            },
+        // Wrapped to intercept touch events - prevents parent pager swipe when touching globe
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .layerBackdrop(backdrop),
-            update = { worldWindow ->
-                // Force a layout pass to ensure WorldWindow viewport matches dimensions
-                worldWindow.requestLayout()
-            },
-            onRelease = { worldWindow ->
-                // Clean up when view is removed
-                worldWindow.onPause()
-                worldWindowRef = null
-            }
-        )
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            // Consume horizontal drag to prevent pager swipe
+                            event.changes.forEach { change ->
+                                if (change.pressed) {
+                                    change.consume()
+                                }
+                            }
+                        }
+                    }
+                }
+        ) {
+            AndroidView(
+                factory = { ctx ->
+                    val (worldWindow, qiblaLayer, headingCone) = createWorldWindow(
+                        context = ctx,
+                        userLat = userLatitude,
+                        userLon = userLongitude,
+                        makkahLat = makkahLatitude,
+                        makkahLon = makkahLongitude,
+                        viewWidth = tileWidthPx.toInt(),
+                        viewHeight = tileHeightPx.toInt(),
+                        onTouchStart = {
+                            isUserInteracting = true
+                            lastInteractionTime = System.currentTimeMillis()
+                        },
+                        onTouchEnd = {
+                            isUserInteracting = false
+                            lastInteractionTime = System.currentTimeMillis()
+                        }
+                    )
+
+                    // Store references for sensor updates
+                    worldWindowRef = worldWindow
+                    qiblaLayerRef = qiblaLayer
+                    userMarkerPlacemark = headingCone
+
+                    // Add lifecycle observer to properly manage GLSurfaceView
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_RESUME -> {
+                                isInForeground = true
+                                worldWindow.onResume()
+                            }
+                            Lifecycle.Event.ON_PAUSE -> {
+                                isInForeground = false
+                                worldWindow.onPause()
+                            }
+                            else -> {}
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+
+                    worldWindow
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(backdrop),
+                update = { worldWindow ->
+                    // Force a layout pass to ensure WorldWindow viewport matches dimensions
+                    worldWindow.requestLayout()
+                },
+                onRelease = { worldWindow ->
+                    // Clean up when view is removed
+                    worldWindow.onPause()
+                    worldWindowRef = null
+                }
+            )
+        }
 
         // Combined header: alignment status + directional guidance
         Box(
@@ -440,6 +461,37 @@ fun QiblaGlobeView(
                 )
             }
         }
+
+        // Locate Me button - resets view to show user and Kaaba
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable {
+                    // Reset camera to show both user and Kaaba
+                    worldWindowRef?.let { ww ->
+                        resetCameraToShowBoth(
+                            ww,
+                            userLatitude,
+                            userLongitude,
+                            makkahLatitude,
+                            makkahLongitude
+                        )
+                    }
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.MyLocation,
+                contentDescription = "Show my location and Kaaba",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
     }
     }  // End BoxWithConstraints
 }
@@ -457,7 +509,7 @@ private fun createWorldWindow(
     viewHeight: Int,
     onTouchStart: () -> Unit,
     onTouchEnd: () -> Unit
-): Triple<WorldWindow, RenderableLayer, Polygon> {
+): Triple<WorldWindow, RenderableLayer, Placemark> {
     val worldWindow = WorldWindow(context)
 
     // Explicitly set layout parameters to ensure proper viewport sizing
@@ -485,36 +537,35 @@ private fun createWorldWindow(
     // Calculate Qibla direction from user to Kaaba
     val qiblaAzimuth = userPos.greatCircleAzimuth(kaabaPos)
 
-    // Load custom icon bitmaps
-    val userLocationBitmap = drawableToBitmap(context, R.drawable.ic_user_location_arrow)
-    val kaabaBitmap = emojiToBitmap("🕋", sizeDp = 48)  // Use 🕋 emoji from overlay
+    // Create Google Maps style user marker with heading shadow
+    val userMarkerBitmap = createUserMarkerWithHeadingShadow(0f)  // Initial heading 0
+    val kaabaBitmap = emojiToBitmap("🕋", sizeDp = 48)
 
-    // 1. Add User Location Placemark with custom arrow icon (static)
+    // 1. Add User Location Placemark with heading shadow marker
     val userAttributes = PlacemarkAttributes().apply {
-        imageSource = ImageSource.fromBitmap(userLocationBitmap)
-        imageScale = 0.6  // Bigger for better visibility
+        imageSource = ImageSource.fromBitmap(userMarkerBitmap)
+        imageScale = 1.0
     }
     val userPlacemark = Placemark(userPos, userAttributes).apply {
-        altitudeMode = WorldWind.ABSOLUTE  // Use absolute altitude
+        altitudeMode = WorldWind.ABSOLUTE
     }
     qiblaLayer.addRenderable(userPlacemark)
 
-    // 2. Add heading indicator (blue viewing cone) - shows direction user is FACING
-    // Initial heading points north (0°)
-    val headingCone = createHeadingIndicator(userLat, userLon, 0f)
-    qiblaLayer.addRenderable(headingCone)
+    // 2. User location marker with heading shadow is handled by the placemark itself
+    // No separate heading indicator - we'll rotate the user marker bitmap instead
+    val headingCone: Polygon? = null  // Not used - heading shown via rotated marker
 
-    // 3. Add Kaaba Placemark with 🕋 emoji icon
+    // 3. Add Kaaba Placemark with emoji icon
     val kaabaAttributes = PlacemarkAttributes().apply {
         imageSource = ImageSource.fromBitmap(kaabaBitmap)
-        imageScale = 0.4  // Smaller, more subtle marker
+        imageScale = 0.4  // Original size
     }
     val kaabaPlacemark = Placemark(kaabaPos, kaabaAttributes).apply {
-        altitudeMode = WorldWind.ABSOLUTE  // Use absolute altitude
+        altitudeMode = WorldWind.ABSOLUTE
     }
     qiblaLayer.addRenderable(kaabaPlacemark)
 
-    // Setup camera view optimized for tile dimensions - Google Maps style
+    // Setup camera view to show BOTH user location AND Kaaba - ZOOMED IN
     val globe = worldWindow.globe
 
     // Calculate great circle heading and distance
@@ -523,80 +574,88 @@ private fun createWorldWindow(
     val distanceMeters = distanceRadians * globe.equatorialRadius
     val earthRadius = globe.equatorialRadius
 
-    // Center camera on user's location (Kaaba will be positioned in the direction of heading)
-    val aspectRatio = viewWidth.toDouble() / viewHeight.toDouble()
-    android.util.Log.d("QiblaGlobeView", "📷 Camera setup: viewWidth=$viewWidth, viewHeight=$viewHeight, aspectRatio=$aspectRatio")
+    // Calculate midpoint between user and Kaaba for camera centering
+    val midLat = (userLat + makkahLat) / 2.0
+    val midLon = (userLon + makkahLon) / 2.0
 
-    // Base range calculation: zoom out to show user centered with Kaaba visible
-    // User at center, Kaaba positioned down in the view direction
-    val baseRange = when {
-        distanceMeters < earthRadius * 0.3 -> {
-            // Very short distance: zoom in to show detail
-            distanceMeters * 4.5
-        }
-        distanceMeters < earthRadius * 0.5 -> {
-            // Short-medium distance (like Dubai-Makkah): show user centered
-            distanceMeters * 4.0
-        }
-        distanceMeters < earthRadius * 1.0 -> {
-            // Medium distance: balanced view with curvature
-            distanceMeters * 3.2
-        }
-        else -> {
-            // Long distance: zoom out to show full arc
-            distanceMeters * 2.5
-        }
-    }
+    android.util.Log.d("QiblaGlobeView", "📷 Camera setup: distance=${(distanceMeters/1000).toInt()}km, midpoint=($midLat, $midLon)")
 
-    // Adjust for aspect ratio - wider tiles can show more horizontally
-    val aspectCorrectedRange = if (aspectRatio > 1.0) {
-        baseRange * (0.9 / Math.sqrt(aspectRatio))  // Slight zoom in for wide tiles
-    } else {
-        baseRange * Math.sqrt(1.1 / aspectRatio)  // Zoom out more for tall tiles
-    }
+    // ZOOMED IN: Closer range to fill the tile with the globe
+    // Use 1.8x distance to show both markers with tight framing
+    val baseRange = distanceMeters * 1.8
 
-    // Zoom out more to see better separation between user and Kaaba markers
-    // This helps show the directional relationship more clearly
-    val minRange = earthRadius * 3.5  // Increased zoom out for better marker separation
-    val maxRange = earthRadius * 6.0  // Allow more zoom out
-    val finalRange = aspectCorrectedRange.coerceIn(minRange, maxRange)
+    // Tighter zoom limits - globe fills more of the tile
+    val minRange = earthRadius * 0.8   // Allow closer zoom
+    val maxRange = earthRadius * 2.5   // Don't zoom out too far
+    val finalRange = baseRange.coerceIn(minRange, maxRange)
 
-    // High tilt angle for side view - user marker in center of visible globe
-    // Higher tilt = more horizontal/side view, lower tilt = more overhead view
-    val tilt = when {
-        distanceMeters < earthRadius * 0.3 -> 50.0  // Side view for close points
-        distanceMeters < earthRadius * 0.5 -> 55.0  // Side view - user in center of globe
-        distanceMeters < earthRadius * 1.0 -> 60.0  // More angled for medium distance
-        else -> 65.0  // Horizontal side view for far points
-    }
-
-    // Zero centering altitude - look directly at user's location
-    val centeringAltitude = 0.0  // Look directly at user position
-
-    // EXPERIMENTAL: Offset longitude to center the globe horizontally
-    // WorldWindow appears to render the globe off-center to the left
-    // This is a workaround to shift the camera view to compensate
-    val longitudeOffset = 20.0  // Shift camera east to move globe right in viewport
-
-    // Offset latitude to center the globe sphere vertically in the tile
-    val latitudeOffset = 25.0  // Look south to move globe center to vertical middle of tile
+    // Tilt angle - 50° for good 3D perspective
+    val tilt = 50.0
 
     val lookAt = LookAt().apply {
         set(
-            userLat - latitudeOffset, userLon + longitudeOffset, centeringAltitude,  // Offset both lat and lon
+            midLat, midLon, 0.0,  // Center on midpoint between user and Kaaba
             WorldWind.ABSOLUTE,
-            finalRange,           // Optimized range for user-centered view
-            heading,              // Orient view toward Kaaba direction
-            tilt,                 // Dynamic tilt for user-centered perspective
+            finalRange,           // Closer range - globe fills tile
+            heading,              // Orient view along Qibla direction
+            tilt,                 // 3D perspective
             0.0                   // No roll
         )
     }
 
-    android.util.Log.d("QiblaGlobeView", "🎯 Camera positioned at: lat=$userLat, lon=${userLon + longitudeOffset} (offset=$longitudeOffset°)")
+    android.util.Log.d("QiblaGlobeView", "🎯 Camera: midpoint=($midLat, $midLon), range=${(finalRange/1000).toInt()}km, heading=$heading°")
 
     worldWindow.navigator.setAsLookAt(globe, lookAt)
 
-    return Triple(worldWindow, qiblaLayer, headingCone)
+    return Triple(worldWindow, qiblaLayer, userPlacemark)
+}
+
+/**
+ * Reset camera to show both user location and Kaaba
+ * Called when user taps the "Locate Me" button
+ */
+private fun resetCameraToShowBoth(
+    worldWindow: WorldWindow,
+    userLat: Double,
+    userLon: Double,
+    makkahLat: Double,
+    makkahLon: Double
+) {
+    val globe = worldWindow.globe
+    val userPos = Position.fromDegrees(userLat, userLon, 0.0)
+    val kaabaPos = Position.fromDegrees(makkahLat, makkahLon, 0.0)
+
+    // Calculate heading and distance
+    val heading = userPos.greatCircleAzimuth(kaabaPos)
+    val distanceRadians = userPos.greatCircleDistance(kaabaPos)
+    val distanceMeters = distanceRadians * globe.equatorialRadius
+    val earthRadius = globe.equatorialRadius
+
+    // Midpoint between user and Kaaba
+    val midLat = (userLat + makkahLat) / 2.0
+    val midLon = (userLon + makkahLon) / 2.0
+
+    // Calculate range to show both
+    val baseRange = distanceMeters * 1.8
+    val minRange = earthRadius * 0.8
+    val maxRange = earthRadius * 2.5
+    val finalRange = baseRange.coerceIn(minRange, maxRange)
+
+    val lookAt = LookAt().apply {
+        set(
+            midLat, midLon, 0.0,
+            WorldWind.ABSOLUTE,
+            finalRange,
+            heading,
+            50.0,  // tilt
+            0.0    // roll
+        )
+    }
+
+    worldWindow.navigator.setAsLookAt(globe, lookAt)
+    worldWindow.requestRedraw()
+
+    android.util.Log.d("QiblaGlobeView", "📍 Camera reset to show user ($userLat, $userLon) and Kaaba")
 }
 
 /**
@@ -631,47 +690,74 @@ private fun updateGlobeViewForOptimalMarkerVisibility(
 }
 
 /**
- * Create a heading indicator (blue viewing cone) showing which direction the user is facing
- * Google Maps style - small, subtle wedge
+ * Create a Google Maps style user location marker with all elements:
+ * 1. Light blue accuracy circle (outer)
+ * 2. Translucent blue heading cone/wedge
+ * 3. White ring around center
+ * 4. Solid blue dot (center)
  */
-private fun createHeadingIndicator(userLat: Double, userLon: Double, heading: Float): Polygon {
-    // Use altitude 0 for all positions since we'll clamp to ground
-    val userPos = Position.fromDegrees(userLat, userLon, 0.0)
+private fun createUserMarkerWithHeadingShadow(heading: Float): Bitmap {
+    val size = 300  // Larger bitmap for better visibility
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
 
-    // Create a small viewing wedge like Google Maps - narrower angle, shorter distance
-    val coneAngle = 15.0  // 30-degree total spread (narrower than before)
-    val coneDistance = 150000.0  // 150km distance (much shorter, more subtle)
+    val centerX = size / 2f
+    val centerY = size / 2f
 
-    val leftAzimuth = heading - coneAngle
-    val rightAzimuth = heading + coneAngle
-
-    // Create cone points - convert Location to Position
-    val leftLoc = userPos.greatCircleLocation(leftAzimuth, coneDistance, gov.nasa.worldwind.geom.Location())
-    val centerLoc = userPos.greatCircleLocation(heading.toDouble(), coneDistance, gov.nasa.worldwind.geom.Location())
-    val rightLoc = userPos.greatCircleLocation(rightAzimuth, coneDistance, gov.nasa.worldwind.geom.Location())
-
-    // Use altitude 0 and let CLAMP_TO_GROUND handle surface positioning
-    val leftPos = Position.fromDegrees(leftLoc.latitude, leftLoc.longitude, 0.0)
-    val centerPos = Position.fromDegrees(centerLoc.latitude, centerLoc.longitude, 0.0)
-    val rightPos = Position.fromDegrees(rightLoc.latitude, rightLoc.longitude, 0.0)
-
-    val conePositions = ArrayList<Position>()
-    conePositions.add(userPos)
-    conePositions.add(leftPos)
-    conePositions.add(centerPos)
-    conePositions.add(rightPos)
-    conePositions.add(userPos)  // Close the polygon
-
-    val coneAttributes = ShapeAttributes().apply {
-        // Google Maps style: Bright vibrant blue with professional opacity
-        interiorColor = WwColor(0.26f, 0.52f, 0.96f, 0.45f)  // Google blue with subtle fill
-        outlineColor = WwColor(0.26f, 0.52f, 0.96f, 0.75f)  // Professional blue outline
-        outlineWidth = 3.0f  // Clean, professional thickness
+    val paint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        style = android.graphics.Paint.Style.FILL
     }
-    val polygon = Polygon(conePositions, coneAttributes).apply {
-        altitudeMode = WorldWind.CLAMP_TO_GROUND  // Fixed: Clamp to surface to prevent distortion during rotation
+
+    // 1. ACCURACY CIRCLE - Light blue outer circle
+    val accuracyRadius = size * 0.45f
+    paint.color = 0x404285F4.toInt()  // Light transparent blue
+    canvas.drawCircle(centerX, centerY, accuracyRadius, paint)
+
+    // 2. HEADING CONE/WEDGE - More prominent and visible
+    canvas.save()
+    canvas.rotate(heading, centerX, centerY)
+
+    val coneLength = size * 0.44f  // Longer cone
+    val coneBaseWidth = size * 0.4f  // Wider base
+
+    // Create wider, more visible cone
+    val conePath = android.graphics.Path().apply {
+        moveTo(centerX, centerY)  // Start at center
+        // Wide arc at base
+        lineTo(centerX - coneBaseWidth / 2, centerY - coneLength * 0.15f)
+        // Taper to tip
+        lineTo(centerX - coneBaseWidth * 0.15f, centerY - coneLength * 0.85f)
+        lineTo(centerX, centerY - coneLength)  // Tip
+        lineTo(centerX + coneBaseWidth * 0.15f, centerY - coneLength * 0.85f)
+        lineTo(centerX + coneBaseWidth / 2, centerY - coneLength * 0.15f)
+        close()
     }
-    return polygon
+
+    // More visible gradient - brighter blue
+    paint.shader = android.graphics.LinearGradient(
+        centerX, centerY,
+        centerX, centerY - coneLength,
+        0xAA4285F4.toInt(),  // More opaque at center
+        0x304285F4.toInt(),  // Still visible at tip
+        android.graphics.Shader.TileMode.CLAMP
+    )
+    canvas.drawPath(conePath, paint)
+    paint.shader = null
+
+    canvas.restore()
+
+    // 3. WHITE RING - around the center dot
+    val whiteRingRadius = size * 0.08f
+    paint.color = 0xFFFFFFFF.toInt()
+    canvas.drawCircle(centerX, centerY, whiteRingRadius, paint)
+
+    // 4. BLUE DOT - solid center
+    val blueDotRadius = size * 0.055f
+    paint.color = 0xFF4285F4.toInt()
+    canvas.drawCircle(centerX, centerY, blueDotRadius, paint)
+
+    return bitmap
 }
 
 /**
