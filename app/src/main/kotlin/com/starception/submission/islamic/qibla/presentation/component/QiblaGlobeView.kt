@@ -266,25 +266,7 @@ fun QiblaGlobeView(
         }
 
         // WorldWind globe view with lifecycle management
-        // Wrapped to intercept touch events - prevents parent pager swipe when touching globe
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            // Consume horizontal drag to prevent pager swipe
-                            event.changes.forEach { change ->
-                                if (change.pressed) {
-                                    change.consume()
-                                }
-                            }
-                        }
-                    }
-                }
-        ) {
-            AndroidView(
+        AndroidView(
                 factory = { ctx ->
                     val (worldWindow, qiblaLayer, headingCone) = createWorldWindow(
                         context = ctx,
@@ -340,7 +322,6 @@ fun QiblaGlobeView(
                     worldWindowRef = null
                 }
             )
-        }
 
         // Combined header: alignment status + directional guidance
         Box(
@@ -544,7 +525,7 @@ private fun createWorldWindow(
     // 1. Add User Location Placemark with heading shadow marker
     val userAttributes = PlacemarkAttributes().apply {
         imageSource = ImageSource.fromBitmap(userMarkerBitmap)
-        imageScale = 1.0
+        imageScale = 0.5
     }
     val userPlacemark = Placemark(userPos, userAttributes).apply {
         altitudeMode = WorldWind.ABSOLUTE
@@ -691,13 +672,13 @@ private fun updateGlobeViewForOptimalMarkerVisibility(
 
 /**
  * Create a Google Maps style user location marker with all elements:
- * 1. Light blue accuracy circle (outer)
- * 2. Translucent blue heading cone/wedge
+ * 1. Small light blue accuracy circle
+ * 2. Blue heading cone with radar/torch gradient effect
  * 3. White ring around center
  * 4. Solid blue dot (center)
  */
 private fun createUserMarkerWithHeadingShadow(heading: Float): Bitmap {
-    val size = 300  // Larger bitmap for better visibility
+    val size = 400
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
@@ -709,51 +690,60 @@ private fun createUserMarkerWithHeadingShadow(heading: Float): Bitmap {
         style = android.graphics.Paint.Style.FILL
     }
 
-    // 1. ACCURACY CIRCLE - Light blue outer circle
-    val accuracyRadius = size * 0.45f
-    paint.color = 0x404285F4.toInt()  // Light transparent blue
-    canvas.drawCircle(centerX, centerY, accuracyRadius, paint)
+    // Define white ring radius first (used by both beam and ring)
+    val whiteRingRadius = size * 0.09f
 
-    // 2. HEADING CONE/WEDGE - More prominent and visible
+    // 1. HEADING BEAM - Torch light starts at full width of white circle
     canvas.save()
     canvas.rotate(heading, centerX, centerY)
+    val beamLength = size * 0.44f
+    val beamStartWidth = whiteRingRadius * 2  // Full width of white circle
+    val beamEndWidth = size * 0.38f           // Spreads wider at end
 
-    val coneLength = size * 0.44f  // Longer cone
-    val coneBaseWidth = size * 0.4f  // Wider base
-
-    // Create wider, more visible cone
-    val conePath = android.graphics.Path().apply {
-        moveTo(centerX, centerY)  // Start at center
-        // Wide arc at base
-        lineTo(centerX - coneBaseWidth / 2, centerY - coneLength * 0.15f)
-        // Taper to tip
-        lineTo(centerX - coneBaseWidth * 0.15f, centerY - coneLength * 0.85f)
-        lineTo(centerX, centerY - coneLength)  // Tip
-        lineTo(centerX + coneBaseWidth * 0.15f, centerY - coneLength * 0.85f)
-        lineTo(centerX + coneBaseWidth / 2, centerY - coneLength * 0.15f)
+    // Create torch beam path - starts at white circle edge, spreads outward
+    val beamPath = android.graphics.Path().apply {
+        // Start at left edge of white circle
+        moveTo(centerX - beamStartWidth / 2, centerY - whiteRingRadius * 0.3f)
+        // Left edge spreads outward
+        lineTo(centerX - beamEndWidth / 2, centerY - beamLength)
+        // Curved top edge
+        quadTo(
+            centerX, centerY - beamLength - beamEndWidth * 0.08f,
+            centerX + beamEndWidth / 2, centerY - beamLength
+        )
+        // Right edge back to white circle
+        lineTo(centerX + beamStartWidth / 2, centerY - whiteRingRadius * 0.3f)
+        // Arc back along the white circle edge
+        quadTo(
+            centerX, centerY - whiteRingRadius * 0.5f,
+            centerX - beamStartWidth / 2, centerY - whiteRingRadius * 0.3f
+        )
         close()
     }
 
-    // More visible gradient - brighter blue
+    // Gradient: bright near circle, fades toward the end
     paint.shader = android.graphics.LinearGradient(
-        centerX, centerY,
-        centerX, centerY - coneLength,
-        0xAA4285F4.toInt(),  // More opaque at center
-        0x304285F4.toInt(),  // Still visible at tip
+        centerX, centerY - whiteRingRadius,
+        centerX, centerY - beamLength,
+        intArrayOf(
+            0x774285F4.toInt(),  // 47% opaque at start
+            0x444285F4.toInt(),  // 27% mid
+            0x184285F4.toInt()   // 9% at end (fades out)
+        ),
+        floatArrayOf(0f, 0.5f, 1f),
         android.graphics.Shader.TileMode.CLAMP
     )
-    canvas.drawPath(conePath, paint)
+    canvas.drawPath(beamPath, paint)
     paint.shader = null
 
     canvas.restore()
 
-    // 3. WHITE RING - around the center dot
-    val whiteRingRadius = size * 0.08f
+    // 3. WHITE RING - around the center dot (uses whiteRingRadius defined above)
     paint.color = 0xFFFFFFFF.toInt()
     canvas.drawCircle(centerX, centerY, whiteRingRadius, paint)
 
     // 4. BLUE DOT - solid center
-    val blueDotRadius = size * 0.055f
+    val blueDotRadius = size * 0.06f
     paint.color = 0xFF4285F4.toInt()
     canvas.drawCircle(centerX, centerY, blueDotRadius, paint)
 
