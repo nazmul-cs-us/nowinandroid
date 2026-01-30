@@ -166,6 +166,8 @@ import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.Checkroom
+import androidx.compose.material.icons.filled.Fullscreen
+import com.starception.submission.feature.prayertimes.components.GlobePopupScreen
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -1023,6 +1025,9 @@ fun SwipeableBigTiles(
         initialPage = (Int.MAX_VALUE / 2 / 4) * 4 // Start in middle, adjusted to show Smart Prediction tile (index 0) first
     )
 
+    // Globe fullscreen popup state
+    var showGlobePopup by remember { mutableStateOf(false) }
+
     // Activity Recognition Permission for Smart Tracking tile
     val context = LocalContext.current
     var hasActivityPermission by remember {
@@ -1075,11 +1080,12 @@ fun SwipeableBigTiles(
         }
     }
 
-    // Use dynamic height based on orientation
-    Column(
-        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 8.dp),
-        modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth()
-    ) {
+    // Use dynamic height based on orientation - wrapped in Box for popup overlay
+    Box(modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 8.dp),
+            modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth()
+        ) {
         // In landscape, pager takes most height but leaves room for indicators
         val pagerModifier = if (isLandscape) {
             Modifier
@@ -1135,7 +1141,8 @@ fun SwipeableBigTiles(
                     onSurahClickWithAyah = onSurahClickWithAyah
                 )
                 3 -> QiblaGlobeTile(
-                    prayerTimes = prayerTimes
+                    prayerTimes = prayerTimes,
+                    onFullscreenClick = { showGlobePopup = true }
                 )
             }
         }
@@ -1199,6 +1206,18 @@ fun SwipeableBigTiles(
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 modifier = Modifier.size(if (isLandscape) 14.dp else 18.dp)
             )
+        }
+    }
+
+        // Globe fullscreen popup overlay
+        if (showGlobePopup) {
+            prayerTimes?.location?.let { locationData ->
+                GlobePopupScreen(
+                    userLatitude = locationData.latitude,
+                    userLongitude = locationData.longitude,
+                    onDismiss = { showGlobePopup = false }
+                )
+            }
         }
     }
 }
@@ -1875,10 +1894,12 @@ private fun SmartInfoTile(
  * - User's current location marker
  * - Kaaba location in Makkah
  * - Great circle path showing Qibla direction
+ * - Fullscreen button to open interactive popup
  */
 @Composable
 private fun QiblaGlobeTile(
-    prayerTimes: DayPrayerTimes?
+    prayerTimes: DayPrayerTimes?,
+    onFullscreenClick: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -1896,6 +1917,26 @@ private fun QiblaGlobeTile(
                     userLongitude = locationData.longitude,
                     modifier = Modifier.fillMaxSize()
                 )
+
+                // Fullscreen button in top-left corner
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                        .clickable { onFullscreenClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Fullscreen,
+                        contentDescription = "Open fullscreen globe",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
             } ?: run {
                 // Fallback when no location data - show loading or default
                 Column(
