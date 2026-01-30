@@ -316,8 +316,8 @@ fun QiblaGlobeView(
                     worldWindow
                 },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .layerBackdrop(backdrop),
+                    .fillMaxSize(),
+                    // Note: removed layerBackdrop to ensure touch events reach WorldWindow
                 update = { worldWindow ->
                     // Force a layout pass to ensure WorldWindow viewport matches dimensions
                     worldWindow.requestLayout()
@@ -699,48 +699,34 @@ private fun createUserMarkerWithHeadingShadow(heading: Float): Bitmap {
     // Define white ring radius first (used by both beam and ring)
     val whiteRingRadius = size * 0.09f
 
-    // 1. HEADING BEAM - Longer and more visible torch light
+    // 1. HEADING BEAM - Natural light beam that fades out gradually
     canvas.save()
     canvas.rotate(heading, centerX, centerY)
-    val beamLength = size * 0.65f             // Increased length (was 0.44f)
-    val beamStartWidth = whiteRingRadius * 2.5f  // Wider at start
-    val beamEndWidth = size * 0.45f           // Wider at end (was 0.38f)
 
-    // Create torch beam path - starts at white circle edge, spreads outward
-    val beamPath = android.graphics.Path().apply {
-        // Start at left edge of white circle
-        moveTo(centerX - beamStartWidth / 2, centerY - whiteRingRadius * 0.3f)
-        // Left edge spreads outward
-        lineTo(centerX - beamEndWidth / 2, centerY - beamLength)
-        // Curved top edge
-        quadTo(
-            centerX, centerY - beamLength - beamEndWidth * 0.1f,
-            centerX + beamEndWidth / 2, centerY - beamLength
-        )
-        // Right edge back to white circle
-        lineTo(centerX + beamStartWidth / 2, centerY - whiteRingRadius * 0.3f)
-        // Arc back along the white circle edge
-        quadTo(
-            centerX, centerY - whiteRingRadius * 0.5f,
-            centerX - beamStartWidth / 2, centerY - whiteRingRadius * 0.3f
-        )
-        close()
+    // Draw multiple layered ovals that fade out - creates natural light beam effect
+    val beamColor = 0x4285F4  // Google blue (without alpha)
+    val numLayers = 12
+    val maxLength = size * 0.48f
+    val maxWidth = size * 0.32f
+
+    for (i in numLayers downTo 1) {
+        val progress = i.toFloat() / numLayers
+        val layerLength = maxLength * progress
+        val layerWidth = maxWidth * progress * 0.8f  // Narrower near center
+
+        // Alpha decreases as we go further (outer layers are more transparent)
+        val alpha = (200 * (1f - progress * 0.7f)).toInt().coerceIn(20, 200)
+
+        paint.color = (alpha shl 24) or beamColor
+
+        // Draw oval for each layer - creates soft gradient effect
+        val ovalLeft = centerX - layerWidth / 2
+        val ovalTop = centerY - layerLength - whiteRingRadius * 0.5f
+        val ovalRight = centerX + layerWidth / 2
+        val ovalBottom = centerY - whiteRingRadius * 0.3f
+
+        canvas.drawOval(ovalLeft, ovalTop, ovalRight, ovalBottom, paint)
     }
-
-    // Gradient: brighter and more visible
-    paint.shader = android.graphics.LinearGradient(
-        centerX, centerY - whiteRingRadius,
-        centerX, centerY - beamLength,
-        intArrayOf(
-            0xBB4285F4.toInt(),  // 73% opaque at start (was 47%)
-            0x884285F4.toInt(),  // 53% mid (was 27%)
-            0x444285F4.toInt()   // 27% at end (was 9%)
-        ),
-        floatArrayOf(0f, 0.5f, 1f),
-        android.graphics.Shader.TileMode.CLAMP
-    )
-    canvas.drawPath(beamPath, paint)
-    paint.shader = null
 
     canvas.restore()
 
