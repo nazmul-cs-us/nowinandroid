@@ -167,6 +167,9 @@ fun QiblaGlobeView(
     val normalizedDiff = if (angularDiff > 180f) 360f - angularDiff else angularDiff
     val isAlignedWithQibla = normalizedDiff <= 5f
 
+    // Debug logging to compare with QiblaCompass
+    android.util.Log.d("QiblaGlobeAlignment", "deviceHeading=$deviceHeading, qiblaDirection=$qiblaDirection, normalizedDiff=$normalizedDiff, isAligned=$isAlignedWithQibla, declination=$magneticDeclination")
+
     // Haptic feedback when becoming aligned - only in foreground to avoid background vibration
     LaunchedEffect(isAlignedWithQibla, isInForeground) {
         if (isAlignedWithQibla && !wasAlignedWithQibla && isInForeground) {
@@ -223,9 +226,12 @@ fun QiblaGlobeView(
                         deviceHeading = newHeading
                         lastUpdatedHeading = newHeading
 
-                        // Update user marker with new heading shadow
+                        // Update user marker with RELATIVE heading to Qibla
+                        // When aligned (diff = 0), beam points UP toward Qibla
+                        // When not aligned, beam shows how much user needs to turn
                         userMarkerPlacemark?.let { placemark ->
-                            val newBitmap = createUserMarkerWithHeadingShadow(newHeading)
+                            val relativeHeading = newHeading - qiblaDirection
+                            val newBitmap = createUserMarkerWithHeadingShadow(relativeHeading)
                             placemark.attributes.imageSource = ImageSource.fromBitmap(newBitmap)
                             worldWindowRef?.requestRedraw()
                         }
@@ -693,12 +699,12 @@ private fun createUserMarkerWithHeadingShadow(heading: Float): Bitmap {
     // Define white ring radius first (used by both beam and ring)
     val whiteRingRadius = size * 0.09f
 
-    // 1. HEADING BEAM - Torch light starts at full width of white circle
+    // 1. HEADING BEAM - Longer and more visible torch light
     canvas.save()
     canvas.rotate(heading, centerX, centerY)
-    val beamLength = size * 0.44f
-    val beamStartWidth = whiteRingRadius * 2  // Full width of white circle
-    val beamEndWidth = size * 0.38f           // Spreads wider at end
+    val beamLength = size * 0.65f             // Increased length (was 0.44f)
+    val beamStartWidth = whiteRingRadius * 2.5f  // Wider at start
+    val beamEndWidth = size * 0.45f           // Wider at end (was 0.38f)
 
     // Create torch beam path - starts at white circle edge, spreads outward
     val beamPath = android.graphics.Path().apply {
@@ -708,7 +714,7 @@ private fun createUserMarkerWithHeadingShadow(heading: Float): Bitmap {
         lineTo(centerX - beamEndWidth / 2, centerY - beamLength)
         // Curved top edge
         quadTo(
-            centerX, centerY - beamLength - beamEndWidth * 0.08f,
+            centerX, centerY - beamLength - beamEndWidth * 0.1f,
             centerX + beamEndWidth / 2, centerY - beamLength
         )
         // Right edge back to white circle
@@ -721,14 +727,14 @@ private fun createUserMarkerWithHeadingShadow(heading: Float): Bitmap {
         close()
     }
 
-    // Gradient: bright near circle, fades toward the end
+    // Gradient: brighter and more visible
     paint.shader = android.graphics.LinearGradient(
         centerX, centerY - whiteRingRadius,
         centerX, centerY - beamLength,
         intArrayOf(
-            0x774285F4.toInt(),  // 47% opaque at start
-            0x444285F4.toInt(),  // 27% mid
-            0x184285F4.toInt()   // 9% at end (fades out)
+            0xBB4285F4.toInt(),  // 73% opaque at start (was 47%)
+            0x884285F4.toInt(),  // 53% mid (was 27%)
+            0x444285F4.toInt()   // 27% at end (was 9%)
         ),
         floatArrayOf(0f, 0.5f, 1f),
         android.graphics.Shader.TileMode.CLAMP

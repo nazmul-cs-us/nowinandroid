@@ -29,12 +29,19 @@ fun getCurrentDate(): String {
 }
 
 /**
- * Calculate Qibla direction using great circle formula
+ * Calculate Qibla direction using standard great circle (spherical) bearing formula
+ *
+ * This uses the correct initial bearing formula for navigation on a sphere:
+ * θ = atan2( sin(Δλ)·cos(φ2), cos(φ1)·sin(φ2) − sin(φ1)·cos(φ2)·cos(Δλ) )
+ *
+ * This ensures consistency with NASA WorldWind's great circle calculations
+ * used in the 3D globe visualization.
+ *
  * @param lat1 Current location latitude
  * @param lon1 Current location longitude
  * @param lat2 Kaaba latitude (21.4225)
  * @param lon2 Kaaba longitude (39.8262)
- * @return Qibla direction in degrees
+ * @return Qibla direction in degrees from true North (0-360)
  */
 fun calculateQiblaDirection(
     lat1: Double, lon1: Double,
@@ -45,9 +52,13 @@ fun calculateQiblaDirection(
     val lat2Rad = Math.toRadians(lat2)
     val deltaLon = Math.toRadians(lon2 - lon1)
 
-    val y = kotlin.math.sin(deltaLon)
-    val x = kotlin.math.cos(lat1Rad) * kotlin.math.tan(lat2Rad) -
-             kotlin.math.sin(lat1Rad) * kotlin.math.cos(deltaLon)
+    // Standard great circle initial bearing formula
+    // y component: sin(Δλ) * cos(φ2)
+    val y = kotlin.math.sin(deltaLon) * kotlin.math.cos(lat2Rad)
+
+    // x component: cos(φ1) * sin(φ2) - sin(φ1) * cos(φ2) * cos(Δλ)
+    val x = kotlin.math.cos(lat1Rad) * kotlin.math.sin(lat2Rad) -
+            kotlin.math.sin(lat1Rad) * kotlin.math.cos(lat2Rad) * kotlin.math.cos(deltaLon)
 
     var qibla = Math.toDegrees(kotlin.math.atan2(y, x))
 
@@ -55,7 +66,7 @@ fun calculateQiblaDirection(
     // atan2 can return negative angles, so we add 360° if negative
     if (qibla < 0) qibla += 360.0
 
-    return qibla  // Direction to Qibla in degrees from North
+    return qibla  // Direction to Qibla in degrees from true North
 }
 
 /**
