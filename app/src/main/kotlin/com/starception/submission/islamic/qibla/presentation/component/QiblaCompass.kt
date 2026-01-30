@@ -81,82 +81,82 @@ fun QiblaCompass(
     var lastCompassUpdateTime by remember { mutableLongStateOf(0L) }
     val COMPASS_UPDATE_INTERVAL_MS = 50L // Update at most every 50ms (20 updates per second)
     
-    // Sensor management - Use TYPE_ORIENTATION for compass, TYPE_MAGNETIC_FIELD for accuracy
+    // Sensor management - Use rotation matrix method (same as QiblaGlobeView) for consistency
     val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
-    val orientationSensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION) }
+    val accelerometerSensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
     val magneticSensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) }
-    
-    // Orientation sensor listener - For compass direction
-    val orientationListener = remember {
-        object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent?) {
-                val currentTime = System.currentTimeMillis()
-                // Throttle updates to prevent flickering
-                if (currentTime - lastCompassUpdateTime < COMPASS_UPDATE_INTERVAL_MS) {
-                    return
-                }
-                lastCompassUpdateTime = currentTime
-                
-                val magneticNorth = Math.round(event!!.values[0]).toFloat()
-                compassDegree = magneticNorth
-                if (isInitializing) {
-                    isInitializing = false
-                }
-            }
-            
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // TYPE_ORIENTATION may not report accuracy reliably, but update if it does
-                if (!isInitializing && accuracy != SensorManager.SENSOR_STATUS_UNRELIABLE) {
-                    sensorAccuracy = accuracy
-                }
-            }
-        }
-    }
-    
-    // Magnetic field sensor listener - For accurate sensor strength detection
-    val magneticFieldListener = remember {
+
+    // Sensor data arrays for rotation matrix calculation
+    val gravity = remember { FloatArray(3) }
+    val geomagnetic = remember { FloatArray(3) }
+
+    // Combined sensor listener - Uses rotation matrix for accurate heading (same as QiblaGlobeView)
+    val sensorListener = remember {
         object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent?) {
                 if (event == null) return
-                
-                // Calculate magnetic field strength: sqrt(x^2 + y^2 + z^2)
-                val x = event.values[0]
-                val y = event.values[1]
-                val z = event.values[2]
-                val strength = sqrt(x * x + y * y + z * z)
-                magneticFieldStrength = strength
 
-                // Determine accuracy based on magnetic field strength
-                // Typical Earth magnetic field: ~25-65 microteslas
-                // Adjusted thresholds based on real-world measurements
-                if (!isInitializing) {
-                    sensorAccuracy = when {
-                        strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too weak
-                        strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too strong (interference)
-                        strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM // Weak field
-                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH // Normal range (25-100)
+                when (event.sensor.type) {
+                    Sensor.TYPE_ACCELEROMETER -> {
+                        System.arraycopy(event.values, 0, gravity, 0, 3)
+                    }
+                    Sensor.TYPE_MAGNETIC_FIELD -> {
+                        System.arraycopy(event.values, 0, geomagnetic, 0, 3)
+
+                        // Calculate magnetic field strength for accuracy detection
+                        val x = event.values[0]
+                        val y = event.values[1]
+                        val z = event.values[2]
+                        val strength = sqrt(x * x + y * y + z * z)
+                        magneticFieldStrength = strength
+
+                        // Update accuracy based on field strength
+                        if (!isInitializing) {
+                            sensorAccuracy = when {
+                                strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                                strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                                strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+                                else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
+                            }
+                        }
+                    }
+                }
+
+                // Throttle compass updates to prevent flickering
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastCompassUpdateTime < COMPASS_UPDATE_INTERVAL_MS) {
+                    return
+                }
+
+                // Calculate orientation using rotation matrix (same method as QiblaGlobeView)
+                val rotationMatrix = FloatArray(9)
+                val success = SensorManager.getRotationMatrix(rotationMatrix, null, gravity, geomagnetic)
+
+                if (success) {
+                    val orientation = FloatArray(3)
+                    SensorManager.getOrientation(rotationMatrix, orientation)
+
+                    // Azimuth (heading) in radians, convert to degrees
+                    var azimuthDegrees = Math.toDegrees(orientation[0].toDouble()).toFloat()
+                    if (azimuthDegrees < 0) {
+                        azimuthDegrees += 360f
+                    }
+
+                    // Store magnetic north (before declination correction)
+                    // Declination is applied later in trueNorth calculation
+                    compassDegree = azimuthDegrees
+                    lastCompassUpdateTime = currentTime
+
+                    if (isInitializing) {
+                        isInitializing = false
                     }
                 }
             }
-            
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // Magnetic field sensor reports accuracy more reliably
-                if (!isInitializing) {
-                    // Combine reported accuracy with strength-based accuracy
-                    val strengthBasedAccuracy = when {
-                        magneticFieldStrength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
-                        magneticFieldStrength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
-                        magneticFieldStrength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
-                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
-                    }
 
-                    // Prioritize strength-based accuracy over system-reported accuracy
-                    // System often reports MEDIUM even when field strength is perfectly normal
-                    sensorAccuracy = if (magneticFieldStrength > 0f) {
-                        strengthBasedAccuracy // Trust our calculation
-                    } else {
-                        minOf(accuracy, strengthBasedAccuracy) // Fallback to conservative approach
-                    }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+                // Update accuracy from system if needed
+                if (!isInitializing && magneticFieldStrength == 0f) {
+                    sensorAccuracy = accuracy
                 }
             }
         }
@@ -231,43 +231,40 @@ fun QiblaCompass(
         label = "compassRotation"
     )
     
-    // Lifecycle management - Register both sensors
+    // Lifecycle management - Register accelerometer and magnetic field sensors (same as QiblaGlobeView)
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    // Register orientation sensor for compass direction
-                    orientationSensor?.let {
+                    // Register accelerometer sensor
+                    accelerometerSensor?.let {
                         sensorManager.registerListener(
-                            orientationListener, 
-                            it, 
-                            SensorManager.SENSOR_DELAY_GAME
+                            sensorListener,
+                            it,
+                            SensorManager.SENSOR_DELAY_UI
                         )
                     }
-                    // Register magnetic field sensor for accuracy detection
+                    // Register magnetic field sensor
                     magneticSensor?.let {
                         sensorManager.registerListener(
-                            magneticFieldListener, 
-                            it, 
-                            SensorManager.SENSOR_DELAY_GAME
+                            sensorListener,
+                            it,
+                            SensorManager.SENSOR_DELAY_UI
                         )
                     }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    // Unregister both sensors
-                    sensorManager.unregisterListener(orientationListener)
-                    sensorManager.unregisterListener(magneticFieldListener)
+                    sensorManager.unregisterListener(sensorListener)
                 }
                 else -> {}
             }
         }
-        
+
         lifecycleOwner.lifecycle.addObserver(observer)
-        
+
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            sensorManager.unregisterListener(orientationListener)
-            sensorManager.unregisterListener(magneticFieldListener)
+            sensorManager.unregisterListener(sensorListener)
         }
     }
     
@@ -286,8 +283,8 @@ fun QiblaCompass(
     )
     val isNearQibla = angularDistance <= 5f
 
-    // Debug logging
-    android.util.Log.d("QiblaCompass", "animatedCompassDegree=$animatedCompassDegree, normalizedAngle=$normalizedAngle, angularDistance=$angularDistance, isNearQibla=$isNearQibla, needsCalibration=$needsCalibration")
+    // Debug logging - compare with QiblaGlobeAlignment
+    android.util.Log.d("QiblaCompassAlignment", "compassDegree=$compassDegree, trueNorth=$trueNorth, qiblaDirection=$qiblaDirection, targetDegree=$targetDegree, angularDistance=$angularDistance, isNearQibla=$isNearQibla, declination=$magneticDeclination")
 
     // Enhanced UI with better novice user guidance
     Box(
