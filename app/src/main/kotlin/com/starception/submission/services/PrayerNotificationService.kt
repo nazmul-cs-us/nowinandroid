@@ -764,7 +764,8 @@ class PrayerNotificationService : Service() {
                                 progress = progress,
                                 prayerPhase = prayerPhase,
                                 prayerName = prayerName,
-                                prayerTime = prayerTime
+                                prayerTime = prayerTime,
+                                nextPrayerCountdown = detailedMessage.trim() // Pass countdown for status chip
                             )
 
                             // Use startForeground() to update notification while maintaining foreground service priority
@@ -1889,23 +1890,35 @@ class PrayerNotificationService : Service() {
                 setPackage(packageName)
             }
 
-            val restartServicePendingIntent = PendingIntent.getService(
+            val restartServicePendingIntent = PendingIntent.getForegroundService(
                 applicationContext,
                 1,
                 restartServiceIntent,
-                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
-            // Restart in 1 second
-            alarmManager.set(
-                android.app.AlarmManager.ELAPSED_REALTIME,
-                android.os.SystemClock.elapsedRealtime() + 1000,
-                restartServicePendingIntent
-            )
+            val triggerTime = android.os.SystemClock.elapsedRealtime() + 1000
 
-            Log.i(TAG, "✅ Service restart scheduled for 1 second from now")
-            FileLogger.i(TAG, "Service restart scheduled via AlarmManager")
+            // Use setExactAndAllowWhileIdle to wake device from Doze mode
+            // This is critical for prayer notifications to work reliably
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,  // WAKEUP to wake device
+                    triggerTime,
+                    restartServicePendingIntent
+                )
+                Log.i(TAG, "✅ Service restart scheduled with setExactAndAllowWhileIdle (Doze-safe)")
+            } else {
+                alarmManager.setExact(
+                    android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    triggerTime,
+                    restartServicePendingIntent
+                )
+                Log.i(TAG, "✅ Service restart scheduled with setExact")
+            }
+
+            FileLogger.i(TAG, "Service restart scheduled via AlarmManager (WAKEUP, Doze-safe)")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to schedule service restart: ${e.message}")
             FileLogger.e(TAG, "Failed to schedule service restart: ${e.message}")
