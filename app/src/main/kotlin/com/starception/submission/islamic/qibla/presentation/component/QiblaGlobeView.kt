@@ -266,8 +266,11 @@ fun QiblaGlobeView(
     Box(
         modifier = modifier
             .fillMaxSize()  // Fill both width and height from parent constraints
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            // Removed clip - can interfere with touch handling on AndroidView
+            .background(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(16.dp)
+            )
     ) {
         // Create backdrop for liquid glass effect
         val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -276,7 +279,7 @@ fun QiblaGlobeView(
             drawContent()
         }
 
-        // WorldWind globe view with lifecycle management - wrapped in touch-passthrough container
+        // WorldWind globe view with lifecycle management
         AndroidView(
                 factory = { ctx ->
                     val (worldWindow, qiblaLayer, headingCone) = createWorldWindow(
@@ -307,6 +310,20 @@ fun QiblaGlobeView(
                     worldWindow.isFocusableInTouchMode = true
                     worldWindow.isClickable = true
 
+                    // Handle touches directly and forward to controller
+                    worldWindow.setOnTouchListener { v, event ->
+                        // Request parent to not intercept
+                        v.parent?.requestDisallowInterceptTouchEvent(true)
+
+                        // Forward to controller
+                        val controller = worldWindow.worldWindowController
+                        val handled = controller?.onTouchEvent(event) ?: false
+                        android.util.Log.d("QiblaGlobeTouch", "🔥 Touch: action=${event.actionMasked}, controller=$handled")
+
+                        // Return true to claim the touch and prevent cancellation
+                        true
+                    }
+
                     // Add lifecycle observer to properly manage GLSurfaceView
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
@@ -323,35 +340,18 @@ fun QiblaGlobeView(
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)
 
-                    // Wrap WorldWindow in a container that ensures touch events are properly dispatched
-                    val container = TouchPassthroughLayout(ctx).apply {
-                        addView(worldWindow)
-                        // Request disallow intercept on the container itself
-                        setOnTouchListener { view, event ->
-                            parent?.requestDisallowInterceptTouchEvent(true)
-                            false
-                        }
-                    }
-
                     worldWindow.requestFocus()
-                    container
+                    worldWindow
                 },
-                modifier = Modifier
-                    .fillMaxSize(),
-                update = { container ->
-                    // Force layout and focus on the WorldWindow inside container
-                    container.requestLayout()
-                    val worldWindow = container.getChildAt(0) as? WorldWindow
-                    worldWindow?.let {
-                        if (!it.hasFocus()) {
-                            it.requestFocus()
-                        }
+                modifier = Modifier.fillMaxSize(),
+                update = { worldWindow ->
+                    worldWindow.requestLayout()
+                    if (!worldWindow.hasFocus()) {
+                        worldWindow.requestFocus()
                     }
                 },
-                onRelease = { container ->
-                    // Clean up when view is removed
-                    val worldWindow = container.getChildAt(0) as? WorldWindow
-                    worldWindow?.onPause()
+                onRelease = { worldWindow ->
+                    worldWindow.onPause()
                     worldWindowRef = null
                 }
             )
@@ -520,21 +520,37 @@ private class TouchPassthroughLayout(context: AndroidContext) : android.widget.F
         return false
     }
 
-    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
-        ev ?: return super.dispatchTouchEvent(ev)
+    override fun onTouchEvent(ev: MotionEvent?): Boolean {
+        ev ?: return super.onTouchEvent(ev)
 
         // Request parent to not intercept
         parent?.requestDisallowInterceptTouchEvent(true)
 
-        // Get the WorldWindow child and dispatch directly to it
-        val worldWindow = getChildAt(0)
+        // Forward touch event to WorldWindow's onTouchEvent via its controller
+        val worldWindow = getChildAt(0) as? WorldWindow
         if (worldWindow != null) {
-            android.util.Log.d("QiblaGlobeTouch", "📱 Dispatching to WorldWindow: action=${ev.actionMasked}")
-            val handled = worldWindow.dispatchTouchEvent(ev)
-            android.util.Log.d("QiblaGlobeTouch", "📱 WorldWindow returned: $handled")
-            return true // Always claim we handled it to prevent cancellation
+            android.util.Log.d("QiblaGlobeTouch", "📱 onTouchEvent forwarding: action=${ev.actionMasked}")
+            // Call the controller directly
+            val controller = worldWindow.worldWindowController
+            if (controller != null) {
+                val handled = controller.onTouchEvent(ev)
+                android.util.Log.d("QiblaGlobeTouch", "📱 Controller returned: $handled")
+                return true
+            }
         }
-        return super.dispatchTouchEvent(ev)
+        return super.onTouchEvent(ev)
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        ev ?: return super.dispatchTouchEvent(ev)
+        parent?.requestDisallowInterceptTouchEvent(true)
+        // First try normal dispatch
+        val result = super.dispatchTouchEvent(ev)
+        // If not handled, handle in onTouchEvent
+        if (!result) {
+            return onTouchEvent(ev)
+        }
+        return result
     }
 }
 
