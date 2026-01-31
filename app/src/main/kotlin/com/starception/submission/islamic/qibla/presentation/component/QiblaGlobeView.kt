@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.ArrowBackIos
+import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -88,7 +88,6 @@ private class TouchTrackingController(
 ) : BasicWorldWindowController() {
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        android.util.Log.d("QiblaGlobeTouch", "🎯 Controller received: action=${event.actionMasked}")
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 onTouchStart()
@@ -99,7 +98,7 @@ private class TouchTrackingController(
         }
         // Let WorldWindow handle the gesture
         super.onTouchEvent(event)
-        // Always return true to claim touch events and prevent Compose from cancelling
+        // Always return true to claim touch events
         return true
     }
 }
@@ -311,16 +310,16 @@ fun QiblaGlobeView(
                     worldWindow.isClickable = true
 
                     // Handle touches directly and forward to controller
+                    // This is required because Compose's AndroidView doesn't properly forward
+                    // touch events to GLSurfaceView (WorldWindow) by default
                     worldWindow.setOnTouchListener { v, event ->
-                        // Request parent to not intercept
+                        // Request parent to not intercept our touch events
                         v.parent?.requestDisallowInterceptTouchEvent(true)
 
-                        // Forward to controller
-                        val controller = worldWindow.worldWindowController
-                        val handled = controller?.onTouchEvent(event) ?: false
-                        android.util.Log.d("QiblaGlobeTouch", "🔥 Touch: action=${event.actionMasked}, controller=$handled")
+                        // Forward touch event to WorldWindow's controller for gesture handling
+                        worldWindow.worldWindowController?.onTouchEvent(event)
 
-                        // Return true to claim the touch and prevent cancellation
+                        // Return true to claim the touch sequence and prevent cancellation
                         true
                     }
 
@@ -408,7 +407,7 @@ fun QiblaGlobeView(
                 ) {
                     // Direction arrow
                     Icon(
-                        imageVector = if (turnLeft) Icons.Default.KeyboardArrowLeft else Icons.Default.KeyboardArrowRight,
+                        imageVector = if (turnLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
                         contentDescription = if (turnLeft) "Turn left" else "Turn right",
                         tint = Color.White,
                         modifier = Modifier.size(24.dp)
@@ -434,7 +433,7 @@ fun QiblaGlobeView(
 
                     // Second arrow for emphasis
                     Icon(
-                        imageVector = if (turnLeft) Icons.Default.KeyboardArrowLeft else Icons.Default.KeyboardArrowRight,
+                        imageVector = if (turnLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
                         contentDescription = if (turnLeft) "Turn left" else "Turn right",
                         tint = Color.White,
                         modifier = Modifier.size(24.dp)
@@ -476,14 +475,20 @@ fun QiblaGlobeView(
             }
         }
 
-        // Locate Me button - resets view to show user and Kaaba
+        // Locate Me button - resets view to show user and Kaaba (with liquid glass effect)
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
                 .size(44.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
+                .drawBackdrop(
+                    backdrop = backdrop,
+                    shape = { CircleShape },
+                    effects = {
+                        vibrancy()
+                        lens(with(density) { 8.dp.toPx() }, with(density) { 16.dp.toPx() })
+                    }
+                )
                 .clickable {
                     // Reset camera to show both user and Kaaba
                     worldWindowRef?.let { ww ->
@@ -503,55 +508,11 @@ fun QiblaGlobeView(
                 imageVector = Icons.Default.MyLocation,
                 contentDescription = "Show my location and Kaaba",
                 tint = Color.White,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
     }
     }  // End BoxWithConstraints
-}
-
-/**
- * Custom FrameLayout that forces touch events directly to WorldWindow child
- */
-private class TouchPassthroughLayout(context: AndroidContext) : android.widget.FrameLayout(context) {
-
-    override fun onInterceptTouchEvent(ev: MotionEvent?): Boolean {
-        // Never intercept - let children handle all touches
-        return false
-    }
-
-    override fun onTouchEvent(ev: MotionEvent?): Boolean {
-        ev ?: return super.onTouchEvent(ev)
-
-        // Request parent to not intercept
-        parent?.requestDisallowInterceptTouchEvent(true)
-
-        // Forward touch event to WorldWindow's onTouchEvent via its controller
-        val worldWindow = getChildAt(0) as? WorldWindow
-        if (worldWindow != null) {
-            android.util.Log.d("QiblaGlobeTouch", "📱 onTouchEvent forwarding: action=${ev.actionMasked}")
-            // Call the controller directly
-            val controller = worldWindow.worldWindowController
-            if (controller != null) {
-                val handled = controller.onTouchEvent(ev)
-                android.util.Log.d("QiblaGlobeTouch", "📱 Controller returned: $handled")
-                return true
-            }
-        }
-        return super.onTouchEvent(ev)
-    }
-
-    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
-        ev ?: return super.dispatchTouchEvent(ev)
-        parent?.requestDisallowInterceptTouchEvent(true)
-        // First try normal dispatch
-        val result = super.dispatchTouchEvent(ev)
-        // If not handled, handle in onTouchEvent
-        if (!result) {
-            return onTouchEvent(ev)
-        }
-        return result
-    }
 }
 
 /**
