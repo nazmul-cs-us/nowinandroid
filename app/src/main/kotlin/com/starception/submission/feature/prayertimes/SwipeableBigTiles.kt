@@ -166,8 +166,12 @@ import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.Checkroom
-import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.outlined.Fullscreen
 import com.starception.submission.feature.prayertimes.components.GlobePopupScreen
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -1901,10 +1905,19 @@ private fun QiblaGlobeTile(
     prayerTimes: DayPrayerTimes?,
     onFullscreenClick: () -> Unit = {}
 ) {
+    val density = LocalDensity.current
+    val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
+
+    // Create backdrop for liquid glass effect
+    val backdrop = rememberLayerBackdrop {
+        drawRect(surfaceColor)
+        drawContent()
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = surfaceColor,
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
     ) {
         Box(
@@ -1918,21 +1931,27 @@ private fun QiblaGlobeTile(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Fullscreen button in top-left corner
+                // Fullscreen button in top-left corner (with liquid glass effect)
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(12.dp)
                         .size(36.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                        .drawBackdrop(
+                            backdrop = backdrop,
+                            shape = { CircleShape },
+                            effects = {
+                                vibrancy()
+                                lens(with(density) { 6.dp.toPx() }, with(density) { 12.dp.toPx() })
+                            }
+                        )
                         .clickable { onFullscreenClick() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Fullscreen,
+                        imageVector = Icons.Outlined.Fullscreen,
                         contentDescription = "Open fullscreen globe",
-                        tint = MaterialTheme.colorScheme.onSurface,
+                        tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 }
