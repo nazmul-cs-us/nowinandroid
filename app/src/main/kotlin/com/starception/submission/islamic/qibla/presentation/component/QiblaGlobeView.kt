@@ -80,6 +80,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Custom controller that tracks user touch interaction
+ * Always returns true to claim the touch sequence and prevent Compose from cancelling it
  */
 private class TouchTrackingController(
     private val onTouchStart: () -> Unit,
@@ -87,6 +88,7 @@ private class TouchTrackingController(
 ) : BasicWorldWindowController() {
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        android.util.Log.d("QiblaGlobeTouch", "🎯 Controller received: action=${event.actionMasked}")
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 onTouchStart()
@@ -95,7 +97,10 @@ private class TouchTrackingController(
                 onTouchEnd()
             }
         }
-        return super.onTouchEvent(event)
+        // Let WorldWindow handle the gesture
+        super.onTouchEvent(event)
+        // Always return true to claim touch events and prevent Compose from cancelling
+        return true
     }
 }
 
@@ -271,7 +276,7 @@ fun QiblaGlobeView(
             drawContent()
         }
 
-        // WorldWind globe view with lifecycle management
+        // WorldWind globe view with lifecycle management - wrapped in touch-passthrough container
         AndroidView(
                 factory = { ctx ->
                     val (worldWindow, qiblaLayer, headingCone) = createWorldWindow(
@@ -297,6 +302,11 @@ fun QiblaGlobeView(
                     qiblaLayerRef = qiblaLayer
                     userMarkerPlacemark = headingCone
 
+                    // CRITICAL: Enable touch handling for WorldWindow (GLSurfaceView)
+                    worldWindow.isFocusable = true
+                    worldWindow.isFocusableInTouchMode = true
+                    worldWindow.isClickable = true
+
                     // Add lifecycle observer to properly manage GLSurfaceView
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
@@ -313,18 +323,35 @@ fun QiblaGlobeView(
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)
 
-                    worldWindow
+                    // Wrap WorldWindow in a container that ensures touch events are properly dispatched
+                    val container = TouchPassthroughLayout(ctx).apply {
+                        addView(worldWindow)
+                        // Request disallow intercept on the container itself
+                        setOnTouchListener { view, event ->
+                            parent?.requestDisallowInterceptTouchEvent(true)
+                            false
+                        }
+                    }
+
+                    worldWindow.requestFocus()
+                    container
                 },
                 modifier = Modifier
                     .fillMaxSize(),
-                    // Note: removed layerBackdrop to ensure touch events reach WorldWindow
-                update = { worldWindow ->
-                    // Force a layout pass to ensure WorldWindow viewport matches dimensions
-                    worldWindow.requestLayout()
+                update = { container ->
+                    // Force layout and focus on the WorldWindow inside container
+                    container.requestLayout()
+                    val worldWindow = container.getChildAt(0) as? WorldWindow
+                    worldWindow?.let {
+                        if (!it.hasFocus()) {
+                            it.requestFocus()
+                        }
+                    }
                 },
-                onRelease = { worldWindow ->
+                onRelease = { container ->
                     // Clean up when view is removed
-                    worldWindow.onPause()
+                    val worldWindow = container.getChildAt(0) as? WorldWindow
+                    worldWindow?.onPause()
                     worldWindowRef = null
                 }
             )
@@ -484,6 +511,34 @@ fun QiblaGlobeView(
 }
 
 /**
+ * Custom FrameLayout that forces touch events directly to WorldWindow child
+ */
+private class TouchPassthroughLayout(context: AndroidContext) : android.widget.FrameLayout(context) {
+
+    override fun onInterceptTouchEvent(ev: MotionEvent?): Boolean {
+        // Never intercept - let children handle all touches
+        return false
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        ev ?: return super.dispatchTouchEvent(ev)
+
+        // Request parent to not intercept
+        parent?.requestDisallowInterceptTouchEvent(true)
+
+        // Get the WorldWindow child and dispatch directly to it
+        val worldWindow = getChildAt(0)
+        if (worldWindow != null) {
+            android.util.Log.d("QiblaGlobeTouch", "📱 Dispatching to WorldWindow: action=${ev.actionMasked}")
+            val handled = worldWindow.dispatchTouchEvent(ev)
+            android.util.Log.d("QiblaGlobeTouch", "📱 WorldWindow returned: $handled")
+            return true // Always claim we handled it to prevent cancellation
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+}
+
+/**
  * Create and configure WorldWind globe view with enhanced Qibla visualization
  */
 private fun createWorldWindow(
@@ -500,7 +555,10 @@ private fun createWorldWindow(
     val worldWindow = WorldWindow(context)
 
     // Explicitly set layout parameters to ensure proper viewport sizing
-    worldWindow.layoutParams = android.view.ViewGroup.LayoutParams(viewWidth, viewHeight)
+    worldWindow.layoutParams = android.view.ViewGroup.LayoutParams(
+        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+    )
     android.util.Log.d("QiblaGlobeView", "🌍 WorldWindow created with explicit size: ${viewWidth}x${viewHeight}")
 
     // Set up touch-tracking controller for pan/zoom with compass pause

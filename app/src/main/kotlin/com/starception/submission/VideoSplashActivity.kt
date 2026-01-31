@@ -16,6 +16,7 @@
 
 package com.starception.submission
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
@@ -37,10 +38,11 @@ import androidx.media3.ui.PlayerView
 /**
  * VIDEO SPLASH ACTIVITY
  *
- * Plays a video splash screen before launching the main application.
+ * Plays a video splash screen on FIRST APP LAUNCH ONLY.
  * Uses ExoPlayer (Media3) for smooth video playback.
  *
  * Features:
+ * - Shows only on first app launch (uses SharedPreferences)
  * - Full-screen immersive video playback
  * - Automatic navigation to MainActivity when video completes
  * - Tap to skip functionality
@@ -51,9 +53,27 @@ class VideoSplashActivity : ComponentActivity() {
     private var player: ExoPlayer? = null
     private var playerView: PlayerView? = null
 
+    companion object {
+        private const val PREFS_NAME = "splash_prefs"
+        private const val KEY_SPLASH_SHOWN = "splash_shown"
+    }
+
     @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Check if splash was already shown
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val splashAlreadyShown = prefs.getBoolean(KEY_SPLASH_SHOWN, false)
+
+        if (splashAlreadyShown) {
+            // Skip splash and go directly to MainActivity
+            navigateToMain()
+            return
+        }
+
+        // Mark splash as shown for future launches
+        prefs.edit().putBoolean(KEY_SPLASH_SHOWN, true).apply()
 
         // Enable edge-to-edge immersive mode
         enableImmersiveMode()

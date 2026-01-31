@@ -118,15 +118,15 @@ fun GlobePopupScreen(
             .background(MaterialTheme.colorScheme.surface.copy(alpha = backgroundAlpha))
             .windowInsetsPadding(WindowInsets.systemBars)
     ) {
-        // Globe container - NO graphicsLayer or clip to ensure touch events work
-        // AndroidView (WorldWind) requires direct touch access without transforms
+        // Globe container - NO graphicsLayer to ensure touch events work properly
+        // AndroidView (WorldWind) requires unmodified touch coordinates
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = 72.dp, bottom = 140.dp)  // Leave space for header and instructions
                 .padding(horizontal = 8.dp)  // Match tile content padding
         ) {
-            // Background styling layer (doesn't block touches)
+            // Background layer with animations (separate from touch-receiving globe)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -134,8 +134,6 @@ fun GlobePopupScreen(
                         scaleX = contentScale
                         scaleY = contentScale
                         alpha = contentAlpha
-                        clip = true
-                        shape = RoundedCornerShape(32.dp)
                     }
                     .background(
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -143,11 +141,13 @@ fun GlobePopupScreen(
                     )
             )
 
-            // Globe view - no transforms or clips, direct touch handling for AndroidView
+            // Globe view - NO transforms, receives raw touch events
             QiblaGlobeView(
                 userLatitude = userLatitude,
                 userLongitude = userLongitude,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(32.dp))
             )
         }
 

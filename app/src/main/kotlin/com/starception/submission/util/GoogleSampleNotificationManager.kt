@@ -335,7 +335,7 @@ object GoogleSampleNotificationManager {
      * @return The built Notification object ready for startForeground()
      */
     @RequiresApi(35) // Android 16+ (BAKLAVA = 35)
-    fun buildPrayerNotification(title: String, content: String, detailedMessage: String = "", progress: Int, prayerPhase: String = "", prayerName: String = "", prayerTime: String = ""): android.app.Notification {
+    fun buildPrayerNotification(title: String, content: String, detailedMessage: String = "", progress: Int, prayerPhase: String = "", prayerName: String = "", prayerTime: String = "", nextPrayerCountdown: String = ""): android.app.Notification {
         android.util.Log.d("GoogleSampleNotificationManager", "Building Progress-Centric prayer notification (for startForeground)...")
         
         // Store current prayer information for action buttons
@@ -459,13 +459,53 @@ object GoogleSampleNotificationManager {
             else -> "🧍"
         }
 
-        // Android 16 Progress-Centric: Create concise, clear status text for status chip (visible on AOD)
-        // Format: [Activity Emoji] [Prayer Phase]
-        val shortCriticalText = when {
-            progress <= 20 -> "$activityEmoji 🕌 Go to Mosque"
-            progress <= 60 -> "$activityEmoji 🧎 Best Time"
-            else -> "$activityEmoji ⏰ Make Time"
+        // Android 16 Status Chip: Text must be under 7 characters for full display
+        // Per documentation: < 7 chars = full text, < 50% fits = icon only
+        // Max chip width is 96dp
+        //
+        // Extract actual countdown from nextPrayerCountdown or content
+        // Format: "Next • Asr in 2h 56m" or "Dhuhr in 45m"
+        // Priority: Show hours if exists (e.g., "Asr2h"), otherwise minutes (e.g., "Dhr45m")
+        val textToSearch = if (nextPrayerCountdown.isNotBlank()) nextPrayerCountdown else content
+
+        // Extract hours if present: "2h" from "2h 56m"
+        val hoursRegex = Regex("""(\d+)\s*h""")
+        val hoursMatch = hoursRegex.find(textToSearch)
+        val hours = hoursMatch?.groupValues?.get(1)?.toIntOrNull()
+
+        // Extract minutes: "56m" or "45m"
+        val minutesRegex = Regex("""(\d+)\s*m""")
+        val minutesMatch = minutesRegex.find(textToSearch)
+        val minutes = minutesMatch?.groupValues?.get(1)?.toIntOrNull()
+
+        // Get short prayer name for chip (3 chars max)
+        // Look for NEXT prayer in the countdown text
+        val nextPrayerShort = when {
+            textToSearch.contains("Fajr", ignoreCase = true) -> "Fjr"
+            textToSearch.contains("Dhuhr", ignoreCase = true) -> "Dhr"
+            textToSearch.contains("Asr", ignoreCase = true) -> "Asr"
+            textToSearch.contains("Maghrib", ignoreCase = true) -> "Mgb"
+            textToSearch.contains("Isha", ignoreCase = true) -> "Ish"
+            else -> "Nxt"
         }
+
+        // Show hours if available, otherwise minutes
+        // e.g., "Asr2h" (5 chars) or "Dhr45m" (6 chars)
+        val shortCriticalText = when {
+            hours != null && hours > 0 -> "$nextPrayerShort${hours}h"  // e.g., "Asr2h"
+            minutes != null -> "$nextPrayerShort${minutes}m"           // e.g., "Dhr45m"
+            else -> {
+                // Fallback to phase-based display if no countdown available
+                when {
+                    progress <= 20 -> "Mo${20 - progress}m"
+                    progress <= 60 -> "Bst${60 - progress}m"
+                    else -> "Pry${100 - progress}m"
+                }
+            }
+        }
+
+        android.util.Log.d("GoogleSampleNotificationManager",
+            "📊 Status Chip: '$shortCriticalText' (${shortCriticalText.length} chars) | Hours: $hours | Minutes: $minutes | From: '$textToSearch'")
         
         // Android 16 Progress-Centric: Combine content for clear journey communication
         val fullContent = if (detailedMessage.isNotEmpty()) {
@@ -501,12 +541,15 @@ object GoogleSampleNotificationManager {
             .setStyle(progressStyle)  // Progress-centric style
             .setOngoing(true)
             .setRequestPromotedOngoing(true)  // Enable Live Updates
-            .setShortCriticalText(shortCriticalText)  // Status chip text for status bar
-            .setUsesChronometer(false)  // Don't use chronometer for prayer tracking
+            .setShortCriticalText(shortCriticalText)  // Status chip text for status bar (< 7 chars)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)  // Appropriate category
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)  // Public visibility for lock screen
             .setShowWhen(true)  // Show timestamp on notification
-            .setWhen(System.currentTimeMillis())  // Update timestamp with each notification update
+
+        // No countdown timer - just show current time
+        // Status chip will display shortCriticalText (e.g., "Asr2h") without live countdown
+        notificationBuilder.setWhen(System.currentTimeMillis())
+        notificationBuilder.setUsesChronometer(false)
 
         // Add "Mark as Prayed" action button only if prayer is NOT already marked
         if (markAsPrayedAction != null) {
