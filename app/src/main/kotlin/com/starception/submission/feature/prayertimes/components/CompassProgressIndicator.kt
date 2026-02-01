@@ -81,7 +81,10 @@ fun CompassProgressIndicator(
     progress: Float,
     modifier: Modifier = Modifier,
     size: androidx.compose.ui.unit.Dp = 88.dp,
-    locationService: EnhancedLocationService? = null
+    locationService: EnhancedLocationService? = null,
+    userLatitude: Double = 0.0,
+    userLongitude: Double = 0.0,
+    showGlobe: Boolean = false
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -551,71 +554,87 @@ fun CompassProgressIndicator(
         }
         
         
-        // Enhanced center content with integrated facing status
+        // Enhanced center content with integrated facing status or globe
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                // Qibla direction with status - no emoji since Kaaba icon is shown separately
-                val displayText = if (needsCalibration) {
-                    "Calibrate"
-                } else if (isNearQibla) {
-                    if (size >= 140.dp) "Facing Qibla" else "Aligned"
-                } else {
-                    "Qibla"
+            if (showGlobe && userLatitude != 0.0 && userLongitude != 0.0) {
+                // Show simple 3D globe in the center of the compass
+                val globeSize = size - 40.dp // Leave space for the compass arc and border
+                Box(
+                    modifier = Modifier
+                        .size(globeSize)
+                        .clip(CircleShape)
+                ) {
+                    SimpleGlobeView(
+                        userLatitude = userLatitude,
+                        userLongitude = userLongitude,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
-                
-                
-                Text(
-                    text = displayText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (needsCalibration) {
-                        Color(0xFFFF4444)
-                    } else if (isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH) {
-                        Color(0xFF00C853) // Bright green when facing Qibla with high accuracy
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    // Qibla direction with status - no emoji since Kaaba icon is shown separately
+                    val displayText = if (needsCalibration) {
+                        "Calibrate"
+                    } else if (isNearQibla) {
+                        if (size >= 140.dp) "Facing Qibla" else "Aligned"
                     } else {
-                        accuracyColor // Use accuracy-based color (orange for medium, green for high)
-                    },
-                    textAlign = TextAlign.Center,
-                    fontWeight = if (isNearQibla && !needsCalibration) FontWeight.Bold else FontWeight.SemiBold,
-                    fontSize = if (size >= 280.dp) 16.sp else 12.sp,
-                )
-                
-                // Guidance text for popup - dynamic based on status with rotation direction
-                if (size >= 260.dp) {
-                    // Stable guidance text to prevent overlapping during rapid changes
-                    val guidanceText = remember(isNearQibla, needsCalibration, needsClockwise, angularDistance) {
-                        if (isNearQibla && !needsCalibration) {
-                            "✓ Aligned with Qibla"
-                        } else if (needsCalibration) {
-                            "Calibrate compass\nby moving phone\nin figure-8"
-                        } else {
-                            // Show rotation direction for minimum path to Qibla
-                            val rotationDirection = if (needsClockwise) "Clockwise" else "Counter-clockwise"
-                            "Turn $rotationDirection\n${angularDistance.toInt()}° to Qibla"
-                        }
+                        "Qibla"
                     }
 
+
                     Text(
-                        text = guidanceText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH) {
-                            Color(0xFF00C853) // Bright green when aligned with high accuracy
+                        text = displayText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (needsCalibration) {
+                            Color(0xFFFF4444)
+                        } else if (isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH) {
+                            Color(0xFF00C853) // Bright green when facing Qibla with high accuracy
                         } else {
-                            Color.Black.copy(alpha = 0.6f)
+                            accuracyColor // Use accuracy-based color (orange for medium, green for high)
                         },
                         textAlign = TextAlign.Center,
-                        fontWeight = if (isNearQibla && !needsCalibration) FontWeight.Medium else FontWeight.Medium,
-                        fontSize = 13.sp,
-                        lineHeight = 15.sp,
-                        modifier = Modifier.padding(top = 6.dp)
+                        fontWeight = if (isNearQibla && !needsCalibration) FontWeight.Bold else FontWeight.SemiBold,
+                        fontSize = if (size >= 280.dp) 16.sp else 12.sp,
                     )
+
+                    // Guidance text for popup - dynamic based on status with rotation direction
+                    if (size >= 260.dp) {
+                        // Stable guidance text to prevent overlapping during rapid changes
+                        val guidanceText = remember(isNearQibla, needsCalibration, needsClockwise, angularDistance) {
+                            if (isNearQibla && !needsCalibration) {
+                                "✓ Aligned with Qibla"
+                            } else if (needsCalibration) {
+                                "Calibrate compass\nby moving phone\nin figure-8"
+                            } else {
+                                // Show rotation direction for minimum path to Qibla
+                                val rotationDirection = if (needsClockwise) "Clockwise" else "Counter-clockwise"
+                                "Turn $rotationDirection\n${angularDistance.toInt()}° to Qibla"
+                            }
+                        }
+
+                        Text(
+                            text = guidanceText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH) {
+                                Color(0xFF00C853) // Bright green when aligned with high accuracy
+                            } else {
+                                Color.Black.copy(alpha = 0.6f)
+                            },
+                            textAlign = TextAlign.Center,
+                            fontWeight = if (isNearQibla && !needsCalibration) FontWeight.Medium else FontWeight.Medium,
+                            fontSize = 13.sp,
+                            lineHeight = 15.sp,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
                 }
             }
         }
