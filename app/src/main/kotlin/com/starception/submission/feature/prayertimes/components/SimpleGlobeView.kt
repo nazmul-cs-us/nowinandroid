@@ -185,7 +185,7 @@ private fun createSimpleWorldWindow(
 
     // Range to show Earth filling its container
     // Lower value = camera closer = Earth fills more of the view
-    val finalRange = earthRadius * 2.2
+    val finalRange = earthRadius * 1.8
 
     val lookAt = LookAt().apply {
         set(
