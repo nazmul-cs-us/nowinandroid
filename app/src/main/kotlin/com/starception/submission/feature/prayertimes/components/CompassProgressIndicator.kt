@@ -487,7 +487,7 @@ fun CompassProgressIndicator(
         CircularProgressIndicator(
             progress = { arcProgress }, // Animated progress - shrinks to dot when aligned
             modifier = Modifier
-                .size(size - 16.dp)
+                .size(size - 28.dp)  // Shrunk to give globe more space
                 .rotate(animatedCompassDegree - 18f) // Offset by -18° (half of 36°) so arc CENTER aligns with Kaaba when facing Qibla
                 .graphicsLayer {
                     alpha = arcAlpha
@@ -563,7 +563,7 @@ fun CompassProgressIndicator(
         ) {
             if (showGlobe && userLatitude != 0.0 && userLongitude != 0.0) {
                 // Show simple 3D globe in the center of the compass
-                val globeSize = size - 40.dp // Leave space for the compass arc and border
+                val globeSize = size - 24.dp // Smaller margin - more space for globe
                 Box(
                     modifier = Modifier
                         .size(globeSize)
