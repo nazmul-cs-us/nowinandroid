@@ -184,7 +184,7 @@ private fun createSimpleWorldWindow(
     val midLon = (userLon + makkahLon) / 2.0
 
     // Range to show the globe filling the view
-    val finalRange = earthRadius * 2.2  // Closer range - globe fills the circle
+    val finalRange = earthRadius * 1.8  // Closer range - globe fills the circle
 
     val lookAt = LookAt().apply {
         set(
