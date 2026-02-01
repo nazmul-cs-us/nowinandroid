@@ -503,7 +503,7 @@ fun CompassProgressIndicator(
                 // Use accuracy-based color (orange for medium, green for high when not aligned)
                 accuracyColor
             },
-            strokeWidth = if (isNearQibla) 10.dp else 8.dp, // Slightly thicker when aligned
+            strokeWidth = if (isNearQibla) 6.dp else 5.dp, // Thinner arc to give globe more space
             trackColor = Color.Black.copy(alpha = 0.1f),
             strokeCap = StrokeCap.Round,
         )
@@ -564,9 +564,8 @@ fun CompassProgressIndicator(
         ) {
             if (showGlobe && userLatitude != 0.0 && userLongitude != 0.0) {
                 // Show simple 3D globe inside the arc
-                // Arc is at (size - 16.dp) with 8.dp stroke, inner edge ~(size - 24.dp)
-                // Globe at (size - 40.dp) gives 8dp gap from arc inner edge
-                val globeSize = size - 40.dp
+                // Balance between globe size and arc visibility
+                val globeSize = size - 24.dp
                 Box(
                     modifier = Modifier
                         .size(globeSize)
