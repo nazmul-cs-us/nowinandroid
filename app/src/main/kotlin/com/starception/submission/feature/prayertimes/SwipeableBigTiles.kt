@@ -1479,7 +1479,10 @@ private fun NextPrayerTile(
                             progress = 0.7f,
                             modifier = Modifier.fillMaxSize(),
                             size = compassSize,
-                            locationService = locationService
+                            locationService = locationService,
+                            userLatitude = prayerTimes?.location?.latitude ?: 0.0,
+                            userLongitude = prayerTimes?.location?.longitude ?: 0.0,
+                            showGlobe = true
                         )
                         }
                     }

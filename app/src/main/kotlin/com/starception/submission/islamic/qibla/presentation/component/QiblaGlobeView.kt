@@ -120,7 +120,8 @@ private class TouchTrackingController(
 fun QiblaGlobeView(
     userLatitude: Double,
     userLongitude: Double,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showControls: Boolean = true  // Set to false to hide overlay buttons and info cards
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -355,161 +356,164 @@ fun QiblaGlobeView(
                 }
             )
 
-        // Combined header: alignment status + directional guidance
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-                .drawBackdrop(
-                    backdrop = backdrop,
-                    shape = { RoundedCornerShape(12.dp) },
-                    effects = {
-                        vibrancy()
-                        lens(with(density) { 16.dp.toPx() }, with(density) { 32.dp.toPx() })
-                    }
-                )
-        ) {
-            if (isAlignedWithQibla) {
-                // Aligned state - compact text
-                Column(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "✓ QIBLA",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
+        // Only show overlay controls when showControls is true
+        if (showControls) {
+            // Combined header: alignment status + directional guidance
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { RoundedCornerShape(12.dp) },
+                        effects = {
+                            vibrancy()
+                            lens(with(density) { 16.dp.toPx() }, with(density) { 32.dp.toPx() })
+                        }
                     )
-                    Text(
-                        text = "Aligned",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 9.sp
-                    )
-                }
-            } else {
-                // Not aligned - show compact directional guidance
-                // Calculate signed difference: positive = turn right, negative = turn left
-                var diff = qiblaDirection - deviceHeading
-
-                // Normalize to [-180, 180] for shortest path
-                if (diff > 180f) diff -= 360f
-                if (diff < -180f) diff += 360f
-
-                val turnLeft = diff < 0
-                val angleDiff = kotlin.math.abs(diff)
-
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    // Direction arrow
-                    Icon(
-                        imageVector = if (turnLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
-                        contentDescription = if (turnLeft) "Turn left" else "Turn right",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-
+            ) {
+                if (isAlignedWithQibla) {
+                    // Aligned state - compact text
                     Column(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = if (turnLeft) "LEFT" else "RIGHT",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = "✓ QIBLA",
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Aligned",
+                            style = MaterialTheme.typography.labelSmall,
                             color = Color.White.copy(alpha = 0.9f),
                             fontSize = 9.sp
                         )
-                        Text(
-                            text = "${angleDiff.toInt()}°",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                    }
+                } else {
+                    // Not aligned - show compact directional guidance
+                    // Calculate signed difference: positive = turn right, negative = turn left
+                    var diff = qiblaDirection - deviceHeading
+
+                    // Normalize to [-180, 180] for shortest path
+                    if (diff > 180f) diff -= 360f
+                    if (diff < -180f) diff += 360f
+
+                    val turnLeft = diff < 0
+                    val angleDiff = kotlin.math.abs(diff)
+
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Direction arrow
+                        Icon(
+                            imageVector = if (turnLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                            contentDescription = if (turnLeft) "Turn left" else "Turn right",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = if (turnLeft) "LEFT" else "RIGHT",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontSize = 9.sp
+                            )
+                            Text(
+                                text = "${angleDiff.toInt()}°",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+
+                        // Second arrow for emphasis
+                        Icon(
+                            imageVector = if (turnLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                            contentDescription = if (turnLeft) "Turn left" else "Turn right",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
+                }
+            }
 
-                    // Second arrow for emphasis
-                    Icon(
-                        imageVector = if (turnLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
-                        contentDescription = if (turnLeft) "Turn left" else "Turn right",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
+            // Distance info overlay
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp)
+                    .drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { RoundedCornerShape(12.dp) },
+                        effects = {
+                            vibrancy()
+                            lens(with(density) { 16.dp.toPx() }, with(density) { 32.dp.toPx() })
+                        }
+                    )
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp)
+                ) {
+                    Text(
+                        text = "🕋 Kaaba",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Makkah, Saudi Arabia",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 11.sp
                     )
                 }
             }
-        }
 
-        // Distance info overlay
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(16.dp)
-                .drawBackdrop(
-                    backdrop = backdrop,
-                    shape = { RoundedCornerShape(12.dp) },
-                    effects = {
-                        vibrancy()
-                        lens(with(density) { 16.dp.toPx() }, with(density) { 32.dp.toPx() })
-                    }
-                )
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp)
+            // Locate Me button - resets view to show user and Kaaba (with liquid glass effect)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .size(44.dp)
+                    .drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { CircleShape },
+                        effects = {
+                            vibrancy()
+                            lens(with(density) { 8.dp.toPx() }, with(density) { 16.dp.toPx() })
+                        }
+                    )
+                    .clickable {
+                        // Reset camera to show both user and Kaaba
+                        worldWindowRef?.let { ww ->
+                            resetCameraToShowBoth(
+                                ww,
+                                userLatitude,
+                                userLongitude,
+                                makkahLatitude,
+                                makkahLongitude
+                            )
+                        }
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "🕋 Kaaba",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Makkah, Saudi Arabia",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 11.sp
+                Icon(
+                    imageVector = Icons.Default.MyLocation,
+                    contentDescription = "Show my location and Kaaba",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
                 )
             }
-        }
-
-        // Locate Me button - resets view to show user and Kaaba (with liquid glass effect)
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .size(44.dp)
-                .drawBackdrop(
-                    backdrop = backdrop,
-                    shape = { CircleShape },
-                    effects = {
-                        vibrancy()
-                        lens(with(density) { 8.dp.toPx() }, with(density) { 16.dp.toPx() })
-                    }
-                )
-                .clickable {
-                    // Reset camera to show both user and Kaaba
-                    worldWindowRef?.let { ww ->
-                        resetCameraToShowBoth(
-                            ww,
-                            userLatitude,
-                            userLongitude,
-                            makkahLatitude,
-                            makkahLongitude
-                        )
-                    }
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.MyLocation,
-                contentDescription = "Show my location and Kaaba",
-                tint = Color.White,
-                modifier = Modifier.size(22.dp)
-            )
         }
     }
     }  // End BoxWithConstraints
