@@ -487,7 +487,7 @@ fun CompassProgressIndicator(
         CircularProgressIndicator(
             progress = { arcProgress }, // Animated progress - shrinks to dot when aligned
             modifier = Modifier
-                .size(size - 28.dp)  // Shrunk to give globe more space
+                .size(size - 16.dp)  // Original size
                 .rotate(animatedCompassDegree - 18f) // Offset by -18° (half of 36°) so arc CENTER aligns with Kaaba when facing Qibla
                 .graphicsLayer {
                     alpha = arcAlpha
@@ -509,9 +509,10 @@ fun CompassProgressIndicator(
         )
 
         // Kaaba icon positioned INSIDE the compass (not on arc track)
+        // Hide when showing globe (globe has its own Kaaba marker)
         // Shows as target indicator - arc rotates around it
         // ANIMATION: Kaaba grows and glows when arc aligns with it
-        if (!needsCalibration) {
+        if (!needsCalibration && !showGlobe) {
             // Position Kaaba inside the arc track (closer to center)
             val radiusOffset = (size / 2) - (if (size >= 260.dp) 48.dp else 28.dp) // More inward
 
@@ -558,12 +559,14 @@ fun CompassProgressIndicator(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(if (showGlobe) 0.dp else 16.dp),  // No padding for globe
             contentAlignment = Alignment.Center
         ) {
             if (showGlobe && userLatitude != 0.0 && userLongitude != 0.0) {
-                // Show simple 3D globe in the center of the compass
-                val globeSize = size - 24.dp // Smaller margin - more space for globe
+                // Show simple 3D globe inside the arc
+                // Arc is at (size - 16.dp) with 8.dp stroke, inner edge ~(size - 24.dp)
+                // Globe at (size - 40.dp) gives 8dp gap from arc inner edge
+                val globeSize = size - 40.dp
                 Box(
                     modifier = Modifier
                         .size(globeSize)

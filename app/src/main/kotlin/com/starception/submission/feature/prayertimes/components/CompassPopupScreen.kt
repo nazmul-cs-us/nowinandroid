@@ -100,7 +100,10 @@ private fun dismissWithAnimation(
 fun CompassPopupScreen(
     progress: Float,
     locationService: EnhancedLocationService?,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    userLatitude: Double = 0.0,
+    userLongitude: Double = 0.0,
+    showGlobe: Boolean = false
 ) {
     val density = LocalDensity.current
     val hapticFeedback = LocalHapticFeedback.current
@@ -308,11 +311,14 @@ fun CompassPopupScreen(
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
 
-                        // Compass
+                        // Compass with globe
                         CompassProgressIndicator(
                             progress = progress,
                             size = compassSizeDp,
                             locationService = locationService,
+                            userLatitude = userLatitude,
+                            userLongitude = userLongitude,
+                            showGlobe = showGlobe,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
 
@@ -518,6 +524,9 @@ fun CompassPopupScreen(
                         progress = progress,
                         size = COMPASS_SIZE_DP.dp,
                         locationService = locationService,
+                        userLatitude = userLatitude,
+                        userLongitude = userLongitude,
+                        showGlobe = showGlobe,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
                 }

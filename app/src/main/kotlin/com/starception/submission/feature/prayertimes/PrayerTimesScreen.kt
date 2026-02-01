@@ -2582,7 +2582,10 @@ fun PrayerTimesScreen(
             onDismiss = {
                 Log.d("PrayerTimes", "onDismiss called, hiding compass popup")
                 showCompassPopup = false
-            }
+            },
+            userLatitude = prayerTimes?.location?.latitude ?: 0.0,
+            userLongitude = prayerTimes?.location?.longitude ?: 0.0,
+            showGlobe = true
         )
     }
 
