@@ -148,20 +148,8 @@ private fun createSimpleWorldWindow(
     val markersLayer = RenderableLayer("Markers")
     worldWindow.layers.addLayer(markersLayer)
 
-    // Create markers
-    val userPos = Position.fromDegrees(userLat, userLon, 200000.0)
+    // Create Kaaba marker only (no user location - cleaner view)
     val kaabaPos = Position.fromDegrees(makkahLat, makkahLon, 200000.0)
-
-    // User marker - simple blue dot
-    val userBitmap = createSimpleUserMarker()
-    val userAttributes = PlacemarkAttributes().apply {
-        imageSource = ImageSource.fromBitmap(userBitmap)
-        imageScale = 0.4
-    }
-    val userPlacemark = Placemark(userPos, userAttributes).apply {
-        altitudeMode = WorldWind.ABSOLUTE
-    }
-    markersLayer.addRenderable(userPlacemark)
 
     // Kaaba marker - emoji
     val kaabaBitmap = emojiToBitmapSimple("🕋", 48)
@@ -174,14 +162,9 @@ private fun createSimpleWorldWindow(
     }
     markersLayer.addRenderable(kaabaPlacemark)
 
-    // Setup camera to show the whole globe
+    // Setup camera centered on Kaaba
     val globe = worldWindow.globe
-    val heading = userPos.greatCircleAzimuth(kaabaPos)
     val earthRadius = globe.equatorialRadius
-
-    // Center on midpoint between user and Kaaba
-    val midLat = (userLat + makkahLat) / 2.0
-    val midLon = (userLon + makkahLon) / 2.0
 
     // Range to show Earth filling its container
     // Lower value = camera closer = Earth fills more of the view
@@ -189,10 +172,10 @@ private fun createSimpleWorldWindow(
 
     val lookAt = LookAt().apply {
         set(
-            midLat, midLon, 0.0,
+            makkahLat, makkahLon, 0.0,  // Center on Kaaba
             WorldWind.ABSOLUTE,
             finalRange,
-            heading,
+            0.0,   // heading - north up
             0.0,   // no tilt - straight on view
             0.0    // roll
         )

@@ -338,7 +338,7 @@ fun CompassProgressIndicator(
             modifier = Modifier.size(size)
         ) {
             val center = Offset(this.size.width / 2, this.size.height / 2)
-            val backgroundRadius = (this.size.minDimension / 2) - 2.dp.toPx()
+            val backgroundRadius = (this.size.minDimension / 2) - 1.dp.toPx()  // Moved outward
             
             // Perfect circle background
             drawCircle(
