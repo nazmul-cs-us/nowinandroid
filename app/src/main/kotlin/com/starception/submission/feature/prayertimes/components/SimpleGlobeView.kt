@@ -162,20 +162,24 @@ private fun createSimpleWorldWindow(
     }
     markersLayer.addRenderable(kaabaPlacemark)
 
-    // Setup camera centered on Kaaba
+    // Setup camera SOUTH of Kaaba so Kaaba appears at TOP
     val globe = worldWindow.globe
     val earthRadius = globe.equatorialRadius
 
     // Range to show Earth filling its container
-    // Lower value = camera closer = Earth fills more of the view
     val finalRange = earthRadius * 1.8
+
+    // Position camera further south of Kaaba (lower latitude)
+    // Kaaba is at ~21.4°N, center camera further south so Kaaba appears at very top
+    val cameraCenterLat = makkahLat - 40.0  // ~40° south of Kaaba
+    val cameraCenterLon = makkahLon  // Same longitude
 
     val lookAt = LookAt().apply {
         set(
-            makkahLat, makkahLon, 0.0,  // Center on Kaaba
+            cameraCenterLat, cameraCenterLon, 0.0,  // Center SOUTH of Kaaba
             WorldWind.ABSOLUTE,
             finalRange,
-            0.0,   // heading - north up
+            0.0,   // heading - north up (Kaaba will be at top)
             0.0,   // no tilt - straight on view
             0.0    // roll
         )
