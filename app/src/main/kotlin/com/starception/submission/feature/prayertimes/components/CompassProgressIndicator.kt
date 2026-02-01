@@ -488,7 +488,7 @@ fun CompassProgressIndicator(
         CircularProgressIndicator(
             progress = { arcProgress }, // Animated progress - shrinks to dot when aligned
             modifier = Modifier
-                .size(size - 14.dp)  // Centered between outer circle and globe
+                .size(size - 12.dp)  // Moved outward, closer to accuracy circle
                 .rotate(animatedCompassDegree - 18f) // Offset by -18° (half of 36°) so arc CENTER aligns with Kaaba when facing Qibla
                 .graphicsLayer {
                     alpha = arcAlpha
