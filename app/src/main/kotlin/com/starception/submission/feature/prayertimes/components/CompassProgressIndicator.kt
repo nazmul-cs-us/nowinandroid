@@ -564,8 +564,8 @@ fun CompassProgressIndicator(
         ) {
             if (showGlobe && userLatitude != 0.0 && userLongitude != 0.0) {
                 // Show simple 3D globe inside the arc
-                // Balance between globe size and arc visibility
-                val globeSize = size - 24.dp
+                // Smaller container to create gap from arc
+                val globeSize = size - 28.dp
                 Box(
                     modifier = Modifier
                         .size(globeSize)
