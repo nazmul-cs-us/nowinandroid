@@ -171,6 +171,17 @@ class NiaAppState(
                 restoreState = true
             }
 
+            // Check if we're navigating to HOME or INTERESTS while a non-top-level screen
+            // (like Settings) is on top - if so, just pop the back stack to dismiss it
+            val currentRoute = navController.currentDestination?.route
+            val isOnNonTopLevelScreen = currentRoute != null &&
+                TopLevelDestination.entries.none { it.route.qualifiedName == currentRoute }
+
+            if (isOnNonTopLevelScreen) {
+                // We're on a screen like Settings - pop it first to ensure proper dismissal
+                navController.popBackStack()
+            }
+
             when (topLevelDestination) {
                 FOR_YOU -> navController.navigateToForYou(topLevelNavOptions)
                 BOOKMARKS -> navController.navigateToBookmarks(topLevelNavOptions)

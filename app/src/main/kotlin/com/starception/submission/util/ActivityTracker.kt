@@ -110,9 +110,10 @@ object ActivityTracker {
     // Callback for activity change (used to update notification immediately)
     private var activityChangeCallback: ((String) -> Unit)? = null
     
-    // Dua cooldown tracking
+    // Dua cooldown tracking - MUST be persisted to survive app restarts
     private var lastDuaPlayTime: Long = 0L
     private var lastDrivingTime: Long = 0L
+    private const val KEY_LAST_DUA_PLAY_TIME = "last_dua_play_time"
 
     // Gap tolerance tracking - continue countdown if driving resumes within gap tolerance
     private var drivingStopTime: Long = 0L  // When driving stopped
@@ -308,13 +309,24 @@ object ActivityTracker {
 
             val timeSinceLastDua = currentTime - lastDuaPlayTime
             val gapSinceLastDriving = currentTime - drivingStopTime
+            val cooldownMinutes = travelDuaCooldownMillis / 60000
+
+            // Enhanced diagnostic logging for cooldown debugging
+            Log.i("ActivityTracker", "🚗 ========== DRIVING DETECTED ==========")
+            Log.i("ActivityTracker", "🚗 Transition: $oldActivity → $activity")
+            Log.i("ActivityTracker", "🚗 Last dua played: ${if (lastDuaPlayTime == 0L) "NEVER" else "${timeSinceLastDua / 1000}s ago"}")
+            Log.i("ActivityTracker", "🚗 Cooldown setting: ${cooldownMinutes}min (${travelDuaCooldownMillis}ms)")
+            Log.i("ActivityTracker", "🚗 Cooldown status: ${if (timeSinceLastDua < travelDuaCooldownMillis) "ACTIVE ⏳" else "EXPIRED ✅"}")
 
             // Check if dua cooldown has passed
             if (timeSinceLastDua < travelDuaCooldownMillis) {
-                Log.d("ActivityTracker", "🚗 Dua cooldown active - ${(travelDuaCooldownMillis - timeSinceLastDua) / 1000}s remaining")
+                val remainingSeconds = (travelDuaCooldownMillis - timeSinceLastDua) / 1000
+                Log.w("ActivityTracker", "🚗 ⏳ COOLDOWN BLOCKING - ${remainingSeconds}s remaining (${remainingSeconds / 60}min)")
+                Log.w("ActivityTracker", "🚗 ⏳ Dua will NOT play until cooldown expires")
                 lastDrivingTime = currentTime
                 return
             }
+            Log.i("ActivityTracker", "🚗 ✅ Cooldown check PASSED - proceeding to schedule dua")
 
             // Check if this is a resume within gap tolerance (e.g., after traffic light)
             if (drivingStopTime > 0 && gapSinceLastDriving < travelDuaGapToleranceMillis && accumulatedDrivingTime > 0) {
@@ -648,9 +660,17 @@ object ActivityTracker {
 
                     // Set cooldown timestamp ONLY when dua actually plays
                     // This ensures if user stops driving before dua plays, they can retry
+                    val previousPlayTime = lastDuaPlayTime
                     lastDuaPlayTime = System.currentTimeMillis()
                     val cooldownMinutes = travelDuaCooldownMillis / 60000
-                    Log.d("ActivityTracker", "🎵 Playing travel dua audio (cooldown started: ${cooldownMinutes}min)")
+
+                    // CRITICAL: Persist cooldown to survive app restarts
+                    saveLastDuaPlayTime(ctx, lastDuaPlayTime)
+
+                    Log.i("ActivityTracker", "🎵 ========== TRAVEL DUA PLAYING ==========")
+                    Log.i("ActivityTracker", "🎵 Cooldown NOW ACTIVE for ${cooldownMinutes}min")
+                    Log.i("ActivityTracker", "🎵 Previous play time: ${if (previousPlayTime == 0L) "NEVER" else "${(lastDuaPlayTime - previousPlayTime) / 1000}s ago"}")
+                    Log.i("ActivityTracker", "🎵 Next dua allowed after: ${cooldownMinutes}min from now")
                 } else {
                     Log.e("ActivityTracker", "Failed to find travel_dua.wav in resources")
                 }
@@ -760,9 +780,34 @@ object ActivityTracker {
             travelDuaPlaybackDelayMillis = playbackDelaySeconds * 1000L
             travelDuaGapToleranceMillis = gapToleranceMinutes * 60 * 1000L
 
+            // CRITICAL: Load persisted cooldown timestamp to survive app restarts
+            lastDuaPlayTime = prefs.getLong(KEY_LAST_DUA_PLAY_TIME, 0L)
+            val timeSinceLastDua = if (lastDuaPlayTime > 0) (System.currentTimeMillis() - lastDuaPlayTime) / 1000 else -1L
+
             Log.i("ActivityTracker", "🚗 Travel dua settings loaded: enabled=$travelDuaEnabled, cooldown=${cooldownMinutes}min, delay=${playbackDelaySeconds}s, gap=${gapToleranceMinutes}min")
+            Log.i("ActivityTracker", "🚗 Persisted cooldown: ${if (lastDuaPlayTime == 0L) "NEVER played" else "Last played ${timeSinceLastDua}s ago"}")
+
+            // Check if cooldown is still active from previous session
+            if (lastDuaPlayTime > 0 && timeSinceLastDua >= 0 && timeSinceLastDua < cooldownMinutes * 60) {
+                val remainingSeconds = (cooldownMinutes * 60) - timeSinceLastDua
+                Log.w("ActivityTracker", "🚗 ⏳ COOLDOWN STILL ACTIVE from previous session - ${remainingSeconds}s remaining")
+            }
         } catch (e: Exception) {
             Log.e("ActivityTracker", "❌ Failed to load travel dua settings, using defaults: ${e.message}")
+        }
+    }
+
+    /**
+     * Save the last dua play time to SharedPreferences
+     * Called when dua actually plays to persist cooldown across app restarts
+     */
+    private fun saveLastDuaPlayTime(context: Context, timestamp: Long) {
+        try {
+            val prefs = context.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putLong(KEY_LAST_DUA_PLAY_TIME, timestamp).apply()
+            Log.d("ActivityTracker", "💾 Saved last dua play time to persist cooldown")
+        } catch (e: Exception) {
+            Log.e("ActivityTracker", "❌ Failed to save last dua play time: ${e.message}")
         }
     }
 

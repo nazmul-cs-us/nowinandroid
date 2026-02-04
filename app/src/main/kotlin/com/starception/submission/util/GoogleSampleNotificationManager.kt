@@ -489,11 +489,17 @@ object GoogleSampleNotificationManager {
             else -> "Nxt"
         }
 
-        // Show hours if available, otherwise minutes
-        // e.g., "Asr2h" (5 chars) or "Dhr45m" (6 chars)
+        // Show time in most accurate format under 7 char limit
+        // - Hours with minutes >= 30: round UP (e.g., 1h 50m → "Mgb2h")
+        // - Hours with minutes < 30: round DOWN (e.g., 1h 20m → "Mgb1h")
+        // - Minutes only: show "Xm" (e.g., "Dhr45m")
         val shortCriticalText = when {
-            hours != null && hours > 0 -> "$nextPrayerShort${hours}h"  // e.g., "Asr2h"
-            minutes != null -> "$nextPrayerShort${minutes}m"           // e.g., "Dhr45m"
+            hours != null && hours > 0 -> {
+                // Round to nearest hour: >= 30 mins rounds up
+                val roundedHours = if (minutes != null && minutes >= 30) hours + 1 else hours
+                "$nextPrayerShort${roundedHours}h"  // e.g., "Mgb2h" for 1h50m
+            }
+            minutes != null && minutes > 0 -> "$nextPrayerShort${minutes}m"  // e.g., "Dhr45m"
             else -> {
                 // Fallback to phase-based display if no countdown available
                 when {
