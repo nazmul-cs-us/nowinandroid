@@ -68,9 +68,11 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -181,6 +183,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.QuranPlayerViewModel
 import androidx.compose.ui.platform.LocalContext
@@ -1029,6 +1032,9 @@ fun SwipeableBigTiles(
         initialPage = (Int.MAX_VALUE / 2 / 4) * 4 // Start in middle, adjusted to show Smart Prediction tile (index 0) first
     )
 
+    // Coroutine scope for animated scroll when dots are tapped
+    val coroutineScope = rememberCoroutineScope()
+
     // Globe fullscreen popup state
     var showGlobePopup by remember { mutableStateOf(false) }
 
@@ -1105,7 +1111,14 @@ fun SwipeableBigTiles(
             state = pagerState,
             modifier = pagerModifier,
             pageSpacing = if (isLandscape) 12.dp else 16.dp,
-            contentPadding = PaddingValues(horizontal = if (isLandscape) 4.dp else 8.dp)
+            contentPadding = PaddingValues(horizontal = if (isLandscape) 4.dp else 8.dp),
+            // Performance optimizations for smooth swiping
+            beyondViewportPageCount = 1, // Preload 1 page on each side for smoother transitions
+            key = { page -> page % 4 }, // Stable keys help avoid unnecessary recomposition
+            flingBehavior = PagerDefaults.flingBehavior(
+                state = pagerState,
+                snapPositionalThreshold = 0.35f // Snap earlier (35% instead of 50%) for snappier feel
+            )
         ) { page ->
             val actualPage = page % 4 // Map infinite pages to our 4 actual tiles
             when (actualPage) {
@@ -1151,11 +1164,33 @@ fun SwipeableBigTiles(
             }
         }
         
-        // Page indicators for swipeable tiles - compact in landscape
+        // Page indicators for swipeable tiles - compact in landscape, CLICKABLE & SWIPEABLE to navigate
+        val view = LocalView.current
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = if (isLandscape) 2.dp else 1.dp),
+                .padding(top = if (isLandscape) 2.dp else 1.dp)
+                .pointerInput(Unit) {
+                    // Swipe gesture on the dots row
+                    var totalDrag = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { totalDrag = 0f },
+                        onDragEnd = {
+                            // Swipe threshold: 50 pixels
+                            if (kotlin.math.abs(totalDrag) > 50) {
+                                val direction = if (totalDrag < 0) 1 else -1 // Swipe left = next, right = previous
+                                val targetPage = pagerState.currentPage + direction
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(targetPage)
+                                }
+                            }
+                        },
+                        onHorizontalDrag = { _, dragAmount ->
+                            totalDrag += dragAmount
+                        }
+                    )
+                },
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1174,6 +1209,22 @@ fun SwipeableBigTiles(
                             else
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                         )
+                        .clickable {
+                            // Calculate target page for infinite scroll
+                            // Find the closest page number that maps to the clicked index
+                            val currentPage = pagerState.currentPage
+                            val currentIndex = currentPage % 4
+                            val diff = index - currentIndex
+                            val targetPage = currentPage + diff
+
+                            // Haptic feedback on tap
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+
+                            // Animate scroll to the target page
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(targetPage)
+                            }
+                        }
                 )
                 if (index < 3) {
                     Spacer(modifier = Modifier.width(if (isLandscape) 4.dp else 8.dp))
@@ -1181,11 +1232,32 @@ fun SwipeableBigTiles(
             }
         }
 
-        // Professional swipe hint - compact in landscape
+        // Professional swipe hint - compact in landscape, SWIPEABLE to navigate
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = if (isLandscape) 2.dp else 0.dp),
+                .padding(top = if (isLandscape) 2.dp else 0.dp)
+                .pointerInput(Unit) {
+                    // Swipe gesture on the hint row
+                    var totalDrag = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { totalDrag = 0f },
+                        onDragEnd = {
+                            // Swipe threshold: 50 pixels
+                            if (kotlin.math.abs(totalDrag) > 50) {
+                                val direction = if (totalDrag < 0) 1 else -1 // Swipe left = next, right = previous
+                                val targetPage = pagerState.currentPage + direction
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(targetPage)
+                                }
+                            }
+                        },
+                        onHorizontalDrag = { _, dragAmount ->
+                            totalDrag += dragAmount
+                        }
+                    )
+                },
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {

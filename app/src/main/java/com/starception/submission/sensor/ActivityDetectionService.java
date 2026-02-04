@@ -1400,24 +1400,40 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
 
     /**
      * Update moving average buffer with new value
+     * Note: Synchronized to prevent ConcurrentModificationException
      */
     private void updateMovingAverage(Deque<Double> buffer, double value) {
-        if (buffer.size() >= MOVING_AVG_SIZE) {
-            buffer.removeFirst();
+        synchronized (buffer) {
+            if (buffer.size() >= MOVING_AVG_SIZE) {
+                buffer.removeFirst();
+            }
+            buffer.addLast(value);
         }
-        buffer.addLast(value);
     }
 
     /**
      * Calculate moving average from buffer
+     * Note: Creates a copy to avoid ConcurrentModificationException when buffer
+     * is being updated by sensor callbacks while we iterate
      */
     private double getMovingAverage(Deque<Double> buffer) {
         if (buffer.isEmpty()) return 0;
-        double sum = 0;
-        for (Double val : buffer) {
-            sum += val;
+
+        // Create a snapshot to avoid ConcurrentModificationException
+        Double[] snapshot;
+        synchronized (buffer) {
+            snapshot = buffer.toArray(new Double[0]);
         }
-        return sum / buffer.size();
+
+        if (snapshot.length == 0) return 0;
+
+        double sum = 0;
+        for (Double val : snapshot) {
+            if (val != null) {
+                sum += val;
+            }
+        }
+        return sum / snapshot.length;
     }
 
     /**
