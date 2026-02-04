@@ -1066,8 +1066,9 @@ fun SwipeableBigTiles(
 
     // Request Activity Recognition permission and ensure detection is running when on Smart Tracking tile (page 1)
     // Also track tile focus for sound/vibration notification suppression
-    LaunchedEffect(pagerState.currentPage) {
-        val actualPage = pagerState.currentPage % 4
+    // Use settledPage instead of currentPage to avoid triggering during swipe animation
+    LaunchedEffect(pagerState.settledPage) {
+        val actualPage = pagerState.settledPage % 4
 
         if (actualPage == 1) {
             // User is on Smart Tracking tile - ensure detection is running
@@ -1194,8 +1195,10 @@ fun SwipeableBigTiles(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Use derivedStateOf to reduce recomposition during swipe
+            val currentPageIndex by remember { derivedStateOf { pagerState.currentPage % 4 } }
             repeat(4) { index ->
-                val isSelected = (pagerState.currentPage % 4) == index
+                val isSelected = currentPageIndex == index
                 // Smaller indicators in landscape
                 val selectedSize = if (isLandscape) 8.dp else 12.dp
                 val unselectedSize = if (isLandscape) 6.dp else 8.dp
