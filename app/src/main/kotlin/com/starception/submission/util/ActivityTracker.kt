@@ -119,6 +119,7 @@ object ActivityTracker {
     private var drivingStopTime: Long = 0L  // When driving stopped
     private var accumulatedDrivingTime: Long = 0L  // Accumulated driving time in ms
     private var drivingStartTime: Long = 0L  // When current driving session started
+    private var duaPlayedForCurrentSession: Boolean = false  // Whether dua already played for current accumulation
 
     // Travel dua settings (loaded from SharedPreferences, can be updated from settings screen)
     private var travelDuaEnabled: Boolean = true
@@ -329,7 +330,9 @@ object ActivityTracker {
             Log.i("ActivityTracker", "🚗 ✅ Cooldown check PASSED - proceeding to schedule dua")
 
             // Check if this is a resume within gap tolerance (e.g., after traffic light)
-            if (drivingStopTime > 0 && gapSinceLastDriving < travelDuaGapToleranceMillis && accumulatedDrivingTime > 0) {
+            // Skip gap tolerance resume if dua already played for this accumulation session
+            // (prevents replay when stopping at signal after cooldown expires)
+            if (drivingStopTime > 0 && gapSinceLastDriving < travelDuaGapToleranceMillis && accumulatedDrivingTime > 0 && !duaPlayedForCurrentSession) {
                 // RESUME: Continue countdown with accumulated time
                 val remainingTime = travelDuaPlaybackDelayMillis - accumulatedDrivingTime
                 if (remainingTime > 0) {
@@ -342,14 +345,17 @@ object ActivityTracker {
                     Log.i("ActivityTracker", "🎵 Accumulated ${accumulatedDrivingTime / 1000}s driving - playing travel dua now!")
                     playDrivingAudio()
                     resetDrivingAccumulation()
+                    duaPlayedForCurrentSession = true
                     // Set driving start time since user is now driving
                     drivingStartTime = currentTime
                 }
             } else {
-                // FRESH START: New driving session (gap exceeds tolerance or first time)
+                // FRESH START: New driving session (gap exceeds tolerance, first time, or dua already played)
                 val delaySeconds = travelDuaPlaybackDelayMillis / 1000
                 Log.i("ActivityTracker", "🚗 New driving session started - scheduling travel dua in ${delaySeconds}s")
-                if (gapSinceLastDriving >= travelDuaGapToleranceMillis && drivingStopTime > 0) {
+                if (duaPlayedForCurrentSession) {
+                    Log.i("ActivityTracker", "🚦 Dua already played this trip - starting fresh countdown (not replaying at signal)")
+                } else if (gapSinceLastDriving >= travelDuaGapToleranceMillis && drivingStopTime > 0) {
                     val gapToleranceMinutes = travelDuaGapToleranceMillis / 60000
                     Log.d("ActivityTracker", "   Gap was ${gapSinceLastDriving / 1000}s (> ${gapToleranceMinutes}min) - resetting accumulation")
                 }
@@ -389,6 +395,7 @@ object ActivityTracker {
         accumulatedDrivingTime = 0L
         drivingStopTime = 0L
         drivingStartTime = 0L
+        duaPlayedForCurrentSession = false
     }
     
     /**
@@ -612,6 +619,7 @@ object ActivityTracker {
                 Log.i("ActivityTracker", "✅ Total driving time: ${totalDrivingTime}s - playing travel dua now!")
                 playDrivingAudio()
                 resetDrivingAccumulation()  // Reset after playing
+                duaPlayedForCurrentSession = true  // Prevent replay on brief stops
                 // IMPORTANT: Reset driving start time since user is still driving
                 // This prevents session time from becoming huge when they stop later
                 drivingStartTime = System.currentTimeMillis()
