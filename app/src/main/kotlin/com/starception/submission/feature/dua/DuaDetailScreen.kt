@@ -7,6 +7,8 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -18,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +40,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -103,6 +107,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
@@ -1026,12 +1031,77 @@ fun DuaDetailScreen(
                 )
             }
 
-            // Pager for duas - swipeable, with scrollable header inside each page
+            // Pager for duas - with manual swipe gestures and arrow indicators
             if (duasList.isNotEmpty()) {
                 android.util.Log.d("DuaScreen", "📖 SHOWING PAGER with ${duasList.size} duas")
+
+                var swipeOffsetX by remember { mutableStateOf(0f) }
+                val swipeThreshold = 300f
+                val duaSwipeScope = rememberCoroutineScope()
+
+                val canSwipeRight = currentPage > 0 || hasPrevious
+                val canSwipeLeft = currentPage < duasList.size - 1 || hasNext
+                val rawProgress = kotlin.math.abs(swipeOffsetX) / swipeThreshold
+                val swipeProgress = rawProgress.coerceIn(0f, 1f)
+                val isSwipingRight = swipeOffsetX > 0f
+                val isSwipingLeft = swipeOffsetX < 0f
+
+                val showLeftArrow = isSwipingRight && canSwipeRight
+                val showRightArrow = isSwipingLeft && canSwipeLeft
+                val targetProgress = when {
+                    showLeftArrow || showRightArrow -> swipeProgress
+                    else -> 0f
+                }
+
+                val animatedProgress by animateFloatAsState(
+                    targetValue = targetProgress,
+                    animationSpec = if (targetProgress == 0f) {
+                        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh)
+                    } else {
+                        spring(stiffness = Spring.StiffnessHigh)
+                    },
+                    label = "duaSwipeArrowProgress",
+                )
+
+                val thresholdReached = swipeProgress >= 1f
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(currentPage) {
+                            detectDragGestures(
+                                onDragStart = { swipeOffsetX = 0f },
+                                onDragEnd = {
+                                    when {
+                                        swipeOffsetX > swipeThreshold && canSwipeRight -> {
+                                            duaSwipeScope.launch {
+                                                val target = if (currentPage > 0) currentPage - 1 else duasList.size - 1
+                                                pagerState.animateScrollToPage(target)
+                                            }
+                                        }
+                                        swipeOffsetX < -swipeThreshold && canSwipeLeft -> {
+                                            duaSwipeScope.launch {
+                                                val target = if (currentPage < duasList.size - 1) currentPage + 1 else 0
+                                                pagerState.animateScrollToPage(target)
+                                            }
+                                        }
+                                    }
+                                    swipeOffsetX = 0f
+                                },
+                                onDragCancel = { swipeOffsetX = 0f },
+                                onDrag = { change, dragAmount ->
+                                    swipeOffsetX += dragAmount.x
+                                    if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y) * 1.5f) {
+                                        change.consume()
+                                    }
+                                }
+                            )
+                        }
+                ) {
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    userScrollEnabled = false
                 ) { page ->
                     val dua = duasList[page]
 
@@ -1566,6 +1636,27 @@ fun DuaDetailScreen(
 
                     }
                 }
+
+                // Left edge arrow (swipe right → previous dua)
+                if (animatedProgress > 0.01f && canSwipeRight && (showLeftArrow || animatedProgress > 0.01f)) {
+                    DuaSwipeArrowIndicator(
+                        progress = animatedProgress,
+                        thresholdReached = thresholdReached && isSwipingRight,
+                        icon = Icons.Default.ChevronLeft,
+                        modifier = Modifier.align(Alignment.CenterStart),
+                    )
+                }
+
+                // Right edge arrow (swipe left → next dua)
+                if (animatedProgress > 0.01f && canSwipeLeft && (showRightArrow || animatedProgress > 0.01f)) {
+                    DuaSwipeArrowIndicator(
+                        progress = animatedProgress,
+                        thresholdReached = thresholdReached && isSwipingLeft,
+                        icon = Icons.Default.ChevronRight,
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                    )
+                }
+                } // end wrapping Box
             } else {
                 // Fallback to single dua from navigation params
                 val parsedContent = remember(content, quranReference) {
@@ -2942,5 +3033,51 @@ private fun ShimmerSectionCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * Animated arrow indicator shown on screen edge during dua pager swipe gestures.
+ */
+@Composable
+private fun DuaSwipeArrowIndicator(
+    progress: Float,
+    thresholdReached: Boolean,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+) {
+    val backgroundColor = if (thresholdReached) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHighest
+    }
+    val iconColor = if (thresholdReached) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    val scale = 0.5f + (progress * 0.5f)
+    val alpha = (progress * 1.5f).coerceIn(0f, 1f)
+
+    Box(
+        modifier = modifier
+            .padding(horizontal = 8.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+            }
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(backgroundColor.copy(alpha = 0.9f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconColor,
+            modifier = Modifier.size(24.dp),
+        )
     }
 }

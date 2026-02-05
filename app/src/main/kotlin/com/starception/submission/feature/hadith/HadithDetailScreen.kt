@@ -2,9 +2,12 @@ package com.starception.submission.feature.hadith
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +28,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.heightIn
@@ -36,6 +40,8 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,8 +61,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
@@ -970,6 +978,7 @@ private fun HadithShimmerLoading(
 /**
  * Swipe container for hadith navigation
  * Swipe right to go to previous hadith, swipe left to go to next hadith
+ * Shows animated arrow indicators on screen edges during horizontal drag
  */
 @Composable
 private fun HadithSwipeContainer(
@@ -979,7 +988,32 @@ private fun HadithSwipeContainer(
     content: @Composable BoxScope.() -> Unit
 ) {
     var swipeOffsetX by remember { mutableStateOf(0f) }
-    val swipeThreshold = 150f
+    val swipeThreshold = 300f
+
+    val canSwipeRight = hadithNumber > 1
+    val rawProgress = kotlin.math.abs(swipeOffsetX) / swipeThreshold
+    val swipeProgress = rawProgress.coerceIn(0f, 1f)
+    val isSwipingRight = swipeOffsetX > 0f
+    val isSwipingLeft = swipeOffsetX < 0f
+
+    val showLeftArrow = isSwipingRight && canSwipeRight
+    val showRightArrow = isSwipingLeft
+    val targetProgress = when {
+        showLeftArrow || showRightArrow -> swipeProgress
+        else -> 0f
+    }
+
+    val animatedProgress by animateFloatAsState(
+        targetValue = targetProgress,
+        animationSpec = if (targetProgress == 0f) {
+            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh)
+        } else {
+            spring(stiffness = Spring.StiffnessHigh)
+        },
+        label = "hadithSwipeArrowProgress",
+    )
+
+    val thresholdReached = swipeProgress >= 1f
 
     Box(
         modifier = Modifier
@@ -992,11 +1026,9 @@ private fun HadithSwipeContainer(
                     },
                     onDragEnd = {
                         when {
-                            // Swipe right - go to previous hadith (if not first)
-                            swipeOffsetX > swipeThreshold && hadithNumber > 1 -> {
+                            swipeOffsetX > swipeThreshold && canSwipeRight -> {
                                 onNavigateToPreviousHadith()
                             }
-                            // Swipe left - go to next hadith
                             swipeOffsetX < -swipeThreshold -> {
                                 onNavigateToNextHadith()
                             }
@@ -1012,6 +1044,76 @@ private fun HadithSwipeContainer(
                     }
                 )
             },
-        content = content
-    )
+    ) {
+        content()
+
+        // Left edge arrow (swipe right → previous hadith)
+        if (animatedProgress > 0.01f && canSwipeRight && (showLeftArrow || animatedProgress > 0.01f)) {
+            HadithSwipeArrowIndicator(
+                progress = animatedProgress,
+                thresholdReached = thresholdReached && isSwipingRight,
+                alignment = Alignment.CenterStart,
+                icon = Icons.Default.ChevronLeft,
+                modifier = Modifier.align(Alignment.CenterStart),
+            )
+        }
+
+        // Right edge arrow (swipe left → next hadith)
+        if (animatedProgress > 0.01f && (showRightArrow || animatedProgress > 0.01f)) {
+            HadithSwipeArrowIndicator(
+                progress = animatedProgress,
+                thresholdReached = thresholdReached && isSwipingLeft,
+                alignment = Alignment.CenterEnd,
+                icon = Icons.Default.ChevronRight,
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
+        }
+    }
+}
+
+/**
+ * Animated arrow indicator shown on screen edge during hadith swipe gestures.
+ */
+@Composable
+private fun HadithSwipeArrowIndicator(
+    progress: Float,
+    thresholdReached: Boolean,
+    alignment: Alignment,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+) {
+    val backgroundColor = if (thresholdReached) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHighest
+    }
+    val iconColor = if (thresholdReached) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    val scale = 0.5f + (progress * 0.5f)
+    val alpha = (progress * 1.5f).coerceIn(0f, 1f)
+
+    Box(
+        modifier = modifier
+            .padding(horizontal = 8.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+            }
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(backgroundColor.copy(alpha = 0.9f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconColor,
+            modifier = Modifier.size(24.dp),
+        )
+    }
 }
