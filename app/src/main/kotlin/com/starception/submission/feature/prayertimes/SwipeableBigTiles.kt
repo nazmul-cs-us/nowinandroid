@@ -1122,46 +1122,66 @@ fun SwipeableBigTiles(
             )
         ) { page ->
             val actualPage = page % 4 // Map infinite pages to our 4 actual tiles
-            when (actualPage) {
-                0 -> NextPrayerTile(
-                    prayerTimes = prayerTimes,
-                    currentTime = currentTime,
-                    locationService = locationService,
-                    getNextPrayer = getNextPrayer,
-                    getCurrentPrayer = getCurrentPrayer,
-                    getPrayerStatus = getPrayerStatus,
-                    getPrayerTimeDisplay = getPrayerTimeDisplay,
-                    getTimeUntilNextPrayer = getTimeUntilNextPrayer,
-                    getTimeSinceCurrentPrayer = getTimeSinceCurrentPrayer,
-                    onCompassClick = onCompassClick,
-                    timeOffsets = timeOffsets,
-                    isLandscape = isLandscape
+            val tileShape = RoundedCornerShape(32.dp)
+
+            // Outer wrapper with shadow for sharp edges (like Material Components)
+            Box(modifier = Modifier.fillMaxSize().padding(4.dp)) {
+                // Shadow layer rendered outside content
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer {
+                            this.shadowElevation = 8.dp.toPx()
+                            this.shape = tileShape
+                            this.clip = false
+                            this.ambientShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.12f)
+                            this.spotShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.2f)
+                        }
                 )
-                1 -> SmartInfoTile(
-                    getSmartTitle = getSmartTitle,
-                    getSmartContent = getSmartContent,
-                    getCurrentDate = getCurrentDate,
-                    getSmartFooter = getSmartFooter,
-                    getCurrentActivity = getCurrentActivity,
-                    getPrayed = getPrayed,
-                    prayerTimes = prayerTimes,
-                    currentTime = currentTime,
-                    timeOffsets = timeOffsets,
-                    isLandscape = isLandscape
-                )
-                2 -> DailyStatsTile(
-                    getPrayerProgress = getPrayerProgress,
-                    getDailyStatsTitle = getDailyStatsTitle,
-                    getDailyStatsMessage = getDailyStatsMessage,
-                    getPrayed = getPrayed,
-                    isLandscape = isLandscape,
-                    onSurahClick = onSurahClick,
-                    onSurahClickWithAyah = onSurahClickWithAyah
-                )
-                3 -> QiblaGlobeTile(
-                    prayerTimes = prayerTimes,
-                    onFullscreenClick = { showGlobePopup = true }
-                )
+                // Content layer
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when (actualPage) {
+                                0 -> NextPrayerTile(
+                            prayerTimes = prayerTimes,
+                            currentTime = currentTime,
+                            locationService = locationService,
+                            getNextPrayer = getNextPrayer,
+                            getCurrentPrayer = getCurrentPrayer,
+                            getPrayerStatus = getPrayerStatus,
+                            getPrayerTimeDisplay = getPrayerTimeDisplay,
+                            getTimeUntilNextPrayer = getTimeUntilNextPrayer,
+                            getTimeSinceCurrentPrayer = getTimeSinceCurrentPrayer,
+                            onCompassClick = onCompassClick,
+                            timeOffsets = timeOffsets,
+                            isLandscape = isLandscape
+                        )
+                        1 -> SmartInfoTile(
+                            getSmartTitle = getSmartTitle,
+                            getSmartContent = getSmartContent,
+                            getCurrentDate = getCurrentDate,
+                            getSmartFooter = getSmartFooter,
+                            getCurrentActivity = getCurrentActivity,
+                            getPrayed = getPrayed,
+                            prayerTimes = prayerTimes,
+                            currentTime = currentTime,
+                            timeOffsets = timeOffsets,
+                            isLandscape = isLandscape
+                        )
+                        2 -> DailyStatsTile(
+                            getPrayerProgress = getPrayerProgress,
+                            getDailyStatsTitle = getDailyStatsTitle,
+                            getDailyStatsMessage = getDailyStatsMessage,
+                            getPrayed = getPrayed,
+                            isLandscape = isLandscape,
+                            onSurahClick = onSurahClick,
+                            onSurahClickWithAyah = onSurahClickWithAyah
+                        )
+                        3 -> QiblaGlobeTile(
+                            prayerTimes = prayerTimes,
+                            onFullscreenClick = { showGlobePopup = true }
+                        )
+                    }
+                }
             }
         }
         
@@ -1324,7 +1344,8 @@ private fun NextPrayerTile(
             modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
-            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+            tonalElevation = 4.dp
         ) {
             Column(
                 modifier = Modifier
@@ -1623,7 +1644,8 @@ private fun SmartInfoTile(
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f))
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)),
+        tonalElevation = 4.dp
     ) {
         Column(
             modifier = Modifier
@@ -1996,7 +2018,8 @@ private fun QiblaGlobeTile(
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(32.dp),
         color = surfaceColor,
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        tonalElevation = 4.dp
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -2178,7 +2201,8 @@ private fun DailyStatsTile(
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.tertiaryContainer,
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f))
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)),
+        tonalElevation = 4.dp
     ) {
         if (showSurahList) {
             // Search query state

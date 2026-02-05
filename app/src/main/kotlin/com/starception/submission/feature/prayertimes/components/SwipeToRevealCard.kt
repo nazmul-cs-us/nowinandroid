@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import kotlin.math.absoluteValue
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.shadow
 
 /**
  * iOS-style swipe-to-reveal action card for prayer time adjustment.
@@ -166,10 +167,44 @@ fun SwipeToRevealCard(
         }
     }
 
+    val cardShape = RoundedCornerShape(24.dp)
+
+    // Animated elevation - increases when revealed/active
+    val targetElevation = when {
+        isRevealed -> 12.dp  // Higher elevation when revealed
+        else -> 6.dp         // Default elevation
+    }
+    val animatedElevation by animateFloatAsState(
+        targetValue = targetElevation.value,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "elevationAnimation"
+    )
+
+    // Outer container with minimal padding for shadow space
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
+        modifier = modifier.padding(2.dp)
     ) {
+        // Shadow layer rendered outside the clip with animated elevation
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    this.shadowElevation = animatedElevation.dp.toPx()
+                    this.shape = cardShape
+                    this.clip = false
+                    this.ambientShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.15f)
+                    this.spotShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.25f)
+                }
+        )
+        // Content with clip for swipe-to-reveal
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(cardShape)
+        ) {
         // LEFT SIDE: Reset button (only show when swiping right FROM COLLAPSED state, or revealed on reset side)
         // Matching the new vertical style of +/- side
         val showResetSide = (swipeOffset > 0 && !isRevealed) || (isRevealed && revealedSide == "reset")
@@ -607,6 +642,7 @@ fun SwipeToRevealCard(
                     )
                 }
             }
+        }
         }
     }
 }
