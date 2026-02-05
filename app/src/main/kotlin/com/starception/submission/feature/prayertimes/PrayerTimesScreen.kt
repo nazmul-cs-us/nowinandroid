@@ -1070,24 +1070,24 @@ fun PrayerTimesScreen(
                         scaleY = scale
                     )
             ) {
-                // Card content inside SwipeToRevealCard
-                Card(
+                // Card content inside SwipeToRevealCard with crisp border definition
+                val prayerStatus = PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)
+                Surface(
                     shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                            "Current" -> MaterialTheme.colorScheme.tertiaryContainer
-                            "Next" -> MaterialTheme.colorScheme.primaryContainer
-                            else -> MaterialTheme.colorScheme.surfaceVariant
-                        }
-                    ),
+                    color = when (prayerStatus) {
+                        "Current" -> MaterialTheme.colorScheme.tertiaryContainer
+                        "Next" -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    },
                     border = BorderStroke(
-                        1.5.dp,
-                        when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                            "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f)
-                            "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                        1.dp,
+                        when (prayerStatus) {
+                            "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
+                            "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                         }
                     ),
+                    tonalElevation = 2.dp,
                     modifier = Modifier
                         .fillMaxSize()
                         .pointerInput(prayerName, currentOffset) {
@@ -1124,7 +1124,7 @@ fun PrayerTimesScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         // Top section: Prayer names with notification bell
