@@ -8,6 +8,9 @@ import android.os.IBinder
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -93,6 +96,7 @@ import java.util.Locale
 
 /**
  * Container that handles swipe gestures for surah navigation
+ * Shows animated arrow indicators on screen edges during horizontal drag
  */
 @Composable
 private fun SurahSwipeContainer(
@@ -102,7 +106,36 @@ private fun SurahSwipeContainer(
     content: @Composable BoxScope.() -> Unit
 ) {
     var swipeOffsetX by remember { mutableStateOf(0f) }
-    val swipeThreshold = 150f
+    val swipeThreshold = 300f
+
+    // Calculate swipe progress (0f to 1f) for arrow animation
+    val canSwipeRight = surahNumber > 1
+    val canSwipeLeft = surahNumber < 114
+    val rawProgress = kotlin.math.abs(swipeOffsetX) / swipeThreshold
+    val swipeProgress = rawProgress.coerceIn(0f, 1f)
+    val isSwipingRight = swipeOffsetX > 0f
+    val isSwipingLeft = swipeOffsetX < 0f
+
+    // Show arrow only when swiping in a valid direction
+    val showLeftArrow = isSwipingRight && canSwipeRight
+    val showRightArrow = isSwipingLeft && canSwipeLeft
+    val targetProgress = when {
+        showLeftArrow || showRightArrow -> swipeProgress
+        else -> 0f
+    }
+
+    // Animate the arrow opacity/scale with spring for snappy feel on release
+    val animatedProgress by animateFloatAsState(
+        targetValue = targetProgress,
+        animationSpec = if (targetProgress == 0f) {
+            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh)
+        } else {
+            spring(stiffness = Spring.StiffnessHigh)
+        },
+        label = "swipeArrowProgress",
+    )
+
+    val thresholdReached = swipeProgress >= 1f
 
     Box(
         modifier = Modifier
@@ -113,8 +146,8 @@ private fun SurahSwipeContainer(
                     onDragStart = { swipeOffsetX = 0f },
                     onDragEnd = {
                         when {
-                            swipeOffsetX > swipeThreshold && surahNumber > 1 -> onNavigateToPreviousSurah()
-                            swipeOffsetX < -swipeThreshold && surahNumber < 114 -> onNavigateToNextSurah()
+                            swipeOffsetX > swipeThreshold && canSwipeRight -> onNavigateToPreviousSurah()
+                            swipeOffsetX < -swipeThreshold && canSwipeLeft -> onNavigateToNextSurah()
                         }
                         swipeOffsetX = 0f
                     },
@@ -127,8 +160,80 @@ private fun SurahSwipeContainer(
                     }
                 )
             },
-        content = content
-    )
+    ) {
+        content()
+
+        // Left edge arrow (swipe right → previous surah)
+        if (animatedProgress > 0.01f && (showLeftArrow || animatedProgress > 0.01f) && canSwipeRight) {
+            SwipeArrowIndicator(
+                progress = animatedProgress,
+                thresholdReached = thresholdReached && isSwipingRight,
+                alignment = Alignment.CenterStart,
+                icon = Icons.Default.ChevronLeft,
+                modifier = Modifier.align(Alignment.CenterStart),
+            )
+        }
+
+        // Right edge arrow (swipe left → next surah)
+        if (animatedProgress > 0.01f && (showRightArrow || animatedProgress > 0.01f) && canSwipeLeft) {
+            SwipeArrowIndicator(
+                progress = animatedProgress,
+                thresholdReached = thresholdReached && isSwipingLeft,
+                alignment = Alignment.CenterEnd,
+                icon = Icons.Default.ChevronRight,
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
+        }
+    }
+}
+
+/**
+ * Animated arrow indicator shown on screen edge during swipe gestures.
+ * Scales and changes color as the user approaches the navigation threshold.
+ */
+@Composable
+private fun SwipeArrowIndicator(
+    progress: Float,
+    thresholdReached: Boolean,
+    alignment: Alignment,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+) {
+    val backgroundColor = if (thresholdReached) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHighest
+    }
+    val iconColor = if (thresholdReached) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    val scale = 0.5f + (progress * 0.5f) // Scale from 50% to 100%
+    val alpha = (progress * 1.5f).coerceIn(0f, 1f) // Fade in faster than scale
+    val horizontalPadding = if (alignment == Alignment.CenterStart) 8.dp else 8.dp
+
+    Box(
+        modifier = modifier
+            .padding(horizontal = horizontalPadding)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+            }
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(backgroundColor.copy(alpha = 0.9f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconColor,
+            modifier = Modifier.size(24.dp),
+        )
+    }
 }
 
 /**
