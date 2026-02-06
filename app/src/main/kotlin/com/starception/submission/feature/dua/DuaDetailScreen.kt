@@ -1034,15 +1034,75 @@ fun DuaDetailScreen(
                 )
             }
 
-            // Pager for duas - with pager swipe and edge indicators
+            // Pager for duas - with custom drag gesture and edge indicators (no sliding)
             if (duasList.isNotEmpty()) {
                 android.util.Log.d("DuaScreen", "📖 SHOWING PAGER with ${duasList.size} duas")
 
-                Box(modifier = Modifier.fillMaxSize()) {
+                // Custom swipe state
+                var swipeOffsetX by remember { mutableStateOf(0f) }
+                var touchY by remember { mutableStateOf(0f) }
+                val swipeThreshold = 300f
+                val coroutineScope = rememberCoroutineScope()
+
+                val swipeProgress = (kotlin.math.abs(swipeOffsetX) / swipeThreshold).coerceIn(0f, 1f)
+                val isSwipingRight = swipeOffsetX > 0f
+                val isSwipingLeft = swipeOffsetX < 0f
+
+                val showLeftIndicator = isSwipingRight && hasPrevious
+                val showRightIndicator = isSwipingLeft && hasNext
+                val targetProgress = if (showLeftIndicator || showRightIndicator) swipeProgress else 0f
+
+                val duaAnimatedProgress by animateFloatAsState(
+                    targetValue = targetProgress,
+                    animationSpec = if (targetProgress == 0f) {
+                        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh)
+                    } else {
+                        spring(stiffness = Spring.StiffnessHigh)
+                    },
+                    label = "duaSwipeProgress",
+                )
+
+                val density = LocalDensity.current
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(currentPage) {
+                            detectDragGestures(
+                                onDragStart = { offset ->
+                                    swipeOffsetX = 0f
+                                    touchY = offset.y
+                                },
+                                onDragEnd = {
+                                    when {
+                                        swipeOffsetX > swipeThreshold && hasPrevious -> {
+                                            coroutineScope.launch {
+                                                pagerState.animateScrollToPage(currentPage - 1)
+                                            }
+                                        }
+                                        swipeOffsetX < -swipeThreshold && hasNext -> {
+                                            coroutineScope.launch {
+                                                pagerState.animateScrollToPage(currentPage + 1)
+                                            }
+                                        }
+                                    }
+                                    swipeOffsetX = 0f
+                                },
+                                onDragCancel = { swipeOffsetX = 0f },
+                                onDrag = { change, dragAmount ->
+                                    swipeOffsetX += dragAmount.x
+                                    touchY = change.position.y
+                                    if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y) * 1.5f) {
+                                        change.consume()
+                                    }
+                                }
+                            )
+                        }
+                ) {
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
-                    userScrollEnabled = true
+                    userScrollEnabled = false
                 ) { page ->
                     val dua = duasList[page]
 
@@ -1578,51 +1638,42 @@ fun DuaDetailScreen(
                     }
                 }
 
-                // Edge indicators based on pager offset
-                val pageOffset = pagerState.currentPageOffsetFraction
-                val absOffset = kotlin.math.abs(pageOffset)
-                val pagerSwipeProgress = (absOffset / 0.2f).coerceIn(0f, 1f)
-                val isSwipingToNext = pageOffset > 0.005f
-                val isSwipingToPrev = pageOffset < -0.005f
+                // Edge indicators using custom swipe state
+                val touchYDp = with(density) { touchY.toDp() }
+                val baseHeight = 72f
+                val targetSize = 46f
+                val indicatorHeight = (baseHeight - (baseHeight - targetSize) * duaAnimatedProgress).dp
+                val verticalOffset = touchYDp - (indicatorHeight / 2)
 
-                val showLeftArrow = isSwipingToPrev && hasPrevious
-                val showRightArrow = isSwipingToNext && hasNext
-                val targetProgress = if (showLeftArrow || showRightArrow) pagerSwipeProgress else 0f
-
-                val duaAnimatedProgress by animateFloatAsState(
-                    targetValue = targetProgress,
-                    animationSpec = if (targetProgress == 0f) {
-                        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh)
-                    } else {
-                        spring(stiffness = Spring.StiffnessHigh)
-                    },
-                    label = "duaSwipeProgress",
-                )
-
-                // When threshold reached, detach from edge
-                val thresholdReachedLeft = pagerSwipeProgress >= 1f && isSwipingToPrev
-                val thresholdReachedRight = pagerSwipeProgress >= 1f && isSwipingToNext
+                val thresholdReachedLeft = swipeProgress >= 1f && showLeftIndicator
+                val thresholdReachedRight = swipeProgress >= 1f && showRightIndicator
                 val detachOffset = 8.dp
 
-                if (duaAnimatedProgress > 0.01f && hasPrevious && showLeftArrow) {
+                if (duaAnimatedProgress > 0.01f && showLeftIndicator) {
                     DuaSwipeArrowIndicator(
                         progress = duaAnimatedProgress,
                         thresholdReached = thresholdReachedLeft,
                         isLeftEdge = true,
                         modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .offset(x = if (thresholdReachedLeft) detachOffset else 0.dp),
+                            .align(Alignment.TopStart)
+                            .offset(
+                                x = if (thresholdReachedLeft) detachOffset else 0.dp,
+                                y = verticalOffset
+                            ),
                     )
                 }
 
-                if (duaAnimatedProgress > 0.01f && hasNext && showRightArrow) {
+                if (duaAnimatedProgress > 0.01f && showRightIndicator) {
                     DuaSwipeArrowIndicator(
                         progress = duaAnimatedProgress,
                         thresholdReached = thresholdReachedRight,
                         isLeftEdge = false,
                         modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .offset(x = if (thresholdReachedRight) -detachOffset else 0.dp),
+                            .align(Alignment.TopEnd)
+                            .offset(
+                                x = if (thresholdReachedRight) -detachOffset else 0.dp,
+                                y = verticalOffset
+                            ),
                     )
                 }
                 } // end wrapping Box
