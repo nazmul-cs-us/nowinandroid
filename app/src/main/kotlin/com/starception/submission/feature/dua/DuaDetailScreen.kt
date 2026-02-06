@@ -1599,21 +1599,30 @@ fun DuaDetailScreen(
                     label = "duaSwipeProgress",
                 )
 
+                // When threshold reached, detach from edge
+                val thresholdReachedLeft = pagerSwipeProgress >= 1f && isSwipingToPrev
+                val thresholdReachedRight = pagerSwipeProgress >= 1f && isSwipingToNext
+                val detachOffset = 8.dp
+
                 if (duaAnimatedProgress > 0.01f && hasPrevious && (showLeftArrow || duaAnimatedProgress > 0.01f)) {
                     DuaSwipeArrowIndicator(
                         progress = duaAnimatedProgress,
-                        thresholdReached = pagerSwipeProgress >= 1f && isSwipingToPrev,
+                        thresholdReached = thresholdReachedLeft,
                         isLeftEdge = true,
-                        modifier = Modifier.align(Alignment.CenterStart),
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(x = if (thresholdReachedLeft) detachOffset else 0.dp),
                     )
                 }
 
                 if (duaAnimatedProgress > 0.01f && hasNext && (showRightArrow || duaAnimatedProgress > 0.01f)) {
                     DuaSwipeArrowIndicator(
                         progress = duaAnimatedProgress,
-                        thresholdReached = pagerSwipeProgress >= 1f && isSwipingToNext,
+                        thresholdReached = thresholdReachedRight,
                         isLeftEdge = false,
-                        modifier = Modifier.align(Alignment.CenterEnd),
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .offset(x = if (thresholdReachedRight) -detachOffset else 0.dp),
                     )
                 }
                 } // end wrapping Box
@@ -3015,9 +3024,9 @@ private fun DuaSwipeArrowIndicator(
 
     val alpha = (progress * 2.5f).coerceIn(0f, 1f)
 
-    val baseWidth = 24f
-    val baseHeight = 64f
-    val targetSize = 40f
+    val baseWidth = 28f
+    val baseHeight = 72f
+    val targetSize = 46f
 
     val pillWidth = baseWidth + (targetSize - baseWidth) * progress
     val pillHeight = baseHeight - (baseHeight - targetSize) * progress
@@ -3043,7 +3052,7 @@ private fun DuaSwipeArrowIndicator(
             imageVector = if (isLeftEdge) Icons.Default.ChevronLeft else Icons.Default.ChevronRight,
             contentDescription = null,
             tint = Color.White,
-            modifier = Modifier.size((18f + progress * 4f).dp),
+            modifier = Modifier.size((28f + progress * 8f).dp),
         )
     }
 }
