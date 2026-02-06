@@ -1,5 +1,7 @@
 package com.starception.submission.feature.hadith
 
+import androidx.activity.BackEventCompat
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -69,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -976,9 +979,8 @@ private fun HadithShimmerLoading(
 }
 
 /**
- * Swipe container for hadith navigation
- * Swipe right to go to previous hadith, swipe left to go to next hadith
- * Shows animated arrow indicators on screen edges during horizontal drag
+ * Container for hadith navigation with drag gesture anywhere on screen.
+ * Shows pill-shaped edge indicator (like system back gesture style).
  */
 @Composable
 private fun HadithSwipeContainer(
@@ -988,20 +990,17 @@ private fun HadithSwipeContainer(
     content: @Composable BoxScope.() -> Unit
 ) {
     var swipeOffsetX by remember { mutableStateOf(0f) }
+    var touchY by remember { mutableStateOf(0f) }
     val swipeThreshold = 300f
 
     val canSwipeRight = hadithNumber > 1
-    val rawProgress = kotlin.math.abs(swipeOffsetX) / swipeThreshold
-    val swipeProgress = rawProgress.coerceIn(0f, 1f)
+    val swipeProgress = (kotlin.math.abs(swipeOffsetX) / swipeThreshold).coerceIn(0f, 1f)
     val isSwipingRight = swipeOffsetX > 0f
     val isSwipingLeft = swipeOffsetX < 0f
 
-    val showLeftArrow = isSwipingRight && canSwipeRight
-    val showRightArrow = isSwipingLeft
-    val targetProgress = when {
-        showLeftArrow || showRightArrow -> swipeProgress
-        else -> 0f
-    }
+    val showLeftIndicator = isSwipingRight && canSwipeRight
+    val showRightIndicator = isSwipingLeft
+    val targetProgress = if (showLeftIndicator || showRightIndicator) swipeProgress else 0f
 
     val animatedProgress by animateFloatAsState(
         targetValue = targetProgress,
@@ -1013,7 +1012,7 @@ private fun HadithSwipeContainer(
         label = "hadithSwipeArrowProgress",
     )
 
-    val thresholdReached = swipeProgress >= 1f
+    val density = LocalDensity.current
 
     Box(
         modifier = Modifier
@@ -1021,99 +1020,104 @@ private fun HadithSwipeContainer(
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .pointerInput(hadithNumber) {
                 detectDragGestures(
-                    onDragStart = {
+                    onDragStart = { offset ->
                         swipeOffsetX = 0f
+                        touchY = offset.y
                     },
                     onDragEnd = {
                         when {
-                            swipeOffsetX > swipeThreshold && canSwipeRight -> {
-                                onNavigateToPreviousHadith()
-                            }
-                            swipeOffsetX < -swipeThreshold -> {
-                                onNavigateToNextHadith()
-                            }
+                            swipeOffsetX > swipeThreshold && canSwipeRight -> onNavigateToPreviousHadith()
+                            swipeOffsetX < -swipeThreshold -> onNavigateToNextHadith()
                         }
                         swipeOffsetX = 0f
                     },
-                    onDragCancel = {
-                        swipeOffsetX = 0f
-                    },
+                    onDragCancel = { swipeOffsetX = 0f },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         swipeOffsetX += dragAmount.x
+                        touchY = change.position.y
                     }
                 )
             },
     ) {
         content()
 
-        // Left edge arrow (swipe right → previous hadith)
-        if (animatedProgress > 0.01f && canSwipeRight && (showLeftArrow || animatedProgress > 0.01f)) {
-            HadithSwipeArrowIndicator(
+        val touchYDp = with(density) { touchY.toDp() }
+        val indicatorHeight = (56f + animatedProgress * 16f).dp
+        val verticalOffset = touchYDp - (indicatorHeight / 2)
+
+        if (animatedProgress > 0.01f && showLeftIndicator) {
+            HadithSwipeEdgeIndicator(
                 progress = animatedProgress,
-                thresholdReached = thresholdReached && isSwipingRight,
-                alignment = Alignment.CenterStart,
-                icon = Icons.Default.ChevronLeft,
-                modifier = Modifier.align(Alignment.CenterStart),
+                thresholdReached = swipeProgress >= 1f,
+                isLeftEdge = true,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(y = verticalOffset),
             )
         }
 
-        // Right edge arrow (swipe left → next hadith)
-        if (animatedProgress > 0.01f && (showRightArrow || animatedProgress > 0.01f)) {
-            HadithSwipeArrowIndicator(
+        if (animatedProgress > 0.01f && showRightIndicator) {
+            HadithSwipeEdgeIndicator(
                 progress = animatedProgress,
-                thresholdReached = thresholdReached && isSwipingLeft,
-                alignment = Alignment.CenterEnd,
-                icon = Icons.Default.ChevronRight,
-                modifier = Modifier.align(Alignment.CenterEnd),
+                thresholdReached = swipeProgress >= 1f,
+                isLeftEdge = false,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(y = verticalOffset),
             )
         }
     }
 }
 
 /**
- * Animated arrow indicator shown on screen edge during hadith swipe gestures.
+ * Android system back gesture style edge indicator.
+ * Starts as tall pill, becomes circular when threshold reached.
  */
 @Composable
-private fun HadithSwipeArrowIndicator(
+private fun HadithSwipeEdgeIndicator(
     progress: Float,
     thresholdReached: Boolean,
-    alignment: Alignment,
-    icon: ImageVector,
+    isLeftEdge: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val backgroundColor = if (thresholdReached) {
         MaterialTheme.colorScheme.primary
     } else {
-        MaterialTheme.colorScheme.surfaceContainerHighest
-    }
-    val iconColor = if (thresholdReached) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurface
+        Color(0xFF424242)
     }
 
-    val scale = 0.5f + (progress * 0.5f)
-    val alpha = (progress * 1.5f).coerceIn(0f, 1f)
+    val alpha = (progress * 2.5f).coerceIn(0f, 1f)
+
+    val baseWidth = 24f
+    val baseHeight = 64f
+    val targetSize = 40f
+
+    val pillWidth = baseWidth + (targetSize - baseWidth) * progress
+    val pillHeight = baseHeight - (baseHeight - targetSize) * progress
+    val cornerRadius = pillWidth / 2f
+
+    val view = LocalView.current
+    LaunchedEffect(thresholdReached) {
+        if (thresholdReached) {
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+        }
+    }
 
     Box(
         modifier = modifier
-            .padding(horizontal = 8.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                this.alpha = alpha
-            }
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(backgroundColor.copy(alpha = 0.9f)),
+            .graphicsLayer { this.alpha = alpha }
+            .width(pillWidth.dp)
+            .height(pillHeight.dp)
+            .clip(RoundedCornerShape(cornerRadius.dp))
+            .background(backgroundColor),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = icon,
+            imageVector = if (isLeftEdge) Icons.Default.ChevronLeft else Icons.Default.ChevronRight,
             contentDescription = null,
-            tint = iconColor,
-            modifier = Modifier.size(24.dp),
+            tint = Color.White,
+            modifier = Modifier.size((18f + progress * 4f).dp),
         )
     }
 }

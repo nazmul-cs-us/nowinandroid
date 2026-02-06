@@ -1,6 +1,8 @@
 package com.starception.submission.feature.dua
 
 import android.content.Context
+import androidx.activity.BackEventCompat
+import androidx.activity.compose.PredictiveBackHandler
 import android.content.SharedPreferences
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
@@ -112,6 +114,7 @@ import androidx.compose.ui.graphics.Color
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -1031,77 +1034,15 @@ fun DuaDetailScreen(
                 )
             }
 
-            // Pager for duas - with manual swipe gestures and arrow indicators
+            // Pager for duas - with pager swipe and edge indicators
             if (duasList.isNotEmpty()) {
                 android.util.Log.d("DuaScreen", "📖 SHOWING PAGER with ${duasList.size} duas")
 
-                var swipeOffsetX by remember { mutableStateOf(0f) }
-                val swipeThreshold = 300f
-                val duaSwipeScope = rememberCoroutineScope()
-
-                val canSwipeRight = currentPage > 0 || hasPrevious
-                val canSwipeLeft = currentPage < duasList.size - 1 || hasNext
-                val rawProgress = kotlin.math.abs(swipeOffsetX) / swipeThreshold
-                val swipeProgress = rawProgress.coerceIn(0f, 1f)
-                val isSwipingRight = swipeOffsetX > 0f
-                val isSwipingLeft = swipeOffsetX < 0f
-
-                val showLeftArrow = isSwipingRight && canSwipeRight
-                val showRightArrow = isSwipingLeft && canSwipeLeft
-                val targetProgress = when {
-                    showLeftArrow || showRightArrow -> swipeProgress
-                    else -> 0f
-                }
-
-                val animatedProgress by animateFloatAsState(
-                    targetValue = targetProgress,
-                    animationSpec = if (targetProgress == 0f) {
-                        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh)
-                    } else {
-                        spring(stiffness = Spring.StiffnessHigh)
-                    },
-                    label = "duaSwipeArrowProgress",
-                )
-
-                val thresholdReached = swipeProgress >= 1f
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(currentPage) {
-                            detectDragGestures(
-                                onDragStart = { swipeOffsetX = 0f },
-                                onDragEnd = {
-                                    when {
-                                        swipeOffsetX > swipeThreshold && canSwipeRight -> {
-                                            duaSwipeScope.launch {
-                                                val target = if (currentPage > 0) currentPage - 1 else duasList.size - 1
-                                                pagerState.animateScrollToPage(target)
-                                            }
-                                        }
-                                        swipeOffsetX < -swipeThreshold && canSwipeLeft -> {
-                                            duaSwipeScope.launch {
-                                                val target = if (currentPage < duasList.size - 1) currentPage + 1 else 0
-                                                pagerState.animateScrollToPage(target)
-                                            }
-                                        }
-                                    }
-                                    swipeOffsetX = 0f
-                                },
-                                onDragCancel = { swipeOffsetX = 0f },
-                                onDrag = { change, dragAmount ->
-                                    swipeOffsetX += dragAmount.x
-                                    if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y) * 1.5f) {
-                                        change.consume()
-                                    }
-                                }
-                            )
-                        }
-                ) {
+                Box(modifier = Modifier.fillMaxSize()) {
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
-                    userScrollEnabled = false
+                    userScrollEnabled = true
                 ) { page ->
                     val dua = duasList[page]
 
@@ -1637,22 +1578,41 @@ fun DuaDetailScreen(
                     }
                 }
 
-                // Left edge arrow (swipe right → previous dua)
-                if (animatedProgress > 0.01f && canSwipeRight && (showLeftArrow || animatedProgress > 0.01f)) {
+                // Edge indicators based on pager offset
+                val pageOffset = pagerState.currentPageOffsetFraction
+                val absOffset = kotlin.math.abs(pageOffset)
+                val pagerSwipeProgress = (absOffset / 0.2f).coerceIn(0f, 1f)
+                val isSwipingToNext = pageOffset > 0.005f
+                val isSwipingToPrev = pageOffset < -0.005f
+
+                val showLeftArrow = isSwipingToPrev && hasPrevious
+                val showRightArrow = isSwipingToNext && hasNext
+                val targetProgress = if (showLeftArrow || showRightArrow) pagerSwipeProgress else 0f
+
+                val duaAnimatedProgress by animateFloatAsState(
+                    targetValue = targetProgress,
+                    animationSpec = if (targetProgress == 0f) {
+                        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh)
+                    } else {
+                        spring(stiffness = Spring.StiffnessHigh)
+                    },
+                    label = "duaSwipeProgress",
+                )
+
+                if (duaAnimatedProgress > 0.01f && hasPrevious && (showLeftArrow || duaAnimatedProgress > 0.01f)) {
                     DuaSwipeArrowIndicator(
-                        progress = animatedProgress,
-                        thresholdReached = thresholdReached && isSwipingRight,
-                        icon = Icons.Default.ChevronLeft,
+                        progress = duaAnimatedProgress,
+                        thresholdReached = pagerSwipeProgress >= 1f && isSwipingToPrev,
+                        isLeftEdge = true,
                         modifier = Modifier.align(Alignment.CenterStart),
                     )
                 }
 
-                // Right edge arrow (swipe left → next dua)
-                if (animatedProgress > 0.01f && canSwipeLeft && (showRightArrow || animatedProgress > 0.01f)) {
+                if (duaAnimatedProgress > 0.01f && hasNext && (showRightArrow || duaAnimatedProgress > 0.01f)) {
                     DuaSwipeArrowIndicator(
-                        progress = animatedProgress,
-                        thresholdReached = thresholdReached && isSwipingLeft,
-                        icon = Icons.Default.ChevronRight,
+                        progress = duaAnimatedProgress,
+                        thresholdReached = pagerSwipeProgress >= 1f && isSwipingToNext,
+                        isLeftEdge = false,
                         modifier = Modifier.align(Alignment.CenterEnd),
                     )
                 }
@@ -3037,47 +2997,53 @@ private fun ShimmerSectionCard(
 }
 
 /**
- * Animated arrow indicator shown on screen edge during dua pager swipe gestures.
+ * Android system back gesture style edge indicator.
+ * Starts as tall pill, becomes circular when threshold reached.
  */
 @Composable
 private fun DuaSwipeArrowIndicator(
     progress: Float,
     thresholdReached: Boolean,
-    icon: ImageVector,
+    isLeftEdge: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val backgroundColor = if (thresholdReached) {
         MaterialTheme.colorScheme.primary
     } else {
-        MaterialTheme.colorScheme.surfaceContainerHighest
-    }
-    val iconColor = if (thresholdReached) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurface
+        Color(0xFF424242)
     }
 
-    val scale = 0.5f + (progress * 0.5f)
-    val alpha = (progress * 1.5f).coerceIn(0f, 1f)
+    val alpha = (progress * 2.5f).coerceIn(0f, 1f)
+
+    val baseWidth = 24f
+    val baseHeight = 64f
+    val targetSize = 40f
+
+    val pillWidth = baseWidth + (targetSize - baseWidth) * progress
+    val pillHeight = baseHeight - (baseHeight - targetSize) * progress
+    val cornerRadius = pillWidth / 2f
+
+    val view = LocalView.current
+    LaunchedEffect(thresholdReached) {
+        if (thresholdReached) {
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+        }
+    }
 
     Box(
         modifier = modifier
-            .padding(horizontal = 8.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                this.alpha = alpha
-            }
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(backgroundColor.copy(alpha = 0.9f)),
+            .graphicsLayer { this.alpha = alpha }
+            .width(pillWidth.dp)
+            .height(pillHeight.dp)
+            .clip(RoundedCornerShape(cornerRadius.dp))
+            .background(backgroundColor),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = icon,
+            imageVector = if (isLeftEdge) Icons.Default.ChevronLeft else Icons.Default.ChevronRight,
             contentDescription = null,
-            tint = iconColor,
-            modifier = Modifier.size(24.dp),
+            tint = Color.White,
+            modifier = Modifier.size((18f + progress * 4f).dp),
         )
     }
 }
