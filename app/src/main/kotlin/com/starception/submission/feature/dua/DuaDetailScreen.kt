@@ -1604,7 +1604,7 @@ fun DuaDetailScreen(
                 val thresholdReachedRight = pagerSwipeProgress >= 1f && isSwipingToNext
                 val detachOffset = 8.dp
 
-                if (duaAnimatedProgress > 0.01f && hasPrevious && (showLeftArrow || duaAnimatedProgress > 0.01f)) {
+                if (duaAnimatedProgress > 0.01f && hasPrevious && showLeftArrow) {
                     DuaSwipeArrowIndicator(
                         progress = duaAnimatedProgress,
                         thresholdReached = thresholdReachedLeft,
@@ -1615,7 +1615,7 @@ fun DuaDetailScreen(
                     )
                 }
 
-                if (duaAnimatedProgress > 0.01f && hasNext && (showRightArrow || duaAnimatedProgress > 0.01f)) {
+                if (duaAnimatedProgress > 0.01f && hasNext && showRightArrow) {
                     DuaSwipeArrowIndicator(
                         progress = duaAnimatedProgress,
                         thresholdReached = thresholdReachedRight,
@@ -3049,7 +3049,7 @@ private fun DuaSwipeArrowIndicator(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = if (isLeftEdge) Icons.Default.ChevronLeft else Icons.Default.ChevronRight,
+            imageVector = if (isLeftEdge) Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
             contentDescription = null,
             tint = Color.White,
             modifier = Modifier.size((28f + progress * 8f).dp),

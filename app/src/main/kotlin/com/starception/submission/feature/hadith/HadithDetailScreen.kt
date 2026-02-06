@@ -1126,7 +1126,7 @@ private fun HadithSwipeEdgeIndicator(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = if (isLeftEdge) Icons.Default.ChevronLeft else Icons.Default.ChevronRight,
+            imageVector = if (isLeftEdge) Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
             contentDescription = null,
             tint = Color.White,
             modifier = Modifier.size((28f + progress * 8f).dp),
