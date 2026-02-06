@@ -171,18 +171,28 @@ private fun SurahSwipeContainer(
 
         // Convert touchY to dp for offset
         val touchYDp = with(density) { touchY.toDp() }
-        val indicatorHeight = (48f + animatedProgress * 16f).dp
+        val baseHeight = 72f
+        val targetSize = 46f
+        val indicatorHeight = (baseHeight - (baseHeight - targetSize) * animatedProgress).dp
         val verticalOffset = touchYDp - (indicatorHeight / 2)
+
+        // When threshold reached, detach from edge (move inward)
+        val thresholdReachedLeft = swipeProgress >= 1f && showLeftIndicator
+        val thresholdReachedRight = swipeProgress >= 1f && showRightIndicator
+        val detachOffset = 8.dp // How far to move away from edge when threshold reached
 
         // Left indicator (when swiping right to go to previous)
         if (animatedProgress > 0.01f && showLeftIndicator) {
             SwipeEdgeIndicator(
                 progress = animatedProgress,
-                thresholdReached = swipeProgress >= 1f,
+                thresholdReached = thresholdReachedLeft,
                 isLeftEdge = true,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .offset(y = verticalOffset),
+                    .offset(
+                        x = if (thresholdReachedLeft) detachOffset else 0.dp,
+                        y = verticalOffset
+                    ),
             )
         }
 
@@ -190,11 +200,14 @@ private fun SurahSwipeContainer(
         if (animatedProgress > 0.01f && showRightIndicator) {
             SwipeEdgeIndicator(
                 progress = animatedProgress,
-                thresholdReached = swipeProgress >= 1f,
+                thresholdReached = thresholdReachedRight,
                 isLeftEdge = false,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(y = verticalOffset),
+                    .offset(
+                        x = if (thresholdReachedRight) -detachOffset else 0.dp,
+                        y = verticalOffset
+                    ),
             )
         }
     }
@@ -220,9 +233,9 @@ private fun SwipeEdgeIndicator(
     val alpha = (progress * 2.5f).coerceIn(0f, 1f)
 
     // Start as tall pill (height >> width), become circular (height = width) as progress increases
-    val baseWidth = 24f
-    val baseHeight = 64f
-    val targetSize = 40f // Final circular size
+    val baseWidth = 28f
+    val baseHeight = 72f
+    val targetSize = 46f // Final circular size
 
     // Interpolate: width grows, height shrinks toward target
     val pillWidth = baseWidth + (targetSize - baseWidth) * progress
@@ -250,7 +263,7 @@ private fun SwipeEdgeIndicator(
             imageVector = if (isLeftEdge) Icons.Default.ChevronLeft else Icons.Default.ChevronRight,
             contentDescription = null,
             tint = Color.White,
-            modifier = Modifier.size((18f + progress * 4f).dp),
+            modifier = Modifier.size((28f + progress * 8f).dp),
         )
     }
 }

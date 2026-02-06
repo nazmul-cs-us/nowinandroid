@@ -1043,28 +1043,40 @@ private fun HadithSwipeContainer(
         content()
 
         val touchYDp = with(density) { touchY.toDp() }
-        val indicatorHeight = (56f + animatedProgress * 16f).dp
+        val baseHeight = 72f
+        val targetSize = 46f
+        val indicatorHeight = (baseHeight - (baseHeight - targetSize) * animatedProgress).dp
         val verticalOffset = touchYDp - (indicatorHeight / 2)
+
+        val thresholdReachedLeft = swipeProgress >= 1f && showLeftIndicator
+        val thresholdReachedRight = swipeProgress >= 1f && showRightIndicator
+        val detachOffset = 8.dp
 
         if (animatedProgress > 0.01f && showLeftIndicator) {
             HadithSwipeEdgeIndicator(
                 progress = animatedProgress,
-                thresholdReached = swipeProgress >= 1f,
+                thresholdReached = thresholdReachedLeft,
                 isLeftEdge = true,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .offset(y = verticalOffset),
+                    .offset(
+                        x = if (thresholdReachedLeft) detachOffset else 0.dp,
+                        y = verticalOffset
+                    ),
             )
         }
 
         if (animatedProgress > 0.01f && showRightIndicator) {
             HadithSwipeEdgeIndicator(
                 progress = animatedProgress,
-                thresholdReached = swipeProgress >= 1f,
+                thresholdReached = thresholdReachedRight,
                 isLeftEdge = false,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(y = verticalOffset),
+                    .offset(
+                        x = if (thresholdReachedRight) -detachOffset else 0.dp,
+                        y = verticalOffset
+                    ),
             )
         }
     }
@@ -1089,9 +1101,9 @@ private fun HadithSwipeEdgeIndicator(
 
     val alpha = (progress * 2.5f).coerceIn(0f, 1f)
 
-    val baseWidth = 24f
-    val baseHeight = 64f
-    val targetSize = 40f
+    val baseWidth = 28f
+    val baseHeight = 72f
+    val targetSize = 46f
 
     val pillWidth = baseWidth + (targetSize - baseWidth) * progress
     val pillHeight = baseHeight - (baseHeight - targetSize) * progress
@@ -1117,7 +1129,7 @@ private fun HadithSwipeEdgeIndicator(
             imageVector = if (isLeftEdge) Icons.Default.ChevronLeft else Icons.Default.ChevronRight,
             contentDescription = null,
             tint = Color.White,
-            modifier = Modifier.size((18f + progress * 4f).dp),
+            modifier = Modifier.size((28f + progress * 8f).dp),
         )
     }
 }
