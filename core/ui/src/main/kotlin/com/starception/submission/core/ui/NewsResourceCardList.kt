@@ -43,6 +43,7 @@ fun LazyListScope.userNewsResourceCardItems(
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
     itemModifier: Modifier = Modifier,
 ) = items(
     items = items,
@@ -63,6 +64,10 @@ fun LazyListScope.userNewsResourceCardItems(
         // Check if this is a Dua item
         val isDuaItem = userNewsResource.type.contains("Dua", ignoreCase = true)
 
+        // Check if this is a Hadith item
+        val isHadithItem = userNewsResource.type.contains("Hadith", ignoreCase = true)
+        val hadithInfo = if (isHadithItem) extractHadithInfo(userNewsResource.url) else null
+
         NewsResourceCardExpanded(
             userNewsResource = userNewsResource,
             isBookmarked = userNewsResource.isSaved,
@@ -76,6 +81,9 @@ fun LazyListScope.userNewsResourceCardItems(
                 // If it's a Surah, navigate to Surah detail
                 if (surahNumber != null) {
                     onSurahClick(surahNumber, userNewsResource.id)
+                } else if (isHadithItem && hadithInfo != null) {
+                    // If it's a Hadith, navigate to Hadith detail
+                    onHadithClick(hadithInfo.first, hadithInfo.second)
                 } else if (isDuaItem) {
                     // If it's a Dua, navigate to Dua detail
                     onDuaClick(userNewsResource)

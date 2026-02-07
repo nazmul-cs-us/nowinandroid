@@ -109,6 +109,7 @@ internal fun ForYouScreen(
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     viewModel: ForYouViewModel = hiltViewModel(),
 ) {
@@ -127,6 +128,7 @@ internal fun ForYouScreen(
         onTopicClick = onTopicClick,
         onSurahClick = onSurahClick,
         onDuaClick = onDuaClick,
+        onHadithClick = onHadithClick,
         saveFollowedTopics = viewModel::dismissOnboarding,
         onNewsResourcesCheckedChanged = viewModel::updateNewsResourceSaved,
         onNewsResourceViewed = { viewModel.setNewsResourceViewed(it, true) },
@@ -144,6 +146,7 @@ internal fun ForYouScreen(
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onDeepLinkOpened: (String) -> Unit,
     saveFollowedTopics: () -> Unit,
     onNewsResourcesCheckedChanged: (String, Boolean) -> Unit,
@@ -202,6 +205,7 @@ internal fun ForYouScreen(
                 onTopicClick = onTopicClick,
                 onSurahClick = onSurahClick,
                 onDuaClick = onDuaClick,
+                onHadithClick = onHadithClick,
             )
 
             item(span = StaggeredGridItemSpan.FullLine, contentType = "bottomSpacing") {

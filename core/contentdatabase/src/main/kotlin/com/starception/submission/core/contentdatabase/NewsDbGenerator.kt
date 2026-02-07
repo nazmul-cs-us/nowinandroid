@@ -25,6 +25,7 @@ object NewsDbGenerator {
 
     // Topic IDs
     private const val TOPIC_HOLY_QURAN = 7
+    private const val TOPIC_SAHIH_BUKHARI = 8
     private const val TOPIC_QURANIC_DUAS = 11
     private const val TOPIC_MORNING_EVENING = 21
     private const val TOPIC_PRAYER = 22
@@ -175,11 +176,17 @@ object NewsDbGenerator {
                 fortressCount = fortressResult.first
                 topicMappings += fortressResult.second
 
+                // Generate from sahih_bukhari.json
+                var bukhariCount = 0
+                val bukhariResult = generateBukhariHadiths(context, db, startId = 3001)
+                bukhariCount = bukhariResult.first
+                topicMappings += bukhariResult.second
+
                 db.close()
 
                 val duration = System.currentTimeMillis() - startTime
                 Log.d(TAG, "News.db regeneration completed in ${duration}ms")
-                Log.d(TAG, "Generated: $surahCount Surahs, $quranicDuaCount Quranic Duas, $fortressCount Fortress Duas")
+                Log.d(TAG, "Generated: $surahCount Surahs, $quranicDuaCount Quranic Duas, $fortressCount Fortress Duas, $bukhariCount Bukhari Hadiths")
                 Log.d(TAG, "Total topic mappings: $topicMappings")
 
                 RegenerationResult(
@@ -187,6 +194,7 @@ object NewsDbGenerator {
                     surahCount = surahCount,
                     quranicDuaCount = quranicDuaCount,
                     fortressDuaCount = fortressCount,
+                    bukhariHadithCount = bukhariCount,
                     topicMappings = topicMappings,
                     durationMs = duration
                 )
@@ -448,6 +456,70 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
         return Pair(count, mappings)
     }
 
+    private fun generateBukhariHadiths(context: Context, newsDb: SQLiteDatabase, startId: Int): Pair<Int, Int> {
+        Log.d(TAG, "Generating Sahih Bukhari hadiths from JSON...")
+
+        var count = 0
+        var mappings = 0
+        var newsId = startId
+        val now = getCurrentTimestamp()
+
+        try {
+            val jsonString = context.assets.open("sahih_bukhari.json").bufferedReader().use { it.readText() }
+            val jsonArray = org.json.JSONArray(jsonString)
+
+            for (volIndex in 0 until jsonArray.length()) {
+                val volume = jsonArray.getJSONObject(volIndex)
+                val books = volume.getJSONArray("books")
+
+                for (bookIndex in 0 until books.length()) {
+                    val book = books.getJSONObject(bookIndex)
+                    val bookName = book.getString("name")
+                    val hadiths = book.getJSONArray("hadiths")
+
+                    for (hadithIndex in 0 until hadiths.length()) {
+                        val hadith = hadiths.getJSONObject(hadithIndex)
+                        val info = hadith.getString("info")
+                        val narrator = hadith.optString("by", "")
+                        val text = hadith.getString("text").trim()
+
+                        // Extract hadith number
+                        val numberMatch = Regex("""Number\s*(\d+)""", RegexOption.IGNORE_CASE).find(info)
+                        val hadithNumber = numberMatch?.groupValues?.get(1)?.toIntOrNull() ?: continue
+
+                        val title = "Hadith $hadithNumber - $bookName"
+                        val content = if (narrator.isNotEmpty()) {
+                            "$narrator\n\n$text"
+                        } else {
+                            text
+                        }
+                        val url = "hadith://sahih_bukhari/$hadithNumber"
+
+                        newsDb.execSQL(
+                            """INSERT INTO news_resources (id, title, content, url, header_image_url, publish_date, type, is_system, is_user_created, source, created_at, updated_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            arrayOf(newsId, title, content, url, "drawable://ic_bukhari", now, "Hadith 📖", 1, 0, "Sahih Bukhari", now, now)
+                        )
+
+                        newsDb.execSQL(
+                            "INSERT INTO news_topics (news_id, topic_id) VALUES (?, ?)",
+                            arrayOf(newsId, TOPIC_SAHIH_BUKHARI)
+                        )
+
+                        newsId++
+                        count++
+                        mappings++
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to generate Bukhari hadiths", e)
+        }
+
+        Log.d(TAG, "Generated $count Bukhari hadiths")
+        return Pair(count, mappings)
+    }
+
     /**
      * Copy asset database to a readable location and return the path
      */
@@ -699,13 +771,72 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                 Log.d(TAG, "Generated $fortressCount Fortress duas")
             }
 
+            // Generate Bukhari Hadiths from JSON
+            var bukhariCount = 0
+            try {
+                val jsonString = context.assets.open("sahih_bukhari.json").bufferedReader().use { it.readText() }
+                val jsonArray = org.json.JSONArray(jsonString)
+                var newsId = 3001
+
+                for (volIndex in 0 until jsonArray.length()) {
+                    val volume = jsonArray.getJSONObject(volIndex)
+                    val books = volume.getJSONArray("books")
+
+                    for (bookIndex in 0 until books.length()) {
+                        val book = books.getJSONObject(bookIndex)
+                        val bookName = book.getString("name")
+                        val hadiths = book.getJSONArray("hadiths")
+
+                        for (hadithIndex in 0 until hadiths.length()) {
+                            val hadith = hadiths.getJSONObject(hadithIndex)
+                            val info = hadith.getString("info")
+                            val narrator = hadith.optString("by", "")
+                            val text = hadith.getString("text").trim()
+
+                            // Extract hadith number
+                            val numberMatch = Regex("""Number\s*(\d+)""", RegexOption.IGNORE_CASE).find(info)
+                            val hadithNumber = numberMatch?.groupValues?.get(1)?.toIntOrNull() ?: continue
+
+                            val title = "Hadith $hadithNumber - $bookName"
+                            val content = if (narrator.isNotEmpty()) {
+                                "$narrator\n\n$text"
+                            } else {
+                                text
+                            }
+                            val url = "hadith://sahih_bukhari/$hadithNumber"
+
+                            newsResources.add(NewsResourceEntity(
+                                id = newsId,
+                                title = title,
+                                content = content,
+                                url = url,
+                                headerImageUrl = "drawable://ic_bukhari",
+                                publishDate = now,
+                                type = "Hadith 📖",
+                                isSystem = 1,
+                                isUserCreated = 0,
+                                source = "Sahih Bukhari",
+                                createdAt = now,
+                                updatedAt = now
+                            ))
+                            crossRefs.add(NewsTopicCrossRef(newsId, TOPIC_SAHIH_BUKHARI))
+                            newsId++
+                            bukhariCount++
+                        }
+                    }
+                }
+                Log.d(TAG, "Generated $bukhariCount Bukhari hadiths")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to generate Bukhari hadiths", e)
+            }
+
             // Insert all data via Room
             dao.insertNewsResources(newsResources)
             dao.insertNewsTopicCrossRefs(crossRefs)
 
             val duration = System.currentTimeMillis() - startTime
             Log.d(TAG, "News.db regeneration completed in ${duration}ms")
-            Log.d(TAG, "Generated: $surahCount Surahs, $quranicDuaCount Quranic Duas, $fortressCount Fortress Duas")
+            Log.d(TAG, "Generated: $surahCount Surahs, $quranicDuaCount Quranic Duas, $fortressCount Fortress Duas, $bukhariCount Bukhari Hadiths")
             Log.d(TAG, "Total topic mappings: ${crossRefs.size}")
 
             RegenerationResult(
@@ -713,6 +844,7 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                 surahCount = surahCount,
                 quranicDuaCount = quranicDuaCount,
                 fortressDuaCount = fortressCount,
+                bukhariHadithCount = bukhariCount,
                 topicMappings = crossRefs.size,
                 durationMs = duration
             )
@@ -734,10 +866,11 @@ data class RegenerationResult(
     val surahCount: Int = 0,
     val quranicDuaCount: Int = 0,
     val fortressDuaCount: Int = 0,
+    val bukhariHadithCount: Int = 0,
     val topicMappings: Int = 0,
     val durationMs: Long = 0,
     val error: String? = null
 ) {
     val totalNewsResources: Int
-        get() = surahCount + quranicDuaCount + fortressDuaCount
+        get() = surahCount + quranicDuaCount + fortressDuaCount + bukhariHadithCount
 }

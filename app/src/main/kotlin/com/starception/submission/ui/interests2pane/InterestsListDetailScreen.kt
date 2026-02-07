@@ -68,11 +68,13 @@ import kotlin.math.max
 fun NavGraphBuilder.interestsListDetailScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
 ) {
     composable<InterestsRoute> {
         InterestsListDetailScreen(
             onSurahClick = onSurahClick,
             onDuaClick = onDuaClick,
+            onHadithClick = onHadithClick,
         )
     }
 }
@@ -83,6 +85,7 @@ internal fun InterestsListDetailScreen(
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
 ) {
     val selectedTopicId by viewModel.selectedTopicId.collectAsStateWithLifecycle()
     InterestsListDetailScreen(
@@ -91,6 +94,7 @@ internal fun InterestsListDetailScreen(
         windowAdaptiveInfo = windowAdaptiveInfo,
         onSurahClick = onSurahClick,
         onDuaClick = onDuaClick,
+        onHadithClick = onHadithClick,
     )
 }
 
@@ -102,6 +106,7 @@ internal fun InterestsListDetailScreen(
     windowAdaptiveInfo: WindowAdaptiveInfo,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
 ) {
     val listDetailNavigator = rememberListDetailPaneScaffoldNavigator(
         scaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo),
@@ -220,6 +225,7 @@ internal fun InterestsListDetailScreen(
                                     onTopicClick = ::onTopicClickShowDetailPane,
                                     onSurahClick = onSurahClick,
                                     onDuaClick = { userNewsResource -> onDuaClick(userNewsResource, route.id) },
+                                    onHadithClick = onHadithClick,
                                     viewModel = hiltViewModel<TopicViewModel, TopicViewModel.Factory>(
                                         key = route.id,
                                     ) { factory ->

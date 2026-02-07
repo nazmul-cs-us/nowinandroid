@@ -1981,7 +1981,7 @@ fun DuaDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .padding(top = 48.dp) // Fixed padding to clear camera punch hole area
+                    .padding(top = 32.dp) // Fixed padding to clear camera punch hole area
             ) {
                 Row(
                     modifier = Modifier
@@ -2901,7 +2901,7 @@ private fun DuaShimmerLoadingContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .padding(top = 48.dp) // Fixed padding to clear camera punch hole area
+                .padding(top = 32.dp) // Fixed padding to clear camera punch hole area
         ) {
             Row(
                 modifier = Modifier
