@@ -77,6 +77,7 @@ fun TopicScreen(
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     viewModel: TopicViewModel = hiltViewModel(),
 ) {
@@ -96,6 +97,7 @@ fun TopicScreen(
         onTopicClick = onTopicClick,
         onSurahClick = onSurahClick,
         onDuaClick = onDuaClick,
+        onHadithClick = onHadithClick,
     )
 }
 
@@ -112,6 +114,7 @@ internal fun TopicScreen(
     onNewsResourceViewed: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val state = rememberLazyListState()
@@ -154,6 +157,7 @@ internal fun TopicScreen(
                         onTopicClick = onTopicClick,
                         onSurahClick = onSurahClick,
                         onDuaClick = onDuaClick,
+                        onHadithClick = onHadithClick,
                     )
                 }
             }
@@ -203,13 +207,14 @@ private fun LazyListScope.topicBody(
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
 ) {
     // TODO: Show icon if available
     item {
         TopicHeader(name, description, imageUrl)
     }
 
-    userNewsResourceCards(news, onBookmarkChanged, onNewsResourceViewed, onTopicClick, onSurahClick, onDuaClick)
+    userNewsResourceCards(news, onBookmarkChanged, onNewsResourceViewed, onTopicClick, onSurahClick, onDuaClick, onHadithClick)
 }
 
 @Composable
@@ -244,6 +249,7 @@ private fun LazyListScope.userNewsResourceCards(
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
 ) {
     when (news) {
         is NewsUiState.Success -> {
@@ -254,6 +260,7 @@ private fun LazyListScope.userNewsResourceCards(
                 onTopicClick = onTopicClick,
                 onSurahClick = onSurahClick,
                 onDuaClick = onDuaClick,
+                onHadithClick = onHadithClick,
                 itemModifier = Modifier.padding(24.dp),
             )
         }

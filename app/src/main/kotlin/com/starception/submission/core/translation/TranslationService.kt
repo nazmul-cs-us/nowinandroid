@@ -174,6 +174,71 @@ class TranslationService private constructor(private val context: Context) {
     }
 
     /**
+     * Translate text from English to the target language.
+     * Used for Bukhari hadiths where we have local English translations.
+     *
+     * @param text The English text to translate
+     * @param targetLang The target language code
+     */
+    suspend fun translateFromEnglish(text: String, targetLang: String): String {
+        // If target is English, return as-is
+        if (targetLang == "en") {
+            return text
+        }
+
+        // If target is transliteration, return original
+        if (targetLang == "transliteration") {
+            return text
+        }
+
+        // Check cache first
+        val cacheKey = generateCacheKey("en_$text", targetLang)
+        getCachedTranslation(cacheKey)?.let { return it }
+
+        return withContext(Dispatchers.IO) {
+            try {
+                val provider = getSelectedProvider()
+                var result: String? = null
+
+                when (provider) {
+                    PROVIDER_GOOGLE -> {
+                        result = translateWithGoogle(text, "en", targetLang)
+                        Log.d(TAG, "Translating from English using Google")
+                    }
+                    PROVIDER_REVERSO -> {
+                        if (reversoSupportedLanguages.contains(targetLang)) {
+                            result = translateWithReverso(text, "en", targetLang)
+                            Log.d(TAG, "Translating from English using Reverso")
+                        } else {
+                            result = translateWithGoogle(text, "en", targetLang)
+                        }
+                    }
+                    else -> {
+                        // Auto mode
+                        if (reversoSupportedLanguages.contains(targetLang)) {
+                            result = translateWithReverso(text, "en", targetLang)
+                        }
+                        if (result == null) {
+                            result = translateWithGoogle(text, "en", targetLang)
+                        }
+                    }
+                }
+
+                if (result != null) {
+                    cacheTranslation(cacheKey, result)
+                    return@withContext result
+                }
+
+                Log.w(TAG, "Translation from English failed, returning original")
+                text
+            } catch (e: Exception) {
+                Log.e(TAG, "Translation from English error", e)
+                text
+            }
+        }
+    }
+
+    /**
      * Translate using Reverso API
      */
     private fun translateWithReverso(text: String, sourceLang: String, targetLang: String): String? {

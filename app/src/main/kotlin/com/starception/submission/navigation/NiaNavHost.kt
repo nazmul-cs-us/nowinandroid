@@ -88,6 +88,13 @@ fun NiaNavHost(
                     topicId = topicId
                 )
             },
+            onHadithClick = { databaseFile, hadithNumber ->
+                val collectionName = databaseFile.removeSuffix(".db")
+                    .replace("_", " ")
+                    .split(" ")
+                    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
+            },
         ) {
             topicScreen(
                 showBackButton = true,
@@ -108,6 +115,14 @@ fun NiaNavHost(
                         newsResourceId = userNewsResource.id,
                         topicId = topicId
                     )
+                },
+                onHadithClick = { databaseFile, hadithNumber ->
+                    // Extract collection name from database file (e.g., "sahih_bukhari.db" -> "Sahih Bukhari")
+                    val collectionName = databaseFile.removeSuffix(".db")
+                        .replace("_", " ")
+                        .split(" ")
+                        .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                    navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
                 },
             )
             // Surah screen nested within For You section
@@ -253,6 +268,13 @@ fun NiaNavHost(
                     newsResourceId = userNewsResource.id,
                     topicId = topicId
                 )
+            },
+            onHadithClick = { databaseFile, hadithNumber ->
+                val collectionName = databaseFile.removeSuffix(".db")
+                    .replace("_", " ")
+                    .split(" ")
+                    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
             },
         )
         prayerTimesScreen(

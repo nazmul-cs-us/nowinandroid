@@ -77,6 +77,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.Hadith
 import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.translation.TranslationService
@@ -127,6 +128,7 @@ fun HadithDetailScreen(
     val context = LocalContext.current
     val repository = remember { HadithRepository.getInstance(context) }
     val translationService = remember { TranslationService.getInstance(context) }
+    val bukhariTranslationRepo = remember { BukhariLocalTranslationRepository.getInstance(context) }
 
     // Landscape detection
     val configuration = LocalConfiguration.current
@@ -174,7 +176,7 @@ fun HadithDetailScreen(
     }
 
     // Translate content when hadith is loaded or settings change
-    // The translation service handles all cases including Arabic → English
+    // Uses local Bukhari translations for English, online API for other languages
     LaunchedEffect(hadith, selectedLanguage, selectedProvider) {
         val currentHadith = hadith ?: return@LaunchedEffect
 
@@ -196,28 +198,62 @@ fun HadithDetailScreen(
 
         isTranslating = true
         try {
-            // Translate Arabic hadith text (main hadith)
-            if (!currentHadith.textArabic.isNullOrEmpty()) {
-                translatedArabic = translationService.translate(currentHadith.textArabic!!, selectedLanguage)
-                android.util.Log.d("HadithDetailScreen", "Translated textArabic to $selectedLanguage")
-            } else {
-                translatedArabic = null
-            }
+            // Check if this is Bukhari - use local English as source for translations
+            val isBukhari = databaseFile.contains("bukhari", ignoreCase = true)
 
-            // Translate textPlain (Translation section)
-            if (!currentHadith.textPlain.isNullOrEmpty()) {
-                translatedText = translationService.translate(currentHadith.textPlain!!, selectedLanguage)
-                android.util.Log.d("HadithDetailScreen", "Translated textPlain to $selectedLanguage")
-            } else {
-                translatedText = null
-            }
+            if (isBukhari) {
+                // Load local Bukhari English translations
+                bukhariTranslationRepo.loadTranslations()
+                val localEnglish = bukhariTranslationRepo.getEnglishText(hadithNumber)
 
-            // Translate elaboration (Explanation section)
-            if (!currentHadith.elaboration.isNullOrEmpty()) {
-                translatedElaboration = translationService.translate(currentHadith.elaboration!!, selectedLanguage)
-                android.util.Log.d("HadithDetailScreen", "Translated elaboration to $selectedLanguage")
+                if (localEnglish != null) {
+                    if (selectedLanguage == "en") {
+                        // English selected - show local English directly
+                        translatedArabic = null
+                        translatedText = localEnglish
+                        translatedElaboration = currentHadith.elaboration
+                        android.util.Log.d("HadithDetailScreen", "✅ Using local Bukhari English for hadith #$hadithNumber")
+                    } else {
+                        // Other language - translate FROM English TO target language
+                        translatedArabic = null
+                        translatedText = translationService.translateFromEnglish(localEnglish, selectedLanguage)
+                        if (!currentHadith.elaboration.isNullOrEmpty()) {
+                            translatedElaboration = translationService.translate(currentHadith.elaboration!!, selectedLanguage)
+                        }
+                        android.util.Log.d("HadithDetailScreen", "✅ Translated Bukhari from English to $selectedLanguage for hadith #$hadithNumber")
+                    }
+                } else {
+                    // Fallback to online if local not found
+                    android.util.Log.w("HadithDetailScreen", "⚠️ Local Bukhari translation not found for #$hadithNumber, using online")
+                    if (!currentHadith.textPlain.isNullOrEmpty()) {
+                        translatedText = translationService.translate(currentHadith.textPlain!!, selectedLanguage)
+                    }
+                }
             } else {
-                translatedElaboration = null
+                // Use online translation service for other collections (translate from Arabic)
+                // Translate Arabic hadith text (main hadith)
+                if (!currentHadith.textArabic.isNullOrEmpty()) {
+                    translatedArabic = translationService.translate(currentHadith.textArabic!!, selectedLanguage)
+                    android.util.Log.d("HadithDetailScreen", "Translated textArabic to $selectedLanguage")
+                } else {
+                    translatedArabic = null
+                }
+
+                // Translate textPlain (Translation section)
+                if (!currentHadith.textPlain.isNullOrEmpty()) {
+                    translatedText = translationService.translate(currentHadith.textPlain!!, selectedLanguage)
+                    android.util.Log.d("HadithDetailScreen", "Translated textPlain to $selectedLanguage")
+                } else {
+                    translatedText = null
+                }
+
+                // Translate elaboration (Explanation section)
+                if (!currentHadith.elaboration.isNullOrEmpty()) {
+                    translatedElaboration = translationService.translate(currentHadith.elaboration!!, selectedLanguage)
+                    android.util.Log.d("HadithDetailScreen", "Translated elaboration to $selectedLanguage")
+                } else {
+                    translatedElaboration = null
+                }
             }
         } catch (e: Exception) {
             android.util.Log.e("HadithDetailScreen", "Translation error", e)
@@ -413,7 +449,7 @@ private fun HadithContent(
                 // Calculate parallax progress based on scroll
                 val scrollOffset = lazyListState.firstVisibleItemScrollOffset.toFloat()
                 val headerHeightPx = with(LocalDensity.current) {
-                    if (isLandscape) 200.dp.toPx() else 400.dp.toPx()
+                    if (isLandscape) 200.dp.toPx() else 300.dp.toPx()
                 }
                 val parallaxProgress = (scrollOffset / headerHeightPx).coerceIn(0f, 1f)
 
@@ -432,13 +468,7 @@ private fun HadithContent(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .then(
-                                    if (isLandscape) {
-                                        Modifier.height(200.dp)
-                                    } else {
-                                        Modifier.aspectRatio(1f)
-                                    }
-                                )
+                                .height(if (isLandscape) 200.dp else 300.dp)
                                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         ) {
                             Image(
@@ -648,8 +678,7 @@ private fun HadithContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .statusBarsPadding() // Account for status bar/punch hole
-                .offset(y = (-8).dp) // Move toolbar higher
+                .padding(top = 32.dp) // Fixed padding to clear camera punch hole area
         ) {
             Row(
                 modifier = Modifier
@@ -881,7 +910,7 @@ private fun HadithShimmerLoading(
 
     val skyPeriod = getCurrentSkyPeriodForTheme()
     val skyColors = getSkyColors(skyPeriod)
-    val headerHeight = if (isLandscape) 200.dp else 420.dp
+    val headerHeight = if (isLandscape) 200.dp else 300.dp
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -957,8 +986,7 @@ private fun HadithShimmerLoading(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding() // Account for status bar/punch hole
-                .offset(y = (-8).dp) // Move toolbar higher
+                .padding(top = 32.dp) // Fixed padding to clear camera punch hole area
         ) {
             Row(
                 modifier = Modifier

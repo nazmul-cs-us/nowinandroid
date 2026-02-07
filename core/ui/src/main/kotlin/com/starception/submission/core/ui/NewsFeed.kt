@@ -58,6 +58,7 @@ fun LazyStaggeredGridScope.newsFeed(
     onExpandedCardClick: () -> Unit = {},
     onSurahClick: (Int, String?) -> Unit = { _, _ -> }, // surahNumber, newsResourceId
     onDuaClick: (UserNewsResource) -> Unit = { _ -> }, // Dua news resource
+    onHadithClick: (String, Int) -> Unit = { _, _ -> }, // databaseFile, hadithNumber
     onNewsClick: ((UserNewsResource) -> Unit)? = null,
     searchQuery: String = "", // Search query for highlighting
 ) {
@@ -122,6 +123,10 @@ fun LazyStaggeredGridScope.newsFeed(
                 // Check if this is a Dua item
                 val isDuaItem = userNewsResource.type.contains("Dua", ignoreCase = true)
 
+                // Check if this is a Hadith item and extract database/number
+                val isHadithItem = userNewsResource.type.contains("Hadith", ignoreCase = true)
+                val hadithInfo = if (isHadithItem) extractHadithInfo(userNewsResource.url) else null
+
                 NewsResourceCardExpanded(
                     userNewsResource = userNewsResource,
                     isBookmarked = userNewsResource.isSaved,
@@ -137,6 +142,9 @@ fun LazyStaggeredGridScope.newsFeed(
                         if (surahNumber != null) {
                             android.util.Log.d("NewsFeedClick", "🕌 Navigating to Surah $surahNumber")
                             onSurahClick(surahNumber, userNewsResource.id)
+                        } else if (isHadithItem && hadithInfo != null) {
+                            android.util.Log.d("NewsFeedClick", "📖 Navigating to Hadith ${hadithInfo.second} from ${hadithInfo.first}")
+                            onHadithClick(hadithInfo.first, hadithInfo.second)
                         } else if (isDuaItem) {
                             android.util.Log.d("NewsFeedClick", "🤲 Navigating to Dua")
                             // Navigate to Dua detail screen
@@ -215,6 +223,31 @@ fun extractSurahNumber(title: String, url: String, type: String): Int? {
         result
     } catch (e: Exception) {
         android.util.Log.e("SurahExtract", "❌ Error extracting Surah: ${e.message}")
+        null
+    }
+}
+
+/**
+ * Extract hadith database and number from URL
+ * Example URL: "hadith://sahih_bukhari/1" -> Pair("sahih_bukhari.db", 1)
+ */
+fun extractHadithInfo(url: String): Pair<String, Int>? {
+    return try {
+        val regex = Regex("hadith://([^/]+)/(\\d+)")
+        val match = regex.find(url)
+        if (match != null) {
+            val dbName = match.groupValues[1]
+            val hadithNumber = match.groupValues[2].toInt()
+            // Convert to database filename
+            val dbFile = "${dbName}.db"
+            android.util.Log.d("HadithExtract", "✅ Found Hadith $hadithNumber from $dbFile")
+            Pair(dbFile, hadithNumber)
+        } else {
+            android.util.Log.d("HadithExtract", "❌ No hadith info found in URL: $url")
+            null
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("HadithExtract", "❌ Error extracting hadith info: ${e.message}")
         null
     }
 }
