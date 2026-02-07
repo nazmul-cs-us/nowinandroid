@@ -182,6 +182,13 @@ fun NiaNavHost(
                     topicId = topicId
                 )
             },
+            onHadithClick = { databaseFile, hadithNumber ->
+                val collectionName = databaseFile.removeSuffix(".db")
+                    .replace("_", " ")
+                    .split(" ")
+                    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
+            },
         ) {
             // Surah screen nested within Bookmarks section
             surahScreen(
