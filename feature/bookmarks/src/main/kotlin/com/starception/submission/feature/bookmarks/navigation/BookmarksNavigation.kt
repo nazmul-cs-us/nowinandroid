@@ -40,6 +40,7 @@ fun NavController.navigateToBookmarks(navOptions: NavOptions) =
  * @param onShowSnackbar - Shows snackbar for undo bookmark removal
  * @param onSurahClick - Called when a Surah news item is clicked, contains the Surah number and news resource ID
  * @param onDuaClick - Called when a Dua news item is clicked, contains the UserNewsResource
+ * @param onHadithClick - Called when a Hadith news item is clicked, contains the database file and hadith number
  * @param onNewsClick - Called when a news item is clicked
  * @param surahDestination - Destination for surah content
  */
@@ -48,12 +49,13 @@ fun NavGraphBuilder.bookmarksSection(
     onShowSnackbar: suspend (String, String?) -> Boolean,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     surahDestination: NavGraphBuilder.() -> Unit,
 ) {
     navigation<BookmarksBaseRoute>(startDestination = BookmarksRoute) {
         composable<BookmarksRoute> {
-            BookmarksRoute(onTopicClick, onShowSnackbar, onSurahClick, onDuaClick, onNewsClick)
+            BookmarksRoute(onTopicClick, onShowSnackbar, onSurahClick, onDuaClick, onHadithClick, onNewsClick)
         }
         surahDestination()
     }
@@ -65,9 +67,10 @@ fun NavGraphBuilder.bookmarksScreen(
     onShowSnackbar: suspend (String, String?) -> Boolean,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
 ) {
     composable<BookmarksRoute> {
-        BookmarksRoute(onTopicClick, onShowSnackbar, onSurahClick, onDuaClick, onNewsClick)
+        BookmarksRoute(onTopicClick, onShowSnackbar, onSurahClick, onDuaClick, onHadithClick, onNewsClick)
     }
 }

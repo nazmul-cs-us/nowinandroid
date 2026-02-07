@@ -449,7 +449,7 @@ private fun HadithContent(
                 // Calculate parallax progress based on scroll
                 val scrollOffset = lazyListState.firstVisibleItemScrollOffset.toFloat()
                 val headerHeightPx = with(LocalDensity.current) {
-                    if (isLandscape) 200.dp.toPx() else 300.dp.toPx()
+                    if (isLandscape) 200.dp.toPx() else 400.dp.toPx()
                 }
                 val parallaxProgress = (scrollOffset / headerHeightPx).coerceIn(0f, 1f)
 
@@ -461,15 +461,19 @@ private fun HadithContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
                     Column {
                         // Album-style header image with parallax
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(if (isLandscape) 200.dp else 300.dp)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .then(
+                                    if (isLandscape) {
+                                        Modifier.height(200.dp)
+                                    } else {
+                                        Modifier.aspectRatio(1f)
+                                    }
+                                )
                         ) {
                             Image(
                                 painter = painterResource(R.drawable.masjid_al_nawabi),

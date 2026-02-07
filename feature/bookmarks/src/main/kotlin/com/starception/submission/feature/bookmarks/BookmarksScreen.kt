@@ -81,6 +81,7 @@ internal fun BookmarksRoute(
     onShowSnackbar: suspend (String, String?) -> Boolean,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: BookmarksViewModel = hiltViewModel(),
@@ -94,6 +95,7 @@ internal fun BookmarksRoute(
         onTopicClick = onTopicClick,
         onSurahClick = onSurahClick,
         onDuaClick = onDuaClick,
+        onHadithClick = onHadithClick,
         onNewsClick = onNewsClick,
         modifier = modifier,
         shouldDisplayUndoBookmark = viewModel.shouldDisplayUndoBookmark,
@@ -115,6 +117,7 @@ internal fun BookmarksScreen(
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
     shouldDisplayUndoBookmark: Boolean = false,
@@ -149,6 +152,7 @@ internal fun BookmarksScreen(
                 onTopicClick,
                 onSurahClick,
                 onDuaClick,
+                onHadithClick,
                 onNewsClick,
                 modifier,
             )
@@ -179,6 +183,7 @@ private fun BookmarksGrid(
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onNewsClick: ((com.starception.submission.core.model.data.UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -205,6 +210,7 @@ private fun BookmarksGrid(
                 onTopicClick = onTopicClick,
                 onSurahClick = onSurahClick,
                 onDuaClick = onDuaClick,
+                onHadithClick = onHadithClick,
                 onNewsClick = onNewsClick,
             )
             item(span = StaggeredGridItemSpan.FullLine) {
