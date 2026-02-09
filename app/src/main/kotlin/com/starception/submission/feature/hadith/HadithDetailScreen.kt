@@ -842,17 +842,28 @@ private fun HadithSectionCard(
         label = "chevronRotation"
     )
 
-    Surface(
+    // Background color for the section
+    val sectionColor = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    val sectionShape = RoundedCornerShape(12.dp)
+
+    // Outer container - use Modifier.shadow with shape for proper rounded shadow
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .graphicsLayer {
-                shadowElevation = if (isDragging) 8f else 0f
-            }
             .zIndex(if (isDragging) 1f else 0f)
-            .clip(RoundedCornerShape(12.dp)),
-        shape = RoundedCornerShape(12.dp),
-        color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+            .shadow(
+                elevation = if (isDragging) 8.dp else 0.dp,
+                shape = sectionShape,
+                clip = false
+            )
+            .clip(sectionShape)
+            .background(sectionColor)
+    ) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = sectionShape,
+        color = sectionColor,
         tonalElevation = 1.dp,
         shadowElevation = 2.dp
     ) {
@@ -993,6 +1004,7 @@ private fun HadithSectionCard(
         }
         }
     }
+    }
 }
 
 /**
@@ -1016,17 +1028,28 @@ private fun HadithSectionCardWithContent(
         label = "chevronRotation"
     )
 
-    Surface(
+    // Background color for the section
+    val sectionColor = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    val sectionShape = RoundedCornerShape(12.dp)
+
+    // Outer container - use Modifier.shadow with shape for proper rounded shadow
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .graphicsLayer {
-                shadowElevation = if (isDragging) 8f else 0f
-            }
             .zIndex(if (isDragging) 1f else 0f)
-            .clip(RoundedCornerShape(12.dp)),
-        shape = RoundedCornerShape(12.dp),
-        color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+            .shadow(
+                elevation = if (isDragging) 8.dp else 0.dp,
+                shape = sectionShape,
+                clip = false
+            )
+            .clip(sectionShape)
+            .background(sectionColor)
+    ) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = sectionShape,
+        color = sectionColor,
         tonalElevation = 1.dp,
         shadowElevation = 2.dp
     ) {
@@ -1124,6 +1147,7 @@ private fun HadithSectionCardWithContent(
                 }
             }
         }
+    }
     }
 }
 
