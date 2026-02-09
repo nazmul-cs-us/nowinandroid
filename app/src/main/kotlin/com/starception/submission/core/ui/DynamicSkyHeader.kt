@@ -991,12 +991,15 @@ private fun drawMinaret(path: Path, x: Float, baseY: Float, width: Float, height
 
 /**
  * Composable effect that enables immersive full-screen mode by hiding the status bar.
- * The status bar is restored when leaving the screen.
+ * The status bar is restored when leaving the screen (if restoreOnDispose is true).
  *
  * Usage: Call this at the top of your screen composable to enable immersive mode.
+ *
+ * @param restoreOnDispose If true, restores status bar when leaving composition. Set to false
+ *                         when navigating between screens that should all be immersive.
  */
 @Composable
-fun ImmersiveFullScreenEffect() {
+fun ImmersiveFullScreenEffect(restoreOnDispose: Boolean = true) {
     val view = androidx.compose.ui.platform.LocalView.current
 
     androidx.compose.runtime.DisposableEffect(Unit) {
@@ -1012,8 +1015,10 @@ fun ImmersiveFullScreenEffect() {
         }
 
         onDispose {
-            // Restore status bar when leaving the screen
-            insetsController?.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            // Only restore status bar if requested
+            if (restoreOnDispose) {
+                insetsController?.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            }
         }
     }
 }

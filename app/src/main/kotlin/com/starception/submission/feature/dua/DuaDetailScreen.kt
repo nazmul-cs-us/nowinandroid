@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +55,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Language
@@ -104,12 +106,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.foundation.lazy.rememberLazyListState
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.ui.graphics.Color
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
@@ -162,6 +170,32 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.platform.LocalDensity
 import com.starception.submission.R
+
+private const val DUA_SECTION_ORDER_PREFS = "dua_section_order_prefs"
+private const val DUA_SECTION_ORDER_KEY = "section_order"
+
+/**
+ * Save dua section order to SharedPreferences
+ */
+private fun saveDuaSectionOrder(context: android.content.Context, order: List<DuaSection>) {
+    val prefs = context.getSharedPreferences(DUA_SECTION_ORDER_PREFS, android.content.Context.MODE_PRIVATE)
+    prefs.edit().putString(DUA_SECTION_ORDER_KEY, order.joinToString(",") { it.name }).apply()
+}
+
+/**
+ * Load dua section order from SharedPreferences
+ */
+private fun loadDuaSectionOrder(context: android.content.Context): List<DuaSection>? {
+    val prefs = context.getSharedPreferences(DUA_SECTION_ORDER_PREFS, android.content.Context.MODE_PRIVATE)
+    val orderString = prefs.getString(DUA_SECTION_ORDER_KEY, null) ?: return null
+    return try {
+        orderString.split(",").mapNotNull { name ->
+            try { DuaSection.valueOf(name) } catch (e: Exception) { null }
+        }
+    } catch (e: Exception) {
+        null
+    }
+}
 
 /**
  * Data class representing a complete Dua
@@ -1108,7 +1142,7 @@ fun DuaDetailScreen(
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         // Track scroll state for collapsing toolbar effect
-                        val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+                        val lazyListState = rememberLazyListState()
 
                         // Force scroll to top immediately when this page is displayed
                         LaunchedEffect(page) {
@@ -1120,6 +1154,80 @@ fun DuaDetailScreen(
                             androidx.compose.runtime.derivedStateOf {
                                 lazyListState.firstVisibleItemIndex > 0 ||
                                 (lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset > 150)
+                            }
+                        }
+
+                        // Build list of available sections based on dua data
+                        val availableSections = remember(dua) {
+                            mutableListOf<DuaSection>().apply {
+                                if (dua.context.isNotEmpty()) add(DuaSection.CONTEXT)
+                                if (dua.arabicText.isNotEmpty()) add(DuaSection.ARABIC)
+                                if (dua.instruction.isNotEmpty()) add(DuaSection.INSTRUCTION)
+                                if (dua.translation.isNotEmpty()) add(DuaSection.TRANSLATION)
+                                if (dua.transliteration.isNotEmpty()) add(DuaSection.TRANSLITERATION)
+                                if (dua.explanation.isNotEmpty()) add(DuaSection.EXPLANATION)
+                                if (dua.note.isNotEmpty()) add(DuaSection.NOTE)
+                                if (dua.postContext.isNotEmpty()) add(DuaSection.POST_CONTEXT)
+                                if (dua.reference.isNotEmpty()) add(DuaSection.REFERENCE)
+                            }.toList()
+                        }
+
+                        // Load saved order and apply it to available sections
+                        val initialSections = remember(availableSections) {
+                            val savedOrder = loadDuaSectionOrder(context)
+                            if (savedOrder != null) {
+                                // Reorder available sections based on saved order
+                                val ordered = mutableListOf<DuaSection>()
+                                savedOrder.forEach { section ->
+                                    if (section in availableSections) ordered.add(section)
+                                }
+                                // Add any new sections not in saved order
+                                availableSections.forEach { section ->
+                                    if (section !in ordered) ordered.add(section)
+                                }
+                                ordered
+                            } else {
+                                availableSections
+                            }
+                        }
+
+                        // Local mutable list for smooth drag reordering
+                        val localSections = remember(initialSections) { initialSections.toMutableStateList() }
+
+                        // Track if reordering happened to save on drag end
+                        var wasReordered by remember { mutableStateOf(false) }
+
+                        // State for loaded hadith references (needed for REFERENCE section)
+                        var hadithReferences by remember { mutableStateOf<List<HadithReference>>(emptyList()) }
+
+                        // Load hadith references by parsing title to get chapter and position
+                        LaunchedEffect(dua.title) {
+                            try {
+                                val titleParts = dua.title.split(": Dua ")
+                                if (titleParts.size == 2) {
+                                    val chapterTitle = titleParts[0].trim()
+                                    val position = titleParts[1].trim().toIntOrNull() ?: 1
+                                    val duaDb = DuaDatabase.getInstance(context)
+                                    val refs = duaDb.duaDao().getHadithReferencesByChapterAndPosition(chapterTitle, position)
+                                    hadithReferences = refs.map { it.toHadithReference() }
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("DuaDetailScreen", "Error loading hadith references", e)
+                            }
+                        }
+
+                        // Reorderable state for the LazyColumn
+                        val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                            // Only reorder if both indices are in the sections range (after header + spacer)
+                            val headerOffset = 2 // 1 header item + 1 spacer before sections
+                            val fromSectionIndex = from.index - headerOffset
+                            val toSectionIndex = to.index - headerOffset
+                            if (fromSectionIndex >= 0 && toSectionIndex >= 0 &&
+                                fromSectionIndex < localSections.size && toSectionIndex < localSections.size) {
+                                localSections.apply {
+                                    add(toSectionIndex, removeAt(fromSectionIndex))
+                                }
+                                wasReordered = true
                             }
                         }
 
@@ -1347,279 +1455,285 @@ fun DuaDetailScreen(
                             Spacer(modifier = Modifier.height(6.dp))
                         }
 
-                        // Context section - When/why to recite (before the dua)
-                        if (dua.context.isNotEmpty()) {
-                            item {
-                                CollapsibleDuaSection(
-                                    title = "Context",
-                                    accentColor = Color(0xFF4CAF50), // Green accent
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    initiallyExpanded = true
-                                ) {
-                                    Text(
-                                        text = dua.context,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontSize = 15.sp,
-                                            lineHeight = 24.sp
-                                        ),
-                                        color = Color(0xFF5D5D5D)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Arabic Text Card - Using CollapsibleDuaSection for consistent styling
-                        if (dua.arabicText.isNotEmpty()) {
-                            item {
-                                CollapsibleDuaSection(
-                                    title = "Arabic",
-                                    accentColor = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    initiallyExpanded = true
-                                ) {
-                                    val tajweedAnnotations = if (showTajweed && dua.surahNumber > 0 && dua.ayahNumber > 0) {
-                                        viewModel.getTajweedAnnotations(dua.surahNumber, dua.ayahNumber)
-                                    } else {
-                                        emptyList()
+                        // Reorderable content sections - each section is a separate item
+                        items(localSections, key = { "section_${it.name}" }) { section ->
+                            ReorderableItem(reorderableLazyListState, key = "section_${section.name}") { isDragging ->
+                                // Shared callback to save order when drag ends
+                                val onDragStopped: () -> Unit = {
+                                    if (wasReordered) {
+                                        saveDuaSectionOrder(context, localSections.toList())
+                                        wasReordered = false
                                     }
+                                }
 
-                                    if (showTajweed && tajweedAnnotations.isNotEmpty()) {
-                                        val annotatedText = TajweedTextApplier.applyWithOverlap(
-                                            text = dua.arabicText,
-                                            annotations = tajweedAnnotations,
-                                            defaultStyle = androidx.compose.ui.text.SpanStyle(
-                                                color = MaterialTheme.colorScheme.onSurface
+                                when (section) {
+                                    DuaSection.CONTEXT -> {
+                                        CollapsibleDuaSection(
+                                            title = "Context",
+                                            accentColor = Color(0xFF4CAF50),
+                                            initiallyExpanded = true,
+                                            showDragHandle = true,
+                                            isDragging = isDragging,
+                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                        ) {
+                                            Text(
+                                                text = dua.context,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontSize = 15.sp,
+                                                    lineHeight = 24.sp
+                                                ),
+                                                color = Color(0xFF5D5D5D)
                                             )
-                                        )
-                                        Text(
-                                            text = annotatedText,
-                                            fontFamily = arabicFontFamily,
-                                            fontSize = 32.sp,
-                                            lineHeight = 54.sp,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    } else {
-                                        Text(
-                                            text = dua.arabicText,
-                                            fontFamily = arabicFontFamily,
-                                            fontSize = 32.sp,
-                                            lineHeight = 54.sp,
-                                            textAlign = TextAlign.Center,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
+                                        }
                                     }
-                                }
-                            }
-                        }
+                                    DuaSection.ARABIC -> {
+                                        CollapsibleDuaSection(
+                                            title = "Arabic (Original)",
+                                            accentColor = MaterialTheme.colorScheme.primary,
+                                            initiallyExpanded = true,
+                                            showDragHandle = true,
+                                            isDragging = isDragging,
+                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                        ) {
+                                            val tajweedAnnotations = if (showTajweed && dua.surahNumber > 0 && dua.ayahNumber > 0) {
+                                                viewModel.getTajweedAnnotations(dua.surahNumber, dua.ayahNumber)
+                                            } else {
+                                                emptyList()
+                                            }
 
-                        // Instruction section - Special instructions (e.g., "Recite 3 times")
-                        if (dua.instruction.isNotEmpty()) {
-                            item {
-                                CollapsibleDuaSection(
-                                    title = "Instruction",
-                                    accentColor = Color(0xFFE91E63), // Pink/red accent
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    initiallyExpanded = true
-                                ) {
-                                    Text(
-                                        text = dua.instruction,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontSize = 15.sp,
-                                            lineHeight = 24.sp,
-                                            fontWeight = FontWeight.Medium
-                                        ),
-                                        color = Color(0xFF5D5D5D)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Translation - Collapsible section with left accent
-                        if (dua.translation.isNotEmpty()) {
-                            item {
-                                CollapsibleDuaSection(
-                                    title = "Translation",
-                                    accentColor = Color(0xFF9E9E9E), // Gray accent
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    initiallyExpanded = true
-                                ) {
-                                    Text(
-                                        text = dua.translation,
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontSize = 17.sp,
-                                            lineHeight = 28.sp,
-                                            fontStyle = FontStyle.Italic
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                            }
-                        }
-
-                        // Transliteration - Collapsible section with left accent
-                        if (dua.transliteration.isNotEmpty()) {
-                            item {
-                                CollapsibleDuaSection(
-                                    title = "Transliteration",
-                                    accentColor = Color(0xFF9E9E9E), // Gray accent
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    initiallyExpanded = true
-                                ) {
-                                    Text(
-                                        text = dua.transliteration,
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontSize = 17.sp,
-                                            lineHeight = 28.sp,
-                                            fontStyle = FontStyle.Italic
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                            }
-                        }
-
-                        // Explanation - Collapsible section
-                        if (dua.explanation.isNotEmpty()) {
-                            item {
-                                CollapsibleDuaSection(
-                                    title = "Explanation",
-                                    accentColor = Color(0xFF8BC34A), // Light green accent
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    initiallyExpanded = false
-                                ) {
-                                    Text(
-                                        text = dua.explanation,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontSize = 15.sp,
-                                            lineHeight = 24.sp
-                                        ),
-                                        color = Color(0xFF5D5D5D)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Note section - Additional scholarly notes
-                        if (dua.note.isNotEmpty()) {
-                            item {
-                                CollapsibleDuaSection(
-                                    title = "Note",
-                                    accentColor = Color(0xFFFF9800), // Orange accent
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    initiallyExpanded = false
-                                ) {
-                                    Text(
-                                        text = dua.note,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontSize = 14.sp,
-                                            lineHeight = 22.sp,
-                                            fontStyle = FontStyle.Italic
-                                        ),
-                                        color = Color(0xFF5D5D5D)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Post Context section - Additional context after the dua
-                        if (dua.postContext.isNotEmpty()) {
-                            item {
-                                CollapsibleDuaSection(
-                                    title = "Additional Context",
-                                    accentColor = Color(0xFF2196F3), // Blue accent
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    initiallyExpanded = false
-                                ) {
-                                    Text(
-                                        text = dua.postContext,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontSize = 15.sp,
-                                            lineHeight = 24.sp
-                                        ),
-                                        color = Color(0xFF5D5D5D)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Reference section - Hadith sources with clickable chips
-                        // Always try to load hadith references for fortress_of_the_muslim duas
-                        item {
-                            // State for loaded hadith references
-                            var hadithReferences by remember { mutableStateOf<List<HadithReference>>(emptyList()) }
-
-                            // Load hadith references by parsing title to get chapter and position
-                            // Titles follow pattern: "When waking up: Dua 1", "In the morning and evening: Dua 2"
-                            LaunchedEffect(dua.title) {
-                                try {
-                                    // Try to parse title to extract chapter name and dua number
-                                    val titleParts = dua.title.split(": Dua ")
-                                    if (titleParts.size == 2) {
-                                        val chapterTitle = titleParts[0].trim()
-                                        val position = titleParts[1].trim().toIntOrNull() ?: 1
-                                        val duaDb = DuaDatabase.getInstance(context)
-                                        val refs = duaDb.duaDao().getHadithReferencesByChapterAndPosition(chapterTitle, position)
-                                        hadithReferences = refs.map { it.toHadithReference() }
-                                        android.util.Log.d("DuaDetailScreen", "📖 Loaded ${hadithReferences.size} hadith references for '$chapterTitle' position $position")
-                                    } else {
-                                        android.util.Log.d("DuaDetailScreen", "📖 Title format not matching: ${dua.title}")
+                                            if (showTajweed && tajweedAnnotations.isNotEmpty()) {
+                                                val annotatedText = TajweedTextApplier.applyWithOverlap(
+                                                    text = dua.arabicText,
+                                                    annotations = tajweedAnnotations,
+                                                    defaultStyle = androidx.compose.ui.text.SpanStyle(
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                )
+                                                Text(
+                                                    text = annotatedText,
+                                                    fontFamily = arabicFontFamily,
+                                                    fontSize = 32.sp,
+                                                    lineHeight = 54.sp,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = dua.arabicText,
+                                                    fontFamily = arabicFontFamily,
+                                                    fontSize = 32.sp,
+                                                    lineHeight = 54.sp,
+                                                    textAlign = TextAlign.Center,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            }
+                                        }
                                     }
-                                } catch (e: Exception) {
-                                    android.util.Log.e("DuaDetailScreen", "❌ Error loading hadith references", e)
-                                }
-                            }
+                                    DuaSection.INSTRUCTION -> {
+                                        CollapsibleDuaSection(
+                                            title = "Instruction",
+                                            accentColor = Color(0xFFE91E63),
+                                            initiallyExpanded = true,
+                                            showDragHandle = true,
+                                            isDragging = isDragging,
+                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                        ) {
+                                            Text(
+                                                text = dua.instruction,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontSize = 15.sp,
+                                                    lineHeight = 24.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                ),
+                                                color = Color(0xFF5D5D5D)
+                                            )
+                                        }
+                                    }
+                                    DuaSection.TRANSLATION -> {
+                                        CollapsibleDuaSection(
+                                            title = "Translation ($translationDisplayName)",
+                                            accentColor = Color(0xFF9E9E9E),
+                                            initiallyExpanded = true,
+                                            showDragHandle = true,
+                                            isDragging = isDragging,
+                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                        ) {
+                                            Text(
+                                                text = dua.translation,
+                                                style = MaterialTheme.typography.bodyLarge.copy(
+                                                    fontSize = 17.sp,
+                                                    lineHeight = 28.sp,
+                                                    fontStyle = FontStyle.Italic
+                                                ),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                    DuaSection.TRANSLITERATION -> {
+                                        CollapsibleDuaSection(
+                                            title = "Transliteration",
+                                            accentColor = Color(0xFF9E9E9E),
+                                            initiallyExpanded = true,
+                                            showDragHandle = true,
+                                            isDragging = isDragging,
+                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                        ) {
+                                            Text(
+                                                text = dua.transliteration,
+                                                style = MaterialTheme.typography.bodyLarge.copy(
+                                                    fontSize = 17.sp,
+                                                    lineHeight = 28.sp,
+                                                    fontStyle = FontStyle.Italic
+                                                ),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                    DuaSection.EXPLANATION -> {
+                                        CollapsibleDuaSection(
+                                            title = "Explanation",
+                                            accentColor = Color(0xFF8BC34A),
+                                            initiallyExpanded = false,
+                                            showDragHandle = true,
+                                            isDragging = isDragging,
+                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                        ) {
+                                            Text(
+                                                text = dua.explanation,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontSize = 15.sp,
+                                                    lineHeight = 24.sp
+                                                ),
+                                                color = Color(0xFF5D5D5D)
+                                            )
+                                        }
+                                    }
+                                    DuaSection.NOTE -> {
+                                        CollapsibleDuaSection(
+                                            title = "Note",
+                                            accentColor = Color(0xFFFF9800),
+                                            initiallyExpanded = false,
+                                            showDragHandle = true,
+                                            isDragging = isDragging,
+                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                        ) {
+                                            Text(
+                                                text = dua.note,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 22.sp,
+                                                    fontStyle = FontStyle.Italic
+                                                ),
+                                                color = Color(0xFF5D5D5D)
+                                            )
+                                        }
+                                    }
+                                    DuaSection.POST_CONTEXT -> {
+                                        CollapsibleDuaSection(
+                                            title = "Additional Context",
+                                            accentColor = Color(0xFF2196F3),
+                                            initiallyExpanded = false,
+                                            showDragHandle = true,
+                                            isDragging = isDragging,
+                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                        ) {
+                                            Text(
+                                                text = dua.postContext,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontSize = 15.sp,
+                                                    lineHeight = 24.sp
+                                                ),
+                                                color = Color(0xFF5D5D5D)
+                                            )
+                                        }
+                                    }
+                                    DuaSection.REFERENCE -> {
+                                        CollapsibleDuaSection(
+                                            title = "Reference",
+                                            accentColor = Color(0xFF9C27B0),
+                                            initiallyExpanded = false,
+                                            showDragHandle = true,
+                                            isDragging = isDragging,
+                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                        ) {
+                                            Column {
+                                                if (dua.reference.isNotEmpty()) {
+                                                    Text(
+                                                        text = dua.reference,
+                                                        style = MaterialTheme.typography.bodySmall.copy(
+                                                            fontSize = 13.sp,
+                                                            lineHeight = 20.sp
+                                                        ),
+                                                        color = Color(0xFF757575)
+                                                    )
+                                                }
 
-                            // Show Reference section if we have reference text OR hadith references
-                            if (dua.reference.isNotEmpty() || hadithReferences.isNotEmpty()) {
-                                CollapsibleDuaSection(
-                                    title = "Reference",
-                                    accentColor = Color(0xFF9C27B0), // Purple accent
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    initiallyExpanded = false
-                                ) {
-                                    Column {
-                                        // Show original reference text
-                                        Text(
-                                            text = dua.reference,
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                fontSize = 13.sp,
-                                                lineHeight = 20.sp
-                                            ),
-                                            color = Color(0xFF757575)
-                                        )
-
-                                        // Show clickable hadith reference chips if available - using NiaTopicTag for consistency
-                                        if (hadithReferences.isNotEmpty() && onHadithClick != null) {
-                                            Spacer(modifier = Modifier.height(12.dp))
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .horizontalScroll(rememberScrollState()),
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
-                                                hadithReferences.forEach { ref ->
-                                                    if (ref.databaseFile != null && ref.hadithNumber != null) {
-                                                        NiaTopicTag(
-                                                            followed = false,
-                                                            onClick = {
-                                                                onHadithClick(
-                                                                    ref.collectionName ?: "Hadith",
-                                                                    ref.hadithNumber,
-                                                                    ref.databaseFile
-                                                                )
-                                                            },
-                                                            text = {
-                                                                Text(
-                                                                    text = ref.displayName.uppercase(Locale.getDefault())
-                                                                )
+                                                if (hadithReferences.isNotEmpty() && onHadithClick != null) {
+                                                    Spacer(modifier = Modifier.height(12.dp))
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .horizontalScroll(rememberScrollState()),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        hadithReferences.forEach { ref ->
+                                                            val refText = buildString {
+                                                                append(ref.collectionName ?: "Hadith")
+                                                                if (ref.hadithNumber != null) {
+                                                                    append(":${ref.hadithNumber}")
+                                                                }
                                                             }
-                                                        )
+                                                            NiaTopicTag(
+                                                                followed = false,
+                                                                onClick = {
+                                                                    if (ref.databaseFile != null && ref.hadithNumber != null) {
+                                                                        onHadithClick(
+                                                                            ref.collectionName ?: "Hadith",
+                                                                            ref.hadithNumber,
+                                                                            ref.databaseFile
+                                                                        )
+                                                                    }
+                                                                },
+                                                                text = {
+                                                                    Text(text = refText.uppercase(Locale.getDefault()))
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                if (topics.isNotEmpty()) {
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        topics.take(2).forEach { topic ->
+                                                            NiaTopicTag(
+                                                                followed = true,
+                                                                onClick = { onTopicClick(topic.id) },
+                                                                text = {
+                                                                    Text(
+                                                                        text = topic.name.uppercase(Locale.getDefault()),
+                                                                        maxLines = 1
+                                                                    )
+                                                                }
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
@@ -2307,6 +2421,7 @@ private fun DuaPageContent(
 /**
  * Collapsible section card component with left accent border
  * Matches the clean, minimal design with expand/collapse functionality
+ * Uses sh.calvin.reorderable library for smooth drag-and-drop UX
  */
 @Composable
 private fun CollapsibleDuaSection(
@@ -2314,6 +2429,9 @@ private fun CollapsibleDuaSection(
     accentColor: Color,
     modifier: Modifier = Modifier,
     initiallyExpanded: Boolean = true,
+    showDragHandle: Boolean = false,
+    isDragging: Boolean = false,
+    dragHandleModifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(initiallyExpanded) }
@@ -2326,88 +2444,131 @@ private fun CollapsibleDuaSection(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .graphicsLayer {
+                shadowElevation = if (isDragging) 8f else 0f
+            }
+            .zIndex(if (isDragging) 1f else 0f)
             .clip(RoundedCornerShape(12.dp)),
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         shadowElevation = 2.dp
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            // Left accent border
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .background(accentColor)
-                    .then(
-                        if (isExpanded) {
-                            Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
-                        } else {
-                            Modifier.height(56.dp)
-                        }
-                    )
-            )
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 0.dp)
-            ) {
-                // Header row - clickable to expand/collapse
-                Row(
+        Column {
+            // Drag handle at top center - modifier applies reorderable drag behavior
+            if (showDragHandle) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { isExpanded = !isExpanded }
-                        .padding(horizontal = 16.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(top = 4.dp),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.DragHandle,
+                        contentDescription = "Drag to reorder",
+                        tint = if (isDragging)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = dragHandleModifier.size(24.dp)
+                    )
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // Left accent border
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .background(accentColor)
+                        .then(
+                            if (isExpanded) {
+                                Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
+                            } else {
+                                Modifier.height(56.dp)
+                            }
+                        )
+                )
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 0.dp)
+                ) {
+                    // Header row - clickable to expand/collapse
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isExpanded = !isExpanded }
+                            .padding(horizontal = 16.dp, vertical = if (showDragHandle) 12.dp else 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowUp,
+                                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .rotate(rotationAngle)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                         Icon(
-                            imageVector = Icons.Default.KeyboardArrowUp,
-                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .size(24.dp)
                                 .rotate(rotationAngle)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
                     }
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .rotate(rotationAngle)
-                    )
-                }
 
-                // Expandable content
-                AnimatedVisibility(
-                    visible = isExpanded,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    // Expandable content
+                    AnimatedVisibility(
+                        visible = isExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
                     ) {
-                        content()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                        ) {
+                            content()
+                        }
                     }
                 }
             }
         }
     }
 }
+
+/**
+ * Section types for reorderable dua content
+ */
+private enum class DuaSection {
+    CONTEXT,
+    ARABIC,
+    INSTRUCTION,
+    TRANSLATION,
+    TRANSLITERATION,
+    EXPLANATION,
+    NOTE,
+    POST_CONTEXT,
+    REFERENCE
+}
+
 
 /**
  * Reusable section card component with icon header (legacy - for backwards compatibility)

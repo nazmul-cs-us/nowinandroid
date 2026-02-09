@@ -112,6 +112,9 @@ dependencies {
     implementation(libs.play.services.location)
     implementation(libs.accompanist.permissions)
 
+    // Reorderable library for drag-and-drop list reordering
+    implementation(libs.reorderable)
+
     // Media support for playback controls
     implementation("androidx.media:media:1.7.0")
 

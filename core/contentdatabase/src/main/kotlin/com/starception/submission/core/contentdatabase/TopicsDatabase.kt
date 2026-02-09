@@ -38,5 +38,29 @@ abstract class TopicsDatabase : RoomDatabase() {
                 instance
             }
         }
+
+        /**
+         * Close database instance and clear singleton
+         */
+        fun closeDatabase() {
+            INSTANCE?.close()
+            INSTANCE = null
+        }
+
+        /**
+         * Refresh database from assets
+         * Closes current database, deletes it, and re-creates from assets
+         */
+        fun refreshFromAssets(context: Context): Boolean {
+            return try {
+                closeDatabase()
+                context.deleteDatabase(DATABASE_NAME)
+                // Force re-creation by getting instance
+                getInstance(context)
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
     }
 }
