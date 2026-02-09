@@ -12,6 +12,7 @@ import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.topicsdatabase.TopicsDatabase
+import com.starception.submission.core.contentdatabase.TopicsDatabase as ContentTopicsDatabase
 import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
@@ -404,7 +405,10 @@ class UnifiedSettingsViewModel @Inject constructor(
                 )
 
                 val success = withContext(Dispatchers.IO) {
-                    TopicsDatabase.refreshFromAssets(context)
+                    val result = TopicsDatabase.refreshFromAssets(context)
+                    // Also refresh the contentdatabase TopicsDatabase singleton
+                    ContentTopicsDatabase.refreshFromAssets(context)
+                    result
                 }
 
                 _developerSettings.value = _developerSettings.value.copy(
@@ -557,6 +561,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                 val results = withContext(Dispatchers.IO) {
                     // First refresh source databases from assets
                     val topicsSuccess = TopicsDatabase.refreshFromAssets(context)
+                    // Also refresh the contentdatabase TopicsDatabase singleton
+                    ContentTopicsDatabase.refreshFromAssets(context)
                     val duasSuccess = DuaDatabase.refreshFromAssets(context)
                     val quranicDuasSuccess = QuranicDuaDatabase.refreshFromAssets(context)
 

@@ -44,6 +44,9 @@ import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,6 +62,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -96,8 +100,40 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
+import androidx.compose.runtime.toMutableStateList
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import com.starception.submission.R
+import android.content.SharedPreferences
+
+private const val HADITH_SECTION_ORDER_PREFS = "hadith_section_order_prefs"
+private const val HADITH_SECTION_ORDER_KEY = "section_order"
+
+/**
+ * Save hadith section order to SharedPreferences
+ */
+private fun saveHadithSectionOrder(context: android.content.Context, order: List<HadithSection>) {
+    val prefs = context.getSharedPreferences(HADITH_SECTION_ORDER_PREFS, android.content.Context.MODE_PRIVATE)
+    prefs.edit().putString(HADITH_SECTION_ORDER_KEY, order.joinToString(",") { it.name }).apply()
+}
+
+/**
+ * Load hadith section order from SharedPreferences
+ */
+private fun loadHadithSectionOrder(context: android.content.Context): List<HadithSection>? {
+    val prefs = context.getSharedPreferences(HADITH_SECTION_ORDER_PREFS, android.content.Context.MODE_PRIVATE)
+    val orderString = prefs.getString(HADITH_SECTION_ORDER_KEY, null) ?: return null
+    return try {
+        orderString.split(",").mapNotNull { name ->
+            try { HadithSection.valueOf(name) } catch (e: Exception) { null }
+        }
+    } catch (e: Exception) {
+        null
+    }
+}
 
 // Gradient colors for hadith header - earthy tones
 private val HadithGradientColors = listOf(
@@ -123,7 +159,19 @@ fun HadithDetailScreen(
     modifier: Modifier = Modifier
 ) {
     // Enable immersive full-screen mode (hides status bar)
-    ImmersiveFullScreenEffect()
+    // Don't restore on dispose to prevent status bar flash when swiping between hadiths
+    ImmersiveFullScreenEffect(restoreOnDispose = false)
+
+    // Create wrapped back click that restores status bar first
+    val view = LocalView.current
+    val wrappedOnBackClick: () -> Unit = {
+        val window = (view.context as? android.app.Activity)?.window
+        val insetsController = window?.let {
+            androidx.core.view.WindowCompat.getInsetsController(it, view)
+        }
+        insetsController?.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        onBackClick()
+    }
 
     val context = LocalContext.current
     val repository = remember { HadithRepository.getInstance(context) }
@@ -277,12 +325,12 @@ fun HadithDetailScreen(
         ) {
             when {
                 isLoading -> {
-                    HadithShimmerLoading(onBackClick = onBackClick, isLandscape = isLandscape)
+                    HadithShimmerLoading(onBackClick = wrappedOnBackClick, isLandscape = isLandscape)
                 }
                 error != null -> {
                     HadithErrorContent(
                         error = error!!,
-                        onBackClick = onBackClick
+                        onBackClick = wrappedOnBackClick
                     )
                 }
                 hadith != null -> {
@@ -290,7 +338,7 @@ fun HadithDetailScreen(
                         hadith = hadith!!,
                         collectionName = collectionName,
                         hadithNumber = hadithNumber,
-                        onBackClick = onBackClick,
+                        onBackClick = wrappedOnBackClick,
                         translatedArabic = translatedArabic,
                         translatedText = translatedText,
                         translatedElaboration = translatedElaboration,
@@ -437,9 +485,61 @@ private fun HadithContent(
     onLanguageClick: () -> Unit = {},
     isLandscape: Boolean = false
 ) {
+    val context = LocalContext.current
+
     Box(modifier = Modifier.fillMaxSize()) {
         // No status bar padding - immersive mode hides status bar
         val lazyListState = rememberLazyListState()
+
+        // Build list of available sections based on hadith data
+        val availableSections = remember(hadith) {
+            mutableListOf<HadithSection>().apply {
+                if (hadith.textArabic.isNotEmpty()) add(HadithSection.ARABIC)
+                if (!hadith.textPlain.isNullOrEmpty()) add(HadithSection.TRANSLATION)
+                if (!hadith.elaboration.isNullOrEmpty()) add(HadithSection.EXPLANATION)
+            }.toList()
+        }
+
+        // Load saved order and apply it to available sections
+        val initialSections = remember(availableSections) {
+            val savedOrder = loadHadithSectionOrder(context)
+            if (savedOrder != null) {
+                // Reorder available sections based on saved order
+                val ordered = mutableListOf<HadithSection>()
+                savedOrder.forEach { section ->
+                    if (section in availableSections) ordered.add(section)
+                }
+                // Add any new sections not in saved order
+                availableSections.forEach { section ->
+                    if (section !in ordered) ordered.add(section)
+                }
+                ordered
+            } else {
+                availableSections
+            }
+        }
+
+        // Local mutable list for smooth drag reordering
+        val localSections = remember(initialSections) { initialSections.toMutableStateList() }
+
+        // Track if reordering happened to save on drag end
+        var wasReordered by remember { mutableStateOf(false) }
+
+        // Reorderable state for the LazyColumn
+        val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
+            // Only reorder if both indices are in the sections range (after header)
+            val headerOffset = 1 // 1 header item before sections
+            val fromSectionIndex = from.index - headerOffset
+            val toSectionIndex = to.index - headerOffset
+            if (fromSectionIndex >= 0 && toSectionIndex >= 0 &&
+                fromSectionIndex < localSections.size && toSectionIndex < localSections.size) {
+                localSections.apply {
+                    add(toSectionIndex, removeAt(fromSectionIndex))
+                }
+                wasReordered = true
+            }
+        }
+
         LazyColumn(
             state = lazyListState,
             modifier = Modifier.fillMaxSize()
@@ -544,130 +644,98 @@ private fun HadithContent(
                 }
             }
 
-            // Arabic Text Card with optional translation
-            if (hadith.textArabic.isNotEmpty()) {
-                item {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        shadowElevation = 1.dp
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            // Original Arabic text
-                            Text(
-                                text = hadith.textArabic,
-                                fontFamily = QuranFonts.PDMSSaleem,
-                                fontSize = 26.sp,
-                                lineHeight = 48.sp,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+            // Reorderable content sections - each section is a separate item
+            items(localSections, key = { "section_${it.name}" }) { section ->
+                ReorderableItem(reorderableLazyListState, key = "section_${section.name}") { isDragging ->
+                    // Shared callback to save order when drag ends
+                    val onDragStopped: () -> Unit = {
+                        if (wasReordered) {
+                            saveHadithSectionOrder(context, localSections.toList())
+                            wasReordered = false
+                        }
+                    }
 
-                            // Show translated Arabic text when available
-                            if (translatedArabic != null && selectedLanguage != "ar") {
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(1.dp)
-                                        .background(MaterialTheme.colorScheme.outlineVariant)
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                // Language label
-                                Text(
-                                    text = "Hadith (${getLanguageName(selectedLanguage)})",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // Translated text
-                                Text(
-                                    text = translatedArabic,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontSize = 16.sp,
-                                        lineHeight = 26.sp
-                                    ),
-                                    textAlign = TextAlign.Center,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            } else if (isTranslating && selectedLanguage != "ar") {
-                                // Loading indicator while translating
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(1.dp)
-                                        .background(MaterialTheme.colorScheme.outlineVariant)
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
+                    when (section) {
+                        HadithSection.ARABIC -> {
+                            HadithSectionCardWithContent(
+                                title = "Arabic (Original)",
+                                accentColor = Color(0xFF4CAF50),
+                                isExpanded = true,
+                                showDragHandle = true,
+                                isDragging = isDragging,
+                                dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                            ) {
                                 Column(
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.fillMaxWidth(),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    repeat(2) { index ->
-                                        val widthFraction = if (index == 0) 0.9f else 0.7f
+                                    Text(
+                                        text = hadith.textArabic,
+                                        fontFamily = QuranFonts.PDMSSaleem,
+                                        fontSize = 26.sp,
+                                        lineHeight = 48.sp,
+                                        textAlign = TextAlign.Center,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+
+                                    if (translatedArabic != null && selectedLanguage != "ar") {
+                                        Spacer(modifier = Modifier.height(16.dp))
                                         Box(
                                             modifier = Modifier
-                                                .fillMaxWidth(widthFraction)
-                                                .height(14.dp)
-                                                .background(
-                                                    MaterialTheme.colorScheme.surfaceVariant,
-                                                    RoundedCornerShape(4.dp)
-                                                )
+                                                .fillMaxWidth()
+                                                .height(1.dp)
+                                                .background(MaterialTheme.colorScheme.outlineVariant)
+                                        )
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(
+                                            text = "Hadith (${getLanguageName(selectedLanguage)})",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = translatedArabic,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontSize = 16.sp,
+                                                lineHeight = 26.sp
+                                            ),
+                                            textAlign = TextAlign.Center,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
                             }
                         }
+                        HadithSection.TRANSLATION -> {
+                            val displayText = translatedText ?: hadith.textPlain ?: ""
+                            HadithSectionCard(
+                                title = "Translation (${getLanguageName(selectedLanguage)})",
+                                accentColor = MaterialTheme.colorScheme.primary,
+                                content = displayText,
+                                isLoading = isTranslating && translatedText == null,
+                                showDragHandle = true,
+                                isDragging = isDragging,
+                                dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                            )
+                        }
+                        HadithSection.EXPLANATION -> {
+                            val displayText = translatedElaboration ?: hadith.elaboration ?: ""
+                            HadithSectionCard(
+                                title = "Explanation (${getLanguageName(selectedLanguage)})",
+                                accentColor = MaterialTheme.colorScheme.secondary,
+                                content = displayText,
+                                isExpanded = false,
+                                isLoading = isTranslating && translatedElaboration == null,
+                                showDragHandle = true,
+                                isDragging = isDragging,
+                                dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                            )
+                        }
                     }
-                }
-            }
-
-            // Translation section - shows translated text based on selected language
-            if (!hadith.textPlain.isNullOrEmpty()) {
-                item {
-                    val displayText = translatedText ?: hadith.textPlain!!
-                    val sectionTitle = if (selectedLanguage != "en" && selectedLanguage != "transliteration") {
-                        "Translation (${getLanguageName(selectedLanguage)})"
-                    } else {
-                        "Translation"
-                    }
-                    HadithSectionCard(
-                        title = sectionTitle,
-                        accentColor = MaterialTheme.colorScheme.primary,
-                        content = displayText,
-                        isLoading = isTranslating && translatedText == null
-                    )
-                }
-            }
-
-            // Elaboration/Explanation section - shows translated elaboration
-            if (!hadith.elaboration.isNullOrEmpty()) {
-                item {
-                    val displayText = translatedElaboration ?: hadith.elaboration!!
-                    val sectionTitle = if (selectedLanguage != "en" && selectedLanguage != "transliteration") {
-                        "Explanation (${getLanguageName(selectedLanguage)})"
-                    } else {
-                        "Explanation"
-                    }
-                    HadithSectionCard(
-                        title = sectionTitle,
-                        accentColor = MaterialTheme.colorScheme.secondary,
-                        content = displayText,
-                        isExpanded = false,
-                        isLoading = isTranslating && translatedElaboration == null
-                    )
                 }
             }
 
@@ -682,7 +750,7 @@ private fun HadithContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .padding(top = 32.dp) // Fixed padding to clear camera punch hole area
+                .padding(top = 48.dp) // Fixed padding to clear camera punch hole area
         ) {
             Row(
                 modifier = Modifier
@@ -761,92 +829,313 @@ private fun HadithSectionCard(
     accentColor: Color,
     content: String,
     isExpanded: Boolean = true,
-    isLoading: Boolean = false
+    isLoading: Boolean = false,
+    showDragHandle: Boolean = false,
+    isDragging: Boolean = false,
+    dragHandleModifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
+    var expanded by remember { mutableStateOf(isExpanded) }
+    val rotationAngle by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "chevronRotation"
+    )
+
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .graphicsLayer {
+                shadowElevation = if (isDragging) 8f else 0f
+            }
+            .zIndex(if (isDragging) 1f else 0f)
+            .clip(RoundedCornerShape(12.dp)),
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         shadowElevation = 2.dp
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            // Left accent border
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(androidx.compose.ui.unit.Dp.Unspecified)
-                    .background(accentColor)
-            )
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(16.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+        Column {
+            // Drag handle at top center - this is the only draggable area
+            if (showDragHandle) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                    Icon(
+                        imageVector = Icons.Default.DragHandle,
+                        contentDescription = "Drag to reorder",
+                        tint = if (isDragging)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = dragHandleModifier.size(24.dp)
                     )
-                    if (isLoading) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        // Simple loading indicator
-                        Box(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                                    RoundedCornerShape(8.dp)
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // Left accent border - adjusts height based on expanded state
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .then(
+                            if (expanded) {
+                                Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
+                            } else {
+                                Modifier.height(56.dp)
+                            }
+                        )
+                        .background(accentColor)
+                )
+
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Header row - clickable to expand/collapse
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { expanded = !expanded }
+                            .padding(horizontal = 16.dp, vertical = if (showDragHandle) 12.dp else 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowUp,
+                                contentDescription = if (expanded) "Collapse" else "Expand",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .graphicsLayer { rotationZ = rotationAngle }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (isLoading) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                            RoundedCornerShape(8.dp)
+                                        )
                                 )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .graphicsLayer { rotationZ = rotationAngle }
                         )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (isLoading) {
-                    // Shimmer loading effect for text
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                // Expandable content with animation
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = expanded,
+                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                     ) {
-                        repeat(3) { index ->
-                            val widthFraction = when (index) {
-                                0 -> 1f
-                                1 -> 0.85f
-                                else -> 0.6f
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(widthFraction)
-                                    .height(14.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        RoundedCornerShape(4.dp)
+                        if (isLoading) {
+                            // Shimmer loading effect for text
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                repeat(3) { index ->
+                                    val widthFraction = when (index) {
+                                        0 -> 1f
+                                        1 -> 0.85f
+                                        else -> 0.6f
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(widthFraction)
+                                            .height(14.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                RoundedCornerShape(4.dp)
+                                            )
                                     )
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = content,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontSize = 15.sp,
+                                    lineHeight = 24.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                } else {
-                    Text(
-                        text = content,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 15.sp,
-                            lineHeight = 24.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            }
+        }
+        }
+    }
+}
+
+/**
+ * Collapsible section card that accepts composable content
+ */
+@Composable
+private fun HadithSectionCardWithContent(
+    title: String,
+    accentColor: Color,
+    isExpanded: Boolean = true,
+    showDragHandle: Boolean = false,
+    isDragging: Boolean = false,
+    dragHandleModifier: Modifier = Modifier,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    var expanded by remember { mutableStateOf(isExpanded) }
+    val rotationAngle by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "chevronRotation"
+    )
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .graphicsLayer {
+                shadowElevation = if (isDragging) 8f else 0f
+            }
+            .zIndex(if (isDragging) 1f else 0f)
+            .clip(RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
+        color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        shadowElevation = 2.dp
+    ) {
+        Column {
+            // Drag handle at top center - this is the only draggable area
+            if (showDragHandle) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DragHandle,
+                        contentDescription = "Drag to reorder",
+                        tint = if (isDragging)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = dragHandleModifier.size(24.dp)
                     )
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // Left accent border
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .then(
+                            if (expanded) {
+                                Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
+                            } else {
+                                Modifier.height(56.dp)
+                            }
+                        )
+                        .background(accentColor)
+                )
+
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Header row - clickable to expand/collapse
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { expanded = !expanded }
+                            .padding(horizontal = 16.dp, vertical = if (showDragHandle) 12.dp else 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowUp,
+                                contentDescription = if (expanded) "Collapse" else "Expand",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .graphicsLayer { rotationZ = rotationAngle }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .graphicsLayer { rotationZ = rotationAngle }
+                        )
+                    }
+
+                    // Expandable content with animation
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = expanded,
+                        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                        ) {
+                            content()
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+/**
+ * Section types for reorderable hadith content
+ */
+private enum class HadithSection {
+    ARABIC,
+    TRANSLATION,
+    EXPLANATION
+}
+
 
 @Composable
 private fun HadithErrorContent(
@@ -990,7 +1279,7 @@ private fun HadithShimmerLoading(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 32.dp) // Fixed padding to clear camera punch hole area
+                .padding(top = 48.dp) // Fixed padding to clear camera punch hole area
         ) {
             Row(
                 modifier = Modifier
