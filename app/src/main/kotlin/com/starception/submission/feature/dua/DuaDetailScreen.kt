@@ -2466,53 +2466,50 @@ private fun CollapsibleDuaSection(
             tonalElevation = 1.dp,
             shadowElevation = 2.dp
         ) {
-        Column {
-            // Drag handle at top center - modifier applies reorderable drag behavior
-            if (showDragHandle) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DragHandle,
-                        contentDescription = "Drag to reorder",
-                        tint = if (isDragging)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = dragHandleModifier.size(24.dp)
+        Row(modifier = Modifier.fillMaxWidth()) {
+            // Left accent border - spans full height including drag handle
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .background(accentColor)
+                    .then(
+                        if (isExpanded) {
+                            Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
+                        } else {
+                            Modifier.height(if (showDragHandle) 84.dp else 56.dp)
+                        }
                     )
-                }
-            }
+            )
 
-            Row(modifier = Modifier.fillMaxWidth()) {
-                // Left accent border
-                Box(
-                    modifier = Modifier
-                        .width(4.dp)
-                        .background(accentColor)
-                        .then(
-                            if (isExpanded) {
-                                Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
-                            } else {
-                                Modifier.height(56.dp)
-                            }
-                        )
-                )
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 0.dp)
-                ) {
-                    // Header row - clickable to expand/collapse
-                    Row(
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                // Drag handle at top center - modifier applies reorderable drag behavior
+                if (showDragHandle) {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { isExpanded = !isExpanded }
-                            .padding(horizontal = 16.dp, vertical = if (showDragHandle) 12.dp else 16.dp),
+                            .padding(top = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DragHandle,
+                            contentDescription = "Drag to reorder",
+                            tint = if (isDragging)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = dragHandleModifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Header row - clickable to expand/collapse
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isExpanded = !isExpanded }
+                        .padding(horizontal = 16.dp, vertical = if (showDragHandle) 12.dp else 16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -2561,7 +2558,6 @@ private fun CollapsibleDuaSection(
                     }
                 }
             }
-        }
         }
     }
 }
