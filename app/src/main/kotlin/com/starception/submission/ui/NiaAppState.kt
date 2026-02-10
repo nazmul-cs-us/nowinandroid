@@ -157,6 +157,12 @@ class NiaAppState(
      */
     fun navigateToTopLevelDestination(topLevelDestination: TopLevelDestination) {
         trace("Navigation: ${topLevelDestination.name}") {
+            // Skip navigation if already on this destination (prevents unnecessary recomposition)
+            val currentDestination = navController.currentDestination
+            if (currentDestination?.hasRoute(route = topLevelDestination.route) == true) {
+                return@trace
+            }
+
             val topLevelNavOptions = navOptions {
                 // Pop up to the start destination of the graph to
                 // avoid building up a large stack of destinations
@@ -173,7 +179,7 @@ class NiaAppState(
 
             // Check if we're navigating to HOME or INTERESTS while a non-top-level screen
             // (like Settings) is on top - if so, just pop the back stack to dismiss it
-            val currentRoute = navController.currentDestination?.route
+            val currentRoute = currentDestination?.route
             val isOnNonTopLevelScreen = currentRoute != null &&
                 TopLevelDestination.entries.none { it.route.qualifiedName == currentRoute }
 

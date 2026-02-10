@@ -32,6 +32,15 @@ data class NewsResourceQuery(
      * News ids to filter for. Null means any news id will match.
      */
     val filterNewsIds: Set<String>? = null,
+    /**
+     * Maximum number of results to return. Null means no limit.
+     * Used for pagination to avoid loading large datasets at once.
+     */
+    val limit: Int? = null,
+    /**
+     * Number of results to skip. Used with limit for pagination.
+     */
+    val offset: Int = 0,
 )
 
 /**

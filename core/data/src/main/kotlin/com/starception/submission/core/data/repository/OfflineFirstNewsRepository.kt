@@ -29,6 +29,10 @@ import javax.inject.Inject
 /**
  * Content database backed implementation of the [NewsRepository].
  * Reads from pre-populated news_resources.db in assets for offline access.
+ *
+ * Performance optimization: Uses DB-level filtering for topic queries instead of
+ * loading all resources and filtering in memory. This is critical for large datasets
+ * (e.g., 7500+ hadith when following Bukhari topic).
  */
 internal class OfflineFirstNewsRepository @Inject constructor(
     private val newsDao: NewsDao,
@@ -37,31 +41,41 @@ internal class OfflineFirstNewsRepository @Inject constructor(
 
     override fun getNewsResources(
         query: NewsResourceQuery,
-    ): Flow<List<NewsResource>> = newsDao.getAllNewsResourcesFlow()
-        .map { newsResources ->
+    ): Flow<List<NewsResource>> {
+        val limit = query.limit
+        val offset = query.offset
+
+        // Choose the most efficient query based on filters
+        val dbFlow = when {
+            // DB-level filtering for topic IDs - most common case for For You feed
+            query.filterTopicIds != null && query.filterTopicIds.isNotEmpty() -> {
+                val topicIntIds = query.filterTopicIds.mapNotNull { it.toIntOrNull() }
+                if (limit != null) {
+                    newsDao.getNewsResourcesByTopicIdsPaginated(topicIntIds, limit, offset)
+                } else {
+                    newsDao.getNewsResourcesByTopicIdsFlow(topicIntIds)
+                }
+            }
+            // DB-level filtering for specific news IDs - used for bookmarks
+            query.filterNewsIds != null && query.filterNewsIds.isNotEmpty() -> {
+                val newsIntIds = query.filterNewsIds.mapNotNull { it.toIntOrNull() }
+                newsDao.getNewsResourcesByIdsFlow(newsIntIds)
+            }
+            // No filter - load all (should be rare in production)
+            else -> {
+                newsDao.getAllNewsResourcesFlow()
+            }
+        }
+
+        return dbFlow.map { newsResources ->
             // Build topics map for efficient lookup
             val allTopics = topicsDao.getAllTopics()
             val topicsMap: Map<Int, Topic> = allTopics.associate { it.id to it.asExternalModel() }
 
             // Convert to external model
-            var resources = newsResources.map { it.asExternalModel(topicsMap) }
-
-            // Apply topic filter if specified
-            query.filterTopicIds?.let { filterIds ->
-                resources = resources.filter { resource ->
-                    resource.topics.any { topic -> topic.id in filterIds }
-                }
-            }
-
-            // Apply news ID filter if specified
-            query.filterNewsIds?.let { filterIds ->
-                resources = resources.filter { resource ->
-                    resource.id in filterIds
-                }
-            }
-
-            resources
+            newsResources.map { it.asExternalModel(topicsMap) }
         }
+    }
 
     /**
      * No network sync needed - data is pre-populated in content database.

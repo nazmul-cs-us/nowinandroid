@@ -132,7 +132,6 @@ fun LazyStaggeredGridScope.newsFeed(
                     isBookmarked = userNewsResource.isSaved,
                     searchQuery = searchQuery,
                     onClick = {
-                        android.util.Log.d("NewsFeedClick", "📱 Card clicked: title='${userNewsResource.title}', surahNumber=$surahNumber, isDua=$isDuaItem")
                         onExpandedCardClick()
                         analyticsHelper.logNewsResourceOpened(
                             newsResourceId = userNewsResource.id,
@@ -140,25 +139,15 @@ fun LazyStaggeredGridScope.newsFeed(
 
                         // If it's a Surah, navigate to Surah detail screen
                         if (surahNumber != null) {
-                            android.util.Log.d("NewsFeedClick", "🕌 Navigating to Surah $surahNumber")
                             onSurahClick(surahNumber, userNewsResource.id)
                         } else if (isHadithItem && hadithInfo != null) {
-                            android.util.Log.d("NewsFeedClick", "📖 Navigating to Hadith ${hadithInfo.second} from ${hadithInfo.first}")
                             onHadithClick(hadithInfo.first, hadithInfo.second)
                         } else if (isDuaItem) {
-                            android.util.Log.d("NewsFeedClick", "🤲 Navigating to Dua")
-                            // Navigate to Dua detail screen
                             onDuaClick(userNewsResource)
                         } else if (onNewsClick != null) {
-                            android.util.Log.d("NewsFeedClick", "📰 Custom news click handler")
-                            // Use custom news click handler if provided
                             onNewsClick(userNewsResource)
                         } else if (userNewsResource.url.isNotBlank()) {
-                            android.util.Log.d("NewsFeedClick", "🌐 Opening URL: ${userNewsResource.url}")
-                            // Otherwise, open in Chrome Custom Tab (only if URL is not empty)
                             launchCustomChromeTab(context, Uri.parse(userNewsResource.url), backgroundColor)
-                        } else {
-                            android.util.Log.d("NewsFeedClick", "⚠️ No action taken - URL is blank and not Surah/Dua")
                         }
 
                         onNewsResourceViewed(userNewsResource.id)
@@ -199,14 +188,11 @@ fun LazyStaggeredGridScope.newsFeed(
  * Example URL: "https://quran.com/1" -> 1
  */
 fun extractSurahNumber(title: String, url: String, type: String): Int? {
-    android.util.Log.d("SurahExtract", "🔍 Checking: title='$title', url='$url', type='$type'")
-
     // First check if it's a Quran or Surah type
     if (type.contains("Quran", ignoreCase = true) || type.contains("Surah", ignoreCase = true)) {
         // Try to extract from title pattern "Surah N:"
         val titleRegex = Regex("Surah\\s+(\\d+):")
         titleRegex.find(title)?.groupValues?.get(1)?.toIntOrNull()?.let {
-            android.util.Log.d("SurahExtract", "✅ Found Surah $it from title (Quran/Surah type)")
             return it
         }
     }
@@ -214,15 +200,8 @@ fun extractSurahNumber(title: String, url: String, type: String): Int? {
     // Fallback: try URL pattern
     return try {
         val urlRegex = Regex("https?://quran\\.com/(\\d+)$")
-        val result = urlRegex.find(url)?.groupValues?.get(1)?.toIntOrNull()
-        if (result != null) {
-            android.util.Log.d("SurahExtract", "✅ Found Surah $result from URL")
-        } else {
-            android.util.Log.d("SurahExtract", "❌ No Surah number found")
-        }
-        result
+        urlRegex.find(url)?.groupValues?.get(1)?.toIntOrNull()
     } catch (e: Exception) {
-        android.util.Log.e("SurahExtract", "❌ Error extracting Surah: ${e.message}")
         null
     }
 }
@@ -238,16 +217,11 @@ fun extractHadithInfo(url: String): Pair<String, Int>? {
         if (match != null) {
             val dbName = match.groupValues[1]
             val hadithNumber = match.groupValues[2].toInt()
-            // Convert to database filename
-            val dbFile = "${dbName}.db"
-            android.util.Log.d("HadithExtract", "✅ Found Hadith $hadithNumber from $dbFile")
-            Pair(dbFile, hadithNumber)
+            Pair("${dbName}.db", hadithNumber)
         } else {
-            android.util.Log.d("HadithExtract", "❌ No hadith info found in URL: $url")
             null
         }
     } catch (e: Exception) {
-        android.util.Log.e("HadithExtract", "❌ Error extracting hadith info: ${e.message}")
         null
     }
 }
