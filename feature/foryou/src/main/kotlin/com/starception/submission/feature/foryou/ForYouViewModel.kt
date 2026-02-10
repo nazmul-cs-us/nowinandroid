@@ -51,6 +51,7 @@ class ForYouViewModel @Inject constructor(
     getFollowableTopics: GetFollowableTopicsUseCase,
 ) : ViewModel() {
 
+
     private val shouldShowOnboarding: Flow<Boolean> =
         userDataRepository.userData.map { !it.shouldHideOnboarding }
 
@@ -85,7 +86,7 @@ class ForYouViewModel @Inject constructor(
 
     val feedState: StateFlow<NewsFeedUiState> =
         userNewsResourceRepository.observeAllForFollowedTopics()
-            .map(NewsFeedUiState::Success)
+            .map { resources -> NewsFeedUiState.Success(resources) }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),

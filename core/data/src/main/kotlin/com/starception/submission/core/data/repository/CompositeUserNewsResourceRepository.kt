@@ -46,15 +46,30 @@ class CompositeUserNewsResourceRepository @Inject constructor(
                 newsResources.mapToUserNewsResources(userData)
             }
 
+    companion object {
+        /**
+         * Default limit for For You feed to ensure fast initial load.
+         * Can be increased or removed for full list loading when needed.
+         */
+        const val FOR_YOU_DEFAULT_LIMIT = 100
+    }
+
     /**
      * Returns available news resources (joined with user data) for the followed topics.
+     * Uses DB-level filtering with pagination for efficient loading.
+     * Limits to [FOR_YOU_DEFAULT_LIMIT] items for fast initial load.
      */
     override fun observeAllForFollowedTopics(): Flow<List<UserNewsResource>> =
         userDataRepository.userData.map { it.followedTopics }.distinctUntilChanged()
             .flatMapLatest { followedTopics ->
                 when {
                     followedTopics.isEmpty() -> flowOf(emptyList())
-                    else -> observeAll(NewsResourceQuery(filterTopicIds = followedTopics))
+                    else -> observeAll(
+                        NewsResourceQuery(
+                            filterTopicIds = followedTopics,
+                            limit = FOR_YOU_DEFAULT_LIMIT,
+                        )
+                    )
                 }
             }
 

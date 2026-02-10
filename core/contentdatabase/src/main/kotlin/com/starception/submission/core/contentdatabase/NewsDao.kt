@@ -81,6 +81,52 @@ interface NewsDao {
     """)
     fun getNewsResourcesByTopicFlow(topicId: Int): Flow<List<NewsResourceWithTopics>>
 
+    /**
+     * Get news resources that belong to ANY of the provided topic IDs.
+     * Uses DISTINCT to avoid duplicates when a news resource belongs to multiple matching topics.
+     * This is the efficient DB-level filtering for followed topics.
+     */
+    @Query("""
+        SELECT DISTINCT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
+               n.publish_date as publishDate, n.type, n.is_system as isSystem,
+               n.is_user_created as isUserCreated, n.source,
+               (SELECT GROUP_CONCAT(topic_id) FROM news_topics WHERE news_id = n.id) as topicIds
+        FROM news_resources n
+        INNER JOIN news_topics nt ON n.id = nt.news_id
+        WHERE nt.topic_id IN (:topicIds)
+        ORDER BY n.id ASC
+    """)
+    fun getNewsResourcesByTopicIdsFlow(topicIds: List<Int>): Flow<List<NewsResourceWithTopics>>
+
+    /**
+     * Get news resources that belong to ANY of the provided topic IDs with pagination.
+     * Uses LIMIT and OFFSET for efficient loading of large datasets.
+     */
+    @Query("""
+        SELECT DISTINCT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
+               n.publish_date as publishDate, n.type, n.is_system as isSystem,
+               n.is_user_created as isUserCreated, n.source,
+               (SELECT GROUP_CONCAT(topic_id) FROM news_topics WHERE news_id = n.id) as topicIds
+        FROM news_resources n
+        INNER JOIN news_topics nt ON n.id = nt.news_id
+        WHERE nt.topic_id IN (:topicIds)
+        ORDER BY n.id ASC
+        LIMIT :limit OFFSET :offset
+    """)
+    fun getNewsResourcesByTopicIdsPaginated(topicIds: List<Int>, limit: Int, offset: Int): Flow<List<NewsResourceWithTopics>>
+
+    /**
+     * Get count of news resources for the provided topic IDs.
+     * Useful for pagination to know total count.
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT n.id)
+        FROM news_resources n
+        INNER JOIN news_topics nt ON n.id = nt.news_id
+        WHERE nt.topic_id IN (:topicIds)
+    """)
+    suspend fun getNewsResourceCountByTopicIds(topicIds: List<Int>): Int
+
     @Query("""
         SELECT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
