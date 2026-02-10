@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.LocationManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -81,6 +83,26 @@ class EnhancedLocationService @Inject constructor(
         } else {
             null
         }
+    }
+
+    private val connectivityManager: ConnectivityManager by lazy {
+        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    }
+
+    /**
+     * NETWORK CONNECTIVITY CHECKER: Validates if device has internet connection
+     *
+     * This is critical for geocoding operations which require network access.
+     * Checking connectivity BEFORE calling geocoder prevents long blocking waits
+     * when there's no internet (the Geocoder API can hang for extended periods).
+     *
+     * @return true if device has active internet connection
+     */
+    private fun hasNetworkConnectivity(): Boolean {
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+               capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
     
     /**
@@ -367,9 +389,17 @@ class EnhancedLocationService @Inject constructor(
         android.util.Log.i("EnhancedLocationService", "   📦 Base location: ${baseLocation.getDisplayName()}")
 
         return try {
+            // Check network connectivity BEFORE attempting geocoding to prevent long blocking waits
+            if (!hasNetworkConnectivity()) {
+                android.util.Log.w("EnhancedLocationService", "   ⚠️ NO NETWORK: Skipping geocoding (would block without internet)")
+                return baseLocation.copy(
+                    city = "${String.format("%.2f", androidLocation.latitude)}, ${String.format("%.2f", androidLocation.longitude)}"
+                )
+            }
+
             geocoder?.let { gc ->
                 android.util.Log.i("EnhancedLocationService", "   ✅ ENHANCED GEOCODER AVAILABLE: Starting reverse geocoding...")
-                
+
                 withTimeoutOrNull(3000) { // 3 second timeout for geocoding to prevent delays
                     val addresses = gc.getFromLocation(
                         androidLocation.latitude,
@@ -498,6 +528,12 @@ class EnhancedLocationService @Inject constructor(
      * @return Result containing list of matching Locations or error
      */
     suspend fun searchLocation(query: String): Result<List<Location>> {
+        // Check network connectivity first to prevent blocking waits
+        if (!hasNetworkConnectivity()) {
+            android.util.Log.w("EnhancedLocationService", "   ⚠️ NO NETWORK: Cannot search locations offline")
+            return Result.failure(RuntimeException("No internet connection - cannot search locations"))
+        }
+
         return try {
             geocoder?.let { gc ->
                 withTimeoutOrNull(5000) { // 5 seconds for search is reasonable

@@ -307,64 +307,55 @@ fun PrayerTimesScreen(
     
     // UI STATE MANAGEMENT - These control what the user sees
     // Try to load cached data immediately, with Dubai fallback for instant startup
+    // Priority: 1. In-memory cache, 2. SharedPreferences cache, 3. Dubai fallback
     val (initialPrayerTimes, initialLocation, initialLoading) = remember {
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 screenContext.applicationContext,
                 PrayerTimeCalculatorEntryPoint::class.java
             )
+
+            // PRIORITY 1: Check in-memory cache (fastest)
             val cache = entryPoint.locationCache()
             val cachedData = cache.getCachedPrayerTimes()
-            
+
             if (cachedData != null) {
                 val (cachedPrayerTimes, _, cachedLocationName) = cachedData
                 if (cachedPrayerTimes != null && cachedLocationName != null) {
-                    android.util.Log.d("PrayerScreen", "🚀 INSTANT STARTUP: Loaded cached data immediately!")
-                    Triple(cachedPrayerTimes, cachedLocationName, false)
-                } else {
-                    // Provide Dubai fallback for instant startup
-                    val dubaiLocation = com.starception.submission.prayer.model.Location(
-                        latitude = 25.2048,
-                        longitude = 55.2708,
-                        timeZoneOffset = 4.0,
-                        city = "Dubai",
-                        country = "UAE"
-                    )
-                    val defaultTimes = com.starception.submission.prayer.model.DayPrayerTimes(
-                        date = LocalDateTime.now(),
-                        fajr = LocalTime.of(5, 15),
-                        sunrise = LocalTime.of(6, 45),
-                        dhuhr = LocalTime.of(12, 15),
-                        asr = LocalTime.of(15, 45),
-                        maghrib = LocalTime.of(18, 30),
-                        isha = LocalTime.of(19, 45),
-                        location = dubaiLocation
-                    )
-                    android.util.Log.d("PrayerScreen", "🕌 Using Dubai default prayer times for instant startup")
-                    Triple(defaultTimes, "Dubai (Default)", false)
+                    android.util.Log.d("PrayerScreen", "🚀 INSTANT STARTUP: Loaded from in-memory cache!")
+                    return@remember Triple(cachedPrayerTimes, cachedLocationName, false)
                 }
-            } else {
-                // Provide Dubai fallback for instant startup
-                val dubaiLocation = com.starception.submission.prayer.model.Location(
-                    latitude = 25.2048,
-                    longitude = 55.2708,
-                    timeZoneOffset = 4.0,
-                    city = "Dubai",
-                    country = "UAE"
-                )
-                val defaultTimes = com.starception.submission.prayer.model.DayPrayerTimes(
-                    date = LocalDateTime.now(),
-                    fajr = LocalTime.of(5, 15),
-                    sunrise = LocalTime.of(6, 45),
-                    dhuhr = LocalTime.of(12, 15),
-                    asr = LocalTime.of(15, 45),
-                    maghrib = LocalTime.of(18, 30),
-                    isha = LocalTime.of(19, 45),
-                    location = dubaiLocation
-                )
-                android.util.Log.d("PrayerScreen", "🕌 Using Dubai default prayer times for first-time startup")
-                Triple(defaultTimes, "Dubai (Default)", false)
             }
+
+            // PRIORITY 2: Check SharedPreferences cache (persists across app restarts)
+            val settingsRepository = entryPoint.prayerSettingsRepository()
+            val persistedCache = settingsRepository.getCachedPrayerTimes()
+            if (persistedCache != null) {
+                android.util.Log.d("PrayerScreen", "🚀 INSTANT STARTUP: Loaded from SharedPreferences cache!")
+                android.util.Log.d("PrayerScreen", "  📍 Cached location: ${persistedCache.location.getDisplayName()}")
+                return@remember Triple(persistedCache, persistedCache.location.getDisplayName(), false)
+            }
+
+            // PRIORITY 3: Dubai fallback for first-time startup only
+            android.util.Log.d("PrayerScreen", "🕌 No cached data found, using Dubai default for first-time startup")
+            val dubaiLocation = com.starception.submission.prayer.model.Location(
+                latitude = 25.2048,
+                longitude = 55.2708,
+                timeZoneOffset = 4.0,
+                city = "Dubai",
+                country = "UAE"
+            )
+            val defaultTimes = com.starception.submission.prayer.model.DayPrayerTimes(
+                date = LocalDateTime.now(),
+                fajr = LocalTime.of(5, 15),
+                sunrise = LocalTime.of(6, 45),
+                dhuhr = LocalTime.of(12, 15),
+                asr = LocalTime.of(15, 45),
+                maghrib = LocalTime.of(18, 30),
+                isha = LocalTime.of(19, 45),
+                location = dubaiLocation
+            )
+            Triple(defaultTimes, "Dubai (Default)", false)
         } catch (e: Exception) {
             android.util.Log.w("PrayerScreen", "Failed to load cache, using Dubai fallback: ${e.message}")
             // Always provide fallback data - never show loading
@@ -1307,42 +1298,17 @@ fun PrayerTimesScreen(
     LaunchedEffect(Unit) {
         android.util.Log.d("PrayerScreen", "=== INSTANT LOAD STRATEGY ===")
         
-        // STEP 1: Try to load cached data instantly (no loading screen)
-        android.util.Log.d("PrayerScreen", "STEP 1: Checking for instant cached data...")
-        try {
-            val entryPoint = EntryPointAccessors.fromApplication(
-                screenContext.applicationContext,
-                PrayerTimeCalculatorEntryPoint::class.java
-            )
-            val cache = entryPoint.locationCache()
-            
-            // Check if we have cached prayer times for today
-            val cachedData = cache.getCachedPrayerTimes()
-            if (cachedData != null) {
-                val (cachedPrayerTimes, cachedDate, cachedLocationName) = cachedData
-                if (cachedPrayerTimes != null && cachedLocationName != null) {
-                    android.util.Log.d("PrayerScreen", "✓ INSTANT LOAD: Found cached prayer times for today!")
-                    android.util.Log.d("PrayerScreen", "  Location: $cachedLocationName")
-                    android.util.Log.d("PrayerScreen", "  Date: $cachedDate")
-                    
-                    // Show cached data immediately - NO LOADING SCREEN!
-                    prayerTimes = cachedPrayerTimes
-                    location = cachedLocationName
-                    isLoading = false
-                    
-                    android.util.Log.d("PrayerScreen", "✓ UI updated instantly with cached data")
-                }
-            } else {
-                android.util.Log.d("PrayerScreen", "No cached data found - this is first time use")
-                // Set fallback location immediately so it's visible
-                location = "Dubai (Default)"
-                isLoading = true  // Only show loading for brand new users
-            }
-        } catch (e: Exception) {
-            android.util.Log.w("PrayerScreen", "Failed to load cached data: ${e.message}")
-            // Set fallback location immediately so it's visible
-            location = "Dubai (Default)"
-            isLoading = true  // Show loading if cache access fails
+        // STEP 1: Skip redundant cache loading - already done in remember{} block
+        // The initial state was set from SharedPreferences cache which persists across app restarts
+        // We only need to refresh with GPS if we don't already have valid data
+        android.util.Log.d("PrayerScreen", "STEP 1: Checking if cached data needs refresh...")
+        val hasValidCachedData = prayerTimes != null && !location.contains("Default")
+        if (hasValidCachedData) {
+            android.util.Log.d("PrayerScreen", "✓ Already loaded from persistent cache: $location")
+            android.util.Log.d("PrayerScreen", "  Skipping redundant in-memory cache check")
+        } else {
+            android.util.Log.d("PrayerScreen", "No valid cached data - first time use or cache expired")
+            isLoading = true  // Only show loading for brand new users
         }
         
         // STEP 2: Update with fresh GPS data in background (auto-refresh on app open)

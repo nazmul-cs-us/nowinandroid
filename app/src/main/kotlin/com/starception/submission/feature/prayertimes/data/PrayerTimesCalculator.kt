@@ -256,11 +256,45 @@ class PrayerTimesCalculator(private val context: Context) {
                                 android.util.Log.d("PrayerCalculation", "✓ PRIORITY 3: GPS location obtained in ${gpsTime}ms")
                                 android.util.Log.d("PrayerCalculation", "  GPS Coordinates: ${androidLoc.latitude}, ${androidLoc.longitude}")
                                 android.util.Log.d("PrayerCalculation", "  GPS Accuracy: ${androidLoc.accuracy}m")
-                                
+
                                 val detailedLocation = locationService.getLocationDetails(androidLoc)
                                 android.util.Log.d("PrayerCalculation", "  Resolved Location: ${detailedLocation.getDisplayName()}")
-                                cache.cacheLocation(detailedLocation) // Cache for next time
-                                detailedLocation
+
+                                // Helper to check if city is just coordinates (geocoding failed)
+                                fun isCityJustCoordinates(city: String): Boolean {
+                                    if (city.isBlank()) return true
+                                    val coordPattern = Regex("""^-?\d+\.?\d*,\s*-?\d+\.?\d*$""")
+                                    return coordPattern.matches(city.trim())
+                                }
+
+                                // Only cache if we got a real city name (geocoding succeeded)
+                                // Don't overwrite good cached location with coordinates-only location
+                                if (!isCityJustCoordinates(detailedLocation.city)) {
+                                    cache.cacheLocation(detailedLocation) // Cache for next time
+                                    android.util.Log.d("PrayerCalculation", "  ✓ Location cached (has real city name)")
+                                    detailedLocation
+                                } else {
+                                    // Geocoding failed - use old cached location if available, but with new coordinates
+                                    android.util.Log.w("PrayerCalculation", "  ⚠️ Geocoding failed (got coordinates only)")
+                                    if (oldCachedLocation != null && !isCityJustCoordinates(oldCachedLocation.city)) {
+                                        // Use old city name with new GPS coordinates (copy all location name fields)
+                                        val mergedLocation = detailedLocation.copy(
+                                            city = oldCachedLocation.city,
+                                            country = oldCachedLocation.country,
+                                            countryCode = oldCachedLocation.countryCode,
+                                            area = oldCachedLocation.area,
+                                            subLocality = oldCachedLocation.subLocality,
+                                            thoroughfare = oldCachedLocation.thoroughfare,
+                                            administrativeArea = oldCachedLocation.administrativeArea
+                                        )
+                                        android.util.Log.d("PrayerCalculation", "  ✓ Using cached city name: ${mergedLocation.getDisplayName()}")
+                                        mergedLocation
+                                    } else {
+                                        // No good cached location, use coordinates
+                                        android.util.Log.w("PrayerCalculation", "  ✗ No cached city name available")
+                                        detailedLocation
+                                    }
+                                }
                             } ?: run {
                                 android.util.Log.w("PrayerCalculation", "GPS failed after ${gpsTime}ms")
                                 
@@ -329,15 +363,54 @@ class PrayerTimesCalculator(private val context: Context) {
             val calcStartTime = System.currentTimeMillis()
             val calculatedTimes = calculator.calculatePrayerTimes(today, location, userSettings)
             val calcDuration = System.currentTimeMillis() - calcStartTime
-            val locationName = location.getDisplayName()
-            
-            if (calculatedTimes != null) {
+
+            // Use old cached location name if new location doesn't have city name (geocoding failed - no internet)
+            // Helper function to check if a string looks like coordinates (e.g., "25.20, 55.27")
+            fun isCoordinatesString(city: String): Boolean {
+                if (city.isBlank()) return false
+                // Coordinates pattern: number, comma, number (e.g., "25.20, 55.27" or "-33.87, 151.21")
+                val coordPattern = Regex("""^-?\d+\.?\d*,\s*-?\d+\.?\d*$""")
+                return coordPattern.matches(city.trim())
+            }
+
+            val newLocationHasRealCityName = location.city.isNotBlank() && !isCoordinatesString(location.city)
+            val oldLocation = userSettings.location
+            val oldLocationHasRealCityName = oldLocation?.city?.isNotBlank() == true &&
+                                              !isCoordinatesString(oldLocation.city)
+
+            // If geocoding failed (coordinates only), use cached location's city/country with new GPS coordinates
+            val correctedLocation = if (!newLocationHasRealCityName && oldLocationHasRealCityName && oldLocation != null) {
+                android.util.Log.w("PrayerCalculation", "⚠️ Using cached city name (geocoding failed): ${oldLocation.getDisplayName()}")
+                // Copy all location name fields from old location (area, city, country, etc.)
+                location.copy(
+                    city = oldLocation.city,
+                    country = oldLocation.country,
+                    countryCode = oldLocation.countryCode,
+                    area = oldLocation.area,
+                    subLocality = oldLocation.subLocality,
+                    thoroughfare = oldLocation.thoroughfare,
+                    administrativeArea = oldLocation.administrativeArea
+                )
+            } else {
+                location
+            }
+            val locationName = correctedLocation.getDisplayName()
+
+            // Update calculated times with corrected location (so DayPrayerTimes.location has city name)
+            val finalCalculatedTimes = if (calculatedTimes != null && correctedLocation != location) {
+                calculatedTimes.copy(location = correctedLocation)
+            } else {
+                calculatedTimes
+            }
+
+            if (finalCalculatedTimes != null) {
                 android.util.Log.d("PrayerCalculation", "✓ Prayer times calculated successfully in ${calcDuration}ms:")
-                android.util.Log.d("PrayerCalculation", "  Fajr:    ${calculatedTimes.fajr}")
-                android.util.Log.d("PrayerCalculation", "  Dhuhr:   ${calculatedTimes.dhuhr}")  
-                android.util.Log.d("PrayerCalculation", "  Asr:     ${calculatedTimes.asr}")
-                android.util.Log.d("PrayerCalculation", "  Maghrib: ${calculatedTimes.maghrib}")
-                android.util.Log.d("PrayerCalculation", "  Isha:    ${calculatedTimes.isha}")
+                android.util.Log.d("PrayerCalculation", "  Fajr:    ${finalCalculatedTimes.fajr}")
+                android.util.Log.d("PrayerCalculation", "  Dhuhr:   ${finalCalculatedTimes.dhuhr}")
+                android.util.Log.d("PrayerCalculation", "  Asr:     ${finalCalculatedTimes.asr}")
+                android.util.Log.d("PrayerCalculation", "  Maghrib: ${finalCalculatedTimes.maghrib}")
+                android.util.Log.d("PrayerCalculation", "  Isha:    ${finalCalculatedTimes.isha}")
+                android.util.Log.d("PrayerCalculation", "  Location: ${finalCalculatedTimes.location.getDisplayName()}")
             } else {
                 android.util.Log.w("PrayerCalculation", "✗ Prayer times calculation returned null after ${calcDuration}ms")
             }
@@ -345,33 +418,60 @@ class PrayerTimesCalculator(private val context: Context) {
             // STEP 6: SAVE LOCATION TO SETTINGS for notification service access
             android.util.Log.d("PrayerCalculation", "STEP 6a: Saving location to settings for notification service")
             try {
-                // Check if we should save location - save if:
-                // 1. No saved location exists, OR
-                // 2. Location changed (different coordinates), OR
-                // 3. Old location has "Current Location" as city (need to fix it), OR
-                // 4. New location is not Dubai default
                 val oldLocation = userSettings.location
                 val hasCurrentLocationBug = oldLocation?.city?.contains("Current Location", ignoreCase = true) == true
-                val locationChanged = oldLocation == null || 
-                    (oldLocation.latitude != location.latitude || oldLocation.longitude != location.longitude)
-                val isNotDubai = !location.getDisplayName().contains("Dubai")
-                
-                val shouldSaveLocation = oldLocation == null || locationChanged || hasCurrentLocationBug || isNotDubai
-                
-                if (shouldSaveLocation) {
-                    if (hasCurrentLocationBug) {
-                        android.util.Log.w("PrayerCalculation", "🔧 FIXING 'Current Location' BUG: Replacing with proper location")
-                        android.util.Log.w("PrayerCalculation", "   Old: ${oldLocation?.getDisplayName()}")
-                        android.util.Log.w("PrayerCalculation", "   New: ${location.getDisplayName()}")
-                    }
-                    android.util.Log.w("PrayerCalculation", "🔥 Saving GPS location to settings: ${location.getDisplayName()}")
-                    android.util.Log.w("PrayerCalculation", "🔥 BEFORE COPY - Custom Isha: ${userSettings.customIshaAngle}")
+
+                // Check if new location has a proper city name (geocoding succeeded)
+                // Also check if it's just coordinates (e.g., "25.20, 55.27") which means geocoding failed
+                val newLocationHasRealCityName = location.city.isNotBlank() &&
+                    !location.city.contains("Current Location", ignoreCase = true) &&
+                    !isCoordinatesString(location.city)
+                val oldLocationHasRealCityName = oldLocation?.city?.isNotBlank() == true &&
+                    !hasCurrentLocationBug &&
+                    !isCoordinatesString(oldLocation.city)
+
+                // Don't overwrite a good cached location (with city name) with coordinates-only location
+                // This preserves the city name when offline (geocoding fails)
+                if (oldLocationHasRealCityName && !newLocationHasRealCityName) {
+                    android.util.Log.w("PrayerCalculation", "⚠️ PRESERVING OLD LOCATION: New location has no city name (geocoding failed - no internet?)")
+                    android.util.Log.w("PrayerCalculation", "   Keeping: ${oldLocation?.getDisplayName()}")
+                    android.util.Log.w("PrayerCalculation", "   Discarding: ${location.getDisplayName()} (coordinates only)")
+                    // Don't save - keep the old location with city name
+                } else if (newLocationHasRealCityName) {
+                    // ALWAYS save when we have a successfully geocoded location with real city name
+                    // This ensures the latest geocoded location is available for offline use
+                    android.util.Log.w("PrayerCalculation", "🔥 Saving geocoded location to settings: ${location.getDisplayName()}")
                     val updatedSettings = userSettings.copy(location = location)
-                    android.util.Log.w("PrayerCalculation", "🔥 AFTER COPY - Custom Isha: ${updatedSettings.customIshaAngle}")
                     settingsRepository.updateSettings(updatedSettings, forceCommit = false)
-                    android.util.Log.w("PrayerCalculation", "🔥 Location update call completed")
+                    android.util.Log.w("PrayerCalculation", "🔥 Location saved for offline use")
                 } else {
-                    android.util.Log.d("PrayerCalculation", "Using existing saved location from settings: ${location.getDisplayName()}")
+                    // Geocoding failed and old location doesn't have city name either
+                    // Check if we should save location - save if:
+                    // 1. No saved location exists, OR
+                    // 2. Location changed (different coordinates), OR
+                    // 3. Old location has "Current Location" as city (need to fix it), OR
+                    // 4. New location is not Dubai default
+                    val locationChanged = oldLocation == null ||
+                        (oldLocation.latitude != location.latitude || oldLocation.longitude != location.longitude)
+                    val isNotDubai = !location.getDisplayName().contains("Dubai")
+
+                    val shouldSaveLocation = oldLocation == null || locationChanged || hasCurrentLocationBug || isNotDubai
+
+                    if (shouldSaveLocation) {
+                        if (hasCurrentLocationBug) {
+                            android.util.Log.w("PrayerCalculation", "🔧 FIXING 'Current Location' BUG: Replacing with proper location")
+                            android.util.Log.w("PrayerCalculation", "   Old: ${oldLocation?.getDisplayName()}")
+                            android.util.Log.w("PrayerCalculation", "   New: ${location.getDisplayName()}")
+                        }
+                        android.util.Log.w("PrayerCalculation", "🔥 Saving GPS location to settings: ${location.getDisplayName()}")
+                        android.util.Log.w("PrayerCalculation", "🔥 BEFORE COPY - Custom Isha: ${userSettings.customIshaAngle}")
+                        val updatedSettings = userSettings.copy(location = location)
+                        android.util.Log.w("PrayerCalculation", "🔥 AFTER COPY - Custom Isha: ${updatedSettings.customIshaAngle}")
+                        settingsRepository.updateSettings(updatedSettings, forceCommit = false)
+                        android.util.Log.w("PrayerCalculation", "🔥 Location update call completed")
+                    } else {
+                        android.util.Log.d("PrayerCalculation", "Using existing saved location from settings: ${location.getDisplayName()}")
+                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.w("PrayerCalculation", "Failed to save location to settings: ${e.message}")
@@ -379,9 +479,9 @@ class PrayerTimesCalculator(private val context: Context) {
             
             // STEP 7: CACHE THE RESULTS for instant future access
             android.util.Log.d("PrayerCalculation", "STEP 7: Caching results for future use")
-            if (calculatedTimes != null) {
+            if (finalCalculatedTimes != null) {
                 try {
-                    cache.cachePrayerTimes(calculatedTimes, today, locationName)
+                    cache.cachePrayerTimes(finalCalculatedTimes, today, locationName)
                     android.util.Log.d("PrayerCalculation", "✓ Prayer times cached successfully for instant future access")
                     // This cached data will be returned immediately on next app launch
                 } catch (e: Exception) {
@@ -390,15 +490,15 @@ class PrayerTimesCalculator(private val context: Context) {
             } else {
                 android.util.Log.w("PrayerCalculation", "Skipping cache - no valid prayer times to cache")
             }
-            
+
             val totalTime = System.currentTimeMillis() - startTime
             android.util.Log.i(TAG, "")
             android.util.Log.i(TAG, "✅ PRAYER CALCULATION ORCHESTRATION COMPLETE")
             android.util.Log.i(TAG, "=".repeat(90))
             android.util.Log.d("PrayerCalculation", "Total calculation time: ${totalTime}ms")
-            android.util.Log.d("PrayerCalculation", "Result: ${if (calculatedTimes != null) "SUCCESS" else "FAILED"}")
-            
-            Pair(calculatedTimes, locationName)
+            android.util.Log.d("PrayerCalculation", "Result: ${if (finalCalculatedTimes != null) "SUCCESS" else "FAILED"}")
+
+            Pair(finalCalculatedTimes, locationName)
         } catch (e: Exception) {
             val totalTime = System.currentTimeMillis() - startTime
             android.util.Log.e(TAG, "")
