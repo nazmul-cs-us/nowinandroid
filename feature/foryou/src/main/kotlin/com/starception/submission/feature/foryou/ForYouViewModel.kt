@@ -89,8 +89,8 @@ class ForYouViewModel @Inject constructor(
             .map { resources -> NewsFeedUiState.Success(resources) }
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = NewsFeedUiState.Loading,
+                started = SharingStarted.Eagerly,
+                initialValue = NewsFeedUiState.Success(emptyList()),
             )
 
     val onboardingUiState: StateFlow<OnboardingUiState> =
@@ -106,8 +106,8 @@ class ForYouViewModel @Inject constructor(
         }
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = OnboardingUiState.Loading,
+                started = SharingStarted.Eagerly,
+                initialValue = OnboardingUiState.NotShown,
             )
 
     fun updateTopicSelection(topicId: String, isChecked: Boolean) {

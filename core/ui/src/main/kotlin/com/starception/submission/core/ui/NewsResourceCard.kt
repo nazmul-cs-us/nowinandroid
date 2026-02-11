@@ -253,14 +253,7 @@ fun NewsResourceHeaderImage(
             },
         contentAlignment = Alignment.Center,
     ) {
-        if (isLoading && hasValidUrl) {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(80.dp),
-                color = MaterialTheme.colorScheme.tertiary,
-            )
-        }
+        // Removed loading spinner - images fade in smoothly instead
 
         // Calculate parallax progress based on screen position
         val normalizedPosition = (cardYPosition / screenHeightPx).coerceIn(0f, 1f)

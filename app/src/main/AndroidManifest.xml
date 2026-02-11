@@ -90,7 +90,8 @@
         <activity
             android:name=".MainActivity"
             android:configChanges="uiMode"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@style/Theme.Nia">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 

@@ -60,17 +60,54 @@ class VideoSplashActivity : ComponentActivity() {
 
     @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+        val launchTime = System.currentTimeMillis()
+        android.util.Log.d("VideoSplash", "═══════════════════════════════════════════")
+        android.util.Log.d("VideoSplash", "🚀 VIDEO SPLASH ACTIVITY onCreate START")
+        android.util.Log.d("VideoSplash", "═══════════════════════════════════════════")
 
-        // Check if splash was already shown
+        // Check if splash was already shown BEFORE super.onCreate()
+        // This allows us to set the correct theme before Android applies it
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val splashAlreadyShown = prefs.getBoolean(KEY_SPLASH_SHOWN, false)
 
+        // Detect system theme
+        val isNightMode = (resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+        android.util.Log.d("VideoSplash", "📋 LAUNCH INFO:")
+        android.util.Log.d("VideoSplash", "   • Splash already shown: $splashAlreadyShown")
+        android.util.Log.d("VideoSplash", "   • System dark mode: $isNightMode")
+        android.util.Log.d("VideoSplash", "   • savedInstanceState: ${if (savedInstanceState != null) "EXISTS" else "NULL"}")
+
         if (splashAlreadyShown) {
-            // Skip splash and go directly to MainActivity
-            navigateToMain()
+            android.util.Log.d("VideoSplash", "⏩ SCENARIO: SKIP SPLASH (subsequent launch)")
+            android.util.Log.d("VideoSplash", "   • Setting theme to Theme.Nia BEFORE super.onCreate()")
+            // Use the main app theme (respects dark/light mode) instead of white video splash theme
+            // This prevents the flash because the theme matches MainActivity's theme
+            setTheme(R.style.Theme_Nia)
+        } else {
+            android.util.Log.d("VideoSplash", "🎬 SCENARIO: SHOW SPLASH (first launch)")
+            android.util.Log.d("VideoSplash", "   • Using default Theme.Nia.VideoSplash (white)")
+        }
+
+        android.util.Log.d("VideoSplash", "📞 Calling super.onCreate()...")
+        super.onCreate(savedInstanceState)
+        android.util.Log.d("VideoSplash", "✅ super.onCreate() completed")
+
+        if (splashAlreadyShown) {
+            android.util.Log.d("VideoSplash", "🔄 NAVIGATING TO MAIN ACTIVITY (no animation)")
+            android.util.Log.d("VideoSplash", "   • Time in VideoSplash: ${System.currentTimeMillis() - launchTime}ms")
+            // Skip splash and go directly to MainActivity without any transition
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+            // No transition animation - instant switch to prevent flash
+            overridePendingTransition(0, 0)
+            android.util.Log.d("VideoSplash", "✅ Navigation initiated, returning from onCreate")
             return
         }
+
+        android.util.Log.d("VideoSplash", "🎥 PREPARING VIDEO PLAYBACK...")
 
         // Mark splash as shown for future launches
         prefs.edit().putBoolean(KEY_SPLASH_SHOWN, true).apply()
@@ -150,6 +187,11 @@ class VideoSplashActivity : ComponentActivity() {
     }
 
     private fun navigateToMain() {
+        android.util.Log.d("VideoSplash", "═══════════════════════════════════════════")
+        android.util.Log.d("VideoSplash", "🎬 VIDEO COMPLETED - navigateToMain()")
+        android.util.Log.d("VideoSplash", "═══════════════════════════════════════════")
+        android.util.Log.d("VideoSplash", "   • Using fade transition (video just finished)")
+
         // Prevent multiple navigations
         player?.removeListener(object : Player.Listener {})
 
@@ -158,6 +200,7 @@ class VideoSplashActivity : ComponentActivity() {
 
         // Smooth fade transition
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        android.util.Log.d("VideoSplash", "✅ Navigation to MainActivity initiated with fade")
     }
 
     override fun onPause() {

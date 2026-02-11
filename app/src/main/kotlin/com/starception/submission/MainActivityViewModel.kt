@@ -16,6 +16,8 @@
 
 package com.starception.submission
 
+import android.app.Application
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -26,6 +28,7 @@ import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.model.data.UserData
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,28 +40,70 @@ import javax.inject.Inject
 @HiltViewModel
 class MainActivityViewModel @Inject constructor(
     private val userDataRepository: UserDataRepository,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
-    // Start with default state but load real data immediately (no splash blocking)
-    private val _uiState = MutableStateFlow<MainActivityUiState>(Success(
-        UserData(
+
+    companion object {
+        private const val THEME_CACHE_PREFS = "theme_cache_prefs"
+        private const val KEY_THEME_BRAND = "cached_theme_brand"
+        private const val KEY_DARK_THEME_CONFIG = "cached_dark_theme_config"
+        private const val KEY_USE_DYNAMIC_COLOR = "cached_use_dynamic_color"
+    }
+
+    // Load cached theme SYNCHRONOUSLY to prevent flash
+    private val cachedTheme: UserData = loadCachedTheme()
+
+    private val _uiState = MutableStateFlow<MainActivityUiState>(Success(cachedTheme))
+    val uiState: StateFlow<MainActivityUiState> = _uiState.asStateFlow()
+
+    /**
+     * Load theme from SharedPreferences cache (SYNCHRONOUS - no flash!)
+     */
+    private fun loadCachedTheme(): UserData {
+        val prefs = context.getSharedPreferences(THEME_CACHE_PREFS, Context.MODE_PRIVATE)
+
+        val themeBrandOrdinal = prefs.getInt(KEY_THEME_BRAND, ThemeBrand.DEFAULT.ordinal)
+        val darkThemeConfigOrdinal = prefs.getInt(KEY_DARK_THEME_CONFIG, DarkThemeConfig.FOLLOW_SYSTEM.ordinal)
+        val useDynamicColor = prefs.getBoolean(KEY_USE_DYNAMIC_COLOR, true)
+
+        val themeBrand = ThemeBrand.entries.getOrElse(themeBrandOrdinal) { ThemeBrand.DEFAULT }
+        val darkThemeConfig = DarkThemeConfig.entries.getOrElse(darkThemeConfigOrdinal) { DarkThemeConfig.FOLLOW_SYSTEM }
+
+        Log.d("MainActivityViewModel", "📦 Loaded cached theme: brand=$themeBrand, darkConfig=$darkThemeConfig, dynamic=$useDynamicColor")
+
+        return UserData(
             bookmarkedNewsResources = emptySet(),
             viewedNewsResources = emptySet(),
             followedTopics = emptySet(),
-            themeBrand = ThemeBrand.DEFAULT,
-            darkThemeConfig = DarkThemeConfig.FOLLOW_SYSTEM,
-            useDynamicColor = true,
+            themeBrand = themeBrand,
+            darkThemeConfig = darkThemeConfig,
+            useDynamicColor = useDynamicColor,
             shouldHideOnboarding = false,
         )
-    ))
-    val uiState: StateFlow<MainActivityUiState> = _uiState.asStateFlow()
-    
+    }
+
+    /**
+     * Save theme to SharedPreferences cache for instant load on next startup
+     */
+    private fun cacheTheme(userData: UserData) {
+        val prefs = context.getSharedPreferences(THEME_CACHE_PREFS, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putInt(KEY_THEME_BRAND, userData.themeBrand.ordinal)
+            .putInt(KEY_DARK_THEME_CONFIG, userData.darkThemeConfig.ordinal)
+            .putBoolean(KEY_USE_DYNAMIC_COLOR, userData.useDynamicColor)
+            .apply()
+        Log.d("MainActivityViewModel", "💾 Cached theme: brand=${userData.themeBrand}, darkConfig=${userData.darkThemeConfig}")
+    }
+
     init {
-        // Load user preferences in background WITHOUT blocking app startup
+        // Load user preferences in background and cache for next startup
         viewModelScope.launch {
             try {
                 Log.d("MainActivityViewModel", "Loading user data for theme preferences")
                 userDataRepository.userData.collect { userData ->
                     _uiState.value = Success(userData)
+                    // Cache theme for instant load on next app startup
+                    cacheTheme(userData)
                     Log.d("MainActivityViewModel", "Theme updated: ${userData.darkThemeConfig}")
                 }
             } catch (e: Exception) {
