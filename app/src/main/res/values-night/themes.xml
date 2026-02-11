@@ -16,12 +16,15 @@
 -->
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <style name="NightAdjusted.Theme.Nia" parent="android:Theme.Material.NoActionBar" />
+    <style name="NightAdjusted.Theme.Nia" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#201A1B</item>
+    </style>
 
     <!-- EMERGENCY FIX: Use regular theme instead of splash screen theme -->
     <style name="NightAdjusted.Theme.Splash" parent="NightAdjusted.Theme.Nia">
         <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+        <item name="android:windowBackground">#201A1B</item>
     </style>
 
     <!-- Video splash screen theme - fullscreen with white background to match video -->

@@ -144,8 +144,15 @@ class MainActivity : FragmentActivity() {
     private lateinit var permissionManager: PermissionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        Log.d("MainActivity", "EMERGENCY FIX: Skip splash screen completely")
-        
+        Log.d("MainActivity", "═══════════════════════════════════════════")
+        Log.d("MainActivity", "🏠 MAIN ACTIVITY onCreate START")
+        Log.d("MainActivity", "═══════════════════════════════════════════")
+        val isNightMode = (resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        Log.d("MainActivity", "   • System dark mode: $isNightMode")
+        Log.d("MainActivity", "   • savedInstanceState: ${if (savedInstanceState != null) "EXISTS" else "NULL"}")
+
         super.onCreate(savedInstanceState)
         
         // EDGE-TO-EDGE DISPLAY - Modern Android UI extending behind system bars

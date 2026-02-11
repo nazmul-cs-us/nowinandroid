@@ -218,8 +218,11 @@ internal fun ForYouScreen(
                 }
             }
         }
+        // Only show loading indicator when there's no content yet
+        // If we have cached data, don't show loading even during background sync
+        val showLoading = (isSyncing || isFeedLoading || isOnboardingLoading) && itemsAvailable == 0
         AnimatedVisibility(
-            visible = isSyncing || isFeedLoading || isOnboardingLoading,
+            visible = showLoading,
             enter = slideInVertically(
                 initialOffsetY = { fullHeight -> -fullHeight },
             ) + fadeIn(),
