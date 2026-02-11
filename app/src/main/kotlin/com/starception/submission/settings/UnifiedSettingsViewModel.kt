@@ -559,10 +559,11 @@ class UnifiedSettingsViewModel @Inject constructor(
                 )
 
                 val results = withContext(Dispatchers.IO) {
-                    // First refresh source databases from assets
+                    // First refresh source databases from assets using Room DAO operations
+                    // This keeps database connections alive so Flows continue to work
                     val topicsSuccess = TopicsDatabase.refreshFromAssets(context)
                     // Also refresh the contentdatabase TopicsDatabase singleton
-                    ContentTopicsDatabase.refreshFromAssets(context)
+                    val contentTopicsSuccess = ContentTopicsDatabase.refreshFromAssets(context)
                     val duasSuccess = DuaDatabase.refreshFromAssets(context)
                     val quranicDuasSuccess = QuranicDuaDatabase.refreshFromAssets(context)
 
@@ -570,7 +571,9 @@ class UnifiedSettingsViewModel @Inject constructor(
                     // This creates Surahs, Quranic Duas, and Fortress Duas
                     val newsRegenResult = NewsDatabase.regenerateFromSources(context)
 
-                    RefreshResults(topicsSuccess, duasSuccess, quranicDuasSuccess, newsRegenResult)
+                    Log.d(TAG, "Database refresh results: topics=$topicsSuccess, contentTopics=$contentTopicsSuccess, duas=$duasSuccess, quranic=$quranicDuasSuccess, news=${newsRegenResult.success}")
+
+                    RefreshResults(topicsSuccess && contentTopicsSuccess, duasSuccess, quranicDuasSuccess, newsRegenResult)
                 }
 
                 val allSuccess = results.topicsSuccess && results.duasSuccess &&

@@ -128,6 +128,12 @@ interface TopicsDao {
     suspend fun deleteAllUserTopics()
 
     /**
+     * Delete all topics (for refresh from assets)
+     */
+    @Query("DELETE FROM topics")
+    suspend fun deleteAllTopics()
+
+    /**
      * Get the next available ID for user topics (starting from 1000)
      */
     @Query("SELECT COALESCE(MAX(id), 999) + 1 FROM topics WHERE id >= 1000")
