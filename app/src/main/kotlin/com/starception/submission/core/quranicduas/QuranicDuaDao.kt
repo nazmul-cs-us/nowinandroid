@@ -1,6 +1,8 @@
 package com.starception.submission.core.quranicduas
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
@@ -52,4 +54,18 @@ interface QuranicDuaDao {
      */
     @Query("SELECT COUNT(*) FROM quranic_duas")
     suspend fun getQuranicDuaCount(): Int
+
+    // ============= Write Operations (for refresh from assets) =============
+
+    /**
+     * Insert multiple Quranic Duas
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(duas: List<QuranicDuaEntity>)
+
+    /**
+     * Delete all Quranic Duas (for refresh from assets)
+     */
+    @Query("DELETE FROM quranic_duas")
+    suspend fun deleteAll()
 }

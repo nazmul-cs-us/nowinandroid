@@ -73,6 +73,9 @@ interface TopicsDao {
     @Query("DELETE FROM topics WHERE is_user_created = 1")
     suspend fun deleteAllUserTopics()
 
+    @Query("DELETE FROM topics")
+    suspend fun deleteAllTopics()
+
     @Query("SELECT COALESCE(MAX(id), 999) + 1 FROM topics WHERE id >= 1000")
     suspend fun getNextUserTopicId(): Int
 }

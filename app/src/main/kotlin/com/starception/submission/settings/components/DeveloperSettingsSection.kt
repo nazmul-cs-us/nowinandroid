@@ -1,8 +1,6 @@
 package com.starception.submission.settings.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,11 +14,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -180,32 +179,67 @@ fun DeveloperSettingsSection(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Refresh All Button
-        Button(
-            onClick = onRefreshAll,
+        // Refresh All Databases Card
+        RefreshAllCard(
+            isRefreshing = state.isRefreshing && state.refreshingDatabase == "all",
             enabled = !state.isRefreshing,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            ),
-            modifier = Modifier.fillMaxWidth()
+            onRefreshAll = onRefreshAll
+        )
+    }
+}
+
+@Composable
+private fun RefreshAllCard(
+    isRefreshing: Boolean,
+    enabled: Boolean,
+    onRefreshAll: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        FilledTonalButton(
+            onClick = onRefreshAll,
+            enabled = enabled,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
         ) {
-            if (state.isRefreshing && state.refreshingDatabase == "all") {
+            if (isRefreshing) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    strokeWidth = 2.dp
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.5.dp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Refreshing All...")
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Refreshing...",
+                    style = MaterialTheme.typography.labelLarge
+                )
             } else {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(22.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Refresh All Databases")
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Refresh All Databases",
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
+        }
+
+        // Progress indicator
+        if (isRefreshing) {
+            Spacer(modifier = Modifier.height(12.dp))
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+            )
         }
     }
 }
@@ -220,16 +254,16 @@ private fun DatabaseInfoCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(16.dp)
         ) {
             Column(
                 modifier = Modifier.weight(1f)
@@ -258,24 +292,21 @@ private fun DatabaseInfoCard(
                 )
             }
 
-            Button(
+            FilledTonalIconButton(
                 onClick = onRefresh,
-                enabled = enabled && !isRefreshing,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                )
+                enabled = enabled && !isRefreshing
             ) {
                 if (isRefreshing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh",
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

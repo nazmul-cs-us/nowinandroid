@@ -1,6 +1,8 @@
 package com.starception.submission.core.duadatabase
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
@@ -348,6 +350,39 @@ interface DuaDao {
         ORDER BY hr.id ASC
     """)
     suspend fun getHadithReferencesByChapterAndPosition(chapterTitle: String, position: Int): List<HadithReferenceEntity>
+
+    // ============= Write Operations (for refresh from assets) =============
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMetadata(metadata: DuaMetadataEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertChapters(chapters: List<DuaChapterEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertInvocations(invocations: List<DuaInvocationEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFootnotes(footnotes: List<DuaFootnoteEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHadithReferences(references: List<HadithReferenceEntity>)
+
+    // Delete in reverse order of dependencies (children first)
+    @Query("DELETE FROM hadith_references")
+    suspend fun deleteAllHadithReferences()
+
+    @Query("DELETE FROM footnotes")
+    suspend fun deleteAllFootnotes()
+
+    @Query("DELETE FROM invocations")
+    suspend fun deleteAllInvocations()
+
+    @Query("DELETE FROM chapters")
+    suspend fun deleteAllChapters()
+
+    @Query("DELETE FROM metadata")
+    suspend fun deleteAllMetadata()
 }
 
 // ============= Data Classes for Query Results =============

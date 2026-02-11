@@ -1,10 +1,15 @@
 package com.starception.submission.core.topicsdatabase
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Room Database for Topics
@@ -96,29 +101,83 @@ abstract class TopicsDatabase : RoomDatabase() {
         }
 
         /**
-         * Refresh database from assets
-         * Closes current database, deletes it, and re-creates from assets
+         * Refresh database from assets using Room DAO operations.
+         * This keeps the database connection alive so Flows continue to work.
          * @return true if refresh was successful, false otherwise
          */
-        fun refreshFromAssets(context: Context): Boolean {
-            return try {
-                android.util.Log.d(TAG, "Starting topics database refresh...")
+        suspend fun refreshFromAssets(context: Context): Boolean {
+            return withContext(Dispatchers.IO) {
+                try {
+                    android.util.Log.d(TAG, "Starting topics database refresh from assets...")
 
-                // Close existing database
-                closeDatabase()
+                    val db = getInstance(context)
+                    val dao = db.topicsDao()
 
-                // Delete the database file
-                val deleted = context.deleteDatabase(DATABASE_NAME)
-                android.util.Log.d(TAG, "Database file deleted: $deleted")
+                    // Copy asset database to temp file to read from
+                    val tempFile = File(context.cacheDir, "temp_topics.db")
+                    context.assets.open("databases/$DATABASE_NAME").use { input ->
+                        FileOutputStream(tempFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
 
-                // Re-initialize (Room will copy from assets)
-                getInstance(context)
+                    // Read topics from asset database
+                    val assetDb = SQLiteDatabase.openDatabase(
+                        tempFile.absolutePath,
+                        null,
+                        SQLiteDatabase.OPEN_READONLY
+                    )
 
-                android.util.Log.d(TAG, "Topics database refresh completed successfully")
-                true
-            } catch (e: Exception) {
-                android.util.Log.e(TAG, "Failed to refresh topics database", e)
-                false
+                    val topics = mutableListOf<TopicEntity>()
+                    val cursor = assetDb.rawQuery("SELECT * FROM topics ORDER BY id ASC", null)
+
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getInt(cursor.getColumnIndexOrThrow("id"))
+                        val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                        val shortDescription = cursor.getString(cursor.getColumnIndexOrThrow("short_description"))
+                        val longDescription = cursor.getString(cursor.getColumnIndexOrThrow("long_description"))
+                        val url = cursor.getString(cursor.getColumnIndexOrThrow("url"))
+                        val imageUrl = cursor.getString(cursor.getColumnIndexOrThrow("image_url"))
+                        val isSystem = cursor.getInt(cursor.getColumnIndexOrThrow("is_system"))
+                        val isUserCreated = cursor.getInt(cursor.getColumnIndexOrThrow("is_user_created"))
+                        // Optional columns that might not exist in asset database
+                        val icon = cursor.getColumnIndex("icon").takeIf { it >= 0 }?.let { cursor.getString(it) }
+                        val createdAt = cursor.getColumnIndex("created_at").takeIf { it >= 0 }?.let { cursor.getString(it) }
+                        val updatedAt = cursor.getColumnIndex("updated_at").takeIf { it >= 0 }?.let { cursor.getString(it) }
+
+                        topics.add(TopicEntity(
+                            id = id,
+                            name = name,
+                            shortDescription = shortDescription,
+                            longDescription = longDescription,
+                            url = url,
+                            imageUrl = imageUrl,
+                            icon = icon,
+                            isSystem = isSystem,
+                            isUserCreated = isUserCreated,
+                            createdAt = createdAt,
+                            updatedAt = updatedAt
+                        ))
+                    }
+                    cursor.close()
+                    assetDb.close()
+                    tempFile.delete()
+
+                    android.util.Log.d(TAG, "Read ${topics.size} topics from assets")
+
+                    // Clear and repopulate using DAO (keeps connection alive)
+                    dao.deleteAllTopics()
+                    dao.insertTopics(topics)
+
+                    // Trigger invalidation so Flows update
+                    db.invalidationTracker.refreshVersionsAsync()
+
+                    android.util.Log.d(TAG, "Topics database refreshed successfully: ${topics.size} topics")
+                    true
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "Error refreshing topics database", e)
+                    false
+                }
             }
         }
 

@@ -1,10 +1,15 @@
 package com.starception.submission.core.quranicduas
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Room Database for Quranic Duas
@@ -84,24 +89,68 @@ abstract class QuranicDuaDatabase : RoomDatabase() {
         }
 
         /**
-         * Refresh database from assets
+         * Refresh database from assets using Room DAO operations.
+         * This keeps the database connection alive so Flows continue to work.
          */
-        fun refreshFromAssets(context: Context): Boolean {
-            return try {
-                android.util.Log.d(TAG, "Starting Quranic Duas database refresh...")
+        suspend fun refreshFromAssets(context: Context): Boolean {
+            return withContext(Dispatchers.IO) {
+                try {
+                    android.util.Log.d(TAG, "Starting Quranic Duas database refresh from assets...")
 
-                closeDatabase()
+                    val db = getInstance(context)
+                    val dao = db.quranicDuaDao()
 
-                val deleted = context.deleteDatabase(DATABASE_NAME)
-                android.util.Log.d(TAG, "Database file deleted: $deleted")
+                    // Copy asset database to temp file to read from
+                    val tempFile = File(context.cacheDir, "temp_quranic_duas.db")
+                    context.assets.open("databases/$DATABASE_NAME").use { input ->
+                        FileOutputStream(tempFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
 
-                getInstance(context)
+                    // Read from asset database
+                    val assetDb = SQLiteDatabase.openDatabase(
+                        tempFile.absolutePath,
+                        null,
+                        SQLiteDatabase.OPEN_READONLY
+                    )
 
-                android.util.Log.d(TAG, "Quranic Duas database refresh completed successfully")
-                true
-            } catch (e: Exception) {
-                android.util.Log.e(TAG, "Failed to refresh Quranic Duas database", e)
-                false
+                    val duas = mutableListOf<QuranicDuaEntity>()
+                    val cursor = assetDb.rawQuery("SELECT * FROM quranic_duas ORDER BY dua_number ASC", null)
+
+                    while (cursor.moveToNext()) {
+                        duas.add(QuranicDuaEntity(
+                            id = cursor.getInt(cursor.getColumnIndexOrThrow("id")),
+                            duaNumber = cursor.getInt(cursor.getColumnIndexOrThrow("dua_number")),
+                            title = cursor.getString(cursor.getColumnIndexOrThrow("title")),
+                            surahReference = cursor.getString(cursor.getColumnIndexOrThrow("surah_reference")),
+                            arabic = cursor.getString(cursor.getColumnIndexOrThrow("arabic")),
+                            transliteration = cursor.getString(cursor.getColumnIndexOrThrow("transliteration")),
+                            translation = cursor.getString(cursor.getColumnIndexOrThrow("translation")),
+                            explanation = cursor.getString(cursor.getColumnIndexOrThrow("explanation")),
+                            createdAt = cursor.getString(cursor.getColumnIndexOrThrow("created_at")),
+                            updatedAt = cursor.getString(cursor.getColumnIndexOrThrow("updated_at"))
+                        ))
+                    }
+                    cursor.close()
+                    assetDb.close()
+                    tempFile.delete()
+
+                    android.util.Log.d(TAG, "Read ${duas.size} Quranic Duas from assets")
+
+                    // Clear and repopulate using DAO (keeps connection alive)
+                    dao.deleteAll()
+                    dao.insertAll(duas)
+
+                    // Trigger invalidation so Flows update
+                    db.invalidationTracker.refreshVersionsAsync()
+
+                    android.util.Log.d(TAG, "Quranic Duas database refreshed successfully: ${duas.size} duas")
+                    true
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "Failed to refresh Quranic Duas database", e)
+                    false
+                }
             }
         }
 

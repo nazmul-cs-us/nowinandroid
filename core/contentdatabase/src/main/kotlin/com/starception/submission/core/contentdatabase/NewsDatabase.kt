@@ -120,6 +120,10 @@ abstract class NewsDatabase : RoomDatabase() {
 
                 if (result.success) {
                     Log.d(TAG, "News database regenerated successfully: ${result.totalNewsResources} resources")
+                    // Force invalidation of all tables to trigger Flow updates
+                    // This ensures all active Flows re-emit with new data
+                    db.invalidationTracker.refreshVersionsAsync()
+                    Log.d(TAG, "Database invalidation tracker refreshed")
                 } else {
                     Log.e(TAG, "News database regeneration failed: ${result.error}")
                 }
