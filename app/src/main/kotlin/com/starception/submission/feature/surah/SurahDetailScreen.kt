@@ -99,6 +99,9 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
 import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.feature.course.CourseCompletionBadgeCompact
+import com.starception.submission.feature.course.CourseCompletionInfo
+import com.starception.submission.feature.course.CourseProgressTracker
 import java.util.Locale
 
 /**
@@ -1424,7 +1427,8 @@ private fun AlbumPlayerContent(
                                     selectedArabicFont = selectedArabicFont,
                                     collapseProgress = collapseProgress,
                                     topics = topics,
-                                    onTopicClick = onTopicClick
+                                    onTopicClick = onTopicClick,
+                                    courseCompletionInfo = CourseProgressTracker.getSurahCourseCompletion(context, surah.number),
                                 )
                             }
                         }
@@ -2890,7 +2894,8 @@ private fun AlbumInfoCard(
     selectedArabicFont: String,
     collapseProgress: Float = 0f,
     topics: List<com.starception.submission.core.topicsdatabase.Topic> = emptyList(),
-    onTopicClick: (String) -> Unit = {}
+    onTopicClick: (String) -> Unit = {},
+    courseCompletionInfo: CourseCompletionInfo? = null,
 ) {
     // Use MaterialTheme.colorScheme for automatic theme support
     // NOTE: Surah names are now handled by the floating overlay for smooth scroll transition
@@ -2921,6 +2926,12 @@ private fun AlbumInfoCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
                     )
+                }
+
+                // Course completion badge (if applicable)
+                if (courseCompletionInfo != null) {
+                    Spacer(Modifier.height(8.dp))
+                    CourseCompletionBadgeCompact(completionInfo = courseCompletionInfo)
                 }
 
                 // Small gap between translation and chips

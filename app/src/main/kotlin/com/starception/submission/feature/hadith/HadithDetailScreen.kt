@@ -91,6 +91,8 @@ import com.starception.submission.core.ui.DynamicSkyHeader
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.core.ui.getCurrentSkyPeriodForTheme
 import com.starception.submission.core.ui.getSkyColors
+import com.starception.submission.feature.course.CourseCompletionBadgeCompact
+import com.starception.submission.feature.course.CourseProgressTracker
 import java.util.Locale
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
@@ -338,6 +340,7 @@ fun HadithDetailScreen(
                         hadith = hadith!!,
                         collectionName = collectionName,
                         hadithNumber = hadithNumber,
+                        databaseFile = databaseFile,
                         onBackClick = wrappedOnBackClick,
                         translatedArabic = translatedArabic,
                         translatedText = translatedText,
@@ -476,6 +479,7 @@ private fun HadithContent(
     hadith: Hadith,
     collectionName: String,
     hadithNumber: Int,
+    databaseFile: String,
     onBackClick: () -> Unit,
     translatedArabic: String? = null,
     translatedText: String? = null,
@@ -638,6 +642,17 @@ private fun HadithContent(
                                         )
                                     }
                                 )
+
+                                // Course completion badge (if applicable)
+                                val courseCompletionInfo = CourseProgressTracker.getHadithCourseCompletion(
+                                    context,
+                                    hadithNumber,
+                                    databaseFile
+                                )
+                                if (courseCompletionInfo != null) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    CourseCompletionBadgeCompact(completionInfo = courseCompletionInfo)
+                                }
                             }
                         }
                     }

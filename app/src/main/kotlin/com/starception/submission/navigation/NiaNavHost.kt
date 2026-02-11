@@ -34,6 +34,8 @@ import com.starception.submission.feature.topic.navigation.navigateToTopic
 import com.starception.submission.feature.topic.navigation.topicScreen
 import com.starception.submission.feature.prayertimes.navigation.prayerTimesScreen
 import com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute
+import com.starception.submission.feature.course.navigation.courseScreen
+import com.starception.submission.feature.course.navigation.navigateToCourseDetail
 import com.starception.submission.feature.surah.navigation.navigateToSurah
 import com.starception.submission.feature.surah.navigation.surahScreen
 import com.starception.submission.feature.dua.duaDetailScreen
@@ -287,6 +289,20 @@ fun NiaNavHost(
         prayerTimesScreen(
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
             onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) }
+        )
+        courseScreen(
+            onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
+            onHadithClick = { databaseFile, hadithNumber ->
+                val collectionName = databaseFile.removeSuffix(".db")
+                    .replace("_", " ")
+                    .split(" ")
+                    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
+            },
+            onCourseClick = { courseId ->
+                navController.navigateToCourseDetail(courseId)
+            },
+            onBackClick = navController::popBackStack,
         )
         // Surah screen accessible from Prayer Times (Noble Quran tile)
         surahScreen(

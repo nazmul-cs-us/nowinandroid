@@ -18,6 +18,7 @@
 <resources>
   <string name="app_name">Submission</string>
   <string name="prayer_times_title">Home</string>
+  <string name="course_title">Course</string>
   <string name="not_connected">Not connected</string>
   <string name="live_notification_title">Prayer Time</string>
   <string name="live_notification_content">%1$s prayer time</string>

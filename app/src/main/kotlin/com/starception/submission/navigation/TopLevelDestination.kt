@@ -26,6 +26,7 @@ import com.starception.submission.feature.foryou.navigation.ForYouBaseRoute
 import com.starception.submission.feature.foryou.navigation.ForYouRoute
 import com.starception.submission.feature.interests.navigation.InterestsRoute
 import com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute
+import com.starception.submission.feature.course.navigation.CourseRoute
 import kotlin.reflect.KClass
 import com.starception.submission.feature.bookmarks.R as bookmarksR
 import com.starception.submission.feature.foryou.R as forYouR
@@ -75,6 +76,13 @@ enum class TopLevelDestination(
         titleTextId = bookmarksR.string.feature_bookmarks_title,
         route = BookmarksRoute::class,
         baseRoute = BookmarksBaseRoute::class,
+    ),
+    COURSE(
+        selectedIcon = NiaIcons.Course,
+        unselectedIcon = NiaIcons.CourseBorder,
+        iconTextId = R.string.course_title,
+        titleTextId = R.string.course_title,
+        route = CourseRoute::class,
     ),
     INTERESTS(
         selectedIcon = NiaIcons.Grid3x3,

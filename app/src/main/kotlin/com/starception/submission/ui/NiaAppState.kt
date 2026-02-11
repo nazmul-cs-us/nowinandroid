@@ -42,6 +42,7 @@ import com.starception.submission.feature.search.navigation.navigateToSearch
 import com.starception.submission.feature.prayertimes.navigation.navigateToPrayerTimes
 import com.starception.submission.navigation.TopLevelDestination
 import com.starception.submission.navigation.TopLevelDestination.BOOKMARKS
+import com.starception.submission.navigation.TopLevelDestination.COURSE
 import com.starception.submission.navigation.TopLevelDestination.FOR_YOU
 import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.navigation.TopLevelDestination.HOME
@@ -193,6 +194,7 @@ class NiaAppState(
                 BOOKMARKS -> navController.navigateToBookmarks(topLevelNavOptions)
                 INTERESTS -> navController.navigateToInterests(null, topLevelNavOptions)
                 HOME -> navController.navigate(com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute, topLevelNavOptions)
+                COURSE -> navController.navigate(com.starception.submission.feature.course.navigation.CourseRoute, topLevelNavOptions)
             }
         }
     }
