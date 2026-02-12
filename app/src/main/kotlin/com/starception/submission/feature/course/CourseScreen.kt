@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import com.starception.submission.core.designsystem.component.NiaTopicTag
 
 /**
  * Course data model
@@ -206,7 +207,7 @@ fun CourseScreen(
                     enrolledCourseIds = newSet
                     prefs.edit().putStringSet("enrolled_courses", newSet).apply()
                 },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
             )
         }
 
@@ -244,7 +245,7 @@ private fun CourseHeader() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 22.dp, vertical = 16.dp),
     ) {
         Text(
             text = "My Learning",
@@ -269,7 +270,7 @@ private fun SectionTitle(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 22.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -396,172 +397,280 @@ private fun CourseCard(
     onEnroll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Get colors based on category
+    val (containerColor, accentColor) = when (course.category) {
+        CourseCategory.MEMORIZATION -> Pair(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.primary
+        )
+        CourseCategory.HADITH -> Pair(
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.secondary
+        )
+        CourseCategory.QURAN -> Pair(
+            MaterialTheme.colorScheme.tertiaryContainer,
+            MaterialTheme.colorScheme.tertiary
+        )
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column {
-            // Course Thumbnail/Banner
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = course.gradientColors,
-                        )
-                    ),
-            ) {
-                // Category badge
-                Surface(
+        Box {
+            Column {
+                // Header with gradient, title and icon
+                Box(
                     modifier = Modifier
-                        .padding(12.dp)
-                        .align(Alignment.TopStart),
-                    shape = RoundedCornerShape(4.dp),
-                    color = Color.Black.copy(alpha = 0.6f),
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    containerColor,
+                                    containerColor.copy(alpha = 0.7f),
+                                )
+                            )
+                        )
+                        .padding(16.dp),
                 ) {
-                    Text(
-                        text = course.category.label.uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        letterSpacing = 0.5.sp,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        // Title and subtitle
+                        Column(
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(
+                                text = course.title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = accentColor,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = 26.sp,
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = course.subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = accentColor.copy(alpha = 0.7f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Lessons count indicator
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = accentColor.copy(alpha = 0.15f),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(
+                                    text = "${course.totalLessons}",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = accentColor,
+                                )
+                                Text(
+                                    text = "lessons",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = accentColor.copy(alpha = 0.8f),
+                                )
+                            }
+                        }
+                    }
                 }
 
-                // Large Icon
-                Icon(
-                    imageVector = course.icon,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.3f),
-                    modifier = Modifier
-                        .size(80.dp)
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 16.dp),
-                )
-
-                // Difficulty badge
-                Surface(
-                    modifier = Modifier
-                        .padding(12.dp)
-                        .align(Alignment.BottomStart),
-                    shape = RoundedCornerShape(4.dp),
-                    color = Color.White,
+                // Bottom section with badges, stats, and button
+                Column(
+                    modifier = Modifier.padding(16.dp),
                 ) {
-                    Text(
-                        text = course.difficulty.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = course.gradientColors.first(),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    // Badges and rating row - NiaTopicTag style
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // Category tag - NiaTopicTag style
+                        NiaTopicTag(
+                            followed = true,
+                            onClick = { },
+                        ) {
+                            Text(course.category.label)
+                        }
+
+                        // Difficulty tag with dots - NiaTopicTag style
+                        NiaTopicTag(
+                            followed = false,
+                            onClick = { },
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            ) {
+                                val difficultyLevel = when (course.difficulty) {
+                                    CourseDifficulty.BEGINNER -> 1
+                                    CourseDifficulty.INTERMEDIATE -> 2
+                                    CourseDifficulty.ADVANCED -> 3
+                                }
+                                repeat(3) { index ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .background(
+                                                color = if (index < difficultyLevel) {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                                },
+                                                shape = CircleShape
+                                            )
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(course.difficulty.label)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        // Rating stars
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = Color(0xFFFFB800),
+                            )
+                            Text(
+                                text = "4.8",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Divider
+                    HorizontalDivider(
+                        modifier = Modifier.fillMaxWidth(),
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                     )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Stats row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Outlined.PlayCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = accentColor,
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "${course.totalLessons} lessons",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Outlined.Schedule,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = accentColor,
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "${course.estimatedDays} days",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Full-width Enroll button - prominent CTA
+                    Button(
+                        onClick = onEnroll,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = accentColor,
+                            contentColor = Color.White,
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.School,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Start Learning",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
 
-            // Course Info
-            Column(
-                modifier = Modifier.padding(16.dp),
+            // FREE ribbon badge - top right corner
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 8.dp),
+                shape = RoundedCornerShape(6.dp),
+                color = Color(0xFF4CAF50),
+                shadowElevation = 2.dp,
             ) {
-                // Title
                 Text(
-                    text = course.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = "FREE",
+                    style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    letterSpacing = 0.5.sp,
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Subtitle
-                Text(
-                    text = course.subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Stats row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // Lessons
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Outlined.PlayCircle,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "${course.totalLessons} lessons",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    // Duration
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Outlined.Schedule,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "${course.estimatedDays} days",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Enroll Button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // Free label
-                    Column {
-                        Text(
-                            text = "FREE",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-
-                    // Enroll button
-                    Button(
-                        onClick = onEnroll,
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = course.gradientColors.first(),
-                        ),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-                    ) {
-                        Text(
-                            text = "Enroll",
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
             }
         }
     }
@@ -659,7 +768,8 @@ internal fun getAvailableCourses(): List<Course> {
             description = "Complete memorization of Juz Amma (30th part) - the most commonly recited surahs in prayers.",
             icon = Icons.Outlined.School,
             totalLessons = 37,
-            estimatedDays = 90,
+            // ~556 total ayahs in Juz Amma, estimate 5 ayahs/day = 111 days, rounded to 120
+            estimatedDays = 120,
             difficulty = CourseDifficulty.INTERMEDIATE,
             category = CourseCategory.MEMORIZATION,
             gradientColors = listOf(
@@ -674,7 +784,8 @@ internal fun getAvailableCourses(): List<Course> {
             description = "A structured plan to read the complete Quran with daily reading goals and progress tracking.",
             icon = Icons.Outlined.ImportContacts,
             totalLessons = 604,
-            estimatedDays = 30,
+            // 604 pages at 2 pages/day = 302 days, rounded to 300
+            estimatedDays = 300,
             difficulty = CourseDifficulty.INTERMEDIATE,
             category = CourseCategory.QURAN,
             gradientColors = listOf(
@@ -714,9 +825,9 @@ private fun CourseSwipeableTiles(
             state = pagerState,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp),
-            pageSpacing = 16.dp,
-            contentPadding = PaddingValues(horizontal = 16.dp),
+                .height(240.dp),
+            pageSpacing = 12.dp,
+            contentPadding = PaddingValues(horizontal = 22.dp),
         ) { page ->
             val course = enrolledCourses[page]
             val progress = courseProgress[course.id] ?: 0
@@ -735,7 +846,7 @@ private fun CourseSwipeableTiles(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 22.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -792,30 +903,42 @@ private fun CourseBigTile(
     val isCompleted = progress >= course.totalLessons
     var showMenu by remember { mutableStateOf(false) }
 
+    // Use different container colors based on category (like home tiles)
+    val (containerColor, accentColor) = when (course.category) {
+        CourseCategory.MEMORIZATION -> Pair(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.primary
+        )
+        CourseCategory.HADITH -> Pair(
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.secondary
+        )
+        CourseCategory.QURAN -> Pair(
+            MaterialTheme.colorScheme.tertiaryContainer,
+            MaterialTheme.colorScheme.tertiary
+        )
+    }
+
     Card(
         modifier = Modifier
             .fillMaxSize()
             .shadow(
-                elevation = 12.dp,
+                elevation = 8.dp,
                 shape = RoundedCornerShape(20.dp),
-                spotColor = course.gradientColors.first().copy(alpha = 0.4f),
+                spotColor = accentColor.copy(alpha = 0.2f),
             ),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
         ) {
-            // Top gradient banner with course info
+            // Top section with course info - Use category container color like home tiles
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = course.gradientColors,
-                        ),
-                    )
+                    .background(containerColor)
                     .clickable(onClick = onClick)
                     .padding(16.dp),
             ) {
@@ -828,12 +951,12 @@ private fun CourseBigTile(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f)),
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                     ) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "More options",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp),
                         )
                     }
@@ -841,15 +964,25 @@ private fun CourseBigTile(
                     DropdownMenu(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false },
+                        containerColor = MaterialTheme.colorScheme.surface,
                     ) {
                         DropdownMenuItem(
-                            text = { Text("View Details") },
+                            text = {
+                                Text(
+                                    "View Details",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            },
                             onClick = {
                                 showMenu = false
                                 onClick()
                             },
                             leadingIcon = {
-                                Icon(Icons.Outlined.Info, contentDescription = null)
+                                Icon(
+                                    Icons.Outlined.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
                             },
                         )
                         DropdownMenuItem(
@@ -881,13 +1014,13 @@ private fun CourseBigTile(
                     // Course category tag
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = Color.White.copy(alpha = 0.2f),
+                        color = accentColor.copy(alpha = 0.1f),
                     ) {
                         Text(
                             text = course.category.label.uppercase(),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = accentColor,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             letterSpacing = 1.sp,
                         )
@@ -899,7 +1032,7 @@ private fun CourseBigTile(
                             text = course.title,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -907,7 +1040,7 @@ private fun CourseBigTile(
                         Text(
                             text = course.subtitle,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.9f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -946,32 +1079,44 @@ private fun CourseBigTile(
                         .fillMaxWidth()
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp)),
-                    color = course.gradientColors.first(),
-                    trackColor = course.gradientColors.first().copy(alpha = 0.2f),
+                    color = accentColor,
+                    trackColor = accentColor.copy(alpha = 0.2f),
                     strokeCap = StrokeCap.Round,
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Continue button
+                // Continue button - Material 3 Expressive style with category accent color
                 Button(
                     onClick = onContinue,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(50), // Full pill shape
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = course.gradientColors.first(),
+                        containerColor = accentColor,
+                        contentColor = Color.White,
+                        disabledContainerColor = accentColor.copy(alpha = 0.5f),
+                        disabledContentColor = Color.White.copy(alpha = 0.7f),
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp,
                     ),
                     enabled = !isCompleted,
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                 ) {
                     Icon(
                         imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.PlayArrow,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(22.dp),
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = if (isCompleted) "Completed" else "Continue Learning",
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
                     )
                 }
             }

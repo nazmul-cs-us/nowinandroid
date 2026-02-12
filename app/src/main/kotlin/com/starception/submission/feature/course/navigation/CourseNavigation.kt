@@ -69,8 +69,14 @@ fun NavGraphBuilder.courseScreen(
                 course = course,
                 onBackClick = onBackClick,
                 onLessonClick = { lesson, index ->
-                    // Mark lesson as completed in CourseProgressTracker
-                    CourseProgressTracker.markLessonCompleted(context, course.id, lesson.id)
+                    // Set as pending completion (user has viewed but not confirmed)
+                    // Completion will be confirmed via bottom sheet when returning
+                    CourseProgressTracker.setPendingCompletion(
+                        context,
+                        course.id,
+                        lesson.id,
+                        lesson.title
+                    )
 
                     // Navigate based on course type
                     when {
@@ -95,8 +101,7 @@ fun NavGraphBuilder.courseScreen(
                     }
                 },
                 onMarkComplete = { lesson ->
-                    // Also mark complete when checkbox is toggled
-                    CourseProgressTracker.markLessonCompleted(context, course.id, lesson.id)
+                    // No longer auto-marking here - CourseDetailScreen shows bottom sheet
                 },
             )
         }
