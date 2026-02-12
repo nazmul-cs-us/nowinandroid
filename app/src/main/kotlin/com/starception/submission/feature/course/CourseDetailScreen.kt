@@ -17,37 +17,128 @@
 package com.starception.submission.feature.course
 
 import android.content.Context
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.Quiz
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.SignalCellularAlt
+import androidx.compose.material.icons.outlined.Verified
+import androidx.compose.material.icons.outlined.WorkspacePremium
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import com.starception.submission.core.designsystem.component.NiaTopicTag
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
- * Lesson data model
+ * Lesson data model with memorization and time tracking
  */
 data class Lesson(
     val id: String,
@@ -57,6 +148,8 @@ data class Lesson(
     val type: LessonType,
     val isCompleted: Boolean = false,
     val isLocked: Boolean = false,
+    val totalAyahs: Int = 3, // For memorization courses
+    val surahNumber: Int = 0, // Surah number for Quran courses
 )
 
 enum class LessonType {
@@ -64,6 +157,7 @@ enum class LessonType {
     READING,
     QUIZ,
     PRACTICE,
+    MEMORIZATION,
 }
 
 /**
@@ -76,7 +170,53 @@ data class CourseModule(
 )
 
 /**
- * Course Detail Screen - Coursera/Udemy style
+ * Memorization progress for a specific lesson/surah
+ */
+data class MemorizationProgress(
+    val lessonId: String,
+    val memorizedAyahs: Set<Int> = emptySet(), // Set of ayah numbers that are memorized
+    val totalAyahs: Int = 3,
+    val timeSpentMinutes: Int = 0, // Total time spent on this lesson
+    val lastPracticed: Long = 0L, // Timestamp of last practice
+    val practiceCount: Int = 0, // Number of times practiced
+)
+
+/**
+ * Learning session for time tracking
+ */
+data class LearningSession(
+    val lessonId: String,
+    val startTime: Long,
+    val endTime: Long,
+    val durationMinutes: Int,
+)
+
+/**
+ * Instructor data model
+ */
+data class Instructor(
+    val name: String,
+    val title: String,
+    val bio: String,
+    val coursesCount: Int,
+    val studentsCount: String,
+    val rating: Float,
+)
+
+/**
+ * Review data model
+ */
+data class Review(
+    val id: String,
+    val userName: String,
+    val rating: Float,
+    val comment: String,
+    val date: String,
+    val helpful: Int,
+)
+
+/**
+ * Course Detail Screen - Professional Coursera/Udemy style with complete overhaul
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +230,7 @@ fun CourseDetailScreen(
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("course_progress", Context.MODE_PRIVATE) }
+    val listState = rememberLazyListState()
 
     // Check if enrolled
     var isEnrolled by remember {
@@ -98,11 +239,63 @@ fun CourseDetailScreen(
         )
     }
 
-    // Track completed lessons
+    // Track completed lessons - use same key as CourseProgressTracker for consistency
     var completedLessons by remember {
         mutableStateOf(
-            prefs.getStringSet("completed_${course.id}", emptySet()) ?: emptySet()
+            prefs.getStringSet("completed_lessons_${course.id}", emptySet()) ?: emptySet()
         )
+    }
+
+    // Track memorization progress per lesson (which ayahs are memorized)
+    var memorizationProgress: Map<String, MemorizationProgress> by remember {
+        mutableStateOf(loadMemorizationProgress(prefs, course.id))
+    }
+
+    // Track time spent per lesson (in minutes)
+    var timeSpentPerLesson: Map<String, Int> by remember {
+        mutableStateOf(loadTimeSpent(prefs, course.id))
+    }
+
+    // State for showing completion bottom sheet
+    var showCompletionSheet by remember { mutableStateOf<Lesson?>(null) }
+
+    // Lifecycle observer to detect when returning from surah/hadith view
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                // Check for pending completion when returning to this screen
+                val pending = CourseProgressTracker.getPendingCompletion(context, course.id)
+                if (pending != null) {
+                    // Find the lesson to show in the bottom sheet
+                    val modules = generateModulesForCourse(course)
+                    for (module in modules) {
+                        val lesson = module.lessons.find { it.id == pending.lessonId }
+                        if (lesson != null) {
+                            showCompletionSheet = lesson
+                            break
+                        }
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+    }
+
+    // Total time spent on course
+    val totalTimeSpentMinutes: Int = remember(timeSpentPerLesson) {
+        timeSpentPerLesson.values.sum()
+    }
+
+    // Last accessed timestamp
+    val lastAccessed = remember {
+        prefs.getLong("last_accessed_${course.id}", 0L)
+    }
+
+    // Update last accessed on screen open
+    remember {
+        prefs.edit().putLong("last_accessed_${course.id}", System.currentTimeMillis()).apply()
+        true
     }
 
     // Generate modules based on course type
@@ -113,84 +306,50 @@ fun CourseDetailScreen(
     val completedCount = completedLessons.size
     val progressPercent = if (totalLessons > 0) (completedCount * 100f / totalLessons) else 0f
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                ),
-            )
-        },
-        bottomBar = {
-            // Show enroll button if not enrolled
-            if (!isEnrolled) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shadowElevation = 8.dp,
-                    color = MaterialTheme.colorScheme.surface,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column {
-                            Text(
-                                text = "Free",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            Text(
-                                text = "${course.totalLessons} lessons",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+    // Calculate estimated time remaining
+    val estimatedMinutesRemaining = remember(completedCount, totalLessons) {
+        val remainingLessons = totalLessons - completedCount
+        remainingLessons * 5 // Average 5 minutes per lesson
+    }
 
-                        Button(
-                            onClick = {
-                                val enrolledSet = (prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()).toMutableSet()
-                                enrolledSet.add(course.id)
-                                prefs.edit().putStringSet("enrolled_courses", enrolledSet).apply()
-                                isEnrolled = true
-                                onEnroll()
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = course.gradientColors.first(),
-                            ),
-                            modifier = Modifier.height(48.dp),
-                        ) {
-                            Text(
-                                text = "Enroll Now",
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 16.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        },
-    ) { paddingValues ->
+    // Instructor and reviews data
+    val instructor = remember { getInstructorForCourse(course) }
+    val reviews = remember { getReviewsForCourse(course) }
+    val learningOutcomes = remember { getLearningOutcomes(course) }
+
+    // Collapsing toolbar state
+    val density = LocalDensity.current
+    val headerHeight = 280.dp
+    val headerHeightPx = with(density) { headerHeight.toPx() }
+    val toolbarHeight = 64.dp
+    val toolbarHeightPx = with(density) { toolbarHeight.toPx() }
+
+    val scrollOffset by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex * 1000 + listState.firstVisibleItemScrollOffset
+        }
+    }
+
+    val collapseProgress by remember {
+        derivedStateOf {
+            (scrollOffset / (headerHeightPx - toolbarHeightPx)).coerceIn(0f, 1f)
+        }
+    }
+
+    val toolbarAlpha by animateFloatAsState(
+        targetValue = collapseProgress,
+        animationSpec = tween(150),
+        label = "toolbarAlpha"
+    )
+
+    Box(modifier = modifier.fillMaxSize()) {
+        // Main Content
         LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 100.dp),
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = if (isEnrolled) 100.dp else 120.dp),
         ) {
-            // Hero Section
+            // Hero Section with Parallax
             item {
                 CourseHeroSection(
                     course = course,
@@ -198,64 +357,360 @@ fun CourseDetailScreen(
                     completedCount = completedCount,
                     totalLessons = totalLessons,
                     isEnrolled = isEnrolled,
+                    collapseProgress = collapseProgress,
+                    estimatedMinutesRemaining = estimatedMinutesRemaining,
+                    lastAccessed = lastAccessed,
                 )
             }
 
-            // Course Stats
+            // Quick Stats Pills
             item {
-                CourseStatsRow(
+                QuickStatsPills(
                     course = course,
                     completedCount = completedCount,
+                    totalLessons = totalLessons,
                 )
             }
 
-            // Continue Learning Card
+            // Certificate Progress (if enrolled and has progress)
+            if (isEnrolled && progressPercent > 0) {
+                item {
+                    CertificateProgressCard(
+                        progressPercent = progressPercent,
+                        course = course,
+                    )
+                }
+            }
+
+            // Memorization & Time Progress Section (for memorization courses)
+            if (isEnrolled && (course.id == "memorize_3_ayahs" || course.id == "juz_amma")) {
+                item {
+                    MemorizationProgressSection(
+                        modules = modules,
+                        memorizationProgress = memorizationProgress,
+                        timeSpentPerLesson = timeSpentPerLesson,
+                        totalTimeSpentMinutes = totalTimeSpentMinutes,
+                        accentColor = MaterialTheme.colorScheme.primary,
+                        onAyahToggle = { lessonId, ayahNumber ->
+                            val currentProgress = memorizationProgress[lessonId] ?: MemorizationProgress(
+                                lessonId = lessonId,
+                                totalAyahs = 3
+                            )
+                            val newAyahs = currentProgress.memorizedAyahs.toMutableSet()
+                            if (ayahNumber in newAyahs) {
+                                newAyahs.remove(ayahNumber)
+                            } else {
+                                newAyahs.add(ayahNumber)
+                            }
+                            val updatedProgress = currentProgress.copy(
+                                memorizedAyahs = newAyahs,
+                                lastPracticed = System.currentTimeMillis()
+                            )
+                            memorizationProgress = memorizationProgress.toMutableMap().apply {
+                                put(lessonId, updatedProgress)
+                            }
+                            saveMemorizationProgress(prefs, course.id, memorizationProgress)
+
+                            // Auto-mark lesson complete if all ayahs memorized
+                            if (newAyahs.size >= currentProgress.totalAyahs) {
+                                if (lessonId !in completedLessons) {
+                                    val newSet = completedLessons.toMutableSet()
+                                    newSet.add(lessonId)
+                                    completedLessons = newSet
+                                    prefs.edit().putStringSet("completed_lessons_${course.id}", newSet).apply()
+                                    prefs.edit().putInt("progress_${course.id}", newSet.size).apply()
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+
+            // Time Spent Card (for all courses when enrolled)
+            if (isEnrolled && totalTimeSpentMinutes > 0) {
+                item {
+                    TimeSpentCard(
+                        totalMinutes = totalTimeSpentMinutes,
+                        lessonsWithTime = timeSpentPerLesson.count { it.value > 0 },
+                        totalLessons = totalLessons,
+                        accentColor = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
+            // Continue Learning Card (if enrolled)
+            if (isEnrolled) {
+                item {
+                    ContinueLearningCard(
+                        modules = modules,
+                        completedLessons = completedLessons,
+                        onLessonClick = onLessonClick,
+                        course = course,
+                    )
+                }
+            }
+
+            // What You'll Learn Section
             item {
-                ContinueLearningCard(
-                    modules = modules,
-                    completedLessons = completedLessons,
-                    onLessonClick = onLessonClick,
+                WhatYouWillLearnSection(
+                    outcomes = learningOutcomes,
+                    accentColor = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            // Instructor Section
+            item {
+                InstructorSection(
+                    instructor = instructor,
+                    accentColor = MaterialTheme.colorScheme.primary,
                 )
             }
 
             // Syllabus Header
             item {
-                Text(
-                    text = "Course Syllabus",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                SyllabusHeader(
+                    totalModules = modules.size,
+                    totalLessons = totalLessons,
+                    estimatedHours = (totalLessons * 5) / 60,
                 )
             }
 
             // Module List
             modules.forEachIndexed { moduleIndex, module ->
-                item {
-                    ModuleCard(
+                item(key = module.id) {
+                    EnhancedModuleCard(
                         module = module,
                         moduleIndex = moduleIndex,
                         completedLessons = completedLessons,
+                        memorizationProgress = memorizationProgress,
+                        timeSpentPerLesson = timeSpentPerLesson,
+                        accentColor = MaterialTheme.colorScheme.primary,
+                        isEnrolled = isEnrolled,
+                        isMemorizationCourse = course.id == "memorize_3_ayahs" || course.id == "juz_amma",
                         onLessonClick = { lesson ->
                             val lessonIndex = module.lessons.indexOf(lesson)
                             onLessonClick(lesson, lessonIndex)
                         },
                         onMarkComplete = { lesson ->
-                            val newSet = completedLessons.toMutableSet()
-                            if (lesson.id in newSet) {
+                            if (lesson.id in completedLessons) {
+                                // Allow unchecking without confirmation
+                                val newSet = completedLessons.toMutableSet()
                                 newSet.remove(lesson.id)
+                                completedLessons = newSet
+                                prefs.edit().putStringSet("completed_lessons_${course.id}", newSet).apply()
+                                prefs.edit().putInt("progress_${course.id}", newSet.size).apply()
                             } else {
-                                newSet.add(lesson.id)
+                                // Show completion confirmation bottom sheet
+                                showCompletionSheet = lesson
                             }
-                            completedLessons = newSet
-                            prefs.edit().putStringSet("completed_${course.id}", newSet).apply()
-                            // Also update legacy progress count
-                            prefs.edit().putInt("progress_${course.id}", newSet.size).apply()
                             onMarkComplete(lesson)
+                        },
+                        onAyahToggle = { lessonId, ayahNumber ->
+                            val lesson = module.lessons.find { it.id == lessonId }
+                            val totalAyahs = lesson?.totalAyahs ?: 3
+                            val currentProgress = memorizationProgress[lessonId] ?: MemorizationProgress(
+                                lessonId = lessonId,
+                                totalAyahs = totalAyahs
+                            )
+                            val newAyahs = currentProgress.memorizedAyahs.toMutableSet()
+                            if (ayahNumber in newAyahs) {
+                                newAyahs.remove(ayahNumber)
+                            } else {
+                                newAyahs.add(ayahNumber)
+                            }
+                            val updatedProgress = currentProgress.copy(
+                                memorizedAyahs = newAyahs,
+                                lastPracticed = System.currentTimeMillis()
+                            )
+                            memorizationProgress = memorizationProgress.toMutableMap().apply {
+                                put(lessonId, updatedProgress)
+                            }
+                            saveMemorizationProgress(prefs, course.id, memorizationProgress)
+
+                            // Auto-mark lesson complete if all ayahs memorized
+                            if (newAyahs.size >= totalAyahs) {
+                                if (lessonId !in completedLessons) {
+                                    val newSet = completedLessons.toMutableSet()
+                                    newSet.add(lessonId)
+                                    completedLessons = newSet
+                                    prefs.edit().putStringSet("completed_lessons_${course.id}", newSet).apply()
+                                    prefs.edit().putInt("progress_${course.id}", newSet.size).apply()
+                                }
+                            }
+                        },
+                        onTimeSpent = { lessonId, minutes ->
+                            val current = timeSpentPerLesson[lessonId] ?: 0
+                            timeSpentPerLesson = timeSpentPerLesson.toMutableMap().apply {
+                                put(lessonId, current + minutes)
+                            }
+                            saveTimeSpent(prefs, course.id, timeSpentPerLesson)
                         },
                     )
                 }
             }
+
+            // Reviews Section
+            item {
+                ReviewsSection(
+                    reviews = reviews,
+                    averageRating = 4.8f,
+                    totalReviews = reviews.size,
+                    accentColor = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            // Similar Courses placeholder
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+            }
         }
+
+        // Collapsing Toolbar
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .alpha(toolbarAlpha),
+            color = MaterialTheme.colorScheme.primary,
+            shadowElevation = if (toolbarAlpha > 0.5f) 4.dp else 0.dp,
+        ) {
+            TopAppBar(
+                title = {
+                    AnimatedVisibility(
+                        visible = toolbarAlpha > 0.7f,
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut(),
+                    ) {
+                        Text(
+                            text = course.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White,
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { /* Share */ }) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = Color.White,
+                        )
+                    }
+                    IconButton(onClick = { /* Bookmark */ }) {
+                        Icon(
+                            imageVector = Icons.Outlined.BookmarkBorder,
+                            contentDescription = "Bookmark",
+                            tint = Color.White,
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                ),
+                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
+            )
+        }
+
+        // Transparent toolbar for when header is visible
+        if (toolbarAlpha < 0.5f) {
+            TopAppBar(
+                title = { },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White,
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { /* Share */ }) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = Color.White,
+                        )
+                    }
+                    IconButton(onClick = { /* Bookmark */ }) {
+                        Icon(
+                            imageVector = Icons.Outlined.BookmarkBorder,
+                            contentDescription = "Bookmark",
+                            tint = Color.White,
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                ),
+                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
+            )
+        }
+
+        // Bottom Action Bar
+        EnhancedBottomBar(
+            course = course,
+            isEnrolled = isEnrolled,
+            progressPercent = progressPercent,
+            onEnroll = {
+                val enrolledSet = (prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()).toMutableSet()
+                enrolledSet.add(course.id)
+                prefs.edit().putStringSet("enrolled_courses", enrolledSet).apply()
+                isEnrolled = true
+                onEnroll()
+            },
+            onContinue = {
+                // Find next incomplete lesson and navigate
+                for (module in modules) {
+                    for ((index, lesson) in module.lessons.withIndex()) {
+                        if (lesson.id !in completedLessons) {
+                            onLessonClick(lesson, index)
+                            return@EnhancedBottomBar
+                        }
+                    }
+                }
+            },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
+
+    // Lesson Completion Bottom Sheet
+    showCompletionSheet?.let { lesson ->
+        LessonCompletionBottomSheet(
+            lessonTitle = lesson.title,
+            courseId = course.id,
+            lessonId = lesson.id,
+            onComplete = { hasRecording ->
+                // Mark lesson as completed
+                CourseProgressTracker.markLessonCompleted(context, course.id, lesson.id)
+                CourseProgressTracker.clearPendingCompletion(context, course.id)
+
+                // Update local state
+                val newSet = completedLessons.toMutableSet()
+                newSet.add(lesson.id)
+                completedLessons = newSet
+                prefs.edit().putStringSet("completed_lessons_${course.id}", newSet).apply()
+                prefs.edit().putInt("progress_${course.id}", newSet.size).apply()
+
+                showCompletionSheet = null
+            },
+            onDismiss = {
+                // Clear pending without marking complete
+                CourseProgressTracker.clearPendingCompletion(context, course.id)
+                showCompletionSheet = null
+            },
+        )
     }
 }
 
@@ -266,244 +721,507 @@ private fun CourseHeroSection(
     completedCount: Int,
     totalLessons: Int,
     isEnrolled: Boolean,
+    collapseProgress: Float,
+    estimatedMinutesRemaining: Int,
+    lastAccessed: Long,
 ) {
-    Column {
-        // Main Banner
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp)
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = course.gradientColors,
-                    )
-                ),
-        ) {
-            // Large background icon
-            Icon(
-                imageVector = course.icon,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.15f),
-                modifier = Modifier
-                    .size(140.dp)
-                    .align(Alignment.CenterEnd)
-                    .offset(x = 20.dp),
-            )
+    val parallaxOffset = collapseProgress * 100
+    val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-            // Content
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 20.dp, end = 20.dp, top = 48.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                // Tags row
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = Color.Black.copy(alpha = 0.3f),
-                    ) {
-                        Text(
-                            text = course.category.label.uppercase(),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            letterSpacing = 1.sp,
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = Color.White,
-                    ) {
-                        Text(
-                            text = course.difficulty.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = course.gradientColors.first(),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        )
-                    }
-                }
-
-                // Title
-                Text(
-                    text = course.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 2,
-                )
-            }
-        }
-
-        // Info Card below banner
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .offset(y = (-16).dp)
-                .padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 4.dp,
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-            ) {
-                // Description
-                Text(
-                    text = course.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Progress or Info
-                if (isEnrolled) {
-                    // Progress section
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "${progressPercent.toInt()}% Complete",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = course.gradientColors.first(),
-                        )
-                        Text(
-                            text = "$completedCount of $totalLessons",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    LinearProgressIndicator(
-                        progress = { progressPercent / 100f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                        color = course.gradientColors.first(),
-                        trackColor = course.gradientColors.first().copy(alpha = 0.2f),
-                        strokeCap = StrokeCap.Round,
-                    )
-                } else {
-                    // Stats for non-enrolled
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "$totalLessons",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = course.gradientColors.first(),
-                            )
-                            Text(
-                                text = "Lessons",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "${course.estimatedDays}",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = course.gradientColors.first(),
-                            )
-                            Text(
-                                text = "Days",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Filled.Star,
-                                contentDescription = null,
-                                tint = Color(0xFFFFB800),
-                                modifier = Modifier.size(24.dp),
-                            )
-                            Text(
-                                text = "Popular",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
+    // Dynamic content based on course
+    val (highlightText, highlightSubtext) = remember(course.id) {
+        when (course.id) {
+            "memorize_3_ayahs" -> Pair("114", "Surahs to Master")
+            "daily_bukhari" -> Pair("365", "Days Journey")
+            "juz_amma" -> Pair("37", "Surahs • Juz 30")
+            "quran_reading" -> Pair("604", "Pages of Quran")
+            else -> Pair("${course.totalLessons}", "Lessons")
         }
     }
-}
 
-@Composable
-private fun CourseStatsRow(
-    course: Course,
-    completedCount: Int,
-) {
-    Row(
+    val courseTagline = remember(course.id) {
+        when (course.id) {
+            "memorize_3_ayahs" -> "Start with the opening verses"
+            "daily_bukhari" -> "One hadith, one day at a time"
+            "juz_amma" -> "The most recited Juz"
+            "quran_reading" -> "Complete the Holy Quran"
+            else -> course.subtitle
+        }
+    }
+
+    // Use category-based colors like in course cards
+    val (containerColor, accentColor) = when (course.category) {
+        CourseCategory.MEMORIZATION -> Pair(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.primary
+        )
+        CourseCategory.HADITH -> Pair(
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.secondary
+        )
+        CourseCategory.QURAN -> Pair(
+            MaterialTheme.colorScheme.tertiaryContainer,
+            MaterialTheme.colorScheme.tertiary
+        )
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+            .graphicsLayer {
+                translationY = parallaxOffset
+                alpha = 1f - (collapseProgress * 0.3f)
+            }
+            .background(containerColor),
     ) {
-        StatItem(
-            icon = Icons.Outlined.MenuBook,
-            value = "${course.totalLessons}",
-            label = "Lessons",
+        // Decorative elements
+        Box(
+            modifier = Modifier
+                .size(180.dp)
+                .offset(x = 260.dp, y = (-30).dp)
+                .background(
+                    color = accentColor.copy(alpha = 0.1f),
+                    shape = CircleShape,
+                )
         )
-        StatItem(
-            icon = Icons.Outlined.Schedule,
-            value = "${course.estimatedDays}",
-            label = "Days",
-        )
-        StatItem(
-            icon = Icons.Outlined.CheckCircle,
-            value = "$completedCount",
-            label = "Done",
-        )
-        StatItem(
-            icon = Icons.Outlined.TrendingUp,
-            value = course.difficulty.label,
-            label = "Level",
-        )
+
+        // Content
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = 20.dp,
+                    end = 20.dp,
+                    top = statusBarHeight + 56.dp,
+                    bottom = 24.dp
+                ),
+        ) {
+            // Main content row: Info + Dynamic Highlight
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                // Left side: Title and description
+                Column(
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        text = course.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        lineHeight = 30.sp,
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = courseTagline,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = accentColor,
+                        fontWeight = FontWeight.Medium,
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = course.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 18.sp,
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Right side: Dynamic highlight number
+                Box(
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(accentColor.copy(alpha = 0.15f))
+                        .border(
+                            width = 1.dp,
+                            color = accentColor.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(16.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = highlightText,
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor,
+                        )
+                        Text(
+                            text = highlightSubtext,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            lineHeight = 14.sp,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Category badges row - NiaTopicTag style
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Category tag
+                NiaTopicTag(
+                    followed = true,
+                    onClick = { },
+                    enabled = false,
+                ) {
+                    Text(course.category.label.uppercase())
+                }
+
+                // Difficulty tag
+                NiaTopicTag(
+                    followed = false,
+                    onClick = { },
+                    enabled = false,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.SignalCellularAlt,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(course.difficulty.label)
+                    }
+                }
+
+                // Rating tag
+                NiaTopicTag(
+                    followed = false,
+                    onClick = { },
+                    enabled = false,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = null,
+                            tint = Color(0xFFFFB800),
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text("4.8")
+                    }
+                }
+            }
+
+            // Progress and last activity - unified card
+            if (isEnrolled) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = accentColor.copy(alpha = 0.1f),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // Progress section
+                        Icon(
+                            imageVector = Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "$completedCount of $totalLessons",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "lessons completed",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        // Divider
+                        if (lastAccessed > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(32.dp)
+                                    .background(accentColor.copy(alpha = 0.3f))
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            // Last activity section
+                            Icon(
+                                imageVector = Icons.Outlined.AccessTime,
+                                contentDescription = null,
+                                tint = accentColor,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = formatLastAccessed(lastAccessed),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = "last activity",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun StatItem(
+private fun QuickStatsPills(
+    course: Course,
+    completedCount: Int,
+    totalLessons: Int,
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            StatPill(
+                icon = Icons.Outlined.PlayCircle,
+                value = "$totalLessons",
+                label = "Lessons",
+                accentColor = MaterialTheme.colorScheme.primary,
+            )
+        }
+        item {
+            StatPill(
+                icon = Icons.Outlined.Schedule,
+                value = "${course.estimatedDays}",
+                label = "Days",
+                accentColor = MaterialTheme.colorScheme.primary,
+            )
+        }
+        item {
+            StatPill(
+                icon = Icons.Outlined.CheckCircle,
+                value = "$completedCount",
+                label = "Completed",
+                accentColor = MaterialTheme.colorScheme.primary,
+            )
+        }
+        item {
+            StatPill(
+                icon = Icons.Outlined.School,
+                value = course.difficulty.label,
+                label = "Level",
+                accentColor = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatPill(
     icon: ImageVector,
     value: String,
     label: String,
+    accentColor: Color,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+        ),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(24.dp),
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(accentColor.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CertificateProgressCard(
+    progressPercent: Float,
+    course: Course,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Certificate icon with progress ring
+            val progressPrimaryColor = MaterialTheme.colorScheme.primary
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(56.dp),
+            ) {
+                androidx.compose.foundation.Canvas(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Background circle
+                    drawArc(
+                        color = progressPrimaryColor.copy(alpha = 0.2f),
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = 6.dp.toPx(),
+                            cap = StrokeCap.Round,
+                        ),
+                    )
+                    // Progress arc
+                    drawArc(
+                        color = progressPrimaryColor,
+                        startAngle = -90f,
+                        sweepAngle = 360f * (progressPercent / 100f),
+                        useCenter = false,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = 6.dp.toPx(),
+                            cap = StrokeCap.Round,
+                        ),
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Outlined.WorkspacePremium,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Certificate Progress",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${progressPercent.toInt()}% complete • ${(100 - progressPercent).toInt()}% to go",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                if (progressPercent >= 100) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.EmojiEvents,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Text(
+                                text = "Certificate Earned!",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.tertiary,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (progressPercent >= 100) {
+                OutlinedButton(
+                    onClick = { /* Download certificate */ },
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        text = "View",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -512,15 +1230,18 @@ private fun ContinueLearningCard(
     modules: List<CourseModule>,
     completedLessons: Set<String>,
     onLessonClick: (Lesson, Int) -> Unit,
+    course: Course,
 ) {
     // Find next incomplete lesson
     var nextLesson: Lesson? = null
     var nextLessonIndex = 0
+    var moduleName = ""
     outer@ for (module in modules) {
         for ((index, lesson) in module.lessons.withIndex()) {
             if (lesson.id !in completedLessons) {
                 nextLesson = lesson
                 nextLessonIndex = index
+                moduleName = module.title
                 break@outer
             }
         }
@@ -530,11 +1251,11 @@ private fun ContinueLearningCard(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
                 .clickable { onLessonClick(nextLesson, nextLessonIndex) },
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                containerColor = MaterialTheme.colorScheme.primary,
             ),
         ) {
             Row(
@@ -543,17 +1264,18 @@ private fun ContinueLearningCard(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Play button with ripple effect
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(52.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
+                        .background(Color.White),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(28.dp),
                     )
                 }
@@ -564,22 +1286,43 @@ private fun ContinueLearningCard(
                     Text(
                         text = "Continue Learning",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                        color = Color.White.copy(alpha = 0.8f),
                     )
                     Text(
                         text = nextLesson.title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = moduleName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                        )
+                        Text(
+                            text = "•",
+                            color = Color.White.copy(alpha = 0.5f),
+                        )
+                        Text(
+                            text = nextLesson.duration,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                        )
+                    }
                 }
 
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }
@@ -587,32 +1330,293 @@ private fun ContinueLearningCard(
 }
 
 @Composable
-private fun ModuleCard(
+private fun WhatYouWillLearnSection(
+    outcomes: List<String>,
+    accentColor: Color,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.School,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(24.dp),
+                )
+                Text(
+                    text = "What You'll Learn",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            outcomes.forEach { outcome ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(
+                        text = outcome,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InstructorSection(
+    instructor: Instructor,
+    accentColor: Color,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+        ) {
+            Text(
+                text = "Instructor",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                verticalAlignment = Alignment.Top,
+            ) {
+                // Instructor avatar
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(accentColor, accentColor.copy(alpha = 0.7f))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = instructor.name.split(" ").map { it.first() }.take(2).joinToString(""),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = instructor.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Icon(
+                            imageVector = Icons.Outlined.Verified,
+                            contentDescription = "Verified",
+                            tint = accentColor,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+
+                    Text(
+                        text = instructor.title,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = instructor.bio,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Stats row
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Column {
+                            Text(
+                                text = "${instructor.coursesCount}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "Courses",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = instructor.studentsCount,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "Students",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFFB800),
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Text(
+                                    text = "${instructor.rating}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                            Text(
+                                text = "Rating",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SyllabusHeader(
+    totalModules: Int,
+    totalLessons: Int,
+    estimatedHours: Int,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+    ) {
+        Text(
+            text = "Course Syllabus",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "$totalModules modules • $totalLessons lessons • ${estimatedHours}h estimated",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun EnhancedModuleCard(
     module: CourseModule,
     moduleIndex: Int,
     completedLessons: Set<String>,
+    memorizationProgress: Map<String, MemorizationProgress>,
+    timeSpentPerLesson: Map<String, Int>,
+    accentColor: Color,
+    isEnrolled: Boolean,
+    isMemorizationCourse: Boolean = false,
     onLessonClick: (Lesson) -> Unit,
     onMarkComplete: (Lesson) -> Unit,
+    onAyahToggle: (String, Int) -> Unit = { _, _ -> },
+    onTimeSpent: (String, Int) -> Unit = { _, _ -> },
 ) {
-    var isExpanded by remember { mutableStateOf(moduleIndex == 0) } // First module expanded by default
+    var isExpanded by remember { mutableStateOf(moduleIndex == 0) }
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = tween(300),
         label = "rotation"
     )
 
     val completedInModule = module.lessons.count { it.id in completedLessons }
     val totalInModule = module.lessons.size
+    val moduleProgress = if (totalInModule > 0) completedInModule.toFloat() / totalInModule else 0f
+    val isModuleComplete = completedInModule == totalInModule
+
+    val borderColor by animateColorAsState(
+        targetValue = if (isModuleComplete) accentColor.copy(alpha = 0.5f)
+        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+        label = "borderColor"
+    )
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .animateContentSize(),
-        shape = RoundedCornerShape(12.dp),
+            .animateContentSize(
+                animationSpec = tween(300, easing = FastOutSlowInEasing)
+            )
+            .border(
+                width = 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(16.dp),
+            ),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column {
             // Module Header
@@ -623,34 +1627,62 @@ private fun ModuleCard(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Module Number
+                // Module Number/Check with progress ring
                 Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (completedInModule == totalInModule) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant
-                            }
-                        ),
                     contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(44.dp),
                 ) {
-                    if (completedInModule == totalInModule) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(20.dp),
+                    // Progress ring
+                    androidx.compose.foundation.Canvas(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        drawArc(
+                            color = accentColor.copy(alpha = 0.2f),
+                            startAngle = -90f,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                width = 3.dp.toPx(),
+                                cap = StrokeCap.Round,
+                            ),
                         )
-                    } else {
-                        Text(
-                            text = "${moduleIndex + 1}",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        drawArc(
+                            color = accentColor,
+                            startAngle = -90f,
+                            sweepAngle = 360f * moduleProgress,
+                            useCenter = false,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                width = 3.dp.toPx(),
+                                cap = StrokeCap.Round,
+                            ),
                         )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isModuleComplete) accentColor
+                                else MaterialTheme.colorScheme.surfaceContainerHigh
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (isModuleComplete) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        } else {
+                            Text(
+                                text = "${moduleIndex + 1}",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
 
@@ -661,7 +1693,9 @@ private fun ModuleCard(
                         text = module.title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "$completedInModule/$totalInModule lessons completed",
                         style = MaterialTheme.typography.labelSmall,
@@ -672,23 +1706,44 @@ private fun ModuleCard(
                 Icon(
                     imageVector = Icons.Default.ExpandMore,
                     contentDescription = if (isExpanded) "Collapse" else "Expand",
-                    modifier = Modifier.rotate(rotationAngle),
+                    modifier = Modifier
+                        .rotate(rotationAngle)
+                        .size(24.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             // Lessons List (when expanded)
-            AnimatedVisibility(visible = isExpanded) {
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(animationSpec = tween(300)) + fadeIn(),
+                exit = shrinkVertically(animationSpec = tween(300)) + fadeOut(),
+            ) {
                 Column(
                     modifier = Modifier.padding(bottom = 8.dp),
                 ) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     module.lessons.forEachIndexed { index, lesson ->
                         val isCompleted = lesson.id in completedLessons
-                        LessonItem(
+                        val lessonMemProgress = memorizationProgress[lesson.id]
+                        val lessonTimeSpent = timeSpentPerLesson[lesson.id] ?: 0
+                        EnhancedLessonItem(
                             lesson = lesson.copy(isCompleted = isCompleted),
                             lessonIndex = index,
+                            accentColor = accentColor,
+                            isEnrolled = isEnrolled,
+                            isMemorizationCourse = isMemorizationCourse,
+                            memorizedAyahs = lessonMemProgress?.memorizedAyahs ?: emptySet(),
+                            timeSpentMinutes = lessonTimeSpent,
                             onClick = { onLessonClick(lesson) },
                             onMarkComplete = { onMarkComplete(lesson) },
+                            onAyahToggle = { ayahNumber -> onAyahToggle(lesson.id, ayahNumber) },
                         )
                     }
                 }
@@ -698,100 +1753,587 @@ private fun ModuleCard(
 }
 
 @Composable
-private fun LessonItem(
+private fun EnhancedLessonItem(
     lesson: Lesson,
     lessonIndex: Int,
+    accentColor: Color,
+    isEnrolled: Boolean,
+    isMemorizationCourse: Boolean = false,
+    memorizedAyahs: Set<Int> = emptySet(),
+    timeSpentMinutes: Int = 0,
     onClick: () -> Unit,
     onMarkComplete: () -> Unit,
+    onAyahToggle: (Int) -> Unit = {},
 ) {
-    Row(
+    var showAyahSelector by remember { mutableStateOf(false) }
+
+    val backgroundColor by animateColorAsState(
+        targetValue = if (lesson.isCompleted) accentColor.copy(alpha = 0.05f)
+        else Color.Transparent,
+        label = "bgColor"
+    )
+
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(backgroundColor)
+                .clickable(enabled = !lesson.isLocked && isEnrolled, onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Completion Checkbox
+            if (isEnrolled) {
+                IconButton(
+                    onClick = onMarkComplete,
+                    modifier = Modifier.size(36.dp),
+                    enabled = !lesson.isLocked,
+                ) {
+                    Icon(
+                        imageVector = if (lesson.isCompleted) {
+                            Icons.Filled.CheckCircle
+                        } else {
+                            Icons.Outlined.RadioButtonUnchecked
+                        },
+                        contentDescription = if (lesson.isCompleted) "Completed" else "Mark complete",
+                        tint = if (lesson.isCompleted) {
+                            accentColor
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        },
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Lesson Info
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = lesson.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (lesson.isCompleted) FontWeight.Normal else FontWeight.Medium,
+                    color = if (lesson.isLocked) {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                // Show subtitle and duration for all lessons
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = lesson.subtitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                            alpha = if (lesson.isLocked) 0.4f else 0.8f
+                        ),
+                    )
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    )
+                    Text(
+                        text = lesson.duration,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                            alpha = if (lesson.isLocked) 0.4f else 0.8f
+                        ),
+                    )
+                }
+
+                // Show time spent if any
+                if (timeSpentMinutes > 0) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(top = 2.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Schedule,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Text(
+                            text = formatTimeSpent(timeSpentMinutes),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        )
+                    }
+                }
+            }
+
+            // Lock or Play Icon
+            if (lesson.isLocked) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = "Locked",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    modifier = Modifier.size(18.dp),
+                )
+            } else if (isEnrolled && !lesson.isCompleted) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Play",
+                    tint = accentColor,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewsSection(
+    reviews: List<Review>,
+    averageRating: Float,
+    totalReviews: Int,
+    accentColor: Color,
+) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = !lesson.isLocked, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        // Completion Checkbox
-        IconButton(
-            onClick = onMarkComplete,
-            modifier = Modifier.size(32.dp),
-            enabled = !lesson.isLocked,
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = if (lesson.isCompleted) {
-                    Icons.Filled.CheckCircle
-                } else {
-                    Icons.Outlined.RadioButtonUnchecked
-                },
-                contentDescription = if (lesson.isCompleted) "Completed" else "Mark complete",
-                tint = if (lesson.isCompleted) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                },
-                modifier = Modifier.size(24.dp),
+            Text(
+                text = "Learner Reviews",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
             )
+            TextButton(onClick = { /* View all */ }) {
+                Text(
+                    text = "See All",
+                    color = accentColor,
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Lesson Type Icon
-        Icon(
-            imageVector = when (lesson.type) {
-                LessonType.VIDEO -> Icons.Outlined.PlayCircle
-                LessonType.READING -> Icons.Outlined.MenuBook
-                LessonType.QUIZ -> Icons.Outlined.Quiz
-                LessonType.PRACTICE -> Icons.Outlined.Edit
-            },
-            contentDescription = null,
-            tint = if (lesson.isLocked) {
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            modifier = Modifier.size(20.dp),
-        )
+        // Rating summary card
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Large rating number
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = "$averageRating",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Row {
+                        repeat(5) { index ->
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = if (index < averageRating.toInt()) Color(0xFFFFB800)
+                                else Color(0xFFFFB800).copy(alpha = 0.3f),
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "$totalReviews reviews",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
-        Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(24.dp))
 
-        // Lesson Info
-        Column(modifier = Modifier.weight(1f)) {
+                // Rating bars
+                Column(modifier = Modifier.weight(1f)) {
+                    listOf(5 to 0.85f, 4 to 0.10f, 3 to 0.03f, 2 to 0.01f, 1 to 0.01f).forEach { (stars, progress) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 2.dp),
+                        ) {
+                            Text(
+                                text = "$stars",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(12.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = Color(0xFFFFB800),
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Individual reviews
+        reviews.take(3).forEach { review ->
+            ReviewCard(review = review)
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun ReviewCard(review: Review) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // User avatar
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = review.userName.first().toString(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = review.userName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        repeat(5) { index ->
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = if (index < review.rating.toInt()) Color(0xFFFFB800)
+                                else Color(0xFFFFB800).copy(alpha = 0.3f),
+                                modifier = Modifier.size(12.dp),
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = review.date,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             Text(
-                text = lesson.title,
+                text = review.comment,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (lesson.isCompleted) FontWeight.Normal else FontWeight.Medium,
-                color = if (lesson.isLocked) {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
             )
-            Text(
-                text = lesson.subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                    alpha = if (lesson.isLocked) 0.4f else 1f
-                ),
-            )
-        }
 
-        // Duration or Lock Icon
-        if (lesson.isLocked) {
-            Icon(
-                imageVector = Icons.Default.Lock,
-                contentDescription = "Locked",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                modifier = Modifier.size(18.dp),
-            )
-        } else {
+            Spacer(modifier = Modifier.height(8.dp))
+
             Text(
-                text = lesson.duration,
+                text = "${review.helpful} found this helpful",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun EnhancedBottomBar(
+    course: Course,
+    isEnrolled: Boolean,
+    progressPercent: Float,
+    onEnroll: () -> Unit,
+    onContinue: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shadowElevation = 16.dp,
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        if (isEnrolled) {
+            // Enrolled state - show progress and continue button
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            ) {
+                // Progress section
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Your Progress",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "${progressPercent.toInt()}%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { progressPercent / 100f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    strokeCap = StrokeCap.Round,
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Full-width Continue button
+                Button(
+                    onClick = onContinue,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    enabled = progressPercent < 100f,
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = if (progressPercent >= 100f) Icons.Filled.CheckCircle else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = if (progressPercent >= 100f) "Course Completed" else "Continue Learning",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        } else {
+            // Not enrolled - show price and enroll button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(
+                        text = "Free",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = "${course.totalLessons} lessons • ${course.estimatedDays} days",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Button(
+                    onClick = onEnroll,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    modifier = Modifier.height(52.dp),
+                    contentPadding = PaddingValues(horizontal = 32.dp),
+                ) {
+                    Text(
+                        text = "Enroll Now",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Helper functions
+
+private fun formatLastAccessed(timestamp: Long): String {
+    if (timestamp == 0L) return "Never"
+
+    val now = System.currentTimeMillis()
+    val diff = now - timestamp
+
+    return when {
+        diff < TimeUnit.MINUTES.toMillis(1) -> "just now"
+        diff < TimeUnit.HOURS.toMillis(1) -> "${TimeUnit.MILLISECONDS.toMinutes(diff)}m ago"
+        diff < TimeUnit.DAYS.toMillis(1) -> "${TimeUnit.MILLISECONDS.toHours(diff)}h ago"
+        diff < TimeUnit.DAYS.toMillis(7) -> "${TimeUnit.MILLISECONDS.toDays(diff)}d ago"
+        else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
+    }
+}
+
+private fun getInstructorForCourse(course: Course): Instructor {
+    return when (course.id) {
+        "memorize_3_ayahs" -> Instructor(
+            name = "Sheikh Ahmad",
+            title = "Quran Memorization Specialist",
+            bio = "15+ years experience teaching Quran memorization with proven techniques for students of all ages.",
+            coursesCount = 8,
+            studentsCount = "12.5K",
+            rating = 4.9f,
+        )
+        "daily_bukhari" -> Instructor(
+            name = "Dr. Muhammad Ali",
+            title = "Hadith Scholar",
+            bio = "PhD in Hadith Sciences, specializing in Sahih Al-Bukhari with focus on practical application.",
+            coursesCount = 5,
+            studentsCount = "8.2K",
+            rating = 4.8f,
+        )
+        "juz_amma" -> Instructor(
+            name = "Ustadh Ibrahim",
+            title = "Tajweed & Memorization Expert",
+            bio = "Ijazah holder in Hafs, teaching Juz Amma memorization with proper tajweed for over 10 years.",
+            coursesCount = 12,
+            studentsCount = "25K",
+            rating = 4.9f,
+        )
+        else -> Instructor(
+            name = "Islamic Academy",
+            title = "Expert Team",
+            bio = "A team of qualified scholars dedicated to teaching authentic Islamic knowledge.",
+            coursesCount = 20,
+            studentsCount = "50K",
+            rating = 4.8f,
+        )
+    }
+}
+
+private fun getReviewsForCourse(course: Course): List<Review> {
+    return listOf(
+        Review(
+            id = "1",
+            userName = "Abdullah M.",
+            rating = 5f,
+            comment = "Excellent course structure! The bite-sized lessons make it easy to stay consistent with my learning.",
+            date = "2 weeks ago",
+            helpful = 24,
+        ),
+        Review(
+            id = "2",
+            userName = "Fatima K.",
+            rating = 5f,
+            comment = "Finally a course that fits my busy schedule. Highly recommend for anyone wanting to strengthen their Islamic knowledge.",
+            date = "1 month ago",
+            helpful = 18,
+        ),
+        Review(
+            id = "3",
+            userName = "Omar S.",
+            rating = 4f,
+            comment = "Great content and well-organized. Would love to see more advanced levels in the future.",
+            date = "1 month ago",
+            helpful = 12,
+        ),
+    )
+}
+
+private fun getLearningOutcomes(course: Course): List<String> {
+    return when (course.id) {
+        "memorize_3_ayahs" -> listOf(
+            "Memorize the opening verses of all 114 Surahs",
+            "Understand the themes and context of each Surah",
+            "Build a strong foundation for complete Quran memorization",
+            "Develop consistent memorization habits",
+            "Learn effective revision techniques",
+        )
+        "daily_bukhari" -> listOf(
+            "Read and understand authentic Prophetic narrations",
+            "Learn practical lessons from Sahih Al-Bukhari",
+            "Build daily habit of hadith study",
+            "Understand the context and application of each hadith",
+            "Strengthen your connection with the Sunnah",
+        )
+        "juz_amma" -> listOf(
+            "Complete memorization of the 30th Juz",
+            "Perfect tajweed and pronunciation",
+            "Understand the meanings of each Surah",
+            "Build confidence in leading prayers",
+            "Master commonly recited Surahs",
+        )
+        "quran_reading" -> listOf(
+            "Complete reading of the entire Quran",
+            "Improve reading fluency and speed",
+            "Develop daily Quran reading habit",
+            "Track your progress through all 30 Juz",
+            "Build a deeper connection with the Quran",
+        )
+        else -> listOf(
+            "Master the course content thoroughly",
+            "Apply knowledge in daily life",
+            "Track progress and stay motivated",
+        )
     }
 }
 
@@ -818,7 +2360,6 @@ private fun generateMemorize3AyahsModules(): List<CourseModule> {
         "Ash-Shu'ara", "An-Naml", "Al-Qasas", "Al-Ankabut", "Ar-Rum"
     )
 
-    // Group surahs into modules of 10
     return surahNames.chunked(10).mapIndexed { moduleIndex, surahs ->
         CourseModule(
             id = "module_$moduleIndex",
@@ -828,9 +2369,11 @@ private fun generateMemorize3AyahsModules(): List<CourseModule> {
                 Lesson(
                     id = "surah_$surahNumber",
                     title = "Surah $surahName",
-                    subtitle = "Memorize first 3 ayahs",
+                    subtitle = "3 ayahs",
                     duration = "5 min",
-                    type = LessonType.PRACTICE,
+                    type = LessonType.MEMORIZATION,
+                    totalAyahs = 3,
+                    surahNumber = surahNumber,
                 )
             }
         )
@@ -838,23 +2381,23 @@ private fun generateMemorize3AyahsModules(): List<CourseModule> {
 }
 
 private fun generateDailyBukhariModules(): List<CourseModule> {
-    val monthNames = listOf(
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    )
-    val daysInMonth = listOf(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    val totalHadiths = 365
+    val hadithsPerSession = 30
+    val totalSessions = (totalHadiths + hadithsPerSession - 1) / hadithsPerSession // Ceiling division
 
-    var hadithCounter = 1
-    return monthNames.mapIndexed { monthIndex, monthName ->
-        val daysCount = daysInMonth[monthIndex]
+    return (0 until totalSessions).map { sessionIndex ->
+        val startHadith = sessionIndex * hadithsPerSession + 1
+        val endHadith = minOf((sessionIndex + 1) * hadithsPerSession, totalHadiths)
+        val hadithsInSession = endHadith - startHadith + 1
+
         CourseModule(
-            id = "month_$monthIndex",
-            title = monthName,
-            lessons = (1..daysCount).map { day ->
-                val currentHadith = hadithCounter++
+            id = "session_$sessionIndex",
+            title = "Session ${sessionIndex + 1}",
+            lessons = (0 until hadithsInSession).map { lessonIndex ->
+                val hadithNumber = startHadith + lessonIndex
                 Lesson(
-                    id = "hadith_$currentHadith",
-                    title = "Day $day: Hadith #$currentHadith",
+                    id = "hadith_$hadithNumber",
+                    title = "Hadith #$hadithNumber",
                     subtitle = "Sahih Al-Bukhari",
                     duration = "3 min",
                     type = LessonType.READING,
@@ -865,54 +2408,64 @@ private fun generateDailyBukhariModules(): List<CourseModule> {
 }
 
 private fun generateJuzAmmaModules(): List<CourseModule> {
-    val juzAmmaSurahs = listOf(
-        "An-Naba", "An-Nazi'at", "Abasa", "At-Takwir", "Al-Infitar",
-        "Al-Mutaffifin", "Al-Inshiqaq", "Al-Buruj", "At-Tariq", "Al-A'la",
-        "Al-Ghashiyah", "Al-Fajr", "Al-Balad", "Ash-Shams", "Al-Layl",
-        "Ad-Duha", "Ash-Sharh", "At-Tin", "Al-Alaq", "Al-Qadr",
-        "Al-Bayyinah", "Az-Zalzalah", "Al-Adiyat", "Al-Qari'ah", "At-Takathur",
-        "Al-Asr", "Al-Humazah", "Al-Fil", "Quraysh", "Al-Ma'un",
-        "Al-Kawthar", "Al-Kafirun", "An-Nasr", "Al-Masad", "Al-Ikhlas",
-        "Al-Falaq", "An-Nas"
+    // Juz Amma surahs with their actual ayah counts
+    val juzAmmaSurahsWithAyahs = listOf(
+        "An-Naba" to 40, "An-Nazi'at" to 46, "Abasa" to 42, "At-Takwir" to 29, "Al-Infitar" to 19,
+        "Al-Mutaffifin" to 36, "Al-Inshiqaq" to 25, "Al-Buruj" to 22, "At-Tariq" to 17, "Al-A'la" to 19,
+        "Al-Ghashiyah" to 26, "Al-Fajr" to 30, "Al-Balad" to 20, "Ash-Shams" to 15, "Al-Layl" to 21,
+        "Ad-Duha" to 11, "Ash-Sharh" to 8, "At-Tin" to 8, "Al-Alaq" to 19, "Al-Qadr" to 5,
+        "Al-Bayyinah" to 8, "Az-Zalzalah" to 8, "Al-Adiyat" to 11, "Al-Qari'ah" to 11, "At-Takathur" to 8,
+        "Al-Asr" to 3, "Al-Humazah" to 9, "Al-Fil" to 5, "Quraysh" to 4, "Al-Ma'un" to 7,
+        "Al-Kawthar" to 3, "Al-Kafirun" to 6, "An-Nasr" to 3, "Al-Masad" to 5, "Al-Ikhlas" to 4,
+        "Al-Falaq" to 5, "An-Nas" to 6
     )
 
     return listOf(
         CourseModule(
             id = "module_long",
             title = "Longer Surahs (78-88)",
-            lessons = juzAmmaSurahs.take(11).mapIndexed { index, name ->
+            lessons = juzAmmaSurahsWithAyahs.take(11).mapIndexed { index, (name, ayahCount) ->
+                val surahNum = 78 + index
                 Lesson(
-                    id = "juz_${78 + index}",
+                    id = "juz_$surahNum",
                     title = "Surah $name",
-                    subtitle = "Surah ${78 + index}",
-                    duration = "10 min",
-                    type = LessonType.PRACTICE,
+                    subtitle = "$ayahCount ayahs",
+                    duration = "${ayahCount / 4 + 5} min",
+                    type = LessonType.MEMORIZATION,
+                    totalAyahs = ayahCount,
+                    surahNumber = surahNum,
                 )
             }
         ),
         CourseModule(
             id = "module_medium",
             title = "Medium Surahs (89-100)",
-            lessons = juzAmmaSurahs.slice(11..22).mapIndexed { index, name ->
+            lessons = juzAmmaSurahsWithAyahs.slice(11..22).mapIndexed { index, (name, ayahCount) ->
+                val surahNum = 89 + index
                 Lesson(
-                    id = "juz_${89 + index}",
+                    id = "juz_$surahNum",
                     title = "Surah $name",
-                    subtitle = "Surah ${89 + index}",
-                    duration = "7 min",
-                    type = LessonType.PRACTICE,
+                    subtitle = "$ayahCount ayahs",
+                    duration = "${ayahCount / 4 + 3} min",
+                    type = LessonType.MEMORIZATION,
+                    totalAyahs = ayahCount,
+                    surahNumber = surahNum,
                 )
             }
         ),
         CourseModule(
             id = "module_short",
             title = "Short Surahs (101-114)",
-            lessons = juzAmmaSurahs.drop(23).mapIndexed { index, name ->
+            lessons = juzAmmaSurahsWithAyahs.drop(23).mapIndexed { index, (name, ayahCount) ->
+                val surahNum = 101 + index
                 Lesson(
-                    id = "juz_${101 + index}",
+                    id = "juz_$surahNum",
                     title = "Surah $name",
-                    subtitle = "Surah ${101 + index}",
-                    duration = "3 min",
-                    type = LessonType.PRACTICE,
+                    subtitle = "$ayahCount ayahs",
+                    duration = "${ayahCount / 2 + 2} min",
+                    type = LessonType.MEMORIZATION,
+                    totalAyahs = ayahCount,
+                    surahNumber = surahNum,
                 )
             }
         ),
@@ -935,5 +2488,368 @@ private fun generateQuranReadingModules(): List<CourseModule> {
                 )
             }
         )
+    }
+}
+
+@Composable
+private fun TextButton(
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        content()
+    }
+}
+
+/**
+ * Memorization Progress Section - Shows detailed ayah-by-ayah progress
+ */
+@Composable
+private fun MemorizationProgressSection(
+    modules: List<CourseModule>,
+    memorizationProgress: Map<String, MemorizationProgress>,
+    timeSpentPerLesson: Map<String, Int>,
+    totalTimeSpentMinutes: Int,
+    accentColor: Color,
+    onAyahToggle: (String, Int) -> Unit,
+) {
+    val totalAyahsToMemorize = modules.sumOf { module ->
+        module.lessons.sumOf { it.totalAyahs }
+    }
+    val totalMemorizedAyahs = memorizationProgress.values.sumOf { it.memorizedAyahs.size }
+    val memorizedSurahs = memorizationProgress.count { it.value.memorizedAyahs.size >= it.value.totalAyahs }
+    val totalSurahs = modules.sumOf { it.lessons.size }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.MenuBook,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(24.dp),
+                )
+                Text(
+                    text = "Memorization Progress",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Stats Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                // Ayahs Memorized
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = "$totalMemorizedAyahs",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = accentColor,
+                    )
+                    Text(
+                        text = "of $totalAyahsToMemorize ayahs",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                // Divider
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(40.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+
+                // Surahs Complete
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = "$memorizedSurahs",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = accentColor,
+                    )
+                    Text(
+                        text = "of $totalSurahs surahs",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                // Divider
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(40.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+
+                // Time Spent
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = formatTimeSpentShort(totalTimeSpentMinutes),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = accentColor,
+                    )
+                    Text(
+                        text = "time spent",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Progress Bar
+            val progress = if (totalAyahsToMemorize > 0) {
+                totalMemorizedAyahs.toFloat() / totalAyahsToMemorize
+            } else 0f
+
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "Overall Progress",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "${(progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = accentColor,
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    color = accentColor,
+                    trackColor = accentColor.copy(alpha = 0.2f),
+                    strokeCap = StrokeCap.Round,
+                )
+            }
+
+            // Tip
+            Spacer(modifier = Modifier.height(16.dp))
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = accentColor.copy(alpha = 0.1f),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "💡",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = "Tap the numbered circles next to each surah to mark ayahs as memorized",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Time Spent Card - Shows total learning time
+ */
+@Composable
+private fun TimeSpentCard(
+    totalMinutes: Int,
+    lessonsWithTime: Int,
+    totalLessons: Int,
+    accentColor: Color,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Clock icon with background
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(accentColor.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Schedule,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Total Learning Time",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = formatTimeSpent(totalMinutes),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = accentColor,
+                )
+                Text(
+                    text = "$lessonsWithTime of $totalLessons lessons started",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+// Helper functions for persistence
+
+private fun loadMemorizationProgress(
+    prefs: android.content.SharedPreferences,
+    courseId: String
+): Map<String, MemorizationProgress> {
+    val result = mutableMapOf<String, MemorizationProgress>()
+    val allKeys = prefs.all.keys.filter { it.startsWith("mem_${courseId}_") }
+
+    for (key in allKeys) {
+        val lessonId = key.removePrefix("mem_${courseId}_")
+        val ayahsString = prefs.getString(key, "") ?: ""
+        val ayahs = if (ayahsString.isNotEmpty()) {
+            ayahsString.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+        } else {
+            emptySet()
+        }
+        val totalAyahs = prefs.getInt("mem_total_${courseId}_$lessonId", 3)
+        val timeSpent = prefs.getInt("time_${courseId}_$lessonId", 0)
+        val lastPracticed = prefs.getLong("lastprac_${courseId}_$lessonId", 0L)
+
+        result[lessonId] = MemorizationProgress(
+            lessonId = lessonId,
+            memorizedAyahs = ayahs,
+            totalAyahs = totalAyahs,
+            timeSpentMinutes = timeSpent,
+            lastPracticed = lastPracticed,
+        )
+    }
+
+    return result
+}
+
+private fun saveMemorizationProgress(
+    prefs: android.content.SharedPreferences,
+    courseId: String,
+    progress: Map<String, MemorizationProgress>
+) {
+    val editor = prefs.edit()
+    for ((lessonId, memProgress) in progress) {
+        val ayahsString = memProgress.memorizedAyahs.joinToString(",")
+        editor.putString("mem_${courseId}_$lessonId", ayahsString)
+        editor.putInt("mem_total_${courseId}_$lessonId", memProgress.totalAyahs)
+        editor.putLong("lastprac_${courseId}_$lessonId", memProgress.lastPracticed)
+    }
+    editor.apply()
+}
+
+private fun loadTimeSpent(
+    prefs: android.content.SharedPreferences,
+    courseId: String
+): Map<String, Int> {
+    val result = mutableMapOf<String, Int>()
+    val allKeys = prefs.all.keys.filter { it.startsWith("time_${courseId}_") }
+
+    for (key in allKeys) {
+        val lessonId = key.removePrefix("time_${courseId}_")
+        val minutes = prefs.getInt(key, 0)
+        if (minutes > 0) {
+            result[lessonId] = minutes
+        }
+    }
+
+    return result
+}
+
+private fun saveTimeSpent(
+    prefs: android.content.SharedPreferences,
+    courseId: String,
+    timeSpent: Map<String, Int>
+) {
+    val editor = prefs.edit()
+    for ((lessonId, minutes) in timeSpent) {
+        editor.putInt("time_${courseId}_$lessonId", minutes)
+    }
+    editor.apply()
+}
+
+private fun formatTimeSpent(minutes: Int): String {
+    return when {
+        minutes < 60 -> "${minutes}min"
+        minutes < 1440 -> "${minutes / 60}h ${minutes % 60}min"
+        else -> "${minutes / 1440}d ${(minutes % 1440) / 60}h"
+    }
+}
+
+private fun formatTimeSpentShort(minutes: Int): String {
+    return when {
+        minutes < 60 -> "${minutes}m"
+        minutes < 1440 -> "${minutes / 60}h"
+        else -> "${minutes / 1440}d"
     }
 }

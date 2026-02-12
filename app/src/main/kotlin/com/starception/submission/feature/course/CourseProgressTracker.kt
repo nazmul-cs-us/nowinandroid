@@ -18,6 +18,7 @@ package com.starception.submission.feature.course
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.json.JSONObject
 
 /**
  * Course completion info returned when checking if content is completed in a course
@@ -29,6 +30,15 @@ data class CourseCompletionInfo(
 )
 
 /**
+ * Pending lesson info for lessons that have been viewed but not yet confirmed as completed
+ */
+data class PendingLessonInfo(
+    val lessonId: String,
+    val lessonTitle: String,
+    val timestamp: Long,
+)
+
+/**
  * Tracks course progress and completed lessons.
  * Stores which specific surahs/hadiths have been completed in each course.
  */
@@ -36,6 +46,7 @@ object CourseProgressTracker {
 
     private const val PREFS_NAME = "course_progress"
     private const val COMPLETED_LESSONS_PREFIX = "completed_lessons_"
+    private const val PENDING_COMPLETION_PREFIX = "pending_completion_"
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -73,6 +84,80 @@ object CourseProgressTracker {
         val key = "$COMPLETED_LESSONS_PREFIX$courseId"
         return prefs.getStringSet(key, emptySet()) ?: emptySet()
     }
+
+    // ==================== Pending Completion Methods ====================
+
+    /**
+     * Set a lesson as pending completion (user has viewed but not confirmed)
+     * @param context Android context
+     * @param courseId The course ID
+     * @param lessonId The lesson ID
+     * @param lessonTitle Human-readable lesson title
+     */
+    fun setPendingCompletion(
+        context: Context,
+        courseId: String,
+        lessonId: String,
+        lessonTitle: String
+    ) {
+        val prefs = getPrefs(context)
+        val key = "$PENDING_COMPLETION_PREFIX$courseId"
+        val json = JSONObject().apply {
+            put("lessonId", lessonId)
+            put("lessonTitle", lessonTitle)
+            put("timestamp", System.currentTimeMillis())
+        }
+        prefs.edit().putString(key, json.toString()).apply()
+    }
+
+    /**
+     * Get the pending lesson info for a course
+     * @return PendingLessonInfo if there's a pending lesson, null otherwise
+     */
+    fun getPendingCompletion(context: Context, courseId: String): PendingLessonInfo? {
+        val prefs = getPrefs(context)
+        val key = "$PENDING_COMPLETION_PREFIX$courseId"
+        val jsonString = prefs.getString(key, null) ?: return null
+
+        return try {
+            val json = JSONObject(jsonString)
+            PendingLessonInfo(
+                lessonId = json.getString("lessonId"),
+                lessonTitle = json.getString("lessonTitle"),
+                timestamp = json.getLong("timestamp"),
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Clear the pending completion for a course
+     */
+    fun clearPendingCompletion(context: Context, courseId: String) {
+        val prefs = getPrefs(context)
+        val key = "$PENDING_COMPLETION_PREFIX$courseId"
+        prefs.edit().remove(key).apply()
+    }
+
+    /**
+     * Check if there's a pending completion for a course
+     */
+    fun hasPendingCompletion(context: Context, courseId: String): Boolean {
+        return getPendingCompletion(context, courseId) != null
+    }
+
+    /**
+     * Confirm a pending completion - mark the lesson as completed and clear pending
+     */
+    fun confirmPendingCompletion(context: Context, courseId: String): Boolean {
+        val pending = getPendingCompletion(context, courseId) ?: return false
+        markLessonCompleted(context, courseId, pending.lessonId)
+        clearPendingCompletion(context, courseId)
+        return true
+    }
+
+    // ==================== End Pending Completion Methods ====================
 
     /**
      * Check if a surah has been completed in any enrolled course
