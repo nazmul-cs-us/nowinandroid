@@ -36,6 +36,9 @@ class PrayerBootReceiver : BroadcastReceiver() {
     @Inject
     lateinit var prayerTimeCalculatorService: PrayerTimeCalculatorService
 
+    @Inject
+    lateinit var prayerSettingsRepository: com.starception.submission.prayer.repository.PrayerSettingsRepository
+
     companion object {
         private const val TAG = "PrayerBootReceiver"
     }
@@ -91,11 +94,15 @@ class PrayerBootReceiver : BroadcastReceiver() {
                 val newTimezone = java.util.TimeZone.getDefault()
                 Log.d(TAG, "🌍 New timezone: ${newTimezone.id} (${newTimezone.displayName})")
 
-                // Cancel existing notifications
+                // Step 1: Re-initialize prayer settings based on new location/country
+                Log.d(TAG, "📍 Force re-initializing prayer calculation settings for new timezone...")
+                prayerSettingsRepository.forceReinitializeForTimezoneChange(newTimezone.id)
+                Log.d(TAG, "✅ Prayer settings force re-initialized for ${newTimezone.id}")
+
+                // Step 2: Cancel existing notifications
                 PrayerNotificationScheduler.cancelAllPrayerNotifications(context)
 
-                // Recalculate and reschedule prayer times
-                // The prayer time calculator will use the new timezone automatically
+                // Step 3: Recalculate and reschedule prayer times with new settings
                 reschedulePrayerNotifications(context)
 
                 // Send broadcast to update UI
@@ -104,7 +111,7 @@ class PrayerBootReceiver : BroadcastReceiver() {
                 updateIntent.putExtra("timezone", newTimezone.id)
                 context.sendBroadcast(updateIntent)
 
-                Log.d(TAG, "✅ Prayer times recalculated for new timezone")
+                Log.d(TAG, "✅ Prayer times and settings recalculated for new timezone: ${newTimezone.id}")
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Failed to handle timezone change: ${e.message}", e)
             }

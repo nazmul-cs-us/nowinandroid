@@ -81,6 +81,7 @@ class PrayerNotificationService : Service() {
     private var currentActivity: String = "UNKNOWN"
     private var activityReceiver: ActivityTransitionReceiver? = null
     private var toneGenerator: ToneGenerator? = null
+    private var timezoneReceiver: BroadcastReceiver? = null
 
     // HandlerThread for sensor callbacks - CRITICAL for background activity detection
     // Android 9+ throttles sensors for background apps, but foreground service handlers work
@@ -153,7 +154,10 @@ class PrayerNotificationService : Service() {
             // Initialize notification manager for separate Live Update notifications
             notificationManager = getSystemService(NotificationManager::class.java)
             Log.d(TAG, "✓ Live Update notification manager initialized separately from foreground service")
-            
+
+            // Register timezone change receiver for dynamic updates
+            registerTimezoneReceiver()
+
             // Initialize Google Play Services Activity Recognition (runs async to prevent ANR)
             // This provides backup activity detection alongside sensor-based detection
             serviceScope.launch(Dispatchers.IO) {
@@ -1809,7 +1813,70 @@ class PrayerNotificationService : Service() {
         }
     }
 
-    
+    /**
+     * Register timezone change receiver for dynamic prayer time updates
+     * This is registered dynamically (not in manifest) for Android 12+ compatibility
+     */
+    private fun registerTimezoneReceiver() {
+        try {
+            timezoneReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    when (intent?.action) {
+                        Intent.ACTION_TIMEZONE_CHANGED -> {
+                            val newTimezone = java.util.TimeZone.getDefault()
+                            Log.d(TAG, "🌍 Timezone changed to: ${newTimezone.id} (${newTimezone.displayName})")
+                            handleTimezoneChange()
+                        }
+                        Intent.ACTION_TIME_CHANGED -> {
+                            Log.d(TAG, "⏰ System time changed - recalculating prayer times")
+                            handleTimezoneChange()
+                        }
+                    }
+                }
+            }
+
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_TIMEZONE_CHANGED)
+                addAction(Intent.ACTION_TIME_CHANGED)
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(timezoneReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(timezoneReceiver, filter)
+            }
+
+            Log.d(TAG, "✓ Timezone change receiver registered")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to register timezone receiver: ${e.message}")
+        }
+    }
+
+    /**
+     * Handle timezone or time change - reload settings and recalculate prayer times
+     */
+    private fun handleTimezoneChange() {
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                val newTimezone = java.util.TimeZone.getDefault()
+                Log.d(TAG, "🔄 Handling timezone/time change to: ${newTimezone.id}")
+
+                // Step 1: Force re-initialize settings based on new timezone/country
+                // This will auto-detect the appropriate calculation method for the new timezone
+                Log.d(TAG, "📍 Force re-initializing prayer settings for new timezone...")
+                prayerSettingsRepository.forceReinitializeForTimezoneChange(newTimezone.id)
+
+                // Step 2: Force refresh and update notification with new prayer times
+                Log.d(TAG, "🕌 Recalculating prayer times with updated settings...")
+                updatePrayerNotificationWithRealData()
+
+                Log.d(TAG, "✅ Prayer times and settings updated for timezone: ${newTimezone.id}")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to handle timezone change: ${e.message}", e)
+            }
+        }
+    }
+
     override fun onDestroy() {
         Log.d(TAG, "Prayer notification service destroy started")
         
@@ -1843,7 +1910,18 @@ class PrayerNotificationService : Service() {
             } catch (e: Exception) {
                 Log.w(TAG, "Error stopping activity recognition", e)
             }
-            
+
+            // Unregister timezone receiver
+            try {
+                timezoneReceiver?.let {
+                    unregisterReceiver(it)
+                    timezoneReceiver = null
+                    Log.d(TAG, "✓ Timezone receiver unregistered")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error unregistering timezone receiver", e)
+            }
+
             // Stop ActivityTracker sensor detection and clear callback
             try {
                 ActivityTracker.setActivityChangeCallback(null)  // Clear callback first
