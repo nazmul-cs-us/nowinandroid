@@ -160,7 +160,147 @@ class PrayerSettingsRepository @Inject constructor(
             Log.d(TAG, "⏭️ Skipping re-initialization: method=${currentSettings.calculationMethod.name}, country=$cachedCountry")
         }
     }
-    
+
+    /**
+     * FORCE RE-INITIALIZE FOR TIMEZONE CHANGE: Called when device timezone changes
+     * Unlike reinitializeWithLocation(), this ALWAYS updates settings based on new timezone
+     * regardless of current calculation method settings.
+     *
+     * @param newTimezoneId The new timezone ID (e.g., "Asia/Kolkata", "America/New_York")
+     */
+    fun forceReinitializeForTimezoneChange(newTimezoneId: String) {
+        Log.i(TAG, "")
+        Log.i(TAG, "🌍 TIMEZONE CHANGE DETECTED: $newTimezoneId")
+        Log.i(TAG, "=".repeat(60))
+
+        // Map timezone to country code
+        val countryCode = getCountryCodeFromTimezone(newTimezoneId)
+        if (countryCode == null) {
+            Log.w(TAG, "⚠️ Could not determine country from timezone: $newTimezoneId")
+            Log.i(TAG, "=".repeat(60))
+            return
+        }
+
+        Log.i(TAG, "📍 Detected country code: $countryCode")
+
+        // Get auto-detected settings for the new country
+        val autoDetectedSettings = getAutoDetectedSettingsForCountry(countryCode)
+        if (autoDetectedSettings == null) {
+            Log.w(TAG, "⚠️ No auto-detected settings available for country: $countryCode")
+            Log.i(TAG, "=".repeat(60))
+            return
+        }
+
+        Log.i(TAG, "✅ Found settings for $countryCode:")
+        Log.i(TAG, "   📐 Calculation Method: ${autoDetectedSettings.calculationMethod.name}")
+        Log.i(TAG, "   🕌 Madhab: ${autoDetectedSettings.asrMadhhab.name}")
+
+        // Update calculation settings with auto-detected values
+        val updatedSettings = PrayerCalculationSettings(
+            calculationMethod = autoDetectedSettings.calculationMethod,
+            asrMadhhab = autoDetectedSettings.asrMadhhab,
+            highLatitudeAdjustment = autoDetectedSettings.highLatitudeAdjustment,
+            customFajrAngle = autoDetectedSettings.customFajrAngle,
+            customIshaAngle = autoDetectedSettings.customIshaAngle,
+            customIshaDelay = autoDetectedSettings.customIshaDelay,
+            timeOffsets = autoDetectedSettings.timeOffsets
+        )
+
+        updateCalculationSettings(updatedSettings, forceCommit = true)
+        Log.i(TAG, "🎯 Prayer settings FORCE updated for timezone change to: $newTimezoneId")
+        Log.i(TAG, "=".repeat(60))
+        Log.i(TAG, "")
+    }
+
+    /**
+     * Map timezone ID to ISO country code
+     * Uses known timezone-to-country mappings
+     */
+    private fun getCountryCodeFromTimezone(timezoneId: String): String? {
+        // Common timezone to country mappings
+        val timezoneCountryMap = mapOf(
+            // India
+            "Asia/Kolkata" to "IN",
+            "Asia/Calcutta" to "IN",
+
+            // UAE
+            "Asia/Dubai" to "AE",
+
+            // Saudi Arabia
+            "Asia/Riyadh" to "SA",
+
+            // Pakistan
+            "Asia/Karachi" to "PK",
+
+            // Bangladesh
+            "Asia/Dhaka" to "BD",
+
+            // Indonesia
+            "Asia/Jakarta" to "ID",
+
+            // Malaysia
+            "Asia/Kuala_Lumpur" to "MY",
+
+            // Turkey
+            "Europe/Istanbul" to "TR",
+
+            // Egypt
+            "Africa/Cairo" to "EG",
+
+            // UK
+            "Europe/London" to "GB",
+
+            // USA
+            "America/New_York" to "US",
+            "America/Chicago" to "US",
+            "America/Denver" to "US",
+            "America/Los_Angeles" to "US",
+
+            // Canada
+            "America/Toronto" to "CA",
+            "America/Vancouver" to "CA",
+
+            // Australia
+            "Australia/Sydney" to "AU",
+            "Australia/Melbourne" to "AU",
+
+            // Germany
+            "Europe/Berlin" to "DE",
+
+            // France
+            "Europe/Paris" to "FR",
+
+            // Qatar
+            "Asia/Qatar" to "QA",
+
+            // Kuwait
+            "Asia/Kuwait" to "KW",
+
+            // Bahrain
+            "Asia/Bahrain" to "BH",
+
+            // Oman
+            "Asia/Muscat" to "OM",
+
+            // Jordan
+            "Asia/Amman" to "JO",
+
+            // Morocco
+            "Africa/Casablanca" to "MA",
+
+            // Singapore
+            "Asia/Singapore" to "SG",
+
+            // Nigeria
+            "Africa/Lagos" to "NG",
+
+            // South Africa
+            "Africa/Johannesburg" to "ZA",
+        )
+
+        return timezoneCountryMap[timezoneId]
+    }
+
     // COMPREHENSIVE PREFERENCE LOGGING SYSTEM - Enhanced logging with detailed data tracking
     // This provides complete visibility into all preference operations for debugging and monitoring
     
