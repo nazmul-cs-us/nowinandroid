@@ -118,6 +118,47 @@ fun CourseScreen(
         }
     }
 
+    // State for showing completion bottom sheet
+    var showCompletionSheet by remember { mutableStateOf<Triple<String, String, String>?>(null) } // courseId, lessonId, lessonTitle
+
+    // Check for pending completions when screen is shown
+    LaunchedEffect(progressUpdateTrigger) {
+        // Check each enrolled course for pending completions
+        for (course in myCourses) {
+            val pending = CourseProgressTracker.getPendingCompletion(context, course.id)
+            if (pending != null) {
+                showCompletionSheet = Triple(course.id, pending.lessonId, pending.lessonTitle)
+                break
+            }
+        }
+    }
+
+    // Show completion bottom sheet
+    showCompletionSheet?.let { (courseId, lessonId, lessonTitle) ->
+        LessonCompletionBottomSheet(
+            lessonTitle = lessonTitle,
+            courseId = courseId,
+            lessonId = lessonId,
+            onComplete = { hasRecording ->
+                // Mark lesson as completed
+                CourseProgressTracker.confirmPendingCompletion(context, courseId)
+                // Update progress count
+                val currentProgress = prefs.getInt("progress_$courseId", 0)
+                val course = availableCourses.find { it.id == courseId }
+                if (course != null && currentProgress < course.totalLessons) {
+                    prefs.edit().putInt("progress_$courseId", currentProgress + 1).apply()
+                    progressUpdateTrigger++
+                }
+                showCompletionSheet = null
+            },
+            onDismiss = {
+                // User said "Not Yet" - clear pending without marking complete
+                CourseProgressTracker.clearPendingCompletion(context, courseId)
+                showCompletionSheet = null
+            },
+        )
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -143,32 +184,49 @@ fun CourseScreen(
                         val currentProgress = prefs.getInt("progress_${course.id}", 0)
                         when (course.id) {
                             "memorize_3_ayahs" -> {
+                                // Set pending completion before navigating
+                                val surahNumber = currentProgress + 1
+                                val lessonId = "surah_$surahNumber"
+                                val lessonTitle = "Surah ${getSurahName(surahNumber)}"
+                                CourseProgressTracker.setPendingCompletion(context, course.id, lessonId, lessonTitle)
                                 // Navigate to the surah (1-114)
-                                onSurahClick(currentProgress + 1)
+                                onSurahClick(surahNumber)
                             }
                             "daily_bukhari" -> {
+                                // Set pending completion before navigating
+                                val hadithNumber = currentProgress + 1
+                                val lessonId = "hadith_$hadithNumber"
+                                val lessonTitle = "Hadith #$hadithNumber"
+                                CourseProgressTracker.setPendingCompletion(context, course.id, lessonId, lessonTitle)
                                 // Navigate to hadith from Bukhari
-                                onHadithClick("sahih_bukhari.db", currentProgress + 1)
+                                onHadithClick("sahih_bukhari.db", hadithNumber)
                             }
                             "juz_amma" -> {
                                 // Juz Amma starts at surah 78
                                 val surahNumber = 78 + currentProgress
                                 if (surahNumber <= 114) {
+                                    // Set pending completion before navigating
+                                    val lessonId = "surah_$surahNumber"
+                                    val lessonTitle = "Surah ${getSurahName(surahNumber)}"
+                                    CourseProgressTracker.setPendingCompletion(context, course.id, lessonId, lessonTitle)
                                     onSurahClick(surahNumber)
                                 }
                             }
                             "quran_reading" -> {
+                                // Set pending completion before navigating
+                                val pageNumber = currentProgress + 1
+                                val lessonId = "page_$pageNumber"
+                                val lessonTitle = "Page $pageNumber"
+                                CourseProgressTracker.setPendingCompletion(context, course.id, lessonId, lessonTitle)
                                 // Navigate to appropriate surah based on page
-                                // For simplicity, map progress to surah (can be refined)
                                 val surahNumber = ((currentProgress / 5) + 1).coerceIn(1, 114)
                                 onSurahClick(surahNumber)
                             }
                             else -> {
-                                // Default: increment progress
-                                if (currentProgress < course.totalLessons) {
-                                    prefs.edit().putInt("progress_${course.id}", currentProgress + 1).apply()
-                                    progressUpdateTrigger++
-                                }
+                                // Default: show completion sheet directly
+                                val lessonId = "lesson_${currentProgress + 1}"
+                                val lessonTitle = "Lesson ${currentProgress + 1}"
+                                showCompletionSheet = Triple(course.id, lessonId, lessonTitle)
                             }
                         }
                     },

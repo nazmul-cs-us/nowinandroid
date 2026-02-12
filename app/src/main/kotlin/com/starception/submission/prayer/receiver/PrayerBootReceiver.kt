@@ -49,6 +49,14 @@ class PrayerBootReceiver : BroadcastReceiver() {
                 reschedulePrayerNotifications(context)
                 restartActivityDetection(context)
             }
+            Intent.ACTION_TIMEZONE_CHANGED -> {
+                Log.d(TAG, "🌍 Timezone changed - recalculating prayer times and rescheduling notifications")
+                handleTimezoneOrTimeChange(context)
+            }
+            Intent.ACTION_TIME_CHANGED -> {
+                Log.d(TAG, "⏰ System time changed - recalculating prayer times and rescheduling notifications")
+                handleTimezoneOrTimeChange(context)
+            }
         }
     }
 
@@ -73,6 +81,36 @@ class PrayerBootReceiver : BroadcastReceiver() {
         }
     }
     
+    /**
+     * Handle timezone or time changes
+     * Recalculates prayer times and reschedules notifications
+     */
+    private fun handleTimezoneOrTimeChange(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val newTimezone = java.util.TimeZone.getDefault()
+                Log.d(TAG, "🌍 New timezone: ${newTimezone.id} (${newTimezone.displayName})")
+
+                // Cancel existing notifications
+                PrayerNotificationScheduler.cancelAllPrayerNotifications(context)
+
+                // Recalculate and reschedule prayer times
+                // The prayer time calculator will use the new timezone automatically
+                reschedulePrayerNotifications(context)
+
+                // Send broadcast to update UI
+                val updateIntent = Intent("com.starception.submission.PRAYER_TIMES_UPDATED")
+                updateIntent.putExtra("reason", "timezone_changed")
+                updateIntent.putExtra("timezone", newTimezone.id)
+                context.sendBroadcast(updateIntent)
+
+                Log.d(TAG, "✅ Prayer times recalculated for new timezone")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to handle timezone change: ${e.message}", e)
+            }
+        }
+    }
+
     private fun reschedulePrayerNotifications(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
