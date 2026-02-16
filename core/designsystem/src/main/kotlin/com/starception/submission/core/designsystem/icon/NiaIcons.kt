@@ -23,13 +23,13 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.PlayLesson
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Upcoming
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.PlayLesson
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
@@ -73,6 +73,6 @@ object NiaIcons {
     val HomeBorder = Icons.Outlined.Home
 
     // Course tab icons - for learning/courses feature
-    val Course = Icons.Filled.School
-    val CourseBorder = Icons.Outlined.School
+    val Course = Icons.Filled.PlayLesson
+    val CourseBorder = Icons.Outlined.PlayLesson
 }

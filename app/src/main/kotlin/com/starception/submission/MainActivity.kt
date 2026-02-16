@@ -191,7 +191,10 @@ class MainActivity : FragmentActivity() {
 
         // Initialize ViewModel for theme handling (but without splash screen blocking)
         val viewModel: MainActivityViewModel by viewModels()
-        
+
+        // Handle deep link for course sharing
+        val deepLinkCourseId = handleCourseDeepLink(intent)
+
         // GOOGLE SAMPLE LIVE UPDATE - Initialize for prayer notifications
         if (Build.VERSION.SDK_INT >= 35) { // Android 16+ (BAKLAVA = 35)
             lifecycleScope.launch {
@@ -249,7 +252,11 @@ class MainActivity : FragmentActivity() {
                     LocalAnalyticsHelper provides analyticsHelper,
                     LocalTimeZone provides currentTimeZone,
                 ) {
-                    NiaApp(appState, mainViewModel = viewModel)
+                    NiaApp(
+                        appState = appState,
+                        mainViewModel = viewModel,
+                        deepLinkCourseId = deepLinkCourseId,
+                    )
                 }
             }
         }
@@ -456,6 +463,27 @@ class MainActivity : FragmentActivity() {
         } catch (e: Exception) {
             Log.w("MainActivity", "Auto-detection failed: ${e.message}")
         }
+    }
+
+    /**
+     * Handle course deep link from share intent
+     * Deep link format: starception://course/{courseId}
+     */
+    private fun handleCourseDeepLink(intent: Intent?): String? {
+        if (intent == null) return null
+
+        val data = intent.data ?: return null
+        Log.d("MainActivity", "🔗 Deep link received: $data")
+
+        // Check if this is a course deep link
+        if (data.scheme == "starception" && data.host == "course") {
+            val courseId = data.pathSegments.firstOrNull()
+            if (courseId != null) {
+                Log.d("MainActivity", "📚 Opening course: $courseId")
+                return courseId
+            }
+        }
+        return null
     }
 }
 

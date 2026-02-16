@@ -17,7 +17,11 @@
 package com.starception.submission.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
@@ -60,10 +64,23 @@ fun NiaNavHost(
     onShowSnackbar: suspend (String, String?) -> Boolean,
     modifier: Modifier = Modifier,
     mainViewModel: MainActivityViewModel? = null,
+    deepLinkCourseId: String? = null,
 ) {
     val navController = appState.navController
     val context = LocalContext.current
     val quranRepository = remember { QuranRepository(context) }
+
+    // Handle deep link for course
+    var deepLinkHandled by remember { mutableStateOf(false) }
+    LaunchedEffect(deepLinkCourseId) {
+        if (deepLinkCourseId != null && !deepLinkHandled) {
+            deepLinkHandled = true
+            // Navigate to course detail after a short delay to ensure NavHost is ready
+            kotlinx.coroutines.delay(300)
+            navController.navigateToCourseDetail(deepLinkCourseId)
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = PrayerTimesRoute,
