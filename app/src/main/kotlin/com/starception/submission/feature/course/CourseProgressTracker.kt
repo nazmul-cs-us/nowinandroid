@@ -110,9 +110,14 @@ object CourseProgressTracker {
         prefs.edit().putString(key, json.toString()).apply()
     }
 
+    // Pending completions expire after 1 hour (in milliseconds)
+    private const val PENDING_EXPIRATION_MS = 60 * 60 * 1000L
+
     /**
      * Get the pending lesson info for a course
      * @return PendingLessonInfo if there's a pending lesson, null otherwise
+     *
+     * Note: Automatically clears and returns null for pending completions older than 1 hour
      */
     fun getPendingCompletion(context: Context, courseId: String): PendingLessonInfo? {
         val prefs = getPrefs(context)
@@ -121,10 +126,21 @@ object CourseProgressTracker {
 
         return try {
             val json = JSONObject(jsonString)
+            val timestamp = json.getLong("timestamp")
+            val currentTime = System.currentTimeMillis()
+
+            // Check if pending completion has expired (older than 1 hour)
+            if (currentTime - timestamp > PENDING_EXPIRATION_MS) {
+                // Auto-clear stale pending completion
+                android.util.Log.d("CourseProgressTracker", "🗑️ Clearing expired pending completion for $courseId (age: ${(currentTime - timestamp) / 1000 / 60} minutes)")
+                clearPendingCompletion(context, courseId)
+                return null
+            }
+
             PendingLessonInfo(
                 lessonId = json.getString("lessonId"),
                 lessonTitle = json.getString("lessonTitle"),
-                timestamp = json.getLong("timestamp"),
+                timestamp = timestamp,
             )
         } catch (e: Exception) {
             null

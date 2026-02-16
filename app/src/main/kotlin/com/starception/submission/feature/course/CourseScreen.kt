@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -118,43 +119,64 @@ fun CourseScreen(
         }
     }
 
-    // State for showing completion bottom sheet
-    var showCompletionSheet by remember { mutableStateOf<Triple<String, String, String>?>(null) } // courseId, lessonId, lessonTitle
+    // State for showing completion dialog - use rememberSaveable to survive predictive back
+    var pendingCourseId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingLessonId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingLessonTitle by rememberSaveable { mutableStateOf<String?>(null) }
+    var dialogShown by rememberSaveable { mutableStateOf(false) }
 
-    // Check for pending completions when screen is shown
+    // Check for pending completions when screen is shown (with delay for navigation to settle)
     LaunchedEffect(progressUpdateTrigger) {
+        // Wait for navigation to settle before checking pending
+        kotlinx.coroutines.delay(500)
         // Check each enrolled course for pending completions
         for (course in myCourses) {
             val pending = CourseProgressTracker.getPendingCompletion(context, course.id)
-            if (pending != null) {
-                showCompletionSheet = Triple(course.id, pending.lessonId, pending.lessonTitle)
+            if (pending != null && !dialogShown) {
+                pendingCourseId = course.id
+                pendingLessonId = pending.lessonId
+                pendingLessonTitle = pending.lessonTitle
+                dialogShown = true
                 break
             }
         }
     }
 
-    // Show completion bottom sheet
-    showCompletionSheet?.let { (courseId, lessonId, lessonTitle) ->
-        LessonCompletionBottomSheet(
-            lessonTitle = lessonTitle,
-            courseId = courseId,
-            lessonId = lessonId,
+    // Show completion dialog (more stable than BottomSheet during predictive back)
+    // Capture values to avoid smart cast issues with delegated properties
+    val currentCourseId = pendingCourseId
+    val currentLessonId = pendingLessonId
+    val currentLessonTitle = pendingLessonTitle
+
+    if (dialogShown && currentCourseId != null && currentLessonId != null && currentLessonTitle != null) {
+        LessonCompletionDialog(
+            lessonTitle = currentLessonTitle,
+            courseId = currentCourseId,
+            lessonId = currentLessonId,
             onComplete = { hasRecording ->
                 // Mark lesson as completed
-                CourseProgressTracker.confirmPendingCompletion(context, courseId)
+                CourseProgressTracker.confirmPendingCompletion(context, currentCourseId)
                 // Update progress count
-                val currentProgress = prefs.getInt("progress_$courseId", 0)
-                val course = availableCourses.find { it.id == courseId }
+                val currentProgress = prefs.getInt("progress_$currentCourseId", 0)
+                val course = availableCourses.find { it.id == currentCourseId }
                 if (course != null && currentProgress < course.totalLessons) {
-                    prefs.edit().putInt("progress_$courseId", currentProgress + 1).apply()
+                    prefs.edit().putInt("progress_$currentCourseId", currentProgress + 1).apply()
                     progressUpdateTrigger++
                 }
-                showCompletionSheet = null
+                // Clear all pending state
+                CourseProgressTracker.clearPendingCompletion(context, currentCourseId)
+                pendingCourseId = null
+                pendingLessonId = null
+                pendingLessonTitle = null
+                dialogShown = false
             },
             onDismiss = {
                 // User said "Not Yet" - clear pending without marking complete
-                CourseProgressTracker.clearPendingCompletion(context, courseId)
-                showCompletionSheet = null
+                CourseProgressTracker.clearPendingCompletion(context, currentCourseId)
+                pendingCourseId = null
+                pendingLessonId = null
+                pendingLessonTitle = null
+                dialogShown = false
             },
         )
     }
@@ -223,10 +245,13 @@ fun CourseScreen(
                                 onSurahClick(surahNumber)
                             }
                             else -> {
-                                // Default: show completion sheet directly
+                                // Default: show completion dialog directly
                                 val lessonId = "lesson_${currentProgress + 1}"
                                 val lessonTitle = "Lesson ${currentProgress + 1}"
-                                showCompletionSheet = Triple(course.id, lessonId, lessonTitle)
+                                pendingCourseId = course.id
+                                pendingLessonId = lessonId
+                                pendingLessonTitle = lessonTitle
+                                dialogShown = true
                             }
                         }
                     },

@@ -17,6 +17,7 @@
 package com.starception.submission.feature.course
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -104,7 +105,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -256,30 +260,55 @@ fun CourseDetailScreen(
         mutableStateOf(loadTimeSpent(prefs, course.id))
     }
 
-    // State for showing completion bottom sheet
+    // State for showing completion bottom sheet - use rememberSaveable to survive config changes
     var showCompletionSheet by remember { mutableStateOf<Lesson?>(null) }
 
-    // Lifecycle observer to detect when returning from surah/hadith view
-    val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                // Check for pending completion when returning to this screen
-                val pending = CourseProgressTracker.getPendingCompletion(context, course.id)
-                if (pending != null) {
-                    // Find the lesson to show in the bottom sheet
-                    val modules = generateModulesForCourse(course)
-                    for (module in modules) {
-                        val lesson = module.lessons.find { it.id == pending.lessonId }
-                        if (lesson != null) {
-                            showCompletionSheet = lesson
-                            break
-                        }
+    // Store pending lesson info that survives recomposition during predictive back
+    var pendingLessonForSheet by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingLessonTitle by rememberSaveable { mutableStateOf<String?>(null) }
+
+    // Track when sheet was shown to distinguish user dismiss from system dismiss
+    var sheetShownTimestamp by remember { mutableStateOf(0L) }
+
+    // Check for pending completion on initial composition
+    LaunchedEffect(Unit) {
+        val pending = CourseProgressTracker.getPendingCompletion(context, course.id)
+        Log.d("CourseDetail_TRACE", "🔍 LaunchedEffect - Pending: ${pending?.lessonId ?: "null"}")
+        if (pending != null && pendingLessonForSheet == null) {
+            pendingLessonForSheet = pending.lessonId
+            pendingLessonTitle = pending.lessonTitle
+            // Clear from prefs immediately
+            CourseProgressTracker.clearPendingCompletion(context, course.id)
+            Log.d("CourseDetail_TRACE", "📋 Stored pending: ${pending.lessonId}, cleared from prefs")
+        }
+    }
+
+    // Retry counter to handle predictive back dismissals
+    var showAttempt by rememberSaveable { mutableIntStateOf(0) }
+
+    // Show bottom sheet when we have a pending lesson (with delay for navigation to settle)
+    // Re-trigger when showAttempt changes (for retries)
+    LaunchedEffect(pendingLessonForSheet, showAttempt) {
+        val lessonId = pendingLessonForSheet
+        if (lessonId != null && showCompletionSheet == null) {
+            Log.d("CourseDetail_TRACE", "⏰ Attempt $showAttempt: Waiting 1.5s for navigation to settle...")
+            kotlinx.coroutines.delay(1500) // 1.5 second delay for predictive back
+            // Double-check we still need to show (might have been dismissed by user)
+            if (pendingLessonForSheet != null && showCompletionSheet == null) {
+                Log.d("CourseDetail_TRACE", "🔍 Looking for lesson: $lessonId")
+                val modules = generateModulesForCourse(course)
+                for (module in modules) {
+                    val lesson = module.lessons.find { it.id == lessonId }
+                    if (lesson != null) {
+                        Log.d("CourseDetail_TRACE", "✅ Found lesson, showing bottom sheet: ${lesson.id}")
+                        sheetShownTimestamp = System.currentTimeMillis()
+                        showCompletionSheet = lesson
+                        break
                     }
                 }
             }
+            // Note: Don't clear pendingLessonForSheet here - only clear when user confirms/dismisses
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
     }
 
     // Total time spent on course
@@ -685,13 +714,15 @@ fun CourseDetailScreen(
         )
     }
 
-    // Lesson Completion Bottom Sheet
+    // Lesson Completion Dialog (more stable than ModalBottomSheet during predictive back)
     showCompletionSheet?.let { lesson ->
-        LessonCompletionBottomSheet(
+        Log.d("CourseDetail_TRACE", "🎯 Rendering LessonCompletionDialog for: ${lesson.id} - ${lesson.title}")
+        LessonCompletionDialog(
             lessonTitle = lesson.title,
             courseId = course.id,
             lessonId = lesson.id,
             onComplete = { hasRecording ->
+                Log.d("CourseDetail_TRACE", "✅ onComplete called for: ${lesson.id}, hasRecording: $hasRecording")
                 // Mark lesson as completed
                 CourseProgressTracker.markLessonCompleted(context, course.id, lesson.id)
                 CourseProgressTracker.clearPendingCompletion(context, course.id)
@@ -703,11 +734,17 @@ fun CourseDetailScreen(
                 prefs.edit().putStringSet("completed_lessons_${course.id}", newSet).apply()
                 prefs.edit().putInt("progress_${course.id}", newSet.size).apply()
 
+                // Clear all pending state
+                pendingLessonForSheet = null
+                pendingLessonTitle = null
                 showCompletionSheet = null
             },
             onDismiss = {
-                // Clear pending without marking complete
+                Log.d("CourseDetail_TRACE", "❌ onDismiss called for: ${lesson.id}")
+                // Clear all pending state when user dismisses
                 CourseProgressTracker.clearPendingCompletion(context, course.id)
+                pendingLessonForSheet = null
+                pendingLessonTitle = null
                 showCompletionSheet = null
             },
         )
