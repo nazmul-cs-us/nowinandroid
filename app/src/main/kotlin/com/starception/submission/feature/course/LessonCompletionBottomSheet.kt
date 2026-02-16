@@ -17,6 +17,7 @@
 package com.starception.submission.feature.course
 
 import android.Manifest
+import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -77,6 +79,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -96,9 +99,13 @@ fun LessonCompletionBottomSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    Log.d("BottomSheet_TRACE", "🎬 LessonCompletionBottomSheet COMPOSING: lesson=$lessonId, title=$lessonTitle")
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Log sheet state
+    Log.d("BottomSheet_TRACE", "📊 Sheet state - isVisible: ${sheetState.isVisible}, currentValue: ${sheetState.currentValue}, targetValue: ${sheetState.targetValue}")
 
     // Recording state
     val recordingManager = remember { VoiceRecordingManager(context) }
@@ -123,7 +130,9 @@ fun LessonCompletionBottomSheet(
 
     // Clean up on dispose
     DisposableEffect(Unit) {
+        Log.d("BottomSheet_TRACE", "🟢 DisposableEffect STARTED for lesson: $lessonId")
         onDispose {
+            Log.d("BottomSheet_TRACE", "🔴 DisposableEffect DISPOSED - composable removed from tree! lesson: $lessonId")
             if (isRecording) {
                 recordingManager.cancelRecording()
             }
@@ -135,9 +144,12 @@ fun LessonCompletionBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = {
+            Log.d("BottomSheet_TRACE", "🚪 onDismissRequest TRIGGERED for lesson: $lessonId")
             if (isRecording) {
+                Log.d("BottomSheet_TRACE", "🎤 Canceling recording...")
                 recordingManager.cancelRecording()
             }
+            Log.d("BottomSheet_TRACE", "📤 Calling onDismiss callback...")
             onDismiss()
         },
         sheetState = sheetState,
@@ -511,4 +523,224 @@ private fun formatDuration(seconds: Int): String {
     val mins = seconds / 60
     val secs = seconds % 60
     return "%02d:%02d".format(mins, secs)
+}
+
+/**
+ * Dialog-based lesson completion UI that is more stable during navigation transitions.
+ * Unlike ModalBottomSheet, AlertDialog doesn't get dismissed during predictive back gestures.
+ */
+@OptIn(ExperimentalPermissionsApi::class)
+@Composable
+fun LessonCompletionDialog(
+    lessonTitle: String,
+    courseId: String,
+    lessonId: String,
+    onComplete: (hasRecording: Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Log.d("CompletionDialog_TRACE", "🎬 LessonCompletionDialog COMPOSING: lesson=$lessonId")
+    val context = LocalContext.current
+
+    // Recording state
+    val recordingManager = remember { VoiceRecordingManager(context) }
+    var isRecording by remember { mutableStateOf(false) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var recordingSeconds by remember { mutableIntStateOf(0) }
+    var hasRecording by remember { mutableStateOf(recordingManager.hasRecording(courseId, lessonId)) }
+
+    // Permission state
+    val audioPermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
+
+    // Timer for recording duration
+    LaunchedEffect(isRecording) {
+        if (isRecording) {
+            recordingSeconds = 0
+            while (isRecording) {
+                delay(1000)
+                recordingSeconds++
+            }
+        }
+    }
+
+    // Clean up on dispose
+    DisposableEffect(Unit) {
+        Log.d("CompletionDialog_TRACE", "🟢 DisposableEffect STARTED")
+        onDispose {
+            Log.d("CompletionDialog_TRACE", "🔴 DisposableEffect DISPOSED")
+            if (isRecording) {
+                recordingManager.cancelRecording()
+            }
+            if (isPlaying) {
+                recordingManager.stopPlayback()
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = {
+            Log.d("CompletionDialog_TRACE", "🚪 onDismissRequest")
+            if (isRecording) {
+                recordingManager.cancelRecording()
+            }
+            onDismiss()
+        },
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false, // Prevent accidental dismissal
+            usePlatformDefaultWidth = false,
+        ),
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier
+            .fillMaxWidth(0.95f)
+            .padding(16.dp),
+        title = null,
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // Header Icon
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Title
+                Text(
+                    text = "Complete Lesson",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Lesson name
+                Text(
+                    text = lessonTitle,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Question
+                Text(
+                    text = "Did you complete this lesson?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Recording Section
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        AnimatedContent(
+                            targetState = isRecording,
+                            label = "recording_state",
+                        ) { recording ->
+                            if (recording) {
+                                RecordingIndicator(
+                                    seconds = recordingSeconds,
+                                    onStop = {
+                                        recordingManager.stopRecording()
+                                        isRecording = false
+                                        hasRecording = true
+                                    },
+                                    onCancel = {
+                                        recordingManager.cancelRecording()
+                                        isRecording = false
+                                    },
+                                )
+                            } else if (hasRecording) {
+                                RecordingPlayback(
+                                    isPlaying = isPlaying,
+                                    onPlay = {
+                                        isPlaying = recordingManager.startPlayback(courseId, lessonId) {
+                                            isPlaying = false
+                                        }
+                                    },
+                                    onStop = {
+                                        recordingManager.stopPlayback()
+                                        isPlaying = false
+                                    },
+                                    onDelete = {
+                                        recordingManager.deleteRecording(courseId, lessonId)
+                                        hasRecording = false
+                                    },
+                                )
+                            } else {
+                                RecordButton(
+                                    hasPermission = audioPermissionState.status.isGranted,
+                                    onRequestPermission = {
+                                        audioPermissionState.launchPermissionRequest()
+                                    },
+                                    onStartRecording = {
+                                        if (recordingManager.startRecording(courseId, lessonId)) {
+                                            isRecording = true
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    Log.d("CompletionDialog_TRACE", "✅ Completed clicked")
+                    onComplete(hasRecording)
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                ),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Completed")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = {
+                    Log.d("CompletionDialog_TRACE", "❌ Not Yet clicked")
+                    onDismiss()
+                },
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text("Not Yet")
+            }
+        },
+    )
 }
