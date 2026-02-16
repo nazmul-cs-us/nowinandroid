@@ -52,6 +52,9 @@ fun NiaTopicTag(
                 disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(
                     alpha = NiaTagDefaults.DISABLED_TOPIC_TAG_CONTAINER_ALPHA,
                 ),
+                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(
+                    alpha = NiaTagDefaults.DISABLED_TOPIC_TAG_CONTENT_ALPHA,
+                ),
             ),
         ) {
             ProvideTextStyle(value = MaterialTheme.typography.labelSmall) {
@@ -80,4 +83,7 @@ object NiaTagDefaults {
     // TODO: File bug
     // Button disabled container alpha value not exposed by ButtonDefaults
     const val DISABLED_TOPIC_TAG_CONTAINER_ALPHA = 0.12f
+
+    // Disabled text should still be readable (brighter than default disabled)
+    const val DISABLED_TOPIC_TAG_CONTENT_ALPHA = 0.8f
 }
