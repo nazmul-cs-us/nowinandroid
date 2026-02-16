@@ -84,6 +84,7 @@ fun NiaApp(
     modifier: Modifier = Modifier,
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
     mainViewModel: MainActivityViewModel? = null,
+    deepLinkCourseId: String? = null,
 ) {
     val shouldShowGradientBackground =
         appState.currentTopLevelDestination == TopLevelDestination.FOR_YOU
@@ -117,6 +118,7 @@ fun NiaApp(
                 onTopAppBarActionClick = { appState.navController.navigateToSettings() },
                 windowAdaptiveInfo = windowAdaptiveInfo,
                 mainViewModel = mainViewModel,
+                deepLinkCourseId = deepLinkCourseId,
             )
         }
     }
@@ -134,6 +136,7 @@ internal fun NiaAppContent(
     modifier: Modifier = Modifier,
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
     mainViewModel: MainActivityViewModel? = null,
+    deepLinkCourseId: String? = null,
 ) {
     val unreadDestinations by appState.topLevelDestinationsWithUnreadResources
         .collectAsStateWithLifecycle()
@@ -242,6 +245,7 @@ internal fun NiaAppContent(
                             ) == ActionPerformed
                         },
                         mainViewModel = mainViewModel,
+                        deepLinkCourseId = deepLinkCourseId,
                     )
                 }
 

@@ -102,6 +102,16 @@
                 <data android:scheme="https" />
                 <data android:host="www.nowinandroid.apps.samples.google.com" />
             </intent-filter>
+
+            <!-- Deep link for course sharing -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="starception" />
+                <data android:host="course" />
+            </intent-filter>
         </activity>
         
         <service

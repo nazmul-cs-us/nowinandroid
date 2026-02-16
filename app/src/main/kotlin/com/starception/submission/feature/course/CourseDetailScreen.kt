@@ -17,6 +17,7 @@
 package com.starception.submission.feature.course
 
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -487,14 +488,6 @@ fun CourseDetailScreen(
                 )
             }
 
-            // Instructor Section
-            item {
-                InstructorSection(
-                    instructor = instructor,
-                    accentColor = MaterialTheme.colorScheme.primary,
-                )
-            }
-
             // Syllabus Header
             item {
                 SyllabusHeader(
@@ -588,7 +581,15 @@ fun CourseDetailScreen(
                 )
             }
 
-            // Similar Courses placeholder
+            // Instructor Section (at the end)
+            item {
+                InstructorSection(
+                    instructor = instructor,
+                    accentColor = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            // Bottom spacing
             item {
                 Spacer(modifier = Modifier.height(24.dp))
             }
@@ -629,7 +630,15 @@ fun CourseDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Share */ }) {
+                    IconButton(onClick = {
+                        val courseLink = "starception://course/${course.id}"
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, course.title)
+                            putExtra(Intent.EXTRA_TEXT, "Check out this course: ${course.title}\n\n${course.description}\n\nOpen in app: $courseLink")
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Share Course"))
+                    }) {
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = "Share",
@@ -665,7 +674,15 @@ fun CourseDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Share */ }) {
+                    IconButton(onClick = {
+                        val courseLink = "starception://course/${course.id}"
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, course.title)
+                            putExtra(Intent.EXTRA_TEXT, "Check out this course: ${course.title}\n\n${course.description}\n\nOpen in app: $courseLink")
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Share Course"))
+                    }) {
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = "Share",
