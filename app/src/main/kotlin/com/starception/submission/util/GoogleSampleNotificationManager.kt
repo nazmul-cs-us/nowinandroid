@@ -33,6 +33,7 @@ import android.os.Looper
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
+import com.starception.submission.MainActivity
 import com.starception.submission.R
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -539,6 +540,17 @@ object GoogleSampleNotificationManager {
         // Get activity icon for notification large icon (top right corner)
         val activityIconBitmap = getActivityIconBitmap()
 
+        // Create PendingIntent to open app when notification is tapped
+        val openAppIntent = Intent(appContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val contentPendingIntent = PendingIntent.getActivity(
+            appContext,
+            NOTIFICATION_ID + 100,  // Use different request code than action buttons
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         // Android 16 Progress-Centric: Build notification with recommended practices
         val notificationBuilder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_prayer)
@@ -551,6 +563,7 @@ object GoogleSampleNotificationManager {
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)  // Appropriate category
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)  // Public visibility for lock screen
             .setShowWhen(true)  // Show timestamp on notification
+            .setContentIntent(contentPendingIntent)  // Open app when notification is tapped
 
         // No countdown timer - just show current time
         // Status chip will display shortCriticalText (e.g., "Asr2h") without live countdown

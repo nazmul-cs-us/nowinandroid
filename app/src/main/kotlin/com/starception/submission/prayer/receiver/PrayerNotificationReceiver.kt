@@ -2,12 +2,14 @@ package com.starception.submission.prayer.receiver
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.starception.submission.MainActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.drawable.toBitmap
@@ -108,6 +110,17 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
 
             val notificationId = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) 2001 else 2002
 
+            // Create PendingIntent to open app when notification is tapped
+            val openAppIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val contentPendingIntent = PendingIntent.getActivity(
+                context,
+                notificationId + 100,  // Unique request code
+                openAppIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             // Create large icon from app launcher icon
             val largeIcon = ContextCompat.getDrawable(context, R.mipmap.ic_launcher)?.toBitmap()
 
@@ -128,6 +141,7 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     .setAutoCancel(true)
                     .setOngoing(false)
                     .setDefaults(NotificationCompat.DEFAULT_ALL)
+                    .setContentIntent(contentPendingIntent)  // Open app when tapped
                     .build()
             } else {
                 // Prayer reminder notification - X minutes before prayer (user configurable)
@@ -144,6 +158,7 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     .setAutoCancel(true)
                     .setOngoing(false)
                     .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
+                    .setContentIntent(contentPendingIntent)  // Open app when tapped
                     .build()
             }
 
