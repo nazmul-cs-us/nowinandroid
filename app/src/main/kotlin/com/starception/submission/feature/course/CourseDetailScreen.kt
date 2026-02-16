@@ -939,7 +939,7 @@ private fun CourseHeroSection(
                     onClick = { },
                     enabled = false,
                 ) {
-                    Text(course.category.label.uppercase())
+                    Text(course.category.label)
                 }
 
                 // Difficulty tag
