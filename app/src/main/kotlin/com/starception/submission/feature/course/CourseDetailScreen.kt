@@ -130,6 +130,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -604,22 +605,7 @@ fun CourseDetailScreen(
             shadowElevation = if (toolbarAlpha > 0.5f) 4.dp else 0.dp,
         ) {
             TopAppBar(
-                title = {
-                    AnimatedVisibility(
-                        visible = toolbarAlpha > 0.7f,
-                        enter = fadeIn() + slideInVertically(),
-                        exit = fadeOut(),
-                    ) {
-                        Text(
-                            text = course.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                },
+                title = { },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
@@ -702,6 +688,89 @@ fun CourseDetailScreen(
                 ),
                 modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
             )
+        }
+
+        // Floating Course title that moves from header to toolbar when scrolling
+        // Similar to Surah detail screen behavior
+        run {
+            // Calculate positions - title starts at content top in header
+            val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val headerYPx = with(density) { (statusBarPadding + 56.dp).toPx() } // Start at content position
+            val toolbarYPx = with(density) { (statusBarPadding + 14.dp).toPx() } // Final locked position - vertically centered in toolbar
+            val startXPx = with(density) { 20.dp.toPx() } // Start X position (match header padding)
+
+            // Calculate X position for toolbar - right after back button
+            val endXPx = with(density) { 56.dp.toPx() } // Position right after back button (56dp)
+
+            // Calculate floating state based on scroll
+            val floatingState by remember {
+                derivedStateOf {
+                    val scrollOff = if (listState.firstVisibleItemIndex == 0) {
+                        listState.firstVisibleItemScrollOffset.toFloat()
+                    } else {
+                        headerYPx
+                    }
+                    val titleY = (headerYPx - scrollOff).coerceAtLeast(toolbarYPx)
+                    val prog = ((headerYPx - titleY) / (headerYPx - toolbarYPx)).coerceIn(0f, 1f)
+                    Triple(titleY, prog, startXPx + (prog * (endXPx - startXPx)))
+                }
+            }
+
+            val (titleYPx, progress, xOffsetPx) = floatingState
+            val scale = 1f - (progress * 0.3f) // Scale from 1.0 to 0.7
+
+            // Animate color from dark (in header) to white (in toolbar)
+            val titleColor by animateColorAsState(
+                targetValue = if (progress > 0.5f) Color.White else MaterialTheme.colorScheme.onSurface,
+                animationSpec = tween(150),
+                label = "titleColor"
+            )
+            val subtitleColor by animateColorAsState(
+                targetValue = if (progress > 0.5f) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                animationSpec = tween(150),
+                label = "subtitleColor"
+            )
+
+            // Max width for title: screen width minus highlight box (90dp), spacer (16dp), and paddings (20dp each side)
+            val maxTitleWidth = with(density) { 220.dp.toPx() } // Approximate max width to avoid overlap
+
+            // Determine if in toolbar mode (progress > 0.5)
+            val isInToolbar = progress > 0.5f
+
+            Box(
+                modifier = Modifier
+                    .graphicsLayer {
+                        translationX = xOffsetPx
+                        translationY = titleYPx
+                        scaleX = scale
+                        scaleY = scale
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                    }
+                    .width(220.dp) // Constrain width to avoid overlap with highlight box
+            ) {
+                Column {
+                    Text(
+                        text = course.title,
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            lineHeight = 28.sp // Reduce line height for tighter multi-line spacing
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        color = titleColor,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    // Only show subtitle when not in toolbar
+                    if (!isInToolbar) {
+                        Text(
+                            text = course.subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = subtitleColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
         }
 
         // Bottom Action Bar
@@ -856,20 +925,12 @@ private fun CourseHeroSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top,
             ) {
-                // Left side: Title and description
+                // Left side: Tagline and description (title is handled by floating title)
                 Column(
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(
-                        text = course.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        lineHeight = 30.sp,
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
+                    // Reserve space for floating title (2-line title ~48dp + subtitle ~20dp + gap)
+                    Spacer(modifier = Modifier.height(88.dp))
 
                     Text(
                         text = courseTagline,
