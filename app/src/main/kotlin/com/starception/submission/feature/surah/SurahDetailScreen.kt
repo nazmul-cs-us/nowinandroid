@@ -19,7 +19,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.ui.input.pointer.positionChanged
+import kotlin.math.sqrt
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
@@ -570,7 +575,8 @@ fun SurahDetailScreen(
     // Track scroll direction for floating toolbar and FAB animation with stable detection
     var previousScrollOffset by remember { mutableStateOf(0) }
     var previousItemIndex by remember { mutableStateOf(0) }
-    var isFloatingToolbarExpanded by remember { mutableStateOf(false) } // Left-side floating toolbar starts collapsed (hint only)
+    var showFloatingToolbar by remember { mutableStateOf(false) } // Floating toolbar hidden initially, shown via More menu
+    var isFloatingToolbarExpanded by remember { mutableStateOf(true) } // When shown, starts expanded
     var showFabVisible by remember { mutableStateOf(true) } // FAB visible by default
 
     // Use LaunchedEffect to track scroll changes with proper thresholds
@@ -598,9 +604,9 @@ fun SurahDetailScreen(
                 // Scrolling down → hide FAB, but don't change floating toolbar state
                 showFabVisible = !isScrollingDown
 
-                // Only collapse floating toolbar when scrolling up AND it's currently expanded
-                if (!isScrollingDown && isFloatingToolbarExpanded) {
-                    isFloatingToolbarExpanded = false
+                // Hide floating toolbar when scrolling up
+                if (!isScrollingDown && showFloatingToolbar) {
+                    showFloatingToolbar = false
                 }
             }
 
@@ -772,6 +778,9 @@ fun SurahDetailScreen(
                     onTafseerProviderChange = { provider -> viewModel.changeTafseerTranslationProvider(provider) },
                     getTafseerTranslationName = { code -> viewModel.getTafseerTranslationName(code) },
                     isLandscape = isLandscape,
+                    onFontSizeChange = { newSize -> viewModel.changeArabicFontSize(newSize) },
+                    minFontSize = minFontSize,
+                    maxFontSize = maxFontSize,
                     modifier = Modifier
                 )
             }
@@ -825,6 +834,14 @@ fun SurahDetailScreen(
                     }
                 } else {
                     android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "⚠️ CLICK_IGNORED | surah=$surahNumber | no newsResourceId")
+                }
+            },
+            onMoreClick = {
+                // Toggle floating toolbar visibility
+                showFloatingToolbar = !showFloatingToolbar
+                // When showing, ensure it's expanded
+                if (showFloatingToolbar) {
+                    isFloatingToolbarExpanded = true
                 }
             },
             modifier = Modifier.align(Alignment.TopCenter)
@@ -959,64 +976,72 @@ fun SurahDetailScreen(
             )
         }
 
-        // Floating action toolbar - draggable hint icon (vertical only, sticks to edges)
-        val toolbarConfig = LocalConfiguration.current
-        val toolbarDensity = LocalDensity.current
-        val toolbarIsLandscape = toolbarConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val screenWidth = toolbarConfig.screenWidthDp.dp
-        val albumHeaderHeightDp = if (toolbarIsLandscape) 200.dp else screenWidth // Limited height in landscape
-        val baseVerticalOffset = albumHeaderHeightDp + 40.dp // Position closer to bottom of album image
-        val baseVerticalOffsetPx = with(toolbarDensity) { baseVerticalOffset.toPx() }
+        // Floating action toolbar - only shown when user clicks More menu
+        if (showFloatingToolbar) {
+            val toolbarConfig = LocalConfiguration.current
+            val toolbarDensity = LocalDensity.current
+            val toolbarIsLandscape = toolbarConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val screenWidth = toolbarConfig.screenWidthDp.dp
+            val albumHeaderHeightDp = if (toolbarIsLandscape) 200.dp else screenWidth // Limited height in landscape
+            val baseVerticalOffset = albumHeaderHeightDp + 40.dp // Position closer to bottom of album image
+            val baseVerticalOffsetPx = with(toolbarDensity) { baseVerticalOffset.toPx() }
 
-        var toolbarOffsetY by remember { mutableStateOf(0f) }
-        var isOnRightSide by remember { mutableStateOf(false) }
+            var toolbarOffsetY by remember { mutableStateOf(0f) }
+            var isOnRightSide by remember { mutableStateOf(false) }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
             Box(
                 modifier = Modifier
-                    .align(if (isOnRightSide) Alignment.TopEnd else Alignment.TopStart)
-                    .offset {
-                        androidx.compose.ui.unit.IntOffset(
-                            0,
-                            (baseVerticalOffsetPx + toolbarOffsetY).toInt()
-                        )
-                    }
+                    .fillMaxSize()
             ) {
-                FloatingActionToolbar(
-                    isExpanded = isFloatingToolbarExpanded,
-                    onExpandedChange = { expanded ->
-                        isFloatingToolbarExpanded = expanded
-                    },
-                    currentFontSize = arabicFontSize,
-                    onIncreaseFontSize = {
-                        if (arabicFontSize < maxFontSize) {
-                            viewModel.changeArabicFontSize(arabicFontSize + 2f)
+                Box(
+                    modifier = Modifier
+                        .align(if (isOnRightSide) Alignment.TopEnd else Alignment.TopStart)
+                        .offset {
+                            androidx.compose.ui.unit.IntOffset(
+                                0,
+                                (baseVerticalOffsetPx + toolbarOffsetY).toInt()
+                            )
                         }
-                    },
-                    onDecreaseFontSize = {
-                        if (arabicFontSize > minFontSize) {
-                            viewModel.changeArabicFontSize(arabicFontSize - 2f)
-                        }
-                    },
-                    isOnRightSide = isOnRightSide,
-                    onDrag = { dragAmount ->
-                        // Only allow vertical movement
-                        toolbarOffsetY += dragAmount.y
-                    },
-                    onSideSwap = {
-                        // Swap between left and right sides
-                        isOnRightSide = !isOnRightSide
-                    },
-                    textAlignment = textAlignment,
-                    onSetAlignment = { alignment ->
-                        viewModel.changeTextAlignment(alignment)
-                    },
-                    showTranslation = showTranslationInText,
-                    onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) }
-                )
+                ) {
+                    FloatingActionToolbar(
+                        isExpanded = isFloatingToolbarExpanded,
+                        onExpandedChange = { expanded ->
+                            isFloatingToolbarExpanded = expanded
+                            // Hide toolbar when collapsed via chevron
+                            if (!expanded) {
+                                showFloatingToolbar = false
+                            }
+                        },
+                        currentFontSize = arabicFontSize,
+                        minFontSize = minFontSize,
+                        maxFontSize = maxFontSize,
+                        onIncreaseFontSize = {
+                            if (arabicFontSize < maxFontSize) {
+                                viewModel.changeArabicFontSize(arabicFontSize + 2f)
+                            }
+                        },
+                        onDecreaseFontSize = {
+                            if (arabicFontSize > minFontSize) {
+                                viewModel.changeArabicFontSize(arabicFontSize - 2f)
+                            }
+                        },
+                        isOnRightSide = isOnRightSide,
+                        onDrag = { dragAmount ->
+                            // Only allow vertical movement
+                            toolbarOffsetY += dragAmount.y
+                        },
+                        onSideSwap = {
+                            // Swap between left and right sides
+                            isOnRightSide = !isOnRightSide
+                        },
+                        textAlignment = textAlignment,
+                        onSetAlignment = { alignment ->
+                            viewModel.changeTextAlignment(alignment)
+                        },
+                        showTranslation = showTranslationInText,
+                        onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) }
+                    )
+                }
             }
         }
 
@@ -1070,6 +1095,7 @@ private fun AlbumPlayerTopBar(
     onFontClick: () -> Unit = {},
     onTajweedClick: () -> Unit = {},
     onBookmarkClick: () -> Unit = {},
+    onMoreClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Smooth transition based on collapseProgress (0 = transparent, 1 = solid)
@@ -1214,11 +1240,11 @@ private fun AlbumPlayerTopBar(
                 )
             }
 
-            // More options menu
-            IconButton(onClick = { /* TODO: More */ }) {
+            // More options menu - toggles floating toolbar
+            IconButton(onClick = onMoreClick) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
-                    contentDescription = "More",
+                    contentDescription = "More options",
                     tint = contentColor
                 )
             }
@@ -1281,6 +1307,9 @@ private fun AlbumPlayerContent(
     onTafseerProviderChange: (String) -> Unit = {},
     getTafseerTranslationName: (String) -> String = { it },
     isLandscape: Boolean = false,
+    onFontSizeChange: (Float) -> Unit = {},
+    minFontSize: Float = 14f,
+    maxFontSize: Float = 60f,
     modifier: Modifier = Modifier
 ) {
     // Use current playing surah/ayahs if available, otherwise use original
@@ -1335,7 +1364,66 @@ private fun AlbumPlayerContent(
         itemsAvailable = totalItems,
     )
 
-    Box(modifier = modifier.fillMaxSize()) {
+    // For pinch-to-zoom font size adjustment
+    val view = LocalView.current
+    var currentFontSizeState by remember { mutableStateOf(arabicFontSize) }
+
+    // Update local state when arabicFontSize changes externally
+    LaunchedEffect(arabicFontSize) {
+        currentFontSizeState = arabicFontSize
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(minFontSize, maxFontSize) {
+                awaitEachGesture {
+                    // Wait for first finger down
+                    awaitFirstDown(requireUnconsumed = false)
+
+                    var previousDistance = 0f
+                    var isPinching = false
+
+                    do {
+                        val event = awaitPointerEvent()
+                        val pointers = event.changes.filter { it.pressed }
+
+                        if (pointers.size >= 2) {
+                            // Two fingers detected - this is a pinch gesture
+                            val pointer1 = pointers[0]
+                            val pointer2 = pointers[1]
+
+                            val dx = pointer1.position.x - pointer2.position.x
+                            val dy = pointer1.position.y - pointer2.position.y
+                            val currentDistance = sqrt(dx * dx + dy * dy)
+
+                            if (isPinching && previousDistance > 0f) {
+                                val scale = currentDistance / previousDistance
+
+                                // Apply zoom to font size
+                                val newFontSize = (currentFontSizeState * scale).coerceIn(minFontSize, maxFontSize)
+                                if (newFontSize != currentFontSizeState) {
+                                    currentFontSizeState = newFontSize
+                                    view.performHapticFeedback(android.view.HapticFeedbackConstants.TEXT_HANDLE_MOVE)
+                                    onFontSizeChange(newFontSize)
+                                }
+                            }
+
+                            previousDistance = currentDistance
+                            isPinching = true
+
+                            // Consume the event to prevent scrolling during pinch
+                            pointers.forEach { it.consume() }
+                        } else {
+                            // Less than 2 fingers - reset pinch state
+                            // Don't consume - let scroll handle it
+                            isPinching = false
+                            previousDistance = 0f
+                        }
+                    } while (event.changes.any { it.pressed })
+                }
+            }
+    ) {
         LazyColumn(
             state = scrollState,
             contentPadding = PaddingValues(top = 0.dp), // No padding needed (status bar is hidden)
@@ -3400,6 +3488,8 @@ private fun FloatingActionToolbar(
     isExpanded: Boolean = true,
     onExpandedChange: (Boolean) -> Unit = {},
     currentFontSize: Float = 22f,
+    minFontSize: Float = 14f,
+    maxFontSize: Float = 60f,
     onIncreaseFontSize: () -> Unit = {},
     onDecreaseFontSize: () -> Unit = {},
     isOnRightSide: Boolean = false,
@@ -3488,7 +3578,7 @@ private fun FloatingActionToolbar(
                         contentDescription = "Increase font size",
                         selected = false,
                         onClick = onIncreaseFontSize,
-                        enabled = currentFontSize < 60f
+                        enabled = currentFontSize < maxFontSize
                     )
 
                     // Decrease font size button
@@ -3497,7 +3587,7 @@ private fun FloatingActionToolbar(
                         contentDescription = "Decrease font size",
                         selected = false,
                         onClick = onDecreaseFontSize,
-                        enabled = currentFontSize > 14f
+                        enabled = currentFontSize > minFontSize
                     )
 
                     // Text alignment buttons - show all three options
