@@ -696,7 +696,21 @@ fun CourseDetailScreen(
             // Calculate positions - title starts at content top in header
             val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val headerYPx = with(density) { (statusBarPadding + 56.dp).toPx() } // Start at content position
-            val toolbarYPx = with(density) { (statusBarPadding + 14.dp).toPx() } // Final locked position - vertically centered in toolbar
+
+            // Adjust toolbar Y position based on title length
+            // Short titles show subtitle too, so need different centering
+            // At 0.7x scale, content is smaller but positioned from top-left origin
+            val isTitleShort = course.title.length <= 15
+            val toolbarYPx = with(density) {
+                if (isTitleShort) {
+                    // Short title + subtitle at 0.7x scale: needs larger offset to appear centered
+                    // Moving Y down (larger value) pushes content lower in toolbar
+                    (statusBarPadding + 18.dp).toPx()
+                } else {
+                    // Long 2-line title: original positioning
+                    (statusBarPadding + 14.dp).toPx()
+                }
+            }
             val startXPx = with(density) { 20.dp.toPx() } // Start X position (match header padding)
 
             // Calculate X position for toolbar - right after back button
@@ -759,11 +773,13 @@ fun CourseDetailScreen(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    // Only show subtitle when not in toolbar
-                    if (!isInToolbar) {
+                    // Show subtitle: always in header mode, and in toolbar mode for short titles
+                    val isTitleShort = course.title.length <= 15
+                    val shouldShowSubtitle = course.subtitle.isNotBlank() && (!isInToolbar || isTitleShort)
+                    if (shouldShowSubtitle) {
                         Text(
                             text = course.subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = if (isInToolbar) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
                             color = subtitleColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -929,8 +945,17 @@ private fun CourseHeroSection(
                 Column(
                     modifier = Modifier.weight(1f),
                 ) {
-                    // Reserve space for floating title (2-line title ~48dp + subtitle ~20dp + gap)
-                    Spacer(modifier = Modifier.height(88.dp))
+                    // Reserve space for floating title
+                    // Single-line title ~28dp, 2-line title ~56dp, subtitle ~20dp, gap ~12dp
+                    val isTitleLong = course.title.length > 15 // Titles longer than 15 chars likely wrap
+                    val hasSubtitle = course.subtitle.isNotBlank()
+                    val titleSpacerHeight = when {
+                        isTitleLong && hasSubtitle -> 88.dp  // 2-line title + subtitle
+                        isTitleLong && !hasSubtitle -> 68.dp // 2-line title only
+                        !isTitleLong && hasSubtitle -> 60.dp // 1-line title + subtitle
+                        else -> 40.dp                         // 1-line title only
+                    }
+                    Spacer(modifier = Modifier.height(titleSpacerHeight))
 
                     Text(
                         text = courseTagline,
@@ -956,14 +981,9 @@ private fun CourseHeroSection(
                 // Right side: Dynamic highlight number
                 Box(
                     modifier = Modifier
-                        .size(90.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(accentColor.copy(alpha = 0.15f))
-                        .border(
-                            width = 1.dp,
-                            color = accentColor.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(16.dp),
-                        ),
+                        .size(95.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(
