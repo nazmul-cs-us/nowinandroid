@@ -105,11 +105,12 @@ import com.starception.submission.core.ui.launchCustomChromeTab
 import com.starception.submission.core.ui.newsFeed
 
 @Composable
-internal fun ForYouScreen(
+fun ForYouScreen(
     onTopicClick: (String) -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    onNewsResourceClick: ((UserNewsResource) -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: ForYouViewModel = hiltViewModel(),
 ) {
@@ -129,6 +130,7 @@ internal fun ForYouScreen(
         onSurahClick = onSurahClick,
         onDuaClick = onDuaClick,
         onHadithClick = onHadithClick,
+        onNewsResourceClick = onNewsResourceClick,
         saveFollowedTopics = viewModel::dismissOnboarding,
         onNewsResourcesCheckedChanged = viewModel::updateNewsResourceSaved,
         onNewsResourceViewed = { viewModel.setNewsResourceViewed(it, true) },
@@ -147,6 +149,7 @@ internal fun ForYouScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    onNewsResourceClick: ((UserNewsResource) -> Unit)? = null,
     onDeepLinkOpened: (String) -> Unit,
     saveFollowedTopics: () -> Unit,
     onNewsResourcesCheckedChanged: (String, Boolean) -> Unit,
@@ -206,6 +209,7 @@ internal fun ForYouScreen(
                 onSurahClick = onSurahClick,
                 onDuaClick = onDuaClick,
                 onHadithClick = onHadithClick,
+                onNewsClick = onNewsResourceClick,
             )
 
             item(span = StaggeredGridItemSpan.FullLine, contentType = "bottomSpacing") {
