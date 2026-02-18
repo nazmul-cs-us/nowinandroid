@@ -137,15 +137,16 @@ fun LazyStaggeredGridScope.newsFeed(
                             newsResourceId = userNewsResource.id,
                         )
 
-                        // If it's a Surah, navigate to Surah detail screen
-                        if (surahNumber != null) {
+                        // If onNewsClick is provided (two-pane mode), show all items in detail pane
+                        if (onNewsClick != null) {
+                            onNewsClick(userNewsResource)
+                        } else if (surahNumber != null) {
+                            // Navigate to Surah detail screen
                             onSurahClick(surahNumber, userNewsResource.id)
                         } else if (isHadithItem && hadithInfo != null) {
                             onHadithClick(hadithInfo.first, hadithInfo.second)
                         } else if (isDuaItem) {
                             onDuaClick(userNewsResource)
-                        } else if (onNewsClick != null) {
-                            onNewsClick(userNewsResource)
                         } else if (userNewsResource.url.isNotBlank()) {
                             launchCustomChromeTab(context, Uri.parse(userNewsResource.url), backgroundColor)
                         }

@@ -180,6 +180,7 @@ fun NiaNavigationRail(
  * @param modifier Modifier to be applied to the navigation suite scaffold.
  * @param navigationSuiteItems A slot to display multiple items via [NiaNavigationSuiteScope].
  * @param windowAdaptiveInfo The window adaptive info.
+ * @param useNavRailInLandscape If true, use NavigationRail in landscape even on phones.
  * @param content The app content inside the scaffold.
  */
 @Composable
@@ -187,10 +188,17 @@ fun NiaNavigationSuiteScaffold(
     navigationSuiteItems: NiaNavigationSuiteScope.() -> Unit,
     modifier: Modifier = Modifier,
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
+    useNavRailInLandscape: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val layoutType = NavigationSuiteScaffoldDefaults
-        .calculateFromAdaptiveInfo(windowAdaptiveInfo)
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+    val layoutType = if (useNavRailInLandscape && isLandscape) {
+        androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType.NavigationRail
+    } else {
+        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
+    }
     val navigationSuiteItemColors = NavigationSuiteItemColors(
         navigationBarItemColors = NavigationBarItemDefaults.colors(
             selectedIconColor = NiaNavigationDefaults.navigationSelectedItemColor(),

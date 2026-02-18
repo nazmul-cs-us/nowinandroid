@@ -22,7 +22,6 @@ import com.starception.submission.R
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.feature.bookmarks.navigation.BookmarksBaseRoute
 import com.starception.submission.feature.bookmarks.navigation.BookmarksRoute
-import com.starception.submission.feature.foryou.navigation.ForYouBaseRoute
 import com.starception.submission.feature.foryou.navigation.ForYouRoute
 import com.starception.submission.feature.interests.navigation.InterestsRoute
 import com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute
@@ -67,7 +66,6 @@ enum class TopLevelDestination(
         iconTextId = forYouR.string.feature_foryou_title,
         titleTextId = R.string.app_name,
         route = ForYouRoute::class,
-        baseRoute = ForYouBaseRoute::class,
     ),
     BOOKMARKS(
         selectedIcon = NiaIcons.Bookmarks,

@@ -30,8 +30,7 @@ import com.starception.submission.feature.search.SearchNote
 import androidx.navigation.compose.composable
 import com.starception.submission.MainActivityViewModel
 import com.starception.submission.feature.bookmarks.navigation.bookmarksSection
-import com.starception.submission.feature.foryou.navigation.ForYouBaseRoute
-import com.starception.submission.feature.foryou.navigation.forYouSection
+import com.starception.submission.feature.foryou.navigation.ForYouRoute
 import com.starception.submission.feature.interests.navigation.navigateToInterests
 import com.starception.submission.feature.search.navigation.searchScreen
 import com.starception.submission.feature.topic.navigation.navigateToTopic
@@ -49,6 +48,7 @@ import com.starception.submission.feature.hadith.navigateToHadithDetail
 import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.settings.navigation.settingsScreen
 import com.starception.submission.ui.NiaAppState
+import com.starception.submission.ui.foryou2pane.forYouListDetailScreen
 import com.starception.submission.ui.interests2pane.interestsListDetailScreen
 
 /**
@@ -86,18 +86,17 @@ fun NiaNavHost(
         startDestination = PrayerTimesRoute,
         modifier = modifier,
     ) {
-        forYouSection(
+        // ForYou two-pane layout (similar to Interests)
+        forYouListDetailScreen(
             onTopicClick = navController::navigateToTopic,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
-            onDuaClick = { userNewsResource ->
+            onDuaClick = { userNewsResource, topicId ->
                 // Extract dua number from title (e.g., "Quranic Dua 1:" or "Quranic Dua #1")
                 val duaNumber = Regex("Dua (\\d+)").find(userNewsResource.title)
                     ?.groupValues?.get(1)?.toIntOrNull()
                     ?: Regex("#(\\d+)").find(userNewsResource.title)
                         ?.groupValues?.get(1)?.toIntOrNull()
                     ?: 1
-                // Get the first topic ID to show correct "Dua X of Y" count
-                val topicId = userNewsResource.followableTopics.firstOrNull()?.topic?.id ?: ""
                 navController.navigateToDuaDetail(
                     title = userNewsResource.title,
                     content = userNewsResource.content,
@@ -114,71 +113,53 @@ fun NiaNavHost(
                     .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
                 navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
             },
-        ) {
-            topicScreen(
-                showBackButton = true,
-                onBackClick = navController::popBackStack,
-                onTopicClick = navController::navigateToTopic,
-                onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
-                onDuaClick = { userNewsResource, topicId ->
-                    val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
+        )
+        // Topic screen for ForYou
+        topicScreen(
+            showBackButton = true,
+            onBackClick = navController::popBackStack,
+            onTopicClick = navController::navigateToTopic,
+            onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
+            onDuaClick = { userNewsResource, topicId ->
+                val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
+                    ?.groupValues?.get(1)?.toIntOrNull()
+                    ?: Regex("Dua (\\d+)").find(userNewsResource.title)
                         ?.groupValues?.get(1)?.toIntOrNull()
-                        ?: Regex("Dua (\\d+)").find(userNewsResource.title)
-                            ?.groupValues?.get(1)?.toIntOrNull()
-                        ?: 1
-                    navController.navigateToDuaDetail(
-                        title = userNewsResource.title,
-                        content = userNewsResource.content,
-                        quranReference = null,
-                        duaNumber = duaNumber,
-                        newsResourceId = userNewsResource.id,
-                        topicId = topicId
-                    )
-                },
-                onHadithClick = { databaseFile, hadithNumber ->
-                    // Extract collection name from database file (e.g., "sahih_bukhari.db" -> "Sahih Bukhari")
-                    val collectionName = databaseFile.removeSuffix(".db")
-                        .replace("_", " ")
-                        .split(" ")
-                        .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
-                    navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
-                },
-            )
-            // Surah screen nested within For You section
-            surahScreen(
-                onBackClick = navController::popBackStack,
-                onTopicClick = navController::navigateToTopic,
-                onNavigateToPreviousSurah = { currentSurahNumber ->
-                    if (currentSurahNumber > 1) {
-                        navController.popBackStack()
-                        navController.navigateToSurah(currentSurahNumber - 1, null)
-                    }
-                },
-                onNavigateToNextSurah = { currentSurahNumber ->
-                    if (currentSurahNumber < 114) {
-                        navController.popBackStack()
-                        navController.navigateToSurah(currentSurahNumber + 1, null)
-                    }
-                }
-            )
-            // Dua detail screen nested within For You section
-            duaDetailScreen(
-                onBackClick = navController::popBackStack,
-                onNavigateToSurah = { surahNumber, ayahNumber ->
-                    navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber)
-                },
-                isBookmarked = { newsResourceId ->
-                    mainViewModel?.isNewsResourceBookmarked(newsResourceId) ?: false
-                },
-                onToggleBookmark = { newsResourceId ->
-                    mainViewModel?.toggleNewsResourceBookmark(newsResourceId)
-                },
-                onTopicClick = navController::navigateToTopic,
-                onHadithClick = { collectionName, hadithNumber, databaseFile ->
-                    navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
-                }
-            )
-        }
+                    ?: 1
+                navController.navigateToDuaDetail(
+                    title = userNewsResource.title,
+                    content = userNewsResource.content,
+                    quranReference = null,
+                    duaNumber = duaNumber,
+                    newsResourceId = userNewsResource.id,
+                    topicId = topicId
+                )
+            },
+            onHadithClick = { databaseFile, hadithNumber ->
+                val collectionName = databaseFile.removeSuffix(".db")
+                    .replace("_", " ")
+                    .split(" ")
+                    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
+            },
+        )
+        // Dua detail screen for ForYou
+        duaDetailScreen(
+            onBackClick = navController::popBackStack,
+            onNavigateToSurah = { surahNumber, ayahNumber ->
+                navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber)
+            },
+            isBookmarked = { newsResourceId ->
+                mainViewModel?.isNewsResourceBookmarked(newsResourceId) ?: false
+            },
+            onToggleBookmark = { newsResourceId ->
+                mainViewModel?.toggleNewsResourceBookmark(newsResourceId)
+            },
+            onTopicClick = navController::navigateToTopic,
+            onHadithClick = { collectionName, hadithNumber, databaseFile ->
+                navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
+            }
+        )
         bookmarksSection(
             onTopicClick = navController::navigateToTopic,
             onShowSnackbar = onShowSnackbar,
