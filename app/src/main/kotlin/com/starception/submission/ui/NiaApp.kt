@@ -318,10 +318,18 @@ private fun NiaMainContent(
                 .fillMaxSize()
                 .padding(padding)
                 .consumeWindowInsets(padding)
-                .windowInsetsPadding(
-                    WindowInsets.safeDrawing.only(
-                        WindowInsetsSides.Horizontal,
-                    ),
+                .then(
+                    // In landscape, nav rail handles left inset, so only apply end inset
+                    // In portrait, apply full horizontal insets
+                    if (isLandscape) {
+                        Modifier.windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.End)
+                        )
+                    } else {
+                        Modifier.windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                        )
+                    }
                 ),
         ) {
             // Show the top app bar on top level destinations
