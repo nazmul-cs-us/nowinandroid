@@ -313,7 +313,20 @@ fun SurahDetailScreen(
     viewModel: SurahDetailViewModel = hiltViewModel()
 ) {
     // Enable immersive full-screen mode (hides status bar)
-    ImmersiveFullScreenEffect()
+    // Don't restore on dispose to prevent status bar flash when swiping between surahs
+    ImmersiveFullScreenEffect(restoreOnDispose = false)
+
+    // Create wrapped back click that restores status bar first
+    val view = LocalView.current
+    val wrappedOnBackClick: () -> Unit = {
+        val window = (view.context as? android.app.Activity)?.window
+        val insetsController = window?.let {
+            androidx.core.view.WindowCompat.getInsetsController(it, view)
+        }
+        // Restore status bar before navigating back
+        insetsController?.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        onBackClick()
+    }
 
     // Get repositories from ViewModel holders (moved from parameters to reduce bytecode complexity)
     val quranRepository: QuranRepository = hiltViewModel<QuranRepositoryHolder>().repository
@@ -816,7 +829,7 @@ fun SurahDetailScreen(
             isBookmarked = isBookmarked,
             selectedArabicFont = selectedArabicFont,
             showTajweed = showTajweed,
-            onBackClick = onBackClick,
+            onBackClick = wrappedOnBackClick,
             onTranslationClick = { showTranslationDialog = true },
             onFontClick = { showFontDialog = true },
             onTajweedClick = { viewModel.changeTajweed(!showTajweed) },
