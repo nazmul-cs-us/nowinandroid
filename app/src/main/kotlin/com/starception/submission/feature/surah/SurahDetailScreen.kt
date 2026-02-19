@@ -859,7 +859,7 @@ fun SurahDetailScreen(
             // Calculate positions once (stable values)
             val albumHeaderHeight = if (localIsLandscape) 200 else localConfig.screenWidthDp
             val headerYPx = with(density) { (albumHeaderHeight + 24).dp.toPx() }
-            val toolbarYPx = with(density) { 68.dp.toPx() }  // Stop below toolbar (52dp padding + 16dp offset)
+            val toolbarYPx = with(density) { 24.dp.toPx() }  // Stop at toolbar level (locked position)
             val startXPx = with(density) { 24.dp.toPx() }
             val endXPx = with(density) { 56.dp.toPx() }
 
