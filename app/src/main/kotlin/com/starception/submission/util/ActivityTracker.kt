@@ -26,6 +26,7 @@ import com.starception.submission.config.ActivityDetectionConfig
 import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.feature.course.CourseProgressTracker
 import com.starception.submission.core.hadithdatabase.HadithRepository
+import com.starception.submission.core.translation.TranslationService
 import java.util.Locale
 
 /**
@@ -761,28 +762,103 @@ object ActivityTracker {
     }
 
     /**
-     * Speak hadith text using TextToSpeech
+     * Speak hadith text using TextToSpeech in user's selected language
      */
     private fun speakHadith(ctx: Context, hadithNumber: Int, text: String) {
+        // Get user's selected language
+        val translationService = TranslationService.getInstance(ctx)
+        val selectedLang = translationService.getSelectedLanguage()
+        val ttsLocale = getLocaleForLanguage(selectedLang)
+
+        Log.d("ActivityTracker", "📚 User's selected language: $selectedLang -> TTS Locale: ${ttsLocale.displayLanguage}")
+
+        // Translate hadith if user selected non-English language
+        if (selectedLang != "en" && selectedLang != "transliteration") {
+            scope.launch {
+                try {
+                    val translatedText = translationService.translateFromEnglish(text, selectedLang)
+                    Log.d("ActivityTracker", "📚 Translated hadith to $selectedLang: ${translatedText.take(100)}...")
+                    speakWithTts(ctx, hadithNumber, translatedText, ttsLocale, selectedLang)
+                } catch (e: Exception) {
+                    Log.e("ActivityTracker", "📚 Translation failed, speaking in English: ${e.message}")
+                    speakWithTts(ctx, hadithNumber, text, Locale.US, "en")
+                }
+            }
+        } else {
+            // English or transliteration - speak in English
+            speakWithTts(ctx, hadithNumber, text, Locale.US, "en")
+        }
+    }
+
+    /**
+     * Actually speak the text using TTS
+     */
+    private fun speakWithTts(ctx: Context, hadithNumber: Int, text: String, locale: Locale, langCode: String) {
+        // Get intro text in the appropriate language
+        val introText = getHadithIntro(hadithNumber, langCode)
+        val fullText = "$introText $text"
+
         // Initialize TTS if not already done
         if (textToSpeech == null) {
             textToSpeech = TextToSpeech(ctx) { status ->
                 if (status == TextToSpeech.SUCCESS) {
                     isTtsInitialized = true
-                    textToSpeech?.language = Locale.US
-                    Log.d("ActivityTracker", "📚 TTS initialized successfully")
-
-                    // Speak the hadith with intro
-                    val fullText = "Hadith number $hadithNumber from Sahih Al-Bukhari. $text"
+                    val result = textToSpeech?.setLanguage(locale)
+                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        Log.w("ActivityTracker", "📚 TTS language $locale not supported, falling back to US English")
+                        textToSpeech?.language = Locale.US
+                    }
+                    Log.d("ActivityTracker", "📚 TTS initialized with language: ${textToSpeech?.language}")
                     textToSpeech?.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
                 } else {
                     Log.e("ActivityTracker", "📚 TTS initialization failed with status: $status")
                 }
             }
         } else if (isTtsInitialized) {
-            // TTS already initialized, speak directly
-            val fullText = "Hadith number $hadithNumber from Sahih Al-Bukhari. $text"
+            // TTS already initialized, set language and speak
+            val result = textToSpeech?.setLanguage(locale)
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Log.w("ActivityTracker", "📚 TTS language $locale not supported, using current")
+            }
             textToSpeech?.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
+        }
+    }
+
+    /**
+     * Get hadith intro text in the specified language
+     */
+    private fun getHadithIntro(hadithNumber: Int, langCode: String): String {
+        return when (langCode) {
+            "bn" -> "সহীহ আল-বুখারী থেকে হাদিস নম্বর $hadithNumber।"
+            "ar" -> "حديث رقم $hadithNumber من صحيح البخاري."
+            "es" -> "Hadiz número $hadithNumber de Sahih Al-Bujari."
+            "fr" -> "Hadith numéro $hadithNumber de Sahih Al-Boukhari."
+            "id" -> "Hadis nomor $hadithNumber dari Sahih Al-Bukhari."
+            "ru" -> "Хадис номер $hadithNumber из Сахих аль-Бухари."
+            "tr" -> "Sahih-i Buhari'den $hadithNumber numaralı hadis."
+            "ur" -> "صحیح البخاری سے حدیث نمبر $hadithNumber۔"
+            "zh" -> "来自《布哈里圣训》的第 $hadithNumber 条圣训。"
+            else -> "Hadith number $hadithNumber from Sahih Al-Bukhari."
+        }
+    }
+
+    /**
+     * Map language code to TTS Locale
+     */
+    private fun getLocaleForLanguage(langCode: String): Locale {
+        return when (langCode) {
+            "en" -> Locale.US
+            "ar" -> Locale("ar")
+            "bn" -> Locale("bn", "BD")
+            "es" -> Locale("es", "ES")
+            "fr" -> Locale.FRANCE
+            "id" -> Locale("id", "ID")
+            "ru" -> Locale("ru", "RU")
+            "sv" -> Locale("sv", "SE")
+            "tr" -> Locale("tr", "TR")
+            "ur" -> Locale("ur", "PK")
+            "zh" -> Locale.SIMPLIFIED_CHINESE
+            else -> Locale.US
         }
     }
 
@@ -795,7 +871,18 @@ object ActivityTracker {
         textToSpeech = null
         isTtsInitialized = false
     }
-    
+
+    /**
+     * TEST FUNCTION: Demo the daily hadith playback feature
+     * Call this to test hadith TTS without needing to drive
+     */
+    fun testDailyHadithPlayback() {
+        Log.i("ActivityTracker", "🧪 ========== TEST: Daily Hadith Playback ==========")
+        context?.let { ctx ->
+            playDailyHadithIfEnrolled(ctx)
+        } ?: Log.e("ActivityTracker", "🧪 TEST FAILED: Context is null - call initialize() first")
+    }
+
     /**
      * Load saved notification mode from SharedPreferences
      * Default is MUTE (silent mode) for new users
