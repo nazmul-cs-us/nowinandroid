@@ -76,7 +76,7 @@ import com.starception.submission.core.ui.UserNewsResourcePreviewParameterProvid
 import com.starception.submission.core.ui.newsFeed
 
 @Composable
-internal fun BookmarksRoute(
+fun BookmarksRoute(
     onTopicClick: (String) -> Unit,
     onShowSnackbar: suspend (String, String?) -> Boolean,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },

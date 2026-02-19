@@ -16,6 +16,7 @@
 
 package com.starception.submission.ui
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -190,6 +192,10 @@ internal fun NiaAppContent(
                 )
             },
         ) { padding ->
+            // Check if we're in landscape mode
+            val configuration = LocalConfiguration.current
+            val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
             Column(
                 Modifier
                     .fillMaxSize()
@@ -201,11 +207,16 @@ internal fun NiaAppContent(
                         ),
                     ),
             ) {
-                // Show the top app bar on top level destinations.
+                // Show the top app bar on top level destinations
+                // Hide top bar for ForYou and Bookmarks in landscape mode (two-pane layout)
                 val destination = appState.currentTopLevelDestination
+                val hideTopBarForTwoPane = isLandscape && (
+                    destination == TopLevelDestination.FOR_YOU ||
+                    destination == TopLevelDestination.BOOKMARKS
+                )
                 var shouldShowTopAppBar = false
 
-                if (destination != null) {
+                if (destination != null && !hideTopBarForTwoPane) {
                     shouldShowTopAppBar = true
                     NiaTopAppBar(
                         titleRes = destination.titleTextId,

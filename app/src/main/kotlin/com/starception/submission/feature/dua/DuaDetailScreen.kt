@@ -1052,7 +1052,8 @@ fun DuaDetailScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = Color.Transparent  // Transparent to let sky extend to top
+        containerColor = Color.Transparent,  // Transparent to let sky extend to top
+        contentWindowInsets = WindowInsets(0, 0, 0, 0) // No padding for status bar in immersive mode
     ) { _ ->
         // Don't apply paddingValues - let content scroll under transparent toolbar like SurahDetailScreen
         Box(modifier = Modifier.fillMaxSize()) {

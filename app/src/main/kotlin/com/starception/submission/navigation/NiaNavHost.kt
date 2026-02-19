@@ -29,7 +29,7 @@ import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.feature.search.SearchNote
 import androidx.navigation.compose.composable
 import com.starception.submission.MainActivityViewModel
-import com.starception.submission.feature.bookmarks.navigation.bookmarksSection
+import com.starception.submission.ui.bookmarks2pane.bookmarksListDetailScreen
 import com.starception.submission.feature.foryou.navigation.ForYouRoute
 import com.starception.submission.feature.interests.navigation.navigateToInterests
 import com.starception.submission.feature.search.navigation.searchScreen
@@ -160,19 +160,18 @@ fun NiaNavHost(
                 navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
             }
         )
-        bookmarksSection(
+        // Bookmarks two-pane layout (similar to ForYou)
+        bookmarksListDetailScreen(
             onTopicClick = navController::navigateToTopic,
             onShowSnackbar = onShowSnackbar,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
-            onDuaClick = { userNewsResource ->
+            onDuaClick = { userNewsResource, topicId ->
                 // Extract dua number from title (e.g., "Quranic Dua 1:" or "Quranic Dua #1")
                 val duaNumber = Regex("Dua (\\d+)").find(userNewsResource.title)
                     ?.groupValues?.get(1)?.toIntOrNull()
                     ?: Regex("#(\\d+)").find(userNewsResource.title)
                         ?.groupValues?.get(1)?.toIntOrNull()
                     ?: 1
-                // Get the first topic ID to show correct "Dua X of Y" count
-                val topicId = userNewsResource.followableTopics.firstOrNull()?.topic?.id ?: ""
                 navController.navigateToDuaDetail(
                     title = userNewsResource.title,
                     content = userNewsResource.content,
@@ -189,42 +188,7 @@ fun NiaNavHost(
                     .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
                 navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
             },
-        ) {
-            // Surah screen nested within Bookmarks section
-            surahScreen(
-                onBackClick = navController::popBackStack,
-                onTopicClick = navController::navigateToTopic,
-                onNavigateToPreviousSurah = { currentSurahNumber ->
-                    if (currentSurahNumber > 1) {
-                        navController.popBackStack()
-                        navController.navigateToSurah(currentSurahNumber - 1, null)
-                    }
-                },
-                onNavigateToNextSurah = { currentSurahNumber ->
-                    if (currentSurahNumber < 114) {
-                        navController.popBackStack()
-                        navController.navigateToSurah(currentSurahNumber + 1, null)
-                    }
-                }
-            )
-            // Dua detail screen nested within Bookmarks section
-            duaDetailScreen(
-                onBackClick = navController::popBackStack,
-                onNavigateToSurah = { surahNumber, ayahNumber ->
-                    navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber)
-                },
-                isBookmarked = { newsResourceId ->
-                    mainViewModel?.isNewsResourceBookmarked(newsResourceId) ?: false
-                },
-                onToggleBookmark = { newsResourceId ->
-                    mainViewModel?.toggleNewsResourceBookmark(newsResourceId)
-                },
-                onTopicClick = navController::navigateToTopic,
-                onHadithClick = { collectionName, hadithNumber, databaseFile ->
-                    navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
-                }
-            )
-        }
+        )
         searchScreen(
             onBackClick = navController::popBackStack,
             onInterestsClick = { appState.navigateToTopLevelDestination(INTERESTS) },
