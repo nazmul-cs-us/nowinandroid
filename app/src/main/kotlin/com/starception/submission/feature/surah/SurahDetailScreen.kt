@@ -623,7 +623,8 @@ fun SurahDetailScreen(
     ) {
         Scaffold(
             topBar = {},
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0) // No padding for status bar in immersive mode
         ) { paddingValues ->
         when (val state = uiState) {
             is SurahDetailUiState.Loading -> {
@@ -1133,7 +1134,7 @@ private fun AlbumPlayerTopBar(
         tonalElevation = (4 * collapseProgress).dp, // Smooth elevation transition
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 52.dp) // Fixed top padding (status bar is hidden by ImmersiveFullScreenEffect)
+            .padding(top = 8.dp) // Minimal top padding since status bar is hidden by immersive mode
     ) {
         Row(
             modifier = Modifier

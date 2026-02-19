@@ -17,14 +17,20 @@
 package com.starception.submission
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.View
+import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -262,8 +268,28 @@ class MainActivity : FragmentActivity() {
         }
         
         Log.d("MainActivity", "ULTRA-MINIMAL onCreate completed")
+
+        // Enable immersive mode - hide status bar for all pages
+        enableImmersiveMode()
     }
-    
+
+    /**
+     * Enable immersive mode to hide the status bar for all pages
+     * Status bar can still be accessed by swiping from the top
+     */
+    private fun enableImmersiveMode() {
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+
+        // Hide status bar
+        windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
+
+        // Allow user to reveal status bar by swiping from the top edge
+        windowInsetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
+        Log.d("MainActivity", "🖥️ Immersive mode enabled: Status bar hidden")
+    }
+
     // REMOVED: Helper function not needed for minimal version
     /**
      * Handle permission request results
