@@ -20,7 +20,6 @@ import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.icon.NiaIcons
-import com.starception.submission.feature.bookmarks.navigation.BookmarksBaseRoute
 import com.starception.submission.feature.bookmarks.navigation.BookmarksRoute
 import com.starception.submission.feature.foryou.navigation.ForYouRoute
 import com.starception.submission.feature.interests.navigation.InterestsRoute
@@ -73,7 +72,6 @@ enum class TopLevelDestination(
         iconTextId = bookmarksR.string.feature_bookmarks_title,
         titleTextId = bookmarksR.string.feature_bookmarks_title,
         route = BookmarksRoute::class,
-        baseRoute = BookmarksBaseRoute::class,
     ),
     COURSE(
         selectedIcon = NiaIcons.Course,

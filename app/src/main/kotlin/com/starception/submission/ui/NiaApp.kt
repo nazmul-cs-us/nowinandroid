@@ -17,18 +17,22 @@
 package com.starception.submission.ui
 
 import android.content.res.Configuration
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -68,6 +72,8 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.component.NiaBackground
 import com.starception.submission.core.designsystem.component.NiaGradientBackground
+import com.starception.submission.core.designsystem.component.NiaNavigationRail
+import com.starception.submission.core.designsystem.component.NiaNavigationRailItem
 import com.starception.submission.core.designsystem.component.NiaNavigationSuiteScaffold
 import com.starception.submission.core.designsystem.component.NiaTopAppBar
 import com.starception.submission.core.designsystem.icon.NiaIcons
@@ -144,125 +150,235 @@ internal fun NiaAppContent(
         .collectAsStateWithLifecycle()
     val currentDestination = appState.currentDestination
 
-    NiaNavigationSuiteScaffold(
-        navigationSuiteItems = {
-            appState.topLevelDestinations.forEach { destination ->
-                val hasUnread = unreadDestinations.contains(destination)
-                val selected = currentDestination
-                    .isRouteInHierarchy(destination.baseRoute)
-                item(
-                    selected = selected,
-                    onClick = { appState.navigateToTopLevelDestination(destination) },
-                    icon = {
-                        Icon(
-                            imageVector = destination.unselectedIcon,
-                            contentDescription = null,
-                        )
-                    },
-                    selectedIcon = {
-                        Icon(
-                            imageVector = destination.selectedIcon,
-                            contentDescription = null,
-                        )
-                    },
-                    label = { Text(stringResource(destination.iconTextId)) },
-                    modifier = Modifier
-                        .testTag("NiaNavItem")
-                        .then(if (hasUnread) Modifier.notificationDot() else Modifier),
-                )
-            }
-        },
-        windowAdaptiveInfo = windowAdaptiveInfo,
-    ) {
-        Scaffold(
-            modifier = modifier.semantics {
-                testTagsAsResourceId = true
-            },
-            containerColor = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            snackbarHost = {
-                SnackbarHost(
-                    snackbarHostState,
-                    modifier = Modifier.windowInsetsPadding(
-                        WindowInsets.safeDrawing.exclude(
-                            WindowInsets.ime,
-                        ),
-                    ),
-                )
-            },
-        ) { padding ->
-            // Check if we're in landscape mode
-            val configuration = LocalConfiguration.current
-            val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // Check if we're in landscape mode
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    // In landscape mode, use custom centered NavigationRail layout
+    if (isLandscape) {
+        NiaLandscapeLayout(
+            appState = appState,
+            snackbarHostState = snackbarHostState,
+            onTopAppBarActionClick = onTopAppBarActionClick,
+            unreadDestinations = unreadDestinations,
+            currentDestination = currentDestination,
+            modifier = modifier,
+            mainViewModel = mainViewModel,
+            deepLinkCourseId = deepLinkCourseId,
+        )
+    } else {
+        // Portrait mode: use standard NiaNavigationSuiteScaffold
+        NiaNavigationSuiteScaffold(
+            navigationSuiteItems = {
+                appState.topLevelDestinations.forEach { destination ->
+                    val hasUnread = unreadDestinations.contains(destination)
+                    val selected = currentDestination
+                        .isRouteInHierarchy(destination.baseRoute)
+                    item(
+                        selected = selected,
+                        onClick = { appState.navigateToTopLevelDestination(destination) },
+                        icon = {
+                            Icon(
+                                imageVector = destination.unselectedIcon,
+                                contentDescription = null,
+                            )
+                        },
+                        selectedIcon = {
+                            Icon(
+                                imageVector = destination.selectedIcon,
+                                contentDescription = null,
+                            )
+                        },
+                        label = { Text(stringResource(destination.iconTextId)) },
+                        modifier = Modifier
+                            .testTag("NiaNavItem")
+                            .then(if (hasUnread) Modifier.notificationDot() else Modifier),
+                    )
+                }
+            },
+            windowAdaptiveInfo = windowAdaptiveInfo,
+        ) {
+            NiaMainContent(
+                appState = appState,
+                snackbarHostState = snackbarHostState,
+                onTopAppBarActionClick = onTopAppBarActionClick,
+                modifier = modifier,
+                isLandscape = false,
+                mainViewModel = mainViewModel,
+                deepLinkCourseId = deepLinkCourseId,
+            )
+        }
+    }
+}
+
+/**
+ * Custom landscape layout with centered NavigationRail.
+ */
+@Composable
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
+private fun NiaLandscapeLayout(
+    appState: NiaAppState,
+    snackbarHostState: SnackbarHostState,
+    onTopAppBarActionClick: () -> Unit,
+    unreadDestinations: Set<TopLevelDestination>,
+    currentDestination: NavDestination?,
+    modifier: Modifier = Modifier,
+    mainViewModel: MainActivityViewModel? = null,
+    deepLinkCourseId: String? = null,
+) {
+    Row(modifier = Modifier.fillMaxSize()) {
+        // Centered NavigationRail - use Box to center the rail vertically
+        // Apply safeDrawing insets to respect camera cutout
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start + WindowInsetsSides.Top + WindowInsetsSides.Bottom)),
+            contentAlignment = Alignment.Center,
+        ) {
+            // Use Column with wrapContentHeight to group items together
             Column(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .consumeWindowInsets(padding)
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(
-                            WindowInsetsSides.Horizontal,
-                        ),
-                    ),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Show the top app bar on top level destinations
-                // Hide top bar for ForYou and Bookmarks in landscape mode (two-pane layout)
-                val destination = appState.currentTopLevelDestination
-                val hideTopBarForTwoPane = isLandscape && (
-                    destination == TopLevelDestination.FOR_YOU ||
-                    destination == TopLevelDestination.BOOKMARKS
-                )
-                var shouldShowTopAppBar = false
-
-                if (destination != null && !hideTopBarForTwoPane) {
-                    shouldShowTopAppBar = true
-                    NiaTopAppBar(
-                        titleRes = destination.titleTextId,
-                        navigationIcon = NiaIcons.Search,
-                        navigationIconContentDescription = stringResource(
-                            id = settingsR.string.feature_settings_top_app_bar_navigation_icon_description,
-                        ),
-                        actionIcon = NiaIcons.Settings,
-                        actionIconContentDescription = stringResource(
-                            id = settingsR.string.feature_settings_top_app_bar_action_icon_description,
-                        ),
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent,
-                        ),
-                        onActionClick = { onTopAppBarActionClick() },
-                        onNavigationClick = { appState.navigateToSearch() },
+                appState.topLevelDestinations.forEach { destination ->
+                    val hasUnread = unreadDestinations.contains(destination)
+                    val selected = currentDestination
+                        .isRouteInHierarchy(destination.baseRoute)
+                    NiaNavigationRailItem(
+                        selected = selected,
+                        onClick = { appState.navigateToTopLevelDestination(destination) },
+                        icon = {
+                            Icon(
+                                imageVector = destination.unselectedIcon,
+                                contentDescription = null,
+                            )
+                        },
+                        selectedIcon = {
+                            Icon(
+                                imageVector = destination.selectedIcon,
+                                contentDescription = null,
+                            )
+                        },
+                        label = { Text(stringResource(destination.iconTextId)) },
+                        modifier = Modifier
+                            .testTag("NiaNavItem")
+                            .then(if (hasUnread) Modifier.notificationDot() else Modifier),
                     )
                 }
-
-                Box(
-                    // Workaround for https://issuetracker.google.com/338478720
-                    modifier = Modifier.consumeWindowInsets(
-                        if (shouldShowTopAppBar) {
-                            WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
-                        } else {
-                            WindowInsets(0, 0, 0, 0)
-                        },
-                    ),
-                ) {
-                    NiaNavHost(
-                        appState = appState,
-                        onShowSnackbar = { message, action ->
-                            snackbarHostState.showSnackbar(
-                                message = message,
-                                actionLabel = action,
-                                duration = Short,
-                            ) == ActionPerformed
-                        },
-                        mainViewModel = mainViewModel,
-                        deepLinkCourseId = deepLinkCourseId,
-                    )
-                }
-
-                // TODO: We may want to add padding or spacer when the snackbar is shown so that
-                //  content doesn't display behind it.
             }
+        }
+        // Content
+        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            NiaMainContent(
+                appState = appState,
+                snackbarHostState = snackbarHostState,
+                onTopAppBarActionClick = onTopAppBarActionClick,
+                modifier = modifier,
+                isLandscape = true,
+                mainViewModel = mainViewModel,
+                deepLinkCourseId = deepLinkCourseId,
+            )
+        }
+    }
+}
+
+/**
+ * Main content area with Scaffold, top bar, and navigation host.
+ */
+@Composable
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
+private fun NiaMainContent(
+    appState: NiaAppState,
+    snackbarHostState: SnackbarHostState,
+    onTopAppBarActionClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isLandscape: Boolean = false,
+    mainViewModel: MainActivityViewModel? = null,
+    deepLinkCourseId: String? = null,
+) {
+    Scaffold(
+        modifier = modifier.semantics {
+            testTagsAsResourceId = true
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = {
+            SnackbarHost(
+                snackbarHostState,
+                modifier = Modifier.windowInsetsPadding(
+                    WindowInsets.safeDrawing.exclude(
+                        WindowInsets.ime,
+                    ),
+                ),
+            )
+        },
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .consumeWindowInsets(padding)
+                .windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(
+                        WindowInsetsSides.Horizontal,
+                    ),
+                ),
+        ) {
+            // Show the top app bar on top level destinations
+            // Hide top bar for ForYou and Bookmarks in landscape mode (two-pane layout)
+            val destination = appState.currentTopLevelDestination
+            val hideTopBarForTwoPane = isLandscape && (
+                destination == TopLevelDestination.FOR_YOU ||
+                destination == TopLevelDestination.BOOKMARKS
+            )
+            var shouldShowTopAppBar = false
+
+            if (destination != null && !hideTopBarForTwoPane) {
+                shouldShowTopAppBar = true
+                NiaTopAppBar(
+                    titleRes = destination.titleTextId,
+                    navigationIcon = NiaIcons.Search,
+                    navigationIconContentDescription = stringResource(
+                        id = settingsR.string.feature_settings_top_app_bar_navigation_icon_description,
+                    ),
+                    actionIcon = NiaIcons.Settings,
+                    actionIconContentDescription = stringResource(
+                        id = settingsR.string.feature_settings_top_app_bar_action_icon_description,
+                    ),
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                    ),
+                    onActionClick = { onTopAppBarActionClick() },
+                    onNavigationClick = { appState.navigateToSearch() },
+                )
+            }
+
+            Box(
+                // Workaround for https://issuetracker.google.com/338478720
+                modifier = Modifier.consumeWindowInsets(
+                    if (shouldShowTopAppBar) {
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+                    } else {
+                        WindowInsets(0, 0, 0, 0)
+                    },
+                ),
+            ) {
+                NiaNavHost(
+                    appState = appState,
+                    onShowSnackbar = { message, action ->
+                        snackbarHostState.showSnackbar(
+                            message = message,
+                            actionLabel = action,
+                            duration = Short,
+                        ) == ActionPerformed
+                    },
+                    mainViewModel = mainViewModel,
+                    deepLinkCourseId = deepLinkCourseId,
+                )
+            }
+
+            // TODO: We may want to add padding or spacer when the snackbar is shown so that
+            //  content doesn't display behind it.
         }
     }
 }

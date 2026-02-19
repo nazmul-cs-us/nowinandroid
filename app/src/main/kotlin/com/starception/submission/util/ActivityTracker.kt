@@ -9,16 +9,24 @@ import android.util.Log
 import android.media.ToneGenerator
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.speech.tts.TextToSpeech
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import com.starception.submission.sensor.ActivityDetectionService
 import com.starception.submission.config.ActivityDetectionConfig
 import com.starception.submission.config.TravelDuaSettings
+import com.starception.submission.feature.course.CourseProgressTracker
+import com.starception.submission.core.hadithdatabase.HadithRepository
+import java.util.Locale
 
 /**
  * Notification mode for activity changes
@@ -66,6 +74,13 @@ object ActivityTracker {
     private var toneGenerator: ToneGenerator? = null
     private var mediaPlayer: MediaPlayer? = null
     private var previousActivity: String = ""
+
+    // TextToSpeech for hadith playback after travel dua
+    private var textToSpeech: TextToSpeech? = null
+    private var isTtsInitialized = false
+
+    // Coroutine scope for async operations
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     // Handler for sensor callbacks from foreground service
     // CRITICAL: Using a Handler from a foreground service ensures sensors deliver
@@ -663,6 +678,9 @@ object ActivityTracker {
                         mp.release()
                         mediaPlayer = null
                         Log.d("ActivityTracker", "🎵 Travel dua audio completed")
+
+                        // After travel dua completes, play daily hadith if enrolled
+                        playDailyHadithIfEnrolled(ctx)
                     }
                     mediaPlayer?.start()
 
@@ -686,6 +704,96 @@ object ActivityTracker {
         } catch (e: Exception) {
             Log.e("ActivityTracker", "Failed to play driving audio: ${e.message}")
         }
+    }
+
+    /**
+     * Play the next uncompleted daily hadith if user is enrolled in the Daily Hadith course
+     */
+    private fun playDailyHadithIfEnrolled(ctx: Context) {
+        try {
+            // Check if user is enrolled in Daily Hadith course
+            val prefs = ctx.getSharedPreferences("course_progress", Context.MODE_PRIVATE)
+            val enrolledCourses = prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()
+
+            if ("daily_bukhari" !in enrolledCourses) {
+                Log.d("ActivityTracker", "📚 User not enrolled in Daily Hadith course - skipping hadith playback")
+                return
+            }
+
+            Log.i("ActivityTracker", "📚 ========== DAILY HADITH PLAYBACK ==========")
+            Log.i("ActivityTracker", "📚 User enrolled in Daily Hadith course")
+
+            // Get completed lessons to find the next uncompleted hadith
+            val completedLessons = CourseProgressTracker.getCompletedLessons(ctx, "daily_bukhari")
+
+            // Find the next uncompleted hadith (1-365)
+            var nextHadithNumber = 1
+            for (i in 1..365) {
+                if ("hadith_$i" !in completedLessons) {
+                    nextHadithNumber = i
+                    break
+                }
+            }
+
+            Log.i("ActivityTracker", "📚 Next hadith to learn: #$nextHadithNumber (${completedLessons.size} completed)")
+
+            // Fetch and play the hadith
+            scope.launch {
+                try {
+                    val hadithRepository = HadithRepository.getInstance(ctx)
+                    val hadith = hadithRepository.getHadith("sahih_bukhari.db", nextHadithNumber)
+
+                    if (hadith != null) {
+                        val textToSpeak = hadith.textPlain ?: hadith.elaboration ?: "Hadith number $nextHadithNumber"
+                        Log.i("ActivityTracker", "📚 Playing hadith #$nextHadithNumber: ${textToSpeak.take(100)}...")
+
+                        speakHadith(ctx, nextHadithNumber, textToSpeak)
+                    } else {
+                        Log.w("ActivityTracker", "📚 Could not fetch hadith #$nextHadithNumber")
+                    }
+                } catch (e: Exception) {
+                    Log.e("ActivityTracker", "📚 Error fetching hadith: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ActivityTracker", "📚 Error in playDailyHadithIfEnrolled: ${e.message}")
+        }
+    }
+
+    /**
+     * Speak hadith text using TextToSpeech
+     */
+    private fun speakHadith(ctx: Context, hadithNumber: Int, text: String) {
+        // Initialize TTS if not already done
+        if (textToSpeech == null) {
+            textToSpeech = TextToSpeech(ctx) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    isTtsInitialized = true
+                    textToSpeech?.language = Locale.US
+                    Log.d("ActivityTracker", "📚 TTS initialized successfully")
+
+                    // Speak the hadith with intro
+                    val fullText = "Hadith number $hadithNumber from Sahih Al-Bukhari. $text"
+                    textToSpeech?.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
+                } else {
+                    Log.e("ActivityTracker", "📚 TTS initialization failed with status: $status")
+                }
+            }
+        } else if (isTtsInitialized) {
+            // TTS already initialized, speak directly
+            val fullText = "Hadith number $hadithNumber from Sahih Al-Bukhari. $text"
+            textToSpeech?.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
+        }
+    }
+
+    /**
+     * Release TextToSpeech resources
+     */
+    fun releaseTts() {
+        textToSpeech?.stop()
+        textToSpeech?.shutdown()
+        textToSpeech = null
+        isTtsInitialized = false
     }
     
     /**

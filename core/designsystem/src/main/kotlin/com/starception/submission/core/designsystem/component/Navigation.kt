@@ -16,14 +16,8 @@
 
 package com.starception.submission.core.designsystem.component
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -42,7 +36,6 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScope
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -223,102 +216,39 @@ fun NiaNavigationSuiteScaffold(
         ),
     )
 
-    // Use custom centered NavigationRail in landscape mode
-    if (useNavRailInLandscape && isLandscape) {
-        Row(modifier = modifier.fillMaxSize()) {
-            // Centered NavigationRail
-            Column(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(80.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                val items = mutableListOf<NiaNavRailItemData>()
-                val railScope = NiaNavigationRailScope(items)
-                navigationSuiteItems(railScope)
-
-                items.forEach { item ->
-                    NiaNavigationRailItem(
-                        selected = item.selected,
-                        onClick = item.onClick,
-                        icon = item.icon,
-                        selectedIcon = item.selectedIcon,
-                        label = item.label,
-                        modifier = item.modifier,
-                    )
-                }
-            }
-            // Content
-            content()
-        }
+    val layoutType = if (useNavRailInLandscape && isLandscape) {
+        androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType.NavigationRail
     } else {
-        // Use standard NavigationSuiteScaffold for portrait mode
-        val layoutType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
-
-        NavigationSuiteScaffold(
-            navigationSuiteItems = {
-                NiaNavigationSuiteScopeImpl(
-                    navigationSuiteScope = this,
-                    navigationSuiteItemColors = navigationSuiteItemColors,
-                ).run(navigationSuiteItems)
-            },
-            layoutType = layoutType,
-            containerColor = Color.Transparent,
-            navigationSuiteColors = NavigationSuiteDefaults.colors(
-                navigationBarContentColor = NiaNavigationDefaults.navigationContentColor(),
-                navigationRailContainerColor = Color.Transparent,
-            ),
-            modifier = modifier,
-        ) {
-            content()
-        }
+        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
     }
-}
 
-/**
- * Data class to hold navigation rail item data for custom layout.
- */
-private data class NiaNavRailItemData(
-    val selected: Boolean,
-    val onClick: () -> Unit,
-    val icon: @Composable () -> Unit,
-    val selectedIcon: @Composable () -> Unit,
-    val label: @Composable (() -> Unit)?,
-    val modifier: Modifier,
-)
-
-/**
- * Scope for collecting navigation rail items in custom layout.
- */
-private class NiaNavigationRailScope(
-    private val items: MutableList<NiaNavRailItemData>,
-) : NiaNavigationSuiteScope {
-    override fun item(
-        selected: Boolean,
-        onClick: () -> Unit,
-        modifier: Modifier,
-        icon: @Composable () -> Unit,
-        selectedIcon: @Composable () -> Unit,
-        label: @Composable (() -> Unit)?,
+    NavigationSuiteScaffold(
+        navigationSuiteItems = {
+            NiaNavigationSuiteScope(
+                navigationSuiteScope = this,
+                navigationSuiteItemColors = navigationSuiteItemColors,
+            ).run(navigationSuiteItems)
+        },
+        layoutType = layoutType,
+        containerColor = Color.Transparent,
+        navigationSuiteColors = NavigationSuiteDefaults.colors(
+            navigationBarContentColor = NiaNavigationDefaults.navigationContentColor(),
+            navigationRailContainerColor = Color.Transparent,
+        ),
+        modifier = modifier,
     ) {
-        items.add(
-            NiaNavRailItemData(
-                selected = selected,
-                onClick = onClick,
-                icon = icon,
-                selectedIcon = selectedIcon,
-                label = label,
-                modifier = modifier,
-            )
-        )
+        content()
     }
 }
 
+
 /**
- * Interface for navigation suite scope to allow different implementations.
+ * A wrapper around [NavigationSuiteScope] to declare navigation items.
  */
-interface NiaNavigationSuiteScope {
+class NiaNavigationSuiteScope internal constructor(
+    private val navigationSuiteScope: NavigationSuiteScope,
+    private val navigationSuiteItemColors: NavigationSuiteItemColors,
+) {
     fun item(
         selected: Boolean,
         onClick: () -> Unit,
@@ -326,23 +256,6 @@ interface NiaNavigationSuiteScope {
         icon: @Composable () -> Unit,
         selectedIcon: @Composable () -> Unit = icon,
         label: @Composable (() -> Unit)? = null,
-    )
-}
-
-/**
- * A wrapper around [NavigationSuiteScope] to declare navigation items.
- */
-class NiaNavigationSuiteScopeImpl internal constructor(
-    private val navigationSuiteScope: NavigationSuiteScope,
-    private val navigationSuiteItemColors: NavigationSuiteItemColors,
-) : NiaNavigationSuiteScope {
-    override fun item(
-        selected: Boolean,
-        onClick: () -> Unit,
-        modifier: Modifier,
-        icon: @Composable () -> Unit,
-        selectedIcon: @Composable () -> Unit,
-        label: @Composable (() -> Unit)?,
     ) = navigationSuiteScope.item(
         selected = selected,
         onClick = onClick,
