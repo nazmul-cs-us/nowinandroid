@@ -1489,9 +1489,9 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
                         .wobbleTransform(wobbleState.wobbleIntensity),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Left column: Swipeable tiles + Location info
                     Column(
