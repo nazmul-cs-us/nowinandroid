@@ -120,6 +120,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -642,7 +645,7 @@ fun CourseDetailScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
                 ),
-                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
+                modifier = Modifier.padding(top = 24.dp),
             )
         }
 
@@ -686,7 +689,7 @@ fun CourseDetailScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
                 ),
-                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
+                modifier = Modifier.padding(top = 24.dp),
             )
         }
 
@@ -865,7 +868,9 @@ private fun CourseHeroSection(
     lastAccessed: Long,
 ) {
     val parallaxOffset = collapseProgress * 100
-    val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val statusBarInsets = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // Use minimum 24.dp when status bar is hidden (immersive mode from other screens)
+    val statusBarHeight = if (statusBarInsets > 0.dp) statusBarInsets else 24.dp
 
     // Dynamic content based on course
     val (highlightText, highlightSubtext) = remember(course.id) {

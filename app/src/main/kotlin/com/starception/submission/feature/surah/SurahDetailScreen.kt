@@ -104,7 +104,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
 import com.starception.submission.core.designsystem.component.NiaTopicTag
-import com.starception.submission.feature.course.CourseCompletionBadgeCompact
+import com.starception.submission.core.designsystem.component.NiaVerifiedTag
 import com.starception.submission.feature.course.CourseCompletionInfo
 import com.starception.submission.feature.course.CourseProgressTracker
 import java.util.Locale
@@ -3033,7 +3033,15 @@ private fun AlbumInfoCard(
                 // Course completion badge (if applicable)
                 if (courseCompletionInfo != null) {
                     Spacer(Modifier.height(8.dp))
-                    CourseCompletionBadgeCompact(completionInfo = courseCompletionInfo)
+                    NiaVerifiedTag(
+                        onClick = { },
+                        enabled = true,
+                        text = {
+                            Text(
+                                text = courseCompletionInfo.courseName.uppercase(Locale.getDefault())
+                            )
+                        }
+                    )
                 }
 
                 // Small gap between translation and chips

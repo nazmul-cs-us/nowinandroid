@@ -90,6 +90,7 @@ import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.feature.surah.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.core.designsystem.component.NiaVerifiedTag
 import com.starception.submission.core.ui.DynamicSkyHeader
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.core.ui.getCurrentSkyPeriodForTheme
@@ -777,7 +778,7 @@ private fun HadithContent(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(if (isLandscape) 140.dp else 196.dp)
+                                .height(if (isLandscape) 130.dp else 170.dp)
                         ) {
                             Surface(
                                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -807,27 +808,39 @@ private fun HadithContent(
 
                                     Spacer(modifier = Modifier.height(12.dp))
 
-                                    // Hadith number chip
-                                    NiaTopicTag(
-                                        followed = true,
-                                        onClick = { },
-                                        enabled = true,
-                                        text = {
-                                            Text(
-                                                text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
-                                            )
-                                        }
-                                    )
-
-                                    // Course completion badge (if applicable)
+                                    // Hadith number chip and course badge in same row
                                     val courseCompletionInfo = CourseProgressTracker.getHadithCourseCompletion(
                                         context,
                                         hadithNumber,
                                         databaseFile
                                     )
-                                    if (courseCompletionInfo != null) {
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        CourseCompletionBadgeCompact(completionInfo = courseCompletionInfo)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        NiaTopicTag(
+                                            followed = true,
+                                            onClick = { },
+                                            enabled = true,
+                                            text = {
+                                                Text(
+                                                    text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
+                                                )
+                                            }
+                                        )
+
+                                        if (courseCompletionInfo != null) {
+                                            NiaVerifiedTag(
+                                                onClick = { },
+                                                enabled = true,
+                                                text = {
+                                                    Text(
+                                                        text = courseCompletionInfo.courseName.uppercase(Locale.getDefault())
+                                                    )
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -846,7 +859,7 @@ private fun HadithContent(
                         ) + fadeOut(animationSpec = tween(durationMillis = 300)),
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .offset(y = (-168).dp)
+                            .offset(y = (-142).dp)
                             .padding(end = 12.dp)
                     ) {
                         FloatingActionButton(
