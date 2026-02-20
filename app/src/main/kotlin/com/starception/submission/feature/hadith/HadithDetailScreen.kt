@@ -610,6 +610,62 @@ private fun HadithContent(
         // No status bar padding - immersive mode hides status bar
         val lazyListState = rememberLazyListState()
 
+        // Calculate toolbar collapse state with smooth transition
+        // At top (album art visible) → Transparent
+        // Scrolled down (past album art) → Solid theme color
+        val collapseProgress = remember {
+            androidx.compose.runtime.derivedStateOf {
+                val itemIndex = lazyListState.firstVisibleItemIndex
+                val offset = lazyListState.firstVisibleItemScrollOffset.toFloat()
+
+                when {
+                    // Past the header - fully solid
+                    itemIndex >= 1 -> 1f
+                    // At header - calculate progress based on scroll offset
+                    else -> {
+                        val headerHeight = if (isLandscape) 340f else 596f // image + info card height
+                        (offset / headerHeight).coerceIn(0f, 1f)
+                    }
+                }
+            }
+        }
+
+        // Track scroll direction for FAB animation
+        var previousScrollOffset by remember { mutableStateOf(0) }
+        var previousItemIndex by remember { mutableStateOf(0) }
+        var showFabVisible by remember { mutableStateOf(true) }
+
+        // Track scroll changes for FAB visibility
+        LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
+            val currentItemIndex = lazyListState.firstVisibleItemIndex
+            val currentOffset = lazyListState.firstVisibleItemScrollOffset
+
+            // Calculate total scroll position for accurate direction detection
+            val currentTotalScroll = (currentItemIndex * 1000) + currentOffset
+            val previousTotalScroll = (previousItemIndex * 1000) + previousScrollOffset
+            val scrollDelta = currentTotalScroll - previousTotalScroll
+
+            // Only respond to significant scroll changes
+            if (kotlin.math.abs(scrollDelta) > 20) {
+                val isScrollingDown = scrollDelta > 0
+
+                // At top: always show FAB
+                val atTop = currentItemIndex == 0 && currentOffset < 100
+
+                if (atTop) {
+                    showFabVisible = true
+                } else {
+                    // Scrolling up → show FAB
+                    // Scrolling down → hide FAB
+                    showFabVisible = !isScrollingDown
+                }
+
+                // Update previous scroll position
+                previousScrollOffset = currentOffset
+                previousItemIndex = currentItemIndex
+            }
+        }
+
         // Build list of available sections based on hadith data
         val availableSections = remember(hadith) {
             mutableListOf<HadithSection>().apply {
@@ -717,76 +773,92 @@ private fun HadithContent(
                             )
                         }
 
-                        // Info card below header
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        // Fixed-height container for info card to match SurahDetailScreen FAB positioning
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 16.dp)
+                                .height(if (isLandscape) 140.dp else 196.dp)
                         ) {
-                            Column {
-                                // Collection name
-                                Text(
-                                    text = hadith.collectionNameEnglish.ifEmpty { collectionName },
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-
-                                // Author
-                                if (hadith.author.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(4.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                            ) {
+                                Column {
+                                    // Collection name
                                     Text(
-                                        text = "Compiled by ${hadith.author}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontStyle = FontStyle.Italic
+                                        text = hadith.collectionNameEnglish.ifEmpty { collectionName },
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
-                                }
 
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                // Hadith number chip
-                                NiaTopicTag(
-                                    followed = true,
-                                    onClick = { },
-                                    enabled = true,
-                                    text = {
+                                    // Author
+                                    if (hadith.author.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
+                                            text = "Compiled by ${hadith.author}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontStyle = FontStyle.Italic
                                         )
                                     }
-                                )
 
-                                // Course completion badge (if applicable)
-                                val courseCompletionInfo = CourseProgressTracker.getHadithCourseCompletion(
-                                    context,
-                                    hadithNumber,
-                                    databaseFile
-                                )
-                                if (courseCompletionInfo != null) {
                                     Spacer(modifier = Modifier.height(12.dp))
-                                    CourseCompletionBadgeCompact(completionInfo = courseCompletionInfo)
+
+                                    // Hadith number chip
+                                    NiaTopicTag(
+                                        followed = true,
+                                        onClick = { },
+                                        enabled = true,
+                                        text = {
+                                            Text(
+                                                text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
+                                            )
+                                        }
+                                    )
+
+                                    // Course completion badge (if applicable)
+                                    val courseCompletionInfo = CourseProgressTracker.getHadithCourseCompletion(
+                                        context,
+                                        hadithNumber,
+                                        databaseFile
+                                    )
+                                    if (courseCompletionInfo != null) {
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        CourseCompletionBadgeCompact(completionInfo = courseCompletionInfo)
+                                    }
                                 }
                             }
                         }
                     }
 
                     // Play FAB positioned at boundary between header image and info card
-                    // Same position as SurahDetailScreen
-                    FloatingActionButton(
-                        onClick = onPlayClick,
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    // Same position as SurahDetailScreen - hides on scroll down, shows on scroll up
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showFabVisible,
+                        enter = scaleIn(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+                        exit = scaleOut(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(durationMillis = 300)),
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
+                            .align(Alignment.BottomEnd)
+                            .offset(y = (-168).dp)
                             .padding(end = 12.dp)
-                            .offset(y = if (isLandscape) 176.dp else 352.dp) // Position at image/info card boundary
                     ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pause" else "Play"
-                        )
+                        FloatingActionButton(
+                            onClick = onPlayClick,
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Pause" else "Play"
+                            )
+                        }
                     }
                 }
             }
@@ -892,12 +964,24 @@ private fun HadithContent(
             }
         }
 
-        // Fixed toolbar at top - transparent to show sky through
-        Box(
+        // Fixed toolbar at top with color transition based on scroll
+        // Smooth transition: transparent (over album art) → solid (scrolled down)
+        val toolbarBackgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = collapseProgress.value)
+        val surfaceColor = MaterialTheme.colorScheme.onSurface
+        val toolbarContentColor = Color(
+            red = 1f + (surfaceColor.red - 1f) * collapseProgress.value,
+            green = 1f + (surfaceColor.green - 1f) * collapseProgress.value,
+            blue = 1f + (surfaceColor.blue - 1f) * collapseProgress.value,
+            alpha = 1f
+        )
+
+        Surface(
+            color = toolbarBackgroundColor,
+            tonalElevation = (4 * collapseProgress.value).dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .padding(top = 48.dp) // Fixed padding to clear camera punch hole area
+                .padding(top = 8.dp) // Minimal top padding since status bar is hidden by immersive mode
         ) {
             Row(
                 modifier = Modifier
@@ -910,7 +994,7 @@ private fun HadithContent(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = Color.White
+                        tint = toolbarContentColor
                     )
                 }
 
@@ -921,7 +1005,7 @@ private fun HadithContent(
                     Icon(
                         imageVector = Icons.Filled.Language,
                         contentDescription = "Select Translation Language",
-                        tint = Color.White
+                        tint = toolbarContentColor
                     )
                 }
 
@@ -942,35 +1026,9 @@ private fun HadithContent(
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "More options",
-                        tint = Color.White
+                        tint = toolbarContentColor
                     )
                 }
-            }
-        }
-
-        // Play FAB at bottom right - same position as SurahDetailScreen
-        androidx.compose.animation.AnimatedVisibility(
-            visible = true,
-            enter = scaleIn(
-                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-            ) + fadeIn(animationSpec = tween(durationMillis = 300)),
-            exit = scaleOut(
-                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-            ) + fadeOut(animationSpec = tween(durationMillis = 300)),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(y = (-168).dp) // Same position as SurahDetailScreen
-                .padding(end = 12.dp)
-        ) {
-            FloatingActionButton(
-                onClick = onPlayClick,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play"
-                )
             }
         }
     }
@@ -1556,7 +1614,7 @@ private fun HadithShimmerLoading(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 48.dp) // Fixed padding to clear camera punch hole area
+                .padding(top = 8.dp) // Minimal top padding since status bar is hidden by immersive mode
         ) {
             Row(
                 modifier = Modifier
