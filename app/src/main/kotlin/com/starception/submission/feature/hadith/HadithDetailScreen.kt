@@ -48,8 +48,11 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -110,6 +113,18 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import com.starception.submission.R
 import android.content.SharedPreferences
+import android.content.res.AssetFileDescriptor
+import android.media.MediaPlayer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.FastOutSlowInEasing
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 private const val HADITH_SECTION_ORDER_PREFS = "hadith_section_order_prefs"
 private const val HADITH_SECTION_ORDER_KEY = "section_order"
@@ -206,6 +221,23 @@ fun HadithDetailScreen(
         "google" to "Google Translate",
         "reverso" to "Reverso"
     )
+
+    // Audio playback state
+    var isPlaying by remember { mutableStateOf(false) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var textToSpeech by remember { mutableStateOf<TextToSpeech?>(null) }
+    var isTtsInitialized by remember { mutableStateOf(false) }
+
+    // Cleanup on dispose
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose {
+            mediaPlayer?.release()
+            mediaPlayer = null
+            textToSpeech?.stop()
+            textToSpeech?.shutdown()
+            textToSpeech = null
+        }
+    }
 
     // Load hadith
     LaunchedEffect(databaseFile, hadithNumber) {
@@ -349,7 +381,87 @@ fun HadithDetailScreen(
                         isTranslating = isTranslating,
                         selectedLanguage = selectedLanguage,
                         onLanguageClick = { showLanguageDialog = true },
-                        isLandscape = isLandscape
+                        isLandscape = isLandscape,
+                        isPlaying = isPlaying,
+                        onPlayClick = {
+                            if (isPlaying) {
+                                // Stop playback
+                                mediaPlayer?.stop()
+                                mediaPlayer?.release()
+                                mediaPlayer = null
+                                textToSpeech?.stop()
+                                isPlaying = false
+                            } else {
+                                // Start playback
+                                val isBukhari = databaseFile.contains("bukhari", ignoreCase = true)
+
+                                // For Bengali language and Bukhari, use audio files
+                                if (selectedLanguage == "bn" && isBukhari) {
+                                    // Try to play from assets
+                                    val formattedNumber = String.format("%04d", hadithNumber)
+                                    val possibleFileNames = listOf(
+                                        "bukhari_audio_bn/bukhari_$formattedNumber.ogg",
+                                        "bukhari_audio_bn/bukhari_$formattedNumber.mp3"
+                                    )
+
+                                    var audioPlayed = false
+                                    for (fileName in possibleFileNames) {
+                                        try {
+                                            val afd: AssetFileDescriptor = context.assets.openFd(fileName)
+                                            mediaPlayer = MediaPlayer().apply {
+                                                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                                                afd.close()
+                                                setOnCompletionListener { mp ->
+                                                    mp.release()
+                                                    mediaPlayer = null
+                                                    isPlaying = false
+                                                }
+                                                setOnErrorListener { mp, _, _ ->
+                                                    mp.release()
+                                                    mediaPlayer = null
+                                                    isPlaying = false
+                                                    true
+                                                }
+                                                prepare()
+                                                start()
+                                            }
+                                            isPlaying = true
+                                            audioPlayed = true
+                                            android.util.Log.i("HadithDetailScreen", "▶️ Playing Bengali audio: $fileName")
+                                            break
+                                        } catch (e: java.io.FileNotFoundException) {
+                                            // Try next file
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("HadithDetailScreen", "Error playing audio: ${e.message}")
+                                        }
+                                    }
+
+                                    // Fall back to TTS if no audio file found
+                                    if (!audioPlayed) {
+                                        android.util.Log.w("HadithDetailScreen", "No Bengali audio for hadith #$hadithNumber, using TTS")
+                                        playWithTts(
+                                            context = context,
+                                            text = translatedText ?: hadith!!.textPlain ?: "",
+                                            language = selectedLanguage,
+                                            tts = textToSpeech,
+                                            onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
+                                            onPlayingChanged = { isPlaying = it }
+                                        )
+                                    }
+                                } else {
+                                    // Use TTS for other languages
+                                    val textToSpeak = translatedText ?: hadith!!.textPlain ?: ""
+                                    playWithTts(
+                                        context = context,
+                                        text = textToSpeak,
+                                        language = selectedLanguage,
+                                        tts = textToSpeech,
+                                        onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
+                                        onPlayingChanged = { isPlaying = it }
+                                    )
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -488,7 +600,9 @@ private fun HadithContent(
     isTranslating: Boolean = false,
     selectedLanguage: String = "en",
     onLanguageClick: () -> Unit = {},
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    isPlaying: Boolean = false,
+    onPlayClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -657,6 +771,23 @@ private fun HadithContent(
                             }
                         }
                     }
+
+                    // Play FAB positioned at boundary between header image and info card
+                    // Same position as SurahDetailScreen
+                    FloatingActionButton(
+                        onClick = onPlayClick,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(end = 12.dp)
+                            .offset(y = if (isLandscape) 176.dp else 352.dp) // Position at image/info card boundary
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play"
+                        )
+                    }
                 }
             }
 
@@ -816,6 +947,32 @@ private fun HadithContent(
                 }
             }
         }
+
+        // Play FAB at bottom right - same position as SurahDetailScreen
+        androidx.compose.animation.AnimatedVisibility(
+            visible = true,
+            enter = scaleIn(
+                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+            exit = scaleOut(
+                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(y = (-168).dp) // Same position as SurahDetailScreen
+                .padding(end = 12.dp)
+        ) {
+            FloatingActionButton(
+                onClick = onPlayClick,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play"
+                )
+            }
+        }
     }
 }
 
@@ -836,6 +993,90 @@ private fun getLanguageName(code: String): String {
         "tr" -> "Turkish"
         "ur" -> "Urdu"
         else -> code.uppercase()
+    }
+}
+
+/**
+ * Play text using TextToSpeech
+ */
+private fun playWithTts(
+    context: android.content.Context,
+    text: String,
+    language: String,
+    tts: TextToSpeech?,
+    onTtsCreated: (TextToSpeech) -> Unit,
+    onPlayingChanged: (Boolean) -> Unit
+) {
+    val locale = when (language) {
+        "en" -> java.util.Locale.US
+        "ar" -> java.util.Locale("ar")
+        "bn" -> java.util.Locale("bn", "BD")
+        "es" -> java.util.Locale("es", "ES")
+        "fr" -> java.util.Locale.FRANCE
+        "id" -> java.util.Locale("id", "ID")
+        "ru" -> java.util.Locale("ru", "RU")
+        "sv" -> java.util.Locale("sv", "SE")
+        "tr" -> java.util.Locale("tr", "TR")
+        "ur" -> java.util.Locale("ur", "PK")
+        "zh" -> java.util.Locale.SIMPLIFIED_CHINESE
+        else -> java.util.Locale.US
+    }
+
+    // Get intro for hadith
+    val intro = when (language) {
+        "bn" -> "সহীহ আল-বুখারী থেকে।"
+        "ar" -> "من صحيح البخاري."
+        "es" -> "De Sahih Al-Bujari."
+        "fr" -> "De Sahih Al-Boukhari."
+        "id" -> "Dari Sahih Al-Bukhari."
+        "ru" -> "Из Сахих аль-Бухари."
+        "tr" -> "Sahih-i Buhari'den."
+        "ur" -> "صحیح البخاری سے۔"
+        "zh" -> "来自《布哈里圣训》。"
+        else -> "From Sahih Al-Bukhari."
+    }
+
+    val fullText = "$intro $text"
+
+    if (tts != null) {
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                onPlayingChanged(true)
+            }
+            override fun onDone(utteranceId: String?) {
+                onPlayingChanged(false)
+            }
+            override fun onError(utteranceId: String?) {
+                onPlayingChanged(false)
+            }
+        })
+        tts.language = locale
+        tts.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_tts")
+        onPlayingChanged(true)
+    } else {
+        // Use a holder to reference TTS in the callback
+        var ttsHolder: TextToSpeech? = null
+        ttsHolder = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                ttsHolder?.let { createdTts ->
+                    onTtsCreated(createdTts)
+                    createdTts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {
+                            onPlayingChanged(true)
+                        }
+                        override fun onDone(utteranceId: String?) {
+                            onPlayingChanged(false)
+                        }
+                        override fun onError(utteranceId: String?) {
+                            onPlayingChanged(false)
+                        }
+                    })
+                    createdTts.language = locale
+                    createdTts.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_tts")
+                    onPlayingChanged(true)
+                }
+            }
+        }
     }
 }
 

@@ -2,6 +2,7 @@ package com.starception.submission.util
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.AssetFileDescriptor
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -74,6 +75,7 @@ object ActivityTracker {
     private var context: Context? = null
     private var toneGenerator: ToneGenerator? = null
     private var mediaPlayer: MediaPlayer? = null
+    private var hadithMediaPlayer: MediaPlayer? = null  // Separate player for hadith audio
     private var previousActivity: String = ""
 
     // TextToSpeech for hadith playback after travel dua
@@ -498,6 +500,14 @@ object ActivityTracker {
             } catch (e: Exception) {
                 Log.w("ActivityTracker", "Error releasing MediaPlayer: ${e.message}")
             }
+
+            // Clean up hadith MediaPlayer
+            try {
+                hadithMediaPlayer?.release()
+                hadithMediaPlayer = null
+            } catch (e: Exception) {
+                Log.w("ActivityTracker", "Error releasing hadith MediaPlayer: ${e.message}")
+            }
             Log.d("ActivityTracker", "🧹 Released audio resources")
         }
     }
@@ -763,6 +773,7 @@ object ActivityTracker {
 
     /**
      * Speak hadith text using TextToSpeech in user's selected language
+     * For Bengali language, uses pre-recorded audio files from assets
      */
     private fun speakHadith(ctx: Context, hadithNumber: Int, text: String) {
         // Get user's selected language
@@ -771,6 +782,17 @@ object ActivityTracker {
         val ttsLocale = getLocaleForLanguage(selectedLang)
 
         Log.d("ActivityTracker", "📚 User's selected language: $selectedLang -> TTS Locale: ${ttsLocale.displayLanguage}")
+
+        // For Bengali language, try to use pre-recorded audio files
+        if (selectedLang == "bn") {
+            Log.i("ActivityTracker", "📚 Bengali language selected - attempting to play audio file")
+            if (playBukhariAudioFromAssets(ctx, hadithNumber)) {
+                Log.i("ActivityTracker", "📚 Successfully playing Bengali audio for hadith #$hadithNumber")
+                return
+            } else {
+                Log.w("ActivityTracker", "📚 Bengali audio not found for hadith #$hadithNumber - falling back to TTS")
+            }
+        }
 
         // Translate hadith if user selected non-English language
         if (selectedLang != "en" && selectedLang != "transliteration") {
@@ -788,6 +810,73 @@ object ActivityTracker {
             // English or transliteration - speak in English
             speakWithTts(ctx, hadithNumber, text, Locale.US, "en")
         }
+    }
+
+    /**
+     * Play Sahih Bukhari audio file from assets for Bengali language
+     * Audio files are stored in assets/bukhari_audio_bn/ folder
+     * Naming convention: bukhari_{hadith_number}.ogg or bukhari_{hadith_number}.mp3
+     *
+     * @param ctx Context
+     * @param hadithNumber The hadith number (1-5515)
+     * @return true if audio file found and started playing, false otherwise
+     */
+    private fun playBukhariAudioFromAssets(ctx: Context, hadithNumber: Int): Boolean {
+        // Release any existing MediaPlayer for hadith
+        hadithMediaPlayer?.release()
+        hadithMediaPlayer = null
+
+        // Format hadith number with leading zeros (4 digits)
+        val formattedNumber = String.format("%04d", hadithNumber)
+
+        // Try OGG first (most files are OGG), then MP3
+        val possibleFileNames = listOf(
+            "bukhari_audio_bn/bukhari_$formattedNumber.ogg",
+            "bukhari_audio_bn/bukhari_$formattedNumber.mp3"
+        )
+
+        for (fileName in possibleFileNames) {
+            try {
+                val assetFileDescriptor: AssetFileDescriptor = ctx.assets.openFd(fileName)
+
+                hadithMediaPlayer = MediaPlayer().apply {
+                    setDataSource(
+                        assetFileDescriptor.fileDescriptor,
+                        assetFileDescriptor.startOffset,
+                        assetFileDescriptor.length
+                    )
+                    assetFileDescriptor.close()
+
+                    setOnCompletionListener { mp ->
+                        mp.release()
+                        hadithMediaPlayer = null
+                        Log.d("ActivityTracker", "📚 Bengali hadith audio completed")
+                    }
+
+                    setOnErrorListener { mp, what, extra ->
+                        Log.e("ActivityTracker", "📚 MediaPlayer error: what=$what, extra=$extra")
+                        mp.release()
+                        hadithMediaPlayer = null
+                        true
+                    }
+
+                    prepare()
+                    start()
+                }
+
+                Log.i("ActivityTracker", "📚 ▶️ Playing Bengali Bukhari audio: $fileName")
+                return true
+
+            } catch (e: java.io.FileNotFoundException) {
+                // File not found, try next extension
+                Log.d("ActivityTracker", "📚 Audio file not found: $fileName")
+            } catch (e: Exception) {
+                Log.e("ActivityTracker", "📚 Error playing audio file $fileName: ${e.message}")
+            }
+        }
+
+        Log.w("ActivityTracker", "📚 No Bengali audio file found for hadith #$hadithNumber")
+        return false
     }
 
     /**
