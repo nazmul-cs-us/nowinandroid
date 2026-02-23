@@ -138,6 +138,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -380,7 +381,7 @@ fun CourseDetailScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = if (isEnrolled) 100.dp else 120.dp),
         ) {
-            // Hero Section with Parallax
+            // Hero Section with course title and info
             item {
                 CourseHeroSection(
                     course = course,
@@ -596,127 +597,65 @@ fun CourseDetailScreen(
             }
         }
 
-        // Collapsing Toolbar
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .alpha(toolbarAlpha),
-            color = MaterialTheme.colorScheme.primary,
-            shadowElevation = if (toolbarAlpha > 0.5f) 4.dp else 0.dp,
-        ) {
-            TopAppBar(
-                title = { },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White,
-                        )
-                    }
+            // Bottom Action Bar
+            EnhancedBottomBar(
+                course = course,
+                isEnrolled = isEnrolled,
+                progressPercent = progressPercent,
+                onEnroll = {
+                    val enrolledSet = (prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()).toMutableSet()
+                    enrolledSet.add(course.id)
+                    prefs.edit().putStringSet("enrolled_courses", enrolledSet).apply()
+                    isEnrolled = true
+                    onEnroll()
                 },
-                actions = {
-                    IconButton(onClick = {
-                        val courseLink = "starception://course/${course.id}"
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, course.title)
-                            putExtra(Intent.EXTRA_TEXT, "Check out this course: ${course.title}\n\n${course.description}\n\nOpen in app: $courseLink")
+                onContinue = {
+                    // Find next incomplete lesson and navigate
+                    for (module in modules) {
+                        for ((index, lesson) in module.lessons.withIndex()) {
+                            if (lesson.id !in completedLessons) {
+                                onLessonClick(lesson, index)
+                                return@EnhancedBottomBar
+                            }
                         }
-                        context.startActivity(Intent.createChooser(shareIntent, "Share Course"))
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share",
-                            tint = Color.White,
-                        )
-                    }
-                    IconButton(onClick = { /* Bookmark */ }) {
-                        Icon(
-                            imageVector = Icons.Outlined.BookmarkBorder,
-                            contentDescription = "Bookmark",
-                            tint = Color.White,
-                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                ),
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.align(Alignment.BottomCenter),
             )
-        }
 
-        // Transparent toolbar for when header is visible
-        if (toolbarAlpha < 0.5f) {
-            TopAppBar(
-                title = { },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White,
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        val courseLink = "starception://course/${course.id}"
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, course.title)
-                            putExtra(Intent.EXTRA_TEXT, "Check out this course: ${course.title}\n\n${course.description}\n\nOpen in app: $courseLink")
-                        }
-                        context.startActivity(Intent.createChooser(shareIntent, "Share Course"))
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share",
-                            tint = Color.White,
-                        )
-                    }
-                    IconButton(onClick = { /* Bookmark */ }) {
-                        Icon(
-                            imageVector = Icons.Outlined.BookmarkBorder,
-                            contentDescription = "Bookmark",
-                            tint = Color.White,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                ),
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
+        // Transparent collapsing toolbar - overlays content like SurahDetailScreen
+        CourseDetailTopBar(
+            collapseProgress = collapseProgress,
+            courseTitle = course.title,
+            courseSubtitle = course.subtitle,
+            onBackClick = onBackClick,
+            onShareClick = {
+                val courseLink = "starception://course/${course.id}"
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, course.title)
+                    putExtra(Intent.EXTRA_TEXT, "Check out this course: ${course.title}\n\n${course.description}\n\nOpen in app: $courseLink")
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "Share Course"))
+            },
+            onBookmarkClick = { /* Bookmark */ },
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
 
         // Floating Course title that moves from header to toolbar when scrolling
-        // Similar to Surah detail screen behavior
         run {
-            // Calculate positions - title starts at content top in header
-            val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-            val headerYPx = with(density) { (statusBarPadding + 56.dp).toPx() } // Start at content position
+            val statusBarInsets = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val statusBarPadding = if (statusBarInsets > 0.dp) statusBarInsets else 8.dp
+            val headerYPx = with(density) { (statusBarPadding + 72.dp).toPx() }
 
-            // Adjust toolbar Y position based on title length
-            // Short titles show subtitle too, so need different centering
-            // At 0.7x scale, content is smaller but positioned from top-left origin
             val isTitleShort = course.title.length <= 15
             val toolbarYPx = with(density) {
-                if (isTitleShort) {
-                    // Short title + subtitle at 0.7x scale: needs larger offset to appear centered
-                    // Moving Y down (larger value) pushes content lower in toolbar
-                    (statusBarPadding + 18.dp).toPx()
-                } else {
-                    // Long 2-line title: original positioning
-                    (statusBarPadding + 14.dp).toPx()
-                }
+                if (isTitleShort) (statusBarPadding + 18.dp).toPx()
+                else (statusBarPadding + 14.dp).toPx()
             }
-            val startXPx = with(density) { 20.dp.toPx() } // Start X position (match header padding)
+            val startXPx = with(density) { 20.dp.toPx() }
+            val endXPx = with(density) { 56.dp.toPx() }
 
-            // Calculate X position for toolbar - right after back button
-            val endXPx = with(density) { 56.dp.toPx() } // Position right after back button (56dp)
-
-            // Calculate floating state based on scroll
             val floatingState by remember {
                 derivedStateOf {
                     val scrollOff = if (listState.firstVisibleItemIndex == 0) {
@@ -731,24 +670,19 @@ fun CourseDetailScreen(
             }
 
             val (titleYPx, progress, xOffsetPx) = floatingState
-            val scale = 1f - (progress * 0.3f) // Scale from 1.0 to 0.7
+            val scale = 1f - (progress * 0.3f)
 
-            // Animate color from dark (in header) to white (in toolbar)
             val titleColor by animateColorAsState(
-                targetValue = if (progress > 0.5f) Color.White else MaterialTheme.colorScheme.onSurface,
+                targetValue = if (progress > 0.5f) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface,
                 animationSpec = tween(150),
                 label = "titleColor"
             )
             val subtitleColor by animateColorAsState(
-                targetValue = if (progress > 0.5f) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                targetValue = if (progress > 0.5f) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant,
                 animationSpec = tween(150),
                 label = "subtitleColor"
             )
 
-            // Max width for title: screen width minus highlight box (90dp), spacer (16dp), and paddings (20dp each side)
-            val maxTitleWidth = with(density) { 220.dp.toPx() } // Approximate max width to avoid overlap
-
-            // Determine if in toolbar mode (progress > 0.5)
             val isInToolbar = progress > 0.5f
 
             Box(
@@ -760,21 +694,17 @@ fun CourseDetailScreen(
                         scaleY = scale
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                     }
-                    .width(220.dp) // Constrain width to avoid overlap with highlight box
+                    .width(220.dp)
             ) {
                 Column {
                     Text(
                         text = course.title,
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            lineHeight = 28.sp // Reduce line height for tighter multi-line spacing
-                        ),
+                        style = MaterialTheme.typography.headlineSmall.copy(lineHeight = 28.sp),
                         fontWeight = FontWeight.Bold,
                         color = titleColor,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    // Show subtitle: always in header mode, and in toolbar mode for short titles
-                    val isTitleShort = course.title.length <= 15
                     val shouldShowSubtitle = course.subtitle.isNotBlank() && (!isInToolbar || isTitleShort)
                     if (shouldShowSubtitle) {
                         Text(
@@ -788,32 +718,6 @@ fun CourseDetailScreen(
                 }
             }
         }
-
-        // Bottom Action Bar
-        EnhancedBottomBar(
-            course = course,
-            isEnrolled = isEnrolled,
-            progressPercent = progressPercent,
-            onEnroll = {
-                val enrolledSet = (prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()).toMutableSet()
-                enrolledSet.add(course.id)
-                prefs.edit().putStringSet("enrolled_courses", enrolledSet).apply()
-                isEnrolled = true
-                onEnroll()
-            },
-            onContinue = {
-                // Find next incomplete lesson and navigate
-                for (module in modules) {
-                    for ((index, lesson) in module.lessons.withIndex()) {
-                        if (lesson.id !in completedLessons) {
-                            onLessonClick(lesson, index)
-                            return@EnhancedBottomBar
-                        }
-                    }
-                }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
     }
 
     // Lesson Completion Dialog (more stable than ModalBottomSheet during predictive back)
@@ -853,6 +757,76 @@ fun CourseDetailScreen(
     }
 }
 
+/**
+ * Transparent collapsing toolbar for course detail screen.
+ * Similar to AlbumPlayerTopBar in SurahDetailScreen.
+ */
+@Composable
+private fun CourseDetailTopBar(
+    collapseProgress: Float,
+    courseTitle: String,
+    courseSubtitle: String,
+    onBackClick: () -> Unit,
+    onShareClick: () -> Unit,
+    onBookmarkClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Smooth transition based on collapseProgress (0 = transparent, 1 = solid)
+    val backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = collapseProgress)
+
+    // Content color transitions from white (over colored header) to onSurface (over solid background)
+    val surfaceColor = MaterialTheme.colorScheme.onSurface
+    val contentColor = Color(
+        red = 1f + (surfaceColor.red - 1f) * collapseProgress,
+        green = 1f + (surfaceColor.green - 1f) * collapseProgress,
+        blue = 1f + (surfaceColor.blue - 1f) * collapseProgress,
+        alpha = 1f
+    )
+
+    Surface(
+        color = backgroundColor,
+        tonalElevation = (4 * collapseProgress).dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBackClick) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = contentColor,
+                )
+            }
+
+            // Spacer for floating title (title is handled by floating title overlay)
+            Spacer(modifier = Modifier.weight(1f))
+
+            IconButton(onClick = onShareClick) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = "Share",
+                    tint = contentColor,
+                )
+            }
+
+            IconButton(onClick = onBookmarkClick) {
+                Icon(
+                    imageVector = Icons.Outlined.BookmarkBorder,
+                    contentDescription = "Bookmark",
+                    tint = contentColor,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun CourseHeroSection(
     course: Course,
@@ -866,8 +840,8 @@ private fun CourseHeroSection(
 ) {
     val parallaxOffset = collapseProgress * 100
     val statusBarInsets = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    // Use minimum 32.dp when status bar is hidden (immersive mode) to clear toolbar
-    val statusBarHeight = if (statusBarInsets > 0.dp) statusBarInsets else 32.dp
+    // Use minimum padding when status bar is hidden to clear toolbar (8dp toolbar top + 56dp toolbar height)
+    val statusBarHeight = if (statusBarInsets > 0.dp) statusBarInsets else 8.dp
 
     // Dynamic content based on course
     val (highlightText, highlightSubtext) = remember(course.id) {
