@@ -120,9 +120,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -645,7 +642,7 @@ fun CourseDetailScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
                 ),
-                modifier = Modifier.padding(top = 24.dp),
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
 
@@ -689,7 +686,7 @@ fun CourseDetailScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
                 ),
-                modifier = Modifier.padding(top = 24.dp),
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
 
@@ -869,8 +866,8 @@ private fun CourseHeroSection(
 ) {
     val parallaxOffset = collapseProgress * 100
     val statusBarInsets = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    // Use minimum 24.dp when status bar is hidden (immersive mode from other screens)
-    val statusBarHeight = if (statusBarInsets > 0.dp) statusBarInsets else 24.dp
+    // Use minimum 32.dp when status bar is hidden (immersive mode) to clear toolbar
+    val statusBarHeight = if (statusBarInsets > 0.dp) statusBarInsets else 32.dp
 
     // Dynamic content based on course
     val (highlightText, highlightSubtext) = remember(course.id) {
