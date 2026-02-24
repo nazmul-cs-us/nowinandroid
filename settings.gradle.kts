@@ -80,6 +80,9 @@ include(":sync:work")
 include(":sync:sync-test")
 include(":ui-test-hilt-manifest")
 
+// Whisper TFLite module for offline speech recognition
+include(":whisper")
+
 check(JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)) {
     """
     Now in Android requires JDK 17+ but it is currently using JDK ${JavaVersion.current()}.
