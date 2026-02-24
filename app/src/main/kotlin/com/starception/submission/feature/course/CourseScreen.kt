@@ -39,6 +39,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.Alignment
@@ -409,40 +410,52 @@ private fun AllCoursesEnrolledSection(
             .maxOrNull()
             ?.coerceAtLeast(5) ?: 5
 
-        Card(
+        // Material 3 Expressive Card
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+            tonalElevation = 2.dp,
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 20.dp, start = 20.dp, end = 20.dp, bottom = 12.dp),
+                    .padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 12.dp),
             ) {
-                // Header
+                // Header with icon - Material 3 Expressive style
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = "Learning Progress",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.TrendingUp,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = "Learning Progress",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                     ) {
                         Text(
                             text = if (overallProgress >= 100) "Complete" else "In Progress",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
+                            fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
@@ -462,77 +475,52 @@ private fun AllCoursesEnrolledSection(
                             Column(
                                 modifier = Modifier.fillMaxSize(),
                             ) {
-                                // Interactive Legend with full name on tap
-                                Box(
+                                // Interactive Legend - expands on tap to show full name
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    ) {
-                                        courseProgressHistory.forEachIndexed { index, data ->
-                                            val isSelected = selectedLegendIndex == index
-                                            Surface(
-                                                shape = RoundedCornerShape(12.dp),
-                                                color = if (isSelected) data.color.copy(alpha = 0.3f) else data.color.copy(alpha = 0.15f),
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .clickable {
-                                                        selectedLegendIndex = if (isSelected) -1 else index
-                                                    },
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.Center,
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(8.dp)
-                                                            .background(data.color, CircleShape)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(
-                                                        text = data.course.title.take(6),
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.Medium,
-                                                        color = data.color,
-                                                        maxLines = 1,
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Show full name tooltip when legend item is selected
-                                    if (selectedLegendIndex >= 0 && selectedLegendIndex < courseProgressHistory.size) {
-                                        val selectedData = courseProgressHistory[selectedLegendIndex]
+                                    courseProgressHistory.forEachIndexed { index, data ->
+                                        val isSelected = selectedLegendIndex == index
                                         Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = if (isSelected) data.color.copy(alpha = 0.25f) else data.color.copy(alpha = 0.12f),
                                             modifier = Modifier
-                                                .align(Alignment.TopCenter)
-                                                .offset(y = 32.dp),
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = MaterialTheme.colorScheme.inverseSurface,
-                                            shadowElevation = 8.dp,
+                                                .then(
+                                                    if (isSelected) Modifier.weight(2f)
+                                                    else Modifier.weight(1f)
+                                                )
+                                                .animateContentSize(
+                                                    animationSpec = spring(
+                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                        stiffness = Spring.StiffnessLow
+                                                    )
+                                                )
+                                                .clickable {
+                                                    selectedLegendIndex = if (isSelected) -1 else index
+                                                },
                                         ) {
                                             Row(
-                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.Center,
                                             ) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(10.dp)
-                                                        .background(selectedData.color, CircleShape)
+                                                        .size(8.dp)
+                                                        .background(data.color, CircleShape)
                                                 )
-                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
                                                 Text(
-                                                    text = selectedData.course.title,
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                                                    text = if (isSelected) data.course.title else data.course.title.take(6),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = if (isSelected) 10.sp else 9.sp,
+                                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                                    color = data.color,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
                                                 )
                                             }
                                         }
@@ -1243,32 +1231,44 @@ private fun StatCard(
     label: String,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    // Material 3 Expressive Card with larger corners and subtle border
+    Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+        tonalElevation = 1.dp,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(10.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
@@ -1286,14 +1286,15 @@ private fun SuggestionCard(
     actionText: String?,
     onClick: (() -> Unit)?,
 ) {
-    Card(
+    // Material 3 Expressive Card with layered background
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)),
+        tonalElevation = 1.dp,
     ) {
         Row(
             modifier = Modifier
@@ -1301,24 +1302,26 @@ private fun SuggestionCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(12.dp),
-                    ),
-                contentAlignment = Alignment.Center,
+            // Icon with expressive background
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.secondary,
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -1327,6 +1330,7 @@ private fun SuggestionCard(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
@@ -1335,11 +1339,23 @@ private fun SuggestionCard(
             }
 
             if (actionText != null && onClick != null) {
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
             }
         }
     }
@@ -1352,87 +1368,125 @@ private fun CourseProgressRow(
     isComplete: Boolean,
     onClick: () -> Unit,
 ) {
-    Card(
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+
+    // Material 3 Expressive Card with circular progress indicator
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isComplete) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isComplete) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
             } else {
-                MaterialTheme.colorScheme.surfaceContainerLow
-            },
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            }
         ),
+        shadowElevation = 2.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Completion indicator
+            // Circular progress indicator
             Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .background(
-                        color = if (isComplete) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        },
-                        shape = CircleShape,
-                    ),
+                modifier = Modifier.size(48.dp),
                 contentAlignment = Alignment.Center,
             ) {
+                // Background circle
+                CircularProgressIndicator(
+                    progress = { 1f },
+                    modifier = Modifier.size(48.dp),
+                    color = trackColor,
+                    strokeWidth = 4.dp,
+                    strokeCap = StrokeCap.Round,
+                )
+                // Progress circle
+                CircularProgressIndicator(
+                    progress = { progress / 100f },
+                    modifier = Modifier.size(48.dp),
+                    color = if (isComplete) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
+                    strokeWidth = 4.dp,
+                    strokeCap = StrokeCap.Round,
+                )
+                // Center content
                 if (isComplete) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
                 } else {
                     Text(
                         text = "$progress%",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = courseName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                if (isComplete) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Course Completed",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "${100 - progress}% remaining",
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = courseName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!isComplete) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    LinearProgressIndicator(
-                        progress = { progress / 100f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
             )
         }
     }
