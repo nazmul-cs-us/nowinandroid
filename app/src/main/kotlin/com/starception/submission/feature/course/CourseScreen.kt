@@ -37,14 +37,23 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -294,31 +303,1137 @@ fun CourseScreen(
             )
         }
 
-        // All Courses enrolled message
+        // All Courses enrolled - Rich achievement section
         if (exploreCourses.isEmpty() && myCourses.isNotEmpty()) {
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center,
+                AllCoursesEnrolledSection(
+                    myCourses = myCourses,
+                    courseProgress = courseProgress,
+                    prefs = prefs,
+                    onCourseClick = onCourseClick,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Rich "All Courses Enrolled" section with achievements, stats, and suggestions
+ */
+@Composable
+private fun AllCoursesEnrolledSection(
+    myCourses: List<Course>,
+    courseProgress: Map<String, Int>,
+    prefs: android.content.SharedPreferences,
+    onCourseClick: (String) -> Unit,
+) {
+    val totalCourses = myCourses.size
+    val totalLessons = myCourses.sumOf { it.totalLessons }
+    val completedLessons = courseProgress.values.sum()
+    val overallProgress = if (totalLessons > 0) (completedLessons.toFloat() / totalLessons * 100).toInt() else 0
+    val completedCourses = myCourses.count { course ->
+        val progress = courseProgress[course.id] ?: 0
+        progress >= course.totalLessons
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    ) {
+        // Progress Overview Card with Pager for multiple graph views
+        val progressPagerState = rememberPagerState(pageCount = { 4 })
+        val pagerCoroutineScope = rememberCoroutineScope()
+
+        // Generate 7-day progress data with persistence
+        val today = java.time.LocalDate.now()
+        val dayLabels = (6 downTo 0).map { daysAgo ->
+            today.minusDays(daysAgo.toLong()).dayOfWeek.name.take(3)
+        }
+
+        // Store and retrieve per-course daily progress from SharedPreferences
+        val todayKey = today.toString()
+
+        // Save today's progress for each course
+        LaunchedEffect(courseProgress) {
+            myCourses.forEach { course ->
+                val progress = courseProgress[course.id] ?: 0
+                prefs.edit().putInt("course_${course.id}_$todayKey", progress).apply()
+            }
+        }
+
+        // Per-course progress history (7 days for each course)
+        data class CourseProgressData(
+            val course: Course,
+            val color: Color,
+            val history: List<Int>
+        )
+
+        val courseColors = listOf(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.secondary,
+            MaterialTheme.colorScheme.tertiary,
+            MaterialTheme.colorScheme.error,
+        )
+
+        val courseProgressHistory = remember(courseProgress) {
+            myCourses.mapIndexed { index, course ->
+                val currentProgress = courseProgress[course.id] ?: 0
+                val history = (6 downTo 0).map { daysAgo ->
+                    val date = today.minusDays(daysAgo.toLong()).toString()
+                    val saved = prefs.getInt("course_${course.id}_$date", -1)
+                    if (saved >= 0) {
+                        saved
+                    } else {
+                        // Estimate past progress
+                        (currentProgress * (1 - daysAgo * 0.15f)).toInt().coerceAtLeast(0)
+                    }
+                }
+                CourseProgressData(
+                    course = course,
+                    color = courseColors[index % courseColors.size],
+                    history = history
+                )
+            }
+        }
+
+        // Selected day for interaction (-1 = none selected)
+        var selectedDayIndex by remember { mutableStateOf(-1) }
+
+        // Selected legend item for showing full name (-1 = none selected)
+        var selectedLegendIndex by remember { mutableStateOf(-1) }
+
+        // Calculate max value for chart scaling
+        val chartMaxValue = courseProgressHistory
+            .flatMap { it.history }
+            .maxOrNull()
+            ?.coerceAtLeast(5) ?: 5
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp, start = 20.dp, end = 20.dp, bottom = 12.dp),
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Outlined.EmojiEvents,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Learning Progress",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                    ) {
                         Text(
-                            text = "You're enrolled in all courses!",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = if (overallProgress >= 100) "Complete" else "In Progress",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Pager with different graph views
+                HorizontalPager(
+                    state = progressPagerState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                ) { page ->
+                    when (page) {
+                        0 -> {
+                            // Page 1: Interactive 7-Day Multi-Course Progress Chart
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                            ) {
+                                // Interactive Legend with full name on tap
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    ) {
+                                        courseProgressHistory.forEachIndexed { index, data ->
+                                            val isSelected = selectedLegendIndex == index
+                                            Surface(
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = if (isSelected) data.color.copy(alpha = 0.3f) else data.color.copy(alpha = 0.15f),
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clickable {
+                                                        selectedLegendIndex = if (isSelected) -1 else index
+                                                    },
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.Center,
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(8.dp)
+                                                            .background(data.color, CircleShape)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = data.course.title.take(6),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = data.color,
+                                                        maxLines = 1,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Show full name tooltip when legend item is selected
+                                    if (selectedLegendIndex >= 0 && selectedLegendIndex < courseProgressHistory.size) {
+                                        val selectedData = courseProgressHistory[selectedLegendIndex]
+                                        Surface(
+                                            modifier = Modifier
+                                                .align(Alignment.TopCenter)
+                                                .offset(y = 32.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.inverseSurface,
+                                            shadowElevation = 8.dp,
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(10.dp)
+                                                        .background(selectedData.color, CircleShape)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = selectedData.course.title,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHighest
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f)
+                                        .padding(horizontal = 8.dp)
+                                        .pointerInput(Unit) {
+                                            detectTapGestures { offset ->
+                                                val dayWidth = size.width / 6f
+                                                val tappedDay = (offset.x / dayWidth).toInt().coerceIn(0, 6)
+                                                selectedDayIndex = if (selectedDayIndex == tappedDay) -1 else tappedDay
+                                            }
+                                        }
+                                ) {
+                                    Canvas(
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        val width = size.width
+                                        val height = size.height - 10f
+                                        val pointSpacing = width / 6f
+                                        val maxVal = chartMaxValue.toFloat()
+
+                                        // Draw subtle horizontal grid lines
+                                        for (i in 0..4) {
+                                            val y = height - (height * i / 4)
+                                            drawLine(
+                                                color = surfaceColor.copy(alpha = 0.5f),
+                                                start = Offset(0f, y),
+                                                end = Offset(width, y),
+                                                strokeWidth = 1f,
+                                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 4f)),
+                                            )
+                                        }
+
+                                        // Draw selected day highlight with gradient
+                                        if (selectedDayIndex >= 0) {
+                                            val x = selectedDayIndex * pointSpacing
+                                            drawRect(
+                                                brush = Brush.verticalGradient(
+                                                    colors = listOf(
+                                                        surfaceColor.copy(alpha = 0.3f),
+                                                        surfaceColor.copy(alpha = 0.1f),
+                                                    ),
+                                                ),
+                                                topLeft = Offset(x - pointSpacing / 2, 0f),
+                                                size = androidx.compose.ui.geometry.Size(pointSpacing, height),
+                                            )
+                                        }
+
+                                        // Draw smooth curves with gradient fills for each course
+                                        courseProgressHistory.forEachIndexed { courseIndex, data ->
+                                            // Calculate points
+                                            val points = data.history.mapIndexed { index, value ->
+                                                Offset(
+                                                    x = index * pointSpacing,
+                                                    y = height - (height * value / maxVal).coerceAtMost(height)
+                                                )
+                                            }
+
+                                            // Create smooth curved path using quadratic bezier
+                                            val curvePath = Path().apply {
+                                                if (points.isNotEmpty()) {
+                                                    moveTo(points[0].x, points[0].y)
+                                                    for (i in 1 until points.size) {
+                                                        val prev = points[i - 1]
+                                                        val curr = points[i]
+                                                        val midX = (prev.x + curr.x) / 2
+                                                        quadraticBezierTo(prev.x + (midX - prev.x) * 0.8f, prev.y, midX, (prev.y + curr.y) / 2)
+                                                        quadraticBezierTo(curr.x - (curr.x - midX) * 0.8f, curr.y, curr.x, curr.y)
+                                                    }
+                                                }
+                                            }
+
+                                            // Create area path with gradient fill (only for first/main course)
+                                            if (courseIndex == 0 && points.isNotEmpty()) {
+                                                val areaPath = Path().apply {
+                                                    moveTo(points[0].x, height)
+                                                    lineTo(points[0].x, points[0].y)
+                                                    for (i in 1 until points.size) {
+                                                        val prev = points[i - 1]
+                                                        val curr = points[i]
+                                                        val midX = (prev.x + curr.x) / 2
+                                                        quadraticBezierTo(prev.x + (midX - prev.x) * 0.8f, prev.y, midX, (prev.y + curr.y) / 2)
+                                                        quadraticBezierTo(curr.x - (curr.x - midX) * 0.8f, curr.y, curr.x, curr.y)
+                                                    }
+                                                    lineTo(points.last().x, height)
+                                                    close()
+                                                }
+                                                drawPath(
+                                                    path = areaPath,
+                                                    brush = Brush.verticalGradient(
+                                                        colors = listOf(
+                                                            data.color.copy(alpha = 0.3f),
+                                                            data.color.copy(alpha = 0.05f),
+                                                        ),
+                                                    ),
+                                                )
+                                            }
+
+                                            // Draw curved line with shadow effect
+                                            drawPath(
+                                                path = curvePath,
+                                                color = data.color.copy(alpha = 0.3f),
+                                                style = Stroke(width = 6f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                                            )
+                                            drawPath(
+                                                path = curvePath,
+                                                color = data.color,
+                                                style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                                            )
+
+                                            // Draw data points with glow effect
+                                            points.forEachIndexed { index, point ->
+                                                val isSelected = index == selectedDayIndex
+                                                // Outer glow
+                                                drawCircle(
+                                                    color = data.color.copy(alpha = 0.3f),
+                                                    radius = if (isSelected) 12f else 8f,
+                                                    center = point,
+                                                )
+                                                // Main point
+                                                drawCircle(
+                                                    color = data.color,
+                                                    radius = if (isSelected) 7f else 5f,
+                                                    center = point,
+                                                )
+                                                // Inner highlight
+                                                drawCircle(
+                                                    color = Color.White,
+                                                    radius = if (isSelected) 3.5f else 2.5f,
+                                                    center = point,
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Professional tooltip when day is selected
+                                    if (selectedDayIndex >= 0) {
+                                        Surface(
+                                            modifier = Modifier
+                                                .align(Alignment.TopCenter)
+                                                .padding(top = 4.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.inverseSurface,
+                                            shadowElevation = 8.dp,
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(12.dp),
+                                                horizontalAlignment = Alignment.Start,
+                                            ) {
+                                                // Day header
+                                                Text(
+                                                    text = dayLabels[selectedDayIndex],
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                                                )
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                // Course progress items
+                                                courseProgressHistory.forEach { data ->
+                                                    Row(
+                                                        modifier = Modifier.padding(vertical = 2.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                    ) {
+                                                        // Color indicator line
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .width(3.dp)
+                                                                .height(16.dp)
+                                                                .background(data.color, RoundedCornerShape(2.dp))
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        // Course name
+                                                        Text(
+                                                            text = data.course.title.take(10),
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.8f),
+                                                            modifier = Modifier.weight(1f),
+                                                        )
+                                                        Spacer(modifier = Modifier.width(12.dp))
+                                                        // Lesson count
+                                                        Text(
+                                                            text = "${data.history[selectedDayIndex]} lessons",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Clickable day labels
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    dayLabels.forEachIndexed { index, day ->
+                                        Surface(
+                                            modifier = Modifier
+                                                .clickable {
+                                                    selectedDayIndex = if (selectedDayIndex == index) -1 else index
+                                                },
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = if (index == selectedDayIndex) {
+                                                MaterialTheme.colorScheme.primaryContainer
+                                            } else {
+                                                Color.Transparent
+                                            },
+                                        ) {
+                                            Text(
+                                                text = day,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = if (index == selectedDayIndex) {
+                                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                },
+                                                fontWeight = if (index == selectedDayIndex) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 9.sp,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        1 -> {
+                            // Page 2: Circular Progress with course bars
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                // Main circular progress
+                                Box(
+                                    modifier = Modifier.size(130.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CircularProgressIndicator(
+                                        progress = { 1f },
+                                        modifier = Modifier.size(130.dp),
+                                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                        strokeWidth = 14.dp,
+                                        strokeCap = StrokeCap.Round,
+                                    )
+                                    CircularProgressIndicator(
+                                        progress = { overallProgress / 100f },
+                                        modifier = Modifier.size(130.dp),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        strokeWidth = 14.dp,
+                                        strokeCap = StrokeCap.Round,
+                                    )
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            text = "$overallProgress%",
+                                            style = MaterialTheme.typography.headlineLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Text(
+                                            text = "Overall",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+
+                                // Course mini progress
+                                Column(
+                                    modifier = Modifier.padding(start = 16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    myCourses.forEach { course ->
+                                        val progress = courseProgress[course.id] ?: 0
+                                        val progressPercent = if (course.totalLessons > 0) {
+                                            (progress.toFloat() / course.totalLessons * 100).toInt()
+                                        } else 0
+
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier.size(36.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    progress = { 1f },
+                                                    modifier = Modifier.size(36.dp),
+                                                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                                    strokeWidth = 4.dp,
+                                                )
+                                                CircularProgressIndicator(
+                                                    progress = { progressPercent / 100f },
+                                                    modifier = Modifier.size(36.dp),
+                                                    color = when (course.category) {
+                                                        CourseCategory.MEMORIZATION -> MaterialTheme.colorScheme.primary
+                                                        CourseCategory.HADITH -> MaterialTheme.colorScheme.secondary
+                                                        CourseCategory.QURAN -> MaterialTheme.colorScheme.tertiary
+                                                    },
+                                                    strokeWidth = 4.dp,
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = course.title.take(12) + if (course.title.length > 12) ".." else "",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    maxLines = 1,
+                                                )
+                                                Text(
+                                                    text = "$progressPercent%",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        2 -> {
+                            // Page 3: Bar chart style progress
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.SpaceEvenly,
+                            ) {
+                                myCourses.forEach { course ->
+                                    val progress = courseProgress[course.id] ?: 0
+                                    val progressPercent = if (course.totalLessons > 0) {
+                                        (progress.toFloat() / course.totalLessons * 100).toInt()
+                                    } else 0
+                                    val isComplete = progressPercent >= 100
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        // Course icon
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .background(
+                                                    color = when (course.category) {
+                                                        CourseCategory.MEMORIZATION -> MaterialTheme.colorScheme.primaryContainer
+                                                        CourseCategory.HADITH -> MaterialTheme.colorScheme.secondaryContainer
+                                                        CourseCategory.QURAN -> MaterialTheme.colorScheme.tertiaryContainer
+                                                    },
+                                                    shape = RoundedCornerShape(10.dp),
+                                                ),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isComplete) Icons.Default.Check else course.icon,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(22.dp),
+                                                tint = when (course.category) {
+                                                    CourseCategory.MEMORIZATION -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                    CourseCategory.HADITH -> MaterialTheme.colorScheme.onSecondaryContainer
+                                                    CourseCategory.QURAN -> MaterialTheme.colorScheme.onTertiaryContainer
+                                                },
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                            ) {
+                                                Text(
+                                                    text = course.title,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Medium,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f),
+                                                )
+                                                Text(
+                                                    text = "$progress/${course.totalLessons}",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            LinearProgressIndicator(
+                                                progress = { progressPercent / 100f },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(8.dp)
+                                                    .clip(RoundedCornerShape(4.dp)),
+                                                color = when (course.category) {
+                                                    CourseCategory.MEMORIZATION -> MaterialTheme.colorScheme.primary
+                                                    CourseCategory.HADITH -> MaterialTheme.colorScheme.secondary
+                                                    CourseCategory.QURAN -> MaterialTheme.colorScheme.tertiary
+                                                },
+                                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        3 -> {
+                            // Page 4: Stats summary
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                ) {
+                                    // Lessons completed
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(64.dp)
+                                                .background(
+                                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                                    shape = CircleShape,
+                                                ),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                text = "$completedLessons",
+                                                style = MaterialTheme.typography.titleLarge,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "Lessons",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Text(
+                                            text = "Completed",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+
+                                    // Courses
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(64.dp)
+                                                .background(
+                                                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                                                    shape = CircleShape,
+                                                ),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                text = "$completedCourses",
+                                                style = MaterialTheme.typography.titleLarge,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "Courses",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Text(
+                                            text = "Finished",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+
+                                    // Remaining
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(64.dp)
+                                                .background(
+                                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                                    shape = CircleShape,
+                                                ),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                text = "${totalLessons - completedLessons}",
+                                                style = MaterialTheme.typography.titleLarge,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "Lessons",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Text(
+                                            text = "Remaining",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(20.dp))
+
+                                // Achievement badge
+                                if (overallProgress >= 50) {
+                                    Surface(
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.EmojiEvents,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(20.dp),
+                                                tint = MaterialTheme.colorScheme.primary,
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = if (overallProgress >= 100) "Learning Champion!"
+                                                       else if (overallProgress >= 75) "Almost There!"
+                                                       else "Great Progress!",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Page indicators (clickable with larger touch target)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    repeat(4) { index ->
+                        Box(
+                            modifier = Modifier
+                                .clickable {
+                                    pagerCoroutineScope.launch {
+                                        progressPagerState.animateScrollToPage(index)
+                                    }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(
+                                        width = if (progressPagerState.currentPage == index) 20.dp else 8.dp,
+                                        height = 8.dp
+                                    )
+                                    .background(
+                                        color = if (progressPagerState.currentPage == index) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceContainerHighest
+                                        },
+                                        shape = RoundedCornerShape(4.dp),
+                                    )
+                            )
+                        }
+                    }
+                }
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Stats Dashboard
+        Text(
+            text = "Your Progress",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // Courses stat
+            StatCard(
+                icon = Icons.Outlined.School,
+                value = "$completedCourses/$totalCourses",
+                label = "Courses",
+                modifier = Modifier.weight(1f),
+            )
+
+            // Lessons stat
+            StatCard(
+                icon = Icons.Outlined.MenuBook,
+                value = "$completedLessons/$totalLessons",
+                label = "Lessons",
+                modifier = Modifier.weight(1f),
+            )
+
+            // Progress stat
+            StatCard(
+                icon = Icons.Outlined.TrendingUp,
+                value = "$overallProgress%",
+                label = "Complete",
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Suggestions Section
+        Text(
+            text = "What's Next?",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+
+        // Review suggestion card
+        SuggestionCard(
+            icon = Icons.Outlined.Refresh,
+            title = "Review & Practice",
+            description = "Revisit your courses to strengthen your knowledge",
+            actionText = "Continue Learning",
+            onClick = {
+                // Navigate to first incomplete course or first course
+                val incompleteCoursE = myCourses.firstOrNull { course ->
+                    val progress = courseProgress[course.id] ?: 0
+                    progress < course.totalLessons
+                }
+                onCourseClick(incompleteCoursE?.id ?: myCourses.first().id)
+            },
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Check back suggestion card
+        SuggestionCard(
+            icon = Icons.Outlined.Notifications,
+            title = "New Courses Coming",
+            description = "We're working on more courses. Check back soon!",
+            actionText = null,
+            onClick = null,
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Course completion overview
+        if (myCourses.isNotEmpty()) {
+            Text(
+                text = "Course Overview",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+
+            myCourses.forEach { course ->
+                val progress = courseProgress[course.id] ?: 0
+                val progressPercent = if (course.totalLessons > 0) {
+                    (progress.toFloat() / course.totalLessons * 100).toInt()
+                } else 0
+                val isComplete = progress >= course.totalLessons
+
+                CourseProgressRow(
+                    courseName = course.title,
+                    progress = progressPercent,
+                    isComplete = isComplete,
+                    onClick = { onCourseClick(course.id) },
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun StatCard(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SuggestionCard(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    actionText: String?,
+    onClick: (() -> Unit)?,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(12.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (actionText != null && onClick != null) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CourseProgressRow(
+    courseName: String,
+    progress: Int,
+    isComplete: Boolean,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isComplete) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Completion indicator
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(
+                        color = if (isComplete) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        shape = CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isComplete) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                    )
+                } else {
+                    Text(
+                        text = "$progress%",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = courseName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!isComplete) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { progress / 100f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
