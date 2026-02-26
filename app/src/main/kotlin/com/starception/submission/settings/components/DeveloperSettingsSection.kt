@@ -73,6 +73,8 @@ fun DeveloperSettingsSection(
     onRefreshDuas: () -> Unit,
     onRefreshQuranicDuas: () -> Unit,
     onRefreshAll: () -> Unit,
+    onTestFastKws: () -> Unit = {},
+    onTestVoiceCompletion: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -185,6 +187,47 @@ fun DeveloperSettingsSection(
             enabled = !state.isRefreshing,
             onRefreshAll = onRefreshAll
         )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Voice Recognition Test Section
+        Text(
+            text = "Voice Recognition",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        // Test Fast KWS Button
+        FilledTonalButton(
+            onClick = onTestFastKws,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Text(
+                text = "Test Fast KWS (~100ms)",
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Test Whisper (Slow) Button
+        FilledTonalButton(
+            onClick = onTestVoiceCompletion,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Text(
+                text = "Test Whisper (~26s)",
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
     }
 }
 

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Schedule
@@ -36,6 +37,7 @@ import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
 import com.starception.submission.settings.components.TravelDuaSection
+import com.starception.submission.settings.components.VoiceSettingsSection
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +54,7 @@ fun UnifiedSettingsScreen(
     val notificationPreferences by viewModel.notificationPreferences.collectAsStateWithLifecycle()
     val travelDuaSettings by viewModel.travelDuaSettings.collectAsStateWithLifecycle()
     val developerSettings by viewModel.developerSettings.collectAsStateWithLifecycle()
+    val voiceSettings by viewModel.voiceSettings.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -154,6 +157,21 @@ fun UnifiedSettingsScreen(
                     }
                 }
 
+                // Voice Settings Section
+                item {
+                    SettingsSection(
+                        title = "Voice Recognition",
+                        icon = Icons.Outlined.Mic,
+                        isExpanded = expandedSections.contains("voice"),
+                        onToggleExpanded = { viewModel.toggleSection("voice") }
+                    ) {
+                        VoiceSettingsSection(
+                            state = voiceSettings,
+                            onEngineSelected = viewModel::updateVoiceSettings
+                        )
+                    }
+                }
+
                 // About Section
                 item {
                     SettingsSection(
@@ -180,7 +198,9 @@ fun UnifiedSettingsScreen(
                             onRefreshTopics = viewModel::refreshTopicsDatabase,
                             onRefreshDuas = viewModel::refreshDuasDatabase,
                             onRefreshQuranicDuas = viewModel::refreshQuranicDuasDatabase,
-                            onRefreshAll = viewModel::refreshAllDatabases
+                            onRefreshAll = viewModel::refreshAllDatabases,
+                            onTestFastKws = viewModel::testFastKws,
+                            onTestVoiceCompletion = viewModel::testVoiceCompletion
                         )
                     }
                 }

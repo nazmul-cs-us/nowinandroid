@@ -412,4 +412,32 @@ class VoiceCompletionManager @Inject constructor(
             }
         }
     }
+
+    /**
+     * TEST FUNCTION: Run a full voice completion test.
+     * Tests the entire flow: TTS prompt → Whisper listen → Confirmation
+     */
+    fun runTest() {
+        Log.i(TAG, "🧪 ========== VOICE COMPLETION TEST STARTED ==========")
+        Log.i(TAG, "🧪 This will test: TTS prompt → Whisper listening → Confirmation")
+        Log.i(TAG, "🧪 Say 'YES' or 'NO' when prompted!")
+
+        promptForCompletion(
+            courseId = "test_course",
+            lessonId = "test_lesson",
+            lessonTitle = "Test Lesson",
+            onComplete = {
+                Log.i(TAG, "🧪 ✅ TEST RESULT: User said YES - lesson would be marked complete")
+                Log.i(TAG, "🧪 ========== VOICE COMPLETION TEST FINISHED ==========")
+            },
+            onSkipped = {
+                Log.i(TAG, "🧪 ⏭️ TEST RESULT: User said NO or timeout - lesson skipped")
+                Log.i(TAG, "🧪 ========== VOICE COMPLETION TEST FINISHED ==========")
+            },
+            onError = { error ->
+                Log.e(TAG, "🧪 ❌ TEST RESULT: Error occurred - $error")
+                Log.i(TAG, "🧪 ========== VOICE COMPLETION TEST FINISHED ==========")
+            }
+        )
+    }
 }

@@ -82,6 +82,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
@@ -656,12 +657,40 @@ private fun SearchTextField(
     onSearchQueryChanged: (String) -> Unit,
     onSearchTriggered: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Voice search state
+    var isVoiceListening by remember { mutableStateOf(false) }
+    val voiceSearchService = remember { VoiceSearchService(context) }
 
     val onSearchExplicitlyTriggered = {
         keyboardController?.hide()
         onSearchTriggered(searchQuery)
+    }
+
+    // Start voice search
+    val startVoiceSearch = {
+        if (!isVoiceListening) {
+            isVoiceListening = true
+            keyboardController?.hide()
+            voiceSearchService.startListening { result ->
+                isVoiceListening = false
+                when (result) {
+                    is VoiceSearchService.VoiceSearchResult.Success -> {
+                        onSearchQueryChanged(result.text)
+                        onSearchTriggered(result.text)
+                    }
+                    is VoiceSearchService.VoiceSearchResult.Error -> {
+                        // Error handled silently - user can try again
+                    }
+                    VoiceSearchService.VoiceSearchResult.Cancelled -> {
+                        // Cancelled - no action needed
+                    }
+                }
+            }
+        }
     }
 
     TextField(
@@ -680,20 +709,46 @@ private fun SearchTextField(
             )
         },
         trailingIcon = {
-            if (searchQuery.isNotEmpty()) {
+            Row {
+                // Voice search button
                 IconButton(
-                    onClick = {
-                        onSearchQueryChanged("")
-                    },
+                    onClick = { startVoiceSearch() },
+                    enabled = !isVoiceListening,
                 ) {
                     Icon(
-                        imageVector = NiaIcons.Close,
-                        contentDescription = stringResource(
-                            id = searchR.string.feature_search_clear_search_text_content_desc,
-                        ),
-                        tint = MaterialTheme.colorScheme.onSurface,
+                        imageVector = if (isVoiceListening) NiaIcons.Mic else NiaIcons.MicOff,
+                        contentDescription = "Voice search",
+                        tint = if (isVoiceListening) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                     )
                 }
+                // Clear button
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(
+                        onClick = {
+                            onSearchQueryChanged("")
+                        },
+                    ) {
+                        Icon(
+                            imageVector = NiaIcons.Close,
+                            contentDescription = stringResource(
+                                id = searchR.string.feature_search_clear_search_text_content_desc,
+                            ),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+        },
+        placeholder = {
+            if (isVoiceListening) {
+                Text(
+                    text = "Listening...",
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         },
         onValueChange = {

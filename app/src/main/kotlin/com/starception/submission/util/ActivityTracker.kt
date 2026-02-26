@@ -32,6 +32,7 @@ import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.voice.VoiceCompletionManager
 import com.starception.submission.voice.WhisperVoiceService
 import com.starception.submission.voice.SherpaOnnxTtsService
+import com.starception.submission.voice.SherpaOnnxKwsService
 import java.util.Locale
 
 /**
@@ -89,6 +90,7 @@ object ActivityTracker {
     // Voice completion for hands-free lesson completion
     private var whisperVoiceService: WhisperVoiceService? = null
     private var sherpaOnnxTtsService: SherpaOnnxTtsService? = null
+    private var sherpaOnnxKwsService: SherpaOnnxKwsService? = null  // Fast keyword spotting (~100ms vs 26s Whisper)
     private var voiceCompletionManager: VoiceCompletionManager? = null
     private var currentHadithNumber: Int = 0  // Track current hadith for TTS completion
 
@@ -1100,6 +1102,81 @@ object ActivityTracker {
         Log.i("ActivityTracker", "🧪 ========== TEST: Daily Hadith Playback ==========")
         context?.let { ctx ->
             playDailyHadithIfEnrolled(ctx)
+        } ?: Log.e("ActivityTracker", "🧪 TEST FAILED: Context is null - call initialize() first")
+    }
+
+    /**
+     * TEST FUNCTION: Test voice completion flow (Whisper STT + TTS)
+     * Tests: TTS prompt → Whisper listening → Confirmation feedback
+     * Say "YES" or "NO" when prompted!
+     */
+    fun testVoiceCompletion() {
+        Log.i("ActivityTracker", "🧪 ========== TEST: Voice Completion ==========")
+        context?.let { ctx ->
+            scope.launch {
+                try {
+                    // Initialize voice services if needed
+                    if (whisperVoiceService == null) {
+                        Log.i("ActivityTracker", "🧪 Initializing Whisper...")
+                        whisperVoiceService = WhisperVoiceService(ctx)
+                        val modelLoaded = whisperVoiceService?.loadModel() ?: false
+                        if (!modelLoaded) {
+                            Log.e("ActivityTracker", "🧪 Failed to load Whisper model")
+                            return@launch
+                        }
+                        Log.i("ActivityTracker", "🧪 Whisper model loaded!")
+                    }
+
+                    if (sherpaOnnxTtsService == null) {
+                        Log.i("ActivityTracker", "🧪 Initializing Sherpa-ONNX TTS...")
+                        sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
+                    }
+
+                    if (voiceCompletionManager == null) {
+                        voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxTtsService!!)
+                    }
+
+                    Log.i("ActivityTracker", "🧪 Starting voice completion test...")
+                    Log.i("ActivityTracker", "🧪 🎤 Say 'YES' or 'NO' when prompted!")
+                    voiceCompletionManager?.runTest()
+
+                } catch (e: Exception) {
+                    Log.e("ActivityTracker", "🧪 TEST FAILED: ${e.message}", e)
+                }
+            }
+        } ?: Log.e("ActivityTracker", "🧪 TEST FAILED: Context is null - call initialize() first")
+    }
+
+    /**
+     * TEST FUNCTION: Test FAST keyword spotting (Sherpa-ONNX KWS)
+     * This is ~100ms vs ~26 seconds for Whisper!
+     * Say "YES" or "NO" when prompted!
+     */
+    fun testFastKws() {
+        Log.i("ActivityTracker", "🧪 ========== TEST: FAST Keyword Spotting (KWS) ==========")
+        Log.i("ActivityTracker", "🧪 This uses Sherpa-ONNX KWS (~100ms) instead of Whisper (~26s)")
+        context?.let { ctx ->
+            scope.launch {
+                try {
+                    // Initialize KWS service if needed
+                    if (sherpaOnnxKwsService == null) {
+                        Log.i("ActivityTracker", "🧪 Initializing Sherpa-ONNX KWS...")
+                        sherpaOnnxKwsService = SherpaOnnxKwsService(ctx)
+                        val modelLoaded = sherpaOnnxKwsService?.loadModel() ?: false
+                        if (!modelLoaded) {
+                            Log.e("ActivityTracker", "🧪 Failed to load KWS model")
+                            return@launch
+                        }
+                        Log.i("ActivityTracker", "🧪 KWS model loaded!")
+                    }
+
+                    Log.i("ActivityTracker", "🧪 🎤 Say 'YES' or 'NO' within 5 seconds!")
+                    sherpaOnnxKwsService?.runTest()
+
+                } catch (e: Exception) {
+                    Log.e("ActivityTracker", "🧪 TEST FAILED: ${e.message}", e)
+                }
+            }
         } ?: Log.e("ActivityTracker", "🧪 TEST FAILED: Context is null - call initialize() first")
     }
 

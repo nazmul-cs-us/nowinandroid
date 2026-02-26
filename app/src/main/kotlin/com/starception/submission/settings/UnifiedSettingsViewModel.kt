@@ -22,6 +22,8 @@ import com.starception.submission.prayer.service.PrayerNotificationServiceManage
 import com.starception.submission.settings.components.DatabaseDisplayInfo
 import com.starception.submission.settings.components.DeveloperSettingsState
 import com.starception.submission.settings.components.RefreshResult
+import com.starception.submission.settings.components.VoiceRecognitionEngine
+import com.starception.submission.settings.components.VoiceSettingsState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
@@ -102,11 +104,16 @@ class UnifiedSettingsViewModel @Inject constructor(
     private val _developerSettings = MutableStateFlow(DeveloperSettingsState())
     val developerSettings: StateFlow<DeveloperSettingsState> = _developerSettings.asStateFlow()
 
+    // Voice settings state
+    private val _voiceSettings = MutableStateFlow(VoiceSettingsState())
+    val voiceSettings: StateFlow<VoiceSettingsState> = _voiceSettings.asStateFlow()
+
     init {
         loadPrayerSettings()
         loadNotificationPreferences()
         loadTravelDuaSettings()
         loadDatabaseInfo()
+        loadVoiceSettings()
     }
 
     private fun loadPrayerSettings() {
@@ -620,6 +627,63 @@ class UnifiedSettingsViewModel @Inject constructor(
                         message = "Error: ${e.message}"
                     )
                 )
+            }
+        }
+    }
+
+    /**
+     * Test fast keyword spotting (Sherpa-ONNX KWS ~100ms)
+     * Say "YES" or "NO" when prompted!
+     */
+    fun testFastKws() {
+        Log.i(TAG, "🧪 Testing Fast KWS from Settings...")
+        ActivityTracker.testFastKws()
+    }
+
+    /**
+     * Test Whisper voice completion (~26 seconds)
+     * Say "YES" or "NO" when prompted!
+     */
+    fun testVoiceCompletion() {
+        Log.i(TAG, "🧪 Testing Voice Completion (Whisper) from Settings...")
+        ActivityTracker.testVoiceCompletion()
+    }
+
+    // ============= Voice Settings =============
+
+    private fun loadVoiceSettings() {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "Loading voice settings...")
+                val prefs = context.getSharedPreferences("voice_settings", Context.MODE_PRIVATE)
+                val engineName = prefs.getString("voice_engine", VoiceRecognitionEngine.SHERPA_KWS.name)
+                val engine = try {
+                    VoiceRecognitionEngine.valueOf(engineName ?: VoiceRecognitionEngine.SHERPA_KWS.name)
+                } catch (e: Exception) {
+                    VoiceRecognitionEngine.SHERPA_KWS
+                }
+                _voiceSettings.value = VoiceSettingsState(selectedEngine = engine)
+                Log.i(TAG, "Voice settings loaded: engine=${engine.name}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading voice settings", e)
+            }
+        }
+    }
+
+    fun updateVoiceSettings(engine: VoiceRecognitionEngine) {
+        viewModelScope.launch {
+            try {
+                _voiceSettings.value = VoiceSettingsState(selectedEngine = engine)
+
+                // Save to SharedPreferences
+                val prefs = context.getSharedPreferences("voice_settings", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putString("voice_engine", engine.name)
+                    .apply()
+
+                Log.i(TAG, "Voice settings saved: engine=${engine.name}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving voice settings", e)
             }
         }
     }

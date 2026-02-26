@@ -20,10 +20,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ShortText
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PlayLesson
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.NotificationsActive
@@ -75,4 +77,8 @@ object NiaIcons {
     // Course tab icons - for learning/courses feature
     val Course = Icons.Filled.PlayLesson
     val CourseBorder = Icons.Outlined.PlayLesson
+
+    // Voice icons
+    val Mic = Icons.Filled.Mic
+    val MicOff = Icons.Outlined.Mic
 }

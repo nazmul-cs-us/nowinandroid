@@ -304,7 +304,9 @@ class WhisperVoiceService @Inject constructor(
      */
     private suspend fun transcribeAudio(audioFile: File): String = withContext(Dispatchers.IO) {
         try {
-            var result = ""
+            // Use atomic reference for thread-safe access
+            val result = java.util.concurrent.atomic.AtomicReference("")
+            val resultReceived = java.util.concurrent.atomic.AtomicBoolean(false)
 
             whisper?.apply {
                 setFilePath(audioFile.absolutePath)
@@ -316,24 +318,33 @@ class WhisperVoiceService @Inject constructor(
                     }
 
                     override fun onResultReceived(transcription: String?) {
-                        result = transcription ?: ""
-                        Log.d(TAG, "Whisper result: $result")
+                        result.set(transcription ?: "")
+                        resultReceived.set(true)
+                        Log.i(TAG, "Whisper result received: '${result.get()}'")
                     }
                 })
 
                 start()
 
-                // Wait for transcription to complete (max 10 seconds)
+                // Wait for either result callback OR timeout (max 60 seconds)
                 var waitTime = 0L
-                while (isInProgress && waitTime < 10000) {
+                while (!resultReceived.get() && waitTime < 60000) {
                     delay(100)
                     waitTime += 100
+                }
+                Log.d(TAG, "Transcription wait time: ${waitTime}ms, resultReceived=${resultReceived.get()}")
+
+                // Additional wait after isInProgress completes to catch late callbacks
+                if (!resultReceived.get() && !isInProgress) {
+                    Log.d(TAG, "Waiting 2s more for late callback...")
+                    delay(2000)
                 }
 
                 stop()
             }
 
-            result.trim()
+            Log.i(TAG, "Final transcription result: '${result.get()}'")
+            result.get().trim()
         } catch (e: Exception) {
             Log.e(TAG, "Error transcribing audio", e)
             ""
