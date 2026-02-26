@@ -34,13 +34,15 @@ import kotlin.coroutines.resume
 
 /**
  * Manages voice-based lesson completion flow.
- * Plays voice prompts, listens for yes/no responses,
+ * Plays voice prompts using offline TTS (Sherpa-ONNX/Coqui VITS),
+ * listens for yes/no responses using Whisper,
  * and triggers lesson completion callbacks.
  */
 @Singleton
 class VoiceCompletionManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val whisperService: WhisperVoiceService
+    private val whisperService: WhisperVoiceService,
+    private val sherpaOnnxTts: SherpaOnnxTtsService
 ) {
     companion object {
         private const val TAG = "VoiceCompletionManager"
@@ -129,8 +131,32 @@ class VoiceCompletionManager @Inject constructor(
 
     /**
      * Play the voice prompt asking user to say yes or no.
+     * Uses Sherpa-ONNX offline TTS (Coqui VITS) as primary,
+     * falls back to Android TTS if unavailable.
      */
     private suspend fun playVoicePrompt(lessonTitle: String): Boolean {
+        val promptText = "Say YES to mark this lesson complete, or NO to skip."
+
+        // Try Sherpa-ONNX offline TTS first
+        return try {
+            Log.d(TAG, "Attempting Sherpa-ONNX offline TTS...")
+            val success = sherpaOnnxTts.speak(promptText)
+            if (success) {
+                Log.i(TAG, "Successfully played prompt with Sherpa-ONNX TTS")
+                return true
+            }
+            Log.w(TAG, "Sherpa-ONNX TTS failed, falling back to Android TTS")
+            playWithAndroidTts(promptText)
+        } catch (e: Exception) {
+            Log.w(TAG, "Sherpa-ONNX TTS error, falling back to Android TTS", e)
+            playWithAndroidTts(promptText)
+        }
+    }
+
+    /**
+     * Fallback to Android system TTS.
+     */
+    private suspend fun playWithAndroidTts(promptText: String): Boolean {
         return suspendCancellableCoroutine { continuation ->
             try {
                 // Initialize TTS if needed
@@ -141,20 +167,20 @@ class VoiceCompletionManager @Inject constructor(
                             textToSpeech?.language = Locale.US
 
                             // Speak the prompt
-                            speakPrompt(lessonTitle) { success ->
+                            speakWithAndroidTts(promptText) { success ->
                                 if (continuation.isActive) {
                                     continuation.resume(success)
                                 }
                             }
                         } else {
-                            Log.e(TAG, "TTS initialization failed")
+                            Log.e(TAG, "Android TTS initialization failed")
                             if (continuation.isActive) {
                                 continuation.resume(false)
                             }
                         }
                     }
                 } else if (isTtsInitialized) {
-                    speakPrompt(lessonTitle) { success ->
+                    speakWithAndroidTts(promptText) { success ->
                         if (continuation.isActive) {
                             continuation.resume(success)
                         }
@@ -170,7 +196,7 @@ class VoiceCompletionManager @Inject constructor(
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error playing voice prompt", e)
+                Log.e(TAG, "Error playing voice prompt with Android TTS", e)
                 if (continuation.isActive) {
                     continuation.resume(false)
                 }
@@ -179,11 +205,9 @@ class VoiceCompletionManager @Inject constructor(
     }
 
     /**
-     * Speak the completion prompt using TTS.
+     * Speak using Android system TTS (fallback).
      */
-    private fun speakPrompt(lessonTitle: String, onComplete: (Boolean) -> Unit) {
-        val promptText = "Say YES to mark this lesson complete, or NO to skip."
-
+    private fun speakWithAndroidTts(promptText: String, onComplete: (Boolean) -> Unit) {
         textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
                 Log.d(TAG, "TTS prompt started")
@@ -261,27 +285,46 @@ class VoiceCompletionManager @Inject constructor(
 
     /**
      * Speak feedback when speech is not recognized.
+     * Uses Sherpa-ONNX offline TTS with Android TTS fallback.
      */
     private fun speakUnrecognizedFeedback() {
-        textToSpeech?.speak(
-            "Sorry, I didn't understand. Skipping.",
-            TextToSpeech.QUEUE_FLUSH,
-            null,
-            "unrecognized_feedback"
-        )
+        scope.launch {
+            val success = try {
+                sherpaOnnxTts.speak("Sorry, I didn't understand. Skipping.")
+            } catch (e: Exception) {
+                false
+            }
+            if (!success) {
+                textToSpeech?.speak(
+                    "Sorry, I didn't understand. Skipping.",
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    "unrecognized_feedback"
+                )
+            }
+        }
     }
 
     /**
      * Play success feedback when lesson is marked complete.
-     * Uses TTS for reliable cross-device support.
+     * Uses Sherpa-ONNX offline TTS with Android TTS fallback.
      */
     private fun playSuccessSound() {
-        textToSpeech?.speak(
-            "Lesson marked as complete.",
-            TextToSpeech.QUEUE_FLUSH,
-            null,
-            "success_feedback"
-        )
+        scope.launch {
+            val success = try {
+                sherpaOnnxTts.speak("Lesson marked as complete.")
+            } catch (e: Exception) {
+                false
+            }
+            if (!success) {
+                textToSpeech?.speak(
+                    "Lesson marked as complete.",
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    "success_feedback"
+                )
+            }
+        }
     }
 
     /**
@@ -299,6 +342,7 @@ class VoiceCompletionManager @Inject constructor(
     fun cancel() {
         isPromptInProgress = false
         textToSpeech?.stop()
+        sherpaOnnxTts.stopSpeaking()
         whisperService.stopListening()
     }
 
@@ -310,5 +354,21 @@ class VoiceCompletionManager @Inject constructor(
         textToSpeech?.shutdown()
         textToSpeech = null
         isTtsInitialized = false
+        sherpaOnnxTts.release()
+    }
+
+    /**
+     * Pre-initialize the offline TTS engine.
+     * Call this early to avoid delay on first use.
+     */
+    fun preInitialize() {
+        scope.launch {
+            try {
+                Log.i(TAG, "Pre-initializing Sherpa-ONNX TTS...")
+                sherpaOnnxTts.initialize()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to pre-initialize Sherpa-ONNX TTS", e)
+            }
+        }
     }
 }

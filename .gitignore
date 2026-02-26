@@ -69,3 +69,10 @@ app/src/main/assets/whisper/*.bin
 app/src/main/assets/sahih_bukhari.json
 app/src/main/assets/tajweed.json
 app/src/main/assets/fortress_of_the_muslim.json
+
+# Sherpa-ONNX TTS model files (60MB+)
+app/src/main/assets/tts/*.onnx
+app/src/main/assets/tts/espeak-ng-data/
+
+# Local AAR libraries
+app/libs/*.aar

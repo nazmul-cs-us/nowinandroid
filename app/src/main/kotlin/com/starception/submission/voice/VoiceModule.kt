@@ -25,7 +25,7 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Hilt module for voice recognition services.
+ * Hilt module for voice recognition and TTS services.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -36,4 +36,10 @@ object VoiceModule {
     fun provideWhisperVoiceService(
         @ApplicationContext context: Context
     ): WhisperVoiceService = WhisperVoiceService(context)
+
+    @Provides
+    @Singleton
+    fun provideSherpaOnnxTtsService(
+        @ApplicationContext context: Context
+    ): SherpaOnnxTtsService = SherpaOnnxTtsService(context)
 }

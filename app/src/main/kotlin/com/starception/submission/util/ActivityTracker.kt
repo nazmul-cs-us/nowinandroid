@@ -31,6 +31,7 @@ import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.voice.VoiceCompletionManager
 import com.starception.submission.voice.WhisperVoiceService
+import com.starception.submission.voice.SherpaOnnxTtsService
 import java.util.Locale
 
 /**
@@ -87,6 +88,7 @@ object ActivityTracker {
 
     // Voice completion for hands-free lesson completion
     private var whisperVoiceService: WhisperVoiceService? = null
+    private var sherpaOnnxTtsService: SherpaOnnxTtsService? = null
     private var voiceCompletionManager: VoiceCompletionManager? = null
     private var currentHadithNumber: Int = 0  // Track current hadith for TTS completion
 
@@ -1061,8 +1063,12 @@ object ActivityTracker {
                     }
                 }
 
+                if (sherpaOnnxTtsService == null) {
+                    sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
+                }
+
                 if (voiceCompletionManager == null) {
-                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!)
+                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxTtsService!!)
                 }
 
                 Log.i("ActivityTracker", "🎤 Triggering voice completion prompt for: $lessonTitle")
