@@ -143,8 +143,7 @@ dependencies {
     implementation("io.github.kyant0:backdrop:1.0.0")
     implementation("io.github.kyant0:capsule:2.1.2")
 
-    // Sherpa-ONNX for offline TTS (Coqui VITS models)
-    implementation(files("libs/sherpa-onnx-1.12.26.aar"))
+    // Sherpa-ONNX provided via api() from feature/search
 
     // OSS Licenses for About section
     implementation(libs.google.oss.licenses)

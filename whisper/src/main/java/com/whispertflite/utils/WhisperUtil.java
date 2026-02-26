@@ -6,6 +6,8 @@ import static java.lang.Math.sin;
 
 import android.util.Log;
 
+import org.jtransforms.fft.FloatFFT_1D;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -168,68 +170,59 @@ public class WhisperUtil {
 
         int nFft = 1 + fftSize / 2;
 
-/////////////// UNCOMMENT below block to use multithreaded mel calculation /////////////////////////
+        // Use JTransforms for fast FFT - create one instance per thread
         // Calculate mel values using multiple threads
         List<Thread> workers = new ArrayList<>();
         for (int iw = 0; iw < nThreads; iw++) {
-            final int ith = iw;  // Capture iw in a final variable for use in the lambda
+            final int ith = iw;
             Thread thread = new Thread(() -> {
-                // Inside the thread, ith will have the same value as iw (first value is 0)
-                Log.d(TAG, "Thread " + ith + " started.");
+                Log.d(TAG, "Thread " + ith + " started (using JTransforms FFT).");
 
-                float[] fftIn = new float[fftSize];
-                Arrays.fill(fftIn, 0.0f);
-                float[] fftOut = new float[fftSize * 2];
+                // Create JTransforms FFT instance for this thread
+                FloatFFT_1D fftTransform = new FloatFFT_1D(fftSize);
+                float[] fftData = new float[fftSize * 2];
+                float[] fftMag = new float[fftSize];
 
                 for (int i = ith; i < mel.nLen; i += nThreads) {
-/////////////// END of Block ///////////////////////////////////////////////////////////////////////
+                    int offset = i * fftStep;
 
-/////////////// COMMENT below block to use multithreaded mel calculation ///////////////////////////
-//        float[] fftIn = new float[fftSize];
-//        Arrays.fill(fftIn, 0.0f);
-//        float[] fftOut = new float[fftSize * 2];
-//
-//        for (int i = 0; i < mel.nLen; i++) {
-/////////////// END of Block ///////////////////////////////////////////////////////////////////////
+                    // Apply Hanning window and prepare FFT input
+                    Arrays.fill(fftData, 0.0f);
+                    for (int j = 0; j < fftSize; j++) {
+                        if (offset + j < nSamples) {
+                            fftData[j] = hann[j] * samples[offset + j];
+                        }
+                    }
 
-            int offset = i * fftStep;
+                    // FFT using JTransforms (much faster than pure Java)
+                    fftTransform.realForwardFull(fftData);
 
-            // apply Hanning window
-            for (int j = 0; j < fftSize; j++) {
-                if (offset + j < nSamples) {
-                    fftIn[j] = hann[j] * samples[offset + j];
-                } else {
-                    fftIn[j] = 0.0f;
+                    // Calculate magnitude squared
+                    for (int j = 0; j < fftSize; j++) {
+                        float re = fftData[2 * j];
+                        float im = fftData[2 * j + 1];
+                        fftMag[j] = re * re + im * im;
+                    }
+
+                    for (int j = 1; j < fftSize / 2; j++) {
+                        fftMag[j] += fftMag[fftSize - j];
+                    }
+
+                    // Mel spectrogram
+                    for (int j = 0; j < mel.nMel; j++) {
+                        double sum = 0.0;
+                        for (int k = 0; k < nFft; k++) {
+                            sum += (fftMag[k] * filters.data[j * nFft + k]);
+                        }
+
+                        if (sum < 1e-10) {
+                            sum = 1e-10;
+                        }
+
+                        sum = log10(sum);
+                        mel.data[j * mel.nLen + i] = (float) sum;
+                    }
                 }
-            }
-
-            // FFT -> mag^2
-            fft(fftIn, fftOut);
-            for (int j = 0; j < fftSize; j++) {
-                fftOut[j] = fftOut[2 * j] * fftOut[2 * j] + fftOut[2 * j + 1] * fftOut[2 * j + 1];
-            }
-
-            for (int j = 1; j < fftSize / 2; j++) {
-                fftOut[j] += fftOut[fftSize - j];
-            }
-
-            // mel spectrogram
-            for (int j = 0; j < mel.nMel; j++) {
-                double sum = 0.0;
-                for (int k = 0; k < nFft; k++) {
-                    sum += (fftOut[k] * filters.data[j * nFft + k]);
-                }
-
-                if (sum < 1e-10) {
-                    sum = 1e-10;
-                }
-
-                sum = log10(sum);
-                mel.data[j * mel.nLen + i] = (float) sum;
-            }
-        }
-
-/////////////// UNCOMMENT below block to use multithreaded mel calculation /////////////////////////
             });
             workers.add(thread);
             thread.start();
@@ -243,9 +236,8 @@ public class WhisperUtil {
                 e.printStackTrace();
             }
         }
-/////////////// END of Block ///////////////////////////////////////////////////////////////////////
 
-        // clamping and normalization
+        // Clamping and normalization
         double mmax = -1e20;
         for (int i = 0; i < mel.nMel * mel.nLen; i++) {
             if (mel.data[i] > mmax) {

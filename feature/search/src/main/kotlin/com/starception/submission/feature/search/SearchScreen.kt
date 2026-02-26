@@ -663,20 +663,72 @@ private fun SearchTextField(
 
     // Voice search state
     var isVoiceListening by remember { mutableStateOf(false) }
-    val voiceSearchService = remember { VoiceSearchService(context) }
+    var partialVoiceText by remember { mutableStateOf("") }
+    var voiceStatusMessage by remember { mutableStateOf<String?>(null) }
+    var activeVoiceService by remember { mutableStateOf("none") } // "sherpa", "whisper", "cloud", "none"
+    var isUsingWhisper by remember { mutableStateOf(false) }
+
+    // Voice services - Whisper (primary), Sherpa (backup), Cloud (fallback)
+    val whisperService = remember { WhisperVoiceService(context) }
+    val sherpaService = remember { SherpaVoiceService(context) }
+    val cloudVoiceService = remember { VoiceSearchService(context) }
+
+    // Initialize voice services in background
+    LaunchedEffect(Unit) {
+        whisperService.initialize()
+        sherpaService.initialize()
+    }
+
+    // Observe Whisper status
+    val whisperStatus by whisperService.statusMessage.collectAsStateWithLifecycle()
+    val isWhisperInitialized by whisperService.isInitialized.collectAsStateWithLifecycle()
+    val isWhisperTranscribing by whisperService.isTranscribing.collectAsStateWithLifecycle()
+
+    // Observe Sherpa status
+    val isSherpaInitialized by sherpaService.isInitialized.collectAsStateWithLifecycle()
+    val sherpaRecognizedText by sherpaService.recognizedText.collectAsStateWithLifecycle()
+
+    // Observe partial results from Sherpa (real-time)
+    LaunchedEffect(sherpaRecognizedText) {
+        if (isVoiceListening && isUsingWhisper && !sherpaRecognizedText.isNullOrBlank()) {
+            partialVoiceText = sherpaRecognizedText ?: ""
+            onSearchQueryChanged(partialVoiceText)
+        }
+    }
+
+    // Observe partial results from cloud service
+    val cloudRecognizedText by cloudVoiceService.recognizedText.collectAsStateWithLifecycle()
+    LaunchedEffect(cloudRecognizedText) {
+        if (isVoiceListening && !isUsingWhisper && !cloudRecognizedText.isNullOrBlank()) {
+            partialVoiceText = cloudRecognizedText ?: ""
+            onSearchQueryChanged(partialVoiceText)
+        }
+    }
+
+    // Update status message
+    LaunchedEffect(whisperStatus, isWhisperTranscribing) {
+        voiceStatusMessage = when {
+            isWhisperTranscribing -> "Transcribing..."
+            whisperStatus != null -> whisperStatus
+            else -> null
+        }
+    }
 
     val onSearchExplicitlyTriggered = {
         keyboardController?.hide()
         onSearchTriggered(searchQuery)
     }
 
-    // Start voice search
+    // Start voice search - uses Whisper (offline) if available, falls back to cloud
     val startVoiceSearch = {
         if (!isVoiceListening) {
             isVoiceListening = true
+            partialVoiceText = ""
             keyboardController?.hide()
-            voiceSearchService.startListening { result ->
+
+            val handleResult: (VoiceSearchService.VoiceSearchResult) -> Unit = { result ->
                 isVoiceListening = false
+                voiceStatusMessage = null
                 when (result) {
                     is VoiceSearchService.VoiceSearchResult.Success -> {
                         onSearchQueryChanged(result.text)
@@ -690,6 +742,41 @@ private fun SearchTextField(
                     }
                 }
             }
+
+            // Priority: Whisper (accurate) > Sherpa (fast backup) > Cloud (fallback)
+            if (isWhisperInitialized) {
+                // Use Whisper for accurate offline recognition
+                activeVoiceService = "whisper"
+                isUsingWhisper = true
+                voiceStatusMessage = "Recording..."
+                whisperService.startListening(handleResult)
+            } else if (isSherpaInitialized) {
+                // Fall back to Sherpa for fast real-time recognition
+                activeVoiceService = "sherpa"
+                isUsingWhisper = true
+                voiceStatusMessage = "Listening..."
+                sherpaService.startListening(handleResult)
+            } else {
+                // Fall back to cloud if no offline service ready
+                activeVoiceService = "cloud"
+                isUsingWhisper = false
+                voiceStatusMessage = "Listening..."
+                cloudVoiceService.startListening(handleResult)
+            }
+        }
+    }
+
+    // Stop voice search
+    val stopVoiceSearch = {
+        if (isVoiceListening) {
+            isVoiceListening = false
+            voiceStatusMessage = "Processing..."
+            when (activeVoiceService) {
+                "sherpa" -> sherpaService.stopListening()
+                "whisper" -> whisperService.stopListening()
+                "cloud" -> cloudVoiceService.stopListening()
+            }
+            activeVoiceService = "none"
         }
     }
 
@@ -709,24 +796,54 @@ private fun SearchTextField(
             )
         },
         trailingIcon = {
-            Row {
-                // Voice search button
+            Row(
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                // Voice search button - tap to start, tap again to stop
                 IconButton(
-                    onClick = { startVoiceSearch() },
-                    enabled = !isVoiceListening,
-                ) {
-                    Icon(
-                        imageVector = if (isVoiceListening) NiaIcons.Mic else NiaIcons.MicOff,
-                        contentDescription = "Voice search",
-                        tint = if (isVoiceListening) {
-                            MaterialTheme.colorScheme.primary
+                    onClick = {
+                        if (isVoiceListening) {
+                            stopVoiceSearch()
                         } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
+                            startVoiceSearch()
+                        }
+                    },
+                ) {
+                    if (isVoiceListening) {
+                        // Show stop icon with recording indicator
+                        Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
+                            // Pulsing circle background
+                            androidx.compose.foundation.Canvas(
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                drawCircle(
+                                    color = androidx.compose.ui.graphics.Color.Red.copy(alpha = 0.2f),
+                                    radius = size.minDimension / 2
+                                )
+                            }
+                            Icon(
+                                imageVector = NiaIcons.Close,
+                                contentDescription = "Stop recording",
+                                tint = androidx.compose.ui.graphics.Color.Red,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                    } else if (isWhisperTranscribing) {
+                        // Show loading indicator while transcribing
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = NiaIcons.Mic,
+                            contentDescription = "Voice search",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
                 }
-                // Clear button
-                if (searchQuery.isNotEmpty()) {
+                // Clear button - hide when voice is listening (stop button already shows X)
+                if (searchQuery.isNotEmpty() && !isVoiceListening) {
                     IconButton(
                         onClick = {
                             onSearchQueryChanged("")
@@ -744,11 +861,32 @@ private fun SearchTextField(
             }
         },
         placeholder = {
-            if (isVoiceListening) {
-                Text(
-                    text = "Listening...",
-                    color = MaterialTheme.colorScheme.primary,
-                )
+            when {
+                isVoiceListening -> {
+                    Text(
+                        text = "Recording.. Tap X to finish.",
+                        color = androidx.compose.ui.graphics.Color.Red,
+                        maxLines = 1,
+                    )
+                }
+                isWhisperTranscribing -> {
+                    Text(
+                        text = "Transcribing...",
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                    )
+                }
+                searchQuery.isEmpty() -> {
+                    Text(
+                        text = when {
+                            isWhisperInitialized -> "Whisper ready"
+                            isSherpaInitialized -> "Sherpa ready"
+                            else -> "Loading..."
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
             }
         },
         onValueChange = {

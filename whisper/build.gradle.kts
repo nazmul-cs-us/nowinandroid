@@ -48,4 +48,11 @@ dependencies {
     // TensorFlow Lite for Whisper inference
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+
+    // GPU delegate for faster inference
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite-gpu-api:2.14.0")
+
+    // JTransforms for fast FFT calculations
+    implementation("com.github.wendykierp:JTransforms:3.1")
 }

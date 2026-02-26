@@ -12,8 +12,8 @@ import com.whispertflite.utils.WhisperUtil;
 import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.Tensor;
-//import org.tensorflow.lite.gpu.CompatibilityList;
-//import org.tensorflow.lite.gpu.GpuDelegate;
+import org.tensorflow.lite.gpu.CompatibilityList;
+import org.tensorflow.lite.gpu.GpuDelegate;
 //import org.tensorflow.lite.nnapi.NnApiDelegate;
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
 
@@ -30,7 +30,7 @@ public class WhisperEngineJava implements WhisperEngine {
     private final Context mContext;
     private boolean mIsInitialized = false;
     private Interpreter mInterpreter = null;
-//    private GpuDelegate gpuDelegate;
+    private GpuDelegate gpuDelegate = null;
 
     public WhisperEngineJava(Context context) {
         mContext = context;
@@ -65,7 +65,11 @@ public class WhisperEngineJava implements WhisperEngine {
     public void deinitialize() {
         if (mInterpreter != null) {
             mInterpreter.close();
-            mInterpreter = null; // Optional: Set to null to avoid accidental reuse
+            mInterpreter = null;
+        }
+        if (gpuDelegate != null) {
+            gpuDelegate.close();
+            gpuDelegate = null;
         }
     }
 
@@ -99,45 +103,23 @@ public class WhisperEngineJava implements WhisperEngine {
         // Set the number of threads for inference
         Interpreter.Options options = new Interpreter.Options();
         options.setNumThreads(Runtime.getRuntime().availableProcessors());
-//        options.setUseXNNPACK(true);
+        // Enable XNNPACK for faster CPU inference
+        options.setUseXNNPACK(true);
 
-//        boolean isNNAPI = true;
-//        if (isNNAPI) {
-//            // Initialize interpreter with NNAPI delegate for Android Pie or above
-//            NnApiDelegate nnapiDelegate = new NnApiDelegate();
-//            options.addDelegate(nnapiDelegate);
-////                    options.setUseNNAPI(false);
-//                    options.setAllowFp16PrecisionForFp32(true);
-//                    options.setAllowBufferHandleOutput(true);
-//            options.setUseNNAPI(true);
-//        }
-
-        // Check if GPU delegate is available asynchronously
-//        TfLiteGpu.isGpuDelegateAvailable(mContext).addOnCompleteListener(task -> {
-//            if (task.isSuccessful() && task.getResult()) {
-//                // GPU is available; initialize the interpreter with GPU delegate
-////                    GpuDelegate gpuDelegate = new GpuDelegate();
-////                    Interpreter.Options options = new Interpreter.Options().addDelegate(gpuDelegate);
-////                    tflite = new Interpreter(loadModelFile(), options);
-//                TfLite.initialize(mContext, TfLiteInitializationOptions.builder().setEnableGpuDelegateSupport(true).build());
-//                Log.d(TAG, "GPU is available; initialize the interpreter with GPU delegate........................");
-//            } else {
-//                // GPU is not available; fallback to CPU
-////                    tflite = new Interpreter(loadModelFile());
-////                    System.out.println("Initialized with CPU.");
-//                Log.d(TAG, "GPU is not available; fallback to CPU........................");
-//            }
-//        });
-        
-//        boolean isGPU = true;
-//        if (isGPU) {
-//            gpuDelegate = new GpuDelegate();
-//            options.setPrecisionLossAllowed(true); // It seems that the default is true
-//            options.setInferencePreference(GpuDelegate.Options.INFERENCE_PREFERENCE_SUSTAINED_SPEED);
-//             .setPrecisionLossAllowed(true) // Allow FP16 precision for faster performance
-//                    .setInferencePreference(GpuDelegate.Options.INFERENCE_PREFERENCE_FAST_SINGLE_ANSWER);
-//            options.addDelegate(gpuDelegate);
-//        }
+        // Try to use GPU delegate for faster inference
+        try {
+            CompatibilityList compatList = new CompatibilityList();
+            if (compatList.isDelegateSupportedOnThisDevice()) {
+                Log.d(TAG, "GPU delegate is supported, enabling...");
+                GpuDelegate.Options gpuOptions = new GpuDelegate.Options();
+                gpuDelegate = new GpuDelegate(gpuOptions);
+                options.addDelegate(gpuDelegate);
+            } else {
+                Log.d(TAG, "GPU delegate not supported, using CPU with XNNPACK");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to initialize GPU delegate, using CPU: " + e.getMessage());
+        }
 
         mInterpreter = new Interpreter(tfliteModel, options);
     }
@@ -146,13 +128,34 @@ public class WhisperEngineJava implements WhisperEngine {
         // Get samples in PCM_FLOAT format
         float[] samples = WaveUtil.getSamples(wavePath);
 
-        int fixedInputSize = WhisperUtil.WHISPER_SAMPLE_RATE * WhisperUtil.WHISPER_CHUNK_SIZE;
-        float[] inputSamples = new float[fixedInputSize];
-        int copyLength = Math.min(samples.length, fixedInputSize);
-        System.arraycopy(samples, 0, inputSamples, 0, copyLength);
+        // Only process actual recorded audio, not fixed 30 seconds
+        int actualSamples = samples.length;
+        int maxSamples = WhisperUtil.WHISPER_SAMPLE_RATE * WhisperUtil.WHISPER_CHUNK_SIZE; // 480000
+        int samplesToProcess = Math.min(actualSamples, maxSamples);
+
+        Log.d(TAG, "Actual samples: " + actualSamples + ", processing: " + samplesToProcess +
+              " (" + (samplesToProcess / (float)WhisperUtil.WHISPER_SAMPLE_RATE) + " seconds)");
 
         int cores = Runtime.getRuntime().availableProcessors();
-        return mWhisperUtil.getMelSpectrogram(inputSamples, inputSamples.length, cores);
+
+        // Calculate mel for actual audio only
+        float[] melActual = mWhisperUtil.getMelSpectrogram(samples, samplesToProcess, cores);
+
+        // Pad to full 3000 frames if needed (model expects fixed input)
+        int expectedMelLen = WhisperUtil.WHISPER_MEL_LEN; // 3000
+        int actualMelLen = samplesToProcess / WhisperUtil.WHISPER_HOP_LENGTH;
+
+        if (actualMelLen < expectedMelLen) {
+            // Create padded output
+            float[] melPadded = new float[WhisperUtil.WHISPER_N_MEL * expectedMelLen];
+            // Copy actual mel data
+            System.arraycopy(melActual, 0, melPadded, 0, Math.min(melActual.length, melPadded.length));
+            // Rest is already zero-padded (Java default)
+            Log.d(TAG, "Mel spectrogram padded from " + actualMelLen + " to " + expectedMelLen + " frames");
+            return melPadded;
+        }
+
+        return melActual;
     }
 
     private String runInference(float[] inputData) {

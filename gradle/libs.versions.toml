@@ -33,6 +33,8 @@ androidxWork = "2.9.0"
 androidxCar = "1.7.0"
 media3 = "1.5.1"
 material = "1.12.0"
+tensorflowLite = "2.14.0"
+tensorflowLiteSupport = "0.4.4"
 constraintlayout = "2.2.0"
 coil = "2.7.0"
 dependencyGuard = "0.5.0"
@@ -163,6 +165,8 @@ roborazzi-accessibility-check = { group = "io.github.takahirom.roborazzi", name 
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+tensorflow-lite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tensorflowLite" }
+tensorflow-lite-support = { group = "org.tensorflow", name = "tensorflow-lite-support", version.ref = "tensorflowLiteSupport" }
 truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
