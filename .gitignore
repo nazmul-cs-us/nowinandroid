@@ -51,3 +51,21 @@ captures/
 # Claude Code local settings
 .claude/
 *.hprof
+
+# Large asset files - not tracked in git (backup separately)
+# Audio files (2.1GB+)
+app/src/main/assets/bukhari_audio_bn/
+
+# Large database files
+app/src/main/assets/databases/*.db
+app/src/main/assets/databases/hadith/*.db
+app/src/main/assets/*.db
+
+# Whisper ML model files (40MB+)
+app/src/main/assets/whisper/*.tflite
+app/src/main/assets/whisper/*.bin
+
+# Large JSON files
+app/src/main/assets/sahih_bukhari.json
+app/src/main/assets/tajweed.json
+app/src/main/assets/fortress_of_the_muslim.json
