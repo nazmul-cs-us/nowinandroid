@@ -408,4 +408,29 @@ class SherpaOnnxTtsService @Inject constructor(
         tts = null
         isInitialized = false
     }
+
+    /**
+     * Test the TTS engine with a simple phrase.
+     * Call this to verify TTS is working.
+     */
+    fun runTest() {
+        Log.i(TAG, "========== TTS TEST STARTED ==========")
+        scope.launch {
+            try {
+                Log.i(TAG, "Step 1: Initializing TTS...")
+                val initSuccess = initialize()
+                Log.i(TAG, "Step 1 Result: ${if (initSuccess) "SUCCESS" else "FAILED"}")
+
+                if (initSuccess) {
+                    Log.i(TAG, "Step 2: Generating speech...")
+                    val speakSuccess = speak("Hello! Offline TTS is working perfectly.")
+                    Log.i(TAG, "Step 2 Result: ${if (speakSuccess) "SUCCESS" else "FAILED"}")
+                }
+
+                Log.i(TAG, "========== TTS TEST COMPLETED ==========")
+            } catch (e: Exception) {
+                Log.e(TAG, "TTS TEST FAILED with exception", e)
+            }
+        }
+    }
 }

@@ -12,9 +12,9 @@ This document tracks ALL assets used by the app, whether bundled in the APK or s
 
 | Storage Location | Total Size | File Count | Status |
 |------------------|------------|------------|--------|
-| APK (assets/) | ~2.7GB | 5,400+ | Bundled |
-| SD Card (/sdcard/Quran/) | ~5.6GB | 343 | External |
-| **TOTAL** | **~8.3GB** | **5,700+** | |
+| APK (assets/) | ~600MB | 100+ | Bundled |
+| SD Card (/sdcard/) | ~7.7GB | 5,700+ | External |
+| **TOTAL** | **~8.3GB** | **5,800+** | |
 
 ---
 
@@ -24,23 +24,7 @@ Assets stored in `app/src/main/assets/` and packaged in the APK.
 
 ### 1.1 Audio Files
 
-#### Bukhari Hadith Audio (Bengali)
-| Path | Size | Files | Format | Used By |
-|------|------|-------|--------|---------|
-| `bukhari_audio_bn/` | 2.1GB | 5,323 | .ogg/.mp3 | `ActivityTracker.kt`, `HadithDetailScreen.kt` |
-
-**File Pattern:** `bukhari_{number}.ogg` or `bukhari_{number}.mp3` (e.g., `bukhari_0001.ogg`)
-
-**Code Reference:**
-```kotlin
-// ActivityTracker.kt:844-845
-"bukhari_audio_bn/bukhari_$formattedNumber.ogg"
-"bukhari_audio_bn/bukhari_$formattedNumber.mp3"
-
-// HadithDetailScreen.kt:404-405
-"bukhari_audio_bn/bukhari_$formattedNumber.ogg"
-"bukhari_audio_bn/bukhari_$formattedNumber.mp3"
-```
+*Note: Bukhari audio moved to SD card - see Section 2.2*
 
 ---
 
@@ -152,9 +136,31 @@ private const val DATA_DIR = "espeak-ng-data"
 
 ## 2. EXTERNAL ASSETS (SD CARD)
 
-Assets stored on device SD card at `/sdcard/Quran/`. Must be copied separately.
+Assets stored on device SD card. Must be copied separately.
 
-### 2.1 Quran Audio (Full Surahs)
+### 2.1 Bukhari Hadith Audio (Bengali)
+| Path | Size | Files | Format | Used By |
+|------|------|-------|--------|---------|
+| `/sdcard/Bukhari/bukhari_audio_bn/` | 2.1GB | 5,323 | .ogg/.mp3 | `ActivityTracker.kt`, `HadithDetailScreen.kt` |
+
+**File Pattern:** `bukhari_{number}.ogg` or `bukhari_{number}.mp3` (e.g., `bukhari_0001.ogg`)
+
+**Code Reference:**
+```kotlin
+// ActivityTracker.kt
+val bukhariAudioPath = "/sdcard/Bukhari/bukhari_audio_bn"
+java.io.File(bukhariAudioPath, "bukhari_$formattedNumber.ogg")
+
+// HadithDetailScreen.kt
+val bukhariPath = "/sdcard/Bukhari/bukhari_audio_bn"
+java.io.File(bukhariPath, "bukhari_$formattedNumber.ogg")
+```
+
+**Backup Location:** `/Users/smarterai/Desktop/bukhari_audio_backup/bukhari_audio_bn/`
+
+---
+
+### 2.2 Quran Audio (Full Surahs)
 
 | Path | Size | Files | Reciter/Content | Used By |
 |------|------|-------|-----------------|---------|

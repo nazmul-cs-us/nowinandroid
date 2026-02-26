@@ -396,22 +396,22 @@ fun HadithDetailScreen(
                                 // Start playback
                                 val isBukhari = databaseFile.contains("bukhari", ignoreCase = true)
 
-                                // For Bengali language and Bukhari, use audio files
+                                // For Bengali language and Bukhari, use audio files from SD card
                                 if (selectedLanguage == "bn" && isBukhari) {
-                                    // Try to play from assets
+                                    // Try to play from SD card
                                     val formattedNumber = String.format("%04d", hadithNumber)
-                                    val possibleFileNames = listOf(
-                                        "bukhari_audio_bn/bukhari_$formattedNumber.ogg",
-                                        "bukhari_audio_bn/bukhari_$formattedNumber.mp3"
+                                    val bukhariPath = "/sdcard/Bukhari/bukhari_audio_bn"
+                                    val possibleFiles = listOf(
+                                        java.io.File(bukhariPath, "bukhari_$formattedNumber.ogg"),
+                                        java.io.File(bukhariPath, "bukhari_$formattedNumber.mp3")
                                     )
 
                                     var audioPlayed = false
-                                    for (fileName in possibleFileNames) {
+                                    for (audioFile in possibleFiles) {
+                                        if (!audioFile.exists()) continue
                                         try {
-                                            val afd: AssetFileDescriptor = context.assets.openFd(fileName)
                                             mediaPlayer = MediaPlayer().apply {
-                                                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                                                afd.close()
+                                                setDataSource(audioFile.absolutePath)
                                                 setOnCompletionListener { mp ->
                                                     mp.release()
                                                     mediaPlayer = null
@@ -428,10 +428,8 @@ fun HadithDetailScreen(
                                             }
                                             isPlaying = true
                                             audioPlayed = true
-                                            android.util.Log.i("HadithDetailScreen", "▶️ Playing Bengali audio: $fileName")
+                                            android.util.Log.i("HadithDetailScreen", "▶️ Playing Bengali audio: ${audioFile.absolutePath}")
                                             break
-                                        } catch (e: java.io.FileNotFoundException) {
-                                            // Try next file
                                         } catch (e: Exception) {
                                             android.util.Log.e("HadithDetailScreen", "Error playing audio: ${e.message}")
                                         }

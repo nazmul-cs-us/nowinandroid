@@ -103,14 +103,12 @@ class VoiceCompletionManager @Inject constructor(
                 Log.d(TAG, "Starting voice listening...")
                 listenForResponse(
                     onYes = {
-                        Log.i(TAG, "User said YES - marking lesson complete")
-                        playSuccessSound()
+                        // Confirmation already spoken in listenForResponse
                         onComplete()
                         isPromptInProgress = false
                     },
                     onNo = {
-                        Log.i(TAG, "User said NO - skipping completion")
-                        playSkipSound()
+                        // Confirmation already spoken in listenForResponse
                         onSkipped()
                         isPromptInProgress = false
                     },
@@ -251,16 +249,29 @@ class VoiceCompletionManager @Inject constructor(
             callback = object : WhisperVoiceService.VoiceRecognitionCallback {
                 override fun onResult(result: WhisperVoiceService.VoiceResult) {
                     when (result) {
-                        is WhisperVoiceService.VoiceResult.Yes -> onYes()
-                        is WhisperVoiceService.VoiceResult.No -> onNo()
+                        is WhisperVoiceService.VoiceResult.Yes -> {
+                            Log.i(TAG, "✅ Whisper recognized: YES")
+                            speakConfirmation("I heard yes. Marking lesson complete.") {
+                                onYes()
+                            }
+                        }
+                        is WhisperVoiceService.VoiceResult.No -> {
+                            Log.i(TAG, "❌ Whisper recognized: NO")
+                            speakConfirmation("I heard no. Skipping this lesson.") {
+                                onNo()
+                            }
+                        }
                         is WhisperVoiceService.VoiceResult.Timeout -> {
-                            Log.d(TAG, "No speech detected (timeout)")
-                            onNo() // Treat timeout as skip
+                            Log.d(TAG, "⏱️ No speech detected (timeout)")
+                            speakConfirmation("No response detected. Skipping.") {
+                                onNo()
+                            }
                         }
                         is WhisperVoiceService.VoiceResult.Unrecognized -> {
-                            Log.d(TAG, "Unrecognized speech: ${result.text}")
-                            speakUnrecognizedFeedback()
-                            onNo() // Treat unrecognized as skip
+                            Log.d(TAG, "❓ Unrecognized speech: ${result.text}")
+                            speakConfirmation("Sorry, I didn't understand: ${result.text}. Skipping.") {
+                                onNo()
+                            }
                         }
                         is WhisperVoiceService.VoiceResult.Error -> {
                             onError(result.message)
@@ -284,56 +295,86 @@ class VoiceCompletionManager @Inject constructor(
     }
 
     /**
-     * Speak feedback when speech is not recognized.
-     * Uses Sherpa-ONNX offline TTS with Android TTS fallback.
+     * Speak confirmation feedback using offline TTS.
+     * Confirms what Whisper heard before taking action.
+     *
+     * @param message The confirmation message to speak
+     * @param onComplete Callback after speech completes
      */
-    private fun speakUnrecognizedFeedback() {
+    private fun speakConfirmation(message: String, onComplete: () -> Unit) {
         scope.launch {
+            Log.i(TAG, "🔊 Speaking confirmation: \"$message\"")
             val success = try {
-                sherpaOnnxTts.speak("Sorry, I didn't understand. Skipping.")
+                sherpaOnnxTts.speak(message, onComplete = {
+                    onComplete()
+                })
             } catch (e: Exception) {
+                Log.w(TAG, "Sherpa-ONNX TTS failed, using Android TTS fallback", e)
                 false
             }
+
             if (!success) {
-                textToSpeech?.speak(
-                    "Sorry, I didn't understand. Skipping.",
-                    TextToSpeech.QUEUE_FLUSH,
-                    null,
-                    "unrecognized_feedback"
-                )
+                // Fallback to Android TTS
+                speakWithAndroidTtsFallback(message, onComplete)
             }
         }
     }
 
     /**
-     * Play success feedback when lesson is marked complete.
-     * Uses Sherpa-ONNX offline TTS with Android TTS fallback.
+     * Fallback to Android system TTS for confirmation.
      */
-    private fun playSuccessSound() {
-        scope.launch {
-            val success = try {
-                sherpaOnnxTts.speak("Lesson marked as complete.")
-            } catch (e: Exception) {
-                false
+    private fun speakWithAndroidTtsFallback(message: String, onComplete: () -> Unit) {
+        if (textToSpeech == null || !isTtsInitialized) {
+            textToSpeech = TextToSpeech(context) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    isTtsInitialized = true
+                    textToSpeech?.language = Locale.US
+                    speakAndroidTtsWithCallback(message, onComplete)
+                } else {
+                    Log.e(TAG, "Android TTS init failed")
+                    onComplete() // Continue even if TTS fails
+                }
             }
-            if (!success) {
-                textToSpeech?.speak(
-                    "Lesson marked as complete.",
-                    TextToSpeech.QUEUE_FLUSH,
-                    null,
-                    "success_feedback"
-                )
-            }
+        } else {
+            speakAndroidTtsWithCallback(message, onComplete)
         }
     }
 
     /**
-     * Play skip feedback when lesson is skipped.
-     * Silently skips without audio feedback.
+     * Speak with Android TTS and trigger callback on completion.
      */
-    private fun playSkipSound() {
-        // No audio feedback for skip - silent skip
-        Log.d(TAG, "Lesson skipped - no audio feedback")
+    private fun speakAndroidTtsWithCallback(message: String, onComplete: () -> Unit) {
+        val utteranceId = "confirmation_${System.currentTimeMillis()}"
+
+        textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(id: String?) {
+                Log.d(TAG, "Android TTS started: $id")
+            }
+
+            override fun onDone(id: String?) {
+                if (id == utteranceId) {
+                    Log.d(TAG, "Android TTS completed: $id")
+                    onComplete()
+                }
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun onError(id: String?) {
+                if (id == utteranceId) {
+                    Log.e(TAG, "Android TTS error: $id")
+                    onComplete()
+                }
+            }
+
+            override fun onError(id: String?, errorCode: Int) {
+                if (id == utteranceId) {
+                    Log.e(TAG, "Android TTS error ($errorCode): $id")
+                    onComplete()
+                }
+            }
+        })
+
+        textToSpeech?.speak(message, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
     }
 
     /**

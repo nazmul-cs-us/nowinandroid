@@ -822,9 +822,12 @@ object ActivityTracker {
         }
     }
 
+    // SD card path for Bukhari audio files (moved from APK assets due to size)
+    private val bukhariAudioPath = "/sdcard/Bukhari/bukhari_audio_bn"
+
     /**
-     * Play Sahih Bukhari audio file from assets for Bengali language
-     * Audio files are stored in assets/bukhari_audio_bn/ folder
+     * Play Sahih Bukhari audio file from SD card for Bengali language
+     * Audio files are stored in /sdcard/Bukhari/ folder
      * Naming convention: bukhari_{hadith_number}.ogg or bukhari_{hadith_number}.mp3
      *
      * @param ctx Context
@@ -839,23 +842,21 @@ object ActivityTracker {
         // Format hadith number with leading zeros (4 digits)
         val formattedNumber = String.format("%04d", hadithNumber)
 
-        // Try OGG first (most files are OGG), then MP3
-        val possibleFileNames = listOf(
-            "bukhari_audio_bn/bukhari_$formattedNumber.ogg",
-            "bukhari_audio_bn/bukhari_$formattedNumber.mp3"
+        // Try OGG first (most files are OGG), then MP3 - from SD card
+        val possibleFiles = listOf(
+            java.io.File(bukhariAudioPath, "bukhari_$formattedNumber.ogg"),
+            java.io.File(bukhariAudioPath, "bukhari_$formattedNumber.mp3")
         )
 
-        for (fileName in possibleFileNames) {
-            try {
-                val assetFileDescriptor: AssetFileDescriptor = ctx.assets.openFd(fileName)
+        for (audioFile in possibleFiles) {
+            if (!audioFile.exists()) {
+                Log.d("ActivityTracker", "📚 Audio file not found: ${audioFile.absolutePath}")
+                continue
+            }
 
+            try {
                 hadithMediaPlayer = MediaPlayer().apply {
-                    setDataSource(
-                        assetFileDescriptor.fileDescriptor,
-                        assetFileDescriptor.startOffset,
-                        assetFileDescriptor.length
-                    )
-                    assetFileDescriptor.close()
+                    setDataSource(audioFile.absolutePath)
 
                     setOnCompletionListener { mp ->
                         mp.release()
@@ -882,18 +883,15 @@ object ActivityTracker {
                     start()
                 }
 
-                Log.i("ActivityTracker", "📚 ▶️ Playing Bengali Bukhari audio: $fileName")
+                Log.i("ActivityTracker", "📚 ▶️ Playing Bengali Bukhari audio: ${audioFile.absolutePath}")
                 return true
 
-            } catch (e: java.io.FileNotFoundException) {
-                // File not found, try next extension
-                Log.d("ActivityTracker", "📚 Audio file not found: $fileName")
             } catch (e: Exception) {
-                Log.e("ActivityTracker", "📚 Error playing audio file $fileName: ${e.message}")
+                Log.e("ActivityTracker", "📚 Error playing audio file ${audioFile.absolutePath}: ${e.message}")
             }
         }
 
-        Log.w("ActivityTracker", "📚 No Bengali audio file found for hadith #$hadithNumber")
+        Log.w("ActivityTracker", "📚 No Bengali audio file found for hadith #$hadithNumber on SD card")
         return false
     }
 
