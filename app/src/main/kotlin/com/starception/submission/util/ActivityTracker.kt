@@ -2,6 +2,7 @@ package com.starception.submission.util
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.AssetFileDescriptor
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -21,12 +22,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import android.speech.tts.UtteranceProgressListener
 import com.starception.submission.sensor.ActivityDetectionService
 import com.starception.submission.config.ActivityDetectionConfig
 import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.feature.course.CourseProgressTracker
 import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.translation.TranslationService
+import com.starception.submission.voice.VoiceCompletionManager
+import com.starception.submission.voice.WhisperVoiceService
 import java.util.Locale
 
 /**
@@ -74,11 +78,17 @@ object ActivityTracker {
     private var context: Context? = null
     private var toneGenerator: ToneGenerator? = null
     private var mediaPlayer: MediaPlayer? = null
+    private var hadithMediaPlayer: MediaPlayer? = null  // Separate player for hadith audio
     private var previousActivity: String = ""
 
     // TextToSpeech for hadith playback after travel dua
     private var textToSpeech: TextToSpeech? = null
     private var isTtsInitialized = false
+
+    // Voice completion for hands-free lesson completion
+    private var whisperVoiceService: WhisperVoiceService? = null
+    private var voiceCompletionManager: VoiceCompletionManager? = null
+    private var currentHadithNumber: Int = 0  // Track current hadith for TTS completion
 
     // Coroutine scope for async operations
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -498,6 +508,14 @@ object ActivityTracker {
             } catch (e: Exception) {
                 Log.w("ActivityTracker", "Error releasing MediaPlayer: ${e.message}")
             }
+
+            // Clean up hadith MediaPlayer
+            try {
+                hadithMediaPlayer?.release()
+                hadithMediaPlayer = null
+            } catch (e: Exception) {
+                Log.w("ActivityTracker", "Error releasing hadith MediaPlayer: ${e.message}")
+            }
             Log.d("ActivityTracker", "🧹 Released audio resources")
         }
     }
@@ -763,6 +781,7 @@ object ActivityTracker {
 
     /**
      * Speak hadith text using TextToSpeech in user's selected language
+     * For Bengali language, uses pre-recorded audio files from assets
      */
     private fun speakHadith(ctx: Context, hadithNumber: Int, text: String) {
         // Get user's selected language
@@ -771,6 +790,17 @@ object ActivityTracker {
         val ttsLocale = getLocaleForLanguage(selectedLang)
 
         Log.d("ActivityTracker", "📚 User's selected language: $selectedLang -> TTS Locale: ${ttsLocale.displayLanguage}")
+
+        // For Bengali language, try to use pre-recorded audio files
+        if (selectedLang == "bn") {
+            Log.i("ActivityTracker", "📚 Bengali language selected - attempting to play audio file")
+            if (playBukhariAudioFromAssets(ctx, hadithNumber)) {
+                Log.i("ActivityTracker", "📚 Successfully playing Bengali audio for hadith #$hadithNumber")
+                return
+            } else {
+                Log.w("ActivityTracker", "📚 Bengali audio not found for hadith #$hadithNumber - falling back to TTS")
+            }
+        }
 
         // Translate hadith if user selected non-English language
         if (selectedLang != "en" && selectedLang != "transliteration") {
@@ -791,12 +821,90 @@ object ActivityTracker {
     }
 
     /**
+     * Play Sahih Bukhari audio file from assets for Bengali language
+     * Audio files are stored in assets/bukhari_audio_bn/ folder
+     * Naming convention: bukhari_{hadith_number}.ogg or bukhari_{hadith_number}.mp3
+     *
+     * @param ctx Context
+     * @param hadithNumber The hadith number (1-5515)
+     * @return true if audio file found and started playing, false otherwise
+     */
+    private fun playBukhariAudioFromAssets(ctx: Context, hadithNumber: Int): Boolean {
+        // Release any existing MediaPlayer for hadith
+        hadithMediaPlayer?.release()
+        hadithMediaPlayer = null
+
+        // Format hadith number with leading zeros (4 digits)
+        val formattedNumber = String.format("%04d", hadithNumber)
+
+        // Try OGG first (most files are OGG), then MP3
+        val possibleFileNames = listOf(
+            "bukhari_audio_bn/bukhari_$formattedNumber.ogg",
+            "bukhari_audio_bn/bukhari_$formattedNumber.mp3"
+        )
+
+        for (fileName in possibleFileNames) {
+            try {
+                val assetFileDescriptor: AssetFileDescriptor = ctx.assets.openFd(fileName)
+
+                hadithMediaPlayer = MediaPlayer().apply {
+                    setDataSource(
+                        assetFileDescriptor.fileDescriptor,
+                        assetFileDescriptor.startOffset,
+                        assetFileDescriptor.length
+                    )
+                    assetFileDescriptor.close()
+
+                    setOnCompletionListener { mp ->
+                        mp.release()
+                        hadithMediaPlayer = null
+                        Log.d("ActivityTracker", "📚 Bengali hadith audio completed")
+
+                        // Trigger voice completion prompt for hands-free lesson marking
+                        triggerVoiceCompletionPrompt(
+                            ctx,
+                            "daily_bukhari",
+                            "hadith_$hadithNumber",
+                            "Hadith #$hadithNumber"
+                        )
+                    }
+
+                    setOnErrorListener { mp, what, extra ->
+                        Log.e("ActivityTracker", "📚 MediaPlayer error: what=$what, extra=$extra")
+                        mp.release()
+                        hadithMediaPlayer = null
+                        true
+                    }
+
+                    prepare()
+                    start()
+                }
+
+                Log.i("ActivityTracker", "📚 ▶️ Playing Bengali Bukhari audio: $fileName")
+                return true
+
+            } catch (e: java.io.FileNotFoundException) {
+                // File not found, try next extension
+                Log.d("ActivityTracker", "📚 Audio file not found: $fileName")
+            } catch (e: Exception) {
+                Log.e("ActivityTracker", "📚 Error playing audio file $fileName: ${e.message}")
+            }
+        }
+
+        Log.w("ActivityTracker", "📚 No Bengali audio file found for hadith #$hadithNumber")
+        return false
+    }
+
+    /**
      * Actually speak the text using TTS
      */
     private fun speakWithTts(ctx: Context, hadithNumber: Int, text: String, locale: Locale, langCode: String) {
         // Get intro text in the appropriate language
         val introText = getHadithIntro(hadithNumber, langCode)
         val fullText = "$introText $text"
+
+        // Store current hadith number for completion callback
+        currentHadithNumber = hadithNumber
 
         // Initialize TTS if not already done
         if (textToSpeech == null) {
@@ -809,6 +917,10 @@ object ActivityTracker {
                         textToSpeech?.language = Locale.US
                     }
                     Log.d("ActivityTracker", "📚 TTS initialized with language: ${textToSpeech?.language}")
+
+                    // Set up utterance progress listener for completion callback
+                    setupTtsCompletionListener(ctx)
+
                     textToSpeech?.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
                 } else {
                     Log.e("ActivityTracker", "📚 TTS initialization failed with status: $status")
@@ -820,8 +932,51 @@ object ActivityTracker {
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                 Log.w("ActivityTracker", "📚 TTS language $locale not supported, using current")
             }
+
+            // Ensure listener is set up
+            setupTtsCompletionListener(ctx)
+
             textToSpeech?.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
         }
+    }
+
+    /**
+     * Set up TTS utterance progress listener for hadith completion callback.
+     * Triggers voice completion prompt when hadith TTS playback finishes.
+     */
+    private fun setupTtsCompletionListener(ctx: Context) {
+        textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                Log.d("ActivityTracker", "📚 TTS started: $utteranceId")
+            }
+
+            override fun onDone(utteranceId: String?) {
+                Log.d("ActivityTracker", "📚 TTS completed: $utteranceId")
+
+                // Check if this is a hadith utterance
+                if (utteranceId?.startsWith("hadith_") == true) {
+                    val hadithNum = utteranceId.removePrefix("hadith_").toIntOrNull()
+                    if (hadithNum != null) {
+                        // Trigger voice completion prompt
+                        triggerVoiceCompletionPrompt(
+                            ctx,
+                            "daily_bukhari",
+                            "hadith_$hadithNum",
+                            "Hadith #$hadithNum"
+                        )
+                    }
+                }
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) {
+                Log.e("ActivityTracker", "📚 TTS error: $utteranceId")
+            }
+
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                Log.e("ActivityTracker", "📚 TTS error ($errorCode): $utteranceId")
+            }
+        })
     }
 
     /**
@@ -870,6 +1025,67 @@ object ActivityTracker {
         textToSpeech?.shutdown()
         textToSpeech = null
         isTtsInitialized = false
+    }
+
+    /**
+     * Trigger voice-based lesson completion prompt after hadith playback.
+     * Only triggers if user is currently driving.
+     *
+     * @param ctx Android context
+     * @param courseId The course ID (e.g., "daily_bukhari")
+     * @param lessonId The lesson ID (e.g., "hadith_1")
+     * @param lessonTitle Human-readable title (e.g., "Hadith #1")
+     */
+    private fun triggerVoiceCompletionPrompt(
+        ctx: Context,
+        courseId: String,
+        lessonId: String,
+        lessonTitle: String
+    ) {
+        // Only trigger if currently driving
+        if (_currentActivity.value != "Driving") {
+            Log.d("ActivityTracker", "🎤 Skipping voice completion - not driving (${_currentActivity.value})")
+            return
+        }
+
+        scope.launch {
+            try {
+                // Initialize voice services if needed
+                if (whisperVoiceService == null) {
+                    Log.i("ActivityTracker", "🎤 Initializing Whisper voice service...")
+                    whisperVoiceService = WhisperVoiceService(ctx)
+                    val modelLoaded = whisperVoiceService?.loadModel() ?: false
+                    if (!modelLoaded) {
+                        Log.e("ActivityTracker", "🎤 Failed to load Whisper model")
+                        return@launch
+                    }
+                }
+
+                if (voiceCompletionManager == null) {
+                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!)
+                }
+
+                Log.i("ActivityTracker", "🎤 Triggering voice completion prompt for: $lessonTitle")
+
+                voiceCompletionManager?.promptForCompletion(
+                    courseId = courseId,
+                    lessonId = lessonId,
+                    lessonTitle = lessonTitle,
+                    onComplete = {
+                        Log.i("ActivityTracker", "✅ Voice completion: User said YES - marking lesson complete")
+                        CourseProgressTracker.markLessonCompleted(ctx, courseId, lessonId)
+                    },
+                    onSkipped = {
+                        Log.i("ActivityTracker", "⏭️ Voice completion: User said NO or timeout - skipped")
+                    },
+                    onError = { error ->
+                        Log.e("ActivityTracker", "❌ Voice completion error: $error")
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e("ActivityTracker", "❌ Error in voice completion: ${e.message}", e)
+            }
+        }
     }
 
     /**

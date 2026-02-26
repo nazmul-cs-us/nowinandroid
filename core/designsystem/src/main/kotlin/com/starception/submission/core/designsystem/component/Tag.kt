@@ -17,14 +17,23 @@
 package com.starception.submission.core.designsystem.component
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.theme.NiaTheme
 
 @Composable
@@ -64,12 +73,68 @@ fun NiaTopicTag(
     }
 }
 
+/**
+ * A verified tag variant with a checkmark icon.
+ * Use this for courses and verified content to differentiate from regular tags.
+ */
+@Composable
+fun NiaVerifiedTag(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    text: @Composable () -> Unit,
+) {
+    Box(modifier = modifier) {
+        val containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        val contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+        TextButton(
+            onClick = onClick,
+            enabled = enabled,
+            colors = ButtonDefaults.textButtonColors(
+                containerColor = containerColor,
+                contentColor = contentColor,
+                disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(
+                    alpha = NiaTagDefaults.DISABLED_TOPIC_TAG_CONTAINER_ALPHA,
+                ),
+                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(
+                    alpha = NiaTagDefaults.DISABLED_TOPIC_TAG_CONTENT_ALPHA,
+                ),
+            ),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Verified,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = contentColor,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                ProvideTextStyle(value = MaterialTheme.typography.labelSmall) {
+                    text()
+                }
+            }
+        }
+    }
+}
+
 @ThemePreviews
 @Composable
 fun TagPreview() {
     NiaTheme {
         NiaTopicTag(followed = true, onClick = {}) {
             Text("Topic".uppercase())
+        }
+    }
+}
+
+@ThemePreviews
+@Composable
+fun VerifiedTagPreview() {
+    NiaTheme {
+        NiaVerifiedTag(onClick = {}) {
+            Text("Course".uppercase())
         }
     }
 }

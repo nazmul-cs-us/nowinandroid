@@ -48,8 +48,11 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -87,6 +90,7 @@ import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.feature.surah.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.core.designsystem.component.NiaVerifiedTag
 import com.starception.submission.core.ui.DynamicSkyHeader
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.core.ui.getCurrentSkyPeriodForTheme
@@ -110,6 +114,18 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import com.starception.submission.R
 import android.content.SharedPreferences
+import android.content.res.AssetFileDescriptor
+import android.media.MediaPlayer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.FastOutSlowInEasing
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 private const val HADITH_SECTION_ORDER_PREFS = "hadith_section_order_prefs"
 private const val HADITH_SECTION_ORDER_KEY = "section_order"
@@ -206,6 +222,23 @@ fun HadithDetailScreen(
         "google" to "Google Translate",
         "reverso" to "Reverso"
     )
+
+    // Audio playback state
+    var isPlaying by remember { mutableStateOf(false) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var textToSpeech by remember { mutableStateOf<TextToSpeech?>(null) }
+    var isTtsInitialized by remember { mutableStateOf(false) }
+
+    // Cleanup on dispose
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose {
+            mediaPlayer?.release()
+            mediaPlayer = null
+            textToSpeech?.stop()
+            textToSpeech?.shutdown()
+            textToSpeech = null
+        }
+    }
 
     // Load hadith
     LaunchedEffect(databaseFile, hadithNumber) {
@@ -349,7 +382,87 @@ fun HadithDetailScreen(
                         isTranslating = isTranslating,
                         selectedLanguage = selectedLanguage,
                         onLanguageClick = { showLanguageDialog = true },
-                        isLandscape = isLandscape
+                        isLandscape = isLandscape,
+                        isPlaying = isPlaying,
+                        onPlayClick = {
+                            if (isPlaying) {
+                                // Stop playback
+                                mediaPlayer?.stop()
+                                mediaPlayer?.release()
+                                mediaPlayer = null
+                                textToSpeech?.stop()
+                                isPlaying = false
+                            } else {
+                                // Start playback
+                                val isBukhari = databaseFile.contains("bukhari", ignoreCase = true)
+
+                                // For Bengali language and Bukhari, use audio files
+                                if (selectedLanguage == "bn" && isBukhari) {
+                                    // Try to play from assets
+                                    val formattedNumber = String.format("%04d", hadithNumber)
+                                    val possibleFileNames = listOf(
+                                        "bukhari_audio_bn/bukhari_$formattedNumber.ogg",
+                                        "bukhari_audio_bn/bukhari_$formattedNumber.mp3"
+                                    )
+
+                                    var audioPlayed = false
+                                    for (fileName in possibleFileNames) {
+                                        try {
+                                            val afd: AssetFileDescriptor = context.assets.openFd(fileName)
+                                            mediaPlayer = MediaPlayer().apply {
+                                                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                                                afd.close()
+                                                setOnCompletionListener { mp ->
+                                                    mp.release()
+                                                    mediaPlayer = null
+                                                    isPlaying = false
+                                                }
+                                                setOnErrorListener { mp, _, _ ->
+                                                    mp.release()
+                                                    mediaPlayer = null
+                                                    isPlaying = false
+                                                    true
+                                                }
+                                                prepare()
+                                                start()
+                                            }
+                                            isPlaying = true
+                                            audioPlayed = true
+                                            android.util.Log.i("HadithDetailScreen", "▶️ Playing Bengali audio: $fileName")
+                                            break
+                                        } catch (e: java.io.FileNotFoundException) {
+                                            // Try next file
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("HadithDetailScreen", "Error playing audio: ${e.message}")
+                                        }
+                                    }
+
+                                    // Fall back to TTS if no audio file found
+                                    if (!audioPlayed) {
+                                        android.util.Log.w("HadithDetailScreen", "No Bengali audio for hadith #$hadithNumber, using TTS")
+                                        playWithTts(
+                                            context = context,
+                                            text = translatedText ?: hadith!!.textPlain ?: "",
+                                            language = selectedLanguage,
+                                            tts = textToSpeech,
+                                            onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
+                                            onPlayingChanged = { isPlaying = it }
+                                        )
+                                    }
+                                } else {
+                                    // Use TTS for other languages
+                                    val textToSpeak = translatedText ?: hadith!!.textPlain ?: ""
+                                    playWithTts(
+                                        context = context,
+                                        text = textToSpeak,
+                                        language = selectedLanguage,
+                                        tts = textToSpeech,
+                                        onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
+                                        onPlayingChanged = { isPlaying = it }
+                                    )
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -488,13 +601,71 @@ private fun HadithContent(
     isTranslating: Boolean = false,
     selectedLanguage: String = "en",
     onLanguageClick: () -> Unit = {},
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    isPlaying: Boolean = false,
+    onPlayClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         // No status bar padding - immersive mode hides status bar
         val lazyListState = rememberLazyListState()
+
+        // Calculate toolbar collapse state with smooth transition
+        // At top (album art visible) → Transparent
+        // Scrolled down (past album art) → Solid theme color
+        val collapseProgress = remember {
+            androidx.compose.runtime.derivedStateOf {
+                val itemIndex = lazyListState.firstVisibleItemIndex
+                val offset = lazyListState.firstVisibleItemScrollOffset.toFloat()
+
+                when {
+                    // Past the header - fully solid
+                    itemIndex >= 1 -> 1f
+                    // At header - calculate progress based on scroll offset
+                    else -> {
+                        val headerHeight = if (isLandscape) 340f else 596f // image + info card height
+                        (offset / headerHeight).coerceIn(0f, 1f)
+                    }
+                }
+            }
+        }
+
+        // Track scroll direction for FAB animation
+        var previousScrollOffset by remember { mutableStateOf(0) }
+        var previousItemIndex by remember { mutableStateOf(0) }
+        var showFabVisible by remember { mutableStateOf(true) }
+
+        // Track scroll changes for FAB visibility
+        LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
+            val currentItemIndex = lazyListState.firstVisibleItemIndex
+            val currentOffset = lazyListState.firstVisibleItemScrollOffset
+
+            // Calculate total scroll position for accurate direction detection
+            val currentTotalScroll = (currentItemIndex * 1000) + currentOffset
+            val previousTotalScroll = (previousItemIndex * 1000) + previousScrollOffset
+            val scrollDelta = currentTotalScroll - previousTotalScroll
+
+            // Only respond to significant scroll changes
+            if (kotlin.math.abs(scrollDelta) > 20) {
+                val isScrollingDown = scrollDelta > 0
+
+                // At top: always show FAB
+                val atTop = currentItemIndex == 0 && currentOffset < 100
+
+                if (atTop) {
+                    showFabVisible = true
+                } else {
+                    // Scrolling up → show FAB
+                    // Scrolling down → hide FAB
+                    showFabVisible = !isScrollingDown
+                }
+
+                // Update previous scroll position
+                previousScrollOffset = currentOffset
+                previousItemIndex = currentItemIndex
+            }
+        }
 
         // Build list of available sections based on hadith data
         val availableSections = remember(hadith) {
@@ -603,58 +774,103 @@ private fun HadithContent(
                             )
                         }
 
-                        // Info card below header
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        // Fixed-height container for info card to match SurahDetailScreen FAB positioning
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 16.dp)
+                                .height(if (isLandscape) 130.dp else 170.dp)
                         ) {
-                            Column {
-                                // Collection name
-                                Text(
-                                    text = hadith.collectionNameEnglish.ifEmpty { collectionName },
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-
-                                // Author
-                                if (hadith.author.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(4.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                            ) {
+                                Column {
+                                    // Collection name
                                     Text(
-                                        text = "Compiled by ${hadith.author}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontStyle = FontStyle.Italic
+                                        text = hadith.collectionNameEnglish.ifEmpty { collectionName },
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
-                                }
 
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                // Hadith number chip
-                                NiaTopicTag(
-                                    followed = true,
-                                    onClick = { },
-                                    enabled = true,
-                                    text = {
+                                    // Author
+                                    if (hadith.author.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
+                                            text = "Compiled by ${hadith.author}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontStyle = FontStyle.Italic
                                         )
                                     }
-                                )
 
-                                // Course completion badge (if applicable)
-                                val courseCompletionInfo = CourseProgressTracker.getHadithCourseCompletion(
-                                    context,
-                                    hadithNumber,
-                                    databaseFile
-                                )
-                                if (courseCompletionInfo != null) {
                                     Spacer(modifier = Modifier.height(12.dp))
-                                    CourseCompletionBadgeCompact(completionInfo = courseCompletionInfo)
+
+                                    // Hadith number chip and course badge in same row
+                                    val courseCompletionInfo = CourseProgressTracker.getHadithCourseCompletion(
+                                        context,
+                                        hadithNumber,
+                                        databaseFile
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        NiaTopicTag(
+                                            followed = true,
+                                            onClick = { },
+                                            enabled = true,
+                                            text = {
+                                                Text(
+                                                    text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
+                                                )
+                                            }
+                                        )
+
+                                        if (courseCompletionInfo != null) {
+                                            NiaVerifiedTag(
+                                                onClick = { },
+                                                enabled = true,
+                                                text = {
+                                                    Text(
+                                                        text = courseCompletionInfo.courseName.uppercase(Locale.getDefault())
+                                                    )
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
                             }
+                        }
+                    }
+
+                    // Play FAB positioned at boundary between header image and info card
+                    // Same position as SurahDetailScreen - hides on scroll down, shows on scroll up
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showFabVisible,
+                        enter = scaleIn(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+                        exit = scaleOut(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(y = (-142).dp)
+                            .padding(end = 12.dp)
+                    ) {
+                        FloatingActionButton(
+                            onClick = onPlayClick,
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Pause" else "Play"
+                            )
                         }
                     }
                 }
@@ -761,12 +977,24 @@ private fun HadithContent(
             }
         }
 
-        // Fixed toolbar at top - transparent to show sky through
-        Box(
+        // Fixed toolbar at top with color transition based on scroll
+        // Smooth transition: transparent (over album art) → solid (scrolled down)
+        val toolbarBackgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = collapseProgress.value)
+        val surfaceColor = MaterialTheme.colorScheme.onSurface
+        val toolbarContentColor = Color(
+            red = 1f + (surfaceColor.red - 1f) * collapseProgress.value,
+            green = 1f + (surfaceColor.green - 1f) * collapseProgress.value,
+            blue = 1f + (surfaceColor.blue - 1f) * collapseProgress.value,
+            alpha = 1f
+        )
+
+        Surface(
+            color = toolbarBackgroundColor,
+            tonalElevation = (4 * collapseProgress.value).dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .padding(top = 48.dp) // Fixed padding to clear camera punch hole area
+                .padding(top = 8.dp) // Minimal top padding since status bar is hidden by immersive mode
         ) {
             Row(
                 modifier = Modifier
@@ -779,7 +1007,7 @@ private fun HadithContent(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = Color.White
+                        tint = toolbarContentColor
                     )
                 }
 
@@ -790,7 +1018,7 @@ private fun HadithContent(
                     Icon(
                         imageVector = Icons.Filled.Language,
                         contentDescription = "Select Translation Language",
-                        tint = Color.White
+                        tint = toolbarContentColor
                     )
                 }
 
@@ -811,7 +1039,7 @@ private fun HadithContent(
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "More options",
-                        tint = Color.White
+                        tint = toolbarContentColor
                     )
                 }
             }
@@ -836,6 +1064,90 @@ private fun getLanguageName(code: String): String {
         "tr" -> "Turkish"
         "ur" -> "Urdu"
         else -> code.uppercase()
+    }
+}
+
+/**
+ * Play text using TextToSpeech
+ */
+private fun playWithTts(
+    context: android.content.Context,
+    text: String,
+    language: String,
+    tts: TextToSpeech?,
+    onTtsCreated: (TextToSpeech) -> Unit,
+    onPlayingChanged: (Boolean) -> Unit
+) {
+    val locale = when (language) {
+        "en" -> java.util.Locale.US
+        "ar" -> java.util.Locale("ar")
+        "bn" -> java.util.Locale("bn", "BD")
+        "es" -> java.util.Locale("es", "ES")
+        "fr" -> java.util.Locale.FRANCE
+        "id" -> java.util.Locale("id", "ID")
+        "ru" -> java.util.Locale("ru", "RU")
+        "sv" -> java.util.Locale("sv", "SE")
+        "tr" -> java.util.Locale("tr", "TR")
+        "ur" -> java.util.Locale("ur", "PK")
+        "zh" -> java.util.Locale.SIMPLIFIED_CHINESE
+        else -> java.util.Locale.US
+    }
+
+    // Get intro for hadith
+    val intro = when (language) {
+        "bn" -> "সহীহ আল-বুখারী থেকে।"
+        "ar" -> "من صحيح البخاري."
+        "es" -> "De Sahih Al-Bujari."
+        "fr" -> "De Sahih Al-Boukhari."
+        "id" -> "Dari Sahih Al-Bukhari."
+        "ru" -> "Из Сахих аль-Бухари."
+        "tr" -> "Sahih-i Buhari'den."
+        "ur" -> "صحیح البخاری سے۔"
+        "zh" -> "来自《布哈里圣训》。"
+        else -> "From Sahih Al-Bukhari."
+    }
+
+    val fullText = "$intro $text"
+
+    if (tts != null) {
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                onPlayingChanged(true)
+            }
+            override fun onDone(utteranceId: String?) {
+                onPlayingChanged(false)
+            }
+            override fun onError(utteranceId: String?) {
+                onPlayingChanged(false)
+            }
+        })
+        tts.language = locale
+        tts.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_tts")
+        onPlayingChanged(true)
+    } else {
+        // Use a holder to reference TTS in the callback
+        var ttsHolder: TextToSpeech? = null
+        ttsHolder = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                ttsHolder?.let { createdTts ->
+                    onTtsCreated(createdTts)
+                    createdTts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {
+                            onPlayingChanged(true)
+                        }
+                        override fun onDone(utteranceId: String?) {
+                            onPlayingChanged(false)
+                        }
+                        override fun onError(utteranceId: String?) {
+                            onPlayingChanged(false)
+                        }
+                    })
+                    createdTts.language = locale
+                    createdTts.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_tts")
+                    onPlayingChanged(true)
+                }
+            }
+        }
     }
 }
 
@@ -1315,7 +1627,7 @@ private fun HadithShimmerLoading(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 48.dp) // Fixed padding to clear camera punch hole area
+                .padding(top = 8.dp) // Minimal top padding since status bar is hidden by immersive mode
         ) {
             Row(
                 modifier = Modifier

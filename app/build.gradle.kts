@@ -85,6 +85,9 @@ dependencies {
     implementation(projects.core.analytics)
     implementation(projects.sync.work)
 
+    // Whisper TFLite module for offline speech recognition
+    implementation(projects.whisper)
+
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.adaptive)
