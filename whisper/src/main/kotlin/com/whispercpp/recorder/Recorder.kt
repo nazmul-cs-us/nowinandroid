@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.sqrt
 
 class Recorder {
     private val scope: CoroutineScope = CoroutineScope(
@@ -19,7 +20,22 @@ class Recorder {
     private var recorder: AudioRecordThread? = null
 
     suspend fun startRecording(outputFile: File, onError: (Exception) -> Unit) = withContext(scope.coroutineContext) {
-        recorder = AudioRecordThread(outputFile, onError)
+        recorder = AudioRecordThread(outputFile, onError, null)
+        recorder?.start()
+    }
+
+    /**
+     * Start recording with amplitude callback for real-time visualization
+     * @param outputFile File to save the recording
+     * @param onError Error callback
+     * @param onAmplitude Callback with normalized amplitude (0.0 to 1.0) called ~60 times per second
+     */
+    suspend fun startRecordingWithAmplitude(
+        outputFile: File,
+        onError: (Exception) -> Unit,
+        onAmplitude: (Float) -> Unit
+    ) = withContext(scope.coroutineContext) {
+        recorder = AudioRecordThread(outputFile, onError, onAmplitude)
         recorder?.start()
     }
 
@@ -33,7 +49,8 @@ class Recorder {
 
 private class AudioRecordThread(
     private val outputFile: File,
-    private val onError: (Exception) -> Unit
+    private val onError: (Exception) -> Unit,
+    private val onAmplitude: ((Float) -> Unit)?
 ) :
     Thread("AudioRecorder") {
     private var quit = AtomicBoolean(false)
@@ -67,6 +84,12 @@ private class AudioRecordThread(
                         for (i in 0 until read) {
                             allData.add(buffer[i])
                         }
+
+                        // Calculate and emit amplitude if callback is provided
+                        onAmplitude?.let { callback ->
+                            val amplitude = calculateRmsAmplitude(buffer, read)
+                            callback(amplitude)
+                        }
                     } else {
                         throw java.lang.RuntimeException("audioRecord.read returned $read")
                     }
@@ -80,6 +103,20 @@ private class AudioRecordThread(
         } catch (e: Exception) {
             onError(e)
         }
+    }
+
+    /**
+     * Calculate normalized RMS amplitude (0.0 to 1.0)
+     */
+    private fun calculateRmsAmplitude(buffer: ShortArray, length: Int): Float {
+        var sum = 0.0
+        for (i in 0 until length) {
+            val sample = buffer[i].toDouble()
+            sum += sample * sample
+        }
+        val rms = sqrt(sum / length)
+        // Normalize to 0-1 range (Short.MAX_VALUE = 32767)
+        return (rms / 32767.0).toFloat().coerceIn(0f, 1f)
     }
 
     fun stopRecording() {

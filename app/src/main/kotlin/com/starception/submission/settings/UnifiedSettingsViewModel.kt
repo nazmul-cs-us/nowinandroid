@@ -24,6 +24,8 @@ import com.starception.submission.settings.components.DeveloperSettingsState
 import com.starception.submission.settings.components.RefreshResult
 import com.starception.submission.settings.components.VoiceRecognitionEngine
 import com.starception.submission.settings.components.VoiceSettingsState
+import com.starception.submission.settings.components.VoiceTestState
+import com.starception.submission.voice.WhisperVoiceService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
@@ -50,6 +52,7 @@ import javax.inject.Inject
 class UnifiedSettingsViewModel @Inject constructor(
     private val userDataRepository: UserDataRepository,
     private val prayerSettingsRepository: PrayerSettingsRepository,
+    private val whisperVoiceService: WhisperVoiceService,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -673,7 +676,7 @@ class UnifiedSettingsViewModel @Inject constructor(
     fun updateVoiceSettings(engine: VoiceRecognitionEngine) {
         viewModelScope.launch {
             try {
-                _voiceSettings.value = VoiceSettingsState(selectedEngine = engine)
+                _voiceSettings.value = _voiceSettings.value.copy(selectedEngine = engine)
 
                 // Save to SharedPreferences
                 val prefs = context.getSharedPreferences("voice_settings", Context.MODE_PRIVATE)
@@ -686,6 +689,113 @@ class UnifiedSettingsViewModel @Inject constructor(
                 Log.e(TAG, "Error saving voice settings", e)
             }
         }
+    }
+
+    /**
+     * Start interactive voice recognition test
+     * Records audio and transcribes using whisper.cpp
+     */
+    fun startVoiceTest() {
+        viewModelScope.launch {
+            Log.i(TAG, "🎤 Starting voice test...")
+
+            // Update state to listening
+            _voiceSettings.value = _voiceSettings.value.copy(
+                testState = VoiceTestState.LISTENING,
+                testResult = null,
+                testError = null
+            )
+
+            // Start listening with the whisper service
+            whisperVoiceService.startListening(
+                durationMs = 5000L,
+                callback = object : WhisperVoiceService.VoiceRecognitionCallback {
+                    override fun onResult(result: WhisperVoiceService.VoiceResult) {
+                        viewModelScope.launch {
+                            when (result) {
+                                is WhisperVoiceService.VoiceResult.Yes -> {
+                                    Log.i(TAG, "🎤 Voice test result: YES")
+                                    _voiceSettings.value = _voiceSettings.value.copy(
+                                        testState = VoiceTestState.SUCCESS,
+                                        testResult = "Yes"
+                                    )
+                                }
+                                is WhisperVoiceService.VoiceResult.No -> {
+                                    Log.i(TAG, "🎤 Voice test result: NO")
+                                    _voiceSettings.value = _voiceSettings.value.copy(
+                                        testState = VoiceTestState.SUCCESS,
+                                        testResult = "No"
+                                    )
+                                }
+                                is WhisperVoiceService.VoiceResult.Unrecognized -> {
+                                    Log.i(TAG, "🎤 Voice test result: ${result.text}")
+                                    _voiceSettings.value = _voiceSettings.value.copy(
+                                        testState = VoiceTestState.SUCCESS,
+                                        testResult = result.text
+                                    )
+                                }
+                                is WhisperVoiceService.VoiceResult.Timeout -> {
+                                    Log.w(TAG, "🎤 Voice test timeout")
+                                    _voiceSettings.value = _voiceSettings.value.copy(
+                                        testState = VoiceTestState.ERROR,
+                                        testError = "No speech detected"
+                                    )
+                                }
+                                is WhisperVoiceService.VoiceResult.Error -> {
+                                    Log.e(TAG, "🎤 Voice test error: ${result.message}")
+                                    _voiceSettings.value = _voiceSettings.value.copy(
+                                        testState = VoiceTestState.ERROR,
+                                        testError = result.message
+                                    )
+                                }
+                            }
+
+                            // Reset to IDLE after 3 seconds
+                            delay(3000)
+                            _voiceSettings.value = _voiceSettings.value.copy(
+                                testState = VoiceTestState.IDLE
+                            )
+                        }
+                    }
+
+                    override fun onListeningStarted() {
+                        Log.i(TAG, "🎤 Voice test listening started")
+                    }
+
+                    override fun onListeningStopped() {
+                        Log.i(TAG, "🎤 Voice test listening stopped")
+                        viewModelScope.launch {
+                            _voiceSettings.value = _voiceSettings.value.copy(
+                                testState = VoiceTestState.PROCESSING
+                            )
+                        }
+                    }
+
+                    override fun onStatusUpdate(message: String) {
+                        Log.i(TAG, "🎤 Voice test status: $message")
+                    }
+
+                    override fun onAmplitudeUpdate(amplitude: Float) {
+                        // Update amplitude in state for reactive visualization
+                        _voiceSettings.value = _voiceSettings.value.copy(amplitude = amplitude)
+                    }
+                }
+            )
+        }
+    }
+
+    /**
+     * Stop the voice test
+     */
+    fun stopVoiceTest() {
+        Log.i(TAG, "🎤 Stopping voice test...")
+        whisperVoiceService.stopListening()
+        _voiceSettings.value = _voiceSettings.value.copy(
+            testState = VoiceTestState.IDLE,
+            testResult = null,
+            testError = null,
+            amplitude = 0f
+        )
     }
 }
 

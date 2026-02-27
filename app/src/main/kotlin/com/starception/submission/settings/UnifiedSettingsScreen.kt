@@ -167,7 +167,9 @@ fun UnifiedSettingsScreen(
                     ) {
                         VoiceSettingsSection(
                             state = voiceSettings,
-                            onEngineSelected = viewModel::updateVoiceSettings
+                            onEngineSelected = viewModel::updateVoiceSettings,
+                            onTestVoice = viewModel::startVoiceTest,
+                            onStopTest = viewModel::stopVoiceTest
                         )
                     }
                 }

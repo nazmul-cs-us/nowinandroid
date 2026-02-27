@@ -215,7 +215,7 @@ fun DeveloperSettingsSection(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Test Whisper (Slow) Button
+        // Test Whisper.cpp (Fast native C++)
         FilledTonalButton(
             onClick = onTestVoiceCompletion,
             shape = RoundedCornerShape(16.dp),
@@ -224,7 +224,7 @@ fun DeveloperSettingsSection(
                 .height(48.dp)
         ) {
             Text(
-                text = "Test Whisper (~26s)",
+                text = "Test Whisper.cpp (~2s)",
                 style = MaterialTheme.typography.labelLarge
             )
         }
