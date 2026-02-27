@@ -200,9 +200,7 @@ fun UnifiedSettingsScreen(
                             onRefreshTopics = viewModel::refreshTopicsDatabase,
                             onRefreshDuas = viewModel::refreshDuasDatabase,
                             onRefreshQuranicDuas = viewModel::refreshQuranicDuasDatabase,
-                            onRefreshAll = viewModel::refreshAllDatabases,
-                            onTestFastKws = viewModel::testFastKws,
-                            onTestVoiceCompletion = viewModel::testVoiceCompletion
+                            onRefreshAll = viewModel::refreshAllDatabases
                         )
                     }
                 }

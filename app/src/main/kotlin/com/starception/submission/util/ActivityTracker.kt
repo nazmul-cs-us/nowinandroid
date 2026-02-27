@@ -33,6 +33,12 @@ import com.starception.submission.voice.VoiceCompletionManager
 import com.starception.submission.voice.WhisperVoiceService
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.SherpaOnnxKwsService
+import com.starception.submission.feature.course.QuranListeningProgress
+import com.starception.submission.feature.quran.QuranPlaybackService
+import com.starception.submission.feature.quran.QuranData
+import android.content.ComponentName
+import android.content.ServiceConnection
+import android.os.IBinder
 import java.util.Locale
 
 /**
@@ -93,6 +99,11 @@ object ActivityTracker {
     private var sherpaOnnxKwsService: SherpaOnnxKwsService? = null  // Fast keyword spotting (~100ms vs 26s Whisper)
     private var voiceCompletionManager: VoiceCompletionManager? = null
     private var currentHadithNumber: Int = 0  // Track current hadith for TTS completion
+
+    // Quran Listening Course - Service binding
+    private var quranService: QuranPlaybackService? = null
+    private var isQuranServiceBound = false
+    private var quranServiceConnection: ServiceConnection? = null
 
     // Coroutine scope for async operations
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -740,6 +751,11 @@ object ActivityTracker {
 
             if ("daily_bukhari" !in enrolledCourses) {
                 Log.d("ActivityTracker", "📚 User not enrolled in Daily Hadith course - skipping hadith playback")
+                // If not enrolled in hadith but enrolled in Quran listening, play Quran directly
+                if (CourseProgressTracker.isEnrolledInQuranListening(ctx)) {
+                    Log.i("ActivityTracker", "📚➡️🕌 No hadith enrollment - going directly to Quran listening")
+                    playQuranListeningIfEnrolled(ctx)
+                }
                 return
             }
 
@@ -1080,12 +1096,30 @@ object ActivityTracker {
                     onComplete = {
                         Log.i("ActivityTracker", "✅ Voice completion: User said YES - marking lesson complete")
                         CourseProgressTracker.markLessonCompleted(ctx, courseId, lessonId)
+
+                        // Chain Quran listening after hadith completion
+                        if (courseId == "daily_bukhari") {
+                            Log.i("ActivityTracker", "📚➡️🕌 Hadith complete - chaining to Quran listening")
+                            playQuranListeningIfEnrolled(ctx)
+                        }
                     },
                     onSkipped = {
                         Log.i("ActivityTracker", "⏭️ Voice completion: User said NO or timeout - skipped")
+
+                        // Still chain Quran listening after hadith even if skipped
+                        if (courseId == "daily_bukhari") {
+                            Log.i("ActivityTracker", "📚➡️🕌 Hadith skipped - chaining to Quran listening anyway")
+                            playQuranListeningIfEnrolled(ctx)
+                        }
                     },
                     onError = { error ->
                         Log.e("ActivityTracker", "❌ Voice completion error: $error")
+
+                        // Still chain Quran listening on error
+                        if (courseId == "daily_bukhari") {
+                            Log.i("ActivityTracker", "📚➡️🕌 Hadith error - chaining to Quran listening")
+                            playQuranListeningIfEnrolled(ctx)
+                        }
                     }
                 )
             } catch (e: Exception) {
@@ -1093,6 +1127,281 @@ object ActivityTracker {
             }
         }
     }
+
+    // ==================== Complete Quran Listening Course Methods ====================
+
+    /**
+     * Bind to QuranPlaybackService for course playback
+     */
+    private fun bindQuranService(ctx: Context) {
+        if (isQuranServiceBound) {
+            Log.d("ActivityTracker", "🕌 Quran service already bound")
+            return
+        }
+
+        quranServiceConnection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                val binder = service as? QuranPlaybackService.QuranBinder
+                quranService = binder?.getService()
+                isQuranServiceBound = true
+                Log.i("ActivityTracker", "🕌 Quran service connected")
+
+                // Set up callbacks for course mode
+                quranService?.onPositionChanged = { position ->
+                    CourseProgressTracker.updateQuranPosition(ctx, position)
+                }
+
+                quranService?.onSurahCompleted = { surahIndex ->
+                    handleQuranSurahCompletion(ctx, surahIndex)
+                }
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                quranService = null
+                isQuranServiceBound = false
+                Log.w("ActivityTracker", "🕌 Quran service disconnected")
+            }
+        }
+
+        val intent = android.content.Intent(ctx, QuranPlaybackService::class.java)
+        ctx.bindService(intent, quranServiceConnection!!, Context.BIND_AUTO_CREATE)
+    }
+
+    /**
+     * Unbind from QuranPlaybackService
+     */
+    private fun unbindQuranService(ctx: Context) {
+        if (isQuranServiceBound && quranServiceConnection != null) {
+            try {
+                ctx.unbindService(quranServiceConnection!!)
+            } catch (e: Exception) {
+                Log.e("ActivityTracker", "🕌 Error unbinding Quran service: ${e.message}")
+            }
+            quranService = null
+            isQuranServiceBound = false
+            quranServiceConnection = null
+        }
+    }
+
+    /**
+     * Play Quran listening if user is enrolled in the Complete Quran Listening course.
+     * Called after Bukhari hadith playback completes.
+     */
+    private fun playQuranListeningIfEnrolled(ctx: Context) {
+        try {
+            // Check enrollment
+            if (!CourseProgressTracker.isEnrolledInQuranListening(ctx)) {
+                Log.d("ActivityTracker", "🕌 User not enrolled in Complete Quran Listening course - skipping")
+                return
+            }
+
+            // Only play if currently driving
+            if (_currentActivity.value != "Driving") {
+                Log.d("ActivityTracker", "🕌 Not driving - skipping Quran listening")
+                return
+            }
+
+            Log.i("ActivityTracker", "🕌 ========== QURAN LISTENING PLAYBACK ==========")
+            Log.i("ActivityTracker", "🕌 User enrolled in Complete Quran Listening course")
+
+            // Get current progress
+            val progress = CourseProgressTracker.getQuranListeningProgress(ctx)
+            val surahName = if (progress.currentSurahIndex < QuranData.surahs.size) {
+                QuranData.surahs[progress.currentSurahIndex].nameEnglish
+            } else {
+                "Surah ${progress.currentSurahNumber}"
+            }
+
+            Log.i("ActivityTracker", "🕌 Resuming: Surah ${progress.currentSurahNumber} ($surahName)")
+            Log.i("ActivityTracker", "🕌 Position: ${progress.currentPositionMs / 1000}s")
+
+            // Bind to service if not already bound
+            if (!isQuranServiceBound) {
+                bindQuranService(ctx)
+                // Wait briefly for service to bind, then start playback
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    startQuranPlayback(ctx, progress)
+                }, 500)
+            } else {
+                startQuranPlayback(ctx, progress)
+            }
+
+        } catch (e: Exception) {
+            Log.e("ActivityTracker", "🕌 Error in playQuranListeningIfEnrolled: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Start Quran playback from saved progress
+     */
+    private fun startQuranPlayback(ctx: Context, progress: QuranListeningProgress) {
+        if (quranService == null) {
+            Log.e("ActivityTracker", "🕌 Quran service not available")
+            return
+        }
+
+        // Start listening session
+        CourseProgressTracker.startQuranListeningSession(ctx)
+
+        // Start playback from saved position
+        quranService?.playSurahForCourse(
+            surahIndex = progress.currentSurahIndex,
+            startPosition = progress.currentPositionMs,
+            forCourse = true
+        )
+
+        Log.i("ActivityTracker", "🕌 ▶️ Started Quran playback for course mode")
+    }
+
+    /**
+     * Handle surah completion - trigger voice confirmation
+     */
+    private fun handleQuranSurahCompletion(ctx: Context, surahIndex: Int) {
+        val surahName = if (surahIndex < QuranData.surahs.size) {
+            QuranData.surahs[surahIndex].nameEnglish
+        } else {
+            "Surah ${surahIndex + 1}"
+        }
+        val lessonId = "surah_${surahIndex + 1}"
+        val lessonTitle = "Surah $surahName"
+
+        Log.i("ActivityTracker", "🕌 Surah completed: $lessonTitle")
+
+        // Trigger voice completion prompt with Quran-specific callbacks
+        triggerQuranVoiceCompletionPrompt(ctx, lessonId, lessonTitle, surahIndex)
+    }
+
+    /**
+     * Trigger voice completion prompt specifically for Quran listening course.
+     * Handles YES/NO with appropriate follow-up actions.
+     */
+    private fun triggerQuranVoiceCompletionPrompt(
+        ctx: Context,
+        lessonId: String,
+        lessonTitle: String,
+        surahIndex: Int
+    ) {
+        // Only trigger if currently driving
+        if (_currentActivity.value != "Driving") {
+            Log.d("ActivityTracker", "🕌 Skipping voice completion - not driving")
+            // Still save progress even if not driving
+            return
+        }
+
+        scope.launch {
+            try {
+                // Initialize voice services if needed
+                if (whisperVoiceService == null) {
+                    Log.i("ActivityTracker", "🕌 Initializing Whisper voice service...")
+                    whisperVoiceService = WhisperVoiceService(ctx)
+                    val modelLoaded = whisperVoiceService?.loadModel() ?: false
+                    if (!modelLoaded) {
+                        Log.e("ActivityTracker", "🕌 Failed to load Whisper model - auto-completing")
+                        // Auto-complete on voice service failure
+                        completeQuranLessonAndContinue(ctx, surahIndex)
+                        return@launch
+                    }
+                }
+
+                if (sherpaOnnxTtsService == null) {
+                    sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
+                }
+
+                if (voiceCompletionManager == null) {
+                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxTtsService!!)
+                }
+
+                Log.i("ActivityTracker", "🕌 Triggering voice completion prompt for: $lessonTitle")
+
+                voiceCompletionManager?.promptForCompletion(
+                    courseId = "complete_quran_listening",
+                    lessonId = lessonId,
+                    lessonTitle = lessonTitle,
+                    onComplete = {
+                        Log.i("ActivityTracker", "🕌 ✅ Voice completion: User said YES - marking lesson complete")
+                        completeQuranLessonAndContinue(ctx, surahIndex)
+                    },
+                    onSkipped = {
+                        Log.i("ActivityTracker", "🕌 ⏭️ Voice completion: User said NO - saving position and stopping")
+                        // End session but don't mark as complete
+                        CourseProgressTracker.endQuranListeningSession(ctx)
+                        quranService?.stopCourseMode()
+                    },
+                    onError = { error ->
+                        Log.e("ActivityTracker", "🕌 ❌ Voice completion error: $error - auto-completing")
+                        // Auto-complete on error to not lose progress
+                        completeQuranLessonAndContinue(ctx, surahIndex)
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e("ActivityTracker", "🕌 ❌ Error in Quran voice completion: ${e.message}", e)
+                // Auto-complete on exception
+                completeQuranLessonAndContinue(ctx, surahIndex)
+            }
+        }
+    }
+
+    /**
+     * Complete current Quran lesson and continue to next surah
+     */
+    private fun completeQuranLessonAndContinue(ctx: Context, completedSurahIndex: Int) {
+        // Mark lesson as complete and get next surah index
+        val nextSurahIndex = CourseProgressTracker.completeCurrentSurah(ctx)
+
+        // Check if still driving
+        if (_currentActivity.value != "Driving") {
+            Log.i("ActivityTracker", "🕌 No longer driving - ending Quran session after completion")
+            CourseProgressTracker.endQuranListeningSession(ctx)
+            quranService?.stopCourseMode()
+            return
+        }
+
+        // Continue to next surah
+        val nextSurahName = if (nextSurahIndex < QuranData.surahs.size) {
+            QuranData.surahs[nextSurahIndex].nameEnglish
+        } else {
+            "Surah ${nextSurahIndex + 1}"
+        }
+
+        Log.i("ActivityTracker", "🕌 ▶️ Continuing to Surah ${nextSurahIndex + 1} ($nextSurahName)")
+
+        quranService?.playSurahForCourse(
+            surahIndex = nextSurahIndex,
+            startPosition = 0,
+            forCourse = true
+        )
+    }
+
+    /**
+     * Stop Quran listening course playback
+     * Called when user stops driving or manually stops
+     */
+    fun stopQuranListening() {
+        context?.let { ctx ->
+            if (quranService?.isInCourseMode() == true) {
+                Log.i("ActivityTracker", "🕌 Stopping Quran listening session")
+                CourseProgressTracker.endQuranListeningSession(ctx)
+                quranService?.stopCourseMode()
+                quranService?.togglePlayPause() // Pause playback
+            }
+        }
+    }
+
+    /**
+     * TEST FUNCTION: Test Quran listening course playback
+     */
+    fun testQuranListening() {
+        Log.i("ActivityTracker", "🧪 ========== TEST: Quran Listening Course ==========")
+        context?.let { ctx ->
+            // Temporarily set activity to driving for test
+            val originalActivity = _currentActivity.value
+            _currentActivity.value = "Driving"
+            playQuranListeningIfEnrolled(ctx)
+            // Note: Don't reset activity - leave as driving for full test
+        } ?: Log.e("ActivityTracker", "🧪 TEST FAILED: Context is null - call initialize() first")
+    }
+
+    // ==================== End Complete Quran Listening Methods ====================
 
     /**
      * TEST FUNCTION: Demo the daily hadith playback feature

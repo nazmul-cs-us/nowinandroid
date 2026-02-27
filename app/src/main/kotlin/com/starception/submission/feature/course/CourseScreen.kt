@@ -2045,6 +2045,22 @@ internal fun getAvailableCourses(): List<Course> {
                 Color(0xFF00f2fe),
             ),
         ),
+        Course(
+            id = "complete_quran_listening",
+            title = "Complete Quran Listening",
+            subtitle = "Listen to entire Quran",
+            description = "Listen to all 114 surahs during your commute. Progress saves automatically and resumes where you left off. Plays after Daily Hadith when driving.",
+            icon = Icons.Outlined.Headphones,
+            totalLessons = 114,
+            // Average surah ~5-10 min, driving ~30min/day = 2-3 surahs/day, ~40-60 days
+            estimatedDays = 60,
+            difficulty = CourseDifficulty.BEGINNER,
+            category = CourseCategory.QURAN,
+            gradientColors = listOf(
+                Color(0xFF00b4db),
+                Color(0xFF0083b0),
+            ),
+        ),
     )
 }
 

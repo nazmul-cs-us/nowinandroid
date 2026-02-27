@@ -221,6 +221,18 @@ object CourseProgressTracker {
             }
         }
 
+        // Check Complete Quran Listening course
+        if (COURSE_ID_QURAN_LISTENING in enrolledCourses && surahNumber in 1..114) {
+            val lessonId = "surah_$surahNumber"
+            if (isLessonCompleted(context, COURSE_ID_QURAN_LISTENING, lessonId)) {
+                return CourseCompletionInfo(
+                    courseId = COURSE_ID_QURAN_LISTENING,
+                    courseName = "Complete Quran Listening",
+                    lessonTitle = "Surah ${getSurahName(surahNumber)}",
+                )
+            }
+        }
+
         return null
     }
 
@@ -277,6 +289,154 @@ object CourseProgressTracker {
         val key = "$COMPLETED_LESSONS_PREFIX$courseId"
         prefs.edit().remove(key).apply()
     }
+
+    // ==================== Complete Quran Listening Course Methods ====================
+
+    private const val KEY_QURAN_LISTENING_PROGRESS = "quran_listening_progress_json"
+    private const val COURSE_ID_QURAN_LISTENING = "complete_quran_listening"
+
+    /**
+     * Get current Quran listening progress
+     * @return QuranListeningProgress with current state
+     */
+    fun getQuranListeningProgress(context: Context): QuranListeningProgress {
+        val prefs = getPrefs(context)
+        val json = prefs.getString(KEY_QURAN_LISTENING_PROGRESS, null)
+        return json?.let { QuranListeningProgress.fromJson(it) } ?: QuranListeningProgress()
+    }
+
+    /**
+     * Save Quran listening progress
+     */
+    fun saveQuranListeningProgress(context: Context, progress: QuranListeningProgress) {
+        val prefs = getPrefs(context)
+        prefs.edit()
+            .putString(KEY_QURAN_LISTENING_PROGRESS, progress.toJson())
+            .apply()
+        android.util.Log.d("CourseProgressTracker", "🕌 Saved Quran progress: Surah ${progress.currentSurahNumber}, position ${progress.currentPositionMs / 1000}s")
+    }
+
+    /**
+     * Update position within current surah (called periodically during playback)
+     * Also updates session listening time
+     */
+    fun updateQuranPosition(context: Context, positionMs: Int) {
+        val progress = getQuranListeningProgress(context)
+        val currentTime = System.currentTimeMillis()
+
+        // Calculate time since last update for session tracking
+        val timeSinceLastUpdate = if (progress.lastPlayedTimestamp > 0) {
+            currentTime - progress.lastPlayedTimestamp
+        } else {
+            0L
+        }
+
+        // Only add to session time if the gap is reasonable (< 10 seconds)
+        // This prevents large jumps when resuming after a pause
+        val additionalSessionTime = if (timeSinceLastUpdate in 1..10000) {
+            timeSinceLastUpdate
+        } else {
+            0L
+        }
+
+        saveQuranListeningProgress(context, progress.copy(
+            currentPositionMs = positionMs,
+            lastPlayedTimestamp = currentTime,
+            sessionListeningTimeMs = progress.sessionListeningTimeMs + additionalSessionTime,
+        ))
+    }
+
+    /**
+     * Mark current surah as complete and advance to next
+     * @return The new surah index (0-113) after advancing
+     */
+    fun completeCurrentSurah(context: Context): Int {
+        val progress = getQuranListeningProgress(context)
+        val completedSurahIndex = progress.currentSurahIndex
+
+        // Mark lesson as completed in existing system
+        val lessonId = "surah_${completedSurahIndex + 1}"
+        markLessonCompleted(context, COURSE_ID_QURAN_LISTENING, lessonId)
+
+        // Calculate next surah (wrap around to 0 after 113)
+        val nextIndex = if (completedSurahIndex >= 113) 0 else completedSurahIndex + 1
+
+        // Update progress for next surah
+        saveQuranListeningProgress(context, progress.copy(
+            currentSurahIndex = nextIndex,
+            currentPositionMs = 0,
+            sessionSurahsCompleted = progress.sessionSurahsCompleted + 1,
+            lastPlayedTimestamp = System.currentTimeMillis(),
+        ))
+
+        android.util.Log.i("CourseProgressTracker", "🕌 Completed Surah ${completedSurahIndex + 1} (${getSurahName(completedSurahIndex + 1)}), advancing to Surah ${nextIndex + 1}")
+
+        return nextIndex
+    }
+
+    /**
+     * Start a new listening session
+     * Resets session counters while preserving overall progress
+     */
+    fun startQuranListeningSession(context: Context) {
+        val progress = getQuranListeningProgress(context)
+        val currentTime = System.currentTimeMillis()
+
+        saveQuranListeningProgress(context, progress.copy(
+            sessionStartTime = currentTime,
+            sessionListeningTimeMs = 0,
+            sessionSurahsCompleted = 0,
+            lastPlayedTimestamp = currentTime,
+        ))
+
+        android.util.Log.i("CourseProgressTracker", "🕌 Started new Quran listening session at Surah ${progress.currentSurahNumber}")
+    }
+
+    /**
+     * End listening session and accumulate stats
+     */
+    fun endQuranListeningSession(context: Context) {
+        val progress = getQuranListeningProgress(context)
+
+        // Accumulate session time into total
+        val updatedProgress = progress.copy(
+            totalListeningTimeMs = progress.totalListeningTimeMs + progress.sessionListeningTimeMs,
+            sessionStartTime = 0,
+            // Keep session stats for display until next session starts
+        )
+
+        saveQuranListeningProgress(context, updatedProgress)
+
+        val sessionMinutes = progress.sessionListeningTimeMs / 60000
+        android.util.Log.i("CourseProgressTracker", "🕌 Ended Quran session: ${sessionMinutes}min listened, ${progress.sessionSurahsCompleted} surahs completed")
+    }
+
+    /**
+     * Get the next uncompleted surah index for the Quran listening course
+     * Useful for finding where to resume if user wants to skip completed surahs
+     */
+    fun getNextUncompletedSurahIndex(context: Context): Int {
+        val completedLessons = getCompletedLessons(context, COURSE_ID_QURAN_LISTENING)
+        for (i in 0..113) {
+            val lessonId = "surah_${i + 1}"
+            if (lessonId !in completedLessons) {
+                return i
+            }
+        }
+        // All completed, start from beginning
+        return 0
+    }
+
+    /**
+     * Check if user is enrolled in Complete Quran Listening course
+     */
+    fun isEnrolledInQuranListening(context: Context): Boolean {
+        val prefs = getPrefs(context)
+        val enrolledCourses = prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()
+        return COURSE_ID_QURAN_LISTENING in enrolledCourses
+    }
+
+    // ==================== End Complete Quran Listening Methods ====================
 
     /**
      * Get surah name by number

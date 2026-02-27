@@ -46,6 +46,12 @@ class QuranPlaybackService : Service() {
     var onSurahChanged: ((Int) -> Unit)? = null
     var onProgressChanged: ((Int, Int) -> Unit)? = null
 
+    // Course mode callbacks and state
+    var onPositionChanged: ((Int) -> Unit)? = null
+    var onSurahCompleted: ((Int) -> Unit)? = null
+    private var isPlayingForCourse = false
+    private var coursePositionUpdateRunnable: Runnable? = null
+
     companion object {
         private const val NOTIFICATION_ID = 2001
         private const val CHANNEL_ID = "quran_playback_channel"
@@ -126,7 +132,15 @@ class QuranPlaybackService : Service() {
         mediaPlayer = MediaPlayer().apply {
             setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
             setOnCompletionListener {
-                playNext()
+                if (isPlayingForCourse) {
+                    // In course mode, notify completion instead of auto-playing next
+                    Log.i("QuranService", "🕌 Surah $currentSurahIndex completed in course mode")
+                    stopCoursePositionUpdates()
+                    onSurahCompleted?.invoke(currentSurahIndex)
+                } else {
+                    // Normal mode - auto-play next
+                    playNext()
+                }
             }
             setOnPreparedListener { mp ->
                 // Only auto-start if we were playing before the track change
@@ -281,6 +295,118 @@ class QuranPlaybackService : Service() {
     }
 
     fun getCurrentSurahIndex(): Int = currentSurahIndex
+
+    // ==================== Course Mode Methods ====================
+
+    /**
+     * Start playback for course from saved position
+     * @param surahIndex Which surah to play (0-113)
+     * @param startPosition Position within surah (milliseconds)
+     * @param forCourse True if playing as part of course listening
+     */
+    fun playSurahForCourse(
+        surahIndex: Int,
+        startPosition: Int = 0,
+        forCourse: Boolean = true
+    ) {
+        try {
+            isPlayingForCourse = forCourse
+            wasPlayingBeforeChange = true // Always auto-play for course
+            currentSurahIndex = surahIndex
+
+            val audioFile = getAudioFile(surahIndex)
+
+            if (!audioFile.exists()) {
+                Log.e("QuranService", "🕌 Audio file not found for course: ${audioFile.absolutePath}")
+                // Skip to next surah
+                if (forCourse) {
+                    val nextIndex = (surahIndex + 1) % QuranData.surahs.size
+                    onSurahCompleted?.invoke(surahIndex) // Treat as completed to advance
+                }
+                return
+            }
+
+            Log.i("QuranService", "🕌 Playing for course: Surah ${surahIndex + 1}, resuming at ${startPosition / 1000}s")
+
+            mediaPlayer?.apply {
+                reset()
+                setDataSource(audioFile.absolutePath)
+
+                // Custom prepared listener for course mode with seek
+                setOnPreparedListener { mp ->
+                    if (startPosition > 0 && startPosition < mp.duration) {
+                        mp.seekTo(startPosition)
+                        Log.d("QuranService", "🕌 Seeked to position: ${startPosition / 1000}s")
+                    }
+                    mp.start()
+                    onPlaybackStateChanged?.invoke(true)
+                    updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+                    startProgressUpdates()
+
+                    // Start course position tracking (every 5 seconds)
+                    if (forCourse) {
+                        startCoursePositionUpdates()
+                    }
+
+                    onProgressChanged?.invoke(mp.currentPosition, mp.duration)
+                    updateMediaSessionMetadata()
+                    updateNotification()
+                }
+
+                prepareAsync()
+            }
+
+            onSurahChanged?.invoke(surahIndex)
+            updateMediaSessionMetadata()
+            startForeground(NOTIFICATION_ID, createNotification())
+
+        } catch (e: Exception) {
+            Log.e("QuranService", "🕌 Failed to play surah for course", e)
+        }
+    }
+
+    /**
+     * Stop course mode and reset to normal playback behavior
+     */
+    fun stopCourseMode() {
+        isPlayingForCourse = false
+        stopCoursePositionUpdates()
+        Log.d("QuranService", "🕌 Course mode stopped")
+    }
+
+    /**
+     * Check if currently playing in course mode
+     */
+    fun isInCourseMode(): Boolean = isPlayingForCourse
+
+    /**
+     * Start periodic position updates for course progress saving (every 5 seconds)
+     */
+    private fun startCoursePositionUpdates() {
+        stopCoursePositionUpdates()
+        coursePositionUpdateRunnable = object : Runnable {
+            override fun run() {
+                if (mediaPlayer?.isPlaying == true && isPlayingForCourse) {
+                    val position = mediaPlayer?.currentPosition ?: 0
+                    onPositionChanged?.invoke(position)
+                    handler.postDelayed(this, 5000) // Update every 5 seconds
+                }
+            }
+        }
+        handler.post(coursePositionUpdateRunnable!!)
+    }
+
+    /**
+     * Stop course position updates
+     */
+    private fun stopCoursePositionUpdates() {
+        coursePositionUpdateRunnable?.let {
+            handler.removeCallbacks(it)
+            coursePositionUpdateRunnable = null
+        }
+    }
+
+    // ==================== End Course Mode Methods ====================
 
     private fun getAudioFile(index: Int): File {
         val surah = QuranData.surahs[index]
@@ -461,6 +587,8 @@ class QuranPlaybackService : Service() {
         super.onDestroy()
         Log.d("QuranService", "Service destroyed")
         stopProgressUpdates()
+        stopCoursePositionUpdates()
+        isPlayingForCourse = false
         mediaSession?.isActive = false
         mediaSession?.release()
         mediaSession = null

@@ -165,6 +165,7 @@ enum class LessonType {
     QUIZ,
     PRACTICE,
     MEMORIZATION,
+    LISTENING,
 }
 
 /**
@@ -860,6 +861,7 @@ private fun CourseHeroSection(
             "daily_bukhari" -> "One hadith, one day at a time"
             "juz_amma" -> "The most recited Juz"
             "quran_reading" -> "Complete the Holy Quran"
+            "complete_quran_listening" -> "Listen during your commute"
             else -> course.subtitle
         }
     }
@@ -933,6 +935,8 @@ private fun CourseHeroSection(
                     }
                     Spacer(modifier = Modifier.height(titleSpacerHeight))
 
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Text(
                         text = courseTagline,
                         style = MaterialTheme.typography.bodyMedium,
@@ -940,7 +944,7 @@ private fun CourseHeroSection(
                         fontWeight = FontWeight.Medium,
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
                         text = course.description,
@@ -2540,6 +2544,7 @@ private fun generateModulesForCourse(course: Course): List<CourseModule> {
         "daily_bukhari" -> generateDailyBukhariModules()
         "juz_amma" -> generateJuzAmmaModules()
         "quran_reading" -> generateQuranReadingModules()
+        "complete_quran_listening" -> generateQuranListeningModules()
         else -> emptyList()
     }
 }
@@ -2683,6 +2688,145 @@ private fun generateQuranReadingModules(): List<CourseModule> {
             }
         )
     }
+}
+
+private fun generateQuranListeningModules(): List<CourseModule> {
+    // All 114 surahs organized by Juz for listening
+    val surahNames = listOf(
+        "Al-Fatihah", "Al-Baqarah", "Aal-E-Imran", "An-Nisa", "Al-Ma'idah",
+        "Al-An'am", "Al-A'raf", "Al-Anfal", "At-Tawbah", "Yunus",
+        "Hud", "Yusuf", "Ar-Ra'd", "Ibrahim", "Al-Hijr",
+        "An-Nahl", "Al-Isra", "Al-Kahf", "Maryam", "Ta-Ha",
+        "Al-Anbiya", "Al-Hajj", "Al-Mu'minun", "An-Nur", "Al-Furqan",
+        "Ash-Shu'ara", "An-Naml", "Al-Qasas", "Al-Ankabut", "Ar-Rum",
+        "Luqman", "As-Sajdah", "Al-Ahzab", "Saba", "Fatir",
+        "Ya-Sin", "As-Saffat", "Sad", "Az-Zumar", "Ghafir",
+        "Fussilat", "Ash-Shura", "Az-Zukhruf", "Ad-Dukhan", "Al-Jathiyah",
+        "Al-Ahqaf", "Muhammad", "Al-Fath", "Al-Hujurat", "Qaf",
+        "Adh-Dhariyat", "At-Tur", "An-Najm", "Al-Qamar", "Ar-Rahman",
+        "Al-Waqi'ah", "Al-Hadid", "Al-Mujadila", "Al-Hashr", "Al-Mumtahanah",
+        "As-Saff", "Al-Jumu'ah", "Al-Munafiqun", "At-Taghabun", "At-Talaq",
+        "At-Tahrim", "Al-Mulk", "Al-Qalam", "Al-Haqqah", "Al-Ma'arij",
+        "Nuh", "Al-Jinn", "Al-Muzzammil", "Al-Muddaththir", "Al-Qiyamah",
+        "Al-Insan", "Al-Mursalat", "An-Naba", "An-Nazi'at", "Abasa",
+        "At-Takwir", "Al-Infitar", "Al-Mutaffifin", "Al-Inshiqaq", "Al-Buruj",
+        "At-Tariq", "Al-A'la", "Al-Ghashiyah", "Al-Fajr", "Al-Balad",
+        "Ash-Shams", "Al-Layl", "Ad-Duha", "Ash-Sharh", "At-Tin",
+        "Al-Alaq", "Al-Qadr", "Al-Bayyinah", "Az-Zalzalah", "Al-Adiyat",
+        "Al-Qari'ah", "At-Takathur", "Al-Asr", "Al-Humazah", "Al-Fil",
+        "Quraysh", "Al-Ma'un", "Al-Kawthar", "Al-Kafirun", "An-Nasr",
+        "Al-Masad", "Al-Ikhlas", "Al-Falaq", "An-Nas"
+    )
+
+    // Approximate duration in minutes for each surah (based on average recitation)
+    val surahDurations = listOf(
+        1, 150, 100, 90, 70, 80, 90, 35, 70, 55,
+        60, 55, 25, 25, 20, 65, 55, 55, 25, 60,
+        50, 40, 30, 35, 30, 55, 45, 50, 35, 30,
+        20, 15, 40, 30, 25, 25, 45, 25, 40, 45,
+        30, 30, 30, 15, 20, 20, 25, 20, 15, 25,
+        15, 15, 15, 20, 15, 25, 20, 20, 20, 15,
+        10, 10, 10, 10, 10, 10, 15, 15, 15, 10,
+        10, 15, 10, 15, 10, 15, 15, 15, 15, 10,
+        10, 10, 15, 10, 10, 5, 10, 10, 15, 10,
+        5, 10, 5, 5, 5, 5, 5, 5, 5, 5,
+        5, 5, 3, 5, 5, 3, 5, 3, 5, 3,
+        5, 3, 3, 3
+    )
+
+    // Group surahs into 6 modules
+    return listOf(
+        CourseModule(
+            id = "module_1",
+            title = "Surahs 1-19",
+            lessons = (0 until 19).map { index ->
+                val surahNum = index + 1
+                Lesson(
+                    id = "surah_$surahNum",
+                    title = "Surah ${surahNames[index]}",
+                    subtitle = "Listen & reflect",
+                    duration = "${surahDurations.getOrElse(index) { 10 }} min",
+                    type = LessonType.LISTENING,
+                    surahNumber = surahNum,
+                )
+            }
+        ),
+        CourseModule(
+            id = "module_2",
+            title = "Surahs 20-38",
+            lessons = (19 until 38).map { index ->
+                val surahNum = index + 1
+                Lesson(
+                    id = "surah_$surahNum",
+                    title = "Surah ${surahNames[index]}",
+                    subtitle = "Listen & reflect",
+                    duration = "${surahDurations.getOrElse(index) { 10 }} min",
+                    type = LessonType.LISTENING,
+                    surahNumber = surahNum,
+                )
+            }
+        ),
+        CourseModule(
+            id = "module_3",
+            title = "Surahs 39-57",
+            lessons = (38 until 57).map { index ->
+                val surahNum = index + 1
+                Lesson(
+                    id = "surah_$surahNum",
+                    title = "Surah ${surahNames[index]}",
+                    subtitle = "Listen & reflect",
+                    duration = "${surahDurations.getOrElse(index) { 10 }} min",
+                    type = LessonType.LISTENING,
+                    surahNumber = surahNum,
+                )
+            }
+        ),
+        CourseModule(
+            id = "module_4",
+            title = "Surahs 58-76",
+            lessons = (57 until 76).map { index ->
+                val surahNum = index + 1
+                Lesson(
+                    id = "surah_$surahNum",
+                    title = "Surah ${surahNames[index]}",
+                    subtitle = "Listen & reflect",
+                    duration = "${surahDurations.getOrElse(index) { 10 }} min",
+                    type = LessonType.LISTENING,
+                    surahNumber = surahNum,
+                )
+            }
+        ),
+        CourseModule(
+            id = "module_5",
+            title = "Surahs 77-95",
+            lessons = (76 until 95).map { index ->
+                val surahNum = index + 1
+                Lesson(
+                    id = "surah_$surahNum",
+                    title = "Surah ${surahNames[index]}",
+                    subtitle = "Listen & reflect",
+                    duration = "${surahDurations.getOrElse(index) { 10 }} min",
+                    type = LessonType.LISTENING,
+                    surahNumber = surahNum,
+                )
+            }
+        ),
+        CourseModule(
+            id = "module_6",
+            title = "Surahs 96-114",
+            lessons = (95 until 114).map { index ->
+                val surahNum = index + 1
+                Lesson(
+                    id = "surah_$surahNum",
+                    title = "Surah ${surahNames[index]}",
+                    subtitle = "Listen & reflect",
+                    duration = "${surahDurations.getOrElse(index) { 10 }} min",
+                    type = LessonType.LISTENING,
+                    surahNumber = surahNum,
+                )
+            }
+        ),
+    )
 }
 
 @Composable
