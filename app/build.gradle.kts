@@ -77,6 +77,9 @@ dependencies {
     implementation(projects.feature.search)
     implementation(projects.feature.settings)
 
+    // Sherpa-ONNX for offline TTS and speech recognition
+    implementation(files("libs/sherpa-onnx-1.12.26.aar"))
+
     implementation(projects.core.common)
     implementation(projects.core.ui)
     implementation(projects.core.designsystem)

@@ -31,9 +31,6 @@ dependencies {
     // Whisper TFLite for offline speech recognition
     implementation(projects.whisper)
 
-    // Sherpa-ONNX for fast offline speech recognition (also used by app for TTS)
-    api(files("libs/sherpa-onnx-1.12.26.aar"))
-
     testImplementation(projects.core.testing)
 
     androidTestImplementation(libs.bundles.androidx.compose.ui.test)

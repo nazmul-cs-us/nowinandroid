@@ -25,7 +25,11 @@ import com.starception.submission.settings.components.RefreshResult
 import com.starception.submission.settings.components.VoiceRecognitionEngine
 import com.starception.submission.settings.components.VoiceSettingsState
 import com.starception.submission.settings.components.VoiceTestState
+import com.starception.submission.settings.components.TtsSettingsState
+import com.starception.submission.settings.components.TtsTestState
+import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.WhisperVoiceService
+import com.starception.submission.voice.SherpaOnnxTtsService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
@@ -53,6 +57,7 @@ class UnifiedSettingsViewModel @Inject constructor(
     private val userDataRepository: UserDataRepository,
     private val prayerSettingsRepository: PrayerSettingsRepository,
     private val whisperVoiceService: WhisperVoiceService,
+    private val ttsService: SherpaOnnxTtsService,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -110,6 +115,10 @@ class UnifiedSettingsViewModel @Inject constructor(
     // Voice settings state
     private val _voiceSettings = MutableStateFlow(VoiceSettingsState())
     val voiceSettings: StateFlow<VoiceSettingsState> = _voiceSettings.asStateFlow()
+
+    // TTS settings
+    private val _ttsSettings = MutableStateFlow(TtsSettingsState())
+    val ttsSettings: StateFlow<TtsSettingsState> = _ttsSettings.asStateFlow()
 
     init {
         loadPrayerSettings()
@@ -796,6 +805,128 @@ class UnifiedSettingsViewModel @Inject constructor(
             testError = null,
             amplitude = 0f
         )
+    }
+
+    // ==================== TTS Settings ====================
+
+    /**
+     * Start TTS test - speaks a test phrase
+     */
+    fun startTtsTest() {
+        viewModelScope.launch {
+            val currentState = _ttsSettings.value
+            Log.i(TAG, "🔊 Starting TTS test with ${currentState.selectedVoice.displayName}, speaker ${currentState.selectedSpeakerId}...")
+
+            // Update state to initializing
+            _ttsSettings.value = currentState.copy(
+                testState = TtsTestState.INITIALIZING,
+                testError = null
+            )
+
+            try {
+                // Set voice before initializing
+                ttsService.setVoice(currentState.selectedVoice)
+
+                // Initialize TTS if needed
+                val initialized = ttsService.initialize()
+                if (!initialized) {
+                    Log.e(TAG, "Failed to initialize TTS")
+                    _ttsSettings.value = _ttsSettings.value.copy(
+                        testState = TtsTestState.ERROR,
+                        testError = "Failed to initialize TTS engine"
+                    )
+                    return@launch
+                }
+
+                // Update state to speaking
+                _ttsSettings.value = _ttsSettings.value.copy(
+                    testState = TtsTestState.SPEAKING
+                )
+
+                // Speak test phrase with selected speaker ID
+                val testPhrase = "Hello! This is a test of the text to speech system. The voice sounds clear and natural."
+                val success = ttsService.speak(
+                    text = testPhrase,
+                    speakerId = currentState.selectedSpeakerId
+                )
+
+                if (success) {
+                    Log.i(TAG, "TTS test completed successfully")
+                    _ttsSettings.value = _ttsSettings.value.copy(
+                        testState = TtsTestState.SUCCESS
+                    )
+                } else {
+                    Log.e(TAG, "TTS test failed")
+                    _ttsSettings.value = _ttsSettings.value.copy(
+                        testState = TtsTestState.ERROR,
+                        testError = "Failed to generate speech"
+                    )
+                }
+
+                // Reset to idle after a delay
+                delay(2000)
+                _ttsSettings.value = _ttsSettings.value.copy(
+                    testState = TtsTestState.IDLE
+                )
+
+            } catch (e: Exception) {
+                Log.e(TAG, "TTS test error", e)
+                _ttsSettings.value = _ttsSettings.value.copy(
+                    testState = TtsTestState.ERROR,
+                    testError = e.message ?: "Unknown error"
+                )
+            }
+        }
+    }
+
+    /**
+     * Stop TTS playback
+     */
+    fun stopTts() {
+        Log.i(TAG, "🔊 Stopping TTS...")
+        ttsService.stopSpeaking()
+        _ttsSettings.value = _ttsSettings.value.copy(
+            testState = TtsTestState.IDLE,
+            testError = null
+        )
+    }
+
+    /**
+     * Update selected TTS voice
+     */
+    fun updateTtsVoice(voice: TtsVoice) {
+        viewModelScope.launch {
+            Log.i(TAG, "🔊 Updating TTS voice to: ${voice.displayName}")
+            _ttsSettings.value = _ttsSettings.value.copy(
+                selectedVoice = voice,
+                selectedSpeakerId = 0  // Reset speaker ID when changing voice
+            )
+
+            // Save preference
+            val prefs = context.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
+            prefs.edit()
+                .putString("selected_voice", voice.name)
+                .apply()
+
+            // Update service with new voice (this will release and prepare for re-init)
+            ttsService.setVoice(voice)
+        }
+    }
+
+    /**
+     * Update selected speaker ID (for multi-speaker models)
+     */
+    fun updateTtsSpeakerId(speakerId: Int) {
+        Log.i(TAG, "🔊 Updating TTS speaker ID to: $speakerId")
+        _ttsSettings.value = _ttsSettings.value.copy(
+            selectedSpeakerId = speakerId
+        )
+
+        // Save preference
+        val prefs = context.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putInt("selected_speaker_id", speakerId)
+            .apply()
     }
 }
 

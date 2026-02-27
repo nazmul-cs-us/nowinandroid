@@ -27,6 +27,8 @@ import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig
+import com.starception.submission.settings.components.TtsModelType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,13 +38,15 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import com.starception.submission.settings.components.TtsVoice
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
 
 /**
- * Offline TTS service using Sherpa-ONNX with Coqui VITS models.
- * Provides fully offline text-to-speech without network dependency.
+ * Offline TTS service using Sherpa-ONNX with multiple voice options.
+ * Supports Piper (American English) and VITS-VCTK (109 British speakers).
+ * Provides high-quality, fully offline text-to-speech without network dependency.
  */
 @Singleton
 class SherpaOnnxTtsService @Inject constructor(
@@ -50,13 +54,6 @@ class SherpaOnnxTtsService @Inject constructor(
 ) {
     companion object {
         private const val TAG = "SherpaOnnxTtsService"
-
-        // Model files in assets/tts/
-        private const val MODEL_FILE = "en_US-lessac-medium.onnx"
-        private const val TOKENS_FILE = "tokens.txt"
-        private const val DATA_DIR = "espeak-ng-data"
-
-        // TTS configuration
         private const val DEFAULT_SPEAKER_ID = 0
         private const val DEFAULT_SPEED = 1.0f
     }
@@ -67,6 +64,7 @@ class SherpaOnnxTtsService @Inject constructor(
     private var audioTrack: AudioTrack? = null
     private var isInitialized = false
     private var isInitializing = false
+    private var currentVoice: TtsVoice = TtsVoice.KOKORO_EN
 
     // Cache directory for extracted model files
     private val modelDir: File by lazy {
@@ -74,7 +72,21 @@ class SherpaOnnxTtsService @Inject constructor(
     }
 
     /**
-     * Initialize the TTS engine.
+     * Set the voice model to use.
+     * If already initialized with a different voice, this will release and re-initialize.
+     */
+    fun setVoice(voice: TtsVoice) {
+        if (currentVoice != voice) {
+            Log.i(TAG, "Switching TTS voice from ${currentVoice.displayName} to ${voice.displayName}")
+            currentVoice = voice
+            if (isInitialized) {
+                release()
+            }
+        }
+    }
+
+    /**
+     * Initialize the TTS engine with the current voice.
      * Must be called before speaking.
      */
     suspend fun initialize(): Boolean {
@@ -85,14 +97,28 @@ class SherpaOnnxTtsService @Inject constructor(
 
         return withContext(Dispatchers.IO) {
             try {
-                Log.i(TAG, "Initializing Sherpa-ONNX TTS...")
+                Log.i(TAG, "Initializing Sherpa-ONNX TTS with ${currentVoice.displayName}...")
 
-                // Extract model files from assets if needed
-                val modelPath = extractAssetFile(MODEL_FILE)
-                val tokensPath = extractAssetFile(TOKENS_FILE)
-                val dataDir = extractAssetDir(DATA_DIR)
+                // Extract model files from assets based on selected voice
+                val modelPath = extractAssetFile(currentVoice.modelFile)
+                val tokensPath = extractAssetFile(currentVoice.tokensFile)
 
-                if (modelPath == null || tokensPath == null || dataDir == null) {
+                // Handle data directory (for espeak-ng)
+                val dataDir = if (currentVoice.dataDir.isNotEmpty()) {
+                    extractAssetDir(currentVoice.dataDir)
+                } else ""
+
+                // Handle lexicon file (for VITS)
+                val lexiconPath = if (currentVoice.lexiconFile.isNotEmpty()) {
+                    extractAssetFile(currentVoice.lexiconFile)
+                } else ""
+
+                // Handle voices file (for Kokoro)
+                val voicesPath = if (currentVoice.voicesFile.isNotEmpty()) {
+                    extractAssetFile(currentVoice.voicesFile)
+                } else ""
+
+                if (modelPath == null || tokensPath == null) {
                     Log.e(TAG, "Failed to extract model files")
                     isInitializing = false
                     return@withContext false
@@ -100,26 +126,47 @@ class SherpaOnnxTtsService @Inject constructor(
 
                 Log.d(TAG, "Model path: $modelPath")
                 Log.d(TAG, "Tokens path: $tokensPath")
-                Log.d(TAG, "Data dir: $dataDir")
+                Log.d(TAG, "Data dir: ${dataDir ?: "N/A"}")
+                Log.d(TAG, "Lexicon path: ${lexiconPath ?: "N/A"}")
+                Log.d(TAG, "Voices path: ${voicesPath ?: "N/A"}")
 
-                // Configure VITS model
-                val vitsConfig = OfflineTtsVitsModelConfig(
-                    model = modelPath,
-                    lexicon = "",
-                    tokens = tokensPath,
-                    dataDir = dataDir,
-                    noiseScale = 0.667f,
-                    noiseScaleW = 0.8f,
-                    lengthScale = 1.0f
-                )
-
-                // Configure TTS model
-                val modelConfig = OfflineTtsModelConfig(
-                    vits = vitsConfig,
-                    numThreads = 2,
-                    debug = false,
-                    provider = "cpu"
-                )
+                // Configure TTS model based on type
+                val modelConfig = when (currentVoice.modelType) {
+                    TtsModelType.KOKORO -> {
+                        Log.i(TAG, "Configuring Kokoro model...")
+                        val kokoroConfig = OfflineTtsKokoroModelConfig(
+                            model = modelPath,
+                            voices = voicesPath ?: "",
+                            tokens = tokensPath,
+                            dataDir = dataDir ?: "",
+                            lengthScale = 1.0f
+                        )
+                        OfflineTtsModelConfig(
+                            kokoro = kokoroConfig,
+                            numThreads = 2,
+                            debug = false,
+                            provider = "cpu"
+                        )
+                    }
+                    TtsModelType.VITS -> {
+                        Log.i(TAG, "Configuring VITS model...")
+                        val vitsConfig = OfflineTtsVitsModelConfig(
+                            model = modelPath,
+                            lexicon = lexiconPath ?: "",
+                            tokens = tokensPath,
+                            dataDir = dataDir ?: "",
+                            noiseScale = 0.667f,
+                            noiseScaleW = 0.8f,
+                            lengthScale = 1.0f
+                        )
+                        OfflineTtsModelConfig(
+                            vits = vitsConfig,
+                            numThreads = 2,
+                            debug = false,
+                            provider = "cpu"
+                        )
+                    }
+                }
 
                 // Create TTS config
                 val ttsConfig = OfflineTtsConfig(
@@ -136,7 +183,7 @@ class SherpaOnnxTtsService @Inject constructor(
                 isInitialized = true
                 isInitializing = false
 
-                Log.i(TAG, "Sherpa-ONNX TTS initialized successfully")
+                Log.i(TAG, "${currentVoice.displayName} TTS initialized successfully")
                 Log.i(TAG, "Sample rate: ${tts?.sampleRate()}, Speakers: ${tts?.numSpeakers()}")
 
                 true
@@ -422,8 +469,8 @@ class SherpaOnnxTtsService @Inject constructor(
                 Log.i(TAG, "Step 1 Result: ${if (initSuccess) "SUCCESS" else "FAILED"}")
 
                 if (initSuccess) {
-                    Log.i(TAG, "Step 2: Generating speech...")
-                    val speakSuccess = speak("Hello! Offline TTS is working perfectly.")
+                    Log.i(TAG, "Step 2: Generating speech with VITS-VCTK...")
+                    val speakSuccess = speak("Hello! The VITS text to speech is working perfectly.")
                     Log.i(TAG, "Step 2 Result: ${if (speakSuccess) "SUCCESS" else "FAILED"}")
                 }
 

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -37,6 +38,8 @@ import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
 import com.starception.submission.settings.components.TravelDuaSection
+import com.starception.submission.settings.components.TtsSettingsSection
+import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.settings.components.VoiceSettingsSection
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,6 +58,7 @@ fun UnifiedSettingsScreen(
     val travelDuaSettings by viewModel.travelDuaSettings.collectAsStateWithLifecycle()
     val developerSettings by viewModel.developerSettings.collectAsStateWithLifecycle()
     val voiceSettings by viewModel.voiceSettings.collectAsStateWithLifecycle()
+    val ttsSettings by viewModel.ttsSettings.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -170,6 +174,24 @@ fun UnifiedSettingsScreen(
                             onEngineSelected = viewModel::updateVoiceSettings,
                             onTestVoice = viewModel::startVoiceTest,
                             onStopTest = viewModel::stopVoiceTest
+                        )
+                    }
+                }
+
+                // TTS Settings Section
+                item {
+                    SettingsSection(
+                        title = "Text-to-Speech",
+                        icon = Icons.Outlined.VolumeUp,
+                        isExpanded = expandedSections.contains("tts"),
+                        onToggleExpanded = { viewModel.toggleSection("tts") }
+                    ) {
+                        TtsSettingsSection(
+                            state = ttsSettings,
+                            onTestTts = viewModel::startTtsTest,
+                            onStopTts = viewModel::stopTts,
+                            onVoiceChanged = viewModel::updateTtsVoice,
+                            onSpeakerChanged = viewModel::updateTtsSpeakerId
                         )
                     }
                 }

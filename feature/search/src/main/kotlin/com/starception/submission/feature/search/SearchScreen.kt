@@ -670,33 +670,19 @@ private fun SearchTextField(
     var activeVoiceService by remember { mutableStateOf("none") } // "sherpa", "whisper", "cloud", "none"
     var isUsingWhisper by remember { mutableStateOf(false) }
 
-    // Voice services - Whisper (primary), Sherpa (backup), Cloud (fallback)
+    // Voice services - Whisper (primary offline), Cloud (fallback)
     val whisperService = remember { WhisperVoiceService(context) }
-    val sherpaService = remember { SherpaVoiceService(context) }
     val cloudVoiceService = remember { VoiceSearchService(context) }
 
     // Initialize voice services in background
     LaunchedEffect(Unit) {
         whisperService.initialize()
-        sherpaService.initialize()
     }
 
     // Observe Whisper status
     val whisperStatus by whisperService.statusMessage.collectAsStateWithLifecycle()
     val isWhisperInitialized by whisperService.isInitialized.collectAsStateWithLifecycle()
     val isWhisperTranscribing by whisperService.isTranscribing.collectAsStateWithLifecycle()
-
-    // Observe Sherpa status
-    val isSherpaInitialized by sherpaService.isInitialized.collectAsStateWithLifecycle()
-    val sherpaRecognizedText by sherpaService.recognizedText.collectAsStateWithLifecycle()
-
-    // Observe partial results from Sherpa (real-time)
-    LaunchedEffect(sherpaRecognizedText) {
-        if (isVoiceListening && isUsingWhisper && !sherpaRecognizedText.isNullOrBlank()) {
-            partialVoiceText = sherpaRecognizedText ?: ""
-            onSearchQueryChanged(partialVoiceText)
-        }
-    }
 
     // Observe partial results from cloud service
     val cloudRecognizedText by cloudVoiceService.recognizedText.collectAsStateWithLifecycle()
@@ -745,21 +731,15 @@ private fun SearchTextField(
                 }
             }
 
-            // Priority: Whisper (accurate) > Sherpa (fast backup) > Cloud (fallback)
+            // Priority: Whisper (offline, accurate) > Cloud (fallback)
             if (isWhisperInitialized) {
                 // Use Whisper for accurate offline recognition
                 activeVoiceService = "whisper"
                 isUsingWhisper = true
                 voiceStatusMessage = "Recording..."
                 whisperService.startListening(handleResult)
-            } else if (isSherpaInitialized) {
-                // Fall back to Sherpa for fast real-time recognition
-                activeVoiceService = "sherpa"
-                isUsingWhisper = true
-                voiceStatusMessage = "Listening..."
-                sherpaService.startListening(handleResult)
             } else {
-                // Fall back to cloud if no offline service ready
+                // Fall back to cloud if offline service not ready
                 activeVoiceService = "cloud"
                 isUsingWhisper = false
                 voiceStatusMessage = "Listening..."
@@ -774,7 +754,6 @@ private fun SearchTextField(
             isVoiceListening = false
             voiceStatusMessage = "Processing..."
             when (activeVoiceService) {
-                "sherpa" -> sherpaService.stopListening()
                 "whisper" -> whisperService.stopListening()
                 "cloud" -> cloudVoiceService.stopListening()
             }
@@ -889,9 +868,8 @@ private fun SearchTextField(
                 searchQuery.isEmpty() -> {
                     Text(
                         text = when {
-                            isWhisperInitialized -> "Whisper ready"
-                            isSherpaInitialized -> "Sherpa ready"
-                            else -> "Loading..."
+                            isWhisperInitialized -> "Voice search ready"
+                            else -> "Loading voice..."
                         },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
