@@ -16,6 +16,17 @@ public class WaveUtil {
     public static void createWaveFile(String filePath, byte[] samples, int sampleRate, int numChannels, int bytesPerSample) {
         try {
             int dataSize = samples.length; // actual data size in bytes
+
+            // Log input data stats - scan ALL samples
+            int nonZero = 0;
+            int maxVal = 0;
+            int numSamples = samples.length / 2;
+            for (int i = 0; i < numSamples; i++) {
+                short sample = (short) ((samples[i*2 + 1] << 8) | (samples[i*2] & 0xFF));
+                if (sample != 0) nonZero++;
+                if (Math.abs(sample) > maxVal) maxVal = Math.abs(sample);
+            }
+            Log.d(TAG, "createWaveFile: writing " + dataSize + " bytes (" + numSamples + " samples), nonZeroTotal=" + nonZero + ", maxAmp=" + maxVal);
             int audioFormat = (bytesPerSample == 2) ? 1 : (bytesPerSample == 4) ? 3 : 0; // PCM_16 = 1, PCM_FLOAT = 3
 
             FileOutputStream fileOutputStream = new FileOutputStream(filePath);
@@ -78,7 +89,9 @@ public class WaveUtil {
             byte[] audioData = new byte[dataLength];
             fileInputStream.read(audioData);
             ByteBuffer byteBuffer = ByteBuffer.wrap(audioData);
-            byteBuffer.order(ByteOrder.nativeOrder());
+            // WAV files are ALWAYS little-endian, regardless of platform native order
+            byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            Log.d(TAG, "Reading WAV: dataLength=" + dataLength + ", numSamples=" + numSamples + ", bitsPerSample=" + bitsPerSample);
 
             // Convert audio data to PCM_FLOAT format
             float[] samples = new float[numSamples];
@@ -91,6 +104,16 @@ public class WaveUtil {
                     samples[i] = byteBuffer.getFloat();
                 }
             }
+
+            // Log audio statistics for debugging - scan ALL samples
+            float maxVal = 0, minVal = 0;
+            int nonZero = 0;
+            for (int i = 0; i < numSamples; i++) {
+                if (samples[i] != 0) nonZero++;
+                if (samples[i] > maxVal) maxVal = samples[i];
+                if (samples[i] < minVal) minVal = samples[i];
+            }
+            Log.d(TAG, "WAV read: " + numSamples + " samples, nonZeroTotal=" + nonZero + ", range=[" + minVal + " to " + maxVal + "]");
 
             return samples;
         } catch (IOException e) {

@@ -128,46 +128,42 @@ public class WhisperEngineJava implements WhisperEngine {
         // Get samples in PCM_FLOAT format
         float[] samples = WaveUtil.getSamples(wavePath);
 
-        // Only process actual recorded audio, not fixed 30 seconds
-        int actualSamples = samples.length;
-        int maxSamples = WhisperUtil.WHISPER_SAMPLE_RATE * WhisperUtil.WHISPER_CHUNK_SIZE; // 480000
-        int samplesToProcess = Math.min(actualSamples, maxSamples);
+        // Model requires exactly 480,000 samples (30 seconds @ 16kHz)
+        // Pad audio to full 30 seconds BEFORE mel calculation (as per whisper_android reference)
+        int requiredSamples = WhisperUtil.WHISPER_SAMPLE_RATE * WhisperUtil.WHISPER_CHUNK_SIZE; // 480000
 
-        Log.d(TAG, "Actual samples: " + actualSamples + ", processing: " + samplesToProcess +
-              " (" + (samplesToProcess / (float)WhisperUtil.WHISPER_SAMPLE_RATE) + " seconds)");
+        Log.d(TAG, "Audio samples: " + samples.length + " (" + (samples.length / (float)WhisperUtil.WHISPER_SAMPLE_RATE) + "s)");
+
+        // Create padded audio buffer
+        float[] paddedSamples;
+        if (samples.length < requiredSamples) {
+            paddedSamples = new float[requiredSamples];
+            System.arraycopy(samples, 0, paddedSamples, 0, samples.length);
+            // Rest is zero-padded by Java default
+            Log.d(TAG, "Padded audio from " + samples.length + " to " + requiredSamples + " samples");
+        } else if (samples.length > requiredSamples) {
+            paddedSamples = new float[requiredSamples];
+            System.arraycopy(samples, 0, paddedSamples, 0, requiredSamples);
+            Log.d(TAG, "Truncated audio from " + samples.length + " to " + requiredSamples + " samples");
+        } else {
+            paddedSamples = samples;
+        }
 
         int cores = Runtime.getRuntime().availableProcessors();
 
-        // Calculate mel for actual audio only
-        float[] melActual = mWhisperUtil.getMelSpectrogram(samples, samplesToProcess, cores);
+        // Calculate mel spectrogram from padded audio
+        float[] melSpectrogram = mWhisperUtil.getMelSpectrogram(paddedSamples, requiredSamples, cores);
 
-        // Pad to full 3000 frames if needed (model expects fixed input)
-        int expectedMelLen = WhisperUtil.WHISPER_MEL_LEN; // 3000
-        int actualMelLen = samplesToProcess / WhisperUtil.WHISPER_HOP_LENGTH;
-
-        if (actualMelLen < expectedMelLen) {
-            // Create padded output
-            float[] melPadded = new float[WhisperUtil.WHISPER_N_MEL * expectedMelLen];
-            // Copy actual mel data
-            System.arraycopy(melActual, 0, melPadded, 0, Math.min(melActual.length, melPadded.length));
-            // Rest is already zero-padded (Java default)
-            Log.d(TAG, "Mel spectrogram padded from " + actualMelLen + " to " + expectedMelLen + " frames");
-            return melPadded;
-        }
-
-        return melActual;
+        return melSpectrogram;
     }
 
     private String runInference(float[] inputData) {
         // Create input tensor
         Tensor inputTensor = mInterpreter.getInputTensor(0);
         TensorBuffer inputBuffer = TensorBuffer.createFixedSize(inputTensor.shape(), inputTensor.dataType());
-//        printTensorDump("Input Tensor Dump ===>", inputTensor);
-
         // Create output tensor
         Tensor outputTensor = mInterpreter.getOutputTensor(0);
         TensorBuffer outputBuffer = TensorBuffer.createFixedSize(outputTensor.shape(), DataType.FLOAT32);
-//        printTensorDump("Output Tensor Dump ===>", outputTensor);
 
         // Load input data
         int inputSize = inputTensor.shape()[0] * inputTensor.shape()[1] * inputTensor.shape()[2] * Float.BYTES;
@@ -194,27 +190,16 @@ public class WhisperEngineJava implements WhisperEngine {
 
         // Retrieve the results
         int outputLen = outputBuffer.getIntArray().length;
-        Log.d(TAG, "output_len: " + outputLen);
         StringBuilder result = new StringBuilder();
         for (int i = 0; i < outputLen; i++) {
             int token = outputBuffer.getBuffer().getInt();
             if (token == mWhisperUtil.getTokenEOT())
                 break;
 
-            // Get word for token and Skip additional token
+            // Get word for token and skip special tokens
             if (token < mWhisperUtil.getTokenEOT()) {
                 String word = mWhisperUtil.getWordFromToken(token);
-                //Log.d(TAG, "Adding token: " + token + ", word: " + word);
                 result.append(word);
-            } else {
-                if (token == mWhisperUtil.getTokenTranscribe())
-                    Log.d(TAG, "It is Transcription...");
-
-                if (token == mWhisperUtil.getTokenTranslate())
-                    Log.d(TAG, "It is Translation...");
-
-                String word = mWhisperUtil.getWordFromToken(token);
-                Log.d(TAG, "Skipping token: " + token + ", word: " + word);
             }
         }
 

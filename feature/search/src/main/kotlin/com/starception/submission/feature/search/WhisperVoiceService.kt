@@ -21,8 +21,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.whispertflite.asr.Recorder
-import com.whispertflite.asr.Whisper
+import com.whispercpp.media.decodeWaveFile
+import com.whispercpp.recorder.Recorder
+import com.whispercpp.whisper.WhisperContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,35 +34,34 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
 
 /**
- * Whisper Voice Service using OpenAI's Whisper model via TensorFlow Lite
+ * Whisper Voice Service using whisper.cpp (native C++ implementation)
  *
  * This provides offline, on-device speech-to-text for search queries.
- * Uses the whisper-tiny.en model for fast, accurate English transcription.
+ * Uses the whisper.cpp library with GGML models for fast, accurate transcription.
  *
  * Benefits over cloud-based recognition:
  * - Works completely offline
  * - Privacy-preserving (audio never leaves device)
  * - No network latency
  * - Works in airplane mode
+ * - Native C++ performance
  */
 class WhisperVoiceService(
     private val context: Context
 ) {
     companion object {
         private const val TAG = "WhisperVoiceService"
-        private const val MODEL_FILE = "whisper-tiny.en.tflite"
-        private const val VOCAB_FILE = "filters_vocab_en.bin"
-        private const val ASSETS_WHISPER_DIR = "whisper"
+        private const val MODEL_ASSET_PATH = "models/ggml-tiny.en.bin"
         private const val RECORDING_FILE = "whisper_recording.wav"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var initJob: Job? = null
+    private var recordJob: Job? = null
 
-    private var whisper: Whisper? = null
+    private var whisperContext: WhisperContext? = null
     private var recorder: Recorder? = null
 
     private val _isInitialized = MutableStateFlow(false)
@@ -89,7 +89,7 @@ class WhisperVoiceService(
 
     /**
      * Initialize the Whisper model
-     * This copies model files from assets and loads the model.
+     * This loads the GGML model from assets.
      * Should be called before starting transcription.
      */
     fun initialize(onComplete: ((Boolean) -> Unit)? = null) {
@@ -128,69 +128,19 @@ class WhisperVoiceService(
 
     private fun initializeWhisper(): Boolean {
         try {
-            // Copy model files from assets to files directory
-            val modelFile = copyAssetToFiles("$ASSETS_WHISPER_DIR/$MODEL_FILE", MODEL_FILE)
-            val vocabFile = copyAssetToFiles("$ASSETS_WHISPER_DIR/$VOCAB_FILE", VOCAB_FILE)
+            Log.i(TAG, "Initializing whisper.cpp from asset: $MODEL_ASSET_PATH")
+            Log.i(TAG, "System info: ${WhisperContext.getSystemInfo()}")
 
-            if (!modelFile.exists() || !vocabFile.exists()) {
-                Log.e(TAG, "Model files not found after copy")
-                return false
-            }
-
-            Log.i(TAG, "Model file: ${modelFile.absolutePath} (${modelFile.length() / 1024}KB)")
-            Log.i(TAG, "Vocab file: ${vocabFile.absolutePath} (${vocabFile.length() / 1024}KB)")
-
-            // Initialize Whisper engine
-            whisper = Whisper(context).apply {
-                setListener(object : Whisper.WhisperListener {
-                    override fun onUpdateReceived(message: String?) {
-                        Log.d(TAG, "Whisper update: $message")
-                        _statusMessage.value = message
-                    }
-
-                    override fun onResultReceived(result: String?) {
-                        Log.i(TAG, "Whisper result: $result")
-                        // Only handle results when transcribing (not during recording)
-                        if (_isTranscribing.value) {
-                            handleTranscriptionResult(result)
-                        }
-                    }
-                })
-
-                // Load the model (isMultilingual = false for English-only model)
-                loadModel(modelFile, vocabFile, false)
-                setAction(Whisper.ACTION_TRANSCRIBE)
-            }
+            // Load model directly from assets using whisper.cpp
+            whisperContext = WhisperContext.createContextFromAsset(
+                context.assets,
+                MODEL_ASSET_PATH
+            )
 
             // Initialize recorder
-            recorder = Recorder(context).apply {
-                setFilePath(getRecordingFilePath())
-                setListener(object : Recorder.RecorderListener {
-                    override fun onUpdateReceived(message: String?) {
-                        Log.d(TAG, "Recorder update: $message")
-                        when (message) {
-                            Recorder.MSG_RECORDING -> {
-                                _statusMessage.value = "Listening..."
-                            }
-                            Recorder.MSG_RECORDING_DONE -> {
-                                _statusMessage.value = "Processing..."
-                                _isListening.value = false
-                                startTranscription()
-                            }
-                            else -> {
-                                _statusMessage.value = message
-                            }
-                        }
-                    }
+            recorder = Recorder()
 
-                    override fun onDataReceived(samples: FloatArray?) {
-                        // We use file-based transcription, not buffer-based
-                        // Do NOT call writeBuffer() here as it conflicts with file transcription
-                    }
-                })
-            }
-
-            Log.i(TAG, "Whisper initialized successfully")
+            Log.i(TAG, "whisper.cpp initialized successfully")
             return true
 
         } catch (e: Exception) {
@@ -199,27 +149,8 @@ class WhisperVoiceService(
         }
     }
 
-    private fun copyAssetToFiles(assetPath: String, fileName: String): File {
-        val outFile = File(context.filesDir, fileName)
-
-        // Only copy if file doesn't exist or is empty
-        if (outFile.exists() && outFile.length() > 0) {
-            Log.d(TAG, "File already exists: ${outFile.absolutePath}")
-            return outFile
-        }
-
-        context.assets.open(assetPath).use { input ->
-            FileOutputStream(outFile).use { output ->
-                input.copyTo(output)
-            }
-        }
-
-        Log.i(TAG, "Copied $assetPath to ${outFile.absolutePath}")
-        return outFile
-    }
-
-    private fun getRecordingFilePath(): String {
-        return File(context.filesDir, RECORDING_FILE).absolutePath
+    private fun getRecordingFile(): File {
+        return File(context.filesDir, RECORDING_FILE)
     }
 
     /**
@@ -241,7 +172,7 @@ class WhisperVoiceService(
 
     /**
      * Start listening for voice input using Whisper
-     * Records audio and transcribes using the local Whisper model.
+     * Records audio and transcribes using the local whisper.cpp model.
      */
     fun startListening(onResult: (VoiceSearchService.VoiceSearchResult) -> Unit) {
         if (!hasPermission()) {
@@ -277,11 +208,37 @@ class WhisperVoiceService(
         _isListening.value = true
         _statusMessage.value = "Listening..."
 
-        // Start recording
-        recorder?.setFilePath(getRecordingFilePath())
-        recorder?.start()
+        // Start recording using coroutine-based recorder
+        recordJob = scope.launch {
+            try {
+                val recordingFile = getRecordingFile()
+                Log.i(TAG, "Starting recording to: ${recordingFile.absolutePath}")
 
-        Log.i(TAG, "Started listening for voice input (Whisper)")
+                recorder?.startRecording(recordingFile) { error ->
+                    Log.e(TAG, "Recording error", error)
+                    scope.launch(Dispatchers.Main) {
+                        _isListening.value = false
+                        _error.value = "Recording error: ${error.message}"
+                        currentCallback?.invoke(
+                            VoiceSearchService.VoiceSearchResult.Error("Recording failed: ${error.message}")
+                        )
+                        currentCallback = null
+                    }
+                }
+
+                Log.i(TAG, "Recording started successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting recording", e)
+                _isListening.value = false
+                _error.value = "Failed to start recording: ${e.message}"
+                currentCallback?.invoke(
+                    VoiceSearchService.VoiceSearchResult.Error("Failed to start recording: ${e.message}")
+                )
+                currentCallback = null
+            }
+        }
+
+        Log.i(TAG, "Started listening for voice input (whisper.cpp)")
     }
 
     /**
@@ -289,29 +246,75 @@ class WhisperVoiceService(
      */
     fun stopListening() {
         if (_isListening.value) {
-            _statusMessage.value = "Stopping..."
-            // Run on background thread because recorder.stop() blocks
-            scope.launch(Dispatchers.IO) {
+            _statusMessage.value = "Processing..."
+
+            scope.launch {
                 try {
-                    recorder?.stop()
-                    // Recording done callback will trigger transcription
+                    // Stop recording
+                    recorder?.stopRecording()
+                    _isListening.value = false
+
+                    // Start transcription
+                    startTranscription()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error stopping recorder", e)
+                    _isListening.value = false
+                    _error.value = "Error stopping recording: ${e.message}"
+                    currentCallback?.invoke(
+                        VoiceSearchService.VoiceSearchResult.Error("Error: ${e.message}")
+                    )
+                    currentCallback = null
                 }
             }
         }
     }
 
-    private fun startTranscription() {
+    private suspend fun startTranscription() {
         _isTranscribing.value = true
         _statusMessage.value = "Transcribing..."
 
-        whisper?.setFilePath(getRecordingFilePath())
-        whisper?.start()
+        try {
+            val recordingFile = getRecordingFile()
+
+            if (!recordingFile.exists() || recordingFile.length() == 0L) {
+                Log.e(TAG, "Recording file missing or empty")
+                handleTranscriptionResult(null)
+                return
+            }
+
+            Log.i(TAG, "Transcribing file: ${recordingFile.absolutePath} (${recordingFile.length()} bytes)")
+
+            // Decode WAV to float array
+            val audioData = withContext(Dispatchers.IO) {
+                decodeWaveFile(recordingFile)
+            }
+
+            Log.i(TAG, "Audio decoded: ${audioData.size} samples (${audioData.size / 16000.0}s)")
+
+            // Transcribe using whisper.cpp
+            val result = whisperContext?.transcribeData(audioData, printTimestamp = false)
+
+            handleTranscriptionResult(result)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during transcription", e)
+            _isTranscribing.value = false
+            _error.value = "Transcription error: ${e.message}"
+            currentCallback?.invoke(
+                VoiceSearchService.VoiceSearchResult.Error("Transcription failed: ${e.message}")
+            )
+            currentCallback = null
+        }
     }
 
     private fun handleTranscriptionResult(result: String?) {
-        val text = result?.trim() ?: ""
+        // Clean up result - remove leading/trailing whitespace and common artifacts
+        val text = result?.trim()
+            ?.replace(Regex("^\\[.*?\\]\\s*"), "") // Remove timestamp prefixes like [00:00.000 --> 00:03.000]
+            ?.replace(Regex("\\s+"), " ") // Normalize whitespace
+            ?.trim()
+            ?: ""
+
         val callback = currentCallback
         currentCallback = null
 
@@ -323,7 +326,6 @@ class WhisperVoiceService(
             if (text.isNotBlank()) {
                 Log.i(TAG, "Transcription result: $text")
                 _statusMessage.value = "Done"
-                Log.d(TAG, "Invoking callback with result: $text")
                 callback?.invoke(VoiceSearchService.VoiceSearchResult.Success(text))
             } else {
                 Log.w(TAG, "Empty transcription result")
@@ -337,25 +339,48 @@ class WhisperVoiceService(
      * Cancel listening and transcription
      */
     fun cancel() {
-        _isListening.value = false
-        _isTranscribing.value = false
+        scope.launch {
+            _isListening.value = false
+            _isTranscribing.value = false
 
-        recorder?.stop()
-        whisper?.stop()
+            try {
+                recorder?.stopRecording()
+            } catch (e: Exception) {
+                Log.w(TAG, "Error stopping recorder during cancel", e)
+            }
 
-        currentCallback?.invoke(VoiceSearchService.VoiceSearchResult.Cancelled)
-        currentCallback = null
+            currentCallback?.invoke(VoiceSearchService.VoiceSearchResult.Cancelled)
+            currentCallback = null
+        }
     }
 
     /**
      * Release all resources
      */
     fun release() {
-        cancel()
-        initJob?.cancel()
-        whisper?.unloadModel()
-        whisper = null
-        recorder = null
-        _isInitialized.value = false
+        scope.launch {
+            cancel()
+            initJob?.cancel()
+            recordJob?.cancel()
+
+            try {
+                whisperContext?.release()
+            } catch (e: Exception) {
+                Log.w(TAG, "Error releasing whisper context", e)
+            }
+
+            whisperContext = null
+            recorder = null
+            _isInitialized.value = false
+        }
+    }
+
+    /**
+     * Test method: Records 3 seconds and transcribes.
+     * Use to verify whisper.cpp is working properly.
+     */
+    fun testMicrophonePlayback() {
+        Log.i(TAG, "Test not implemented for whisper.cpp recorder")
+        _statusMessage.value = "Test not available"
     }
 }

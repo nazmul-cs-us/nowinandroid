@@ -1,8 +1,8 @@
 /*
- * Whisper TFLite Module
- * Based on https://github.com/vilassn/whisper_android
- *
- * Provides offline speech-to-text using OpenAI's Whisper model with TensorFlow Lite
+ * Whisper Module
+ * Provides offline speech-to-text using:
+ * - whisper.cpp (native C++ implementation) - primary
+ * - TensorFlow Lite implementation - legacy
  */
 
 plugins {
@@ -45,14 +45,20 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.core:core-ktx:1.15.0")
 
-    // TensorFlow Lite for Whisper inference
+    // Coroutines for whisper.cpp
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // whisper.cpp AAR (native C++ implementation)
+    implementation(files("libs/whisper-cpp.aar"))
+
+    // TensorFlow Lite for Whisper inference (legacy)
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
-    // GPU delegate for faster inference
+    // GPU delegate for faster inference (legacy)
     implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-gpu-api:2.14.0")
 
-    // JTransforms for fast FFT calculations
+    // JTransforms for fast FFT calculations (legacy)
     implementation("com.github.wendykierp:JTransforms:3.1")
 }

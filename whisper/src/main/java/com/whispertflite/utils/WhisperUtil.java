@@ -209,10 +209,13 @@ public class WhisperUtil {
                     }
 
                     // Mel spectrogram
+                    // IMPORTANT: Use filters.nFft for filter indexing, not local nFft
+                    // filters.data is laid out as [nMel * filters.nFft]
                     for (int j = 0; j < mel.nMel; j++) {
                         double sum = 0.0;
-                        for (int k = 0; k < nFft; k++) {
-                            sum += (fftMag[k] * filters.data[j * nFft + k]);
+                        int filterLen = filters.nFft;
+                        for (int k = 0; k < filterLen && k < nFft; k++) {
+                            sum += (fftMag[k] * filters.data[j * filterLen + k]);
                         }
 
                         if (sum < 1e-10) {

@@ -18,6 +18,8 @@ package com.starception.submission.feature.search
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -799,7 +801,7 @@ private fun SearchTextField(
             Row(
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
-                // Voice search button - tap to start, tap again to stop
+                // Voice search button - tap to start/stop, long-press to test mic
                 IconButton(
                     onClick = {
                         if (isVoiceListening) {
@@ -807,6 +809,14 @@ private fun SearchTextField(
                         } else {
                             startVoiceSearch()
                         }
+                    },
+                    modifier = Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = {
+                                // Long press: test microphone with playback
+                                whisperService.testMicrophonePlayback()
+                            }
+                        )
                     },
                 ) {
                     if (isVoiceListening) {
