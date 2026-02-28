@@ -20,6 +20,7 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import com.starception.submission.settings.components.VoiceRecognitionEngine
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,13 +36,14 @@ import kotlin.coroutines.resume
 /**
  * Manages voice-based lesson completion flow.
  * Plays voice prompts using offline TTS (Sherpa-ONNX/Coqui VITS),
- * listens for yes/no responses using Whisper,
+ * listens for yes/no responses using the user-selected engine (Sherpa KWS or Whisper),
  * and triggers lesson completion callbacks.
  */
 @Singleton
 class VoiceCompletionManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val whisperService: WhisperVoiceService,
+    private val sherpaKwsService: SherpaOnnxKwsService,
     private val sherpaOnnxTts: SherpaOnnxTtsService
 ) {
     companion object {
@@ -131,9 +133,13 @@ class VoiceCompletionManager @Inject constructor(
      * Play the voice prompt asking user to say yes or no.
      * Uses Sherpa-ONNX offline TTS (Coqui VITS) as primary,
      * falls back to Android TTS if unavailable.
+     * Uses the user-selected TTS voice from settings.
      */
     private suspend fun playVoicePrompt(lessonTitle: String): Boolean {
         val promptText = "Say YES to mark this lesson complete, or NO to skip."
+
+        // Apply user-selected TTS voice from settings
+        applyUserSelectedTtsVoice()
 
         // Try Sherpa-ONNX offline TTS first
         return try {
@@ -237,14 +243,134 @@ class VoiceCompletionManager @Inject constructor(
     }
 
     /**
-     * Listen for user's yes/no response using Whisper.
+     * Get the user-selected voice recognition engine from SharedPreferences.
+     */
+    private fun getSelectedEngine(): VoiceRecognitionEngine {
+        val prefs = context.getSharedPreferences("voice_settings", Context.MODE_PRIVATE)
+        val engineName = prefs.getString("voice_engine", VoiceRecognitionEngine.SHERPA_KWS.name)
+        return try {
+            VoiceRecognitionEngine.valueOf(engineName ?: VoiceRecognitionEngine.SHERPA_KWS.name)
+        } catch (e: Exception) {
+            VoiceRecognitionEngine.SHERPA_KWS
+        }
+    }
+
+    /**
+     * Apply the user-selected TTS voice from settings.
+     * Ensures consistent TTS voice across all prompts and confirmations.
+     */
+    private fun applyUserSelectedTtsVoice() {
+        val ttsPrefs = context.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
+        val selectedVoiceName = ttsPrefs.getString("selected_voice", null)
+        val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
+
+        val voice = if (selectedVoiceName != null) {
+            try {
+                com.starception.submission.settings.components.TtsVoice.valueOf(selectedVoiceName)
+            } catch (e: Exception) {
+                com.starception.submission.settings.components.TtsVoice.KOKORO_EN
+            }
+        } else {
+            com.starception.submission.settings.components.TtsVoice.KOKORO_EN
+        }
+
+        sherpaOnnxTts.setVoice(voice)
+        Log.d(TAG, "🔊 Using TTS voice: ${voice.displayName}, speaker $selectedSpeakerId")
+    }
+
+    /**
+     * Listen for user's yes/no response using the selected voice recognition engine.
+     * Honors the user's selection from Voice Settings (Sherpa KWS or Whisper).
      */
     private suspend fun listenForResponse(
         onYes: () -> Unit,
         onNo: () -> Unit,
         onError: (String) -> Unit
     ) {
-        whisperService.startListening(
+        val selectedEngine = getSelectedEngine()
+        Log.i(TAG, "🎤 Using voice engine: ${selectedEngine.displayName}")
+
+        when (selectedEngine) {
+            VoiceRecognitionEngine.SHERPA_KWS -> {
+                listenWithSherpaKws(onYes, onNo, onError)
+            }
+            VoiceRecognitionEngine.WHISPER -> {
+                listenWithWhisper(onYes, onNo, onError)
+            }
+        }
+    }
+
+    /**
+     * Listen using Sherpa-ONNX KWS (fast ~100ms keyword spotting)
+     */
+    private fun listenWithSherpaKws(
+        onYes: () -> Unit,
+        onNo: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        scope.launch {
+            sherpaKwsService.startListening(
+                durationMs = LISTENING_DURATION_MS,
+                callback = object : SherpaOnnxKwsService.VoiceRecognitionCallback {
+                    override fun onResult(result: SherpaOnnxKwsService.VoiceResult) {
+                        when (result) {
+                            is SherpaOnnxKwsService.VoiceResult.Yes -> {
+                                Log.i(TAG, "✅ KWS detected: YES")
+                                speakConfirmation("I heard yes. Marking lesson complete.") {
+                                    onYes()
+                                }
+                            }
+                            is SherpaOnnxKwsService.VoiceResult.No -> {
+                                Log.i(TAG, "❌ KWS detected: NO")
+                                speakConfirmation("I heard no. Skipping this lesson.") {
+                                    onNo()
+                                }
+                            }
+                            is SherpaOnnxKwsService.VoiceResult.Timeout -> {
+                                Log.d(TAG, "⏱️ KWS timeout - no keyword detected")
+                                speakConfirmation("No response detected. Skipping.") {
+                                    onNo()
+                                }
+                            }
+                            is SherpaOnnxKwsService.VoiceResult.Unrecognized -> {
+                                Log.d(TAG, "❓ KWS unrecognized: ${result.text}")
+                                speakConfirmation("Sorry, I didn't understand. Skipping.") {
+                                    onNo()
+                                }
+                            }
+                            is SherpaOnnxKwsService.VoiceResult.Error -> {
+                                Log.e(TAG, "❌ KWS error: ${result.message}")
+                                onError(result.message)
+                            }
+                        }
+                    }
+
+                    override fun onListeningStarted() {
+                        Log.d(TAG, "KWS listening started")
+                    }
+
+                    override fun onListeningStopped() {
+                        Log.d(TAG, "KWS listening stopped")
+                    }
+
+                    override fun onStatusUpdate(message: String) {
+                        Log.d(TAG, "KWS status: $message")
+                    }
+                }
+            )
+        }
+    }
+
+    /**
+     * Listen using Whisper (full transcription ~2s)
+     */
+    private fun listenWithWhisper(
+        onYes: () -> Unit,
+        onNo: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        scope.launch {
+            whisperService.startListening(
             durationMs = LISTENING_DURATION_MS,
             callback = object : WhisperVoiceService.VoiceRecognitionCallback {
                 override fun onResult(result: WhisperVoiceService.VoiceResult) {
@@ -280,23 +406,25 @@ class VoiceCompletionManager @Inject constructor(
                 }
 
                 override fun onListeningStarted() {
-                    Log.d(TAG, "Voice listening started")
+                    Log.d(TAG, "Whisper listening started")
                 }
 
                 override fun onListeningStopped() {
-                    Log.d(TAG, "Voice listening stopped")
+                    Log.d(TAG, "Whisper listening stopped")
                 }
 
                 override fun onStatusUpdate(message: String) {
-                    Log.d(TAG, "Voice status: $message")
+                    Log.d(TAG, "Whisper status: $message")
                 }
             }
         )
+        }
     }
 
     /**
      * Speak confirmation feedback using offline TTS.
      * Confirms what Whisper heard before taking action.
+     * Uses the user-selected TTS voice from settings.
      *
      * @param message The confirmation message to speak
      * @param onComplete Callback after speech completes
@@ -304,6 +432,10 @@ class VoiceCompletionManager @Inject constructor(
     private fun speakConfirmation(message: String, onComplete: () -> Unit) {
         scope.launch {
             Log.i(TAG, "🔊 Speaking confirmation: \"$message\"")
+
+            // Apply user-selected TTS voice from settings
+            applyUserSelectedTtsVoice()
+
             val success = try {
                 sherpaOnnxTts.speak(message, onComplete = {
                     onComplete()
@@ -385,6 +517,7 @@ class VoiceCompletionManager @Inject constructor(
         textToSpeech?.stop()
         sherpaOnnxTts.stopSpeaking()
         whisperService.stopListening()
+        sherpaKwsService.stopListening()
     }
 
     /**
@@ -415,11 +548,14 @@ class VoiceCompletionManager @Inject constructor(
 
     /**
      * TEST FUNCTION: Run a full voice completion test.
-     * Tests the entire flow: TTS prompt → Whisper listen → Confirmation
+     * Tests the entire flow: TTS prompt → Voice recognition → Confirmation
+     * Uses the user-selected voice engine from settings.
      */
     fun runTest() {
+        val selectedEngine = getSelectedEngine()
         Log.i(TAG, "🧪 ========== VOICE COMPLETION TEST STARTED ==========")
-        Log.i(TAG, "🧪 This will test: TTS prompt → Whisper listening → Confirmation")
+        Log.i(TAG, "🧪 Using engine: ${selectedEngine.displayName}")
+        Log.i(TAG, "🧪 This will test: TTS prompt → Voice recognition → Confirmation")
         Log.i(TAG, "🧪 Say 'YES' or 'NO' when prompted!")
 
         promptForCompletion(

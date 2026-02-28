@@ -31,8 +31,10 @@ import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig
 import com.starception.submission.settings.components.TtsModelType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -197,6 +199,7 @@ class SherpaOnnxTtsService @Inject constructor(
 
     /**
      * Speak text using offline TTS.
+     * Splits long text into sentences for faster initial playback.
      * @param text The text to speak
      * @param speed Speech speed (0.5 = half speed, 2.0 = double speed)
      * @param speakerId Speaker ID for multi-speaker models (0 for single speaker)
@@ -220,26 +223,44 @@ class SherpaOnnxTtsService @Inject constructor(
         return suspendCancellableCoroutine { continuation ->
             scope.launch {
                 try {
-                    Log.d(TAG, "Generating speech for: \"$text\"")
+                    // Split text into sentences for faster progressive playback
+                    val sentences = splitIntoSentences(text)
+                        .filter { it.isNotBlank() }
+                    Log.d(TAG, "Speaking ${sentences.size} sentences with parallel generation...")
 
-                    // Generate audio
-                    val audio = tts?.generate(
-                        text = text,
-                        sid = speakerId,
-                        speed = speed
-                    )
-
-                    if (audio == null || audio.samples.isEmpty()) {
-                        Log.e(TAG, "Failed to generate audio")
+                    if (sentences.isEmpty()) {
                         onComplete?.invoke()
-                        if (continuation.isActive) continuation.resume(false)
+                        if (continuation.isActive) continuation.resume(true)
                         return@launch
                     }
 
-                    Log.d(TAG, "Generated ${audio.samples.size} samples at ${audio.sampleRate} Hz")
+                    // Generate first sentence immediately
+                    var currentAudio = generateSentence(sentences[0], speakerId, speed, 1, sentences.size)
 
-                    // Play audio
-                    playAudio(audio)
+                    for (index in sentences.indices) {
+                        if (currentAudio == null) {
+                            Log.w(TAG, "Skipping empty audio for sentence ${index + 1}")
+                            // Try to generate next sentence if available
+                            if (index + 1 < sentences.size) {
+                                currentAudio = generateSentence(sentences[index + 1], speakerId, speed, index + 2, sentences.size)
+                            }
+                            continue
+                        }
+
+                        // Start generating NEXT sentence in background while playing current
+                        val nextAudioDeferred: Deferred<GeneratedAudio?>? = if (index + 1 < sentences.size) {
+                            async {
+                                generateSentence(sentences[index + 1], speakerId, speed, index + 2, sentences.size)
+                            }
+                        } else null
+
+                        // Play current sentence (blocking)
+                        Log.d(TAG, "Playing sentence ${index + 1}/${sentences.size}")
+                        playAudio(currentAudio)
+
+                        // Get pre-generated next audio (should be ready by now)
+                        currentAudio = nextAudioDeferred?.await()
+                    }
 
                     onComplete?.invoke()
                     if (continuation.isActive) continuation.resume(true)
@@ -255,6 +276,49 @@ class SherpaOnnxTtsService @Inject constructor(
                 stopSpeaking()
             }
         }
+    }
+
+    /**
+     * Generate audio for a single sentence.
+     */
+    private fun generateSentence(
+        sentence: String,
+        speakerId: Int,
+        speed: Float,
+        sentenceNum: Int,
+        totalSentences: Int
+    ): GeneratedAudio? {
+        Log.d(TAG, "Generating sentence $sentenceNum/$totalSentences: \"${sentence.take(50)}...\"")
+        val audio = tts?.generate(
+            text = sentence,
+            sid = speakerId,
+            speed = speed
+        )
+        if (audio != null && audio.samples.isNotEmpty()) {
+            Log.d(TAG, "Generated ${audio.samples.size} samples at ${audio.sampleRate} Hz")
+        }
+        return if (audio?.samples?.isNotEmpty() == true) audio else null
+    }
+
+    /**
+     * Split text into sentences for progressive playback.
+     * Keeps sentences reasonably sized for faster generation.
+     */
+    private fun splitIntoSentences(text: String): List<String> {
+        // Split on sentence boundaries (. ! ?)
+        val sentences = text.split(Regex("(?<=[.!?])\\s+"))
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+
+        // If text is short or has no sentence boundaries, return as-is
+        if (sentences.size <= 1 && text.length > 200) {
+            // Split long text without punctuation by commas or chunks
+            return text.split(Regex(",\\s*|;\\s*"))
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+        }
+
+        return sentences
     }
 
     /**

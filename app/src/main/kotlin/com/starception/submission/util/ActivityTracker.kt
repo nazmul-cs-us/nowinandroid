@@ -120,6 +120,9 @@ object ActivityTracker {
     // Smart Activity tile focus tracking - only play sound/vibration when tile is visible
     private var isSmartActivityTileInFocus = false
 
+    // Manual trigger mode - bypasses driving check for voice completion
+    private var isManualTriggerMode = false
+
     /**
      * Set whether the Smart Activity tile is currently visible/in focus
      * When not in focus, sound/vibration notifications are suppressed
@@ -886,7 +889,8 @@ object ActivityTracker {
                             ctx,
                             "daily_bukhari",
                             "hadith_$hadithNumber",
-                            "Hadith #$hadithNumber"
+                            "Hadith #$hadithNumber",
+                            isManualTriggerMode
                         )
                     }
 
@@ -915,6 +919,7 @@ object ActivityTracker {
 
     /**
      * Actually speak the text using TTS
+     * Uses user-selected TTS engine: Sherpa-ONNX for English, Android TTS for other languages
      */
     private fun speakWithTts(ctx: Context, hadithNumber: Int, text: String, locale: Locale, langCode: String) {
         // Get intro text in the appropriate language
@@ -924,6 +929,77 @@ object ActivityTracker {
         // Store current hadith number for completion callback
         currentHadithNumber = hadithNumber
 
+        // For English, check if user selected Sherpa-ONNX TTS
+        if (langCode == "en") {
+            val ttsPrefs = ctx.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
+            val selectedVoiceName = ttsPrefs.getString("selected_voice", null)
+            val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
+
+            // If user has selected a Sherpa-ONNX voice, use it
+            if (selectedVoiceName != null) {
+                Log.i("ActivityTracker", "📚 Using Sherpa-ONNX TTS: $selectedVoiceName, speaker $selectedSpeakerId")
+                speakWithSherpaOnnxTts(ctx, hadithNumber, fullText, selectedVoiceName, selectedSpeakerId)
+                return
+            }
+        }
+
+        // Fall back to Android TTS for non-English or if no Sherpa-ONNX voice selected
+        Log.i("ActivityTracker", "📚 Using Android TTS for language: $langCode")
+        speakWithAndroidTts(ctx, hadithNumber, fullText, locale)
+    }
+
+    /**
+     * Speak using Sherpa-ONNX TTS (offline, high-quality)
+     */
+    private fun speakWithSherpaOnnxTts(ctx: Context, hadithNumber: Int, text: String, voiceName: String, speakerId: Int) {
+        scope.launch {
+            try {
+                // Initialize Sherpa-ONNX TTS if needed
+                if (sherpaOnnxTtsService == null) {
+                    sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
+                }
+
+                // Set voice from user settings
+                val voice = try {
+                    com.starception.submission.settings.components.TtsVoice.valueOf(voiceName)
+                } catch (e: Exception) {
+                    com.starception.submission.settings.components.TtsVoice.KOKORO_EN
+                }
+                sherpaOnnxTtsService?.setVoice(voice)
+
+                Log.i("ActivityTracker", "📚 Sherpa-ONNX TTS speaking hadith #$hadithNumber with ${voice.displayName}")
+
+                val success = sherpaOnnxTtsService?.speak(
+                    text = text,
+                    speakerId = speakerId,
+                    onComplete = {
+                        Log.d("ActivityTracker", "📚 Sherpa-ONNX TTS completed hadith #$hadithNumber")
+                        // Trigger voice completion prompt
+                        triggerVoiceCompletionPrompt(
+                            ctx,
+                            "daily_bukhari",
+                            "hadith_$hadithNumber",
+                            "Hadith #$hadithNumber",
+                            isManualTriggerMode
+                        )
+                    }
+                ) ?: false
+
+                if (!success) {
+                    Log.e("ActivityTracker", "📚 Sherpa-ONNX TTS failed, falling back to Android TTS")
+                    speakWithAndroidTts(ctx, hadithNumber, text, Locale.US)
+                }
+            } catch (e: Exception) {
+                Log.e("ActivityTracker", "📚 Sherpa-ONNX TTS error: ${e.message}")
+                speakWithAndroidTts(ctx, hadithNumber, text, Locale.US)
+            }
+        }
+    }
+
+    /**
+     * Speak using Android's built-in TextToSpeech
+     */
+    private fun speakWithAndroidTts(ctx: Context, hadithNumber: Int, text: String, locale: Locale) {
         // Initialize TTS if not already done
         if (textToSpeech == null) {
             textToSpeech = TextToSpeech(ctx) { status ->
@@ -934,14 +1010,14 @@ object ActivityTracker {
                         Log.w("ActivityTracker", "📚 TTS language $locale not supported, falling back to US English")
                         textToSpeech?.language = Locale.US
                     }
-                    Log.d("ActivityTracker", "📚 TTS initialized with language: ${textToSpeech?.language}")
+                    Log.d("ActivityTracker", "📚 Android TTS initialized with language: ${textToSpeech?.language}")
 
                     // Set up utterance progress listener for completion callback
                     setupTtsCompletionListener(ctx)
 
-                    textToSpeech?.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
+                    textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
                 } else {
-                    Log.e("ActivityTracker", "📚 TTS initialization failed with status: $status")
+                    Log.e("ActivityTracker", "📚 Android TTS initialization failed with status: $status")
                 }
             }
         } else if (isTtsInitialized) {
@@ -954,7 +1030,7 @@ object ActivityTracker {
             // Ensure listener is set up
             setupTtsCompletionListener(ctx)
 
-            textToSpeech?.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
+            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
         }
     }
 
@@ -980,7 +1056,8 @@ object ActivityTracker {
                             ctx,
                             "daily_bukhari",
                             "hadith_$hadithNum",
-                            "Hadith #$hadithNum"
+                            "Hadith #$hadithNum",
+                            isManualTriggerMode
                         )
                     }
                 }
@@ -1046,22 +1123,89 @@ object ActivityTracker {
     }
 
     /**
+     * Get the user-selected TTS voice from settings.
+     * Returns the voice name and speaker ID, or null if not set.
+     */
+    private fun getUserSelectedTtsVoice(ctx: Context): Pair<com.starception.submission.settings.components.TtsVoice, Int> {
+        val ttsPrefs = ctx.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
+        val selectedVoiceName = ttsPrefs.getString("selected_voice", null)
+        val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
+
+        val voice = if (selectedVoiceName != null) {
+            try {
+                com.starception.submission.settings.components.TtsVoice.valueOf(selectedVoiceName)
+            } catch (e: Exception) {
+                com.starception.submission.settings.components.TtsVoice.KOKORO_EN
+            }
+        } else {
+            com.starception.submission.settings.components.TtsVoice.KOKORO_EN
+        }
+
+        return Pair(voice, selectedSpeakerId)
+    }
+
+    /**
+     * Speak short feedback message using Sherpa-ONNX TTS.
+     * Used to give audio confirmation to user during hands-free operation.
+     * Uses the user-selected TTS voice from settings.
+     *
+     * @param ctx Android context
+     * @param message Short message to speak
+     * @param onComplete Called after speaking completes
+     */
+    private fun speakFeedback(ctx: Context, message: String, onComplete: () -> Unit = {}) {
+        Log.i("ActivityTracker", "🗣️ Speaking feedback: \"$message\"")
+        scope.launch {
+            try {
+                // Ensure TTS service is initialized
+                if (sherpaOnnxTtsService == null) {
+                    sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
+                }
+
+                // Use user-selected TTS voice from settings
+                val (voice, speakerId) = getUserSelectedTtsVoice(ctx)
+                sherpaOnnxTtsService?.setVoice(voice)
+                Log.d("ActivityTracker", "🗣️ Using TTS voice: ${voice.displayName}, speaker $speakerId")
+
+                val success = sherpaOnnxTtsService?.speak(
+                    text = message,
+                    speakerId = speakerId,
+                    onComplete = {
+                        Log.d("ActivityTracker", "🗣️ Feedback complete: \"$message\"")
+                        onComplete()
+                    }
+                ) ?: false
+
+                if (!success) {
+                    Log.w("ActivityTracker", "🗣️ TTS failed, continuing without feedback")
+                    onComplete()
+                }
+            } catch (e: Exception) {
+                Log.e("ActivityTracker", "🗣️ Error speaking feedback: ${e.message}")
+                onComplete()
+            }
+        }
+    }
+
+    /**
      * Trigger voice-based lesson completion prompt after hadith playback.
-     * Only triggers if user is currently driving.
+     * Only triggers if user is currently driving (unless bypassDrivingCheck is true).
      *
      * @param ctx Android context
      * @param courseId The course ID (e.g., "daily_bukhari")
      * @param lessonId The lesson ID (e.g., "hadith_1")
      * @param lessonTitle Human-readable title (e.g., "Hadith #1")
+     * @param bypassDrivingCheck If true, will trigger even when not driving (for manual tests)
      */
     private fun triggerVoiceCompletionPrompt(
         ctx: Context,
         courseId: String,
         lessonId: String,
-        lessonTitle: String
+        lessonTitle: String,
+        bypassDrivingCheck: Boolean = false
     ) {
-        // Only trigger if currently driving
-        if (_currentActivity.value != "Driving") {
+        // Only trigger if currently driving (unless bypassing for manual test)
+        if (!bypassDrivingCheck && _currentActivity.value != "Driving") {
             Log.d("ActivityTracker", "🎤 Skipping voice completion - not driving (${_currentActivity.value})")
             return
         }
@@ -1083,8 +1227,12 @@ object ActivityTracker {
                     sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
                 }
 
+                if (sherpaOnnxKwsService == null) {
+                    sherpaOnnxKwsService = SherpaOnnxKwsService(ctx)
+                }
+
                 if (voiceCompletionManager == null) {
-                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxTtsService!!)
+                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxKwsService!!, sherpaOnnxTtsService!!)
                 }
 
                 Log.i("ActivityTracker", "🎤 Triggering voice completion prompt for: $lessonTitle")
@@ -1097,28 +1245,46 @@ object ActivityTracker {
                         Log.i("ActivityTracker", "✅ Voice completion: User said YES - marking lesson complete")
                         CourseProgressTracker.markLessonCompleted(ctx, courseId, lessonId)
 
-                        // Chain Quran listening after hadith completion
-                        if (courseId == "daily_bukhari") {
-                            Log.i("ActivityTracker", "📚➡️🕌 Hadith complete - chaining to Quran listening")
-                            playQuranListeningIfEnrolled(ctx)
+                        // Give audio feedback that lesson was marked complete
+                        speakFeedback(ctx, "Lesson marked complete!") {
+                            // Chain Quran listening after hadith completion
+                            if (courseId == "daily_bukhari") {
+                                Log.i("ActivityTracker", "📚➡️🕌 Hadith complete - chaining to Quran listening")
+                                playQuranListeningIfEnrolled(ctx)
+                            } else {
+                                // Reset manual trigger mode when chain ends
+                                isManualTriggerMode = false
+                            }
                         }
                     },
                     onSkipped = {
                         Log.i("ActivityTracker", "⏭️ Voice completion: User said NO or timeout - skipped")
 
-                        // Still chain Quran listening after hadith even if skipped
-                        if (courseId == "daily_bukhari") {
-                            Log.i("ActivityTracker", "📚➡️🕌 Hadith skipped - chaining to Quran listening anyway")
-                            playQuranListeningIfEnrolled(ctx)
+                        // Give audio feedback that lesson was skipped
+                        speakFeedback(ctx, "Lesson skipped.") {
+                            // Still chain Quran listening after hadith even if skipped
+                            if (courseId == "daily_bukhari") {
+                                Log.i("ActivityTracker", "📚➡️🕌 Hadith skipped - chaining to Quran listening anyway")
+                                playQuranListeningIfEnrolled(ctx)
+                            } else {
+                                // Reset manual trigger mode when chain ends
+                                isManualTriggerMode = false
+                            }
                         }
                     },
                     onError = { error ->
                         Log.e("ActivityTracker", "❌ Voice completion error: $error")
 
-                        // Still chain Quran listening on error
-                        if (courseId == "daily_bukhari") {
-                            Log.i("ActivityTracker", "📚➡️🕌 Hadith error - chaining to Quran listening")
-                            playQuranListeningIfEnrolled(ctx)
+                        // Give audio feedback about the error, then continue
+                        speakFeedback(ctx, "Could not hear response. Continuing to next lesson.") {
+                            // Still chain Quran listening on error
+                            if (courseId == "daily_bukhari") {
+                                Log.i("ActivityTracker", "📚➡️🕌 Hadith error - chaining to Quran listening")
+                                playQuranListeningIfEnrolled(ctx)
+                            } else {
+                                // Reset manual trigger mode when chain ends
+                                isManualTriggerMode = false
+                            }
                         }
                     }
                 )
@@ -1192,11 +1358,19 @@ object ActivityTracker {
             // Check enrollment
             if (!CourseProgressTracker.isEnrolledInQuranListening(ctx)) {
                 Log.d("ActivityTracker", "🕌 User not enrolled in Complete Quran Listening course - skipping")
+                // Give feedback that audio chain is complete (in manual mode only)
+                if (isManualTriggerMode) {
+                    speakFeedback(ctx, "Audio chain complete. Enroll in Complete Quran Listening course to continue with Quran playback.") {
+                        isManualTriggerMode = false
+                    }
+                } else {
+                    isManualTriggerMode = false
+                }
                 return
             }
 
-            // Only play if currently driving
-            if (_currentActivity.value != "Driving") {
+            // Only play if currently driving (unless in manual trigger mode)
+            if (!isManualTriggerMode && _currentActivity.value != "Driving") {
                 Log.d("ActivityTracker", "🕌 Not driving - skipping Quran listening")
                 return
             }
@@ -1237,20 +1411,34 @@ object ActivityTracker {
     private fun startQuranPlayback(ctx: Context, progress: QuranListeningProgress) {
         if (quranService == null) {
             Log.e("ActivityTracker", "🕌 Quran service not available")
+            // Give feedback and reset
+            speakFeedback(ctx, "Quran playback service not available.") {
+                isManualTriggerMode = false
+            }
             return
         }
 
-        // Start listening session
-        CourseProgressTracker.startQuranListeningSession(ctx)
+        // Get surah name for announcement
+        val surahName = if (progress.currentSurahIndex < QuranData.surahs.size) {
+            QuranData.surahs[progress.currentSurahIndex].nameEnglish
+        } else {
+            "Surah ${progress.currentSurahNumber}"
+        }
 
-        // Start playback from saved position
-        quranService?.playSurahForCourse(
-            surahIndex = progress.currentSurahIndex,
-            startPosition = progress.currentPositionMs,
-            forCourse = true
-        )
+        // Announce what's playing
+        speakFeedback(ctx, "Now playing Surah $surahName") {
+            // Start listening session
+            CourseProgressTracker.startQuranListeningSession(ctx)
 
-        Log.i("ActivityTracker", "🕌 ▶️ Started Quran playback for course mode")
+            // Start playback from saved position
+            quranService?.playSurahForCourse(
+                surahIndex = progress.currentSurahIndex,
+                startPosition = progress.currentPositionMs,
+                forCourse = true
+            )
+
+            Log.i("ActivityTracker", "🕌 ▶️ Started Quran playback for course mode")
+        }
     }
 
     /**
@@ -1281,8 +1469,8 @@ object ActivityTracker {
         lessonTitle: String,
         surahIndex: Int
     ) {
-        // Only trigger if currently driving
-        if (_currentActivity.value != "Driving") {
+        // Only trigger if currently driving (unless in manual trigger mode)
+        if (!isManualTriggerMode && _currentActivity.value != "Driving") {
             Log.d("ActivityTracker", "🕌 Skipping voice completion - not driving")
             // Still save progress even if not driving
             return
@@ -1307,8 +1495,12 @@ object ActivityTracker {
                     sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
                 }
 
+                if (sherpaOnnxKwsService == null) {
+                    sherpaOnnxKwsService = SherpaOnnxKwsService(ctx)
+                }
+
                 if (voiceCompletionManager == null) {
-                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxTtsService!!)
+                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxKwsService!!, sherpaOnnxTtsService!!)
                 }
 
                 Log.i("ActivityTracker", "🕌 Triggering voice completion prompt for: $lessonTitle")
@@ -1319,18 +1511,28 @@ object ActivityTracker {
                     lessonTitle = lessonTitle,
                     onComplete = {
                         Log.i("ActivityTracker", "🕌 ✅ Voice completion: User said YES - marking lesson complete")
-                        completeQuranLessonAndContinue(ctx, surahIndex)
+                        // Give audio feedback and continue
+                        speakFeedback(ctx, "Surah marked complete!") {
+                            completeQuranLessonAndContinue(ctx, surahIndex)
+                        }
                     },
                     onSkipped = {
                         Log.i("ActivityTracker", "🕌 ⏭️ Voice completion: User said NO - saving position and stopping")
-                        // End session but don't mark as complete
-                        CourseProgressTracker.endQuranListeningSession(ctx)
-                        quranService?.stopCourseMode()
+                        // Give audio feedback
+                        speakFeedback(ctx, "Quran listening session ended.") {
+                            // End session but don't mark as complete
+                            CourseProgressTracker.endQuranListeningSession(ctx)
+                            quranService?.stopCourseMode()
+                            // Reset manual trigger mode when user explicitly stops
+                            isManualTriggerMode = false
+                        }
                     },
                     onError = { error ->
                         Log.e("ActivityTracker", "🕌 ❌ Voice completion error: $error - auto-completing")
-                        // Auto-complete on error to not lose progress
-                        completeQuranLessonAndContinue(ctx, surahIndex)
+                        // Give feedback about error and auto-continue
+                        speakFeedback(ctx, "Could not hear response. Continuing to next surah.") {
+                            completeQuranLessonAndContinue(ctx, surahIndex)
+                        }
                     }
                 )
             } catch (e: Exception) {
@@ -1348,8 +1550,8 @@ object ActivityTracker {
         // Mark lesson as complete and get next surah index
         val nextSurahIndex = CourseProgressTracker.completeCurrentSurah(ctx)
 
-        // Check if still driving
-        if (_currentActivity.value != "Driving") {
+        // Check if still driving (unless in manual trigger mode)
+        if (!isManualTriggerMode && _currentActivity.value != "Driving") {
             Log.i("ActivityTracker", "🕌 No longer driving - ending Quran session after completion")
             CourseProgressTracker.endQuranListeningSession(ctx)
             quranService?.stopCourseMode()
@@ -1415,6 +1617,46 @@ object ActivityTracker {
     }
 
     /**
+     * Manually trigger the full audio chain: Travel Dua → Hadith → Quran
+     * This plays the same sequence that would play during driving, but manually triggered.
+     * Useful for testing or when user wants to listen without driving.
+     */
+    fun triggerFullAudioChain() {
+        Log.i("ActivityTracker", "🎵 ========== MANUAL TRIGGER: Full Audio Chain ==========")
+        Log.i("ActivityTracker", "🎵 Sequence: Travel Dua → Hadith (if enrolled) → Quran (if enrolled)")
+        // Set manual trigger mode to bypass driving check for voice completion
+        isManualTriggerMode = true
+        context?.let { ctx ->
+            try {
+                // Release any existing MediaPlayer instance
+                mediaPlayer?.release()
+
+                // Create and play the travel dua audio
+                val resId = ctx.resources.getIdentifier("travel_dua", "raw", ctx.packageName)
+                if (resId != 0) {
+                    mediaPlayer = MediaPlayer.create(ctx, resId)
+                    mediaPlayer?.setOnCompletionListener { mp ->
+                        mp.release()
+                        mediaPlayer = null
+                        Log.d("ActivityTracker", "🎵 Travel dua completed - triggering hadith...")
+
+                        // After travel dua completes, play daily hadith if enrolled
+                        playDailyHadithIfEnrolled(ctx)
+                    }
+                    mediaPlayer?.start()
+                    Log.i("ActivityTracker", "🎵 Playing Travel Dua...")
+                } else {
+                    Log.e("ActivityTracker", "🎵 Travel dua not found, skipping to hadith...")
+                    // Still try to play hadith even if travel dua not found
+                    playDailyHadithIfEnrolled(ctx)
+                }
+            } catch (e: Exception) {
+                Log.e("ActivityTracker", "🎵 Error triggering audio chain: ${e.message}")
+            }
+        } ?: Log.e("ActivityTracker", "🎵 FAILED: Context is null - call initialize() first")
+    }
+
+    /**
      * TEST FUNCTION: Test voice completion flow (Whisper STT + TTS)
      * Tests: TTS prompt → Whisper listening → Confirmation feedback
      * Say "YES" or "NO" when prompted!
@@ -1441,8 +1683,12 @@ object ActivityTracker {
                         sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
                     }
 
+                    if (sherpaOnnxKwsService == null) {
+                        sherpaOnnxKwsService = SherpaOnnxKwsService(ctx)
+                    }
+
                     if (voiceCompletionManager == null) {
-                        voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxTtsService!!)
+                        voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxKwsService!!, sherpaOnnxTtsService!!)
                     }
 
                     Log.i("ActivityTracker", "🧪 Starting voice completion test...")

@@ -156,7 +156,8 @@ fun UnifiedSettingsScreen(
                     ) {
                         TravelDuaSection(
                             settings = travelDuaSettings,
-                            onSettingsChanged = viewModel::updateTravelDuaSettings
+                            onSettingsChanged = viewModel::updateTravelDuaSettings,
+                            onTriggerAudioChain = viewModel::triggerFullAudioChain
                         )
                     }
                 }

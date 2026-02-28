@@ -661,6 +661,15 @@ class UnifiedSettingsViewModel @Inject constructor(
         ActivityTracker.testVoiceCompletion()
     }
 
+    /**
+     * Manually trigger the full audio chain: Travel Dua → Hadith → Quran
+     * This plays the same sequence that would play during driving.
+     */
+    fun triggerFullAudioChain() {
+        Log.i(TAG, "🎵 Triggering full audio chain from Settings...")
+        ActivityTracker.triggerFullAudioChain()
+    }
+
     // ============= Voice Settings =============
 
     private fun loadVoiceSettings() {

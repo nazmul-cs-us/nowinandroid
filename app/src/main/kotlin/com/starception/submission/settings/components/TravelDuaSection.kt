@@ -1,5 +1,9 @@
 package com.starception.submission.settings.components
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -18,6 +22,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -36,11 +43,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.starception.submission.config.TravelDuaSettings
 
 /**
@@ -50,8 +59,43 @@ import com.starception.submission.config.TravelDuaSettings
 fun TravelDuaSection(
     settings: TravelDuaSettings,
     onSettingsChanged: (TravelDuaSettings) -> Unit,
+    onTriggerAudioChain: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
+    // State to track if we need to trigger audio chain after permission granted
+    var pendingAudioChainTrigger by remember { mutableStateOf(false) }
+
+    // Permission launcher for RECORD_AUDIO
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted && pendingAudioChainTrigger) {
+            // Permission granted, trigger audio chain
+            pendingAudioChainTrigger = false
+            onTriggerAudioChain()
+        }
+        pendingAudioChainTrigger = false
+    }
+
+    // Helper function to check permission and trigger audio chain
+    fun checkPermissionAndPlay() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            // Permission already granted, play immediately
+            onTriggerAudioChain()
+        } else {
+            // Request permission
+            pendingAudioChainTrigger = true
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     Column(modifier = modifier) {
         // Master toggle
         ListItem(
@@ -147,6 +191,33 @@ fun TravelDuaSection(
                         onSettingsChanged(settings.copy(drivingSpeedThresholdKmh = value))
                     }
                 )
+
+                // Manual trigger button
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { checkPermissionAndPlay() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Play Audio Chain")
+                }
+                Text(
+                    text = "Plays: Travel Dua → Hadith (if enrolled) → Quran (if enrolled)\nSay YES/NO to mark lessons complete (mic permission required)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Info text
                 Text(

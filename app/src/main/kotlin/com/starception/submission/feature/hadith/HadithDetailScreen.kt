@@ -119,6 +119,10 @@ import android.media.MediaPlayer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.compose.animation.scaleIn
+import com.starception.submission.voice.SherpaOnnxTtsService
+import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import com.starception.submission.settings.components.TtsVoice
+import dagger.hilt.android.EntryPointAccessors
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -195,6 +199,29 @@ fun HadithDetailScreen(
     val repository = remember { HadithRepository.getInstance(context) }
     val translationService = remember { TranslationService.getInstance(context) }
     val bukhariTranslationRepo = remember { BukhariLocalTranslationRepository.getInstance(context) }
+
+    // Get Sherpa-ONNX TTS service via Hilt entry point
+    val sherpaOnnxTts = remember {
+        val entryPoint = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            SherpaOnnxTtsEntryPoint::class.java
+        )
+        entryPoint.sherpaOnnxTtsService()
+    }
+
+    // Load user's TTS preferences from SharedPreferences
+    val ttsPrefs = remember {
+        context.getSharedPreferences("tts_settings", android.content.Context.MODE_PRIVATE)
+    }
+    val selectedVoiceName = ttsPrefs.getString("selected_voice", TtsVoice.KOKORO_EN.name) ?: TtsVoice.KOKORO_EN.name
+    val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
+    val selectedVoice = remember(selectedVoiceName) {
+        try {
+            TtsVoice.valueOf(selectedVoiceName)
+        } catch (e: Exception) {
+            TtsVoice.KOKORO_EN
+        }
+    }
 
     // Landscape detection
     val configuration = LocalConfiguration.current
@@ -391,6 +418,7 @@ fun HadithDetailScreen(
                                 mediaPlayer?.release()
                                 mediaPlayer = null
                                 textToSpeech?.stop()
+                                sherpaOnnxTts.stopSpeaking()
                                 isPlaying = false
                             } else {
                                 // Start playback
@@ -435,29 +463,42 @@ fun HadithDetailScreen(
                                         }
                                     }
 
-                                    // Fall back to TTS if no audio file found
+                                    // Fall back to Sherpa-ONNX TTS if no audio file found
                                     if (!audioPlayed) {
-                                        android.util.Log.w("HadithDetailScreen", "No Bengali audio for hadith #$hadithNumber, using TTS")
+                                        android.util.Log.w("HadithDetailScreen", "No Bengali audio for hadith #$hadithNumber, using Sherpa-ONNX TTS")
+                                        playWithSherpaOnnxTts(
+                                            sherpaOnnxTts = sherpaOnnxTts,
+                                            text = translatedText ?: hadith!!.textPlain ?: "",
+                                            selectedVoice = selectedVoice,
+                                            speakerId = selectedSpeakerId,
+                                            onPlayingChanged = { isPlaying = it }
+                                        )
+                                    }
+                                } else {
+                                    // Use Sherpa-ONNX TTS (user-selected voice) for English
+                                    // For non-English languages, fall back to Android TTS
+                                    val textToSpeak = translatedText ?: hadith!!.textPlain ?: ""
+                                    if (selectedLanguage == "en") {
+                                        android.util.Log.i("HadithDetailScreen", "🔊 Using Sherpa-ONNX TTS with ${selectedVoice.displayName}, speaker $selectedSpeakerId")
+                                        playWithSherpaOnnxTts(
+                                            sherpaOnnxTts = sherpaOnnxTts,
+                                            text = textToSpeak,
+                                            selectedVoice = selectedVoice,
+                                            speakerId = selectedSpeakerId,
+                                            onPlayingChanged = { isPlaying = it }
+                                        )
+                                    } else {
+                                        // Non-English languages use Android TTS (has more language support)
+                                        android.util.Log.i("HadithDetailScreen", "🔊 Using Android TTS for $selectedLanguage")
                                         playWithTts(
                                             context = context,
-                                            text = translatedText ?: hadith!!.textPlain ?: "",
+                                            text = textToSpeak,
                                             language = selectedLanguage,
                                             tts = textToSpeech,
                                             onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
                                             onPlayingChanged = { isPlaying = it }
                                         )
                                     }
-                                } else {
-                                    // Use TTS for other languages
-                                    val textToSpeak = translatedText ?: hadith!!.textPlain ?: ""
-                                    playWithTts(
-                                        context = context,
-                                        text = textToSpeak,
-                                        language = selectedLanguage,
-                                        tts = textToSpeech,
-                                        onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
-                                        onPlayingChanged = { isPlaying = it }
-                                    )
                                 }
                             }
                         }
@@ -1145,6 +1186,48 @@ private fun playWithTts(
                     onPlayingChanged(true)
                 }
             }
+        }
+    }
+}
+
+/**
+ * Play text using Sherpa-ONNX offline TTS with user-selected voice settings.
+ * Uses the voice and speaker ID selected in Settings > TTS Settings.
+ */
+private fun playWithSherpaOnnxTts(
+    sherpaOnnxTts: SherpaOnnxTtsService,
+    text: String,
+    selectedVoice: TtsVoice,
+    speakerId: Int,
+    onPlayingChanged: (Boolean) -> Unit
+) {
+    val intro = "From Sahih Al-Bukhari."
+    val fullText = "$intro $text"
+
+    // Set the voice from user settings
+    sherpaOnnxTts.setVoice(selectedVoice)
+
+    // Launch coroutine for TTS playback
+    CoroutineScope(Dispatchers.Main).launch {
+        try {
+            onPlayingChanged(true)
+
+            // Initialize and speak
+            val success = sherpaOnnxTts.speak(
+                text = fullText,
+                speakerId = speakerId,
+                onComplete = {
+                    onPlayingChanged(false)
+                }
+            )
+
+            if (!success) {
+                android.util.Log.e("HadithDetailScreen", "Sherpa-ONNX TTS failed to speak")
+                onPlayingChanged(false)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("HadithDetailScreen", "Error playing with Sherpa-ONNX TTS", e)
+            onPlayingChanged(false)
         }
     }
 }
