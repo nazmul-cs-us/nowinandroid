@@ -199,7 +199,7 @@ class SherpaOnnxTtsService @Inject constructor(
 
     /**
      * Speak text using offline TTS.
-     * Splits long text into sentences for faster initial playback.
+     * Generates all audio first, then plays continuously without gaps.
      * @param text The text to speak
      * @param speed Speech speed (0.5 = half speed, 2.0 = double speed)
      * @param speakerId Speaker ID for multi-speaker models (0 for single speaker)
@@ -223,10 +223,10 @@ class SherpaOnnxTtsService @Inject constructor(
         return suspendCancellableCoroutine { continuation ->
             scope.launch {
                 try {
-                    // Split text into sentences for faster progressive playback
+                    // Split text into sentences for generation
                     val sentences = splitIntoSentences(text)
                         .filter { it.isNotBlank() }
-                    Log.d(TAG, "Speaking ${sentences.size} sentences with parallel generation...")
+                    Log.d(TAG, "Generating ${sentences.size} sentences...")
 
                     if (sentences.isEmpty()) {
                         onComplete?.invoke()
@@ -234,33 +234,29 @@ class SherpaOnnxTtsService @Inject constructor(
                         return@launch
                     }
 
-                    // Generate first sentence immediately
-                    var currentAudio = generateSentence(sentences[0], speakerId, speed, 1, sentences.size)
+                    // Generate all sentences and collect audio samples
+                    val allSamples = mutableListOf<Float>()
+                    var sampleRate = 22050
 
-                    for (index in sentences.indices) {
-                        if (currentAudio == null) {
-                            Log.w(TAG, "Skipping empty audio for sentence ${index + 1}")
-                            // Try to generate next sentence if available
-                            if (index + 1 < sentences.size) {
-                                currentAudio = generateSentence(sentences[index + 1], speakerId, speed, index + 2, sentences.size)
-                            }
-                            continue
+                    for ((index, sentence) in sentences.withIndex()) {
+                        val audio = generateSentence(sentence, speakerId, speed, index + 1, sentences.size)
+                        if (audio != null && audio.samples.isNotEmpty()) {
+                            allSamples.addAll(audio.samples.toList())
+                            sampleRate = audio.sampleRate
                         }
-
-                        // Start generating NEXT sentence in background while playing current
-                        val nextAudioDeferred: Deferred<GeneratedAudio?>? = if (index + 1 < sentences.size) {
-                            async {
-                                generateSentence(sentences[index + 1], speakerId, speed, index + 2, sentences.size)
-                            }
-                        } else null
-
-                        // Play current sentence (blocking)
-                        Log.d(TAG, "Playing sentence ${index + 1}/${sentences.size}")
-                        playAudio(currentAudio)
-
-                        // Get pre-generated next audio (should be ready by now)
-                        currentAudio = nextAudioDeferred?.await()
                     }
+
+                    if (allSamples.isEmpty()) {
+                        Log.w(TAG, "No audio samples generated")
+                        onComplete?.invoke()
+                        if (continuation.isActive) continuation.resume(false)
+                        return@launch
+                    }
+
+                    Log.d(TAG, "Playing ${allSamples.size} total samples at $sampleRate Hz (no gaps)")
+
+                    // Play all audio continuously without gaps
+                    playAudioSamples(allSamples.toFloatArray(), sampleRate)
 
                     onComplete?.invoke()
                     if (continuation.isActive) continuation.resume(true)
@@ -322,15 +318,20 @@ class SherpaOnnxTtsService @Inject constructor(
     }
 
     /**
-     * Play generated audio samples.
+     * Play generated audio samples from a GeneratedAudio object.
      */
     private fun playAudio(audio: GeneratedAudio) {
+        playAudioSamples(audio.samples, audio.sampleRate)
+    }
+
+    /**
+     * Play audio samples continuously without gaps.
+     * Uses a single AudioTrack for smooth playback.
+     */
+    private fun playAudioSamples(samples: FloatArray, sampleRate: Int) {
         try {
             // Stop any existing playback
             stopAudioTrack()
-
-            val sampleRate = audio.sampleRate
-            val samples = audio.samples
 
             // Convert float samples to 16-bit PCM
             val pcmData = ShortArray(samples.size)
@@ -368,9 +369,9 @@ class SherpaOnnxTtsService @Inject constructor(
             audioTrack?.write(pcmData, 0, pcmData.size)
             audioTrack?.play()
 
-            // Wait for playback to complete
+            // Wait for playback to complete (no extra buffer - continuous playback)
             val durationMs = (samples.size * 1000L) / sampleRate
-            Thread.sleep(durationMs + 100) // Add small buffer
+            Thread.sleep(durationMs + 50) // Minimal buffer for audio cleanup
 
             stopAudioTrack()
 

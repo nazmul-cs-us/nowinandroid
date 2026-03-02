@@ -33,6 +33,8 @@ import com.starception.submission.voice.VoiceCompletionManager
 import com.starception.submission.voice.WhisperVoiceService
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.SherpaOnnxKwsService
+import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import dagger.hilt.android.EntryPointAccessors
 import com.starception.submission.feature.course.QuranListeningProgress
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.feature.quran.QuranData
@@ -122,6 +124,23 @@ object ActivityTracker {
 
     // Manual trigger mode - bypasses driving check for voice completion
     private var isManualTriggerMode = false
+
+    /**
+     * Get the shared Sherpa-ONNX TTS service from Hilt singleton.
+     * This ensures we use the same TTS instance as VoiceCompletionManager
+     * and respects user-selected voice settings.
+     */
+    private fun getSharedTtsService(ctx: Context): SherpaOnnxTtsService {
+        if (sherpaOnnxTtsService == null) {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                ctx.applicationContext,
+                SherpaOnnxTtsEntryPoint::class.java
+            )
+            sherpaOnnxTtsService = entryPoint.sherpaOnnxTtsService()
+            Log.i("ActivityTracker", "🔊 Using shared Hilt TTS service (same as VoiceCompletionManager)")
+        }
+        return sherpaOnnxTtsService!!
+    }
 
     /**
      * Set whether the Smart Activity tile is currently visible/in focus
@@ -954,10 +973,8 @@ object ActivityTracker {
     private fun speakWithSherpaOnnxTts(ctx: Context, hadithNumber: Int, text: String, voiceName: String, speakerId: Int) {
         scope.launch {
             try {
-                // Initialize Sherpa-ONNX TTS if needed
-                if (sherpaOnnxTtsService == null) {
-                    sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
-                }
+                // Get shared TTS service (uses Hilt singleton)
+                val ttsService = getSharedTtsService(ctx)
 
                 // Set voice from user settings
                 val voice = try {
@@ -965,11 +982,11 @@ object ActivityTracker {
                 } catch (e: Exception) {
                     com.starception.submission.settings.components.TtsVoice.KOKORO_EN
                 }
-                sherpaOnnxTtsService?.setVoice(voice)
+                ttsService.setVoice(voice)
 
                 Log.i("ActivityTracker", "📚 Sherpa-ONNX TTS speaking hadith #$hadithNumber with ${voice.displayName}")
 
-                val success = sherpaOnnxTtsService?.speak(
+                val success = ttsService.speak(
                     text = text,
                     speakerId = speakerId,
                     onComplete = {
@@ -983,7 +1000,7 @@ object ActivityTracker {
                             isManualTriggerMode
                         )
                     }
-                ) ?: false
+                )
 
                 if (!success) {
                     Log.e("ActivityTracker", "📚 Sherpa-ONNX TTS failed, falling back to Android TTS")
@@ -1157,24 +1174,22 @@ object ActivityTracker {
         Log.i("ActivityTracker", "🗣️ Speaking feedback: \"$message\"")
         scope.launch {
             try {
-                // Ensure TTS service is initialized
-                if (sherpaOnnxTtsService == null) {
-                    sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
-                }
+                // Get shared TTS service (uses Hilt singleton)
+                val ttsService = getSharedTtsService(ctx)
 
                 // Use user-selected TTS voice from settings
                 val (voice, speakerId) = getUserSelectedTtsVoice(ctx)
-                sherpaOnnxTtsService?.setVoice(voice)
+                ttsService.setVoice(voice)
                 Log.d("ActivityTracker", "🗣️ Using TTS voice: ${voice.displayName}, speaker $speakerId")
 
-                val success = sherpaOnnxTtsService?.speak(
+                val success = ttsService.speak(
                     text = message,
                     speakerId = speakerId,
                     onComplete = {
                         Log.d("ActivityTracker", "🗣️ Feedback complete: \"$message\"")
                         onComplete()
                     }
-                ) ?: false
+                )
 
                 if (!success) {
                     Log.w("ActivityTracker", "🗣️ TTS failed, continuing without feedback")
@@ -1223,16 +1238,15 @@ object ActivityTracker {
                     }
                 }
 
-                if (sherpaOnnxTtsService == null) {
-                    sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
-                }
+                // Get shared TTS service (uses Hilt singleton)
+                val ttsService = getSharedTtsService(ctx)
 
                 if (sherpaOnnxKwsService == null) {
                     sherpaOnnxKwsService = SherpaOnnxKwsService(ctx)
                 }
 
                 if (voiceCompletionManager == null) {
-                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxKwsService!!, sherpaOnnxTtsService!!)
+                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxKwsService!!, ttsService)
                 }
 
                 Log.i("ActivityTracker", "🎤 Triggering voice completion prompt for: $lessonTitle")
@@ -1491,16 +1505,15 @@ object ActivityTracker {
                     }
                 }
 
-                if (sherpaOnnxTtsService == null) {
-                    sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
-                }
+                // Get shared TTS service (uses Hilt singleton)
+                val ttsService = getSharedTtsService(ctx)
 
                 if (sherpaOnnxKwsService == null) {
                     sherpaOnnxKwsService = SherpaOnnxKwsService(ctx)
                 }
 
                 if (voiceCompletionManager == null) {
-                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxKwsService!!, sherpaOnnxTtsService!!)
+                    voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxKwsService!!, ttsService)
                 }
 
                 Log.i("ActivityTracker", "🕌 Triggering voice completion prompt for: $lessonTitle")
@@ -1678,17 +1691,16 @@ object ActivityTracker {
                         Log.i("ActivityTracker", "🧪 Whisper model loaded!")
                     }
 
-                    if (sherpaOnnxTtsService == null) {
-                        Log.i("ActivityTracker", "🧪 Initializing Sherpa-ONNX TTS...")
-                        sherpaOnnxTtsService = SherpaOnnxTtsService(ctx)
-                    }
+                    // Get shared TTS service (uses Hilt singleton)
+                    val ttsService = getSharedTtsService(ctx)
+                    Log.i("ActivityTracker", "🧪 Using shared Sherpa-ONNX TTS service")
 
                     if (sherpaOnnxKwsService == null) {
                         sherpaOnnxKwsService = SherpaOnnxKwsService(ctx)
                     }
 
                     if (voiceCompletionManager == null) {
-                        voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxKwsService!!, sherpaOnnxTtsService!!)
+                        voiceCompletionManager = VoiceCompletionManager(ctx, whisperVoiceService!!, sherpaOnnxKwsService!!, ttsService)
                     }
 
                     Log.i("ActivityTracker", "🧪 Starting voice completion test...")

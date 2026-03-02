@@ -29,6 +29,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -1027,6 +1032,42 @@ private fun HadithContent(
             alpha = 1f
         )
 
+        // Get center camera cutout bounds to avoid overlapping icons
+        val view = LocalView.current
+        val density = LocalDensity.current
+
+        // Calculate the right edge of the camera cutout
+        // Dynamic toolbar layout based on camera cutout
+        val configuration = LocalConfiguration.current
+        val screenWidthDp = configuration.screenWidthDp.dp
+
+        // Get camera cutout bounds
+        val cutoutRightDp = remember(view) {
+            val displayCutout = view.rootWindowInsets?.displayCutout
+            if (displayCutout != null && displayCutout.boundingRects.isNotEmpty()) {
+                val maxRight = displayCutout.boundingRects.maxOfOrNull { it.right } ?: 0
+                with(density) { maxRight.toDp() }
+            } else {
+                0.dp
+            }
+        }
+
+        // Calculate available width for icons on the right side
+        val availableWidthDp = screenWidthDp - cutoutRightDp - 16.dp
+
+        // Icon sizes - Language (48dp) + Badge (~100dp) + More (48dp) = 196dp needed
+        val iconButtonSize = 44.dp
+        val badgeWidth = 90.dp // Compact badge width
+        val moreButtonSize = 44.dp
+
+        // Total needed for all elements
+        val totalNeeded = iconButtonSize + badgeWidth + moreButtonSize // ~178dp
+
+        // Show elements based on available space
+        // Priority: More (always) > Language > Badge
+        val showLanguageButton = availableWidthDp >= (iconButtonSize + moreButtonSize) // ~88dp
+        val showBadge = availableWidthDp >= totalNeeded // ~178dp
+
         Surface(
             color = toolbarBackgroundColor,
             tonalElevation = (4 * collapseProgress.value).dp,
@@ -1040,8 +1081,10 @@ private fun HadithContent(
                     .fillMaxWidth()
                     .height(64.dp)
                     .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                // LEFT SIDE - Back button
                 IconButton(onClick = onBackClick) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -1050,36 +1093,54 @@ private fun HadithContent(
                     )
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
+                // RIGHT SIDE - Dynamic icons based on available space
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    // Language selector button - shown if space allows (priority 1)
+                    if (showLanguageButton) {
+                        IconButton(
+                            onClick = onLanguageClick,
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Language,
+                                contentDescription = "Select Translation Language",
+                                tint = toolbarContentColor,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
 
-                // Language selector button
-                IconButton(onClick = onLanguageClick) {
-                    Icon(
-                        imageVector = Icons.Filled.Language,
-                        contentDescription = "Select Translation Language",
-                        tint = toolbarContentColor
-                    )
-                }
-
-                // Collection badge - using NiaTopicTag for consistency with Dua detail
-                NiaTopicTag(
-                    followed = false,
-                    onClick = { },
-                    enabled = true,
-                    text = {
-                        Text(
-                            text = collectionName.uppercase(Locale.getDefault())
+                    // Collection badge - shown if space allows (priority 2)
+                    if (showBadge) {
+                        NiaTopicTag(
+                            followed = false,
+                            onClick = { },
+                            enabled = true,
+                            text = {
+                                Text(
+                                    text = collectionName.uppercase(Locale.getDefault()),
+                                    fontSize = 10.sp,
+                                    maxLines = 1
+                                )
+                            }
                         )
                     }
-                )
 
-                // More options menu
-                IconButton(onClick = { /* TODO: More options */ }) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "More options",
-                        tint = toolbarContentColor
-                    )
+                    // More options menu (always shown)
+                    IconButton(
+                        onClick = { /* TODO: More options */ },
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "More options",
+                            tint = toolbarContentColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
         }
@@ -1713,6 +1774,7 @@ private fun HadithShimmerLoading(
             Row(
                 modifier = Modifier
                     .height(64.dp)
+                    .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)) // Honor camera cutout horizontally only
                     .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

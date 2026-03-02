@@ -862,7 +862,7 @@ fun SurahDetailScreen(
         )
 
         // Floating Surah name that moves from info card to toolbar when scrolling
-        // Uses scroll offset for smooth translation (like DuaDetailScreen)
+        // Animates to position next to back button (left side), icons are on right side after camera
         if (uiState is SurahDetailUiState.Success) {
             val surah = (uiState as SurahDetailUiState.Success).surah
             val density = LocalDensity.current
@@ -874,7 +874,7 @@ fun SurahDetailScreen(
             val headerYPx = with(density) { (albumHeaderHeight + 24).dp.toPx() }
             val toolbarYPx = with(density) { 24.dp.toPx() }  // Stop at toolbar level (locked position)
             val startXPx = with(density) { 24.dp.toPx() }
-            val endXPx = with(density) { 56.dp.toPx() }
+            val endXPx = with(density) { 56.dp.toPx() }  // Position after back button
 
             // Use derivedStateOf for stable, optimized updates
             val floatingState by remember {
@@ -891,7 +891,7 @@ fun SurahDetailScreen(
             }
 
             val (namesYPx, progress, xOffsetPx) = floatingState
-            val scale = 1f - (progress * 0.4f)
+            val scale = 1f - (progress * 0.4f)  // Scale down as it moves up
             val contentColor = MaterialTheme.colorScheme.onSurface
 
             Box(
@@ -990,72 +990,104 @@ fun SurahDetailScreen(
             )
         }
 
-        // Floating action toolbar - only shown when user clicks More menu
+        // Floating pills - appear near top-right when More is clicked
         if (showFloatingToolbar) {
-            val toolbarConfig = LocalConfiguration.current
-            val toolbarDensity = LocalDensity.current
-            val toolbarIsLandscape = toolbarConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            val screenWidth = toolbarConfig.screenWidthDp.dp
-            val albumHeaderHeightDp = if (toolbarIsLandscape) 200.dp else screenWidth // Limited height in landscape
-            val baseVerticalOffset = albumHeaderHeightDp + 40.dp // Position closer to bottom of album image
-            val baseVerticalOffsetPx = with(toolbarDensity) { baseVerticalOffset.toPx() }
-
-            var toolbarOffsetY by remember { mutableStateOf(0f) }
-            var isOnRightSide by remember { mutableStateOf(false) }
-
+            // Scrim to dismiss on tap outside
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) { showFloatingToolbar = false }
+            )
+
+            // Floating pills container - positioned top-right below toolbar
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 80.dp, end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.End
             ) {
-                Box(
-                    modifier = Modifier
-                        .align(if (isOnRightSide) Alignment.TopEnd else Alignment.TopStart)
-                        .offset {
-                            androidx.compose.ui.unit.IntOffset(
-                                0,
-                                (baseVerticalOffsetPx + toolbarOffsetY).toInt()
-                            )
+                // Font Size pill
+                FloatingPill(
+                    icon = Icons.Default.TextFields,
+                    label = "Size",
+                    trailing = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { if (arabicFontSize > minFontSize) viewModel.changeArabicFontSize(arabicFontSize - 2f) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Default.Remove, "Decrease", Modifier.size(16.dp))
+                            }
+                            Text("${arabicFontSize.toInt()}", style = MaterialTheme.typography.labelMedium)
+                            IconButton(
+                                onClick = { if (arabicFontSize < maxFontSize) viewModel.changeArabicFontSize(arabicFontSize + 2f) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Default.Add, "Increase", Modifier.size(16.dp))
+                            }
                         }
-                ) {
-                    FloatingActionToolbar(
-                        isExpanded = isFloatingToolbarExpanded,
-                        onExpandedChange = { expanded ->
-                            isFloatingToolbarExpanded = expanded
-                            // Hide toolbar when collapsed via chevron
-                            if (!expanded) {
-                                showFloatingToolbar = false
+                    }
+                )
+
+                // Alignment pill
+                FloatingPill(
+                    icon = Icons.Default.FormatAlignCenter,
+                    label = "Align",
+                    trailing = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            listOf("start" to Icons.Default.FormatAlignLeft, "center" to Icons.Default.FormatAlignCenter, "end" to Icons.Default.FormatAlignRight).forEach { (align, icon) ->
+                                Surface(
+                                    onClick = { viewModel.changeTextAlignment(align) },
+                                    shape = CircleShape,
+                                    color = if (textAlignment == align) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            icon, align,
+                                            tint = if (textAlignment == align) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
                             }
-                        },
-                        currentFontSize = arabicFontSize,
-                        minFontSize = minFontSize,
-                        maxFontSize = maxFontSize,
-                        onIncreaseFontSize = {
-                            if (arabicFontSize < maxFontSize) {
-                                viewModel.changeArabicFontSize(arabicFontSize + 2f)
-                            }
-                        },
-                        onDecreaseFontSize = {
-                            if (arabicFontSize > minFontSize) {
-                                viewModel.changeArabicFontSize(arabicFontSize - 2f)
-                            }
-                        },
-                        isOnRightSide = isOnRightSide,
-                        onDrag = { dragAmount ->
-                            // Only allow vertical movement
-                            toolbarOffsetY += dragAmount.y
-                        },
-                        onSideSwap = {
-                            // Swap between left and right sides
-                            isOnRightSide = !isOnRightSide
-                        },
-                        textAlignment = textAlignment,
-                        onSetAlignment = { alignment ->
-                            viewModel.changeTextAlignment(alignment)
-                        },
-                        showTranslation = showTranslationInText,
-                        onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) }
-                    )
-                }
+                        }
+                    }
+                )
+
+                // Translation toggle pill
+                FloatingPill(
+                    icon = if (showTranslationInText) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                    label = "Translation",
+                    isActive = showTranslationInText,
+                    onClick = { viewModel.changeShowTranslation(!showTranslationInText) }
+                )
+
+                // Tajweed toggle pill
+                FloatingPill(
+                    icon = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                    label = "Tajweed",
+                    isActive = showTajweed,
+                    onClick = { viewModel.changeTajweed(!showTajweed) }
+                )
+
+                // Font selection pill
+                FloatingPill(
+                    icon = Icons.Default.FontDownload,
+                    label = when (selectedArabicFont) {
+                        "pdms_saleem" -> "PDMS Saleem"
+                        "noor_e_hidayat" -> "Noor e Hidayat"
+                        "thabit" -> "Thabit"
+                        "uthmani_script" -> "Uthmani"
+                        "indopak_script" -> "IndoPak"
+                        else -> "Font"
+                    },
+                    onClick = { showFontDialog = true }
+                )
             }
         }
 
@@ -1142,6 +1174,47 @@ private fun AlbumPlayerTopBar(
         else -> "??"
     }
 
+    // Dynamic toolbar layout based on camera cutout
+    // Measure available space after camera cutout and fit as many icons as possible
+
+    val view = LocalView.current
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val screenWidthDp = configuration.screenWidthDp.dp
+
+    // Get camera cutout bounds
+    val cutoutRightDp = remember(view) {
+        val displayCutout = view.rootWindowInsets?.displayCutout
+        if (displayCutout != null && displayCutout.boundingRects.isNotEmpty()) {
+            // Find the rightmost edge of any cutout
+            val maxRight = displayCutout.boundingRects.maxOfOrNull { it.right } ?: 0
+            with(density) { maxRight.toDp() }
+        } else {
+            0.dp // No cutout
+        }
+    }
+
+    // Calculate available width for icons on the right side
+    // Screen width - cutout right edge - some padding
+    val availableWidthDp = screenWidthDp - cutoutRightDp - 16.dp
+
+    // Define icon sizes
+    val iconButtonSize = 44.dp
+    val translationButtonSize = 44.dp
+
+    // Calculate how many icons can fit (More button is always shown)
+    // Icons: Translation (44dp), Bookmark (44dp), Font (44dp), Tajweed (44dp), More (44dp)
+    val moreButtonSize = 44.dp
+    val remainingWidth = availableWidthDp - moreButtonSize
+    val maxIconsThatFit = (remainingWidth / iconButtonSize).toInt().coerceAtLeast(0)
+
+    // Priority order: Translation, Bookmark, Font, Tajweed
+    // Show as many as can fit, rest go to overflow menu
+    val showTranslation = maxIconsThatFit >= 1
+    val showBookmark = maxIconsThatFit >= 2
+    val showFont = maxIconsThatFit >= 3
+    val showTajweedButton = maxIconsThatFit >= 4
+
     Surface(
         color = backgroundColor,
         tonalElevation = (4 * collapseProgress).dp, // Smooth elevation transition
@@ -1154,8 +1227,10 @@ private fun AlbumPlayerTopBar(
                 .fillMaxWidth()
                 .height(64.dp)
                 .padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            // LEFT SIDE - Back button only (floating surah name will animate here)
             IconButton(onClick = onBackClick) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -1164,103 +1239,110 @@ private fun AlbumPlayerTopBar(
                 )
             }
 
-            // Spacer for title area (actual floating title is an overlay)
-            Spacer(Modifier.weight(1f))
-
-            // Translation button with language indicator
-            Surface(
-                onClick = onTranslationClick,
-                modifier = Modifier.size(40.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = contentColor.copy(alpha = 0.12f),
-                contentColor = contentColor
+            // RIGHT SIDE - Dynamic icons based on available space after camera cutout
+            // Shows as many icons as can fit, rest accessible via More menu
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxSize()
+                // Translation button - shown if space allows (priority 1)
+                if (showTranslation) {
+                    Surface(
+                        onClick = onTranslationClick,
+                        modifier = Modifier.size(40.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = contentColor.copy(alpha = 0.12f),
+                        contentColor = contentColor
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Text(
+                                text = translationDisplay,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = contentColor,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // Bookmark button - shown if space allows (priority 2)
+                if (showBookmark) {
+                    IconButton(
+                        onClick = onBookmarkClick,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                            contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
+                            tint = contentColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Font button - shown if space allows (priority 3)
+                if (showFont) {
+                    val fontDisplay = when (selectedArabicFont) {
+                        "pdms_saleem" -> "ص"
+                        "noor_e_hidayat" -> "ن"
+                        "thabit" -> "ث"
+                        "uthmani_script" -> "ع"
+                        "indopak_script" -> "پ"
+                        else -> "F"
+                    }
+                    Surface(
+                        onClick = onFontClick,
+                        modifier = Modifier.size(40.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = contentColor.copy(alpha = 0.12f),
+                        contentColor = contentColor
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Text(
+                                text = fontDisplay,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = contentColor,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // Tajweed toggle - shown if space allows (priority 4)
+                if (showTajweedButton) {
+                    IconButton(
+                        onClick = onTajweedClick,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                            contentDescription = if (showTajweed) "Disable Tajweed" else "Enable Tajweed",
+                            tint = contentColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // More options menu - always shown (floating toolbar has all options)
+                IconButton(
+                    onClick = onMoreClick,
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Language,
-                        contentDescription = "Translation",
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "More options",
                         tint = contentColor,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = translationDisplay,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = contentColor,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold
+                        modifier = Modifier.size(24.dp)
                     )
                 }
-            }
-
-            Spacer(Modifier.width(8.dp))
-
-            // Font selection button with font hint
-            val fontDisplay = when (selectedArabicFont) {
-                "pdms_saleem" -> "PS"
-                "noor_e_hidayat" -> "NH"
-                "thabit" -> "TH"
-                "uthmani_script" -> "US"
-                "indopak_script" -> "IP"
-                else -> "F"
-            }
-            Surface(
-                onClick = onFontClick,
-                modifier = Modifier.size(40.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = contentColor.copy(alpha = 0.12f),
-                contentColor = contentColor
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.TextFormat,
-                        contentDescription = "Font selection",
-                        tint = contentColor,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = fontDisplay,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = contentColor,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(Modifier.width(4.dp))
-
-            // Tajweed toggle button - uses Check icons like bookmark
-            IconButton(onClick = onTajweedClick) {
-                Icon(
-                    imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
-                    contentDescription = if (showTajweed) "Disable Tajweed colors" else "Enable Tajweed colors",
-                    tint = contentColor
-                )
-            }
-
-            IconButton(onClick = onBookmarkClick) {
-                Icon(
-                    imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                    contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
-                    tint = contentColor
-                )
-            }
-
-            // More options menu - toggles floating toolbar
-            IconButton(onClick = onMoreClick) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "More options",
-                    tint = contentColor
-                )
             }
         }
     }
@@ -3521,6 +3603,12 @@ private fun FloatingActionToolbar(
     onSetAlignment: (String) -> Unit = {},
     showTranslation: Boolean = true,
     onToggleTranslation: () -> Unit = {},
+    // Font selection
+    selectedArabicFont: String = "pdms_saleem",
+    onFontClick: () -> Unit = {},
+    // Tajweed toggle
+    showTajweed: Boolean = false,
+    onTajweedClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
 
@@ -3640,6 +3728,22 @@ private fun FloatingActionToolbar(
                         contentDescription = if (showTranslation) "Hide translation" else "Show translation",
                         selected = showTranslation,
                         onClick = onToggleTranslation
+                    )
+
+                    // Tajweed toggle button
+                    FloatingToolbarButton(
+                        icon = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                        contentDescription = if (showTajweed) "Disable Tajweed colors" else "Enable Tajweed colors",
+                        selected = showTajweed,
+                        onClick = onTajweedClick
+                    )
+
+                    // Font selection button
+                    FloatingToolbarButton(
+                        icon = Icons.Default.FontDownload,
+                        contentDescription = "Select Arabic font",
+                        selected = false,
+                        onClick = onFontClick
                     )
                 }
             }
