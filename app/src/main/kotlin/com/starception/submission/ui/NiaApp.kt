@@ -154,8 +154,22 @@ internal fun NiaAppContent(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    // In landscape mode, use custom centered NavigationRail layout
-    if (isLandscape) {
+    // Check if we should hide the bottom navigation bar (for detail screens)
+    val shouldHideBottomBar = appState.shouldHideBottomBar
+
+    // When bottom bar should be hidden, render content directly without navigation scaffold
+    if (shouldHideBottomBar) {
+        NiaMainContent(
+            appState = appState,
+            snackbarHostState = snackbarHostState,
+            onTopAppBarActionClick = onTopAppBarActionClick,
+            modifier = modifier,
+            isLandscape = isLandscape,
+            mainViewModel = mainViewModel,
+            deepLinkCourseId = deepLinkCourseId,
+        )
+    } else if (isLandscape) {
+        // In landscape mode, use custom centered NavigationRail layout
         NiaLandscapeLayout(
             appState = appState,
             snackbarHostState = snackbarHostState,

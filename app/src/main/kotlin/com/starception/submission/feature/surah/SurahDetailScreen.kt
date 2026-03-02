@@ -990,7 +990,7 @@ fun SurahDetailScreen(
             )
         }
 
-        // Floating pills - appear near top-right when More is clicked
+        // Bottom floating toolbar - replaces navigation bar when More is clicked
         if (showFloatingToolbar) {
             // Scrim to dismiss on tap outside
             Box(
@@ -1002,92 +1002,113 @@ fun SurahDetailScreen(
                     ) { showFloatingToolbar = false }
             )
 
-            // Floating pills container - positioned top-right below toolbar
-            Column(
+            // Bottom toolbar container - positioned at bottom, hiding navigation bar
+            Surface(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 80.dp, end = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.End
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                tonalElevation = 3.dp
             ) {
-                // Font Size pill
-                FloatingPill(
-                    icon = Icons.Default.TextFields,
-                    label = "Size",
-                    trailing = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { if (arabicFontSize > minFontSize) viewModel.changeArabicFontSize(arabicFontSize - 2f) },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(Icons.Default.Remove, "Decrease", Modifier.size(16.dp))
-                            }
-                            Text("${arabicFontSize.toInt()}", style = MaterialTheme.typography.labelMedium)
-                            IconButton(
-                                onClick = { if (arabicFontSize < maxFontSize) viewModel.changeArabicFontSize(arabicFontSize + 2f) },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(Icons.Default.Add, "Increase", Modifier.size(16.dp))
-                            }
-                        }
-                    }
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 12.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Font Size controls
+                    BottomToolbarItem(
+                        icon = Icons.Default.TextDecrease,
+                        label = "A-",
+                        onClick = { if (arabicFontSize > minFontSize) viewModel.changeArabicFontSize(arabicFontSize - 2f) },
+                        enabled = arabicFontSize > minFontSize
+                    )
 
-                // Alignment pill
-                FloatingPill(
-                    icon = Icons.Default.FormatAlignCenter,
-                    label = "Align",
-                    trailing = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            listOf("start" to Icons.Default.FormatAlignLeft, "center" to Icons.Default.FormatAlignCenter, "end" to Icons.Default.FormatAlignRight).forEach { (align, icon) ->
-                                Surface(
-                                    onClick = { viewModel.changeTextAlignment(align) },
-                                    shape = CircleShape,
-                                    color = if (textAlignment == align) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            icon, align,
-                                            tint = if (textAlignment == align) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                )
+                    BottomToolbarItem(
+                        icon = Icons.Default.TextIncrease,
+                        label = "A+",
+                        onClick = { if (arabicFontSize < maxFontSize) viewModel.changeArabicFontSize(arabicFontSize + 2f) },
+                        enabled = arabicFontSize < maxFontSize
+                    )
 
-                // Translation toggle pill
-                FloatingPill(
-                    icon = if (showTranslationInText) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                    label = "Translation",
-                    isActive = showTranslationInText,
-                    onClick = { viewModel.changeShowTranslation(!showTranslationInText) }
-                )
+                    // Divider
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(32.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant)
+                    )
 
-                // Tajweed toggle pill
-                FloatingPill(
-                    icon = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
-                    label = "Tajweed",
-                    isActive = showTajweed,
-                    onClick = { viewModel.changeTajweed(!showTajweed) }
-                )
+                    // Alignment buttons
+                    BottomToolbarItem(
+                        icon = Icons.Default.FormatAlignLeft,
+                        label = "Left",
+                        onClick = { viewModel.changeTextAlignment("start") },
+                        isActive = textAlignment == "start"
+                    )
 
-                // Font selection pill
-                FloatingPill(
-                    icon = Icons.Default.FontDownload,
-                    label = when (selectedArabicFont) {
-                        "pdms_saleem" -> "PDMS Saleem"
-                        "noor_e_hidayat" -> "Noor e Hidayat"
-                        "thabit" -> "Thabit"
-                        "uthmani_script" -> "Uthmani"
-                        "indopak_script" -> "IndoPak"
-                        else -> "Font"
-                    },
-                    onClick = { showFontDialog = true }
-                )
+                    BottomToolbarItem(
+                        icon = Icons.Default.FormatAlignCenter,
+                        label = "Center",
+                        onClick = { viewModel.changeTextAlignment("center") },
+                        isActive = textAlignment == "center"
+                    )
+
+                    BottomToolbarItem(
+                        icon = Icons.Default.FormatAlignRight,
+                        label = "Right",
+                        onClick = { viewModel.changeTextAlignment("end") },
+                        isActive = textAlignment == "end"
+                    )
+
+                    // Divider
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(32.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant)
+                    )
+
+                    // Translation toggle
+                    BottomToolbarItem(
+                        icon = if (showTranslationInText) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        label = "Trans",
+                        onClick = { viewModel.changeShowTranslation(!showTranslationInText) },
+                        isActive = showTranslationInText
+                    )
+
+                    // Tajweed toggle
+                    BottomToolbarItem(
+                        icon = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                        label = "Tajweed",
+                        onClick = { viewModel.changeTajweed(!showTajweed) },
+                        isActive = showTajweed
+                    )
+
+                    // Font selection
+                    BottomToolbarItem(
+                        icon = Icons.Default.FontDownload,
+                        label = when (selectedArabicFont) {
+                            "pdms_saleem" -> "Saleem"
+                            "noor_e_hidayat" -> "Noor"
+                            "thabit" -> "Thabit"
+                            "uthmani_script" -> "Uthmani"
+                            "indopak_script" -> "IndoPak"
+                            else -> "Font"
+                        },
+                        onClick = { showFontDialog = true }
+                    )
+
+                    // Close button
+                    BottomToolbarItem(
+                        icon = Icons.Default.Close,
+                        label = "Close",
+                        onClick = { showFloatingToolbar = false }
+                    )
+                }
             }
         }
 
@@ -3794,6 +3815,57 @@ private fun FloatingToolbarButton(
                 tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                 modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Bottom toolbar item - used in the bottom floating toolbar
+ * Displays an icon with a small label below it
+ */
+@Composable
+private fun BottomToolbarItem(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    isActive: Boolean = false
+) {
+    val containerColor = when {
+        isActive -> MaterialTheme.colorScheme.primaryContainer
+        else -> Color.Transparent
+    }
+    val contentColor = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        isActive -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.widthIn(min = 56.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = containerColor
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = contentColor,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = contentColor,
+                maxLines = 1
             )
         }
     }

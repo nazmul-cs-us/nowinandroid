@@ -46,6 +46,10 @@ import com.starception.submission.navigation.TopLevelDestination.COURSE
 import com.starception.submission.navigation.TopLevelDestination.FOR_YOU
 import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.navigation.TopLevelDestination.HOME
+import com.starception.submission.feature.surah.navigation.SurahRoute
+import com.starception.submission.feature.course.navigation.CourseDetailRoute
+import com.starception.submission.feature.dua.DuaDetailRoute
+import com.starception.submission.feature.hadith.HadithDetailRoute
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -109,6 +113,19 @@ class NiaAppState(
             return TopLevelDestination.entries.firstOrNull { topLevelDestination ->
                 currentDestination?.hasRoute(route = topLevelDestination.route) == true
             }
+        }
+
+    /**
+     * Returns true if the bottom navigation bar should be hidden.
+     * This is true for full-screen detail screens like Surah, Course Detail, Dua Detail, etc.
+     */
+    val shouldHideBottomBar: Boolean
+        @Composable get() {
+            val destination = currentDestination ?: return false
+            return destination.hasRoute<SurahRoute>() ||
+                   destination.hasRoute<CourseDetailRoute>() ||
+                   destination.hasRoute<DuaDetailRoute>() ||
+                   destination.hasRoute<HadithDetailRoute>()
         }
 
     val isOffline = networkMonitor.isOnline

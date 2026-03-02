@@ -36,7 +36,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -67,6 +69,15 @@ import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.filled.TextFormat
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.TextDecrease
+import androidx.compose.material.icons.filled.TextIncrease
+import androidx.compose.material.icons.filled.FormatAlignLeft
+import androidx.compose.material.icons.filled.FormatAlignCenter
+import androidx.compose.material.icons.filled.FormatAlignRight
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material.icons.outlined.RecordVoiceOver
@@ -905,6 +916,12 @@ fun DuaDetailScreen(
     // Dialog states
     var showTranslationDialog by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
+    var showFloatingToolbar by remember { mutableStateOf(false) }
+
+    // Font size state for toolbar controls
+    var arabicFontSize by remember { mutableStateOf(32f) }
+    val minFontSize = 20f
+    val maxFontSize = 48f
 
     // Bookmark state - will be updated when page changes
     var isBookmarked by remember { mutableStateOf(false) }
@@ -2090,13 +2107,104 @@ fun DuaDetailScreen(
                 }
             }
 
+            // Bottom floating toolbar - replaces navigation bar when More is clicked
+            if (showFloatingToolbar) {
+                // Scrim to dismiss on tap outside
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) { showFloatingToolbar = false }
+                )
+
+                // Bottom toolbar container - positioned at bottom
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .navigationBarsPadding(),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    tonalElevation = 3.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 12.dp)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Font Size controls
+                        DuaBottomToolbarItem(
+                            icon = Icons.Default.TextDecrease,
+                            label = "A-",
+                            onClick = { if (arabicFontSize > minFontSize) arabicFontSize -= 2f },
+                            enabled = arabicFontSize > minFontSize
+                        )
+
+                        DuaBottomToolbarItem(
+                            icon = Icons.Default.TextIncrease,
+                            label = "A+",
+                            onClick = { if (arabicFontSize < maxFontSize) arabicFontSize += 2f },
+                            enabled = arabicFontSize < maxFontSize
+                        )
+
+                        // Divider
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .height(32.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant)
+                        )
+
+                        // Translation toggle
+                        DuaBottomToolbarItem(
+                            icon = Icons.Default.Language,
+                            label = translationCode,
+                            onClick = { showTranslationDialog = true }
+                        )
+
+                        // Tajweed toggle
+                        DuaBottomToolbarItem(
+                            icon = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                            label = "Tajweed",
+                            onClick = { viewModel.toggleTajweed() },
+                            isActive = showTajweed
+                        )
+
+                        // Font selection
+                        DuaBottomToolbarItem(
+                            icon = Icons.Default.FontDownload,
+                            label = when (selectedFont) {
+                                "pdms_saleem" -> "Saleem"
+                                "noor_e_hidayat" -> "Noor"
+                                "thabit" -> "Thabit"
+                                "uthmani_script" -> "Uthmani"
+                                "indopak_script" -> "IndoPak"
+                                else -> "Font"
+                            },
+                            onClick = { showFontDialog = true }
+                        )
+
+                        // Close button
+                        DuaBottomToolbarItem(
+                            icon = Icons.Default.Close,
+                            label = "Close",
+                            onClick = { showFloatingToolbar = false }
+                        )
+                    }
+                }
+            }
+
             // Fixed toolbar at top - transparent to show sky through
-            // Use fixed padding instead of statusBarsPadding() to prevent jump when immersive mode activates
+            // Use minimal padding to match SurahDetailScreen positioning
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .padding(top = 32.dp) // Fixed padding to clear camera punch hole area
+                    .padding(top = 8.dp) // Minimal top padding to match SurahDetailScreen
             ) {
                 Row(
                     modifier = Modifier
@@ -2217,9 +2325,9 @@ fun DuaDetailScreen(
                         )
                     }
 
-                    // More options button (vertical dots)
+                    // More options button (vertical dots) - toggles bottom toolbar
                     IconButton(
-                        onClick = { /* Menu action */ },
+                        onClick = { showFloatingToolbar = !showFloatingToolbar },
                         modifier = Modifier.offset(x = (-8).dp)
                     ) {
                         Icon(
@@ -3275,5 +3383,56 @@ private fun DuaSwipeArrowIndicator(
             tint = Color.White,
             modifier = Modifier.size((28f + progress * 8f).dp),
         )
+    }
+}
+
+/**
+ * Bottom toolbar item - used in the bottom floating toolbar for Dua detail screen
+ * Displays an icon with a small label below it
+ */
+@Composable
+private fun DuaBottomToolbarItem(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    isActive: Boolean = false
+) {
+    val containerColor = when {
+        isActive -> MaterialTheme.colorScheme.primaryContainer
+        else -> Color.Transparent
+    }
+    val contentColor = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        isActive -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.widthIn(min = 56.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = containerColor
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = contentColor,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = contentColor,
+                maxLines = 1
+            )
+        }
     }
 }
