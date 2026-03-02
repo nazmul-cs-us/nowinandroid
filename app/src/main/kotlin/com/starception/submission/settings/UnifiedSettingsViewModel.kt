@@ -126,6 +126,7 @@ class UnifiedSettingsViewModel @Inject constructor(
         loadTravelDuaSettings()
         loadDatabaseInfo()
         loadVoiceSettings()
+        loadTtsSettings()
     }
 
     private fun loadPrayerSettings() {
@@ -705,6 +706,36 @@ class UnifiedSettingsViewModel @Inject constructor(
                 Log.i(TAG, "Voice settings saved: engine=${engine.name}")
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving voice settings", e)
+            }
+        }
+    }
+
+    // ============= TTS Settings =============
+
+    /**
+     * Load TTS settings from SharedPreferences
+     */
+    private fun loadTtsSettings() {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "Loading TTS settings...")
+                val prefs = context.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
+                val voiceName = prefs.getString("selected_voice", TtsVoice.KOKORO_EN.name)
+                val speakerId = prefs.getInt("selected_speaker_id", 0)
+
+                val voice = try {
+                    TtsVoice.valueOf(voiceName ?: TtsVoice.KOKORO_EN.name)
+                } catch (e: Exception) {
+                    TtsVoice.KOKORO_EN
+                }
+
+                _ttsSettings.value = _ttsSettings.value.copy(
+                    selectedVoice = voice,
+                    selectedSpeakerId = speakerId
+                )
+                Log.i(TAG, "TTS settings loaded: voice=${voice.name}, speakerId=$speakerId")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading TTS settings", e)
             }
         }
     }
