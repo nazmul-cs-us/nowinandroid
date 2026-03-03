@@ -102,6 +102,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -923,6 +924,10 @@ fun DuaDetailScreen(
     val minFontSize = 20f
     val maxFontSize = 48f
 
+    // Toolbar collapse progress state (0 = transparent, 1 = solid background)
+    // This is updated from inside the pager based on scroll position
+    var toolbarCollapseProgress by remember { mutableFloatStateOf(0f) }
+
     // Bookmark state - will be updated when page changes
     var isBookmarked by remember { mutableStateOf(false) }
 
@@ -1172,6 +1177,28 @@ fun DuaDetailScreen(
                             androidx.compose.runtime.derivedStateOf {
                                 lazyListState.firstVisibleItemIndex > 0 ||
                                 (lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset > 150)
+                            }
+                        }
+
+                        // Update toolbar collapse progress based on scroll position (matches SurahDetailScreen)
+                        LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
+                            val itemIndex = lazyListState.firstVisibleItemIndex
+                            val offset = lazyListState.firstVisibleItemScrollOffset.toFloat()
+
+                            toolbarCollapseProgress = when {
+                                // Past the header - fully solid
+                                itemIndex >= 1 -> 1f
+                                // Within header (item 0) - smooth transition
+                                itemIndex == 0 -> {
+                                    val transitionStart = 100f
+                                    val transitionEnd = 300f
+                                    when {
+                                        offset <= transitionStart -> 0f  // Transparent
+                                        offset >= transitionEnd -> 1f    // Solid
+                                        else -> (offset - transitionStart) / (transitionEnd - transitionStart)
+                                    }
+                                }
+                                else -> 0f
                             }
                         }
 
@@ -2198,9 +2225,22 @@ fun DuaDetailScreen(
                 }
             }
 
-            // Fixed toolbar at top - transparent to show sky through
-            // Use minimal padding to match SurahDetailScreen positioning
-            Box(
+            // Fixed toolbar at top - background transitions from transparent to solid on scroll
+            // Smooth transition based on toolbarCollapseProgress (0 = transparent, 1 = solid)
+            val toolbarBackgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = toolbarCollapseProgress)
+
+            // Content color transitions from white (over image) to onSurface (over solid background)
+            val surfaceColor = MaterialTheme.colorScheme.onSurface
+            val toolbarContentColor = Color(
+                red = 1f + (surfaceColor.red - 1f) * toolbarCollapseProgress,
+                green = 1f + (surfaceColor.green - 1f) * toolbarCollapseProgress,
+                blue = 1f + (surfaceColor.blue - 1f) * toolbarCollapseProgress,
+                alpha = 1f
+            )
+
+            Surface(
+                color = toolbarBackgroundColor,
+                tonalElevation = (4 * toolbarCollapseProgress).dp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
@@ -2218,7 +2258,7 @@ fun DuaDetailScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = toolbarContentColor
                         )
                     }
 
@@ -2229,8 +2269,8 @@ fun DuaDetailScreen(
                         onClick = { showTranslationDialog = true },
                         modifier = Modifier.size(40.dp),
                         shape = RoundedCornerShape(8.dp),
-                        color = Color.White.copy(alpha = 0.12f),
-                        contentColor = Color.White
+                        color = toolbarContentColor.copy(alpha = 0.12f),
+                        contentColor = toolbarContentColor
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -2240,13 +2280,13 @@ fun DuaDetailScreen(
                             Icon(
                                 imageVector = Icons.Default.Language,
                                 contentDescription = "Translation",
-                                tint = Color.White,
+                                tint = toolbarContentColor,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = translationCode,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
+                                color = toolbarContentColor,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -2260,8 +2300,8 @@ fun DuaDetailScreen(
                         onClick = { showFontDialog = true },
                         modifier = Modifier.size(40.dp),
                         shape = RoundedCornerShape(8.dp),
-                        color = Color.White.copy(alpha = 0.12f),
-                        contentColor = Color.White
+                        color = toolbarContentColor.copy(alpha = 0.12f),
+                        contentColor = toolbarContentColor
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -2271,13 +2311,13 @@ fun DuaDetailScreen(
                             Icon(
                                 imageVector = Icons.Default.TextFormat,
                                 contentDescription = "Font selection",
-                                tint = Color.White,
+                                tint = toolbarContentColor,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = fontDisplay,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
+                                color = toolbarContentColor,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -2291,7 +2331,7 @@ fun DuaDetailScreen(
                         Icon(
                             imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
                             contentDescription = if (showTajweed) "Disable Tajweed" else "Enable Tajweed",
-                            tint = Color.White
+                            tint = toolbarContentColor
                         )
                     }
 
@@ -2321,7 +2361,7 @@ fun DuaDetailScreen(
                         Icon(
                             imageVector = if (localBookmarkState) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
                             contentDescription = if (localBookmarkState) "Remove Bookmark" else "Add Bookmark",
-                            tint = Color.White
+                            tint = toolbarContentColor
                         )
                     }
 
@@ -2333,7 +2373,7 @@ fun DuaDetailScreen(
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "More options",
-                            tint = Color.White
+                            tint = toolbarContentColor
                         )
                     }
                 }

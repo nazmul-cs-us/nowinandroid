@@ -871,7 +871,8 @@ fun SurahDetailScreen(
 
             // Calculate positions once (stable values)
             val albumHeaderHeight = if (localIsLandscape) 200 else localConfig.screenWidthDp
-            val headerYPx = with(density) { (albumHeaderHeight + 24).dp.toPx() }
+            // Start floating names higher (12dp) to ensure good separation from translation text below
+            val headerYPx = with(density) { (albumHeaderHeight + 12).dp.toPx() }
             val toolbarYPx = with(density) { 24.dp.toPx() }  // Stop at toolbar level (locked position)
             val startXPx = with(density) { 24.dp.toPx() }
             val endXPx = with(density) { 56.dp.toPx() }  // Position after back button
@@ -904,7 +905,9 @@ fun SurahDetailScreen(
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                     }
             ) {
-                Column {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Text(
                         text = surah.nameEnglish,
                         style = MaterialTheme.typography.headlineMedium,
@@ -3111,23 +3114,33 @@ private fun AlbumInfoCard(
             .fillMaxWidth()
             .fillMaxHeight() // Fill parent Box container (196dp)
     ) {
+        // Dynamic spacer height based on whether course badge exists
+        // Spacer creates room for floating names (English + Arabic)
+        // When course badge exists, need more space to separate from badge content
+        // When no badge, less space needed for cleaner appearance
+        val floatingNameSpacerHeight = if (courseCompletionInfo != null) 72.dp else 44.dp
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
-                .padding(top = 16.dp, bottom = 8.dp),
+                .padding(top = 10.dp, bottom = 4.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             // Top section: Spacer for floating overlay (item 3: Al-Fatihah / الفاتحة)
-            Spacer(Modifier.height(56.dp))
+            // Height is dynamic based on whether course badge exists
+            Spacer(Modifier.height(floatingNameSpacerHeight))
 
-            // Bottom section: Translation + Chips grouped together (items 4 & 5)
-            Column {
+            // Bottom section: Translation + Course badge + Chips grouped together
+            // Consistent spacing for proper separation
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 // Item 4: Translation
                 if (surah.nameTranslation.isNotBlank()) {
                     Text(
                         text = "\"${surah.nameTranslation}\"",
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
                     )
@@ -3135,7 +3148,6 @@ private fun AlbumInfoCard(
 
                 // Course completion badge (if applicable)
                 if (courseCompletionInfo != null) {
-                    Spacer(Modifier.height(8.dp))
                     NiaVerifiedTag(
                         onClick = { },
                         enabled = true,
@@ -3147,33 +3159,37 @@ private fun AlbumInfoCard(
                     )
                 }
 
-                // Small gap between translation and chips
-                Spacer(Modifier.height(6.dp))
-
                 // Item 5: Chips row - 7 AYAHS, MECCAN on left | HOLY QURAN on right
+                // Use weight to prevent shrinking of info chips
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left side - Info chips
+                    // Left side - Info chips (fixed size, should not shrink)
                     Row(
+                        modifier = Modifier.wrapContentWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         InfoChip(text = "${surah.ayahCount} Ayahs")
                         InfoChip(text = surah.revelationType)
                     }
 
-                    // Right side - Topic tags
-                    if (topics.isNotEmpty()) {
-                        topics.forEach { topic ->
-                            NiaTopicTag(
-                                followed = true,
-                                onClick = { onTopicClick(topic.id) },
-                                text = {
-                                    Text(text = topic.name.uppercase(Locale.getDefault()))
-                                }
-                            )
+                    // Right side - Topic tags (can wrap if needed)
+                    Row(
+                        modifier = Modifier.wrapContentWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (topics.isNotEmpty()) {
+                            topics.forEach { topic ->
+                                NiaTopicTag(
+                                    followed = true,
+                                    onClick = { onTopicClick(topic.id) },
+                                    text = {
+                                        Text(text = topic.name.uppercase(Locale.getDefault()))
+                                    }
+                                )
+                            }
                         }
                     }
                 }
