@@ -81,6 +81,7 @@ fun UnifiedSettingsScreen(
     val autoDetectedCountryName by viewModel.autoDetectedCountryName.collectAsStateWithLifecycle()
     val notificationPreferences by viewModel.notificationPreferences.collectAsStateWithLifecycle()
     val travelDuaSettings by viewModel.travelDuaSettings.collectAsStateWithLifecycle()
+    val isAudioChainPlaying by viewModel.isAudioChainPlaying.collectAsStateWithLifecycle()
     val developerSettings by viewModel.developerSettings.collectAsStateWithLifecycle()
     val voiceSettings by viewModel.voiceSettings.collectAsStateWithLifecycle()
     val ttsSettings by viewModel.ttsSettings.collectAsStateWithLifecycle()
@@ -200,7 +201,9 @@ fun UnifiedSettingsScreen(
                         TravelDuaSection(
                             settings = travelDuaSettings,
                             onSettingsChanged = viewModel::updateTravelDuaSettings,
-                            onTriggerAudioChain = viewModel::triggerFullAudioChain
+                            onTriggerAudioChain = viewModel::triggerFullAudioChain,
+                            onStopAudioChain = viewModel::stopAudioChain,
+                            isPlaying = isAudioChainPlaying
                         )
                     }
                 }

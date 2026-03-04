@@ -108,6 +108,10 @@ class UnifiedSettingsViewModel @Inject constructor(
     private val _travelDuaSettings = MutableStateFlow(TravelDuaSettings())
     val travelDuaSettings: StateFlow<TravelDuaSettings> = _travelDuaSettings.asStateFlow()
 
+    // Audio chain playing state
+    private val _isAudioChainPlaying = MutableStateFlow(false)
+    val isAudioChainPlaying: StateFlow<Boolean> = _isAudioChainPlaying.asStateFlow()
+
     // Developer settings state
     private val _developerSettings = MutableStateFlow(DeveloperSettingsState())
     val developerSettings: StateFlow<DeveloperSettingsState> = _developerSettings.asStateFlow()
@@ -668,7 +672,33 @@ class UnifiedSettingsViewModel @Inject constructor(
      */
     fun triggerFullAudioChain() {
         Log.i(TAG, "🎵 Triggering full audio chain from Settings...")
+        _isAudioChainPlaying.value = true
         ActivityTracker.triggerFullAudioChain()
+    }
+
+    /**
+     * Stop the currently playing audio chain.
+     */
+    fun stopAudioChain() {
+        Log.i(TAG, "⏹️ Stopping audio chain from Settings...")
+        _isAudioChainPlaying.value = false
+
+        // Stop DrivingAudioService
+        try {
+            val stopIntent = android.content.Intent(context, com.starception.submission.services.DrivingAudioService::class.java).apply {
+                action = com.starception.submission.services.DrivingAudioService.ACTION_STOP
+            }
+            context.startService(stopIntent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping audio chain", e)
+        }
+    }
+
+    /**
+     * Called when audio chain playback completes naturally.
+     */
+    fun onAudioChainComplete() {
+        _isAudioChainPlaying.value = false
     }
 
     // ============= Voice Settings =============

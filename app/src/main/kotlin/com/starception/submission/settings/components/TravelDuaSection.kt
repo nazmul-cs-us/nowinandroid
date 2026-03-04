@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -12,6 +13,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -28,6 +30,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Schedule
@@ -68,13 +71,16 @@ import androidx.core.content.ContextCompat
 import com.starception.submission.config.TravelDuaSettings
 
 /**
- * Modern Travel Dua settings section with Material 3 design.
+ * Compact Travel Dua settings section with Material 3 design.
+ * Features play/pause button for audio chain control.
  */
 @Composable
 fun TravelDuaSection(
     settings: TravelDuaSettings,
     onSettingsChanged: (TravelDuaSettings) -> Unit,
     onTriggerAudioChain: () -> Unit = {},
+    onStopAudioChain: () -> Unit = {},
+    isPlaying: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -111,7 +117,7 @@ fun TravelDuaSection(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Master toggle with modern switch
         ModernSwitchRow(
@@ -136,140 +142,142 @@ fun TravelDuaSection(
             exit = fadeOut() + shrinkVertically()
         ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Timing Settings Section
-                ModernSliderCard(
-                    icon = Icons.Outlined.Timer,
-                    label = "Driving Time",
-                    description = "How long to drive before dua plays",
-                    value = settings.playbackDelaySeconds,
-                    minValue = 10,
-                    maxValue = 180,
-                    unit = "sec",
-                    onValueChange = { value ->
-                        onSettingsChanged(settings.copy(playbackDelaySeconds = value))
-                    }
-                )
-
-                ModernSliderCard(
-                    icon = Icons.Outlined.Schedule,
-                    label = "Cooldown Period",
-                    description = "Wait time before dua can play again",
-                    value = settings.cooldownMinutes,
-                    minValue = 1,
-                    maxValue = 30,
-                    unit = "min",
-                    onValueChange = { value ->
-                        onSettingsChanged(settings.copy(cooldownMinutes = value))
-                    }
-                )
-
-                ModernSliderCard(
-                    icon = Icons.Outlined.Traffic,
-                    label = "Stop Tolerance",
-                    description = "Max stop time before timer resets",
-                    value = settings.gapToleranceMinutes,
-                    minValue = 1,
-                    maxValue = 15,
-                    unit = "min",
-                    onValueChange = { value ->
-                        onSettingsChanged(settings.copy(gapToleranceMinutes = value))
-                    }
-                )
-
-                ModernSliderCard(
-                    icon = Icons.Outlined.Speed,
-                    label = "Speed Threshold",
-                    description = "Minimum speed to detect driving",
-                    value = settings.drivingSpeedThresholdKmh,
-                    minValue = 10,
-                    maxValue = 40,
-                    unit = "km/h",
-                    onValueChange = { value ->
-                        onSettingsChanged(settings.copy(drivingSpeedThresholdKmh = value))
-                    }
-                )
-
-                // Manual trigger button with modern styling
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Button(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        checkPermissionAndPlay()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                // Compact 2x2 grid for sliders
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                    CompactSliderCard(
+                        icon = Icons.Outlined.Timer,
+                        label = "Driving",
+                        value = settings.playbackDelaySeconds,
+                        minValue = 10,
+                        maxValue = 180,
+                        unit = "s",
+                        modifier = Modifier.weight(1f),
+                        onValueChange = { value ->
+                            onSettingsChanged(settings.copy(playbackDelaySeconds = value))
+                        }
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Test Audio Chain",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
+                    CompactSliderCard(
+                        icon = Icons.Outlined.Schedule,
+                        label = "Cooldown",
+                        value = settings.cooldownMinutes,
+                        minValue = 1,
+                        maxValue = 30,
+                        unit = "m",
+                        modifier = Modifier.weight(1f),
+                        onValueChange = { value ->
+                            onSettingsChanged(settings.copy(cooldownMinutes = value))
+                        }
                     )
                 }
 
-                // Info card
-                Surface(
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                    CompactSliderCard(
+                        icon = Icons.Outlined.Traffic,
+                        label = "Gap",
+                        value = settings.gapToleranceMinutes,
+                        minValue = 1,
+                        maxValue = 15,
+                        unit = "m",
+                        modifier = Modifier.weight(1f),
+                        onValueChange = { value ->
+                            onSettingsChanged(settings.copy(gapToleranceMinutes = value))
+                        }
+                    )
+                    CompactSliderCard(
+                        icon = Icons.Outlined.Speed,
+                        label = "Speed",
+                        value = settings.drivingSpeedThresholdKmh,
+                        minValue = 10,
+                        maxValue = 40,
+                        unit = "km/h",
+                        modifier = Modifier.weight(1f),
+                        onValueChange = { value ->
+                            onSettingsChanged(settings.copy(drivingSpeedThresholdKmh = value))
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                // Play/Pause button with animated content
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (isPlaying) {
+                            onStopAudioChain()
+                        } else {
+                            checkPermissionAndPlay()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isPlaying)
+                            MaterialTheme.colorScheme.error
+                        else
+                            MaterialTheme.colorScheme.primary,
+                        contentColor = if (isPlaying)
+                            MaterialTheme.colorScheme.onError
+                        else
+                            MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    AnimatedContent(
+                        targetState = isPlaying,
+                        transitionSpec = {
+                            fadeIn() togetherWith fadeOut()
+                        },
+                        label = "play_pause"
+                    ) { playing ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
+                            Icon(
+                                imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Audio Chain",
+                                text = if (playing) "Stop" else "Test Audio Chain",
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "Travel Dua \u2192 Hadith (if enrolled) \u2192 Quran (if enrolled)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Say YES or NO to mark lessons complete. Microphone permission required for voice recognition.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
                 }
+
+                // Compact info text
+                Text(
+                    text = "Travel Dua → Hadith → Quran • Say YES/NO to complete",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                )
             }
         }
     }
 }
 
+/**
+ * Compact slider card for 2x2 grid layout.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ModernSliderCard(
+private fun CompactSliderCard(
     icon: ImageVector,
     label: String,
-    description: String,
     value: Int,
     minValue: Int,
     maxValue: Int,
@@ -281,14 +289,15 @@ private fun ModernSliderCard(
     var previousValue by remember { mutableStateOf(value) }
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            // Header row with icon, label, and value
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -296,48 +305,39 @@ private fun ModernSliderCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Icon with gradient background
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    Column {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                // Value badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "$value$unit",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
                 }
             }
 
-            // Modern slider with value thumb
+            // Compact slider
             Slider(
                 value = value.toFloat(),
                 onValueChange = { newValue ->
@@ -349,35 +349,13 @@ private fun ModernSliderCard(
                     onValueChange(newIntValue)
                 },
                 valueRange = minValue.toFloat()..maxValue.toFloat(),
-                modifier = Modifier.fillMaxWidth(),
-                thumb = {
-                    Box(
-                        modifier = Modifier
-                            .height(28.dp)
-                            .shadow(
-                                elevation = 4.dp,
-                                shape = RoundedCornerShape(14.dp)
-                            )
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.primary)
-                            .padding(horizontal = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "$value$unit",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                lineHeight = 14.sp
-                            ),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(24.dp),
                 colors = SliderDefaults.colors(
-                    activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                    activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    thumbColor = MaterialTheme.colorScheme.primary
                 )
             )
         }

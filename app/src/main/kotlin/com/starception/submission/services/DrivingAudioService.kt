@@ -98,6 +98,10 @@ class DrivingAudioService : Service() {
     var onPlaybackComplete: (() -> Unit)? = null
     var onStateChanged: ((PlaybackState) -> Unit)? = null
 
+    // Hadith TTS cache tracking - always maintain 3 hadiths in cache
+    private val cachedHadithNumbers = mutableSetOf<Int>()
+    private val CACHE_TARGET_SIZE = 3
+
     enum class PlaybackState {
         IDLE,
         PLAYING_TRAVEL_DUA,
@@ -247,6 +251,10 @@ class DrivingAudioService : Service() {
                 return
             }
 
+            // 🔄 PRE-GENERATE: Start generating hadith TTS in background while travel dua plays
+            // This eliminates the gap between travel dua and hadith playback
+            preGenerateHadithTtsInBackground()
+
             mediaPlayer = MediaPlayer.create(this, resId).apply {
                 setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
                 setOnCompletionListener {
@@ -269,6 +277,148 @@ class DrivingAudioService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Error playing travel dua", e)
             onTravelDuaComplete()
+        }
+    }
+
+    /**
+     * Pre-generate hadith TTS in background while travel dua plays.
+     * This allows hadith playback to start immediately after travel dua completes.
+     * Always maintains 3 hadiths in cache.
+     */
+    private fun preGenerateHadithTtsInBackground() {
+        val hadithNumber = pendingHadithNumber
+
+        if (hadithNumber == null || hadithNumber <= 0) {
+            Log.d(TAG, "🔄 No hadith number to pre-generate")
+            return
+        }
+
+        // Fill cache to target size starting from current hadith
+        maintainHadithCache(hadithNumber)
+    }
+
+    /**
+     * Maintain exactly 3 hadiths in cache at all times.
+     * Call this after playing a hadith to refill the cache.
+     *
+     * @param currentHadithNumber The current/next hadith number to start from
+     */
+    private fun maintainHadithCache(currentHadithNumber: Int) {
+        // Check if user has Sherpa-ONNX TTS configured
+        val ttsPrefs = getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
+        val selectedVoiceName = ttsPrefs.getString("selected_voice", null)
+        val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
+
+        if (selectedVoiceName == null) {
+            Log.d(TAG, "🔄 Using Android TTS, no pre-generation needed")
+            return
+        }
+
+        scope.launch {
+            try {
+                val voice = try {
+                    TtsVoice.valueOf(selectedVoiceName)
+                } catch (e: Exception) {
+                    TtsVoice.KOKORO_EN
+                }
+                sherpaOnnxTts.setVoice(voice)
+
+                // Remove hadiths before current one from tracking (they're old)
+                cachedHadithNumbers.removeAll { it < currentHadithNumber }
+
+                // Calculate how many more hadiths we need to cache
+                val neededCount = CACHE_TARGET_SIZE - cachedHadithNumbers.size
+                Log.i(TAG, "📦 Cache status: ${cachedHadithNumbers.size}/$CACHE_TARGET_SIZE hadiths cached, need $neededCount more")
+
+                if (neededCount <= 0) {
+                    Log.d(TAG, "📦 Cache full, no pre-generation needed")
+                    return@launch
+                }
+
+                // Find the next hadith numbers to cache
+                var nextHadithToCache = currentHadithNumber
+                var generatedCount = 0
+
+                while (generatedCount < neededCount && nextHadithToCache <= 7563) {
+                    // Skip if already in cache
+                    if (cachedHadithNumbers.contains(nextHadithToCache)) {
+                        nextHadithToCache++
+                        continue
+                    }
+
+                    // Get hadith text from repository
+                    val hadithText = getHadithTextForNumber(nextHadithToCache)
+                    if (hadithText != null) {
+                        val introText = "Hadith number $nextHadithToCache from Sahih Al-Bukhari."
+                        val fullText = "$introText $hadithText"
+
+                        // Check if already in TTS cache
+                        if (!sherpaOnnxTts.isCached(fullText)) {
+                            Log.i(TAG, "🔄 Pre-generating hadith #$nextHadithToCache (${fullText.length} chars) [${cachedHadithNumbers.size + generatedCount + 1}/$CACHE_TARGET_SIZE]")
+                            sherpaOnnxTts.preGenerateAsync(
+                                text = fullText,
+                                speakerId = selectedSpeakerId
+                            )
+                            cachedHadithNumbers.add(nextHadithToCache)
+                            generatedCount++
+                            // Small delay between generations to avoid overloading
+                            kotlinx.coroutines.delay(500)
+                        } else {
+                            // Already in TTS cache, just track it
+                            cachedHadithNumbers.add(nextHadithToCache)
+                            Log.d(TAG, "📦 Hadith #$nextHadithToCache already in TTS cache")
+                        }
+                    }
+                    nextHadithToCache++
+                }
+
+                Log.i(TAG, "📦 Cache updated: ${cachedHadithNumbers.size}/$CACHE_TARGET_SIZE hadiths now cached: $cachedHadithNumbers")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "🔄 Error maintaining cache: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Mark a hadith as played (remove from cache tracking).
+     * Then refill cache to maintain 3 hadiths.
+     */
+    private fun markHadithPlayed(hadithNumber: Int) {
+        cachedHadithNumbers.remove(hadithNumber)
+        Log.d(TAG, "📦 Removed hadith #$hadithNumber from cache tracking, remaining: $cachedHadithNumbers")
+        // Refill cache starting from next hadith
+        maintainHadithCache(hadithNumber + 1)
+    }
+
+    /**
+     * Get hadith text for a specific hadith number.
+     * Uses HadithRepository to fetch from database.
+     */
+    private suspend fun getHadithTextForNumber(hadithNumber: Int): String? {
+        return try {
+            val hadithRepository = com.starception.submission.core.hadithdatabase.HadithRepository.getInstance(this)
+            val hadith = hadithRepository.getHadith("sahih_bukhari.db", hadithNumber)
+
+            // Get user's selected language for translation
+            val translationService = com.starception.submission.core.translation.TranslationService.getInstance(this)
+            val selectedLang = translationService.getSelectedLanguage()
+
+            var text = hadith?.textPlain ?: hadith?.elaboration ?: return null
+
+            // Translate if needed (not English/Bengali audio)
+            if (selectedLang != "en" && selectedLang != "bn" && selectedLang != "transliteration") {
+                try {
+                    text = translationService.translateFromEnglish(text, selectedLang)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Translation failed for hadith #$hadithNumber, using English")
+                }
+            }
+
+            text
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching hadith #$hadithNumber: ${e.message}")
+            null
         }
     }
 
@@ -349,13 +499,13 @@ class DrivingAudioService : Service() {
         updateState(PlaybackState.PLAYING_HADITH_TTS, "Hadith #$hadithNumber", "Sahih Al-Bukhari")
         updateNotification()
 
-        // Check for Sherpa-ONNX TTS preference
+        // Check for Sherpa-ONNX TTS preference from Settings
         val ttsPrefs = getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
         val selectedVoiceName = ttsPrefs.getString("selected_voice", null)
         val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
 
         if (selectedVoiceName != null) {
-            // Use Sherpa-ONNX TTS
+            // Use Sherpa-ONNX TTS as configured in Settings
             speakWithSherpaOnnx(hadithNumber, text, selectedVoiceName, selectedSpeakerId)
         } else {
             // Use Android TTS
@@ -376,7 +526,12 @@ class DrivingAudioService : Service() {
                 val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
                 val fullText = "$introText $text"
 
-                val success = sherpaOnnxTts.speak(
+                // Check if audio was pre-generated during travel dua playback
+                val isCached = sherpaOnnxTts.isCached(fullText)
+                Log.i(TAG, "📚 Hadith TTS: cached=$isCached, using ${if (isCached) "pre-generated audio 🎯" else "live generation"}")
+
+                // Use speakCachedOrGenerate to play from cache if available
+                val success = sherpaOnnxTts.speakCachedOrGenerate(
                     text = fullText,
                     speakerId = speakerId,
                     onComplete = {
@@ -445,6 +600,9 @@ class DrivingAudioService : Service() {
 
     private fun onHadithComplete(hadithNumber: Int) {
         Log.i(TAG, "📚 Hadith #$hadithNumber playback complete - triggering voice prompt")
+
+        // 📦 CACHE MANAGEMENT: Remove played hadith and refill cache to 3
+        markHadithPlayed(hadithNumber)
 
         // Update state to voice prompt
         updateState(PlaybackState.VOICE_PROMPT, "Say YES or NO", "Mark lesson complete?")

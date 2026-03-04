@@ -1702,6 +1702,7 @@ object ActivityTracker {
     /**
      * Manually trigger the full audio chain: Travel Dua → Hadith → Quran
      * This plays the same sequence that would play during driving, but manually triggered.
+     * Uses DrivingAudioService for proper MediaSession and notification controls.
      * Useful for testing or when user wants to listen without driving.
      */
     fun triggerFullAudioChain() {
@@ -1711,27 +1712,32 @@ object ActivityTracker {
         isManualTriggerMode = true
         context?.let { ctx ->
             try {
-                // Release any existing MediaPlayer instance
-                mediaPlayer?.release()
+                // Use DrivingAudioService for proper MediaSession notification
+                scope.launch {
+                    val hadithInfo = getNextHadithInfo(ctx)
 
-                // Create and play the travel dua audio
-                val resId = ctx.resources.getIdentifier("travel_dua", "raw", ctx.packageName)
-                if (resId != 0) {
-                    mediaPlayer = MediaPlayer.create(ctx, resId)
-                    mediaPlayer?.setOnCompletionListener { mp ->
-                        mp.release()
-                        mediaPlayer = null
-                        Log.d("ActivityTracker", "🎵 Travel dua completed - triggering hadith...")
+                    // Start DrivingAudioService with travel dua
+                    val serviceIntent = Intent(ctx, DrivingAudioService::class.java).apply {
+                        putExtra(DrivingAudioService.EXTRA_AUDIO_TYPE, DrivingAudioService.TYPE_TRAVEL_DUA)
 
-                        // After travel dua completes, play daily hadith if enrolled
-                        playDailyHadithIfEnrolled(ctx)
+                        // Pass hadith info if enrolled
+                        hadithInfo?.let { (number, text, useAudio) ->
+                            putExtra(DrivingAudioService.EXTRA_HADITH_NUMBER, number)
+                            if (!useAudio && text != null) {
+                                putExtra(DrivingAudioService.EXTRA_HADITH_TEXT, text)
+                            }
+                            putExtra(DrivingAudioService.EXTRA_COURSE_ID, "daily_bukhari")
+                            putExtra(DrivingAudioService.EXTRA_LESSON_ID, "hadith_$number")
+                        }
                     }
-                    mediaPlayer?.start()
-                    Log.i("ActivityTracker", "🎵 Playing Travel Dua...")
-                } else {
-                    Log.e("ActivityTracker", "🎵 Travel dua not found, skipping to hadith...")
-                    // Still try to play hadith even if travel dua not found
-                    playDailyHadithIfEnrolled(ctx)
+
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        ctx.startForegroundService(serviceIntent)
+                    } else {
+                        ctx.startService(serviceIntent)
+                    }
+
+                    Log.i("ActivityTracker", "🎵 DrivingAudioService started with notification controls")
                 }
             } catch (e: Exception) {
                 Log.e("ActivityTracker", "🎵 Error triggering audio chain: ${e.message}")

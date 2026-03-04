@@ -77,6 +77,12 @@ class SherpaOnnxTtsService @Inject constructor(
     private var isInitializing = false
     private var currentVoice: TtsVoice = TtsVoice.KOKORO_EN
 
+    // Pre-generated audio cache (key: text hash, value: samples + sample rate)
+    private data class CachedAudio(val samples: FloatArray, val sampleRate: Int)
+    private val audioCache = mutableMapOf<Int, CachedAudio>()
+    @Volatile
+    private var preGenerationJob: kotlinx.coroutines.Job? = null
+
     // Cache directory for extracted model files
     private val modelDir: File by lazy {
         File(context.filesDir, "tts_model").also { it.mkdirs() }
@@ -272,29 +278,62 @@ class SherpaOnnxTtsService @Inject constructor(
                         return@withLock
                     }
 
-                    // Generate all sentences and collect audio samples
-                    val allSamples = mutableListOf<Float>()
-                    var sampleRate = 22050
+                    // Hybrid approach:
+                    // - Short text (<=10 sentences): Generate all first for smooth playback
+                    // - Long text (>10 sentences): Batch of 5 for faster start with some gaps
+                    val sampleRate = tts?.sampleRate() ?: 22050
+                    var playedAnySamples = false
 
-                    for ((index, sentence) in sentences.withIndex()) {
-                        val audio = generateSentence(sentence, speakerId, speed, index + 1, sentences.size)
-                        if (audio != null && audio.samples.isNotEmpty()) {
-                            allSamples.addAll(audio.samples.toList())
-                            sampleRate = audio.sampleRate
+                    if (sentences.size <= 10) {
+                        // Short text: generate all first for gap-free playback
+                        Log.d(TAG, "Short text (${sentences.size} sentences) - generating all first")
+                        val allSamples = mutableListOf<Float>()
+
+                        for ((index, sentence) in sentences.withIndex()) {
+                            val audio = generateSentence(sentence, speakerId, speed, index + 1, sentences.size)
+                            if (audio != null && audio.samples.isNotEmpty()) {
+                                allSamples.addAll(audio.samples.toList())
+                            }
+                        }
+
+                        if (allSamples.isNotEmpty()) {
+                            Log.d(TAG, "Playing ${allSamples.size} samples continuously")
+                            playAudioSamples(allSamples.toFloatArray(), sampleRate)
+                            playedAnySamples = true
+                        }
+                    } else {
+                        // Long text: batch of 5 sentences for faster initial response
+                        val BATCH_SIZE = 5
+                        val batches = sentences.chunked(BATCH_SIZE)
+                        Log.d(TAG, "Long text (${sentences.size} sentences) - ${batches.size} batches of $BATCH_SIZE")
+
+                        for ((batchIndex, batch) in batches.withIndex()) {
+                            val batchSamples = mutableListOf<Float>()
+
+                            for ((sentenceIndex, sentence) in batch.withIndex()) {
+                                val globalIndex = batchIndex * BATCH_SIZE + sentenceIndex + 1
+                                val audio = generateSentence(sentence, speakerId, speed, globalIndex, sentences.size)
+                                if (audio != null && audio.samples.isNotEmpty()) {
+                                    batchSamples.addAll(audio.samples.toList())
+                                }
+                            }
+
+                            if (batchSamples.isNotEmpty()) {
+                                Log.d(TAG, "Playing batch ${batchIndex + 1}/${batches.size}")
+                                playAudioSamples(batchSamples.toFloatArray(), sampleRate)
+                                playedAnySamples = true
+                            }
                         }
                     }
 
-                    if (allSamples.isEmpty()) {
+                    if (!playedAnySamples) {
                         Log.w(TAG, "No audio samples generated")
                         onComplete?.invoke()
                         if (continuation.isActive) continuation.resume(false)
                         return@withLock
                     }
 
-                    Log.d(TAG, "Playing ${allSamples.size} total samples at $sampleRate Hz (no gaps)")
-
-                    // Play all audio continuously without gaps
-                    playAudioSamples(allSamples.toFloatArray(), sampleRate)
+                    Log.d(TAG, "Finished playing all ${sentences.size} sentences")
 
                     onComplete?.invoke()
                     if (continuation.isActive) continuation.resume(true)
@@ -457,6 +496,103 @@ class SherpaOnnxTtsService @Inject constructor(
         } catch (e: Exception) {
             Log.w(TAG, "Error stopping AudioTrack", e)
         }
+    }
+
+    // ==================== Pre-generation API ====================
+
+    /**
+     * Pre-generate TTS audio in background. Call this while other audio plays.
+     * The generated audio will be cached and played instantly when speak() is called.
+     */
+    fun preGenerateAsync(
+        text: String,
+        speakerId: Int = DEFAULT_SPEAKER_ID,
+        speed: Float = DEFAULT_SPEED
+    ) {
+        val textHash = text.hashCode()
+
+        // Skip if already cached or being generated
+        if (audioCache.containsKey(textHash)) {
+            Log.d(TAG, "Audio already cached for text hash $textHash")
+            return
+        }
+
+        preGenerationJob?.cancel()
+        preGenerationJob = scope.launch {
+            Log.i(TAG, "🔄 Starting background pre-generation...")
+
+            if (!isInitialized) {
+                val initialized = initialize()
+                if (!initialized) {
+                    Log.e(TAG, "Failed to initialize TTS for pre-generation")
+                    return@launch
+                }
+            }
+
+            ttsMutex.withLock {
+                try {
+                    val sentences = splitIntoSentences(text).filter { it.isNotBlank() }
+                    val allSamples = mutableListOf<Float>()
+                    var sampleRate = tts?.sampleRate() ?: 22050
+
+                    Log.d(TAG, "🔄 Pre-generating ${sentences.size} sentences...")
+
+                    for ((index, sentence) in sentences.withIndex()) {
+                        val audio = generateSentence(sentence, speakerId, speed, index + 1, sentences.size)
+                        if (audio != null && audio.samples.isNotEmpty()) {
+                            allSamples.addAll(audio.samples.toList())
+                            sampleRate = audio.sampleRate
+                        }
+                    }
+
+                    if (allSamples.isNotEmpty()) {
+                        audioCache[textHash] = CachedAudio(allSamples.toFloatArray(), sampleRate)
+                        Log.i(TAG, "✅ Pre-generation complete: ${allSamples.size} samples cached")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error during pre-generation", e)
+                }
+            }
+        }
+    }
+
+    /**
+     * Check if audio for given text is pre-generated and cached.
+     */
+    fun isCached(text: String): Boolean = audioCache.containsKey(text.hashCode())
+
+    /**
+     * Play pre-generated audio if cached, otherwise generate and play normally.
+     */
+    suspend fun speakCachedOrGenerate(
+        text: String,
+        speakerId: Int = DEFAULT_SPEAKER_ID,
+        speed: Float = DEFAULT_SPEED,
+        onComplete: (() -> Unit)? = null
+    ): Boolean {
+        val textHash = text.hashCode()
+        val cached = audioCache[textHash]
+
+        if (cached != null) {
+            Log.i(TAG, "🎯 Playing from cache (${cached.samples.size} samples)")
+            audioCache.remove(textHash) // Clear cache after use
+            playAudioSamples(cached.samples, cached.sampleRate)
+            onComplete?.invoke()
+            return true
+        }
+
+        // Not cached, generate and play normally
+        Log.d(TAG, "Cache miss, generating normally")
+        return speak(text, speed, speakerId, onComplete)
+    }
+
+    /**
+     * Clear all cached audio.
+     */
+    fun clearCache() {
+        audioCache.clear()
+        preGenerationJob?.cancel()
+        Log.d(TAG, "Audio cache cleared")
     }
 
     /**
