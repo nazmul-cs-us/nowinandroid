@@ -1,6 +1,7 @@
 package com.starception.submission.settings.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -11,8 +12,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -51,6 +54,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -404,6 +408,175 @@ private fun GoogleHumVisualization(
     }
 }
 
+/**
+ * Animated mic button with dynamic shape morphing based on state
+ * - Idle: Rounded square with subtle pulse
+ * - Listening: Morphs to circle with expanding rings
+ * - Processing: Rotating gradient
+ */
+@Composable
+private fun AnimatedMicButton(
+    isActive: Boolean,
+    amplitude: Float,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "micPulse")
+
+    // Corner radius animation (square to circle morph)
+    val cornerRadius by animateFloatAsState(
+        targetValue = if (isActive) 50f else 30f,  // 30% rounded when idle, full circle when active
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "cornerRadius"
+    )
+
+    // Scale animation
+    val scale by animateFloatAsState(
+        targetValue = if (isActive) 1.1f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "scale"
+    )
+
+    // Pulsing animation for idle state
+    val idlePulse by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "idlePulse"
+    )
+
+    // Rotation for processing state
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
+    // Ring animations for listening
+    val ring1Scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ring1"
+    )
+    val ring1Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ring1Alpha"
+    )
+    val ring2Scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing, delayMillis = 400),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ring2"
+    )
+    val ring2Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing, delayMillis = 400),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ring2Alpha"
+    )
+
+    // Dynamic amplitude response
+    val amplitudeScale by animateFloatAsState(
+        targetValue = 1f + (amplitude * 0.2f),
+        animationSpec = tween(50),
+        label = "amplitudeScale"
+    )
+
+    val buttonSize = 60.dp
+    val finalScale = if (isActive) scale * amplitudeScale else idlePulse
+
+    // Use theme colors
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+
+    Box(
+        modifier = modifier.size(90.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Expanding rings when active
+        if (isActive) {
+            Box(
+                modifier = Modifier
+                    .size(buttonSize * ring1Scale)
+                    .clip(RoundedCornerShape(cornerRadius.toInt()))
+                    .background(primaryColor.copy(alpha = ring1Alpha))
+            )
+            Box(
+                modifier = Modifier
+                    .size(buttonSize * ring2Scale)
+                    .clip(RoundedCornerShape(cornerRadius.toInt()))
+                    .background(secondaryColor.copy(alpha = ring2Alpha))
+            )
+        }
+
+        // Main button with dynamic shape
+        Box(
+            modifier = Modifier
+                .size(buttonSize * finalScale)
+                .clip(RoundedCornerShape(cornerRadius.toInt()))
+                .background(
+                    brush = Brush.sweepGradient(
+                        colors = if (isActive)
+                            listOf(primaryColor, secondaryColor, tertiaryColor, primaryColor)
+                        else
+                            listOf(primaryColor, secondaryColor, primaryColor),
+                        center = Offset(0.5f, 0.5f)
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            // Inner circle for better visual
+            Box(
+                modifier = Modifier
+                    .size((buttonSize.value * 0.85f).dp)
+                    .clip(RoundedCornerShape((cornerRadius * 0.9f).toInt()))
+                    .background(
+                        if (isActive)
+                            Color.White.copy(alpha = 0.15f)
+                        else
+                            Color.White.copy(alpha = 0.1f)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.RecordVoiceOver,
+                    contentDescription = if (isActive) "Listening" else "Tap to speak",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun ModernVoiceTestCard(
     testState: VoiceTestState,
@@ -418,67 +591,78 @@ private fun ModernVoiceTestCard(
     val haptic = LocalHapticFeedback.current
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true, color = MaterialTheme.colorScheme.primary)
+            ) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                if (isActive) onStopTest() else onTestVoice()
+            },
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Visualization area
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = ripple(bounded = true, color = GoogleBlue)
-                    ) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (isActive) onStopTest() else onTestVoice()
-                    }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                GoogleHumVisualization(
-                    isAnimating = isActive,
-                    amplitude = amplitude,
-                    modifier = Modifier.fillMaxSize()
+                // Animated Mic button with rings
+                AnimatedMicButton(
+                    isActive = isActive,
+                    amplitude = amplitude
                 )
+
+                // Larger visualization area
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(140.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    GoogleHumVisualization(
+                        isAnimating = isActive,
+                        amplitude = amplitude,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            // Status text inside card
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Status text with animation
             AnimatedContent(
                 targetState = testState,
                 transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
                 label = "statusText"
             ) { state ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = when (state) {
-                            VoiceTestState.IDLE -> "Tap to test voice recognition"
-                            VoiceTestState.LISTENING -> "Listening... Tap to stop"
-                            VoiceTestState.PROCESSING -> "Processing with Whisper.cpp"
-                            VoiceTestState.SUCCESS -> if (testResult != null) "\"$testResult\"" else "Recognized"
-                            VoiceTestState.ERROR -> testError ?: "Error"
-                        },
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        color = when (state) {
-                            VoiceTestState.ERROR -> GoogleRed
-                            VoiceTestState.SUCCESS -> GoogleGreen
-                            VoiceTestState.LISTENING -> GoogleBlue
-                            else -> MaterialTheme.colorScheme.onSurface
-                        },
-                        textAlign = TextAlign.Center
-                    )
-                }
+                Text(
+                    text = when (state) {
+                        VoiceTestState.IDLE -> "Tap to test voice recognition"
+                        VoiceTestState.LISTENING -> "Listening... Tap to stop"
+                        VoiceTestState.PROCESSING -> "Processing..."
+                        VoiceTestState.SUCCESS -> if (testResult != null) "\"$testResult\"" else "Recognized"
+                        VoiceTestState.ERROR -> testError ?: "Error occurred"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = when (state) {
+                        VoiceTestState.ERROR -> MaterialTheme.colorScheme.error
+                        VoiceTestState.SUCCESS -> MaterialTheme.colorScheme.primary
+                        VoiceTestState.LISTENING -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
