@@ -1,0 +1,719 @@
+/*
+ * Copyright 2024 Starception
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.starception.submission.services
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.media.MediaPlayer
+import android.os.Binder
+import android.os.Build
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.PowerManager
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.media.session.MediaButtonReceiver
+import com.starception.submission.R
+import com.starception.submission.settings.components.TtsVoice
+import com.starception.submission.voice.SherpaOnnxTtsService
+import com.starception.submission.voice.VoiceCompletionManager
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import java.io.File
+import java.util.Locale
+import javax.inject.Inject
+
+/**
+ * Unified audio playback service for driving mode with full MediaSession support.
+ * Handles: Travel Dua → Hadith (audio or TTS) → Quran → Voice Completion Prompt
+ *
+ * Features:
+ * - MediaSession for system media controls (lock screen, notification, Bluetooth)
+ * - MediaStyle notification with play/pause/stop controls
+ * - Background playback with wake lock
+ * - Proper audio chain management
+ */
+@AndroidEntryPoint
+class DrivingAudioService : Service() {
+
+    @Inject
+    lateinit var sherpaOnnxTts: SherpaOnnxTtsService
+
+    @Inject
+    lateinit var voiceCompletionManager: VoiceCompletionManager
+
+    private val binder = DrivingAudioBinder()
+    private var mediaPlayer: MediaPlayer? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var mediaSession: MediaSessionCompat? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    // TTS for hadith playback
+    private var textToSpeech: TextToSpeech? = null
+    private var isTtsInitialized = false
+
+    // Current playback state
+    private var currentState = PlaybackState.IDLE
+    private var currentTitle = "Driving Mode"
+    private var currentSubtitle = ""
+    private var isPaused = false
+
+    // Pending audio chain
+    private var pendingHadithNumber: Int? = null
+    private var pendingHadithText: String? = null
+    private var pendingCourseId: String? = null
+    private var pendingLessonId: String? = null
+
+    // Callbacks
+    var onPlaybackComplete: (() -> Unit)? = null
+    var onStateChanged: ((PlaybackState) -> Unit)? = null
+
+    enum class PlaybackState {
+        IDLE,
+        PLAYING_TRAVEL_DUA,
+        PLAYING_HADITH_AUDIO,
+        PLAYING_HADITH_TTS,
+        PLAYING_QURAN,
+        VOICE_PROMPT,
+        PAUSED
+    }
+
+    companion object {
+        private const val TAG = "DrivingAudioService"
+        private const val NOTIFICATION_ID = 3001
+        private const val CHANNEL_ID = "driving_audio_channel"
+
+        const val ACTION_PLAY = "com.starception.submission.DRIVING_PLAY"
+        const val ACTION_PAUSE = "com.starception.submission.DRIVING_PAUSE"
+        const val ACTION_STOP = "com.starception.submission.DRIVING_STOP"
+        const val ACTION_SKIP = "com.starception.submission.DRIVING_SKIP"
+
+        const val EXTRA_AUDIO_TYPE = "audio_type"
+        const val EXTRA_HADITH_NUMBER = "hadith_number"
+        const val EXTRA_HADITH_TEXT = "hadith_text"
+        const val EXTRA_COURSE_ID = "course_id"
+        const val EXTRA_LESSON_ID = "lesson_id"
+
+        const val TYPE_TRAVEL_DUA = "travel_dua"
+        const val TYPE_HADITH_AUDIO = "hadith_audio"
+        const val TYPE_HADITH_TTS = "hadith_tts"
+
+        // Bukhari audio path on SD card
+        private const val BUKHARI_AUDIO_PATH = "/sdcard/Bukhari/bukhari_audio_bn"
+    }
+
+    inner class DrivingAudioBinder : Binder() {
+        fun getService(): DrivingAudioService = this@DrivingAudioService
+    }
+
+    override fun onBind(intent: Intent?): IBinder = binder
+
+    override fun onCreate() {
+        super.onCreate()
+        Log.d(TAG, "Service created")
+        createNotificationChannel()
+        acquireWakeLock()
+        initializeMediaSession()
+    }
+
+    private fun acquireWakeLock() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "DrivingAudio::WakeLock"
+        ).apply {
+            acquire(2 * 60 * 60 * 1000L) // 2 hours max
+        }
+    }
+
+    private fun initializeMediaSession() {
+        mediaSession = MediaSessionCompat(this, "DrivingAudioService").apply {
+            setFlags(
+                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
+                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+            )
+
+            setCallback(object : MediaSessionCompat.Callback() {
+                override fun onPlay() {
+                    Log.d(TAG, "MediaSession: onPlay")
+                    resume()
+                }
+
+                override fun onPause() {
+                    Log.d(TAG, "MediaSession: onPause")
+                    pause()
+                }
+
+                override fun onStop() {
+                    Log.d(TAG, "MediaSession: onStop")
+                    stop()
+                }
+
+                override fun onSkipToNext() {
+                    Log.d(TAG, "MediaSession: onSkipToNext")
+                    skipCurrent()
+                }
+            })
+
+            isActive = true
+        }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        MediaButtonReceiver.handleIntent(mediaSession, intent)
+
+        when (intent?.action) {
+            ACTION_PLAY -> resume()
+            ACTION_PAUSE -> pause()
+            ACTION_STOP -> stop()
+            ACTION_SKIP -> skipCurrent()
+            else -> {
+                // Handle audio type requests
+                val audioType = intent?.getStringExtra(EXTRA_AUDIO_TYPE)
+                when (audioType) {
+                    TYPE_TRAVEL_DUA -> {
+                        pendingHadithNumber = intent.getIntExtra(EXTRA_HADITH_NUMBER, -1).takeIf { it > 0 }
+                        pendingHadithText = intent.getStringExtra(EXTRA_HADITH_TEXT)
+                        pendingCourseId = intent.getStringExtra(EXTRA_COURSE_ID)
+                        pendingLessonId = intent.getStringExtra(EXTRA_LESSON_ID)
+                        playTravelDua()
+                    }
+                    TYPE_HADITH_AUDIO -> {
+                        val hadithNumber = intent.getIntExtra(EXTRA_HADITH_NUMBER, 1)
+                        pendingCourseId = intent.getStringExtra(EXTRA_COURSE_ID)
+                        pendingLessonId = intent.getStringExtra(EXTRA_LESSON_ID)
+                        playHadithAudio(hadithNumber)
+                    }
+                    TYPE_HADITH_TTS -> {
+                        val hadithNumber = intent.getIntExtra(EXTRA_HADITH_NUMBER, 1)
+                        val hadithText = intent.getStringExtra(EXTRA_HADITH_TEXT) ?: ""
+                        pendingCourseId = intent.getStringExtra(EXTRA_COURSE_ID)
+                        pendingLessonId = intent.getStringExtra(EXTRA_LESSON_ID)
+                        playHadithTts(hadithNumber, hadithText)
+                    }
+                }
+            }
+        }
+
+        return START_STICKY
+    }
+
+    // ==================== Playback Methods ====================
+
+    /**
+     * Play travel dua audio
+     */
+    fun playTravelDua() {
+        try {
+            Log.i(TAG, "🚗 Playing travel dua")
+
+            // Release existing player
+            mediaPlayer?.release()
+
+            val resId = resources.getIdentifier("travel_dua", "raw", packageName)
+            if (resId == 0) {
+                Log.e(TAG, "Travel dua resource not found")
+                onTravelDuaComplete()
+                return
+            }
+
+            mediaPlayer = MediaPlayer.create(this, resId).apply {
+                setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
+                setOnCompletionListener {
+                    Log.d(TAG, "🚗 Travel dua completed")
+                    onTravelDuaComplete()
+                }
+                setOnErrorListener { _, what, extra ->
+                    Log.e(TAG, "MediaPlayer error: what=$what, extra=$extra")
+                    onTravelDuaComplete()
+                    true
+                }
+            }
+
+            updateState(PlaybackState.PLAYING_TRAVEL_DUA, "Travel Dua", "دعاء السفر")
+            startForeground(NOTIFICATION_ID, createNotification())
+
+            mediaPlayer?.start()
+            isPaused = false
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error playing travel dua", e)
+            onTravelDuaComplete()
+        }
+    }
+
+    private fun onTravelDuaComplete() {
+        // Check if we have pending hadith to play
+        val hadithNum = pendingHadithNumber
+        val hadithText = pendingHadithText
+
+        if (hadithNum != null && hadithNum > 0) {
+            if (hadithText != null) {
+                playHadithTts(hadithNum, hadithText)
+            } else {
+                playHadithAudio(hadithNum)
+            }
+        } else {
+            // No hadith pending, complete
+            onPlaybackComplete?.invoke()
+            updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+        }
+    }
+
+    /**
+     * Play hadith audio from SD card (Bengali)
+     */
+    fun playHadithAudio(hadithNumber: Int) {
+        try {
+            Log.i(TAG, "📚 Playing hadith audio #$hadithNumber")
+
+            mediaPlayer?.release()
+
+            val formattedNumber = String.format("%04d", hadithNumber)
+            val possibleFiles = listOf(
+                File(BUKHARI_AUDIO_PATH, "bukhari_$formattedNumber.ogg"),
+                File(BUKHARI_AUDIO_PATH, "bukhari_$formattedNumber.mp3")
+            )
+
+            val audioFile = possibleFiles.find { it.exists() }
+            if (audioFile == null) {
+                Log.w(TAG, "📚 Hadith audio not found for #$hadithNumber")
+                // Fall back to TTS or skip
+                onHadithComplete(hadithNumber)
+                return
+            }
+
+            mediaPlayer = MediaPlayer().apply {
+                setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
+                setDataSource(audioFile.absolutePath)
+                setOnCompletionListener {
+                    Log.d(TAG, "📚 Hadith audio completed")
+                    onHadithComplete(hadithNumber)
+                }
+                setOnErrorListener { _, what, extra ->
+                    Log.e(TAG, "MediaPlayer error: what=$what, extra=$extra")
+                    onHadithComplete(hadithNumber)
+                    true
+                }
+                prepare()
+            }
+
+            updateState(PlaybackState.PLAYING_HADITH_AUDIO, "Hadith #$hadithNumber", "Sahih Al-Bukhari")
+            updateNotification()
+
+            mediaPlayer?.start()
+            isPaused = false
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error playing hadith audio", e)
+            onHadithComplete(hadithNumber)
+        }
+    }
+
+    /**
+     * Play hadith using TTS
+     */
+    fun playHadithTts(hadithNumber: Int, text: String) {
+        Log.i(TAG, "📚 Playing hadith TTS #$hadithNumber")
+
+        updateState(PlaybackState.PLAYING_HADITH_TTS, "Hadith #$hadithNumber", "Sahih Al-Bukhari")
+        updateNotification()
+
+        // Check for Sherpa-ONNX TTS preference
+        val ttsPrefs = getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
+        val selectedVoiceName = ttsPrefs.getString("selected_voice", null)
+        val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
+
+        if (selectedVoiceName != null) {
+            // Use Sherpa-ONNX TTS
+            speakWithSherpaOnnx(hadithNumber, text, selectedVoiceName, selectedSpeakerId)
+        } else {
+            // Use Android TTS
+            speakWithAndroidTts(hadithNumber, text)
+        }
+    }
+
+    private fun speakWithSherpaOnnx(hadithNumber: Int, text: String, voiceName: String, speakerId: Int) {
+        scope.launch {
+            try {
+                val voice = try {
+                    TtsVoice.valueOf(voiceName)
+                } catch (e: Exception) {
+                    TtsVoice.KOKORO_EN
+                }
+                sherpaOnnxTts.setVoice(voice)
+
+                val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
+                val fullText = "$introText $text"
+
+                val success = sherpaOnnxTts.speak(
+                    text = fullText,
+                    speakerId = speakerId,
+                    onComplete = {
+                        Log.d(TAG, "📚 Sherpa-ONNX TTS completed")
+                        handler.post { onHadithComplete(hadithNumber) }
+                    }
+                )
+
+                if (!success) {
+                    Log.w(TAG, "Sherpa-ONNX TTS failed, falling back to Android TTS")
+                    speakWithAndroidTts(hadithNumber, text)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Sherpa-ONNX TTS error", e)
+                speakWithAndroidTts(hadithNumber, text)
+            }
+        }
+    }
+
+    private fun speakWithAndroidTts(hadithNumber: Int, text: String) {
+        val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
+        val fullText = "$introText $text"
+        val utteranceId = "hadith_$hadithNumber"
+
+        if (textToSpeech == null) {
+            textToSpeech = TextToSpeech(this) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    isTtsInitialized = true
+                    textToSpeech?.language = Locale.US
+                    setupTtsListener(hadithNumber)
+                    textToSpeech?.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+                } else {
+                    Log.e(TAG, "Android TTS init failed")
+                    onHadithComplete(hadithNumber)
+                }
+            }
+        } else if (isTtsInitialized) {
+            setupTtsListener(hadithNumber)
+            textToSpeech?.speak(fullText, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        }
+    }
+
+    private fun setupTtsListener(hadithNumber: Int) {
+        textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                Log.d(TAG, "TTS started: $utteranceId")
+            }
+
+            override fun onDone(utteranceId: String?) {
+                Log.d(TAG, "TTS completed: $utteranceId")
+                handler.post { onHadithComplete(hadithNumber) }
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) {
+                Log.e(TAG, "TTS error: $utteranceId")
+                handler.post { onHadithComplete(hadithNumber) }
+            }
+
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                Log.e(TAG, "TTS error ($errorCode): $utteranceId")
+                handler.post { onHadithComplete(hadithNumber) }
+            }
+        })
+    }
+
+    private fun onHadithComplete(hadithNumber: Int) {
+        Log.i(TAG, "📚 Hadith #$hadithNumber playback complete - triggering voice prompt")
+
+        // Update state to voice prompt
+        updateState(PlaybackState.VOICE_PROMPT, "Say YES or NO", "Mark lesson complete?")
+        updateNotification()
+
+        // Trigger voice completion prompt
+        val courseId = pendingCourseId ?: "daily_bukhari"
+        val lessonId = pendingLessonId ?: "hadith_$hadithNumber"
+
+        voiceCompletionManager.promptForCompletion(
+            courseId = courseId,
+            lessonId = lessonId,
+            lessonTitle = "Hadith #$hadithNumber",
+            onComplete = {
+                Log.i(TAG, "✅ Lesson marked complete via voice")
+                onPlaybackComplete?.invoke()
+                updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+            },
+            onSkipped = {
+                Log.i(TAG, "⏭️ Lesson skipped via voice")
+                onPlaybackComplete?.invoke()
+                updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+            },
+            onError = { error ->
+                Log.e(TAG, "Voice prompt error: $error")
+                onPlaybackComplete?.invoke()
+                updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+            }
+        )
+    }
+
+    // ==================== Playback Controls ====================
+
+    fun pause() {
+        Log.d(TAG, "⏸️ Pause requested")
+        when (currentState) {
+            PlaybackState.PLAYING_TRAVEL_DUA,
+            PlaybackState.PLAYING_HADITH_AUDIO -> {
+                mediaPlayer?.pause()
+                isPaused = true
+                updateState(PlaybackState.PAUSED, currentTitle, "Paused")
+                updateNotification()
+            }
+            PlaybackState.PLAYING_HADITH_TTS -> {
+                textToSpeech?.stop()
+                sherpaOnnxTts.stopSpeaking()
+                isPaused = true
+                updateState(PlaybackState.PAUSED, currentTitle, "Paused")
+                updateNotification()
+            }
+            else -> {}
+        }
+    }
+
+    fun resume() {
+        Log.d(TAG, "▶️ Resume requested")
+        if (isPaused && mediaPlayer != null) {
+            mediaPlayer?.start()
+            isPaused = false
+            // Restore previous state
+            when {
+                currentTitle.contains("Travel") -> updateState(PlaybackState.PLAYING_TRAVEL_DUA, currentTitle, "دعاء السفر")
+                currentTitle.contains("Hadith") -> updateState(PlaybackState.PLAYING_HADITH_AUDIO, currentTitle, "Sahih Al-Bukhari")
+            }
+            updateNotification()
+        }
+    }
+
+    fun stop() {
+        Log.d(TAG, "⏹️ Stop requested")
+        mediaPlayer?.stop()
+        mediaPlayer?.release()
+        mediaPlayer = null
+        textToSpeech?.stop()
+        sherpaOnnxTts.stopSpeaking()
+        voiceCompletionManager.cancel()
+
+        isPaused = false
+        updateState(PlaybackState.IDLE, "Driving Mode", "Stopped")
+
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    fun skipCurrent() {
+        Log.d(TAG, "⏭️ Skip requested")
+        when (currentState) {
+            PlaybackState.PLAYING_TRAVEL_DUA -> {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+                onTravelDuaComplete()
+            }
+            PlaybackState.PLAYING_HADITH_AUDIO,
+            PlaybackState.PLAYING_HADITH_TTS -> {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+                textToSpeech?.stop()
+                sherpaOnnxTts.stopSpeaking()
+                onPlaybackComplete?.invoke()
+                updateState(PlaybackState.IDLE, "Driving Mode", "Skipped")
+            }
+            PlaybackState.VOICE_PROMPT -> {
+                voiceCompletionManager.cancel()
+                onPlaybackComplete?.invoke()
+                updateState(PlaybackState.IDLE, "Driving Mode", "Skipped")
+            }
+            else -> {}
+        }
+    }
+
+    fun isPlaying(): Boolean = mediaPlayer?.isPlaying == true ||
+        currentState == PlaybackState.PLAYING_HADITH_TTS
+
+    fun getCurrentState(): PlaybackState = currentState
+
+    // ==================== State Management ====================
+
+    private fun updateState(state: PlaybackState, title: String, subtitle: String) {
+        currentState = state
+        currentTitle = title
+        currentSubtitle = subtitle
+
+        onStateChanged?.invoke(state)
+        updateMediaSessionMetadata()
+        updatePlaybackState()
+    }
+
+    private fun updateMediaSessionMetadata() {
+        val appIcon = BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+
+        mediaSession?.setMetadata(
+            MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentSubtitle)
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Driving Mode")
+                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, mediaPlayer?.duration?.toLong() ?: 0L)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, appIcon)
+                .build()
+        )
+    }
+
+    private fun updatePlaybackState() {
+        val state = when (currentState) {
+            PlaybackState.IDLE -> PlaybackStateCompat.STATE_STOPPED
+            PlaybackState.PAUSED -> PlaybackStateCompat.STATE_PAUSED
+            PlaybackState.VOICE_PROMPT -> PlaybackStateCompat.STATE_PAUSED
+            else -> PlaybackStateCompat.STATE_PLAYING
+        }
+
+        val position = mediaPlayer?.currentPosition?.toLong() ?: 0L
+
+        mediaSession?.setPlaybackState(
+            PlaybackStateCompat.Builder()
+                .setActions(
+                    PlaybackStateCompat.ACTION_PLAY or
+                    PlaybackStateCompat.ACTION_PAUSE or
+                    PlaybackStateCompat.ACTION_STOP or
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+                )
+                .setState(state, position, 1.0f)
+                .build()
+        )
+    }
+
+    // ==================== Notification ====================
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Driving Audio",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Travel dua and hadith playback during driving"
+                setShowBadge(false)
+            }
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun createNotification(): Notification {
+        val isPlaying = isPlaying() && currentState != PlaybackState.PAUSED
+
+        // Create intent for opening the app
+        val contentIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val contentPendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            contentIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Stop action
+        val stopIntent = Intent(this, DrivingAudioService::class.java).apply {
+            action = ACTION_STOP
+        }
+        val stopPendingIntent = PendingIntent.getService(
+            this,
+            1,
+            stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(currentTitle)
+            .setContentText(currentSubtitle)
+            .setSubText("Driving Mode")
+            .setSmallIcon(R.drawable.transparent_greyscaled)
+            .setContentIntent(contentPendingIntent)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setStyle(
+                androidx.media.app.NotificationCompat.MediaStyle()
+                    .setMediaSession(mediaSession?.sessionToken)
+                    .setShowActionsInCompactView(0, 1, 2)
+            )
+            // Play/Pause button
+            .addAction(
+                if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+                if (isPlaying) "Pause" else "Play",
+                MediaButtonReceiver.buildMediaButtonPendingIntent(
+                    this,
+                    if (isPlaying) PlaybackStateCompat.ACTION_PAUSE else PlaybackStateCompat.ACTION_PLAY
+                )
+            )
+            // Skip button
+            .addAction(
+                android.R.drawable.ic_media_next,
+                "Skip",
+                MediaButtonReceiver.buildMediaButtonPendingIntent(
+                    this,
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+                )
+            )
+            // Stop button
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                "Stop",
+                stopPendingIntent
+            )
+            .build()
+    }
+
+    private fun updateNotification() {
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.notify(NOTIFICATION_ID, createNotification())
+    }
+
+    // ==================== Lifecycle ====================
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d(TAG, "Service destroyed")
+
+        mediaSession?.isActive = false
+        mediaSession?.release()
+        mediaSession = null
+
+        mediaPlayer?.release()
+        mediaPlayer = null
+
+        textToSpeech?.shutdown()
+        textToSpeech = null
+
+        wakeLock?.release()
+        wakeLock = null
+    }
+}

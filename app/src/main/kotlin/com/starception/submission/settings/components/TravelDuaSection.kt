@@ -5,11 +5,16 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,21 +23,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.Traffic
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +55,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -53,7 +68,7 @@ import androidx.core.content.ContextCompat
 import com.starception.submission.config.TravelDuaSettings
 
 /**
- * Travel Dua settings section for configuring when travel dua plays during driving.
+ * Modern Travel Dua settings section with Material 3 design.
  */
 @Composable
 fun TravelDuaSection(
@@ -63,6 +78,7 @@ fun TravelDuaSection(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
 
     // State to track if we need to trigger audio chain after permission granted
     var pendingAudioChainTrigger by remember { mutableStateOf(false) }
@@ -72,7 +88,6 @@ fun TravelDuaSection(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted && pendingAudioChainTrigger) {
-            // Permission granted, trigger audio chain
             pendingAudioChainTrigger = false
             onTriggerAudioChain()
         }
@@ -87,74 +102,45 @@ fun TravelDuaSection(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasPermission) {
-            // Permission already granted, play immediately
             onTriggerAudioChain()
         } else {
-            // Request permission
             pendingAudioChainTrigger = true
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
-    Column(modifier = modifier) {
-        // Master toggle
-        ListItem(
-            headlineContent = {
-                Text(
-                    "Travel Dua",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-            },
-            supportingContent = {
-                Text(
-                    if (settings.enabled) "Plays dua when driving" else "Disabled",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            leadingContent = {
-                Icon(
-                    imageVector = Icons.Default.DirectionsCar,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            },
-            trailingContent = {
-                Switch(
-                    checked = settings.enabled,
-                    onCheckedChange = { enabled ->
-                        onSettingsChanged(settings.copy(enabled = enabled))
-                    }
-                )
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Master toggle with modern switch
+        ModernSwitchRow(
+            title = "Auto-Play Travel Dua",
+            subtitle = if (settings.enabled) "Plays dua when driving detected" else "Tap to enable",
+            checked = settings.enabled,
+            onCheckedChange = { enabled ->
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onSettingsChanged(settings.copy(enabled = enabled))
             }
         )
 
         // Sub-settings - only visible when enabled
         AnimatedVisibility(
             visible = settings.enabled,
-            enter = fadeIn() + expandVertically(),
+            enter = fadeIn() + expandVertically(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ),
             exit = fadeOut() + shrinkVertically()
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Cooldown setting
-                TravelDuaSliderItem(
-                    label = "Cooldown",
-                    description = "Wait time before dua can play again",
-                    value = settings.cooldownMinutes,
-                    minValue = 1,
-                    maxValue = 30,
-                    unit = "min",
-                    onValueChange = { value ->
-                        onSettingsChanged(settings.copy(cooldownMinutes = value))
-                    }
-                )
-
-                // Playback delay setting
-                TravelDuaSliderItem(
+                // Timing Settings Section
+                ModernSliderCard(
+                    icon = Icons.Outlined.Timer,
                     label = "Driving Time",
                     description = "How long to drive before dua plays",
                     value = settings.playbackDelaySeconds,
@@ -166,10 +152,23 @@ fun TravelDuaSection(
                     }
                 )
 
-                // Gap tolerance setting
-                TravelDuaSliderItem(
+                ModernSliderCard(
+                    icon = Icons.Outlined.Schedule,
+                    label = "Cooldown Period",
+                    description = "Wait time before dua can play again",
+                    value = settings.cooldownMinutes,
+                    minValue = 1,
+                    maxValue = 30,
+                    unit = "min",
+                    onValueChange = { value ->
+                        onSettingsChanged(settings.copy(cooldownMinutes = value))
+                    }
+                )
+
+                ModernSliderCard(
+                    icon = Icons.Outlined.Traffic,
                     label = "Stop Tolerance",
-                    description = "Max stop time (traffic lights) before reset",
+                    description = "Max stop time before timer resets",
                     value = settings.gapToleranceMinutes,
                     minValue = 1,
                     maxValue = 15,
@@ -179,10 +178,10 @@ fun TravelDuaSection(
                     }
                 )
 
-                // Driving speed threshold setting
-                TravelDuaSliderItem(
+                ModernSliderCard(
+                    icon = Icons.Outlined.Speed,
                     label = "Speed Threshold",
-                    description = "Min speed to detect driving (lower = more sensitive)",
+                    description = "Minimum speed to detect driving",
                     value = settings.drivingSpeedThresholdKmh,
                     minValue = 10,
                     maxValue = 40,
@@ -192,43 +191,74 @@ fun TravelDuaSection(
                     }
                 )
 
-                // Manual trigger button
-                Spacer(modifier = Modifier.height(8.dp))
+                // Manual trigger button with modern styling
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Button(
-                    onClick = { checkPermissionAndPlay() },
-                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        checkPermissionAndPlay()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
-                        modifier = Modifier.padding(end = 8.dp)
+                        modifier = Modifier.size(24.dp)
                     )
-                    Text("Play Audio Chain")
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Test Audio Chain",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
-                Text(
-                    text = "Plays: Travel Dua → Hadith (if enrolled) → Quran (if enrolled)\nSay YES/NO to mark lessons complete (mic permission required)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
-                    textAlign = TextAlign.Center
-                )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Info text
-                Text(
-                    text = "The travel dua will play after driving continuously for ${settings.playbackDelaySeconds} seconds. " +
-                            "Brief stops under ${settings.gapToleranceMinutes} minutes (like traffic lights) won't reset the timer. " +
-                            "After playing, the dua won't repeat for ${settings.cooldownMinutes} minutes. " +
-                            "Driving is detected when speed exceeds ${settings.drivingSpeedThresholdKmh} km/h.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                // Info card
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Audio Chain",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Travel Dua \u2192 Hadith (if enrolled) \u2192 Quran (if enrolled)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Say YES or NO to mark lessons complete. Microphone permission required for voice recognition.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -236,7 +266,8 @@ fun TravelDuaSection(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TravelDuaSliderItem(
+private fun ModernSliderCard(
+    icon: ImageVector,
     label: String,
     description: String,
     value: Int,
@@ -249,70 +280,106 @@ private fun TravelDuaSliderItem(
     val hapticFeedback = LocalHapticFeedback.current
     var previousValue by remember { mutableStateOf(value) }
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Slider(
-            value = value.toFloat(),
-            onValueChange = { newValue ->
-                val newIntValue = newValue.toInt()
-                if (newIntValue != previousValue) {
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    previousValue = newIntValue
-                }
-                onValueChange(newIntValue)
-            },
-            valueRange = minValue.toFloat()..maxValue.toFloat(),
-            modifier = Modifier.fillMaxWidth(),
-            thumb = {
-                Box(
-                    modifier = Modifier
-                        .height(28.dp)
-                        .shadow(
-                            elevation = 4.dp,
-                            shape = RoundedCornerShape(14.dp)
-                        )
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.primary)
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "$value$unit",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            lineHeight = 14.sp
-                        ),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        textAlign = TextAlign.Center
-                    )
+                    // Icon with gradient background
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-            },
-            colors = SliderDefaults.colors(
-                activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            }
+
+            // Modern slider with value thumb
+            Slider(
+                value = value.toFloat(),
+                onValueChange = { newValue ->
+                    val newIntValue = newValue.toInt()
+                    if (newIntValue != previousValue) {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        previousValue = newIntValue
+                    }
+                    onValueChange(newIntValue)
+                },
+                valueRange = minValue.toFloat()..maxValue.toFloat(),
+                modifier = Modifier.fillMaxWidth(),
+                thumb = {
+                    Box(
+                        modifier = Modifier
+                            .height(28.dp)
+                            .shadow(
+                                elevation = 4.dp,
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "$value$unit",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                lineHeight = 14.sp
+                            ),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                },
+                colors = SliderDefaults.colors(
+                    activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
             )
-        )
+        }
     }
 }

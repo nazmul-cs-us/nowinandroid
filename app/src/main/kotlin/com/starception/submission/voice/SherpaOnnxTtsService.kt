@@ -37,6 +37,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -62,6 +64,13 @@ class SherpaOnnxTtsService @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    // Mutex for thread-safe access to TTS engine (prevents native crashes)
+    private val ttsMutex = Mutex()
+
+    // Flag to track if generation is in progress (for safe release)
+    @Volatile
+    private var isGenerating = false
+
     private var tts: OfflineTts? = null
     private var audioTrack: AudioTrack? = null
     private var isInitialized = false
@@ -76,13 +85,28 @@ class SherpaOnnxTtsService @Inject constructor(
     /**
      * Set the voice model to use.
      * If already initialized with a different voice, this will release and re-initialize.
+     * Thread-safe: waits for any ongoing generation to complete before releasing.
      */
     fun setVoice(voice: TtsVoice) {
         if (currentVoice != voice) {
             Log.i(TAG, "Switching TTS voice from ${currentVoice.displayName} to ${voice.displayName}")
             currentVoice = voice
             if (isInitialized) {
-                release()
+                // Don't release while generation is in progress - just mark for re-init
+                if (isGenerating) {
+                    Log.w(TAG, "TTS generation in progress, deferring voice switch")
+                    scope.launch {
+                        // Wait for generation to complete
+                        while (isGenerating) {
+                            kotlinx.coroutines.delay(100)
+                        }
+                        ttsMutex.withLock {
+                            releaseInternal()
+                        }
+                    }
+                } else {
+                    release()
+                }
             }
         }
     }
@@ -200,6 +224,7 @@ class SherpaOnnxTtsService @Inject constructor(
     /**
      * Speak text using offline TTS.
      * Generates all audio first, then plays continuously without gaps.
+     * Thread-safe: uses mutex to prevent concurrent TTS access.
      * @param text The text to speak
      * @param speed Speech speed (0.5 = half speed, 2.0 = double speed)
      * @param speakerId Speaker ID for multi-speaker models (0 for single speaker)
@@ -222,7 +247,20 @@ class SherpaOnnxTtsService @Inject constructor(
 
         return suspendCancellableCoroutine { continuation ->
             scope.launch {
+                // Use mutex to prevent concurrent TTS access (native library is not thread-safe)
+                ttsMutex.withLock {
                 try {
+                    // Double-check TTS is still valid after acquiring lock
+                    if (tts == null || !isInitialized) {
+                        Log.w(TAG, "TTS became unavailable, reinitializing...")
+                        val reinit = initialize()
+                        if (!reinit) {
+                            onComplete?.invoke()
+                            if (continuation.isActive) continuation.resume(false)
+                            return@withLock
+                        }
+                    }
+
                     // Split text into sentences for generation
                     val sentences = splitIntoSentences(text)
                         .filter { it.isNotBlank() }
@@ -231,7 +269,7 @@ class SherpaOnnxTtsService @Inject constructor(
                     if (sentences.isEmpty()) {
                         onComplete?.invoke()
                         if (continuation.isActive) continuation.resume(true)
-                        return@launch
+                        return@withLock
                     }
 
                     // Generate all sentences and collect audio samples
@@ -250,7 +288,7 @@ class SherpaOnnxTtsService @Inject constructor(
                         Log.w(TAG, "No audio samples generated")
                         onComplete?.invoke()
                         if (continuation.isActive) continuation.resume(false)
-                        return@launch
+                        return@withLock
                     }
 
                     Log.d(TAG, "Playing ${allSamples.size} total samples at $sampleRate Hz (no gaps)")
@@ -267,6 +305,7 @@ class SherpaOnnxTtsService @Inject constructor(
                     if (continuation.isActive) continuation.resume(false)
                 }
             }
+            }
 
             continuation.invokeOnCancellation {
                 stopSpeaking()
@@ -276,6 +315,7 @@ class SherpaOnnxTtsService @Inject constructor(
 
     /**
      * Generate audio for a single sentence.
+     * Thread-safe with null checks to prevent native crashes.
      */
     private fun generateSentence(
         sentence: String,
@@ -284,16 +324,37 @@ class SherpaOnnxTtsService @Inject constructor(
         sentenceNum: Int,
         totalSentences: Int
     ): GeneratedAudio? {
-        Log.d(TAG, "Generating sentence $sentenceNum/$totalSentences: \"${sentence.take(50)}...\"")
-        val audio = tts?.generate(
-            text = sentence,
-            sid = speakerId,
-            speed = speed
-        )
-        if (audio != null && audio.samples.isNotEmpty()) {
-            Log.d(TAG, "Generated ${audio.samples.size} samples at ${audio.sampleRate} Hz")
+        // Capture TTS reference to prevent race condition
+        val ttsEngine = tts
+        if (ttsEngine == null) {
+            Log.w(TAG, "TTS engine is null, cannot generate audio")
+            return null
         }
-        return if (audio?.samples?.isNotEmpty() == true) audio else null
+
+        if (!isInitialized) {
+            Log.w(TAG, "TTS not initialized, cannot generate audio")
+            return null
+        }
+
+        Log.d(TAG, "Generating sentence $sentenceNum/$totalSentences: \"${sentence.take(50)}...\"")
+
+        return try {
+            isGenerating = true
+            val audio = ttsEngine.generate(
+                text = sentence,
+                sid = speakerId,
+                speed = speed
+            )
+            if (audio != null && audio.samples.isNotEmpty()) {
+                Log.d(TAG, "Generated ${audio.samples.size} samples at ${audio.sampleRate} Hz")
+            }
+            if (audio?.samples?.isNotEmpty() == true) audio else null
+        } catch (e: Exception) {
+            Log.e(TAG, "Native TTS error generating sentence: ${e.message}", e)
+            null
+        } finally {
+            isGenerating = false
+        }
     }
 
     /**
@@ -513,12 +574,34 @@ class SherpaOnnxTtsService @Inject constructor(
 
     /**
      * Release all resources.
+     * Thread-safe: waits for any ongoing generation to complete.
      */
     fun release() {
-        stopSpeaking()
-        tts?.free()
+        // If generation is in progress, stop it first
+        if (isGenerating) {
+            Log.w(TAG, "Releasing TTS while generation in progress - stopping first")
+            stopSpeaking()
+            // Give a small delay for the generation to stop
+            Thread.sleep(100)
+        }
+
+        releaseInternal()
+    }
+
+    /**
+     * Internal release without waiting - called from mutex-protected contexts.
+     */
+    private fun releaseInternal() {
+        try {
+            stopAudioTrack()
+            tts?.free()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error releasing TTS", e)
+        }
         tts = null
         isInitialized = false
+        isGenerating = false
+        Log.d(TAG, "TTS resources released")
     }
 
     /**

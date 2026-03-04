@@ -39,8 +39,10 @@ import com.starception.submission.feature.course.QuranListeningProgress
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.feature.quran.QuranData
 import android.content.ComponentName
+import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import com.starception.submission.services.DrivingAudioService
 import java.util.Locale
 
 /**
@@ -106,6 +108,11 @@ object ActivityTracker {
     private var quranService: QuranPlaybackService? = null
     private var isQuranServiceBound = false
     private var quranServiceConnection: ServiceConnection? = null
+
+    // Driving Audio Service - for travel dua, hadith, TTS with notification controls
+    private var drivingAudioService: DrivingAudioService? = null
+    private var isDrivingServiceBound = false
+    private var drivingServiceConnection: ServiceConnection? = null
 
     // Coroutine scope for async operations
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -718,47 +725,110 @@ object ActivityTracker {
     }
     
     /**
-     * Play driving audio (travel dua) when driving starts
+     * Play driving audio (travel dua) when driving starts.
+     * Uses DrivingAudioService for proper MediaSession and notification controls.
      */
     private fun playDrivingAudio() {
         try {
             context?.let { ctx ->
-                // Release any existing MediaPlayer instance
-                mediaPlayer?.release()
+                Log.i("ActivityTracker", "🎵 ========== STARTING DRIVING AUDIO SERVICE ==========")
 
-                // Create and play the travel dua audio
-                val resId = ctx.resources.getIdentifier("travel_dua", "raw", ctx.packageName)
-                if (resId != 0) {
-                    mediaPlayer = MediaPlayer.create(ctx, resId)
-                    mediaPlayer?.setOnCompletionListener { mp ->
-                        mp.release()
-                        mediaPlayer = null
-                        Log.d("ActivityTracker", "🎵 Travel dua audio completed")
+                // Set cooldown timestamp when dua starts playing
+                val previousPlayTime = lastDuaPlayTime
+                lastDuaPlayTime = System.currentTimeMillis()
+                val cooldownMinutes = travelDuaCooldownMillis / 60000
 
-                        // After travel dua completes, play daily hadith if enrolled
-                        playDailyHadithIfEnrolled(ctx)
+                // Persist cooldown to survive app restarts
+                saveLastDuaPlayTime(ctx, lastDuaPlayTime)
+
+                Log.i("ActivityTracker", "🎵 Cooldown NOW ACTIVE for ${cooldownMinutes}min")
+                Log.i("ActivityTracker", "🎵 Previous play time: ${if (previousPlayTime == 0L) "NEVER" else "${(lastDuaPlayTime - previousPlayTime) / 1000}s ago"}")
+
+                // Prepare hadith info for the service
+                scope.launch {
+                    val hadithInfo = getNextHadithInfo(ctx)
+
+                    // Start DrivingAudioService with travel dua
+                    val serviceIntent = Intent(ctx, DrivingAudioService::class.java).apply {
+                        putExtra(DrivingAudioService.EXTRA_AUDIO_TYPE, DrivingAudioService.TYPE_TRAVEL_DUA)
+
+                        // Pass hadith info if enrolled
+                        hadithInfo?.let { (number, text, useAudio) ->
+                            putExtra(DrivingAudioService.EXTRA_HADITH_NUMBER, number)
+                            if (!useAudio && text != null) {
+                                putExtra(DrivingAudioService.EXTRA_HADITH_TEXT, text)
+                            }
+                            putExtra(DrivingAudioService.EXTRA_COURSE_ID, "daily_bukhari")
+                            putExtra(DrivingAudioService.EXTRA_LESSON_ID, "hadith_$number")
+                        }
                     }
-                    mediaPlayer?.start()
 
-                    // Set cooldown timestamp ONLY when dua actually plays
-                    // This ensures if user stops driving before dua plays, they can retry
-                    val previousPlayTime = lastDuaPlayTime
-                    lastDuaPlayTime = System.currentTimeMillis()
-                    val cooldownMinutes = travelDuaCooldownMillis / 60000
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        ctx.startForegroundService(serviceIntent)
+                    } else {
+                        ctx.startService(serviceIntent)
+                    }
 
-                    // CRITICAL: Persist cooldown to survive app restarts
-                    saveLastDuaPlayTime(ctx, lastDuaPlayTime)
-
-                    Log.i("ActivityTracker", "🎵 ========== TRAVEL DUA PLAYING ==========")
-                    Log.i("ActivityTracker", "🎵 Cooldown NOW ACTIVE for ${cooldownMinutes}min")
-                    Log.i("ActivityTracker", "🎵 Previous play time: ${if (previousPlayTime == 0L) "NEVER" else "${(lastDuaPlayTime - previousPlayTime) / 1000}s ago"}")
-                    Log.i("ActivityTracker", "🎵 Next dua allowed after: ${cooldownMinutes}min from now")
-                } else {
-                    Log.e("ActivityTracker", "Failed to find travel_dua.wav in resources")
+                    Log.i("ActivityTracker", "🎵 DrivingAudioService started with notification controls")
                 }
             }
         } catch (e: Exception) {
-            Log.e("ActivityTracker", "Failed to play driving audio: ${e.message}")
+            Log.e("ActivityTracker", "Failed to start driving audio service: ${e.message}")
+        }
+    }
+
+    /**
+     * Get the next hadith information for playback.
+     * Returns Triple(hadithNumber, hadithText, useBengaliAudio) or null if not enrolled.
+     */
+    private suspend fun getNextHadithInfo(ctx: Context): Triple<Int, String?, Boolean>? {
+        try {
+            val prefs = ctx.getSharedPreferences("course_progress", Context.MODE_PRIVATE)
+            val enrolledCourses = prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()
+
+            if ("daily_bukhari" !in enrolledCourses) {
+                Log.d("ActivityTracker", "📚 User not enrolled in Daily Hadith course")
+                return null
+            }
+
+            // Find next uncompleted hadith
+            val completedLessons = CourseProgressTracker.getCompletedLessons(ctx, "daily_bukhari")
+            var nextHadithNumber = 1
+            for (i in 1..365) {
+                if ("hadith_$i" !in completedLessons) {
+                    nextHadithNumber = i
+                    break
+                }
+            }
+
+            // Check user's selected language for audio vs TTS
+            val translationService = TranslationService.getInstance(ctx)
+            val selectedLang = translationService.getSelectedLanguage()
+            val useBengaliAudio = selectedLang == "bn"
+
+            // Get hadith text for TTS (if not using Bengali audio)
+            var hadithText: String? = null
+            if (!useBengaliAudio) {
+                val hadithRepository = HadithRepository.getInstance(ctx)
+                val hadith = hadithRepository.getHadith("sahih_bukhari.db", nextHadithNumber)
+                hadithText = hadith?.textPlain ?: hadith?.elaboration
+
+                // Translate if needed
+                if (selectedLang != "en" && selectedLang != "transliteration" && hadithText != null) {
+                    try {
+                        hadithText = translationService.translateFromEnglish(hadithText, selectedLang)
+                    } catch (e: Exception) {
+                        Log.w("ActivityTracker", "Translation failed, using English")
+                    }
+                }
+            }
+
+            Log.i("ActivityTracker", "📚 Next hadith: #$nextHadithNumber, useBengaliAudio=$useBengaliAudio")
+            return Triple(nextHadithNumber, hadithText, useBengaliAudio)
+
+        } catch (e: Exception) {
+            Log.e("ActivityTracker", "Error getting hadith info: ${e.message}")
+            return null
         }
     }
 

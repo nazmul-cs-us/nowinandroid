@@ -218,7 +218,7 @@ class MainActivity : FragmentActivity() {
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val isSystemDarkTheme = resources.configuration.isSystemInDarkTheme
-            
+
             // Debug logging
             when (uiState) {
                 is MainActivityUiState.Success -> {
@@ -228,7 +228,18 @@ class MainActivity : FragmentActivity() {
                     Log.d("MainActivity", "Theme state - Loading with defaults")
                 }
             }
-            
+
+            // IMPORTANT: rememberNiaAppState must be OUTSIDE NiaTheme to prevent
+            // navigation state loss when theme changes. Theme recomposition inside
+            // NiaTheme was causing the NavHost to be recreated, losing the Settings screen.
+            val appState = rememberNiaAppState(
+                networkMonitor = networkMonitor,
+                userNewsResourceRepository = userNewsResourceRepository,
+                timeZoneMonitor = timeZoneMonitor,
+            )
+
+            val currentTimeZone by appState.currentTimeZone.collectAsStateWithLifecycle()
+
             NiaTheme(
                 darkTheme = when (uiState) {
                     is MainActivityUiState.Success -> uiState.shouldUseDarkTheme(isSystemDarkTheme)
@@ -245,14 +256,6 @@ class MainActivity : FragmentActivity() {
             ) {
                 // Update theme color bridge so View-based components can access theme colors
                 com.starception.submission.util.ThemeColorBridge.UpdateColors()
-
-                val appState = rememberNiaAppState(
-                    networkMonitor = networkMonitor,
-                    userNewsResourceRepository = userNewsResourceRepository,
-                    timeZoneMonitor = timeZoneMonitor,
-                )
-                
-                val currentTimeZone by appState.currentTimeZone.collectAsStateWithLifecycle()
 
                 CompositionLocalProvider(
                     LocalAnalyticsHelper provides analyticsHelper,

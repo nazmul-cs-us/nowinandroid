@@ -51,9 +51,16 @@ class VoiceCompletionManager @Inject constructor(
 
         // Configuration
         const val LISTENING_DURATION_MS = 5000L
+        const val LISTENING_DURATION_RETRY_MS = 6000L  // Longer duration for retries
         const val PROMPT_DELAY_MS = 500L
         const val UTTERANCE_ID_PROMPT = "voice_completion_prompt"
+
+        // Retry configuration for noisy environments
+        const val MAX_RETRY_ATTEMPTS = 2  // Will try up to 3 times total (1 initial + 2 retries)
     }
+
+    // Retry state
+    private var currentRetryCount = 0
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -281,61 +288,146 @@ class VoiceCompletionManager @Inject constructor(
     /**
      * Listen for user's yes/no response using the selected voice recognition engine.
      * Honors the user's selection from Voice Settings (Sherpa KWS or Whisper).
+     * Implements retry mechanism for noisy environments (driving mode).
      */
     private suspend fun listenForResponse(
         onYes: () -> Unit,
         onNo: () -> Unit,
         onError: (String) -> Unit
     ) {
+        // Reset retry count at start of new listening session
+        currentRetryCount = 0
+        listenForResponseInternal(onYes, onNo, onError)
+    }
+
+    /**
+     * Internal listen function that handles retries.
+     */
+    private suspend fun listenForResponseInternal(
+        onYes: () -> Unit,
+        onNo: () -> Unit,
+        onError: (String) -> Unit
+    ) {
         val selectedEngine = getSelectedEngine()
-        Log.i(TAG, "🎤 Using voice engine: ${selectedEngine.displayName}")
+        val isRetry = currentRetryCount > 0
+        val listeningDuration = if (isRetry) LISTENING_DURATION_RETRY_MS else LISTENING_DURATION_MS
+
+        Log.i(TAG, "🎤 Using voice engine: ${selectedEngine.displayName}${if (isRetry) " (retry $currentRetryCount)" else ""}")
 
         when (selectedEngine) {
             VoiceRecognitionEngine.SHERPA_KWS -> {
-                listenWithSherpaKws(onYes, onNo, onError)
+                listenWithSherpaKws(onYes, onNo, onError, listeningDuration)
             }
             VoiceRecognitionEngine.WHISPER -> {
-                listenWithWhisper(onYes, onNo, onError)
+                listenWithWhisper(onYes, onNo, onError, listeningDuration)
+            }
+        }
+    }
+
+    /**
+     * Handle retry logic for unrecognized or timeout results.
+     * Returns true if a retry was initiated, false if max retries reached.
+     */
+    private fun handleRetry(
+        reason: String,
+        onYes: () -> Unit,
+        onNo: () -> Unit,
+        onError: (String) -> Unit
+    ): Boolean {
+        if (currentRetryCount < MAX_RETRY_ATTEMPTS) {
+            currentRetryCount++
+            Log.i(TAG, "🔄 Retrying voice recognition (attempt ${currentRetryCount + 1}/${MAX_RETRY_ATTEMPTS + 1}): $reason")
+
+            // Speak retry prompt and listen again
+            scope.launch {
+                speakRetryPrompt {
+                    scope.launch {
+                        delay(PROMPT_DELAY_MS)
+                        listenForResponseInternal(onYes, onNo, onError)
+                    }
+                }
+            }
+            return true
+        } else {
+            Log.i(TAG, "🛑 Max retries reached ($MAX_RETRY_ATTEMPTS), giving up: $reason")
+            return false
+        }
+    }
+
+    /**
+     * Speak a shorter retry prompt for noisy environments.
+     */
+    private fun speakRetryPrompt(onComplete: () -> Unit) {
+        scope.launch {
+            val retryPrompt = when (currentRetryCount) {
+                1 -> "Sorry, I didn't catch that. Please say YES or NO more clearly."
+                else -> "One more try. Say YES or NO loudly."
+            }
+
+            Log.i(TAG, "🔊 Retry prompt: $retryPrompt")
+            applyUserSelectedTtsVoice()
+
+            val success = try {
+                sherpaOnnxTts.speak(retryPrompt, onComplete = { onComplete() })
+            } catch (e: Exception) {
+                Log.w(TAG, "Sherpa-ONNX TTS failed for retry prompt", e)
+                false
+            }
+
+            if (!success) {
+                speakWithAndroidTtsFallback(retryPrompt, onComplete)
             }
         }
     }
 
     /**
      * Listen using Sherpa-ONNX KWS (fast ~100ms keyword spotting)
+     * Implements retry logic for noisy environments.
      */
     private fun listenWithSherpaKws(
         onYes: () -> Unit,
         onNo: () -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        durationMs: Long = LISTENING_DURATION_MS
     ) {
         scope.launch {
             sherpaKwsService.startListening(
-                durationMs = LISTENING_DURATION_MS,
+                durationMs = durationMs,
                 callback = object : SherpaOnnxKwsService.VoiceRecognitionCallback {
                     override fun onResult(result: SherpaOnnxKwsService.VoiceResult) {
                         when (result) {
                             is SherpaOnnxKwsService.VoiceResult.Yes -> {
                                 Log.i(TAG, "✅ KWS detected: YES")
+                                currentRetryCount = 0  // Reset on success
                                 speakConfirmation("I heard yes. Marking lesson complete.") {
                                     onYes()
                                 }
                             }
                             is SherpaOnnxKwsService.VoiceResult.No -> {
                                 Log.i(TAG, "❌ KWS detected: NO")
+                                currentRetryCount = 0  // Reset on success
                                 speakConfirmation("I heard no. Skipping this lesson.") {
                                     onNo()
                                 }
                             }
                             is SherpaOnnxKwsService.VoiceResult.Timeout -> {
                                 Log.d(TAG, "⏱️ KWS timeout - no keyword detected")
-                                speakConfirmation("No response detected. Skipping.") {
-                                    onNo()
+                                // Try retry before giving up
+                                val retried = handleRetry("timeout - no speech detected", onYes, onNo, onError)
+                                if (!retried) {
+                                    speakConfirmation("No response detected after multiple tries. Skipping.") {
+                                        onNo()
+                                    }
                                 }
                             }
                             is SherpaOnnxKwsService.VoiceResult.Unrecognized -> {
                                 Log.d(TAG, "❓ KWS unrecognized: ${result.text}")
-                                speakConfirmation("Sorry, I didn't understand. Skipping.") {
-                                    onNo()
+                                // Try retry before giving up
+                                val retried = handleRetry("unrecognized: ${result.text}", onYes, onNo, onError)
+                                if (!retried) {
+                                    speakConfirmation("Sorry, I couldn't understand. Skipping.") {
+                                        onNo()
+                                    }
                                 }
                             }
                             is SherpaOnnxKwsService.VoiceResult.Error -> {
@@ -346,7 +438,7 @@ class VoiceCompletionManager @Inject constructor(
                     }
 
                     override fun onListeningStarted() {
-                        Log.d(TAG, "KWS listening started")
+                        Log.d(TAG, "KWS listening started (duration: ${durationMs}ms)")
                     }
 
                     override fun onListeningStopped() {
@@ -363,40 +455,52 @@ class VoiceCompletionManager @Inject constructor(
 
     /**
      * Listen using Whisper (full transcription ~2s)
+     * Implements retry logic for noisy environments.
      */
     private fun listenWithWhisper(
         onYes: () -> Unit,
         onNo: () -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        durationMs: Long = LISTENING_DURATION_MS
     ) {
         scope.launch {
             whisperService.startListening(
-            durationMs = LISTENING_DURATION_MS,
+            durationMs = durationMs,
             callback = object : WhisperVoiceService.VoiceRecognitionCallback {
                 override fun onResult(result: WhisperVoiceService.VoiceResult) {
                     when (result) {
                         is WhisperVoiceService.VoiceResult.Yes -> {
                             Log.i(TAG, "✅ Whisper recognized: YES")
+                            currentRetryCount = 0  // Reset on success
                             speakConfirmation("I heard yes. Marking lesson complete.") {
                                 onYes()
                             }
                         }
                         is WhisperVoiceService.VoiceResult.No -> {
                             Log.i(TAG, "❌ Whisper recognized: NO")
+                            currentRetryCount = 0  // Reset on success
                             speakConfirmation("I heard no. Skipping this lesson.") {
                                 onNo()
                             }
                         }
                         is WhisperVoiceService.VoiceResult.Timeout -> {
                             Log.d(TAG, "⏱️ No speech detected (timeout)")
-                            speakConfirmation("No response detected. Skipping.") {
-                                onNo()
+                            // Try retry before giving up
+                            val retried = handleRetry("timeout - no speech detected", onYes, onNo, onError)
+                            if (!retried) {
+                                speakConfirmation("No response detected after multiple tries. Skipping.") {
+                                    onNo()
+                                }
                             }
                         }
                         is WhisperVoiceService.VoiceResult.Unrecognized -> {
                             Log.d(TAG, "❓ Unrecognized speech: ${result.text}")
-                            speakConfirmation("Sorry, I didn't understand: ${result.text}. Skipping.") {
-                                onNo()
+                            // Try retry before giving up
+                            val retried = handleRetry("unrecognized: ${result.text}", onYes, onNo, onError)
+                            if (!retried) {
+                                speakConfirmation("Sorry, I couldn't understand. Skipping.") {
+                                    onNo()
+                                }
                             }
                         }
                         is WhisperVoiceService.VoiceResult.Error -> {
@@ -406,7 +510,7 @@ class VoiceCompletionManager @Inject constructor(
                 }
 
                 override fun onListeningStarted() {
-                    Log.d(TAG, "Whisper listening started")
+                    Log.d(TAG, "Whisper listening started (duration: ${durationMs}ms)")
                 }
 
                 override fun onListeningStopped() {

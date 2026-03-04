@@ -22,6 +22,9 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.k2fsa.sherpa.onnx.FeatureConfig
@@ -89,6 +92,11 @@ class SherpaOnnxKwsService @Inject constructor(
     private var audioRecord: AudioRecord? = null
     private var isRecording = false
     private var isListening = false  // Prevent concurrent listening
+
+    // Audio enhancement effects for noisy environments (driving mode)
+    private var noiseSuppressor: NoiseSuppressor? = null
+    private var acousticEchoCanceler: AcousticEchoCanceler? = null
+    private var automaticGainControl: AutomaticGainControl? = null
 
     // Cache directory for extracted model files
     private val modelDir: File by lazy {
@@ -312,6 +320,8 @@ class SherpaOnnxKwsService @Inject constructor(
     /**
      * Stream audio and detect keywords in real-time.
      * Returns the first detected keyword or empty string if timeout.
+     *
+     * Uses Android's built-in noise suppression for better detection in noisy environments (driving).
      */
     private fun streamAndDetect(durationMs: Long, callback: VoiceRecognitionCallback, stream: OnlineStream): String {
         try {
@@ -321,13 +331,14 @@ class SherpaOnnxKwsService @Inject constructor(
                 return ""
             }
 
+            // Use VOICE_RECOGNITION source - optimized for speech with built-in processing
             @Suppress("MissingPermission")
             audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,  // Better than MIC for speech
                 SAMPLE_RATE,
                 CHANNEL_CONFIG,
                 AUDIO_FORMAT,
-                bufferSize.coerceAtLeast(CHUNK_SIZE_SAMPLES * 2)
+                bufferSize.coerceAtLeast(CHUNK_SIZE_SAMPLES * 4)  // Larger buffer for processing
             )
 
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
@@ -337,10 +348,14 @@ class SherpaOnnxKwsService @Inject constructor(
                 return ""
             }
 
+            // Attach audio enhancement effects for noisy driving environments
+            val audioSessionId = audioRecord?.audioSessionId ?: 0
+            attachAudioEffects(audioSessionId)
+
             // Start recording
             audioRecord?.startRecording()
             isRecording = true
-            Log.d(TAG, "Started streaming audio for keyword detection...")
+            Log.d(TAG, "Started streaming audio for keyword detection with noise suppression...")
 
             val shortBuffer = ShortArray(CHUNK_SIZE_SAMPLES)
             val floatBuffer = FloatArray(CHUNK_SIZE_SAMPLES)
@@ -383,8 +398,11 @@ class SherpaOnnxKwsService @Inject constructor(
                     floatBuffer[i] = shortBuffer[i].toFloat() / Short.MAX_VALUE
                 }
 
-                // Feed to KWS stream
-                stream.acceptWaveform(floatBuffer.copyOf(read), SAMPLE_RATE)
+                // Apply high-pass filter to remove low-frequency road/engine noise
+                val filteredAudio = applyHighPassFilter(floatBuffer.copyOf(read))
+
+                // Feed filtered audio to KWS stream
+                stream.acceptWaveform(filteredAudio, SAMPLE_RATE)
 
                 // Check for keyword detection
                 var localReadyCount = 0
@@ -429,6 +447,106 @@ class SherpaOnnxKwsService @Inject constructor(
     }
 
     /**
+     * Attach audio enhancement effects for noisy environments.
+     * These help filter out road noise, wind, and other ambient sounds during driving.
+     */
+    private fun attachAudioEffects(audioSessionId: Int) {
+        // Noise Suppressor - reduces background noise
+        if (NoiseSuppressor.isAvailable()) {
+            try {
+                noiseSuppressor = NoiseSuppressor.create(audioSessionId)?.apply {
+                    enabled = true
+                    Log.i(TAG, "✅ NoiseSuppressor enabled (session: $audioSessionId)")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ Failed to create NoiseSuppressor: ${e.message}")
+            }
+        } else {
+            Log.w(TAG, "⚠️ NoiseSuppressor not available on this device")
+        }
+
+        // Acoustic Echo Canceler - prevents TTS audio from being picked up by mic
+        if (AcousticEchoCanceler.isAvailable()) {
+            try {
+                acousticEchoCanceler = AcousticEchoCanceler.create(audioSessionId)?.apply {
+                    enabled = true
+                    Log.i(TAG, "✅ AcousticEchoCanceler enabled (session: $audioSessionId)")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ Failed to create AcousticEchoCanceler: ${e.message}")
+            }
+        } else {
+            Log.w(TAG, "⚠️ AcousticEchoCanceler not available on this device")
+        }
+
+        // Automatic Gain Control - normalizes volume levels
+        if (AutomaticGainControl.isAvailable()) {
+            try {
+                automaticGainControl = AutomaticGainControl.create(audioSessionId)?.apply {
+                    enabled = true
+                    Log.i(TAG, "✅ AutomaticGainControl enabled (session: $audioSessionId)")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ Failed to create AutomaticGainControl: ${e.message}")
+            }
+        } else {
+            Log.w(TAG, "⚠️ AutomaticGainControl not available on this device")
+        }
+    }
+
+    /**
+     * Release audio enhancement effects.
+     */
+    private fun releaseAudioEffects() {
+        try {
+            noiseSuppressor?.release()
+            noiseSuppressor = null
+        } catch (e: Exception) {
+            Log.w(TAG, "Error releasing NoiseSuppressor", e)
+        }
+
+        try {
+            acousticEchoCanceler?.release()
+            acousticEchoCanceler = null
+        } catch (e: Exception) {
+            Log.w(TAG, "Error releasing AcousticEchoCanceler", e)
+        }
+
+        try {
+            automaticGainControl?.release()
+            automaticGainControl = null
+        } catch (e: Exception) {
+            Log.w(TAG, "Error releasing AutomaticGainControl", e)
+        }
+    }
+
+    /**
+     * Apply simple high-pass filter to remove low-frequency road noise.
+     * Road/engine noise is typically below 300Hz, while speech is 300Hz-3400Hz.
+     *
+     * Uses a simple first-order IIR high-pass filter with cutoff ~200Hz.
+     */
+    private var previousSample = 0f
+    private var filteredSample = 0f
+
+    private fun applyHighPassFilter(samples: FloatArray): FloatArray {
+        // High-pass filter coefficient (alpha)
+        // For cutoff frequency fc and sample rate fs:
+        // alpha = 1 / (1 + 2*pi*fc/fs)
+        // With fc=200Hz and fs=16000Hz: alpha ≈ 0.926
+        val alpha = 0.926f
+
+        val filtered = FloatArray(samples.size)
+        for (i in samples.indices) {
+            // First-order high-pass: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
+            filteredSample = alpha * (filteredSample + samples[i] - previousSample)
+            previousSample = samples[i]
+            filtered[i] = filteredSample
+        }
+        return filtered
+    }
+
+    /**
      * Stop recording.
      */
     private fun stopRecording() {
@@ -440,6 +558,13 @@ class SherpaOnnxKwsService @Inject constructor(
         } catch (e: Exception) {
             Log.w(TAG, "Error stopping AudioRecord", e)
         }
+
+        // Release audio effects
+        releaseAudioEffects()
+
+        // Reset filter state
+        previousSample = 0f
+        filteredSample = 0f
     }
 
     /**

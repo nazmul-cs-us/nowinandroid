@@ -66,6 +66,7 @@ fun rememberNiaAppState(
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
     navController: NavHostController = rememberNavController(),
 ): NiaAppState {
+    
     NavigationTrackingSideEffect(navController)
     return remember(
         navController,
@@ -195,16 +196,14 @@ class NiaAppState(
                 restoreState = true
             }
 
-            // Check if we're navigating to HOME or INTERESTS while a non-top-level screen
-            // (like Settings) is on top - if so, just pop the back stack to dismiss it
-            val currentRoute = currentDestination?.route
-            val isOnNonTopLevelScreen = currentRoute != null &&
-                TopLevelDestination.entries.none { it.route.qualifiedName == currentRoute }
-
-            if (isOnNonTopLevelScreen) {
-                // We're on a screen like Settings - pop it first to ensure proper dismissal
-                navController.popBackStack()
-            }
+            // DISABLED: This was causing Settings to dismiss unexpectedly when theme changes
+            // caused recomposition. The normal navigation with popUpTo should handle this properly.
+            // val currentRoute = currentDestination?.route
+            // val isOnNonTopLevelScreen = currentRoute != null &&
+            //     TopLevelDestination.entries.none { it.route.qualifiedName == currentRoute }
+            // if (isOnNonTopLevelScreen) {
+            //     navController.popBackStack()
+            // }
 
             when (topLevelDestination) {
                 FOR_YOU -> navController.navigateToForYou(topLevelNavOptions)

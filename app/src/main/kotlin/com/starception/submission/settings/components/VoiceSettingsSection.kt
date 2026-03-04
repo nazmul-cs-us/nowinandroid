@@ -1,10 +1,10 @@
 package com.starception.submission.settings.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -18,49 +18,41 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.Stop
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -75,17 +67,20 @@ import kotlin.random.Random
 enum class VoiceRecognitionEngine(
     val displayName: String,
     val description: String,
-    val speed: String
+    val speed: String,
+    val icon: ImageVector
 ) {
     SHERPA_KWS(
-        displayName = "Fast Keyword Spotting",
-        description = "Real-time yes/no detection using Sherpa-ONNX. Optimized for quick hands-free responses.",
-        speed = "~100ms"
+        displayName = "Fast Keywords",
+        description = "Real-time yes/no detection, optimized for hands-free responses",
+        speed = "~100ms",
+        icon = Icons.Outlined.Bolt
     ),
     WHISPER(
-        displayName = "Whisper.cpp (Full Transcription)",
-        description = "Full speech-to-text using native whisper.cpp. Fast and accurate offline transcription.",
-        speed = "~2 seconds"
+        displayName = "Full Transcription",
+        description = "Complete speech-to-text using Whisper.cpp for accurate offline transcription",
+        speed = "~2 sec",
+        icon = Icons.Outlined.RecordVoiceOver
     )
 }
 
@@ -108,11 +103,17 @@ data class VoiceSettingsState(
     val testState: VoiceTestState = VoiceTestState.IDLE,
     val testResult: String? = null,
     val testError: String? = null,
-    val amplitude: Float = 0f // Real-time audio amplitude (0.0 to 1.0)
+    val amplitude: Float = 0f
 )
 
+// Google colors for the dots
+private val GoogleBlue = Color(0xFF4285F4)
+private val GoogleRed = Color(0xFFEA4335)
+private val GoogleYellow = Color(0xFFFBBC05)
+private val GoogleGreen = Color(0xFF34A853)
+
 /**
- * Voice Settings Section - allows users to select voice recognition engine and test it
+ * Modern Voice Settings Section with Material 3 design
  */
 @Composable
 fun VoiceSettingsSection(
@@ -122,52 +123,203 @@ fun VoiceSettingsSection(
     onStopTest: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.selectableGroup()) {
-        Text(
-            text = "Voice Recognition Engine",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
+    val haptic = LocalHapticFeedback.current
 
-        VoiceRecognitionEngine.entries.forEach { engine ->
-            VoiceEngineCard(
-                engine = engine,
-                isSelected = state.selectedEngine == engine,
-                onSelect = { onEngineSelected(engine) }
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Engine selection section
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Recognition Engine",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
             )
-            if (engine != VoiceRecognitionEngine.entries.last()) {
-                Spacer(modifier = Modifier.height(8.dp))
+
+            // Modern engine selection cards
+            VoiceRecognitionEngine.entries.forEach { engine ->
+                ModernEngineCard(
+                    engine = engine,
+                    isSelected = state.selectedEngine == engine,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onEngineSelected(engine)
+                    }
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // Voice test section
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Test Voice Recognition",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
+            )
 
-        // Interactive Voice Test Section
-        VoiceTestCard(
-            testState = state.testState,
-            testResult = state.testResult,
-            testError = state.testError,
-            amplitude = state.amplitude,
-            onTestVoice = onTestVoice,
-            onStopTest = onStopTest
-        )
+            ModernVoiceTestCard(
+                testState = state.testState,
+                testResult = state.testResult,
+                testError = state.testError,
+                amplitude = state.amplitude,
+                onTestVoice = onTestVoice,
+                onStopTest = onStopTest
+            )
+        }
     }
 }
 
-// Google colors for the dots
-private val GoogleBlue = Color(0xFF4285F4)
-private val GoogleRed = Color(0xFFEA4335)
-private val GoogleYellow = Color(0xFFFBBC05)
-private val GoogleGreen = Color(0xFF34A853)
+@Composable
+private fun ModernEngineCard(
+    engine: VoiceRecognitionEngine,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        else
+            MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "cardBackground"
+    )
+
+    val borderColor by animateColorAsState(
+        targetValue = if (isSelected)
+            MaterialTheme.colorScheme.primary
+        else
+            Color.Transparent,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "cardBorder"
+    )
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(
+                width = 2.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true, color = MaterialTheme.colorScheme.primary),
+                onClick = onClick
+            ),
+        color = backgroundColor,
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Icon with gradient background
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = if (isSelected) listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                            ) else listOf(
+                                MaterialTheme.colorScheme.surfaceContainerHighest,
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = engine.icon,
+                    contentDescription = null,
+                    tint = if (isSelected)
+                        MaterialTheme.colorScheme.onPrimary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            // Text content
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = engine.displayName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isSelected)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurface
+                    )
+                    // Speed badge
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (engine == VoiceRecognitionEngine.SHERPA_KWS)
+                            GoogleGreen.copy(alpha = 0.2f)
+                        else
+                            MaterialTheme.colorScheme.tertiaryContainer
+                    ) {
+                        Text(
+                            text = engine.speed,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = if (engine == VoiceRecognitionEngine.SHERPA_KWS)
+                                GoogleGreen
+                            else
+                                MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = engine.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Selection indicator
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Check,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
 
 /**
  * Data class representing a single animated dot
  */
 private data class AnimatedDot(
-    val baseX: Float,      // Base X position (0-1 normalized)
-    val baseY: Float,      // Base Y position (0-1 normalized)
+    val baseX: Float,
+    val baseY: Float,
     val size: Float,
     val color: Color,
     val phaseOffset: Float,
@@ -176,7 +328,6 @@ private data class AnimatedDot(
 
 /**
  * Google Hum-style animated voice visualization
- * Dots arranged in a 3D globe/sphere pattern that rotates and reacts to voice
  */
 @Composable
 private fun GoogleHumVisualization(
@@ -186,7 +337,6 @@ private fun GoogleHumVisualization(
 ) {
     val googleColors = listOf(GoogleBlue, GoogleRed, GoogleYellow, GoogleGreen)
 
-    // Generate dots positioned on a sphere surface
     val dots = remember {
         val random = Random(42)
         val numDots = 60
@@ -208,7 +358,6 @@ private fun GoogleHumVisualization(
         }
     }
 
-    // Smooth constant rotation - 10 seconds per full rotation
     val infiniteTransition = rememberInfiniteTransition(label = "globeRotation")
     val rotationAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -220,47 +369,30 @@ private fun GoogleHumVisualization(
         label = "rotationAngle"
     )
 
-    // Smooth amplitude with slower tween for fluid transitions
     val smoothAmplitude by animateFloatAsState(
         targetValue = amplitude,
         animationSpec = tween(150, easing = LinearEasing),
         label = "smoothAmplitude"
     )
 
-    Canvas(
-        modifier = modifier
-            .fillMaxSize()
-    ) {
+    Canvas(modifier = modifier.fillMaxSize()) {
         val centerX = size.width / 2
         val centerY = size.height / 2
         val baseRadius = minOf(size.width, size.height) * 0.35f
-
-        // Amplify amplitude for visible effect
         val amp = (smoothAmplitude * 6f).coerceIn(0f, 1f)
-
-        // Globe expands smoothly with amplitude
         val dynamicRadius = baseRadius * (1f + amp * 0.5f)
 
         dots.forEach { dot ->
-            // Constant smooth rotation
             val rotatedTheta = dot.baseX + rotationAngle * dot.speedMultiplier
-
-            // Convert spherical to 3D
             val x3d = sin(dot.baseY) * cos(rotatedTheta)
             val y3d = cos(dot.baseY)
             val z3d = sin(dot.baseY) * sin(rotatedTheta)
-
-            // Project to 2D with perspective
             val perspective = 0.5f + (z3d + 1f) * 0.25f
             val projectedX = centerX + x3d * dynamicRadius
             val projectedY = centerY + y3d * dynamicRadius
-
-            // Size: base + depth + amplitude boost
             val baseSize = dot.size * perspective
             val amplitudeBoost = 1f + amp * 2f
             val finalSize = baseSize * amplitudeBoost
-
-            // Alpha based on depth
             val alpha = (0.4f + perspective * 0.6f).coerceIn(0f, 1f)
 
             drawCircle(
@@ -273,7 +405,7 @@ private fun GoogleHumVisualization(
 }
 
 @Composable
-private fun VoiceTestCard(
+private fun ModernVoiceTestCard(
     testState: VoiceTestState,
     testResult: String?,
     testError: String?,
@@ -283,13 +415,12 @@ private fun VoiceTestCard(
     modifier: Modifier = Modifier
 ) {
     val isActive = testState == VoiceTestState.LISTENING || testState == VoiceTestState.PROCESSING
+    val haptic = LocalHapticFeedback.current
 
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(24.dp),
-        modifier = modifier.fillMaxWidth()
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -297,16 +428,22 @@ private fun VoiceTestCard(
                 .fillMaxWidth()
                 .padding(24.dp)
         ) {
-            // Google Hum visualization - dots scattered across the area
+            // Visualization area
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .clickable(onClick = if (isActive) onStopTest else onTestVoice)
+                    .height(180.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(bounded = true, color = GoogleBlue)
+                    ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (isActive) onStopTest() else onTestVoice()
+                    }
             ) {
-
-                // Animated dots visualization - reactive to voice amplitude
                 GoogleHumVisualization(
                     isAnimating = isActive,
                     amplitude = amplitude,
@@ -316,7 +453,7 @@ private fun VoiceTestCard(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Status text
+            // Status text with animation
             AnimatedContent(
                 targetState = testState,
                 transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
@@ -326,7 +463,7 @@ private fun VoiceTestCard(
                     Text(
                         text = when (state) {
                             VoiceTestState.IDLE -> "Tap to test voice recognition"
-                            VoiceTestState.LISTENING -> "Listening..."
+                            VoiceTestState.LISTENING -> "Listening... Tap to stop"
                             VoiceTestState.PROCESSING -> "Processing with Whisper.cpp"
                             VoiceTestState.SUCCESS -> if (testResult != null) "\"$testResult\"" else "Recognized"
                             VoiceTestState.ERROR -> testError ?: "Error"
@@ -342,73 +479,6 @@ private fun VoiceTestCard(
                         textAlign = TextAlign.Center
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun VoiceEngineCard(
-    engine: VoiceRecognitionEngine,
-    isSelected: Boolean,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerLow
-            }
-        ),
-        shape = RoundedCornerShape(12.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .selectable(
-                selected = isSelected,
-                role = Role.RadioButton,
-                onClick = onSelect
-            )
-    ) {
-        Row(
-            verticalAlignment = Alignment.Top,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            RadioButton(
-                selected = isSelected,
-                onClick = null // handled by selectable
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = engine.displayName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = engine.speed,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (engine == VoiceRecognitionEngine.SHERPA_KWS) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.tertiary
-                        }
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = engine.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }

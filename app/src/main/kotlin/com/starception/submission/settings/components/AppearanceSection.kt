@@ -1,21 +1,48 @@
 package com.starception.submission.settings.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.SettingsBrightness
+import androidx.compose.material3.ripple
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.theme.supportsDynamicTheming
 import com.starception.submission.core.model.data.DarkThemeConfig
@@ -31,105 +58,325 @@ fun AppearanceSection(
     modifier: Modifier = Modifier
 ) {
     val supportDynamicColor = supportsDynamicTheming()
+    val haptic = LocalHapticFeedback.current
 
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         // Theme Brand Section
-        SectionTitle(text = "Theme")
-        Column(Modifier.selectableGroup()) {
-            ThemeChooserRow(
-                text = "Default",
-                selected = themeSettings.brand == ThemeBrand.DEFAULT,
-                onClick = { onChangeThemeBrand(ThemeBrand.DEFAULT) }
-            )
-            ThemeChooserRow(
-                text = "Android",
-                selected = themeSettings.brand == ThemeBrand.ANDROID,
-                onClick = { onChangeThemeBrand(ThemeBrand.ANDROID) }
-            )
-            ThemeChooserRow(
-                text = "Coastal",
-                selected = themeSettings.brand == ThemeBrand.COASTAL,
-                onClick = { onChangeThemeBrand(ThemeBrand.COASTAL) }
-            )
-        }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ModernSectionTitle(text = "Color Theme")
 
-        // Dynamic Color Section (only visible when Default theme and Android 12+)
-        AnimatedVisibility(visible = themeSettings.brand == ThemeBrand.DEFAULT && supportDynamicColor) {
-            Column {
-                SectionTitle(text = "Dynamic Color")
-                Column(Modifier.selectableGroup()) {
-                    ThemeChooserRow(
-                        text = "Yes",
-                        selected = themeSettings.useDynamicColor,
-                        onClick = { onChangeDynamicColorPreference(true) }
-                    )
-                    ThemeChooserRow(
-                        text = "No",
-                        selected = !themeSettings.useDynamicColor,
-                        onClick = { onChangeDynamicColorPreference(false) }
-                    )
-                }
+            // Theme pills
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ThemePill(
+                    label = "Default",
+                    selected = themeSettings.brand == ThemeBrand.DEFAULT,
+                    color = Color(0xFF6750A4),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onChangeThemeBrand(ThemeBrand.DEFAULT)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                ThemePill(
+                    label = "Android",
+                    selected = themeSettings.brand == ThemeBrand.ANDROID,
+                    color = Color(0xFF3DDC84),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onChangeThemeBrand(ThemeBrand.ANDROID)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                ThemePill(
+                    label = "Coastal",
+                    selected = themeSettings.brand == ThemeBrand.COASTAL,
+                    color = Color(0xFF0097A7),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onChangeThemeBrand(ThemeBrand.COASTAL)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
-        // Dark Mode Section
-        SectionTitle(text = "Dark Mode")
-        Column(Modifier.selectableGroup()) {
-            ThemeChooserRow(
-                text = "System Default",
-                selected = themeSettings.darkThemeConfig == DarkThemeConfig.FOLLOW_SYSTEM,
-                onClick = { onChangeDarkThemeConfig(DarkThemeConfig.FOLLOW_SYSTEM) }
+        // Dynamic Color Section (only visible when Default theme and Android 12+)
+        AnimatedVisibility(
+            visible = themeSettings.brand == ThemeBrand.DEFAULT && supportDynamicColor
+        ) {
+            ModernSwitchRow(
+                title = "Dynamic Colors",
+                subtitle = "Use colors from your wallpaper",
+                checked = themeSettings.useDynamicColor,
+                onCheckedChange = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onChangeDynamicColorPreference(it)
+                }
             )
-            ThemeChooserRow(
-                text = "Light",
-                selected = themeSettings.darkThemeConfig == DarkThemeConfig.LIGHT,
-                onClick = { onChangeDarkThemeConfig(DarkThemeConfig.LIGHT) }
-            )
-            ThemeChooserRow(
-                text = "Dark",
-                selected = themeSettings.darkThemeConfig == DarkThemeConfig.DARK,
-                onClick = { onChangeDarkThemeConfig(DarkThemeConfig.DARK) }
+        }
+
+        // Dark Mode Section with modern segmented button
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ModernSectionTitle(text = "Display Mode")
+
+            ModernSegmentedButtons(
+                options = listOf(
+                    SegmentOption(
+                        label = "System",
+                        icon = Icons.Outlined.SettingsBrightness,
+                        selected = themeSettings.darkThemeConfig == DarkThemeConfig.FOLLOW_SYSTEM
+                    ),
+                    SegmentOption(
+                        label = "Light",
+                        icon = Icons.Outlined.LightMode,
+                        selected = themeSettings.darkThemeConfig == DarkThemeConfig.LIGHT
+                    ),
+                    SegmentOption(
+                        label = "Dark",
+                        icon = Icons.Outlined.DarkMode,
+                        selected = themeSettings.darkThemeConfig == DarkThemeConfig.DARK
+                    )
+                ),
+                onOptionSelected = { index ->
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    when (index) {
+                        0 -> onChangeDarkThemeConfig(DarkThemeConfig.FOLLOW_SYSTEM)
+                        1 -> onChangeDarkThemeConfig(DarkThemeConfig.LIGHT)
+                        2 -> onChangeDarkThemeConfig(DarkThemeConfig.DARK)
+                    }
+                }
             )
         }
     }
 }
 
 @Composable
-private fun SectionTitle(text: String) {
+private fun ModernSectionTitle(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Medium,
+        color = MaterialTheme.colorScheme.primary
     )
 }
 
 @Composable
-private fun ThemeChooserRow(
-    text: String,
+private fun ThemePill(
+    label: String,
     selected: Boolean,
-    onClick: () -> Unit
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .selectable(
-                selected = selected,
-                role = Role.RadioButton,
-                onClick = onClick
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected)
+            color.copy(alpha = 0.15f)
+        else
+            MaterialTheme.colorScheme.surfaceContainerHighest,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "pillBackground"
+    )
+
+    val borderColor by animateColorAsState(
+        targetValue = if (selected)
+            color
+        else
+            Color.Transparent,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "pillBorder"
+    )
+
+    Surface(
+        modifier = modifier
+            .height(56.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .border(
+                width = 2.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(16.dp)
             )
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true, color = color),
+                onClick = onClick
+            ),
+        color = backgroundColor,
+        shape = RoundedCornerShape(16.dp)
     ) {
-        RadioButton(
-            selected = selected,
-            onClick = null
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            // Color dot
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+
+            Spacer(modifier = Modifier.size(8.dp))
+
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected) color else MaterialTheme.colorScheme.onSurface
+            )
+
+            if (selected) {
+                Spacer(modifier = Modifier.size(4.dp))
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = "Selected",
+                    tint = color,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+    }
+}
+
+data class SegmentOption(
+    val label: String,
+    val icon: ImageVector? = null,
+    val selected: Boolean = false
+)
+
+@Composable
+fun ModernSegmentedButtons(
+    options: List<SegmentOption>,
+    onOptionSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest
+    ) {
+        Row(
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            options.forEachIndexed { index, option ->
+                val backgroundColor by animateColorAsState(
+                    targetValue = if (option.selected)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else
+                        Color.Transparent,
+                    animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                    label = "segmentBackground"
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(
+                                bounded = true,
+                                color = MaterialTheme.colorScheme.primary
+                            ),
+                            onClick = { onOptionSelected(index) }
+                        ),
+                    color = backgroundColor,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (option.icon != null) {
+                            Icon(
+                                imageVector = option.icon,
+                                contentDescription = null,
+                                tint = if (option.selected)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.size(6.dp))
+                        }
+                        Text(
+                            text = option.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (option.selected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (option.selected)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ModernSwitchRow(
+    title: String,
+    subtitle: String? = null,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(bounded = true),
+                    onClick = { onCheckedChange(!checked) }
+                )
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (subtitle != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Switch(
+                checked = checked,
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
+            )
+        }
     }
 }
