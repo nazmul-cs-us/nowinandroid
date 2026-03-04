@@ -67,6 +67,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import com.starception.submission.config.TravelDuaSettings
 
@@ -152,6 +154,7 @@ fun TravelDuaSection(
                     CompactSliderCard(
                         icon = Icons.Outlined.Timer,
                         label = "Driving",
+                        description = "How long you need to drive before the Travel Dua plays. Prevents triggering during short trips.",
                         value = settings.playbackDelaySeconds,
                         minValue = 10,
                         maxValue = 180,
@@ -164,6 +167,7 @@ fun TravelDuaSection(
                     CompactSliderCard(
                         icon = Icons.Outlined.Schedule,
                         label = "Cooldown",
+                        description = "Minimum wait time before the dua can play again. Prevents repeating on the same journey.",
                         value = settings.cooldownMinutes,
                         minValue = 1,
                         maxValue = 30,
@@ -182,6 +186,7 @@ fun TravelDuaSection(
                     CompactSliderCard(
                         icon = Icons.Outlined.Traffic,
                         label = "Gap",
+                        description = "How long you can stop (traffic light, etc.) before the driving timer resets.",
                         value = settings.gapToleranceMinutes,
                         minValue = 1,
                         maxValue = 15,
@@ -194,6 +199,7 @@ fun TravelDuaSection(
                     CompactSliderCard(
                         icon = Icons.Outlined.Speed,
                         label = "Speed",
+                        description = "Minimum speed to be considered 'driving'. Lower values may trigger while walking.",
                         value = settings.drivingSpeedThresholdKmh,
                         minValue = 10,
                         maxValue = 40,
@@ -272,12 +278,14 @@ fun TravelDuaSection(
 
 /**
  * Compact slider card for 2x2 grid layout.
+ * Shows tooltip with description on tap.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CompactSliderCard(
     icon: ImageVector,
     label: String,
+    description: String = "",
     value: Int,
     minValue: Int,
     maxValue: Int,
@@ -287,77 +295,124 @@ private fun CompactSliderCard(
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     var previousValue by remember { mutableStateOf(value) }
+    var showTooltip by remember { mutableStateOf(false) }
 
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
-    ) {
-        Column(
-            modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+    Box(modifier = modifier) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
         ) {
-            // Header row with icon, label, and value
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                // Header row with icon, label, and value
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                // Value badge
-                Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.primary)
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            if (description.isNotEmpty()) {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showTooltip = !showTooltip
+                            }
+                        },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (description.isNotEmpty()) {
+                            Icon(
+                                imageVector = Icons.Outlined.Info,
+                                contentDescription = "Info",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    }
+                    // Value badge
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "$value$unit",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
+
+                // Compact slider
+                Slider(
+                    value = value.toFloat(),
+                    onValueChange = { newValue ->
+                        val newIntValue = newValue.toInt()
+                        if (newIntValue != previousValue) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            previousValue = newIntValue
+                        }
+                        onValueChange(newIntValue)
+                        showTooltip = false // Hide tooltip when adjusting
+                    },
+                    valueRange = minValue.toFloat()..maxValue.toFloat(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(24.dp),
+                    colors = SliderDefaults.colors(
+                        activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        thumbColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
+        }
+
+        // Tooltip popup
+        if (showTooltip && description.isNotEmpty()) {
+            Popup(
+                alignment = Alignment.TopCenter,
+                onDismissRequest = { showTooltip = false },
+                properties = PopupProperties(focusable = true)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .width(180.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.inverseSurface,
+                    shadowElevation = 4.dp
                 ) {
                     Text(
-                        text = "$value$unit",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        modifier = Modifier.padding(10.dp)
                     )
                 }
             }
-
-            // Compact slider
-            Slider(
-                value = value.toFloat(),
-                onValueChange = { newValue ->
-                    val newIntValue = newValue.toInt()
-                    if (newIntValue != previousValue) {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        previousValue = newIntValue
-                    }
-                    onValueChange(newIntValue)
-                },
-                valueRange = minValue.toFloat()..maxValue.toFloat(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(24.dp),
-                colors = SliderDefaults.colors(
-                    activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    thumbColor = MaterialTheme.colorScheme.primary
-                )
-            )
         }
     }
 }
