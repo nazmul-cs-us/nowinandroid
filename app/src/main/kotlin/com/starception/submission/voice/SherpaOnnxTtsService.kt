@@ -64,6 +64,11 @@ class SherpaOnnxTtsService @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    init {
+        // Load persisted cache from disk on service creation
+        loadCacheFromDisk()
+    }
+
     // Mutex for thread-safe access to TTS engine (prevents native crashes)
     private val ttsMutex = Mutex()
 
@@ -78,10 +83,23 @@ class SherpaOnnxTtsService @Inject constructor(
     private var currentVoice: TtsVoice = TtsVoice.KOKORO_EN
 
     // Pre-generated audio cache (key: text hash, value: samples + sample rate)
+    // Cache is persisted to disk for survival across app restarts
     private data class CachedAudio(val samples: FloatArray, val sampleRate: Int)
     private val audioCache = mutableMapOf<Int, CachedAudio>()
-    @Volatile
-    private var preGenerationJob: kotlinx.coroutines.Job? = null
+
+    // Track which texts are currently being generated to avoid duplicates
+    private val generatingHashes = mutableSetOf<Int>()
+
+    // Persistent cache directory
+    private val cacheDir: File by lazy {
+        File(context.cacheDir, "tts_audio_cache").also {
+            it.mkdirs()
+            Log.d(TAG, "📂 TTS cache directory: ${it.absolutePath}")
+        }
+    }
+
+    // Maximum number of cached audio files to keep on disk
+    private val MAX_CACHE_FILES = 10
 
     // Cache directory for extracted model files
     private val modelDir: File by lazy {
@@ -117,17 +135,27 @@ class SherpaOnnxTtsService @Inject constructor(
         }
     }
 
+    // Mutex for initialization to ensure only one initialization at a time
+    private val initMutex = kotlinx.coroutines.sync.Mutex()
+
     /**
      * Initialize the TTS engine with the current voice.
      * Must be called before speaking.
+     * Thread-safe: multiple callers will wait for initialization to complete.
      */
     suspend fun initialize(): Boolean {
+        // Fast path: already initialized
         if (isInitialized) return true
-        if (isInitializing) return false
 
-        isInitializing = true
+        // Use mutex to ensure only one initialization at a time
+        // Other callers will wait until initialization completes
+        return initMutex.withLock {
+            // Check again after acquiring lock (another thread might have initialized)
+            if (isInitialized) return@withLock true
 
-        return withContext(Dispatchers.IO) {
+            isInitializing = true
+
+        withContext(Dispatchers.IO) {
             try {
                 Log.i(TAG, "Initializing Sherpa-ONNX TTS with ${currentVoice.displayName}...")
 
@@ -224,6 +252,7 @@ class SherpaOnnxTtsService @Inject constructor(
                 isInitializing = false
                 false
             }
+        }
         }
     }
 
@@ -503,6 +532,7 @@ class SherpaOnnxTtsService @Inject constructor(
     /**
      * Pre-generate TTS audio in background. Call this while other audio plays.
      * The generated audio will be cached and played instantly when speak() is called.
+     * Multiple calls can run concurrently - each text generates independently.
      */
     fun preGenerateAsync(
         text: String,
@@ -511,58 +541,164 @@ class SherpaOnnxTtsService @Inject constructor(
     ) {
         val textHash = text.hashCode()
 
-        // Skip if already cached or being generated
+        // Skip if already cached
         if (audioCache.containsKey(textHash)) {
             Log.d(TAG, "Audio already cached for text hash $textHash")
             return
         }
 
-        preGenerationJob?.cancel()
-        preGenerationJob = scope.launch {
-            Log.i(TAG, "🔄 Starting background pre-generation...")
-
-            if (!isInitialized) {
-                val initialized = initialize()
-                if (!initialized) {
-                    Log.e(TAG, "Failed to initialize TTS for pre-generation")
-                    return@launch
-                }
+        // Skip if already being generated
+        synchronized(generatingHashes) {
+            if (textHash in generatingHashes) {
+                Log.d(TAG, "Audio already being generated for text hash $textHash")
+                return
             }
+            generatingHashes.add(textHash)
+        }
 
-            ttsMutex.withLock {
-                try {
-                    val sentences = splitIntoSentences(text).filter { it.isNotBlank() }
-                    val allSamples = mutableListOf<Float>()
-                    var sampleRate = tts?.sampleRate() ?: 22050
+        // Launch independent job for this text (don't cancel others)
+        scope.launch {
+            Log.i(TAG, "🔄 Starting background pre-generation for hash=$textHash...")
 
-                    Log.d(TAG, "🔄 Pre-generating ${sentences.size} sentences...")
+            try {
+                if (!isInitialized) {
+                    val initialized = initialize()
+                    if (!initialized) {
+                        Log.e(TAG, "Failed to initialize TTS for pre-generation")
+                        return@launch
+                    }
+                }
 
-                    for ((index, sentence) in sentences.withIndex()) {
-                        val audio = generateSentence(sentence, speakerId, speed, index + 1, sentences.size)
-                        if (audio != null && audio.samples.isNotEmpty()) {
-                            allSamples.addAll(audio.samples.toList())
-                            sampleRate = audio.sampleRate
+                ttsMutex.withLock {
+                    try {
+                        val sentences = splitIntoSentences(text).filter { it.isNotBlank() }
+                        val allSamples = mutableListOf<Float>()
+                        var sampleRate = tts?.sampleRate() ?: 22050
+
+                        Log.d(TAG, "🔄 Pre-generating ${sentences.size} sentences for hash=$textHash...")
+
+                        for ((index, sentence) in sentences.withIndex()) {
+                            val audio = generateSentence(sentence, speakerId, speed, index + 1, sentences.size)
+                            if (audio != null && audio.samples.isNotEmpty()) {
+                                allSamples.addAll(audio.samples.toList())
+                                sampleRate = audio.sampleRate
+                            }
                         }
-                    }
 
-                    if (allSamples.isNotEmpty()) {
-                        audioCache[textHash] = CachedAudio(allSamples.toFloatArray(), sampleRate)
-                        Log.i(TAG, "✅ Pre-generation complete: ${allSamples.size} samples cached")
+                        if (allSamples.isNotEmpty()) {
+                            val cachedAudio = CachedAudio(allSamples.toFloatArray(), sampleRate)
+                            audioCache[textHash] = cachedAudio
+                            Log.i(TAG, "✅ Pre-generation complete: ${allSamples.size} samples cached (hash=$textHash)")
+                            Log.d(TAG, "📦 Cache now has ${audioCache.size} entries: ${audioCache.keys}")
+
+                            // Persist to disk for survival across app restarts
+                            saveToDisk(textHash, cachedAudio)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error during pre-generation for hash=$textHash", e)
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error during pre-generation", e)
+                }
+            } finally {
+                // Remove from generating set when done
+                synchronized(generatingHashes) {
+                    generatingHashes.remove(textHash)
                 }
             }
         }
     }
 
     /**
-     * Check if audio for given text is pre-generated and cached.
+     * Check if audio for given text is pre-generated and cached (memory or disk).
      */
-    fun isCached(text: String): Boolean = audioCache.containsKey(text.hashCode())
+    fun isCached(text: String): Boolean {
+        val hash = text.hashCode()
+
+        // First check memory cache
+        if (audioCache.containsKey(hash)) {
+            return true
+        }
+
+        // Then check disk cache
+        val diskFile = File(cacheDir, "${hash}_*.pcm")
+        val files = cacheDir.listFiles { file ->
+            file.name.startsWith("${hash}_") && file.extension == "pcm"
+        }
+
+        if (files != null && files.isNotEmpty()) {
+            // Found on disk, load into memory
+            loadSingleFileFromDisk(files.first())
+            return audioCache.containsKey(hash)
+        }
+
+        if (audioCache.isNotEmpty()) {
+            Log.d(TAG, "🔍 Cache lookup: hash=$hash NOT found. Cache has ${audioCache.size} entries: ${audioCache.keys}")
+        }
+        return false
+    }
+
+    /**
+     * Load a single cache file from disk into memory.
+     */
+    private fun loadSingleFileFromDisk(file: File): Boolean {
+        return try {
+            val parts = file.nameWithoutExtension.split("_")
+            if (parts.size != 2) return false
+
+            val hash = parts[0].toIntOrNull() ?: return false
+            val sampleRate = parts[1].toIntOrNull() ?: return false
+
+            if (audioCache.containsKey(hash)) return true // Already loaded
+
+            val bytes = file.readBytes()
+            val samples = FloatArray(bytes.size / 4)
+            java.nio.ByteBuffer.wrap(bytes)
+                .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                .asFloatBuffer()
+                .get(samples)
+
+            audioCache[hash] = CachedAudio(samples, sampleRate)
+            Log.d(TAG, "📂 Loaded from disk: ${file.name} (${samples.size} samples)")
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to load from disk: ${file.name}", e)
+            false
+        }
+    }
+
+    /**
+     * Get current cache size (number of pre-generated audio clips).
+     */
+    fun getCacheSize(): Int = audioCache.size
+
+    /**
+     * Get cache info for logging/debugging.
+     * Returns a summary of cached audio clips (memory + disk).
+     */
+    fun getCacheInfo(): String {
+        // Memory cache info
+        val totalSamples = audioCache.values.sumOf { it.samples.size }
+        val totalDurationMs = if (audioCache.isNotEmpty()) {
+            val avgSampleRate = audioCache.values.first().sampleRate
+            (totalSamples * 1000L) / avgSampleRate
+        } else 0L
+
+        // Disk cache info
+        val diskFiles = cacheDir.listFiles { file -> file.extension == "pcm" } ?: emptyArray()
+        val diskSizeKb = diskFiles.sumOf { it.length() } / 1024
+
+        return "📦 TTS Cache: ${audioCache.size} in memory (~${totalDurationMs / 1000}s), ${diskFiles.size} on disk (${diskSizeKb}KB)"
+    }
+
+    /**
+     * Get number of cached files on disk.
+     */
+    fun getDiskCacheCount(): Int {
+        return cacheDir.listFiles { file -> file.extension == "pcm" }?.size ?: 0
+    }
 
     /**
      * Play pre-generated audio if cached, otherwise generate and play normally.
+     * Checks both memory and disk cache.
      */
     suspend fun speakCachedOrGenerate(
         text: String,
@@ -571,29 +707,170 @@ class SherpaOnnxTtsService @Inject constructor(
         onComplete: (() -> Unit)? = null
     ): Boolean {
         val textHash = text.hashCode()
-        val cached = audioCache[textHash]
+
+        // Check memory cache first
+        var cached = audioCache[textHash]
+
+        // If not in memory, try loading from disk
+        if (cached == null) {
+            val files = cacheDir.listFiles { file ->
+                file.name.startsWith("${textHash}_") && file.extension == "pcm"
+            }
+            if (files != null && files.isNotEmpty()) {
+                if (loadSingleFileFromDisk(files.first())) {
+                    cached = audioCache[textHash]
+                    Log.i(TAG, "📂 Loaded from disk cache: hash=$textHash")
+                }
+            }
+        }
 
         if (cached != null) {
-            Log.i(TAG, "🎯 Playing from cache (${cached.samples.size} samples)")
-            audioCache.remove(textHash) // Clear cache after use
+            Log.i(TAG, "🎯 Playing from cache (${cached.samples.size} samples, hash=$textHash)")
+            // DON'T remove from memory cache - keep for potential replay
+            // But DO delete the disk file to allow new hadith caching
+            deleteDiskCache(textHash)
             playAudioSamples(cached.samples, cached.sampleRate)
+            audioCache.remove(textHash) // Remove from memory after playing
             onComplete?.invoke()
             return true
         }
 
         // Not cached, generate and play normally
-        Log.d(TAG, "Cache miss, generating normally")
+        Log.d(TAG, "Cache miss (hash=$textHash), generating normally")
         return speak(text, speed, speakerId, onComplete)
     }
 
     /**
-     * Clear all cached audio.
+     * Delete a specific cache file from disk.
+     */
+    private fun deleteDiskCache(textHash: Int) {
+        try {
+            val files = cacheDir.listFiles { file ->
+                file.name.startsWith("${textHash}_") && file.extension == "pcm"
+            }
+            files?.forEach { file ->
+                file.delete()
+                Log.d(TAG, "🗑️ Deleted disk cache: ${file.name}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error deleting disk cache for hash=$textHash", e)
+        }
+    }
+
+    /**
+     * Clear all cached audio (memory and disk).
      */
     fun clearCache() {
         audioCache.clear()
-        preGenerationJob?.cancel()
-        Log.d(TAG, "Audio cache cleared")
+        synchronized(generatingHashes) {
+            generatingHashes.clear()
+        }
+        // Also clear disk cache
+        cacheDir.listFiles()?.forEach { it.delete() }
+        Log.d(TAG, "Audio cache cleared (memory and disk)")
     }
+
+    /**
+     * Load cached audio files from disk into memory.
+     * Call this on service initialization to restore persisted cache.
+     */
+    fun loadCacheFromDisk() {
+        scope.launch {
+            try {
+                val files = cacheDir.listFiles { file -> file.extension == "pcm" } ?: return@launch
+                var loadedCount = 0
+
+                for (file in files) {
+                    try {
+                        // Filename format: {hash}_{sampleRate}.pcm
+                        val parts = file.nameWithoutExtension.split("_")
+                        if (parts.size != 2) continue
+
+                        val hash = parts[0].toIntOrNull() ?: continue
+                        val sampleRate = parts[1].toIntOrNull() ?: continue
+
+                        // Skip if already in memory
+                        if (audioCache.containsKey(hash)) continue
+
+                        // Load PCM data
+                        val bytes = file.readBytes()
+                        val samples = FloatArray(bytes.size / 4)
+                        java.nio.ByteBuffer.wrap(bytes)
+                            .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                            .asFloatBuffer()
+                            .get(samples)
+
+                        audioCache[hash] = CachedAudio(samples, sampleRate)
+                        loadedCount++
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to load cache file: ${file.name}", e)
+                        file.delete() // Clean up corrupted file
+                    }
+                }
+
+                if (loadedCount > 0) {
+                    Log.i(TAG, "📂 Loaded $loadedCount cached audio files from disk")
+                    Log.i(TAG, getCacheInfo())
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading cache from disk", e)
+            }
+        }
+    }
+
+    /**
+     * Save cached audio to disk for persistence.
+     */
+    private fun saveToDisk(textHash: Int, audio: CachedAudio) {
+        scope.launch {
+            try {
+                // Filename format: {hash}_{sampleRate}.pcm
+                val file = File(cacheDir, "${textHash}_${audio.sampleRate}.pcm")
+
+                // Convert float array to bytes
+                val buffer = java.nio.ByteBuffer.allocate(audio.samples.size * 4)
+                    .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                buffer.asFloatBuffer().put(audio.samples)
+
+                file.writeBytes(buffer.array())
+                Log.d(TAG, "💾 Saved audio to disk: ${file.name} (${audio.samples.size} samples)")
+
+                // Cleanup old files if we have too many
+                pruneOldCacheFiles()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving audio to disk", e)
+            }
+        }
+    }
+
+    /**
+     * Remove oldest cache files if we exceed the limit.
+     */
+    private fun pruneOldCacheFiles() {
+        try {
+            val files = cacheDir.listFiles { file -> file.extension == "pcm" }
+                ?.sortedBy { it.lastModified() } ?: return
+
+            if (files.size > MAX_CACHE_FILES) {
+                val toDelete = files.take(files.size - MAX_CACHE_FILES)
+                toDelete.forEach { file ->
+                    val hash = file.nameWithoutExtension.split("_").firstOrNull()?.toIntOrNull()
+                    if (hash != null) {
+                        audioCache.remove(hash) // Also remove from memory
+                    }
+                    file.delete()
+                    Log.d(TAG, "🗑️ Pruned old cache file: ${file.name}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error pruning cache files", e)
+        }
+    }
+
+    /**
+     * Get list of cached hadith hashes (for debugging).
+     */
+    fun getCachedHashes(): Set<Int> = audioCache.keys.toSet()
 
     /**
      * Extract a single file from assets to internal storage.

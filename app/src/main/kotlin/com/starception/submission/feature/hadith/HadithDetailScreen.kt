@@ -474,6 +474,7 @@ fun HadithDetailScreen(
                                         playWithSherpaOnnxTts(
                                             sherpaOnnxTts = sherpaOnnxTts,
                                             text = translatedText ?: hadith!!.textPlain ?: "",
+                                            hadithNumber = hadithNumber,
                                             selectedVoice = selectedVoice,
                                             speakerId = selectedSpeakerId,
                                             onPlayingChanged = { isPlaying = it }
@@ -488,6 +489,7 @@ fun HadithDetailScreen(
                                         playWithSherpaOnnxTts(
                                             sherpaOnnxTts = sherpaOnnxTts,
                                             text = textToSpeak,
+                                            hadithNumber = hadithNumber,
                                             selectedVoice = selectedVoice,
                                             speakerId = selectedSpeakerId,
                                             onPlayingChanged = { isPlaying = it }
@@ -1254,27 +1256,36 @@ private fun playWithTts(
 /**
  * Play text using Sherpa-ONNX offline TTS with user-selected voice settings.
  * Uses the voice and speaker ID selected in Settings > TTS Settings.
+ *
+ * Uses speakCachedOrGenerate() to leverage pre-generated audio from the
+ * DrivingAudioService cache (3-hadith rolling cache).
  */
 private fun playWithSherpaOnnxTts(
     sherpaOnnxTts: SherpaOnnxTtsService,
     text: String,
+    hadithNumber: Int,
     selectedVoice: TtsVoice,
     speakerId: Int,
     onPlayingChanged: (Boolean) -> Unit
 ) {
-    val intro = "From Sahih Al-Bukhari."
-    val fullText = "$intro $text"
+    // IMPORTANT: Use same intro format as DrivingAudioService for cache compatibility
+    val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
+    val fullText = "$introText $text"
 
     // Set the voice from user settings
     sherpaOnnxTts.setVoice(selectedVoice)
+
+    // Check if cached (from DrivingAudioService pre-generation)
+    val isCached = sherpaOnnxTts.isCached(fullText)
+    android.util.Log.i("HadithDetailScreen", "🔊 Playing hadith #$hadithNumber - cached: $isCached")
 
     // Launch coroutine for TTS playback
     CoroutineScope(Dispatchers.Main).launch {
         try {
             onPlayingChanged(true)
 
-            // Initialize and speak
-            val success = sherpaOnnxTts.speak(
+            // Use speakCachedOrGenerate to leverage pre-generated cache
+            val success = sherpaOnnxTts.speakCachedOrGenerate(
                 text = fullText,
                 speakerId = speakerId,
                 onComplete = {

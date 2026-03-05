@@ -40,6 +40,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.BorderStroke
+import com.starception.submission.voice.SherpaOnnxTtsService
+import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
+import com.starception.submission.core.hadithdatabase.HadithRepository
+import com.starception.submission.settings.components.TtsVoice
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.Alignment
@@ -149,6 +153,15 @@ fun CourseScreen(
                 dialogShown = true
                 break
             }
+        }
+    }
+
+    // Pre-generate TTS for next 3 hadiths when Daily Bukhari is enrolled
+    // This eliminates delay when user clicks "Continue Learning"
+    LaunchedEffect(enrolledCourseIds, courseProgress) {
+        if ("daily_bukhari" in enrolledCourseIds) {
+            val currentProgress = prefs.getInt("progress_daily_bukhari", 0)
+            preGenerateHadithTts(context, currentProgress + 1)
         }
     }
 
@@ -2436,4 +2449,94 @@ private fun getJuzAmmaSurahName(progressIndex: Int): String {
     } else {
         "Completed"
     }
+}
+
+/**
+ * Pre-generate TTS for the next 3 hadiths starting from the given hadith number.
+ * This runs in background so the audio is ready when user clicks "Continue Learning".
+ *
+ * Uses the same text format as DrivingAudioService for cache compatibility.
+ */
+private suspend fun preGenerateHadithTts(context: Context, startHadithNumber: Int) {
+    try {
+        android.util.Log.i("CourseScreen", "🔄 Pre-generating TTS for hadith #$startHadithNumber and next 2...")
+
+        // Check TTS settings
+        val ttsPrefs = context.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
+        val selectedVoiceName = ttsPrefs.getString("selected_voice", null)
+        val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
+
+        if (selectedVoiceName == null) {
+            android.util.Log.d("CourseScreen", "🔄 Using Android TTS, no pre-generation needed")
+            return
+        }
+
+        // Get SherpaOnnxTtsService via EntryPoint
+        val entryPoint = dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            HadithTtsEntryPoint::class.java
+        )
+        val sherpaOnnxTts = entryPoint.sherpaOnnxTtsService()
+
+        // Set voice from settings
+        val voice = try {
+            TtsVoice.valueOf(selectedVoiceName)
+        } catch (e: Exception) {
+            TtsVoice.KOKORO_EN
+        }
+        sherpaOnnxTts.setVoice(voice)
+
+        // Use BukhariLocalTranslationRepository (SAME source as DrivingAudioService and HadithDetailScreen)
+        // This ensures cache hash matches across all entry points
+        val bukhariTranslationRepo = BukhariLocalTranslationRepository.getInstance(context)
+        bukhariTranslationRepo.loadTranslations()
+
+        // Fallback to database if needed
+        val hadithRepository = HadithRepository.getInstance(context)
+
+        // Pre-generate next 3 hadiths
+        for (offset in 0 until 3) {
+            val hadithNumber = startHadithNumber + offset
+            if (hadithNumber > 7563) break // Max Bukhari hadiths
+
+            // Use BukhariLocalTranslationRepository for text (same as HadithDetailScreen)
+            val hadithText = bukhariTranslationRepo.getEnglishText(hadithNumber)
+                ?: run {
+                    // Fallback to database if not in JSON
+                    val hadith = hadithRepository.getHadith("sahih_bukhari.db", hadithNumber)
+                    hadith?.textPlain ?: hadith?.elaboration
+                }
+                ?: continue
+
+            // Use same format as DrivingAudioService for cache compatibility
+            val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
+            val fullText = "$introText $hadithText"
+
+            // Check if already cached
+            if (!sherpaOnnxTts.isCached(fullText)) {
+                android.util.Log.i("CourseScreen", "🔄 Pre-generating hadith #$hadithNumber (${fullText.length} chars)")
+                sherpaOnnxTts.preGenerateAsync(
+                    text = fullText,
+                    speakerId = selectedSpeakerId
+                )
+                // Small delay between generations
+                kotlinx.coroutines.delay(500)
+            } else {
+                android.util.Log.d("CourseScreen", "📦 Hadith #$hadithNumber already cached")
+            }
+        }
+
+        android.util.Log.i("CourseScreen", "✅ Pre-generation complete for hadiths #$startHadithNumber to #${startHadithNumber + 2}")
+    } catch (e: Exception) {
+        android.util.Log.e("CourseScreen", "Error pre-generating hadith TTS", e)
+    }
+}
+
+/**
+ * Hilt EntryPoint to get SherpaOnnxTtsService in non-Hilt components
+ */
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface HadithTtsEntryPoint {
+    fun sherpaOnnxTtsService(): SherpaOnnxTtsService
 }

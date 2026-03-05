@@ -354,7 +354,7 @@ class DrivingAudioService : Service() {
 
                         // Check if already in TTS cache
                         if (!sherpaOnnxTts.isCached(fullText)) {
-                            Log.i(TAG, "🔄 Pre-generating hadith #$nextHadithToCache (${fullText.length} chars) [${cachedHadithNumbers.size + generatedCount + 1}/$CACHE_TARGET_SIZE]")
+                            Log.i(TAG, "🔄 Pre-generating hadith #$nextHadithToCache (${fullText.length} chars, hash=${fullText.hashCode()}) [${cachedHadithNumbers.size + generatedCount + 1}/$CACHE_TARGET_SIZE]")
                             sherpaOnnxTts.preGenerateAsync(
                                 text = fullText,
                                 speakerId = selectedSpeakerId
@@ -366,13 +366,14 @@ class DrivingAudioService : Service() {
                         } else {
                             // Already in TTS cache, just track it
                             cachedHadithNumbers.add(nextHadithToCache)
-                            Log.d(TAG, "📦 Hadith #$nextHadithToCache already in TTS cache")
+                            Log.d(TAG, "📦 Hadith #$nextHadithToCache already in TTS cache (hash=${fullText.hashCode()})")
                         }
                     }
                     nextHadithToCache++
                 }
 
                 Log.i(TAG, "📦 Cache updated: ${cachedHadithNumbers.size}/$CACHE_TARGET_SIZE hadiths now cached: $cachedHadithNumbers")
+                Log.i(TAG, "📦 ${sherpaOnnxTts.getCacheInfo()}")
 
             } catch (e: Exception) {
                 Log.e(TAG, "🔄 Error maintaining cache: ${e.message}")
@@ -392,30 +393,62 @@ class DrivingAudioService : Service() {
     }
 
     /**
+     * Get current hadith cache status for debugging.
+     * Returns info about both hadith tracking and TTS audio cache.
+     */
+    fun getCacheStatus(): String {
+        val hadithInfo = "📚 Hadith tracking: ${cachedHadithNumbers.size}/$CACHE_TARGET_SIZE hadiths: $cachedHadithNumbers"
+        val ttsInfo = sherpaOnnxTts.getCacheInfo()
+        Log.i(TAG, "🔍 CACHE STATUS:")
+        Log.i(TAG, "   $hadithInfo")
+        Log.i(TAG, "   $ttsInfo")
+        return "$hadithInfo\n$ttsInfo"
+    }
+
+    /**
      * Get hadith text for a specific hadith number.
-     * Uses HadithRepository to fetch from database.
+     * IMPORTANT: Uses BukhariLocalTranslationRepository (same as HadithDetailScreen)
+     * to ensure text hash matches for TTS cache hits.
      */
     private suspend fun getHadithTextForNumber(hadithNumber: Int): String? {
         return try {
-            val hadithRepository = com.starception.submission.core.hadithdatabase.HadithRepository.getInstance(this)
-            val hadith = hadithRepository.getHadith("sahih_bukhari.db", hadithNumber)
+            // Use the SAME source as HadithDetailScreen for cache compatibility
+            val bukhariTranslationRepo = com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository.getInstance(this)
+            bukhariTranslationRepo.loadTranslations()
 
-            // Get user's selected language for translation
-            val translationService = com.starception.submission.core.translation.TranslationService.getInstance(this)
-            val selectedLang = translationService.getSelectedLanguage()
+            // Get English text from JSON (same format as HadithDetailScreen uses)
+            val localEnglish = bukhariTranslationRepo.getEnglishText(hadithNumber)
 
-            var text = hadith?.textPlain ?: hadith?.elaboration ?: return null
+            if (localEnglish != null) {
+                Log.d(TAG, "📚 Loaded hadith #$hadithNumber from BukhariLocalTranslation (${localEnglish.length} chars)")
 
-            // Translate if needed (not English/Bengali audio)
-            if (selectedLang != "en" && selectedLang != "bn" && selectedLang != "transliteration") {
-                try {
-                    text = translationService.translateFromEnglish(text, selectedLang)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Translation failed for hadith #$hadithNumber, using English")
+                // Get user's selected language for translation
+                val translationService = com.starception.submission.core.translation.TranslationService.getInstance(this)
+                val selectedLang = translationService.getSelectedLanguage()
+
+                // For English, return as-is (matches HadithDetailScreen exactly)
+                if (selectedLang == "en" || selectedLang == "transliteration") {
+                    return localEnglish
                 }
-            }
 
-            text
+                // For other languages, translate from English
+                if (selectedLang != "bn") { // Bengali uses audio files, not TTS
+                    try {
+                        return translationService.translateFromEnglish(localEnglish, selectedLang)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Translation failed for hadith #$hadithNumber, using English")
+                        return localEnglish
+                    }
+                }
+
+                localEnglish
+            } else {
+                // Fallback to database if JSON doesn't have this hadith
+                Log.w(TAG, "⚠️ Hadith #$hadithNumber not in BukhariLocalTranslation, falling back to database")
+                val hadithRepository = com.starception.submission.core.hadithdatabase.HadithRepository.getInstance(this)
+                val hadith = hadithRepository.getHadith("sahih_bukhari.db", hadithNumber)
+                hadith?.textPlain ?: hadith?.elaboration
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching hadith #$hadithNumber: ${e.message}")
             null
@@ -523,12 +556,19 @@ class DrivingAudioService : Service() {
                 }
                 sherpaOnnxTts.setVoice(voice)
 
+                // IMPORTANT: Fetch text using SAME method as maintainHadithCache()
+                // to ensure cache hash matches. Don't use the text parameter as it
+                // may come from a different source.
+                val hadithText = getHadithTextForNumber(hadithNumber) ?: text
                 val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
-                val fullText = "$introText $text"
+                val fullText = "$introText $hadithText"
 
                 // Check if audio was pre-generated during travel dua playback
                 val isCached = sherpaOnnxTts.isCached(fullText)
                 Log.i(TAG, "📚 Hadith TTS: cached=$isCached, using ${if (isCached) "pre-generated audio 🎯" else "live generation"}")
+                if (!isCached) {
+                    Log.d(TAG, "📦 Cache miss - text hash: ${fullText.hashCode()}, text length: ${fullText.length}")
+                }
 
                 // Use speakCachedOrGenerate to play from cache if available
                 val success = sherpaOnnxTts.speakCachedOrGenerate(
