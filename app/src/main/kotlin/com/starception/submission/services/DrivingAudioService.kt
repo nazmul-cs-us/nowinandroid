@@ -40,6 +40,9 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.media.session.MediaButtonReceiver
 import com.starception.submission.R
+import com.starception.submission.feature.course.CourseProgressTracker
+import com.starception.submission.feature.course.QuranListeningProgress
+import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.VoiceCompletionManager
@@ -102,6 +105,11 @@ class DrivingAudioService : Service() {
     private val cachedHadithNumbers = mutableSetOf<Int>()
     private val CACHE_TARGET_SIZE = 3
 
+    // Quran playback state tracking
+    private var currentQuranSurahIndex = 0
+    private var quranPositionUpdateRunnable: Runnable? = null
+    private val QURAN_POSITION_UPDATE_INTERVAL_MS = 5000L // Save position every 5 seconds
+
     enum class PlaybackState {
         IDLE,
         PLAYING_TRAVEL_DUA,
@@ -134,6 +142,9 @@ class DrivingAudioService : Service() {
 
         // Bukhari audio path on SD card
         private const val BUKHARI_AUDIO_PATH = "/sdcard/Bukhari/bukhari_audio_bn"
+
+        // Quran audio paths on SD card
+        private const val QURAN_ARABIC_PATH = "/sdcard/Quran/Arabic"
     }
 
     inner class DrivingAudioBinder : Binder() {
@@ -641,8 +652,9 @@ class DrivingAudioService : Service() {
     private fun onHadithComplete(hadithNumber: Int) {
         Log.i(TAG, "📚 Hadith #$hadithNumber playback complete - triggering voice prompt")
 
-        // 📦 CACHE MANAGEMENT: Remove played hadith and refill cache to 3
-        markHadithPlayed(hadithNumber)
+        // IMPORTANT: Do NOT call markHadithPlayed() here!
+        // Background TTS pre-generation competes for ttsMutex and blocks voice prompt.
+        // Move to AFTER voice prompt completes to prevent blocking.
 
         // Update state to voice prompt
         updateState(PlaybackState.VOICE_PROMPT, "Say YES or NO", "Mark lesson complete?")
@@ -658,20 +670,182 @@ class DrivingAudioService : Service() {
             lessonTitle = "Hadith #$hadithNumber",
             onComplete = {
                 Log.i(TAG, "✅ Lesson marked complete via voice")
-                onPlaybackComplete?.invoke()
-                updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+                // Actually mark the lesson as completed in the progress tracker
+                CourseProgressTracker.markLessonCompleted(this@DrivingAudioService, courseId, lessonId)
+                // NOW start pre-generating next hadiths (after voice prompt done)
+                markHadithPlayed(hadithNumber)
+                // Continue to Quran playback if enrolled
+                startQuranPlaybackIfEnrolled(hadithNumber)
             },
             onSkipped = {
                 Log.i(TAG, "⏭️ Lesson skipped via voice")
-                onPlaybackComplete?.invoke()
-                updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+                // NOW start pre-generating next hadiths (after voice prompt done)
+                markHadithPlayed(hadithNumber)
+                // Continue to Quran playback if enrolled
+                startQuranPlaybackIfEnrolled(hadithNumber)
             },
             onError = { error ->
                 Log.e(TAG, "Voice prompt error: $error")
-                onPlaybackComplete?.invoke()
-                updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+                // NOW start pre-generating next hadiths (even on error)
+                markHadithPlayed(hadithNumber)
+                // Continue to Quran playback if enrolled (even on error)
+                startQuranPlaybackIfEnrolled(hadithNumber)
             }
         )
+    }
+
+    // ==================== Quran Playback Methods ====================
+
+    /**
+     * Check if user is enrolled in Quran listening and start playback if so.
+     * Called after voice prompt completion (both YES and NO responses).
+     * @param afterHadith The hadith number that was just completed
+     */
+    private fun startQuranPlaybackIfEnrolled(afterHadith: Int) {
+        val isEnrolled = CourseProgressTracker.isEnrolledInQuranListening(this)
+        if (!isEnrolled) {
+            Log.i(TAG, "🕌 User not enrolled in Quran listening course, finishing flow")
+            onPlaybackComplete?.invoke()
+            updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+            return
+        }
+
+        // Start a new listening session
+        CourseProgressTracker.startQuranListeningSession(this)
+
+        // Get saved progress
+        val progress = CourseProgressTracker.getQuranListeningProgress(this)
+        Log.i(TAG, "🕌 Starting Quran playback - Surah ${progress.currentSurahNumber}, position ${progress.currentPositionMs / 1000}s")
+
+        playQuranSurah(progress.currentSurahIndex, progress.currentPositionMs)
+    }
+
+    /**
+     * Play a specific Quran surah.
+     * @param surahIndex 0-based surah index (0-113)
+     * @param startPositionMs Position to resume from (in milliseconds)
+     */
+    fun playQuranSurah(surahIndex: Int, startPositionMs: Int = 0) {
+        try {
+            currentQuranSurahIndex = surahIndex
+
+            // Get surah info
+            if (surahIndex < 0 || surahIndex >= QuranData.surahs.size) {
+                Log.e(TAG, "🕌 Invalid surah index: $surahIndex")
+                onQuranComplete()
+                return
+            }
+
+            val surah = QuranData.surahs[surahIndex]
+            Log.i(TAG, "🕌 Playing Quran: Surah ${surah.number} - ${surah.nameEnglish} (${surah.nameArabic})")
+
+            // Release existing player
+            mediaPlayer?.release()
+
+            // Find audio file
+            val fileName = String.format("%03d", surah.number) + "-" + surah.nameEnglish.lowercase().replace(" ", "-") + ".ogg"
+            val audioFile = File(QURAN_ARABIC_PATH, fileName)
+
+            if (!audioFile.exists()) {
+                Log.w(TAG, "🕌 Quran audio file not found: ${audioFile.absolutePath}")
+                // Try next surah
+                val nextIndex = CourseProgressTracker.completeCurrentSurah(this)
+                if (nextIndex != surahIndex) {
+                    playQuranSurah(nextIndex, 0)
+                } else {
+                    onQuranComplete()
+                }
+                return
+            }
+
+            mediaPlayer = MediaPlayer().apply {
+                setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
+                setDataSource(audioFile.absolutePath)
+
+                setOnPreparedListener { mp ->
+                    // Seek to saved position if resuming
+                    if (startPositionMs > 0 && startPositionMs < mp.duration) {
+                        mp.seekTo(startPositionMs)
+                        Log.d(TAG, "🕌 Seeked to saved position: ${startPositionMs / 1000}s")
+                    }
+                    mp.start()
+                    startQuranPositionUpdates()
+                }
+
+                setOnCompletionListener {
+                    Log.i(TAG, "🕌 Surah ${surah.number} (${surah.nameEnglish}) playback completed")
+                    stopQuranPositionUpdates()
+
+                    // Mark this surah as complete and get next surah index
+                    val nextIndex = CourseProgressTracker.completeCurrentSurah(this@DrivingAudioService)
+                    Log.i(TAG, "🕌 Advancing to next surah: ${nextIndex + 1}")
+
+                    // For now, complete the flow after one surah
+                    // In the future, could continue to next surah or prompt user
+                    onQuranComplete()
+                }
+
+                setOnErrorListener { _, what, extra ->
+                    Log.e(TAG, "🕌 MediaPlayer error: what=$what, extra=$extra")
+                    stopQuranPositionUpdates()
+                    onQuranComplete()
+                    true
+                }
+
+                prepare()
+            }
+
+            updateState(PlaybackState.PLAYING_QURAN, "Surah ${surah.nameEnglish}", surah.nameArabic)
+            updateNotification()
+            isPaused = false
+
+        } catch (e: Exception) {
+            Log.e(TAG, "🕌 Error playing Quran surah", e)
+            onQuranComplete()
+        }
+    }
+
+    /**
+     * Start periodic position updates for Quran playback.
+     * Saves progress every 5 seconds.
+     */
+    private fun startQuranPositionUpdates() {
+        stopQuranPositionUpdates()
+        quranPositionUpdateRunnable = object : Runnable {
+            override fun run() {
+                if (mediaPlayer?.isPlaying == true && currentState == PlaybackState.PLAYING_QURAN) {
+                    val position = mediaPlayer?.currentPosition ?: 0
+                    CourseProgressTracker.updateQuranPosition(this@DrivingAudioService, position)
+                    handler.postDelayed(this, QURAN_POSITION_UPDATE_INTERVAL_MS)
+                }
+            }
+        }
+        handler.post(quranPositionUpdateRunnable!!)
+    }
+
+    /**
+     * Stop position updates for Quran playback.
+     */
+    private fun stopQuranPositionUpdates() {
+        quranPositionUpdateRunnable?.let {
+            handler.removeCallbacks(it)
+            quranPositionUpdateRunnable = null
+        }
+    }
+
+    /**
+     * Called when Quran playback is complete.
+     * Ends the listening session and completes the audio flow.
+     */
+    private fun onQuranComplete() {
+        stopQuranPositionUpdates()
+
+        // End the listening session and accumulate stats
+        CourseProgressTracker.endQuranListeningSession(this)
+
+        Log.i(TAG, "🕌 Quran playback complete - ending driving audio flow")
+        onPlaybackComplete?.invoke()
+        updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
     }
 
     // ==================== Playback Controls ====================
@@ -680,9 +854,16 @@ class DrivingAudioService : Service() {
         Log.d(TAG, "⏸️ Pause requested")
         when (currentState) {
             PlaybackState.PLAYING_TRAVEL_DUA,
-            PlaybackState.PLAYING_HADITH_AUDIO -> {
+            PlaybackState.PLAYING_HADITH_AUDIO,
+            PlaybackState.PLAYING_QURAN -> {
                 mediaPlayer?.pause()
                 isPaused = true
+                if (currentState == PlaybackState.PLAYING_QURAN) {
+                    stopQuranPositionUpdates()
+                    // Save current position before pausing
+                    val position = mediaPlayer?.currentPosition ?: 0
+                    CourseProgressTracker.updateQuranPosition(this, position)
+                }
                 updateState(PlaybackState.PAUSED, currentTitle, "Paused")
                 updateNotification()
             }
@@ -706,6 +887,13 @@ class DrivingAudioService : Service() {
             when {
                 currentTitle.contains("Travel") -> updateState(PlaybackState.PLAYING_TRAVEL_DUA, currentTitle, "دعاء السفر")
                 currentTitle.contains("Hadith") -> updateState(PlaybackState.PLAYING_HADITH_AUDIO, currentTitle, "Sahih Al-Bukhari")
+                currentTitle.contains("Surah") -> {
+                    val surah = if (currentQuranSurahIndex < QuranData.surahs.size) {
+                        QuranData.surahs[currentQuranSurahIndex]
+                    } else null
+                    updateState(PlaybackState.PLAYING_QURAN, currentTitle, surah?.nameArabic ?: "ٱلْقُرْآنُ")
+                    startQuranPositionUpdates()
+                }
             }
             updateNotification()
         }
@@ -713,6 +901,15 @@ class DrivingAudioService : Service() {
 
     fun stop() {
         Log.d(TAG, "⏹️ Stop requested")
+
+        // Save Quran position before stopping
+        if (currentState == PlaybackState.PLAYING_QURAN) {
+            val position = mediaPlayer?.currentPosition ?: 0
+            CourseProgressTracker.updateQuranPosition(this, position)
+            CourseProgressTracker.endQuranListeningSession(this)
+        }
+
+        stopQuranPositionUpdates()
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
@@ -746,6 +943,18 @@ class DrivingAudioService : Service() {
                 onPlaybackComplete?.invoke()
                 updateState(PlaybackState.IDLE, "Driving Mode", "Skipped")
             }
+            PlaybackState.PLAYING_QURAN -> {
+                // Save position before skipping
+                val position = mediaPlayer?.currentPosition ?: 0
+                CourseProgressTracker.updateQuranPosition(this, position)
+                stopQuranPositionUpdates()
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+                CourseProgressTracker.endQuranListeningSession(this)
+                onPlaybackComplete?.invoke()
+                updateState(PlaybackState.IDLE, "Driving Mode", "Skipped")
+            }
             PlaybackState.VOICE_PROMPT -> {
                 voiceCompletionManager.cancel()
                 onPlaybackComplete?.invoke()
@@ -756,7 +965,8 @@ class DrivingAudioService : Service() {
     }
 
     fun isPlaying(): Boolean = mediaPlayer?.isPlaying == true ||
-        currentState == PlaybackState.PLAYING_HADITH_TTS
+        currentState == PlaybackState.PLAYING_HADITH_TTS ||
+        currentState == PlaybackState.PLAYING_QURAN
 
     fun getCurrentState(): PlaybackState = currentState
 

@@ -76,6 +76,10 @@ class SherpaOnnxTtsService @Inject constructor(
     @Volatile
     private var isGenerating = false
 
+    // Flag to cancel ongoing background pre-generation when voice prompt needs priority
+    @Volatile
+    private var cancelBackgroundGeneration = false
+
     private var tts: OfflineTts? = null
     private var audioTrack: AudioTrack? = null
     private var isInitialized = false
@@ -498,11 +502,15 @@ class SherpaOnnxTtsService @Inject constructor(
             audioTrack?.write(pcmData, 0, pcmData.size)
             audioTrack?.play()
 
-            // Wait for playback to complete (no extra buffer - continuous playback)
+            // Wait for playback to complete
             val durationMs = (samples.size * 1000L) / sampleRate
-            Thread.sleep(durationMs + 50) // Minimal buffer for audio cleanup
+            Thread.sleep(durationMs + 100) // Buffer for audio cleanup
 
             stopAudioTrack()
+
+            // Minimal delay - mic now works immediately after TTS
+            // Removed 200ms delay that was causing user's "yes" to be missed
+            Thread.sleep(20)
 
         } catch (e: Exception) {
             Log.e(TAG, "Error playing audio", e)
@@ -515,6 +523,24 @@ class SherpaOnnxTtsService @Inject constructor(
      */
     fun stopSpeaking() {
         stopAudioTrack()
+    }
+
+    /**
+     * Request cancellation of any ongoing background pre-generation.
+     * Use this before speaking high-priority audio (like voice prompts).
+     */
+    fun cancelBackgroundWork() {
+        cancelBackgroundGeneration = true
+        Log.i(TAG, "🛑 Cancellation requested for background generation")
+    }
+
+    /**
+     * Check if background TTS generation is currently in progress.
+     * If true, callers should use an alternative TTS (e.g., Android TTS)
+     * to avoid waiting for the mutex.
+     */
+    fun isBackgroundWorkInProgress(): Boolean {
+        return isGenerating || generatingHashes.isNotEmpty()
     }
 
     private fun stopAudioTrack() {
@@ -569,34 +595,51 @@ class SherpaOnnxTtsService @Inject constructor(
                     }
                 }
 
-                ttsMutex.withLock {
-                    try {
-                        val sentences = splitIntoSentences(text).filter { it.isNotBlank() }
-                        val allSamples = mutableListOf<Float>()
-                        var sampleRate = tts?.sampleRate() ?: 22050
+                // IMPORTANT: Acquire mutex PER-SENTENCE to allow priority speech to interrupt
+                // This prevents voice prompts from waiting 20+ seconds for entire pre-generation
+                try {
+                    val sentences = splitIntoSentences(text).filter { it.isNotBlank() }
+                    val allSamples = mutableListOf<Float>()
+                    var sampleRate = tts?.sampleRate() ?: 22050
 
-                        Log.d(TAG, "🔄 Pre-generating ${sentences.size} sentences for hash=$textHash...")
+                    Log.d(TAG, "🔄 Pre-generating ${sentences.size} sentences for hash=$textHash...")
 
-                        for ((index, sentence) in sentences.withIndex()) {
+                    for ((index, sentence) in sentences.withIndex()) {
+                        // Check for cancellation request BEFORE acquiring mutex
+                        if (cancelBackgroundGeneration) {
+                            Log.i(TAG, "🛑 Background generation cancelled for hash=$textHash at sentence ${index + 1}/${sentences.size}")
+                            cancelBackgroundGeneration = false
+                            break
+                        }
+
+                        // Acquire mutex only for this sentence - allows priority speech to jump in between sentences
+                        ttsMutex.withLock {
+                            // Double-check cancellation after acquiring mutex
+                            if (cancelBackgroundGeneration) {
+                                Log.i(TAG, "🛑 Background generation cancelled (in mutex) for hash=$textHash")
+                                cancelBackgroundGeneration = false
+                                return@withLock
+                            }
+
                             val audio = generateSentence(sentence, speakerId, speed, index + 1, sentences.size)
                             if (audio != null && audio.samples.isNotEmpty()) {
                                 allSamples.addAll(audio.samples.toList())
                                 sampleRate = audio.sampleRate
                             }
                         }
-
-                        if (allSamples.isNotEmpty()) {
-                            val cachedAudio = CachedAudio(allSamples.toFloatArray(), sampleRate)
-                            audioCache[textHash] = cachedAudio
-                            Log.i(TAG, "✅ Pre-generation complete: ${allSamples.size} samples cached (hash=$textHash)")
-                            Log.d(TAG, "📦 Cache now has ${audioCache.size} entries: ${audioCache.keys}")
-
-                            // Persist to disk for survival across app restarts
-                            saveToDisk(textHash, cachedAudio)
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error during pre-generation for hash=$textHash", e)
                     }
+
+                    if (allSamples.isNotEmpty()) {
+                        val cachedAudio = CachedAudio(allSamples.toFloatArray(), sampleRate)
+                        audioCache[textHash] = cachedAudio
+                        Log.i(TAG, "✅ Pre-generation complete: ${allSamples.size} samples cached (hash=$textHash)")
+                        Log.d(TAG, "📦 Cache now has ${audioCache.size} entries: ${audioCache.keys}")
+
+                        // Persist to disk for survival across app restarts
+                        saveToDisk(textHash, cachedAudio)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error during pre-generation for hash=$textHash", e)
                 }
             } finally {
                 // Remove from generating set when done
@@ -777,6 +820,10 @@ class SherpaOnnxTtsService @Inject constructor(
     fun loadCacheFromDisk() {
         scope.launch {
             try {
+                // Small delay to ensure object is fully constructed before accessing lazy properties
+                // This prevents NullPointerException when accessing cacheDir from init block
+                kotlinx.coroutines.delay(100)
+
                 val files = cacheDir.listFiles { file -> file.extension == "pcm" } ?: return@launch
                 var loadedCount = 0
 

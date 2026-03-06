@@ -19,12 +19,15 @@ package com.starception.submission.voice
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AutomaticGainControl
 import android.media.audiofx.NoiseSuppressor
+import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.k2fsa.sherpa.onnx.FeatureConfig
@@ -101,6 +104,11 @@ class SherpaOnnxKwsService @Inject constructor(
     // Cache directory for extracted model files
     private val modelDir: File by lazy {
         File(context.filesDir, "kws_model").also { it.mkdirs() }
+    }
+
+    // Audio manager for device selection
+    private val audioManager: AudioManager by lazy {
+        context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
 
     /**
@@ -331,15 +339,12 @@ class SherpaOnnxKwsService @Inject constructor(
                 return ""
             }
 
-            // Use VOICE_RECOGNITION source - optimized for speech with built-in processing
-            @Suppress("MissingPermission")
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,  // Better than MIC for speech
-                SAMPLE_RATE,
-                CHANNEL_CONFIG,
-                AUDIO_FORMAT,
-                bufferSize.coerceAtLeast(CHUNK_SIZE_SAMPLES * 4)  // Larger buffer for processing
-            )
+            // Check if we're in Bluetooth mode - this affects audio source selection
+            val isBluetoothMode = audioManager.mode == AudioManager.MODE_IN_COMMUNICATION
+            Log.i(TAG, "🎤 Audio mode: ${if (isBluetoothMode) "IN_COMMUNICATION (Bluetooth)" else "NORMAL"}")
+
+            // Create AudioRecord with explicit device selection for phone's built-in mic
+            audioRecord = createAudioRecordWithPreferredDevice(bufferSize, isBluetoothMode)
 
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
                 Log.e(TAG, "AudioRecord not initialized")
@@ -348,6 +353,9 @@ class SherpaOnnxKwsService @Inject constructor(
                 return ""
             }
 
+            // Log which device is being used
+            logAudioRecordingDevice()
+
             // Attach audio enhancement effects for noisy driving environments
             val audioSessionId = audioRecord?.audioSessionId ?: 0
             attachAudioEffects(audioSessionId)
@@ -355,7 +363,7 @@ class SherpaOnnxKwsService @Inject constructor(
             // Start recording
             audioRecord?.startRecording()
             isRecording = true
-            Log.d(TAG, "Started streaming audio for keyword detection with noise suppression...")
+            Log.i(TAG, "🎤 Started streaming audio for keyword detection (duration: ${durationMs}ms)")
 
             val shortBuffer = ShortArray(CHUNK_SIZE_SAMPLES)
             val floatBuffer = FloatArray(CHUNK_SIZE_SAMPLES)
@@ -388,9 +396,10 @@ class SherpaOnnxKwsService @Inject constructor(
                 }
                 val rms = kotlin.math.sqrt(sumSquares / read)
 
-                // Log audio level every ~1 second (every 10 chunks at 100ms each)
-                if ((totalSamplesRead / CHUNK_SIZE_SAMPLES) % 10 == 0) {
-                    Log.d(TAG, "🎙️ Audio chunk: samples=$read, RMS=${rms.toInt()}, total=${totalSamplesRead}")
+                // Log audio level every 500ms (every 5 chunks at 100ms each) - use INFO level for visibility
+                if ((totalSamplesRead / CHUNK_SIZE_SAMPLES) % 5 == 0) {
+                    val dbLevel = if (rms > 0) 20 * kotlin.math.log10(rms) else -100.0
+                    Log.i(TAG, "🎙️ AUDIO LEVEL: RMS=${rms.toInt()}, dB=${dbLevel.toInt()}, samples=$totalSamplesRead")
                 }
 
                 // Convert short samples to float [-1.0, 1.0]
@@ -398,11 +407,12 @@ class SherpaOnnxKwsService @Inject constructor(
                     floatBuffer[i] = shortBuffer[i].toFloat() / Short.MAX_VALUE
                 }
 
-                // Apply high-pass filter to remove low-frequency road/engine noise
-                val filteredAudio = applyHighPassFilter(floatBuffer.copyOf(read))
+                // DISABLED: High-pass filter was too aggressive, feed raw audio for testing
+                // val filteredAudio = applyHighPassFilter(floatBuffer.copyOf(read))
+                // stream.acceptWaveform(filteredAudio, SAMPLE_RATE)
 
-                // Feed filtered audio to KWS stream
-                stream.acceptWaveform(filteredAudio, SAMPLE_RATE)
+                // Feed raw audio to KWS stream (no filtering for voice capture testing)
+                stream.acceptWaveform(floatBuffer.copyOf(read), SAMPLE_RATE)
 
                 // Check for keyword detection
                 var localReadyCount = 0
@@ -448,50 +458,50 @@ class SherpaOnnxKwsService @Inject constructor(
 
     /**
      * Attach audio enhancement effects for noisy environments.
-     * These help filter out road noise, wind, and other ambient sounds during driving.
+     * DISABLED FOR TESTING: NoiseSuppressor and AcousticEchoCanceler were too aggressive.
      */
     private fun attachAudioEffects(audioSessionId: Int) {
-        // Noise Suppressor - reduces background noise
-        if (NoiseSuppressor.isAvailable()) {
-            try {
-                noiseSuppressor = NoiseSuppressor.create(audioSessionId)?.apply {
-                    enabled = true
-                    Log.i(TAG, "✅ NoiseSuppressor enabled (session: $audioSessionId)")
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "⚠️ Failed to create NoiseSuppressor: ${e.message}")
-            }
-        } else {
-            Log.w(TAG, "⚠️ NoiseSuppressor not available on this device")
-        }
+        // DISABLED: NoiseSuppressor was too aggressive, suppressing user's voice
+        // if (NoiseSuppressor.isAvailable()) {
+        //     try {
+        //         noiseSuppressor = NoiseSuppressor.create(audioSessionId)?.apply {
+        //             enabled = true
+        //             Log.i(TAG, "✅ NoiseSuppressor enabled (session: $audioSessionId)")
+        //         }
+        //     } catch (e: Exception) {
+        //         Log.w(TAG, "⚠️ Failed to create NoiseSuppressor: ${e.message}")
+        //     }
+        // }
+        Log.i(TAG, "⚠️ NoiseSuppressor DISABLED for voice capture testing")
 
-        // Acoustic Echo Canceler - prevents TTS audio from being picked up by mic
-        if (AcousticEchoCanceler.isAvailable()) {
-            try {
-                acousticEchoCanceler = AcousticEchoCanceler.create(audioSessionId)?.apply {
-                    enabled = true
-                    Log.i(TAG, "✅ AcousticEchoCanceler enabled (session: $audioSessionId)")
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "⚠️ Failed to create AcousticEchoCanceler: ${e.message}")
-            }
-        } else {
-            Log.w(TAG, "⚠️ AcousticEchoCanceler not available on this device")
-        }
+        // DISABLED: AcousticEchoCanceler may also be interfering with voice capture
+        // if (AcousticEchoCanceler.isAvailable()) {
+        //     try {
+        //         acousticEchoCanceler = AcousticEchoCanceler.create(audioSessionId)?.apply {
+        //             enabled = true
+        //             Log.i(TAG, "✅ AcousticEchoCanceler enabled (session: $audioSessionId)")
+        //         }
+        //     } catch (e: Exception) {
+        //         Log.w(TAG, "⚠️ Failed to create AcousticEchoCanceler: ${e.message}")
+        //     }
+        // }
+        Log.i(TAG, "⚠️ AcousticEchoCanceler DISABLED for voice capture testing")
 
-        // Automatic Gain Control - normalizes volume levels
-        if (AutomaticGainControl.isAvailable()) {
-            try {
-                automaticGainControl = AutomaticGainControl.create(audioSessionId)?.apply {
-                    enabled = true
-                    Log.i(TAG, "✅ AutomaticGainControl enabled (session: $audioSessionId)")
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "⚠️ Failed to create AutomaticGainControl: ${e.message}")
-            }
-        } else {
-            Log.w(TAG, "⚠️ AutomaticGainControl not available on this device")
-        }
+        // DISABLED: AGC might be interfering with audio capture on some devices
+        // Keeping all audio effects disabled until we confirm mic is working
+        // if (AutomaticGainControl.isAvailable()) {
+        //     try {
+        //         automaticGainControl = AutomaticGainControl.create(audioSessionId)?.apply {
+        //             enabled = true
+        //             Log.i(TAG, "✅ AutomaticGainControl enabled (session: $audioSessionId)")
+        //         }
+        //     } catch (e: Exception) {
+        //         Log.w(TAG, "⚠️ Failed to create AutomaticGainControl: ${e.message}")
+        //     }
+        // } else {
+        //     Log.w(TAG, "⚠️ AutomaticGainControl not available on this device")
+        // }
+        Log.i(TAG, "⚠️ AutomaticGainControl DISABLED for voice capture testing")
     }
 
     /**
@@ -565,6 +575,134 @@ class SherpaOnnxKwsService @Inject constructor(
         // Reset filter state
         previousSample = 0f
         filteredSample = 0f
+    }
+
+    /**
+     * Create AudioRecord with preferred device selection.
+     * On Android 12+ (API 31+), explicitly selects the phone's built-in microphone
+     * to avoid using car Bluetooth microphone which is far away and noisy.
+     *
+     * @param bufferSize Minimum buffer size
+     * @param isBluetoothMode If true, uses MIC source instead of VOICE_RECOGNITION for better compatibility
+     */
+    @Suppress("MissingPermission")
+    private fun createAudioRecordWithPreferredDevice(bufferSize: Int, isBluetoothMode: Boolean = false): AudioRecord {
+        val actualBufferSize = bufferSize.coerceAtLeast(CHUNK_SIZE_SAMPLES * 4)
+
+        // ALWAYS use MIC audio source for now
+        // VOICE_RECOGNITION was returning silent audio (amplitude=0.0000) on some devices
+        // MIC provides raw microphone input without system-level preprocessing
+        Log.i(TAG, "🎤 Using MIC audio source (VOICE_RECOGNITION was returning silence)")
+        val audioSource = MediaRecorder.AudioSource.MIC
+
+        // On Android 6.0+ (API 23+), use AudioRecord.Builder for better control
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val builder = AudioRecord.Builder()
+                .setAudioSource(audioSource)
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(SAMPLE_RATE)
+                        .setChannelMask(CHANNEL_CONFIG)
+                        .setEncoding(AUDIO_FORMAT)
+                        .build()
+                )
+                .setBufferSizeInBytes(actualBufferSize)
+
+            // On Android 12+ (API 31+), explicitly set preferred device to built-in mic
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val builtInMic = findBuiltInMicrophone()
+                if (builtInMic != null) {
+                    Log.i(TAG, "🎤 Setting preferred device to built-in mic: ${builtInMic.productName}")
+                    builder.setContext(context)
+                    // Note: setPreferredDevice is set after build on the AudioRecord instance
+                }
+            }
+
+            val record = builder.build()
+
+            // Set preferred device after building (Android 6.0+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val builtInMic = findBuiltInMicrophone()
+                if (builtInMic != null) {
+                    val success = record.setPreferredDevice(builtInMic)
+                    Log.i(TAG, "🎤 setPreferredDevice(${builtInMic.productName}): $success")
+                }
+            }
+
+            return record
+        } else {
+            // Fallback for older devices
+            return AudioRecord(
+                audioSource,
+                SAMPLE_RATE,
+                CHANNEL_CONFIG,
+                AUDIO_FORMAT,
+                actualBufferSize
+            )
+        }
+    }
+
+    /**
+     * Find the phone's built-in microphone device.
+     * Returns null if not found or on older Android versions.
+     */
+    private fun findBuiltInMicrophone(): AudioDeviceInfo? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return null
+        }
+
+        val devices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
+        Log.d(TAG, "🎤 Available input devices: ${devices.size}")
+
+        for (device in devices) {
+            val typeName = getDeviceTypeName(device.type)
+            Log.d(TAG, "  - ${device.productName} (type=$typeName, id=${device.id})")
+
+            // Prefer TYPE_BUILTIN_MIC (phone's main microphone)
+            if (device.type == AudioDeviceInfo.TYPE_BUILTIN_MIC) {
+                Log.i(TAG, "🎤 Found built-in microphone: ${device.productName}")
+                return device
+            }
+        }
+
+        // If no built-in mic found, return first non-Bluetooth device
+        for (device in devices) {
+            if (device.type != AudioDeviceInfo.TYPE_BLUETOOTH_SCO &&
+                device.type != AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) {
+                Log.i(TAG, "🎤 Using fallback device: ${device.productName}")
+                return device
+            }
+        }
+
+        Log.w(TAG, "🎤 No suitable microphone found!")
+        return null
+    }
+
+    /**
+     * Log which audio device is actually being used for recording.
+     */
+    private fun logAudioRecordingDevice() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val routedDevice = audioRecord?.routedDevice
+            if (routedDevice != null) {
+                Log.i(TAG, "🎤 RECORDING DEVICE: ${routedDevice.productName} (type=${getDeviceTypeName(routedDevice.type)})")
+            } else {
+                Log.w(TAG, "🎤 RECORDING DEVICE: Unknown (routedDevice is null)")
+            }
+        }
+    }
+
+    /**
+     * Get human-readable name for audio device type.
+     */
+    private fun getDeviceTypeName(type: Int): String = when (type) {
+        AudioDeviceInfo.TYPE_BUILTIN_MIC -> "BUILTIN_MIC"
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "BLUETOOTH_SCO"
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "BLUETOOTH_A2DP"
+        AudioDeviceInfo.TYPE_WIRED_HEADSET -> "WIRED_HEADSET"
+        AudioDeviceInfo.TYPE_USB_DEVICE -> "USB_DEVICE"
+        AudioDeviceInfo.TYPE_USB_HEADSET -> "USB_HEADSET"
+        else -> "UNKNOWN($type)"
     }
 
     /**

@@ -19,6 +19,10 @@ package com.starception.submission.voice
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioManager
+import android.media.AudioTrack
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.whispercpp.media.decodeWaveFile
@@ -63,6 +67,11 @@ class WhisperVoiceService @Inject constructor(
     // whisper.cpp context
     private var whisperContext: WhisperContext? = null
     private var isModelLoaded = false
+
+    // Audio manager for device selection
+    private val audioManager: AudioManager by lazy {
+        context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    }
 
     // Recorder
     private var recorder: Recorder? = null
@@ -110,8 +119,8 @@ class WhisperVoiceService @Inject constructor(
                 MODEL_ASSET_PATH
             )
 
-            // Initialize recorder
-            recorder = Recorder()
+            // Initialize recorder with AudioManager for preferred device selection
+            recorder = Recorder(audioManager)
 
             isModelLoaded = true
             Log.i(TAG, "whisper.cpp model loaded successfully")
@@ -219,8 +228,14 @@ class WhisperVoiceService @Inject constructor(
         }
     }
 
+    // Store last recording for debug playback
+    private var lastRecordingFile: File? = null
+    private var lastRecordingData: FloatArray? = null
+    private var debugAudioTrack: AudioTrack? = null
+
     /**
      * Transcribe audio file using whisper.cpp.
+     * Keeps the recording for potential debug playback on failure.
      */
     private suspend fun transcribeAudio(audioFile: File): String = withContext(Dispatchers.IO) {
         try {
@@ -235,6 +250,10 @@ class WhisperVoiceService @Inject constructor(
             val audioData = decodeWaveFile(audioFile)
             Log.i(TAG, "Audio decoded: ${audioData.size} samples (${audioData.size / 16000.0}s)")
 
+            // Store for potential debug playback
+            lastRecordingData = audioData
+            lastRecordingFile = audioFile
+
             // Transcribe using whisper.cpp
             val result = whisperContext?.transcribeData(audioData, printTimestamp = false)
                 ?.trim()
@@ -245,8 +264,8 @@ class WhisperVoiceService @Inject constructor(
 
             Log.i(TAG, "Transcription result: '$result'")
 
-            // Cleanup audio file
-            audioFile.delete()
+            // Don't delete file yet - keep for debug playback
+            // File will be overwritten on next recording anyway
 
             result
         } catch (e: Exception) {
@@ -254,6 +273,94 @@ class WhisperVoiceService @Inject constructor(
             ""
         }
     }
+
+    /**
+     * Play back the last recorded audio for debugging.
+     * Useful when voice recognition fails to understand what was captured.
+     */
+    suspend fun playLastRecording(onComplete: () -> Unit = {}) = withContext(Dispatchers.IO) {
+        val audioData = lastRecordingData
+        if (audioData == null || audioData.isEmpty()) {
+            Log.w(TAG, "🔊 No recorded audio to play back")
+            withContext(Dispatchers.Main) { onComplete() }
+            return@withContext
+        }
+
+        try {
+            Log.i(TAG, "🔊 Playing back last recording (${audioData.size} samples, ${audioData.size / 16000.0}s)")
+
+            // Stop any existing playback
+            stopDebugPlayback()
+
+            // Convert float samples to 16-bit PCM
+            val pcmData = ShortArray(audioData.size)
+            for (i in audioData.indices) {
+                val sample = audioData[i].coerceIn(-1f, 1f)
+                pcmData[i] = (sample * Short.MAX_VALUE).toInt().toShort()
+            }
+
+            // Create AudioTrack for playback (16kHz mono - Whisper's sample rate)
+            val sampleRate = 16000
+            val bufferSize = AudioTrack.getMinBufferSize(
+                sampleRate,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            )
+
+            debugAudioTrack = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .build()
+                )
+                .setBufferSizeInBytes(bufferSize.coerceAtLeast(pcmData.size * 2))
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+
+            debugAudioTrack?.write(pcmData, 0, pcmData.size)
+            debugAudioTrack?.play()
+
+            // Wait for playback to complete
+            val durationMs = (audioData.size * 1000L) / sampleRate
+            Log.i(TAG, "🔊 Debug playback duration: ${durationMs}ms")
+            Thread.sleep(durationMs + 100)
+
+            stopDebugPlayback()
+
+            withContext(Dispatchers.Main) { onComplete() }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error playing back recording", e)
+            stopDebugPlayback()
+            withContext(Dispatchers.Main) { onComplete() }
+        }
+    }
+
+    /**
+     * Stop debug playback.
+     */
+    private fun stopDebugPlayback() {
+        try {
+            debugAudioTrack?.stop()
+            debugAudioTrack?.release()
+            debugAudioTrack = null
+        } catch (e: Exception) {
+            Log.w(TAG, "Error stopping debug playback", e)
+        }
+    }
+
+    /**
+     * Check if there's a recording available for playback.
+     */
+    fun hasRecordingForPlayback(): Boolean = lastRecordingData != null && lastRecordingData!!.isNotEmpty()
 
     /**
      * Parse transcription text to detect yes/no intent.
@@ -267,16 +374,26 @@ class WhisperVoiceService @Inject constructor(
         }
 
         // Check for yes variants
+        // Includes phonetically similar misrecognitions from Whisper tiny model
+        // "one is" and "once" are common mishearings of "yes" in noisy environments
         val yesPatterns = listOf(
             "yes", "yeah", "yep", "yup", "sure", "okay", "ok",
             "affirmative", "correct", "right", "done", "complete",
-            "mark it", "mark complete", "finished"
+            "mark it", "mark complete", "finished",
+            // Common Whisper misrecognitions of "yes"
+            "one is", "ones", "once", "want", "wants", "ya", "yas",
+            "yess", "yea", "uh huh", "mhm", "mm hmm", "mmhmm",
+            "absolutely", "definitely", "of course"
         )
 
         // Check for no variants
+        // Includes common misrecognitions and informal speech
         val noPatterns = listOf(
             "no", "nope", "nah", "not yet", "skip", "later",
-            "negative", "cancel", "don't", "stop"
+            "negative", "cancel", "don't", "stop",
+            // Common variations and misrecognitions
+            "now", "know", "naw", "na", "uh uh", "mm mm", "nuh uh",
+            "never", "not now", "pass", "next"
         )
 
         // Check yes patterns

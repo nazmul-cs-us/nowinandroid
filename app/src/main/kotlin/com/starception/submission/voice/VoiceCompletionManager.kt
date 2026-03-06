@@ -16,7 +16,12 @@
 
 package com.starception.submission.voice
 
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
+import android.os.Build
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -52,7 +57,11 @@ class VoiceCompletionManager @Inject constructor(
         // Configuration
         const val LISTENING_DURATION_MS = 5000L
         const val LISTENING_DURATION_RETRY_MS = 6000L  // Longer duration for retries
-        const val PROMPT_DELAY_MS = 500L
+        // FAST TRANSITION: Mic works, minimize delays to catch user's immediate response
+        // Previous 300ms + 1500ms delays caused "yes" to be completely missed
+        const val PROMPT_DELAY_MS = 50L  // Tiny delay - mic is ready immediately
+        const val BLUETOOTH_EXTRA_DELAY_MS = 50L  // Minimal extra for Bluetooth
+        // Note: The mic is explicitly set to phone's built-in mic via setPreferredDevice()
         const val UTTERANCE_ID_PROMPT = "voice_completion_prompt"
 
         // Retry configuration for noisy environments
@@ -61,6 +70,11 @@ class VoiceCompletionManager @Inject constructor(
 
     // Retry state
     private var currentRetryCount = 0
+
+    // Audio manager for Bluetooth handling
+    private val audioManager: AudioManager by lazy {
+        context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    }
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -99,29 +113,53 @@ class VoiceCompletionManager @Inject constructor(
 
         scope.launch {
             try {
+                // Check Bluetooth status before starting
+                val isBluetoothConnected = isBluetoothAudioConnected()
+                if (isBluetoothConnected) {
+                    Log.i(TAG, "🔵 BLUETOOTH MODE: Phone connected to Bluetooth audio")
+                    Log.i(TAG, "🔵 Will use phone's built-in microphone for clearer voice recognition")
+                }
+
                 // Play voice prompt
                 val promptPlayed = playVoicePrompt(lessonTitle)
                 if (!promptPlayed) {
                     Log.w(TAG, "Failed to play voice prompt, using fallback")
                 }
 
-                // Small delay after prompt
-                delay(PROMPT_DELAY_MS)
+                // CRITICAL: Stop TTS explicitly to release all audio resources
+                // This is essential after long TTS playback chains
+                Log.d(TAG, "🔊 Stopping TTS to release audio resources...")
+                sherpaOnnxTts.stopSpeaking()
+
+                // Delay after prompt - extra delay for Bluetooth
+                val totalDelay = if (isBluetoothConnected) {
+                    PROMPT_DELAY_MS + BLUETOOTH_EXTRA_DELAY_MS
+                } else {
+                    PROMPT_DELAY_MS
+                }
+                Log.i(TAG, "⏳ Waiting ${totalDelay}ms after TTS before listening (Bluetooth: $isBluetoothConnected)...")
+                delay(totalDelay)
 
                 // Start listening
-                Log.d(TAG, "Starting voice listening...")
+                Log.i(TAG, "🎤 Starting voice listening...")
                 listenForResponse(
                     onYes = {
+                        // Restore audio state after recording
+                        restoreAudioState()
                         // Confirmation already spoken in listenForResponse
                         onComplete()
                         isPromptInProgress = false
                     },
                     onNo = {
+                        // Restore audio state after recording
+                        restoreAudioState()
                         // Confirmation already spoken in listenForResponse
                         onSkipped()
                         isPromptInProgress = false
                     },
                     onError = { error ->
+                        // Restore audio state after recording
+                        restoreAudioState()
                         Log.e(TAG, "Voice recognition error: $error")
                         onError(error)
                         isPromptInProgress = false
@@ -144,6 +182,19 @@ class VoiceCompletionManager @Inject constructor(
      */
     private suspend fun playVoicePrompt(lessonTitle: String): Boolean {
         val promptText = "Say YES to mark this lesson complete, or NO to skip."
+
+        // Cancel any ongoing background TTS pre-generation to get priority
+        // This is critical - background hadith generation can take 20+ seconds
+        // and would block the voice prompt if we don't cancel it
+        Log.i(TAG, "🎤 Cancelling background TTS work for voice prompt priority...")
+        sherpaOnnxTts.cancelBackgroundWork()
+
+        // Check if background work is still in progress
+        // If so, use Android TTS to avoid waiting for mutex
+        if (sherpaOnnxTts.isBackgroundWorkInProgress()) {
+            Log.w(TAG, "🎤 Background TTS in progress, using Android TTS to avoid delay")
+            return playWithAndroidTts(promptText)
+        }
 
         // Apply user-selected TTS voice from settings
         applyUserSelectedTtsVoice()
@@ -263,6 +314,160 @@ class VoiceCompletionManager @Inject constructor(
     }
 
     /**
+     * Check if Bluetooth audio is connected (A2DP for media or HFP for calls).
+     * When connected to car Bluetooth, we need special handling:
+     * - TTS plays through car speakers (A2DP)
+     * - Recording might try to use car's microphone (HFP) which is far and noisy
+     * - We want to force use of phone's built-in microphone instead
+     */
+    private fun isBluetoothAudioConnected(): Boolean {
+        return try {
+            // Check for Bluetooth audio output devices
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                val hasBluetooth = devices.any { device ->
+                    device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                    device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+                }
+                if (hasBluetooth) {
+                    Log.d(TAG, "🔵 Bluetooth audio output detected")
+                }
+                hasBluetooth
+            } else {
+                // Fallback for older devices
+                @Suppress("DEPRECATION")
+                audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error checking Bluetooth status", e)
+            false
+        }
+    }
+
+    // Store original audio state to restore after recording
+    private var originalAudioMode: Int = AudioManager.MODE_NORMAL
+    private var wasBluetoothScoOn: Boolean = false
+    private var wasSpeakerphoneOn: Boolean = false
+
+    /**
+     * Disable Bluetooth SCO and configure audio routing to force recording
+     * through phone's built-in microphone instead of car's far-away microphone.
+     *
+     * Key steps:
+     * 1. Disable Bluetooth SCO (stops using car's HFP microphone)
+     * 2. Set audio mode to MODE_IN_COMMUNICATION (signals voice recording intent)
+     * 3. Turn off speakerphone (ensures phone's primary mic is used)
+     *
+     * Note: The actual mic selection is done via setPreferredDevice() in the
+     * recording services. MODE_IN_COMMUNICATION helps signal our intent but
+     * may not be strictly necessary on all devices.
+     */
+    private fun forcePhoneMicrophone() {
+        try {
+            // Save original state for restoration
+            originalAudioMode = audioManager.mode
+            wasBluetoothScoOn = audioManager.isBluetoothScoOn
+            wasSpeakerphoneOn = audioManager.isSpeakerphoneOn
+
+            Log.i(TAG, "🎤 Audio state before: mode=${getModeString(originalAudioMode)}, SCO=$wasBluetoothScoOn, speaker=$wasSpeakerphoneOn")
+
+            // Step 1: Disable Bluetooth SCO to stop using car's microphone
+            if (audioManager.isBluetoothScoOn) {
+                Log.i(TAG, "🎤 Disabling Bluetooth SCO to use phone microphone")
+                audioManager.isBluetoothScoOn = false
+                audioManager.stopBluetoothSco()
+            }
+
+            // Step 2: DO NOT change audio mode - it causes silent microphone on some devices!
+            // MODE_IN_COMMUNICATION was causing amplitude=0.0000 (silent mic)
+            // setPreferredDevice() in recording services handles mic selection properly
+            // if (audioManager.mode != AudioManager.MODE_IN_COMMUNICATION) {
+            //     Log.i(TAG, "🎤 Setting audio mode to MODE_IN_COMMUNICATION for voice recording")
+            //     audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            // }
+            Log.i(TAG, "🎤 Keeping audio mode as ${getModeString(audioManager.mode)} (not changing to avoid silent mic)")
+
+            // Step 3: Turn off speakerphone to use primary phone microphone
+            if (audioManager.isSpeakerphoneOn) {
+                Log.i(TAG, "🎤 Turning off speakerphone to use primary mic")
+                audioManager.isSpeakerphoneOn = false
+            }
+
+            Log.i(TAG, "🎤 Audio state after: mode=${getModeString(audioManager.mode)}, SCO=${audioManager.isBluetoothScoOn}, speaker=${audioManager.isSpeakerphoneOn}")
+
+        } catch (e: Exception) {
+            Log.w(TAG, "Error forcing phone microphone", e)
+        }
+    }
+
+    /**
+     * Restore audio state after recording is complete.
+     */
+    private fun restoreAudioState() {
+        try {
+            Log.d(TAG, "🎤 Restoring original audio state")
+            audioManager.mode = originalAudioMode
+            // Don't restore SCO automatically - let system handle it
+        } catch (e: Exception) {
+            Log.w(TAG, "Error restoring audio state", e)
+        }
+    }
+
+    private fun getModeString(mode: Int): String = when (mode) {
+        AudioManager.MODE_NORMAL -> "NORMAL"
+        AudioManager.MODE_RINGTONE -> "RINGTONE"
+        AudioManager.MODE_IN_CALL -> "IN_CALL"
+        AudioManager.MODE_IN_COMMUNICATION -> "IN_COMMUNICATION"
+        else -> "UNKNOWN($mode)"
+    }
+
+    /**
+     * Prepare audio routing for voice recording.
+     * MINIMAL DELAYS - mic is working, we just need quick transition.
+     * Previous 2+ second delays caused user's "yes" to be missed entirely.
+     */
+    private suspend fun prepareAudioForRecording(): Long {
+        val isBluetoothConnected = isBluetoothAudioConnected()
+
+        // FAST AUDIO TRANSITION - mic works, minimize delay to catch user's response
+        Log.i(TAG, "🔄 FAST AUDIO PREP: Stopping TTS...")
+        sherpaOnnxTts.stopSpeaking()
+
+        Log.i(TAG, "🔄 FAST AUDIO PREP: Requesting audio focus...")
+        try {
+            val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val focusRequest = android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    .setAudioAttributes(
+                        android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build()
+                    )
+                    .build()
+                audioManager.requestAudioFocus(focusRequest)
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            }
+            Log.i(TAG, "🎤 Audio focus: $result")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error requesting audio focus", e)
+        }
+
+        // Minimal delay - just enough for audio system transition
+        delay(100)
+
+        if (isBluetoothConnected) {
+            Log.i(TAG, "🔵 Bluetooth - forcing phone microphone")
+            forcePhoneMicrophone()
+            delay(100)
+            return 200L
+        }
+
+        return 100L
+    }
+
+    /**
      * Apply the user-selected TTS voice from settings.
      * Ensures consistent TTS voice across all prompts and confirmations.
      */
@@ -302,6 +507,7 @@ class VoiceCompletionManager @Inject constructor(
 
     /**
      * Internal listen function that handles retries.
+     * Prepares audio routing (forces phone mic when Bluetooth connected) before listening.
      */
     private suspend fun listenForResponseInternal(
         onYes: () -> Unit,
@@ -313,6 +519,13 @@ class VoiceCompletionManager @Inject constructor(
         val listeningDuration = if (isRetry) LISTENING_DURATION_RETRY_MS else LISTENING_DURATION_MS
 
         Log.i(TAG, "🎤 Using voice engine: ${selectedEngine.displayName}${if (isRetry) " (retry $currentRetryCount)" else ""}")
+
+        // Prepare audio routing - forces phone mic when Bluetooth is connected
+        // This prevents using the car's far-away, noisy microphone
+        val extraDelay = prepareAudioForRecording()
+        if (extraDelay > 0) {
+            Log.d(TAG, "🎤 Added ${extraDelay}ms delay for Bluetooth audio routing")
+        }
 
         when (selectedEngine) {
             VoiceRecognitionEngine.SHERPA_KWS -> {
@@ -326,6 +539,7 @@ class VoiceCompletionManager @Inject constructor(
 
     /**
      * Handle retry logic for unrecognized or timeout results.
+     * Plays back the captured audio for debugging before retrying.
      * Returns true if a retry was initiated, false if max retries reached.
      */
     private fun handleRetry(
@@ -338,19 +552,60 @@ class VoiceCompletionManager @Inject constructor(
             currentRetryCount++
             Log.i(TAG, "🔄 Retrying voice recognition (attempt ${currentRetryCount + 1}/${MAX_RETRY_ATTEMPTS + 1}): $reason")
 
-            // Speak retry prompt and listen again
+            // Play back what was captured for debugging, then retry
             scope.launch {
-                speakRetryPrompt {
-                    scope.launch {
-                        delay(PROMPT_DELAY_MS)
-                        listenForResponseInternal(onYes, onNo, onError)
+                // Play back the captured audio so user can hear what was recorded
+                playBackCapturedAudioForDebug {
+                    // After playback, speak retry prompt and listen again
+                    speakRetryPrompt {
+                        scope.launch {
+                            delay(PROMPT_DELAY_MS)
+                            listenForResponseInternal(onYes, onNo, onError)
+                        }
                     }
                 }
             }
             return true
         } else {
             Log.i(TAG, "🛑 Max retries reached ($MAX_RETRY_ATTEMPTS), giving up: $reason")
+            // Play back final failed recording for debugging
+            scope.launch {
+                playBackCapturedAudioForDebug {}
+            }
             return false
+        }
+    }
+
+    /**
+     * Play back the captured audio for debugging purposes.
+     * This helps diagnose what Whisper actually recorded when it fails.
+     */
+    private fun playBackCapturedAudioForDebug(onComplete: () -> Unit) {
+        scope.launch {
+            if (whisperService.hasRecordingForPlayback()) {
+                Log.i(TAG, "🔊 DEBUG: Playing back what was captured...")
+                // First announce we're playing back
+                val announcementPlayed = try {
+                    sherpaOnnxTts.speak("Here is what I heard:", onComplete = {})
+                } catch (e: Exception) {
+                    false
+                }
+
+                delay(if (announcementPlayed) 1500L else 500L)
+
+                // Play the actual recording
+                whisperService.playLastRecording {
+                    Log.i(TAG, "🔊 DEBUG: Playback complete")
+                    // Use scope.launch for the delay since we're in a callback
+                    scope.launch {
+                        delay(500) // Small pause before continuing
+                        onComplete()
+                    }
+                }
+            } else {
+                Log.d(TAG, "🔊 DEBUG: No recording available for playback")
+                onComplete()
+            }
         }
     }
 
@@ -365,6 +620,15 @@ class VoiceCompletionManager @Inject constructor(
             }
 
             Log.i(TAG, "🔊 Retry prompt: $retryPrompt")
+
+            // Check if background work is still in progress
+            // If so, use Android TTS to avoid waiting for mutex
+            if (sherpaOnnxTts.isBackgroundWorkInProgress()) {
+                Log.w(TAG, "🎤 Background TTS in progress, using Android TTS for retry prompt")
+                speakWithAndroidTtsFallback(retryPrompt, onComplete)
+                return@launch
+            }
+
             applyUserSelectedTtsVoice()
 
             val success = try {
@@ -536,6 +800,14 @@ class VoiceCompletionManager @Inject constructor(
     private fun speakConfirmation(message: String, onComplete: () -> Unit) {
         scope.launch {
             Log.i(TAG, "🔊 Speaking confirmation: \"$message\"")
+
+            // Check if background work is still in progress
+            // If so, use Android TTS to avoid waiting for mutex
+            if (sherpaOnnxTts.isBackgroundWorkInProgress()) {
+                Log.w(TAG, "🎤 Background TTS in progress, using Android TTS for confirmation")
+                speakWithAndroidTtsFallback(message, onComplete)
+                return@launch
+            }
 
             // Apply user-selected TTS voice from settings
             applyUserSelectedTtsVoice()
