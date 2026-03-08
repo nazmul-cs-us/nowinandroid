@@ -23,6 +23,7 @@ import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
+import android.media.AudioTrack
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AutomaticGainControl
@@ -95,6 +96,8 @@ class SherpaOnnxKwsService @Inject constructor(
     private var audioRecord: AudioRecord? = null
     private var isRecording = false
     private var isListening = false  // Prevent concurrent listening
+    private var lastRecordingData: FloatArray? = null
+    private var debugAudioTrack: AudioTrack? = null
 
     // Audio enhancement effects for noisy environments (driving mode)
     private var noiseSuppressor: NoiseSuppressor? = null
@@ -367,6 +370,7 @@ class SherpaOnnxKwsService @Inject constructor(
 
             val shortBuffer = ShortArray(CHUNK_SIZE_SAMPLES)
             val floatBuffer = FloatArray(CHUNK_SIZE_SAMPLES)
+            val capturedAudio = mutableListOf<Float>()
 
             val startTime = System.currentTimeMillis()
             var totalSamplesRead = 0
@@ -406,6 +410,7 @@ class SherpaOnnxKwsService @Inject constructor(
                 for (i in 0 until read) {
                     floatBuffer[i] = shortBuffer[i].toFloat() / Short.MAX_VALUE
                 }
+                capturedAudio.addAll(floatBuffer.copyOf(read).asList())
 
                 // DISABLED: High-pass filter was too aggressive, feed raw audio for testing
                 // val filteredAudio = applyHighPassFilter(floatBuffer.copyOf(read))
@@ -447,6 +452,9 @@ class SherpaOnnxKwsService @Inject constructor(
             }
 
             stopRecording()
+            if (capturedAudio.isNotEmpty()) {
+                lastRecordingData = capturedAudio.toFloatArray()
+            }
             return ""
 
         } catch (e: Exception) {
@@ -752,10 +760,89 @@ class SherpaOnnxKwsService @Inject constructor(
     }
 
     /**
+     * Check if KWS has a captured recording available for debug playback.
+     */
+    fun hasRecordingForPlayback(): Boolean {
+        val data = lastRecordingData
+        return data != null && data.isNotEmpty()
+    }
+
+    /**
+     * Play back the last captured KWS recording for debugging.
+     */
+    suspend fun playLastRecording(onComplete: () -> Unit = {}) = withContext(Dispatchers.IO) {
+        val audioData = lastRecordingData
+        if (audioData == null || audioData.isEmpty()) {
+            Log.w(TAG, "🔊 No KWS recording to play back")
+            withContext(Dispatchers.Main) { onComplete() }
+            return@withContext
+        }
+
+        try {
+            Log.i(TAG, "🔊 Playing back KWS recording (${audioData.size} samples, ${audioData.size / SAMPLE_RATE.toDouble()}s)")
+            stopDebugPlayback()
+
+            val pcmData = ShortArray(audioData.size)
+            for (i in audioData.indices) {
+                val sample = audioData[i].coerceIn(-1f, 1f)
+                pcmData[i] = (sample * Short.MAX_VALUE).toInt().toShort()
+            }
+
+            val bufferSize = AudioTrack.getMinBufferSize(
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            )
+
+            debugAudioTrack = AudioTrack.Builder()
+                .setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(SAMPLE_RATE)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .build()
+                )
+                .setBufferSizeInBytes(bufferSize.coerceAtLeast(pcmData.size * 2))
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+
+            debugAudioTrack?.write(pcmData, 0, pcmData.size)
+            debugAudioTrack?.play()
+
+            val durationMs = (audioData.size * 1000L) / SAMPLE_RATE
+            Thread.sleep(durationMs + 100)
+            stopDebugPlayback()
+
+            withContext(Dispatchers.Main) { onComplete() }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error playing back KWS recording", e)
+            stopDebugPlayback()
+            withContext(Dispatchers.Main) { onComplete() }
+        }
+    }
+
+    private fun stopDebugPlayback() {
+        try {
+            debugAudioTrack?.stop()
+            debugAudioTrack?.release()
+            debugAudioTrack = null
+        } catch (e: Exception) {
+            Log.w(TAG, "Error stopping KWS debug playback", e)
+        }
+    }
+
+    /**
      * Release resources.
      */
     fun release() {
         stopListening()
+        stopDebugPlayback()
         kws?.release()
         kws = null
         isModelLoaded = false

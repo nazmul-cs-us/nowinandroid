@@ -28,6 +28,7 @@ import com.starception.submission.settings.components.VoiceTestState
 import com.starception.submission.settings.components.TtsSettingsState
 import com.starception.submission.settings.components.TtsTestState
 import com.starception.submission.settings.components.TtsVoice
+import com.starception.submission.voice.SherpaOnnxKwsService
 import com.starception.submission.voice.WhisperVoiceService
 import com.starception.submission.voice.SherpaOnnxTtsService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -57,6 +58,7 @@ class UnifiedSettingsViewModel @Inject constructor(
     private val userDataRepository: UserDataRepository,
     private val prayerSettingsRepository: PrayerSettingsRepository,
     private val whisperVoiceService: WhisperVoiceService,
+    private val sherpaOnnxKwsService: SherpaOnnxKwsService,
     private val ttsService: SherpaOnnxTtsService,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
@@ -772,7 +774,7 @@ class UnifiedSettingsViewModel @Inject constructor(
 
     /**
      * Start interactive voice recognition test
-     * Records audio and transcribes using whisper.cpp
+     * Uses the currently selected recognition engine (Sherpa KWS or Whisper)
      */
     fun startVoiceTest() {
         viewModelScope.launch {
@@ -785,81 +787,155 @@ class UnifiedSettingsViewModel @Inject constructor(
                 testError = null
             )
 
-            // Start listening with the whisper service
-            whisperVoiceService.startListening(
-                durationMs = 5000L,
-                callback = object : WhisperVoiceService.VoiceRecognitionCallback {
-                    override fun onResult(result: WhisperVoiceService.VoiceResult) {
-                        viewModelScope.launch {
-                            when (result) {
-                                is WhisperVoiceService.VoiceResult.Yes -> {
-                                    Log.i(TAG, "🎤 Voice test result: YES")
+            when (_voiceSettings.value.selectedEngine) {
+                VoiceRecognitionEngine.SHERPA_KWS -> {
+                    Log.i(TAG, "🎤 Voice test engine: SHERPA_KWS")
+                    sherpaOnnxKwsService.startListening(
+                        durationMs = 5000L,
+                        callback = object : SherpaOnnxKwsService.VoiceRecognitionCallback {
+                            override fun onResult(result: SherpaOnnxKwsService.VoiceResult) {
+                                viewModelScope.launch {
+                                    when (result) {
+                                        is SherpaOnnxKwsService.VoiceResult.Yes -> {
+                                            Log.i(TAG, "🎤 Voice test result: YES")
+                                            _voiceSettings.value = _voiceSettings.value.copy(
+                                                testState = VoiceTestState.SUCCESS,
+                                                testResult = "Yes"
+                                            )
+                                        }
+                                        is SherpaOnnxKwsService.VoiceResult.No -> {
+                                            Log.i(TAG, "🎤 Voice test result: NO")
+                                            _voiceSettings.value = _voiceSettings.value.copy(
+                                                testState = VoiceTestState.SUCCESS,
+                                                testResult = "No"
+                                            )
+                                        }
+                                        is SherpaOnnxKwsService.VoiceResult.Unrecognized -> {
+                                            Log.i(TAG, "🎤 Voice test result: ${result.text}")
+                                            _voiceSettings.value = _voiceSettings.value.copy(
+                                                testState = VoiceTestState.SUCCESS,
+                                                testResult = result.text
+                                            )
+                                        }
+                                        is SherpaOnnxKwsService.VoiceResult.Timeout -> {
+                                            Log.w(TAG, "🎤 Voice test timeout")
+                                            _voiceSettings.value = _voiceSettings.value.copy(
+                                                testState = VoiceTestState.ERROR,
+                                                testError = "No speech detected"
+                                            )
+                                        }
+                                        is SherpaOnnxKwsService.VoiceResult.Error -> {
+                                            Log.e(TAG, "🎤 Voice test error: ${result.message}")
+                                            _voiceSettings.value = _voiceSettings.value.copy(
+                                                testState = VoiceTestState.ERROR,
+                                                testError = result.message
+                                            )
+                                        }
+                                    }
+
+                                    delay(3000)
                                     _voiceSettings.value = _voiceSettings.value.copy(
-                                        testState = VoiceTestState.SUCCESS,
-                                        testResult = "Yes"
-                                    )
-                                }
-                                is WhisperVoiceService.VoiceResult.No -> {
-                                    Log.i(TAG, "🎤 Voice test result: NO")
-                                    _voiceSettings.value = _voiceSettings.value.copy(
-                                        testState = VoiceTestState.SUCCESS,
-                                        testResult = "No"
-                                    )
-                                }
-                                is WhisperVoiceService.VoiceResult.Unrecognized -> {
-                                    Log.i(TAG, "🎤 Voice test result: ${result.text}")
-                                    _voiceSettings.value = _voiceSettings.value.copy(
-                                        testState = VoiceTestState.SUCCESS,
-                                        testResult = result.text
-                                    )
-                                }
-                                is WhisperVoiceService.VoiceResult.Timeout -> {
-                                    Log.w(TAG, "🎤 Voice test timeout")
-                                    _voiceSettings.value = _voiceSettings.value.copy(
-                                        testState = VoiceTestState.ERROR,
-                                        testError = "No speech detected"
-                                    )
-                                }
-                                is WhisperVoiceService.VoiceResult.Error -> {
-                                    Log.e(TAG, "🎤 Voice test error: ${result.message}")
-                                    _voiceSettings.value = _voiceSettings.value.copy(
-                                        testState = VoiceTestState.ERROR,
-                                        testError = result.message
+                                        testState = VoiceTestState.IDLE
                                     )
                                 }
                             }
 
-                            // Reset to IDLE after 3 seconds
-                            delay(3000)
-                            _voiceSettings.value = _voiceSettings.value.copy(
-                                testState = VoiceTestState.IDLE
-                            )
+                            override fun onListeningStarted() {
+                                Log.i(TAG, "🎤 Voice test listening started")
+                            }
+
+                            override fun onListeningStopped() {
+                                Log.i(TAG, "🎤 Voice test listening stopped")
+                                viewModelScope.launch {
+                                    _voiceSettings.value = _voiceSettings.value.copy(
+                                        testState = VoiceTestState.PROCESSING
+                                    )
+                                }
+                            }
+
+                            override fun onStatusUpdate(message: String) {
+                                Log.i(TAG, "🎤 Voice test status: $message")
+                            }
                         }
-                    }
-
-                    override fun onListeningStarted() {
-                        Log.i(TAG, "🎤 Voice test listening started")
-                    }
-
-                    override fun onListeningStopped() {
-                        Log.i(TAG, "🎤 Voice test listening stopped")
-                        viewModelScope.launch {
-                            _voiceSettings.value = _voiceSettings.value.copy(
-                                testState = VoiceTestState.PROCESSING
-                            )
-                        }
-                    }
-
-                    override fun onStatusUpdate(message: String) {
-                        Log.i(TAG, "🎤 Voice test status: $message")
-                    }
-
-                    override fun onAmplitudeUpdate(amplitude: Float) {
-                        // Update amplitude in state for reactive visualization
-                        _voiceSettings.value = _voiceSettings.value.copy(amplitude = amplitude)
-                    }
+                    )
                 }
-            )
+
+                VoiceRecognitionEngine.WHISPER -> {
+                    Log.i(TAG, "🎤 Voice test engine: WHISPER")
+                    whisperVoiceService.startListening(
+                        durationMs = 5000L,
+                        callback = object : WhisperVoiceService.VoiceRecognitionCallback {
+                            override fun onResult(result: WhisperVoiceService.VoiceResult) {
+                                viewModelScope.launch {
+                                    when (result) {
+                                        is WhisperVoiceService.VoiceResult.Yes -> {
+                                            Log.i(TAG, "🎤 Voice test result: YES")
+                                            _voiceSettings.value = _voiceSettings.value.copy(
+                                                testState = VoiceTestState.SUCCESS,
+                                                testResult = "Yes"
+                                            )
+                                        }
+                                        is WhisperVoiceService.VoiceResult.No -> {
+                                            Log.i(TAG, "🎤 Voice test result: NO")
+                                            _voiceSettings.value = _voiceSettings.value.copy(
+                                                testState = VoiceTestState.SUCCESS,
+                                                testResult = "No"
+                                            )
+                                        }
+                                        is WhisperVoiceService.VoiceResult.Unrecognized -> {
+                                            Log.i(TAG, "🎤 Voice test result: ${result.text}")
+                                            _voiceSettings.value = _voiceSettings.value.copy(
+                                                testState = VoiceTestState.SUCCESS,
+                                                testResult = result.text
+                                            )
+                                        }
+                                        is WhisperVoiceService.VoiceResult.Timeout -> {
+                                            Log.w(TAG, "🎤 Voice test timeout")
+                                            _voiceSettings.value = _voiceSettings.value.copy(
+                                                testState = VoiceTestState.ERROR,
+                                                testError = "No speech detected"
+                                            )
+                                        }
+                                        is WhisperVoiceService.VoiceResult.Error -> {
+                                            Log.e(TAG, "🎤 Voice test error: ${result.message}")
+                                            _voiceSettings.value = _voiceSettings.value.copy(
+                                                testState = VoiceTestState.ERROR,
+                                                testError = result.message
+                                            )
+                                        }
+                                    }
+
+                                    delay(3000)
+                                    _voiceSettings.value = _voiceSettings.value.copy(
+                                        testState = VoiceTestState.IDLE
+                                    )
+                                }
+                            }
+
+                            override fun onListeningStarted() {
+                                Log.i(TAG, "🎤 Voice test listening started")
+                            }
+
+                            override fun onListeningStopped() {
+                                Log.i(TAG, "🎤 Voice test listening stopped")
+                                viewModelScope.launch {
+                                    _voiceSettings.value = _voiceSettings.value.copy(
+                                        testState = VoiceTestState.PROCESSING
+                                    )
+                                }
+                            }
+
+                            override fun onStatusUpdate(message: String) {
+                                Log.i(TAG, "🎤 Voice test status: $message")
+                            }
+
+                            override fun onAmplitudeUpdate(amplitude: Float) {
+                                _voiceSettings.value = _voiceSettings.value.copy(amplitude = amplitude)
+                            }
+                        }
+                    )
+                }
+            }
         }
     }
 

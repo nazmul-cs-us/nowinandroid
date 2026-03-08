@@ -70,6 +70,8 @@ private class AudioRecordThread(
     companion object {
         private const val TAG = "AudioRecordThread"
         private const val SAMPLE_RATE = 16000
+        private const val MAX_RECORDING_MS = 30_000L
+        private const val MAX_SAMPLES = (SAMPLE_RATE * (MAX_RECORDING_MS / 1000L)).toInt()
 
         // High-pass filter state (for road noise removal)
         private var previousSample = 0f
@@ -122,21 +124,47 @@ private class AudioRecordThread(
                 audioRecord.startRecording()
                 resetFilter()
 
-                val allData = mutableListOf<Short>()
+                var allData = ShortArray(SAMPLE_RATE * 10) // Start with 10s capacity.
+                var dataSize = 0
+
+                fun appendSample(sample: Short): Boolean {
+                    if (dataSize >= MAX_SAMPLES) {
+                        return false
+                    }
+                    if (dataSize >= allData.size) {
+                        val nextSize = (allData.size * 2).coerceAtMost(MAX_SAMPLES)
+                        allData = allData.copyOf(nextSize)
+                    }
+                    allData[dataSize++] = sample
+                    return true
+                }
 
                 // Add 500ms of pre-roll silence at the start
                 // This prevents Whisper from cutting off the first word ("yes")
                 // which was being lost due to AudioRecord startup delay
                 val preRollSamples = SAMPLE_RATE / 2  // 500ms at 16kHz = 8000 samples
                 Log.i(TAG, "🎙️ Adding $preRollSamples samples of pre-roll silence")
-                repeat(preRollSamples) { allData.add(0) }
+                repeat(preRollSamples) {
+                    if (!appendSample(0)) {
+                        Log.w(TAG, "🎙️ Reached max recording size during pre-roll; stopping early")
+                        quit.set(true)
+                        return@repeat
+                    }
+                }
 
                 var totalSamplesRead = 0
                 var chunkCount = 0
+                val recordingStartMs = System.currentTimeMillis()
 
                 Log.i(TAG, "🎙️ RECORDING STARTED - entering main recording loop")
 
                 while (!quit.get()) {
+                    val elapsedMs = System.currentTimeMillis() - recordingStartMs
+                    if (elapsedMs >= MAX_RECORDING_MS) {
+                        Log.w(TAG, "🎙️ Max recording duration ${MAX_RECORDING_MS}ms reached, forcing stop")
+                        break
+                    }
+
                     val read = audioRecord.read(buffer, 0, buffer.size)
                     if (read > 0) {
                         totalSamplesRead += read
@@ -148,7 +176,11 @@ private class AudioRecordThread(
                         // }
                         // Store raw audio without filtering for voice capture testing
                         for (i in 0 until read) {
-                            allData.add(buffer[i])
+                            if (!appendSample(buffer[i])) {
+                                Log.w(TAG, "🎙️ Max recording buffer reached at $dataSize samples, forcing stop")
+                                quit.set(true)
+                                break
+                            }
                         }
 
                         // Calculate amplitude for logging and callback
@@ -169,8 +201,9 @@ private class AudioRecordThread(
                 }
 
                 audioRecord.stop()
-                Log.i(TAG, "🎙️ RECORDING STOPPED - total samples: ${allData.size}, chunks: $chunkCount, duration: ${allData.size / 16000.0}s")
-                encodeWaveFile(outputFile, allData.toShortArray())
+                val finalData = allData.copyOf(dataSize)
+                Log.i(TAG, "🎙️ RECORDING STOPPED - total samples: ${finalData.size}, chunks: $chunkCount, duration: ${finalData.size / 16000.0}s")
+                encodeWaveFile(outputFile, finalData)
                 Log.i(TAG, "🎙️ WAV FILE SAVED: ${outputFile.absolutePath} (${outputFile.length()} bytes)")
             } finally {
                 releaseAudioEffects()

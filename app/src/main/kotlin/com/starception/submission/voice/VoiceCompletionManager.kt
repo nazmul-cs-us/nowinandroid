@@ -582,8 +582,20 @@ class VoiceCompletionManager @Inject constructor(
      */
     private fun playBackCapturedAudioForDebug(onComplete: () -> Unit) {
         scope.launch {
-            if (whisperService.hasRecordingForPlayback()) {
-                Log.i(TAG, "🔊 DEBUG: Playing back what was captured...")
+            val selectedEngine = getSelectedEngine()
+            val hasKwsRecording = sherpaKwsService.hasRecordingForPlayback()
+            val hasWhisperRecording = whisperService.hasRecordingForPlayback()
+
+            val playbackLabel = when {
+                selectedEngine == VoiceRecognitionEngine.SHERPA_KWS && hasKwsRecording -> "KWS"
+                selectedEngine == VoiceRecognitionEngine.WHISPER && hasWhisperRecording -> "Whisper"
+                hasKwsRecording -> "KWS"
+                hasWhisperRecording -> "Whisper"
+                else -> null
+            }
+
+            if (playbackLabel != null) {
+                Log.i(TAG, "🔊 DEBUG: Playing back captured audio from $playbackLabel...")
                 // First announce we're playing back
                 val announcementPlayed = try {
                     sherpaOnnxTts.speak("Here is what I heard:", onComplete = {})
@@ -594,12 +606,20 @@ class VoiceCompletionManager @Inject constructor(
                 delay(if (announcementPlayed) 1500L else 500L)
 
                 // Play the actual recording
-                whisperService.playLastRecording {
-                    Log.i(TAG, "🔊 DEBUG: Playback complete")
-                    // Use scope.launch for the delay since we're in a callback
-                    scope.launch {
-                        delay(500) // Small pause before continuing
-                        onComplete()
+                when (playbackLabel) {
+                    "KWS" -> sherpaKwsService.playLastRecording {
+                        Log.i(TAG, "🔊 DEBUG: KWS playback complete")
+                        scope.launch {
+                            delay(500)
+                            onComplete()
+                        }
+                    }
+                    else -> whisperService.playLastRecording {
+                        Log.i(TAG, "🔊 DEBUG: Whisper playback complete")
+                        scope.launch {
+                            delay(500)
+                            onComplete()
+                        }
                     }
                 }
             } else {
@@ -679,9 +699,8 @@ class VoiceCompletionManager @Inject constructor(
                                 // Try retry before giving up
                                 val retried = handleRetry("timeout - no speech detected", onYes, onNo, onError)
                                 if (!retried) {
-                                    speakConfirmation("No response detected after multiple tries. Skipping.") {
-                                        onNo()
-                                    }
+                                    Log.i(TAG, "🔁 KWS retries exhausted, falling back to Whisper once")
+                                    listenWithWhisper(onYes, onNo, onError, durationMs)
                                 }
                             }
                             is SherpaOnnxKwsService.VoiceResult.Unrecognized -> {
@@ -689,9 +708,8 @@ class VoiceCompletionManager @Inject constructor(
                                 // Try retry before giving up
                                 val retried = handleRetry("unrecognized: ${result.text}", onYes, onNo, onError)
                                 if (!retried) {
-                                    speakConfirmation("Sorry, I couldn't understand. Skipping.") {
-                                        onNo()
-                                    }
+                                    Log.i(TAG, "🔁 KWS unrecognized after retries, falling back to Whisper once")
+                                    listenWithWhisper(onYes, onNo, onError, durationMs)
                                 }
                             }
                             is SherpaOnnxKwsService.VoiceResult.Error -> {

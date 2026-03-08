@@ -145,6 +145,18 @@ class DrivingAudioService : Service() {
 
         // Quran audio paths on SD card
         private const val QURAN_ARABIC_PATH = "/sdcard/Quran/Arabic"
+        private const val QURAN_BENGALI_PATH = "/sdcard/Quran/Bengali"
+        private const val QURAN_ENGLISH_PATH = "/sdcard/Quran/English"
+
+        private const val QURAN_PREFS = "quran_prefs"
+        private const val KEY_AUDIO_LANGUAGE = "audio_language"
+        private const val KEY_QURAN_AUDIO_LANGUAGE = "quran_audio_language"
+    }
+
+    private enum class ChainQuranAudioLanguage {
+        ARABIC_ONLY,
+        BENGALI_TRANSLATION,
+        ENGLISH_TRANSLATION
     }
 
     inner class DrivingAudioBinder : Binder() {
@@ -742,9 +754,24 @@ class DrivingAudioService : Service() {
             // Release existing player
             mediaPlayer?.release()
 
-            // Find audio file
-            val fileName = String.format("%03d", surah.number) + "-" + surah.nameEnglish.lowercase().replace(" ", "-") + ".ogg"
-            val audioFile = File(QURAN_ARABIC_PATH, fileName)
+            // Resolve audio file from the same persisted language setting used by Surah detail.
+            val selectedAudioLanguage = getSelectedQuranAudioLanguage()
+            var audioFile = getQuranAudioFileForLanguage(surahIndex, surah, selectedAudioLanguage)
+
+            if (!audioFile.exists() && selectedAudioLanguage != ChainQuranAudioLanguage.ARABIC_ONLY) {
+                val fallbackArabicFile = getQuranAudioFileForLanguage(
+                    surahIndex = surahIndex,
+                    surah = surah,
+                    language = ChainQuranAudioLanguage.ARABIC_ONLY
+                )
+                if (fallbackArabicFile.exists()) {
+                    Log.w(
+                        TAG,
+                        "🕌 Selected Quran audio ($selectedAudioLanguage) missing for Surah ${surah.number}; falling back to Arabic"
+                    )
+                    audioFile = fallbackArabicFile
+                }
+            }
 
             if (!audioFile.exists()) {
                 Log.w(TAG, "🕌 Quran audio file not found: ${audioFile.absolutePath}")
@@ -775,14 +802,7 @@ class DrivingAudioService : Service() {
                 setOnCompletionListener {
                     Log.i(TAG, "🕌 Surah ${surah.number} (${surah.nameEnglish}) playback completed")
                     stopQuranPositionUpdates()
-
-                    // Mark this surah as complete and get next surah index
-                    val nextIndex = CourseProgressTracker.completeCurrentSurah(this@DrivingAudioService)
-                    Log.i(TAG, "🕌 Advancing to next surah: ${nextIndex + 1}")
-
-                    // For now, complete the flow after one surah
-                    // In the future, could continue to next surah or prompt user
-                    onQuranComplete()
+                    promptForSurahCompletion(surahIndex, surah.number, surah.nameEnglish)
                 }
 
                 setOnErrorListener { _, what, extra ->
@@ -801,6 +821,98 @@ class DrivingAudioService : Service() {
 
         } catch (e: Exception) {
             Log.e(TAG, "🕌 Error playing Quran surah", e)
+            onQuranComplete()
+        }
+    }
+
+    private fun getSelectedQuranAudioLanguage(): ChainQuranAudioLanguage {
+        val prefs = getSharedPreferences(QURAN_PREFS, Context.MODE_PRIVATE)
+        val storedValue = prefs.getString(KEY_AUDIO_LANGUAGE, null)
+            ?: prefs.getString(KEY_QURAN_AUDIO_LANGUAGE, null)
+            ?: ChainQuranAudioLanguage.ARABIC_ONLY.name
+
+        return when (storedValue.uppercase(Locale.US)) {
+            "ARABIC_ONLY", "AR", "ARABIC" -> ChainQuranAudioLanguage.ARABIC_ONLY
+            "BENGALI_TRANSLATION", "BN", "BENGALI" -> ChainQuranAudioLanguage.BENGALI_TRANSLATION
+            "ENGLISH_TRANSLATION", "EN", "ENGLISH" -> ChainQuranAudioLanguage.ENGLISH_TRANSLATION
+            else -> {
+                Log.w(TAG, "🕌 Unknown quran audio_language='$storedValue', defaulting to Arabic")
+                ChainQuranAudioLanguage.ARABIC_ONLY
+            }
+        }
+    }
+
+    private fun getQuranAudioFileForLanguage(
+        surahIndex: Int,
+        surah: com.starception.submission.feature.quran.Surah,
+        language: ChainQuranAudioLanguage
+    ): File {
+        return when (language) {
+            ChainQuranAudioLanguage.ARABIC_ONLY -> File(QURAN_ARABIC_PATH, surah.fileName)
+
+            ChainQuranAudioLanguage.BENGALI_TRANSLATION -> {
+                val bengaliDir = File(QURAN_BENGALI_PATH)
+                val allFiles = bengaliDir.listFiles()?.sortedBy { it.name } ?: emptyList()
+                allFiles.getOrNull(surahIndex) ?: File("")
+            }
+
+            ChainQuranAudioLanguage.ENGLISH_TRANSLATION -> {
+                val englishDir = File(QURAN_ENGLISH_PATH)
+                val pattern = String.format("%03d", surah.number)
+                englishDir.listFiles()?.find { it.name.startsWith(pattern) }
+                    ?: File(englishDir, "${pattern} ${surah.nameEnglish.lowercase().replace(" ", "_")}.ogg")
+            }
+        }
+    }
+
+    /**
+     * Ask for consent before marking Surah as complete.
+     * YES -> mark complete and continue to next Surah.
+     * NO  -> keep progress without completing current Surah and end Quran flow.
+     */
+    private fun promptForSurahCompletion(
+        surahIndex: Int,
+        surahNumber: Int,
+        surahNameEnglish: String
+    ) {
+        val lessonId = "surah_$surahNumber"
+        val lessonTitle = "Surah #$surahNumber"
+
+        Log.i(TAG, "🕌 Prompting completion consent for $lessonTitle ($surahNameEnglish)")
+
+        updateState(PlaybackState.VOICE_PROMPT, "Say YES or NO", "Mark Surah complete?")
+        updateNotification()
+
+        voiceCompletionManager.promptForCompletion(
+            courseId = "complete_quran_listening",
+            lessonId = lessonId,
+            lessonTitle = lessonTitle,
+            onComplete = {
+                Log.i(TAG, "🕌 ✅ User confirmed completion for $lessonId")
+                continueToNextSurahAfterCompletion(surahIndex)
+            },
+            onSkipped = {
+                Log.i(TAG, "🕌 ⏭️ User skipped completion for $lessonId - ending Quran flow")
+                onQuranComplete()
+            },
+            onError = { error ->
+                Log.e(TAG, "🕌 Voice completion error for $lessonId: $error - ending Quran flow safely")
+                onQuranComplete()
+            }
+        )
+    }
+
+    /**
+     * Mark current Surah complete and continue playback with the next one.
+     */
+    private fun continueToNextSurahAfterCompletion(previousSurahIndex: Int) {
+        val nextIndex = CourseProgressTracker.completeCurrentSurah(this)
+        Log.i(TAG, "🕌 Advancing to next surah: ${nextIndex + 1}")
+
+        if (nextIndex in QuranData.surahs.indices && nextIndex != previousSurahIndex) {
+            playQuranSurah(nextIndex, 0)
+        } else {
+            Log.i(TAG, "🕌 Quran listening cycle complete")
             onQuranComplete()
         }
     }
