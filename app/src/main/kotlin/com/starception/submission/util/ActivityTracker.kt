@@ -371,6 +371,14 @@ object ActivityTracker {
 
         // ========== DRIVING STARTED ==========
         if (activity == "Driving" && oldActivity != "Driving") {
+            // Do not auto-trigger driving audio when app is not visible.
+            // This prevents unexpected chain start when app is closed/locked.
+            if (!isAppInForeground) {
+                Log.i("ActivityTracker", "🚫 App in background - suppressing auto travel dua/chain start")
+                lastDrivingTime = currentTime
+                return
+            }
+
             // Check if travel dua feature is enabled
             if (!travelDuaEnabled) {
                 Log.d("ActivityTracker", "🚗 Travel dua disabled in settings")
@@ -693,6 +701,11 @@ object ActivityTracker {
             val actualDelay = (System.currentTimeMillis() - scheduledTime) / 1000
             // Verify user is still driving before playing
             if (_currentActivity.value == "Driving") {
+                if (!isAppInForeground) {
+                    Log.i("ActivityTracker", "🚫 App moved to background before delay elapsed - skipping travel dua")
+                    pendingDuaRunnable = null
+                    return@Runnable
+                }
                 val totalDrivingTime = (accumulatedDrivingTime + (System.currentTimeMillis() - drivingStartTime)) / 1000
                 Log.i("ActivityTracker", "✅ Total driving time: ${totalDrivingTime}s - playing travel dua now!")
                 playDrivingAudio()
@@ -731,6 +744,11 @@ object ActivityTracker {
     private fun playDrivingAudio() {
         try {
             context?.let { ctx ->
+                if (!isAppInForeground) {
+                    Log.i("ActivityTracker", "🚫 App in background - not starting DrivingAudioService")
+                    return
+                }
+
                 Log.i("ActivityTracker", "🎵 ========== STARTING DRIVING AUDIO SERVICE ==========")
 
                 // Set cooldown timestamp when dua starts playing

@@ -44,6 +44,9 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = NiaBuildType.DEBUG.applicationIdSuffix
+            // Coverage instrumentation is breaking Hilt generated injector packaging at runtime.
+            enableUnitTestCoverage = false
+            enableAndroidTestCoverage = false
         }
         release {
             isMinifyEnabled = true

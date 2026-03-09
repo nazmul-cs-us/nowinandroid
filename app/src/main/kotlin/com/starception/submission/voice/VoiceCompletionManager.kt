@@ -19,6 +19,7 @@ package com.starception.submission.voice
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.app.KeyguardManager
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
@@ -33,6 +34,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -61,6 +63,9 @@ class VoiceCompletionManager @Inject constructor(
         // Previous 300ms + 1500ms delays caused "yes" to be completely missed
         const val PROMPT_DELAY_MS = 50L  // Tiny delay - mic is ready immediately
         const val BLUETOOTH_EXTRA_DELAY_MS = 50L  // Minimal extra for Bluetooth
+        const val LOCKED_DEVICE_EXTRA_DELAY_MS = 250L
+        const val ENGINE_READY_TIMEOUT_MS = 8000L
+        const val ENGINE_READY_POLL_MS = 120L
         // Note: The mic is explicitly set to phone's built-in mic via setPreferredDevice()
         const val UTTERANCE_ID_PROMPT = "voice_completion_prompt"
 
@@ -113,8 +118,25 @@ class VoiceCompletionManager @Inject constructor(
 
         scope.launch {
             try {
+                // Warm up the selected recognizer before prompt/listen flow.
+                // This avoids the first-attempt miss where model load time eats the user's first "yes".
+                val selectedEngine = getSelectedEngine()
+                val ready = ensureVoiceEngineReady(selectedEngine)
+                if (!ready) {
+                    val message = "Voice recognition not ready (${selectedEngine.name})"
+                    Log.e(TAG, message)
+                    onError(message)
+                    isPromptInProgress = false
+                    return@launch
+                }
+                Log.i(TAG, "✅ Voice engine ready: ${selectedEngine.name}")
+
                 // Check Bluetooth status before starting
                 val isBluetoothConnected = isBluetoothAudioConnected()
+                val isLocked = isDeviceLocked()
+                if (isLocked) {
+                    Log.i(TAG, "🔒 Device is locked - enabling lock-screen voice capture mode")
+                }
                 if (isBluetoothConnected) {
                     Log.i(TAG, "🔵 BLUETOOTH MODE: Phone connected to Bluetooth audio")
                     Log.i(TAG, "🔵 Will use phone's built-in microphone for clearer voice recognition")
@@ -136,7 +158,7 @@ class VoiceCompletionManager @Inject constructor(
                     PROMPT_DELAY_MS + BLUETOOTH_EXTRA_DELAY_MS
                 } else {
                     PROMPT_DELAY_MS
-                }
+                } + if (isLocked) LOCKED_DEVICE_EXTRA_DELAY_MS else 0L
                 Log.i(TAG, "⏳ Waiting ${totalDelay}ms after TTS before listening (Bluetooth: $isBluetoothConnected)...")
                 delay(totalDelay)
 
@@ -313,6 +335,45 @@ class VoiceCompletionManager @Inject constructor(
         }
     }
 
+    private suspend fun preloadVoiceEngine(engine: VoiceRecognitionEngine): Boolean {
+        return try {
+            when (engine) {
+                VoiceRecognitionEngine.SHERPA_KWS -> sherpaKwsService.loadModel()
+                VoiceRecognitionEngine.WHISPER -> whisperService.loadModel()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error preloading voice engine ${engine.name}", e)
+            false
+        }
+    }
+
+    private fun isVoiceEngineReady(engine: VoiceRecognitionEngine): Boolean {
+        return when (engine) {
+            VoiceRecognitionEngine.SHERPA_KWS -> sherpaKwsService.isModelReady()
+            VoiceRecognitionEngine.WHISPER -> whisperService.isModelReady()
+        }
+    }
+
+    /**
+     * Ensure the selected recognition engine is fully ready BEFORE prompt playback.
+     * This guarantees users hear the prompt only when the recognizer can process response immediately after.
+     */
+    private suspend fun ensureVoiceEngineReady(engine: VoiceRecognitionEngine): Boolean {
+        if (isVoiceEngineReady(engine)) return true
+
+        // Trigger load once first.
+        preloadVoiceEngine(engine)
+
+        val ready = withTimeoutOrNull(ENGINE_READY_TIMEOUT_MS) {
+            while (!isVoiceEngineReady(engine)) {
+                delay(ENGINE_READY_POLL_MS)
+            }
+            true
+        } ?: false
+
+        return ready
+    }
+
     /**
      * Check if Bluetooth audio is connected (A2DP for media or HFP for calls).
      * When connected to car Bluetooth, we need special handling:
@@ -340,6 +401,22 @@ class VoiceCompletionManager @Inject constructor(
             }
         } catch (e: Exception) {
             Log.w(TAG, "Error checking Bluetooth status", e)
+            false
+        }
+    }
+
+    private fun isDeviceLocked(): Boolean {
+        return try {
+            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+            if (keyguardManager == null) {
+                false
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                keyguardManager.isDeviceLocked
+            } else {
+                keyguardManager.isKeyguardLocked
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to check keyguard lock state", e)
             false
         }
     }
@@ -428,6 +505,7 @@ class VoiceCompletionManager @Inject constructor(
      */
     private suspend fun prepareAudioForRecording(): Long {
         val isBluetoothConnected = isBluetoothAudioConnected()
+        val isLocked = isDeviceLocked()
 
         // FAST AUDIO TRANSITION - mic works, minimize delay to catch user's response
         Log.i(TAG, "🔄 FAST AUDIO PREP: Stopping TTS...")
@@ -458,6 +536,12 @@ class VoiceCompletionManager @Inject constructor(
         delay(100)
 
         if (isBluetoothConnected) {
+            if (isLocked) {
+                // For lock-screen driving usage, keep BT route (car mic) instead of forcing phone mic.
+                Log.i(TAG, "🔵🔒 Bluetooth + locked device - keeping Bluetooth microphone route")
+                return 100L
+            }
+
             Log.i(TAG, "🔵 Bluetooth - forcing phone microphone")
             forcePhoneMicrophone()
             delay(100)
@@ -516,7 +600,9 @@ class VoiceCompletionManager @Inject constructor(
     ) {
         val selectedEngine = getSelectedEngine()
         val isRetry = currentRetryCount > 0
-        val listeningDuration = if (isRetry) LISTENING_DURATION_RETRY_MS else LISTENING_DURATION_MS
+        val isLocked = isDeviceLocked()
+        val baseDuration = if (isRetry) LISTENING_DURATION_RETRY_MS else LISTENING_DURATION_MS
+        val listeningDuration = if (isLocked) baseDuration + 3000L else baseDuration
 
         Log.i(TAG, "🎤 Using voice engine: ${selectedEngine.displayName}${if (isRetry) " (retry $currentRetryCount)" else ""}")
 

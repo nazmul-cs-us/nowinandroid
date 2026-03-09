@@ -229,6 +229,16 @@ class DrivingAudioService : Service() {
                 val audioType = intent?.getStringExtra(EXTRA_AUDIO_TYPE)
                 when (audioType) {
                     TYPE_TRAVEL_DUA -> {
+                        // Ignore duplicate chain starts while a chain is already active.
+                        // This can happen when driving is detected again in traffic.
+                        if (isChainActive()) {
+                            Log.w(
+                                TAG,
+                                "Ignoring duplicate TYPE_TRAVEL_DUA start; chain already active in state=$currentState"
+                            )
+                            return START_STICKY
+                        }
+
                         pendingHadithNumber = intent.getIntExtra(EXTRA_HADITH_NUMBER, -1).takeIf { it > 0 }
                         pendingHadithText = intent.getStringExtra(EXTRA_HADITH_TEXT)
                         pendingCourseId = intent.getStringExtra(EXTRA_COURSE_ID)
@@ -1081,6 +1091,10 @@ class DrivingAudioService : Service() {
         currentState == PlaybackState.PLAYING_QURAN
 
     fun getCurrentState(): PlaybackState = currentState
+
+    private fun isChainActive(): Boolean {
+        return currentState != PlaybackState.IDLE || mediaPlayer?.isPlaying == true || isPaused
+    }
 
     // ==================== State Management ====================
 
