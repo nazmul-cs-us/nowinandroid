@@ -24,12 +24,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,6 +40,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material3.Icon
@@ -508,6 +512,11 @@ private fun AnimatedMicButton(
         animationSpec = tween(50),
         label = "amplitudeScale"
     )
+    val iconScale by animateFloatAsState(
+        targetValue = if (isActive) 1.08f + (amplitude * 0.08f) else 1f,
+        animationSpec = tween(120),
+        label = "iconScale"
+    )
 
     val buttonSize = 60.dp
     val finalScale = if (isActive) scale * amplitudeScale else idlePulse
@@ -566,12 +575,33 @@ private fun AnimatedMicButton(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.RecordVoiceOver,
-                    contentDescription = if (isActive) "Listening" else "Tap to speak",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Campaign,
+                        contentDescription = if (isActive) "Listening" else "Tap to speak",
+                        tint = Color.White,
+                        modifier = Modifier.size((28f * iconScale).dp)
+                    )
+
+                    if (isActive) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .offset(x = 5.dp, y = (-5).dp)
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = (0.25f + ring1Alpha).coerceIn(0f, 1f)))
+                        )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .offset(x = 9.dp, y = 4.dp)
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = (0.2f + ring2Alpha).coerceIn(0f, 1f)))
+                        )
+                    }
+                }
             }
         }
     }
@@ -593,14 +623,7 @@ private fun ModernVoiceTestCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true, color = MaterialTheme.colorScheme.primary)
-            ) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                if (isActive) onStopTest() else onTestVoice()
-            },
+            .clip(RoundedCornerShape(24.dp)),
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
@@ -612,24 +635,25 @@ private fun ModernVoiceTestCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Animated Mic button with rings
-                AnimatedMicButton(
-                    isActive = isActive,
-                    amplitude = amplitude
-                )
-
-                // Larger visualization area
+                // Full test area as one capsule
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(140.dp),
+                        .fillMaxWidth()
+                        .height(148.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(bounded = true, color = MaterialTheme.colorScheme.primary)
+                        ) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (isActive) onStopTest() else onTestVoice()
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    GoogleHumVisualization(
-                        isAnimating = isActive,
+                    BubbleSpeakerPad(
+                        isActive = isActive,
                         amplitude = amplitude,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -662,6 +686,178 @@ private fun ModernVoiceTestCard(
                     },
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BubbleSpeakerPad(
+    isActive: Boolean,
+    amplitude: Float,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "speakerPad")
+    val bubblePulse by infiniteTransition.animateFloat(
+        initialValue = 0.75f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bubblePulse"
+    )
+    val level by animateFloatAsState(
+        targetValue = if (isActive) (0.6f + amplitude * 0.25f).coerceIn(0.5f, 0.9f) else 0.35f,
+        animationSpec = tween(180),
+        label = "level"
+    )
+
+    BoxWithConstraints(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        Color(0xFF0D355B),
+                        Color(0xFF101A24)
+                    )
+                )
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(maxWidth * 0.34f)
+                .padding(end = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            GoogleHumVisualization(
+                isAnimating = isActive,
+                amplitude = amplitude,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width((maxWidth * level).coerceAtMost(maxWidth * 0.72f))
+                .clip(RoundedCornerShape(20.dp))
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color(0xFF0B4B83),
+                            Color(0xFF0E3A67)
+                        )
+                    )
+                )
+        )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 10.dp)
+                .size(94.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.08f)),
+            contentAlignment = Alignment.Center
+        ) {
+            GoogleHumVisualization(
+                isAnimating = isActive,
+                amplitude = amplitude,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+            )
+
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF112A43).copy(alpha = 0.88f)),
+                contentAlignment = Alignment.Center
+            ) {
+                DotPlayPauseGlyph(
+                    isPause = isActive,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(x = (-86).dp, y = (-30).dp)
+                .size((8f * bubblePulse).dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.75f))
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(x = (-78).dp, y = (-12).dp)
+                .size((6f * bubblePulse).dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.68f))
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(x = (-70).dp, y = (8).dp)
+                .size((5f * bubblePulse).dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.6f))
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(x = (-92).dp, y = 24.dp)
+                .size((5f * bubblePulse).dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.5f))
+        )
+    }
+}
+
+@Composable
+private fun DotPlayPauseGlyph(
+    isPause: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val dotColor = Color.White
+    val dotSize = 4.dp
+
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        if (isPause) {
+            listOf((-7).dp, 7.dp).forEach { xOffset ->
+                listOf((-7).dp, 0.dp, 7.dp).forEach { yOffset ->
+                    Box(
+                        modifier = Modifier
+                            .offset(x = xOffset, y = yOffset)
+                            .size(dotSize)
+                            .clip(CircleShape)
+                            .background(dotColor)
+                    )
+                }
+            }
+        } else {
+            listOf(
+                Pair((-8).dp, 0.dp),
+                Pair((-2).dp, (-4).dp),
+                Pair((-2).dp, 4.dp),
+                Pair(4.dp, (-8).dp),
+                Pair(4.dp, 0.dp),
+                Pair(4.dp, 8.dp)
+            ).forEach { (xOffset, yOffset) ->
+                Box(
+                    modifier = Modifier
+                        .offset(x = xOffset, y = yOffset)
+                        .size(dotSize)
+                        .clip(CircleShape)
+                        .background(dotColor)
                 )
             }
         }

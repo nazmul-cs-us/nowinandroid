@@ -40,6 +40,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.media.session.MediaButtonReceiver
 import com.starception.submission.R
+import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.feature.course.CourseProgressTracker
 import com.starception.submission.feature.course.QuranListeningProgress
 import com.starception.submission.feature.quran.QuranData
@@ -151,6 +152,7 @@ class DrivingAudioService : Service() {
         private const val QURAN_PREFS = "quran_prefs"
         private const val KEY_AUDIO_LANGUAGE = "audio_language"
         private const val KEY_QURAN_AUDIO_LANGUAGE = "quran_audio_language"
+        private const val KEY_LAST_DUA_PLAY_TIME = "last_dua_play_time"
     }
 
     private enum class ChainQuranAudioLanguage {
@@ -306,6 +308,7 @@ class DrivingAudioService : Service() {
 
             mediaPlayer?.start()
             isPaused = false
+            persistTravelDuaStartTime()
 
         } catch (e: Exception) {
             Log.e(TAG, "Error playing travel dua", e)
@@ -1032,9 +1035,7 @@ class DrivingAudioService : Service() {
         }
 
         stopQuranPositionUpdates()
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
-        mediaPlayer = null
+        stopAndReleaseMediaPlayer("stop()")
         textToSpeech?.stop()
         sherpaOnnxTts.stopSpeaking()
         voiceCompletionManager.cancel()
@@ -1050,16 +1051,12 @@ class DrivingAudioService : Service() {
         Log.d(TAG, "⏭️ Skip requested")
         when (currentState) {
             PlaybackState.PLAYING_TRAVEL_DUA -> {
-                mediaPlayer?.stop()
-                mediaPlayer?.release()
-                mediaPlayer = null
+                stopAndReleaseMediaPlayer("skip travel dua")
                 onTravelDuaComplete()
             }
             PlaybackState.PLAYING_HADITH_AUDIO,
             PlaybackState.PLAYING_HADITH_TTS -> {
-                mediaPlayer?.stop()
-                mediaPlayer?.release()
-                mediaPlayer = null
+                stopAndReleaseMediaPlayer("skip hadith")
                 textToSpeech?.stop()
                 sherpaOnnxTts.stopSpeaking()
                 onPlaybackComplete?.invoke()
@@ -1070,9 +1067,7 @@ class DrivingAudioService : Service() {
                 val position = mediaPlayer?.currentPosition ?: 0
                 CourseProgressTracker.updateQuranPosition(this, position)
                 stopQuranPositionUpdates()
-                mediaPlayer?.stop()
-                mediaPlayer?.release()
-                mediaPlayer = null
+                stopAndReleaseMediaPlayer("skip quran")
                 CourseProgressTracker.endQuranListeningSession(this)
                 onPlaybackComplete?.invoke()
                 updateState(PlaybackState.IDLE, "Driving Mode", "Skipped")
@@ -1249,5 +1244,34 @@ class DrivingAudioService : Service() {
 
         wakeLock?.release()
         wakeLock = null
+    }
+
+    private fun persistTravelDuaStartTime() {
+        try {
+            val now = System.currentTimeMillis()
+            getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putLong(KEY_LAST_DUA_PLAY_TIME, now)
+                .apply()
+            Log.i(TAG, "🚗 Cooldown persisted at playback start")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to persist travel dua start time: ${e.message}")
+        }
+    }
+
+    private fun stopAndReleaseMediaPlayer(reason: String) {
+        val player = mediaPlayer ?: return
+        try {
+            player.stop()
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "MediaPlayer stop ignored in invalid state ($reason): ${e.message}")
+        } finally {
+            try {
+                player.release()
+            } catch (e: Exception) {
+                Log.w(TAG, "MediaPlayer release error ($reason): ${e.message}")
+            }
+            mediaPlayer = null
+        }
     }
 }

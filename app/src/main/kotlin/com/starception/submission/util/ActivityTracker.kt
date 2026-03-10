@@ -371,14 +371,6 @@ object ActivityTracker {
 
         // ========== DRIVING STARTED ==========
         if (activity == "Driving" && oldActivity != "Driving") {
-            // Do not auto-trigger driving audio when app is not visible.
-            // This prevents unexpected chain start when app is closed/locked.
-            if (!isAppInForeground) {
-                Log.i("ActivityTracker", "🚫 App in background - suppressing auto travel dua/chain start")
-                lastDrivingTime = currentTime
-                return
-            }
-
             // Check if travel dua feature is enabled
             if (!travelDuaEnabled) {
                 Log.d("ActivityTracker", "🚗 Travel dua disabled in settings")
@@ -408,27 +400,39 @@ object ActivityTracker {
             Log.i("ActivityTracker", "🚗 ✅ Cooldown check PASSED - proceeding to schedule dua")
 
             // Check if this is a resume within gap tolerance (e.g., after traffic light)
-            // Skip gap tolerance resume if dua already played for this accumulation session
-            // (prevents replay when stopping at signal after cooldown expires)
-            if (drivingStopTime > 0 && gapSinceLastDriving < travelDuaGapToleranceMillis && accumulatedDrivingTime > 0 && !duaPlayedForCurrentSession) {
-                // RESUME: Continue countdown with accumulated time
-                val remainingTime = travelDuaPlaybackDelayMillis - accumulatedDrivingTime
-                if (remainingTime > 0) {
-                    Log.i("ActivityTracker", "🚦 Driving resumed within ${gapSinceLastDriving / 1000}s gap - continuing countdown")
-                    Log.i("ActivityTracker", "   Accumulated: ${accumulatedDrivingTime / 1000}s, Remaining: ${remainingTime / 1000}s")
-                    drivingStartTime = currentTime
-                    scheduleDrivingDuaWithRemainingTime(remainingTime)
+            if (drivingStopTime > 0 && gapSinceLastDriving < travelDuaGapToleranceMillis) {
+                drivingStartTime = currentTime
+
+                // If dua already played for this trip/session, never replay within gap tolerance.
+                if (duaPlayedForCurrentSession) {
+                    Log.i(
+                        "ActivityTracker",
+                        "🚦 Driving resumed within ${gapSinceLastDriving / 1000}s gap - dua already played for this session, skipping replay"
+                    )
+                } else if (accumulatedDrivingTime > 0) {
+                    // RESUME: Continue countdown with accumulated time
+                    val remainingTime = travelDuaPlaybackDelayMillis - accumulatedDrivingTime
+                    if (remainingTime > 0) {
+                        Log.i("ActivityTracker", "🚦 Driving resumed within ${gapSinceLastDriving / 1000}s gap - continuing countdown")
+                        Log.i("ActivityTracker", "   Accumulated: ${accumulatedDrivingTime / 1000}s, Remaining: ${remainingTime / 1000}s")
+                        scheduleDrivingDuaWithRemainingTime(remainingTime)
+                    } else {
+                        // Already accumulated enough time, play dua now
+                        Log.i("ActivityTracker", "🎵 Accumulated ${accumulatedDrivingTime / 1000}s driving - playing travel dua now!")
+                        playDrivingAudio()
+                        resetDrivingAccumulation()
+                        duaPlayedForCurrentSession = true
+                        // Set driving start time since user is now driving
+                        drivingStartTime = currentTime
+                    }
                 } else {
-                    // Already accumulated enough time, play dua now
-                    Log.i("ActivityTracker", "🎵 Accumulated ${accumulatedDrivingTime / 1000}s driving - playing travel dua now!")
-                    playDrivingAudio()
-                    resetDrivingAccumulation()
-                    duaPlayedForCurrentSession = true
-                    // Set driving start time since user is now driving
-                    drivingStartTime = currentTime
+                    // No prior accumulation in this resumed window; start a normal delay.
+                    val delaySeconds = travelDuaPlaybackDelayMillis / 1000
+                    Log.i("ActivityTracker", "🚦 Driving resumed within gap - scheduling travel dua in ${delaySeconds}s")
+                    scheduleDrivingDuaWithDelay()
                 }
             } else {
-                // FRESH START: New driving session (gap exceeds tolerance, first time, or dua already played)
+                // FRESH START: New driving session (first time or gap exceeds tolerance)
                 val delaySeconds = travelDuaPlaybackDelayMillis / 1000
                 Log.i("ActivityTracker", "🚗 New driving session started - scheduling travel dua in ${delaySeconds}s")
                 if (duaPlayedForCurrentSession) {
@@ -701,11 +705,6 @@ object ActivityTracker {
             val actualDelay = (System.currentTimeMillis() - scheduledTime) / 1000
             // Verify user is still driving before playing
             if (_currentActivity.value == "Driving") {
-                if (!isAppInForeground) {
-                    Log.i("ActivityTracker", "🚫 App moved to background before delay elapsed - skipping travel dua")
-                    pendingDuaRunnable = null
-                    return@Runnable
-                }
                 val totalDrivingTime = (accumulatedDrivingTime + (System.currentTimeMillis() - drivingStartTime)) / 1000
                 Log.i("ActivityTracker", "✅ Total driving time: ${totalDrivingTime}s - playing travel dua now!")
                 playDrivingAudio()
@@ -744,11 +743,6 @@ object ActivityTracker {
     private fun playDrivingAudio() {
         try {
             context?.let { ctx ->
-                if (!isAppInForeground) {
-                    Log.i("ActivityTracker", "🚫 App in background - not starting DrivingAudioService")
-                    return
-                }
-
                 Log.i("ActivityTracker", "🎵 ========== STARTING DRIVING AUDIO SERVICE ==========")
 
                 // Set cooldown timestamp when dua starts playing

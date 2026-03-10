@@ -1,6 +1,7 @@
 package com.starception.submission.settings.components
 
 import android.Manifest
+import android.os.Build
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -88,15 +89,15 @@ fun TravelDuaSection(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
-    // State to track if we need to trigger audio chain after permission granted
+    // State to track if we need to trigger audio chain after permissions are granted
     var pendingAudioChainTrigger by remember { mutableStateOf(false) }
 
-    // Permission launcher for RECORD_AUDIO
-    val micPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted && pendingAudioChainTrigger) {
-            pendingAudioChainTrigger = false
+    // Permission launcher for required audio-chain permissions.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { grantResults ->
+        val allGranted = grantResults.values.all { it }
+        if (allGranted && pendingAudioChainTrigger) {
             onTriggerAudioChain()
         }
         pendingAudioChainTrigger = false
@@ -104,16 +105,30 @@ fun TravelDuaSection(
 
     // Helper function to check permission and trigger audio chain
     fun checkPermissionAndPlay() {
-        val hasPermission = ContextCompat.checkSelfPermission(
+        val hasMicPermission = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
+        val storagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        val hasStoragePermission = ContextCompat.checkSelfPermission(
+            context,
+            storagePermission
+        ) == PackageManager.PERMISSION_GRANTED
 
-        if (hasPermission) {
+        if (hasMicPermission && hasStoragePermission) {
             onTriggerAudioChain()
         } else {
             pendingAudioChainTrigger = true
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.RECORD_AUDIO,
+                    storagePermission
+                )
+            )
         }
     }
 
