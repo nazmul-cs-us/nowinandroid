@@ -1255,12 +1255,18 @@ private fun AlbumPlayerTopBar(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             // LEFT SIDE - Back button only (floating surah name will animate here)
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = contentColor
-                )
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = contentColor.copy(alpha = 0.15f)
+            ) {
+                IconButton(onClick = onBackClick) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = contentColor
+                    )
+                }
             }
 
             // RIGHT SIDE - Dynamic icons based on available space after camera cutout
@@ -2199,12 +2205,18 @@ private fun BottomSheetNotesContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
 
             Column(modifier = Modifier.weight(1f)) {

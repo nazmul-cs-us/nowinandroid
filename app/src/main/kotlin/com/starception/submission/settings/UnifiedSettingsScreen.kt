@@ -71,6 +71,7 @@ import com.starception.submission.settings.components.VoiceSettingsSection
 @Composable
 fun UnifiedSettingsScreen(
     onBackClick: () -> Unit,
+    onNavigateToSalahDataCollection: () -> Unit = {},
     viewModel: UnifiedSettingsViewModel = hiltViewModel()
 ) {
     val themeSettings by viewModel.themeSettings.collectAsStateWithLifecycle()
@@ -273,7 +274,8 @@ fun UnifiedSettingsScreen(
                             onRefreshTopics = viewModel::refreshTopicsDatabase,
                             onRefreshDuas = viewModel::refreshDuasDatabase,
                             onRefreshQuranicDuas = viewModel::refreshQuranicDuasDatabase,
-                            onRefreshAll = viewModel::refreshAllDatabases
+                            onRefreshAll = viewModel::refreshAllDatabases,
+                            onNavigateToSalahDataCollection = onNavigateToSalahDataCollection
                         )
                     }
                 }

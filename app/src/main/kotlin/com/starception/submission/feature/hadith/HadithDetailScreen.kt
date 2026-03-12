@@ -1087,12 +1087,18 @@ private fun HadithContent(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 // LEFT SIDE - Back button
-                IconButton(onClick = onBackClick) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = toolbarContentColor
-                    )
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    shape = CircleShape,
+                    color = toolbarContentColor.copy(alpha = 0.15f)
+                ) {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = toolbarContentColor
+                        )
+                    }
                 }
 
                 // RIGHT SIDE - Dynamic icons based on available space
@@ -1672,16 +1678,21 @@ private fun HadithErrorContent(
         }
 
         // Back button
-        IconButton(
-            onClick = onBackClick,
+        Surface(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(8.dp)
+                .size(40.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back"
-            )
+            IconButton(onClick = onBackClick) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
 }
@@ -1789,12 +1800,18 @@ private fun HadithShimmerLoading(
                     .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBackClick) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White
-                    )
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    shape = CircleShape,
+                    color = Color.White.copy(alpha = 0.15f)
+                ) {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         }

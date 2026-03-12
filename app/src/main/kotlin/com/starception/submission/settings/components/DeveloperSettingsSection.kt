@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -73,6 +74,7 @@ fun DeveloperSettingsSection(
     onRefreshDuas: () -> Unit,
     onRefreshQuranicDuas: () -> Unit,
     onRefreshAll: () -> Unit,
+    onNavigateToSalahDataCollection: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -185,6 +187,28 @@ fun DeveloperSettingsSection(
             enabled = !state.isRefreshing,
             onRefreshAll = onRefreshAll
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Salah Data Collection Tool
+        FilledTonalButton(
+            onClick = onNavigateToSalahDataCollection,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Sensors,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Salah Data Collection",
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
 
     }
 }

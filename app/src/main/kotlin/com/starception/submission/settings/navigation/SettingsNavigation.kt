@@ -12,11 +12,13 @@ object SettingsRoute
 fun NavController.navigateToSettings() = navigate(SettingsRoute)
 
 fun NavGraphBuilder.settingsScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onNavigateToSalahDataCollection: () -> Unit = {}
 ) {
     composable<SettingsRoute> {
         UnifiedSettingsScreen(
-            onBackClick = onBackClick
+            onBackClick = onBackClick,
+            onNavigateToSalahDataCollection = onNavigateToSalahDataCollection
         )
     }
 }

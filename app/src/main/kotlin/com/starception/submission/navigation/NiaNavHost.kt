@@ -45,6 +45,8 @@ import com.starception.submission.feature.dua.duaDetailScreen
 import com.starception.submission.feature.dua.navigateToDuaDetail
 import com.starception.submission.feature.hadith.hadithDetailScreen
 import com.starception.submission.feature.hadith.navigateToHadithDetail
+import com.starception.submission.feature.salah.datacollection.navigateToSalahDataCollection
+import com.starception.submission.feature.salah.datacollection.salahDataCollectionScreen
 import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.settings.navigation.settingsScreen
 import com.starception.submission.ui.NiaAppState
@@ -285,6 +287,11 @@ fun NiaNavHost(
         )
         // Unified Settings screen
         settingsScreen(
+            onBackClick = navController::popBackStack,
+            onNavigateToSalahDataCollection = navController::navigateToSalahDataCollection
+        )
+        // Salah data collection screen (developer tool)
+        salahDataCollectionScreen(
             onBackClick = navController::popBackStack
         )
         // Hadith detail screen
