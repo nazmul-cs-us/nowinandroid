@@ -507,11 +507,23 @@ class VoiceCompletionManager @Inject constructor(
         val isBluetoothConnected = isBluetoothAudioConnected()
         val isLocked = isDeviceLocked()
 
-        // FAST AUDIO TRANSITION - mic works, minimize delay to catch user's response
-        Log.i(TAG, "🔄 FAST AUDIO PREP: Stopping TTS...")
+        // Cancel any lingering background TTS generation and wait for it to actually stop.
+        // In driving mode, hadith pre-generation may still hold audio resources which
+        // causes the mic to record silence instead of the user's voice.
+        sherpaOnnxTts.cancelBackgroundWork()
+        var bgWaitAttempts = 0
+        while (sherpaOnnxTts.isBackgroundWorkInProgress() && bgWaitAttempts < 10) {
+            delay(100)
+            bgWaitAttempts++
+        }
+        if (bgWaitAttempts > 0) {
+            Log.i(TAG, "🔄 Waited ${bgWaitAttempts * 100}ms for background TTS to fully stop")
+        }
+
+        Log.i(TAG, "🔄 AUDIO PREP: Stopping TTS and releasing audio resources...")
         sherpaOnnxTts.stopSpeaking()
 
-        Log.i(TAG, "🔄 FAST AUDIO PREP: Requesting audio focus...")
+        Log.i(TAG, "🔄 AUDIO PREP: Requesting audio focus...")
         try {
             val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val focusRequest = android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
@@ -532,23 +544,25 @@ class VoiceCompletionManager @Inject constructor(
             Log.w(TAG, "Error requesting audio focus", e)
         }
 
-        // Minimal delay - just enough for audio system transition
-        delay(100)
+        // Delay for audio system transition.
+        // After a long audio chain (travel dua → hadith TTS), the audio subsystem
+        // needs time to fully release AudioTrack and MediaPlayer sessions.
+        delay(300)
 
         if (isBluetoothConnected) {
             if (isLocked) {
                 // For lock-screen driving usage, keep BT route (car mic) instead of forcing phone mic.
                 Log.i(TAG, "🔵🔒 Bluetooth + locked device - keeping Bluetooth microphone route")
-                return 100L
+                return 300L
             }
 
             Log.i(TAG, "🔵 Bluetooth - forcing phone microphone")
             forcePhoneMicrophone()
-            delay(100)
-            return 200L
+            delay(200)
+            return 500L
         }
 
-        return 100L
+        return 300L
     }
 
     /**

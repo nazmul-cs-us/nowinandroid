@@ -23,6 +23,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.os.Binder
@@ -267,6 +269,52 @@ class DrivingAudioService : Service() {
         return START_STICKY
     }
 
+    // ==================== Foreground Service Type Management ====================
+
+    /**
+     * Upgrade the foreground service type to include MICROPHONE before voice recording.
+     * On Android 14+ (API 34), the foreground service type MUST include MICROPHONE for
+     * the app to access the mic from the background. Without this, AudioRecord captures silence.
+     *
+     * We start with only MEDIA_PLAYBACK (no RECORD_AUDIO needed) and upgrade here
+     * right before we need mic access. This prevents SecurityException during playTravelDua().
+     */
+    private fun upgradeForegroundServiceForMicrophone() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            // Check if RECORD_AUDIO is granted before trying to include microphone type
+            val hasRecordAudio = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+            if (hasRecordAudio) {
+                try {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        createNotification(),
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK or
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                    )
+                    Log.i(TAG, "🎤 Upgraded foreground service to include MICROPHONE type")
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "🎤 Cannot upgrade to MICROPHONE type: ${e.message}")
+                }
+            } else {
+                Log.w(TAG, "🎤 RECORD_AUDIO not granted - mic will capture silence from background!")
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // API 29-33: re-call startForeground with both types (less strict enforcement)
+            try {
+                startForeground(
+                    NOTIFICATION_ID,
+                    createNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK or
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+                Log.i(TAG, "🎤 Upgraded foreground service to include MICROPHONE type (API ${Build.VERSION.SDK_INT})")
+            } catch (e: Exception) {
+                Log.w(TAG, "🎤 Failed to upgrade foreground type: ${e.message}")
+            }
+        }
+    }
+
     // ==================== Playback Methods ====================
 
     /**
@@ -304,7 +352,20 @@ class DrivingAudioService : Service() {
             }
 
             updateState(PlaybackState.PLAYING_TRAVEL_DUA, "Travel Dua", "دعاء السفر")
-            startForeground(NOTIFICATION_ID, createNotification())
+            // Start foreground with ONLY mediaPlayback type. Including microphone type
+            // requires RECORD_AUDIO to be granted BEFORE startForeground(), and if it's not,
+            // a SecurityException kills the entire chain. We upgrade to include microphone
+            // type later, right before voice recording starts.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    createNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, createNotification())
+            }
+            Log.i(TAG, "🚗 Foreground service started (mediaPlayback only)")
 
             mediaPlayer?.start()
             isPaused = false
@@ -565,6 +626,11 @@ class DrivingAudioService : Service() {
     fun playHadithTts(hadithNumber: Int, text: String) {
         Log.i(TAG, "📚 Playing hadith TTS #$hadithNumber")
 
+        // Release travel dua MediaPlayer to free its audio session.
+        // Keeping it alive can block the phone microphone later during voice recording.
+        mediaPlayer?.release()
+        mediaPlayer = null
+
         updateState(PlaybackState.PLAYING_HADITH_TTS, "Hadith #$hadithNumber", "Sahih Al-Bukhari")
         updateNotification()
 
@@ -681,10 +747,31 @@ class DrivingAudioService : Service() {
         // Background TTS pre-generation competes for ttsMutex and blocks voice prompt.
         // Move to AFTER voice prompt completes to prevent blocking.
 
+        // Cancel background TTS generation and release all audio resources BEFORE
+        // starting the voice prompt. This prevents the mic from recording silence
+        // due to lingering audio sessions from the travel dua → hadith chain.
+        sherpaOnnxTts.cancelBackgroundWork()
+        sherpaOnnxTts.stopSpeaking()
+        mediaPlayer?.release()
+        mediaPlayer = null
+
+        // Upgrade foreground service type to include MICROPHONE before voice recording.
+        // Without this, on Android 14+ the app in the background gets silent mic buffers.
+        upgradeForegroundServiceForMicrophone()
+
         // Update state to voice prompt
         updateState(PlaybackState.VOICE_PROMPT, "Say YES or NO", "Mark lesson complete?")
         updateNotification()
 
+        // Allow audio subsystem to fully release resources after the long
+        // MediaPlayer + AudioTrack chain before the mic starts recording.
+        scope.launch {
+            kotlinx.coroutines.delay(500)
+            startVoicePromptForHadith(hadithNumber)
+        }
+    }
+
+    private fun startVoicePromptForHadith(hadithNumber: Int) {
         // Trigger voice completion prompt
         val courseId = pendingCourseId ?: "daily_bukhari"
         val lessonId = pendingLessonId ?: "hadith_$hadithNumber"
@@ -893,10 +980,21 @@ class DrivingAudioService : Service() {
 
         Log.i(TAG, "🕌 Prompting completion consent for $lessonTitle ($surahNameEnglish)")
 
+        // Release Quran MediaPlayer to free audio session before mic recording
+        sherpaOnnxTts.stopSpeaking()
+        mediaPlayer?.release()
+        mediaPlayer = null
+
+        // Upgrade foreground service type to include MICROPHONE before voice recording.
+        upgradeForegroundServiceForMicrophone()
+
         updateState(PlaybackState.VOICE_PROMPT, "Say YES or NO", "Mark Surah complete?")
         updateNotification()
 
-        voiceCompletionManager.promptForCompletion(
+        // Allow audio subsystem to settle after Quran MediaPlayer release
+        scope.launch {
+            kotlinx.coroutines.delay(500)
+            voiceCompletionManager.promptForCompletion(
             courseId = "complete_quran_listening",
             lessonId = lessonId,
             lessonTitle = lessonTitle,
@@ -913,6 +1011,7 @@ class DrivingAudioService : Service() {
                 onQuranComplete()
             }
         )
+        }
     }
 
     /**

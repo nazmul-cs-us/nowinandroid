@@ -122,6 +122,15 @@
             android:stopWithTask="false" />
             <!-- Using dataSync|location for prayer data sync and background location for activity detection -->
             
+        <!-- Debug receiver to simulate driving detection via adb -->
+        <receiver
+            android:name=".util.DebugDrivingReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.starception.submission.DEBUG_SIMULATE_DRIVING" />
+            </intent-filter>
+        </receiver>
+
         <!-- Prayer Action Receiver for notification actions like "Mark as Prayed" -->
         <receiver
             android:name=".util.PrayerActionReceiver"
