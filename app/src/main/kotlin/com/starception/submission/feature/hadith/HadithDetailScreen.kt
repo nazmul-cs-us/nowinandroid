@@ -2,13 +2,9 @@ package com.starception.submission.feature.hadith
 
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -77,7 +73,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import android.content.res.Configuration
@@ -96,10 +91,7 @@ import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.feature.surah.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.component.NiaVerifiedTag
-import com.starception.submission.core.ui.DynamicSkyHeader
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
-import com.starception.submission.core.ui.getCurrentSkyPeriodForTheme
-import com.starception.submission.core.ui.getSkyColors
 import com.starception.submission.feature.course.CourseCompletionBadgeCompact
 import com.starception.submission.feature.course.CourseProgressTracker
 import java.util.Locale
@@ -161,15 +153,6 @@ private fun loadHadithSectionOrder(context: android.content.Context): List<Hadit
         null
     }
 }
-
-// Gradient colors for hadith header - earthy tones
-private val HadithGradientColors = listOf(
-    Color(0xFF795548),  // Brown
-    Color(0xFF8D6E63),  // Light brown
-    Color(0xFF6D4C41),  // Dark brown
-    Color(0xFF5D4037),  // Darker brown
-    Color(0xFF4E342E)   // Deepest brown
-)
 
 /**
  * Hadith Detail Screen - displays a single hadith from a collection
@@ -1702,69 +1685,76 @@ private fun HadithShimmerLoading(
     onBackClick: () -> Unit,
     isLandscape: Boolean = false
 ) {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val shimmerOffset = transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmerOffset"
-    )
-
-    val skyPeriod = getCurrentSkyPeriodForTheme()
-    val skyColors = getSkyColors(skyPeriod)
-    val headerHeight = if (isLandscape) 200.dp else 300.dp
-
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header shimmer with dynamic sky
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(headerHeight) // Match taller header
-            ) {
-                // Dynamic sky background based on time of day
-                DynamicSkyHeader(
-                    modifier = Modifier.fillMaxSize(),
-                    height = headerHeight,
-                    period = skyPeriod
-                )
-                // Semi-transparent overlay
+            // Header shimmer matching the new Masjid al-Nawabi design
+            Column {
+                // Mosque image placeholder matching the loaded state
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.2f))
-                )
-                // Header content positioned at bottom to show more sky artwork
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = if (isLandscape) 24.dp else 16.dp)
-                        .padding(top = if (isLandscape) 60.dp else 100.dp, bottom = 4.dp), // Position content at very bottom
-                    verticalArrangement = Arrangement.Bottom,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .fillMaxWidth()
+                        .then(
+                            if (isLandscape) {
+                                Modifier.height(200.dp)
+                            } else {
+                                Modifier.aspectRatio(1f)
+                            }
+                        )
                 ) {
-                    // Collection name placeholder
-                    Box(
-                        modifier = Modifier
-                            .size(width = 150.dp, height = 24.dp)
-                            .background(
-                                Color.White.copy(alpha = 0.2f),
-                                RoundedCornerShape(12.dp)
-                            )
+                    Image(
+                        painter = painterResource(R.drawable.masjid_al_nawabi),
+                        contentDescription = "Masjid al-Nawabi",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.Center,
+                        alpha = 0.6f // Slightly dimmed for shimmer effect
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    // Hadith number placeholder
-                    Box(
+                }
+
+                // Info card placeholder matching the loaded state
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (isLandscape) 130.dp else 170.dp)
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         modifier = Modifier
-                            .size(width = 100.dp, height = 36.dp)
-                            .background(
-                                Color.White.copy(alpha = 0.15f),
-                                RoundedCornerShape(18.dp)
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp, vertical = 16.dp)
+                    ) {
+                        Column {
+                            // Collection name shimmer
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 200.dp, height = 28.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        RoundedCornerShape(8.dp)
+                                    )
                             )
-                    )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            // Author shimmer
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 260.dp, height = 16.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                        RoundedCornerShape(6.dp)
+                                    )
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            // Hadith number chip shimmer
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 100.dp, height = 32.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                        RoundedCornerShape(16.dp)
+                                    )
+                            )
+                        }
+                    }
                 }
             }
 
