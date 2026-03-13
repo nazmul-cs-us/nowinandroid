@@ -63,14 +63,23 @@ class LibGDXFragment : AndroidFragmentApplication() {
 
         val view = initializeForView(viz, cfg)
 
-        // Enable touch handling for orbit camera
+        // Enable touch handling for orbit camera (zoom, pan, rotate)
         view.isFocusable = true
         view.isFocusableInTouchMode = true
+        view.requestFocus()
 
-        // Prevent parent scroll views from intercepting touch events during gestures
-        view.setOnTouchListener { v, _ ->
+        // Prevent parent scroll views (LazyColumn) from intercepting touch events.
+        // This is critical — without it, vertical drags get stolen by the scrollable parent.
+        view.setOnTouchListener { v, event ->
+            // Claim all touches for this view's entire gesture
             v.parent?.requestDisallowInterceptTouchEvent(true)
-            false // Let LibGDX handle touches through its input processor
+            // Walk up the view hierarchy to block all ancestors
+            var parent = v.parent
+            while (parent != null) {
+                parent.requestDisallowInterceptTouchEvent(true)
+                parent = if (parent is View) (parent as View).parent else null
+            }
+            false // Let LibGDX handle the actual touch through its input processor
         }
 
         return view

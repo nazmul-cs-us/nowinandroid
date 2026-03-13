@@ -16,7 +16,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,6 +46,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -78,11 +78,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -91,12 +88,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.starception.submission.feature.salah.visualization.CurrentSampleCard
+import com.starception.submission.feature.salah.visualization.DataQualitySummary
+import com.starception.submission.feature.salah.visualization.PlaybackBar
 import com.starception.submission.feature.salah.visualization.Visualization3DView
 import com.starception.submission.feature.salah.visualization.VisualizationControls
 import com.starception.submission.feature.salah.visualization.VisualizationState
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
 import java.text.SimpleDateFormat
+import kotlin.math.abs
 import java.util.Date
 import java.util.Locale
 
@@ -187,6 +188,10 @@ fun SalahDataCollectionScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item { RecordingHero(uiState, viewModel) }
+                    // Capture quality feedback during recording
+                    if (uiState.isRecording && uiState.lastSample != null) {
+                        item { CaptureQualityCard(uiState) }
+                    }
                     item { PostureSelector(uiState, viewModel) }
                     item { TrainingProgress(uiState) }
                     // 3D Visualization Card
@@ -234,6 +239,10 @@ fun SalahDataCollectionScreen(
                     item { QuickGuide() }
                 }
                 item { RecordingHero(uiState, viewModel) }
+                // Capture quality feedback during recording
+                if (uiState.isRecording && uiState.lastSample != null) {
+                    item { CaptureQualityCard(uiState) }
+                }
                 item { PostureSelector(uiState, viewModel) }
                 item { SessionStats(uiState) }
                 item { TrainingProgress(uiState) }
@@ -1469,47 +1478,76 @@ private fun Visualization3DCard(
     onVizStateChange: (VisualizationState) -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header row with toggle
+            // Header row
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggleVisualization(!showVisualization) }
+                    .padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "3D Visualization",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                OutlinedButton(
-                    onClick = { onToggleVisualization(!showVisualization) },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = if (showVisualization) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            Color.Transparent
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ViewInAr,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
-                    )
+                    }
+                    Column {
+                        Text(
+                            text = "3D Visualization",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (allSamples.isNotEmpty()) {
+                            Text(
+                                text = "${allSamples.size} samples loaded",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (showVisualization) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHighest
+                    }
                 ) {
                     Text(
                         text = if (showVisualization) "Hide" else "Show",
-                        style = MaterialTheme.typography.labelSmall
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (showVisualization) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
                     )
                 }
             }
@@ -1522,34 +1560,64 @@ private fun Visualization3DCard(
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     if (allSamples.isEmpty()) {
-                        // Loading or no data
-                        Box(
+                        // Empty state
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(200.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
+                                .height(180.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow
                         ) {
-                            Text(
-                                text = "Loading samples...\nRecord some data first!",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    modifier = Modifier.size(56.dp)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ViewInAr,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "No data yet",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Record training data to visualize",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
                         }
                     } else {
                         // 3D View
-                        Box(
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(400.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .height(350.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color(0xFF1C1C1E)
                         ) {
                             Visualization3DView(
                                 samples = allSamples,
@@ -1558,6 +1626,21 @@ private fun Visualization3DCard(
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
+
+                        // Playback controls directly below 3D view
+                        if (vizState.totalSamples > 0) {
+                            PlaybackBar(
+                                state = vizState,
+                                onStateChange = onVizStateChange
+                            )
+                            CurrentSampleCard(vizState)
+                        }
+
+                        // Data quality summary
+                        DataQualitySummary(
+                            samples = allSamples,
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
                         // Controls
                         VisualizationControls(
@@ -1569,5 +1652,201 @@ private fun Visualization3DCard(
                 }
             }
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// CAPTURE QUALITY CARD - Simple visual feedback
+// ═══════════════════════════════════════════════════════
+
+@Composable
+private fun CaptureQualityCard(uiState: SalahDataCollectionUiState) {
+    val sample = uiState.lastSample ?: return
+    val posture = uiState.currentPosture
+
+    // Stability from gyro magnitude
+    val gyro = sample.gyroMagnitude
+    val isStable = gyro < 0.3f
+    val isShaky = gyro >= 0.6f
+
+    // Posture orientation check
+    val orientationOk = isPostureOrientationOk(posture, sample.pitch, sample.roll)
+
+    // Overall quality: both stability AND orientation must be good
+    val overallQuality = when {
+        isShaky -> CaptureQuality.BAD
+        !isStable && !orientationOk -> CaptureQuality.BAD
+        isStable && orientationOk -> CaptureQuality.GREAT
+        isStable || orientationOk -> CaptureQuality.OK
+        else -> CaptureQuality.OK
+    }
+
+    val statusColor = when (overallQuality) {
+        CaptureQuality.GREAT -> Color(0xFF43A047)
+        CaptureQuality.OK -> Color(0xFFFFB300)
+        CaptureQuality.BAD -> Color(0xFFE53935)
+    }
+
+    val cardColor = when (overallQuality) {
+        CaptureQuality.GREAT -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+        CaptureQuality.OK -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f)
+        CaptureQuality.BAD -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(tween(300))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Big status indicator circle
+            val infiniteTransition = rememberInfiniteTransition(label = "quality_pulse")
+            val pulseScale by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = if (overallQuality == CaptureQuality.BAD) 1.08f else 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(600, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "quality_scale"
+            )
+
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .scale(pulseScale)
+                    .clip(CircleShape)
+                    .background(statusColor.copy(alpha = 0.15f))
+                    .border(2.5.dp, statusColor.copy(alpha = 0.5f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = when (overallQuality) {
+                        CaptureQuality.GREAT -> "\u2714"  // checkmark
+                        CaptureQuality.OK -> "~"
+                        CaptureQuality.BAD -> "!"
+                    },
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = statusColor
+                )
+            }
+
+            // Main message - big and clear
+            Text(
+                text = when (overallQuality) {
+                    CaptureQuality.GREAT -> "Perfect! Keep holding"
+                    CaptureQuality.OK -> "Almost there..."
+                    CaptureQuality.BAD -> "Hold still!"
+                },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = statusColor,
+                textAlign = TextAlign.Center
+            )
+
+            // Simple guidance text
+            val guidanceText = getSimpleGuidance(posture, isStable, orientationOk)
+            Text(
+                text = guidanceText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp
+            )
+
+            // Stability bar (simple, no numbers)
+            val stabilityFraction = (1f - (gyro / 1.0f).coerceIn(0f, 1f))
+            val animatedFraction by animateFloatAsState(
+                targetValue = stabilityFraction,
+                animationSpec = tween(200),
+                label = "stability_bar"
+            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Steadiness",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .height(6.dp)
+                            .fillMaxWidth(animatedFraction)
+                            .background(
+                                color = statusColor,
+                                shape = RoundedCornerShape(3.dp)
+                            )
+                    )
+                }
+            }
+        }
+    }
+}
+
+private enum class CaptureQuality {
+    GREAT, OK, BAD
+}
+
+private fun isPostureOrientationOk(posture: SalahPosture, pitch: Float, roll: Float): Boolean {
+    return when (posture) {
+        SalahPosture.QIYAM -> abs(pitch) < 30f && abs(roll) < 30f
+        SalahPosture.RUKU -> pitch in 30f..80f || pitch in -80f..-30f
+        SalahPosture.GOING_TO_SUJUD -> true  // movement expected
+        SalahPosture.SUJUD -> abs(pitch) > 50f || abs(roll) > 50f
+        SalahPosture.JALSA -> abs(pitch) < 45f
+        SalahPosture.TASHAHHUD -> abs(pitch) < 45f
+        SalahPosture.QIYAM_RISING -> true  // movement expected
+        SalahPosture.TRANSITION -> true
+        SalahPosture.NOT_PRAYING -> true
+    }
+}
+
+private fun getSimpleGuidance(posture: SalahPosture, isStable: Boolean, orientationOk: Boolean): String {
+    // If shaky, that's the priority message
+    if (!isStable) {
+        return "Place the phone in your pocket and stay in position"
+    }
+
+    // If orientation is wrong, give posture-specific simple tip
+    if (!orientationOk) {
+        return when (posture) {
+            SalahPosture.QIYAM -> "Stand straight with phone in your pocket"
+            SalahPosture.RUKU -> "Bend forward with your back level"
+            SalahPosture.SUJUD -> "Go fully into prostration"
+            SalahPosture.JALSA -> "Sit upright between prostrations"
+            SalahPosture.TASHAHHUD -> "Sit still in the final position"
+            else -> "Adjust your position"
+        }
+    }
+
+    // Everything is good
+    return when (posture) {
+        SalahPosture.QIYAM -> "Standing position looks great"
+        SalahPosture.RUKU -> "Bowing position looks great"
+        SalahPosture.GOING_TO_SUJUD -> "Keep moving naturally"
+        SalahPosture.SUJUD -> "Prostration looks great"
+        SalahPosture.JALSA -> "Sitting position looks great"
+        SalahPosture.TASHAHHUD -> "Final sitting looks great"
+        SalahPosture.QIYAM_RISING -> "Keep rising smoothly"
+        else -> "Data is being captured"
     }
 }

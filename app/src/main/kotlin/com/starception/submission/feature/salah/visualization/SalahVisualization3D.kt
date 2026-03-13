@@ -20,9 +20,11 @@ import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Vector3
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * LibGDX-based 3D visualization for salah sensor training data.
@@ -77,6 +79,26 @@ class SalahVisualization3D(
     private var groundModel: Model? = null
     private var groundInstance: ModelInstance? = null
 
+    // Humanoid body parts (pill-shaped)
+    private var headModel: Model? = null
+    private var headInstance: ModelInstance? = null
+    private var torsoModel: Model? = null
+    private var torsoInstance: ModelInstance? = null
+    private var upperArmModel: Model? = null
+    private var leftUpperArmInstance: ModelInstance? = null
+    private var rightUpperArmInstance: ModelInstance? = null
+    private var forearmModel: Model? = null
+    private var leftForearmInstance: ModelInstance? = null
+    private var rightForearmInstance: ModelInstance? = null
+    private var upperLegModel: Model? = null
+    private var leftUpperLegInstance: ModelInstance? = null
+    private var rightUpperLegInstance: ModelInstance? = null
+    private var lowerLegModel: Model? = null
+    private var leftLowerLegInstance: ModelInstance? = null
+    private var rightLowerLegInstance: ModelInstance? = null
+    private var prayerMatModel: Model? = null
+    private var prayerMatInstance: ModelInstance? = null
+
     // Gravity vectors
     private var gravityArrowModels: MutableList<Model> = mutableListOf()
     private var gravityArrowInstances: MutableList<Pair<SalahPosture, ModelInstance>> = mutableListOf()
@@ -102,8 +124,22 @@ class SalahVisualization3D(
         camera.far = 300f
         camera.update()
 
-        // Setup camera controller
-        cameraController = CameraInputController(camera)
+        // Setup camera controller — override pinch zoom to dolly (move camera)
+        // instead of changing field-of-view, which feels unresponsive on mobile
+        cameraController = object : CameraInputController(camera) {
+            private val zoomDir = Vector3()
+            override fun pinchZoom(amount: Float): Boolean {
+                // Dolly zoom: move camera along view direction toward/away from target
+                val delta = zoomDir.set(camera.direction).nor().scl(amount * translateUnits)
+                camera.position.add(delta)
+                // Prevent zooming through the target
+                if (camera.position.dst(target) < 2f) {
+                    camera.position.sub(delta)
+                }
+                camera.update()
+                return true
+            }
+        }
         Gdx.input.inputProcessor = cameraController
 
         // Setup rendering
@@ -111,16 +147,18 @@ class SalahVisualization3D(
         shapeRenderer = ShapeRenderer()
         shapeRenderer.setAutoShapeType(true)
 
-        // Setup environment
+        // Setup environment — brighter ambient + two-point lighting for depth
         environment = Environment()
-        environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.4f, 0.4f, 0.4f, 1f))
-        environment.add(DirectionalLight().set(0.8f, 0.8f, 0.8f, -1f, -0.8f, -0.2f))
+        environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.5f, 0.5f, 0.5f, 1f))
+        environment.add(DirectionalLight().set(0.85f, 0.85f, 0.9f, -1f, -0.8f, -0.2f))
+        environment.add(DirectionalLight().set(0.3f, 0.3f, 0.35f, 1f, 0.5f, 0.5f))
 
         // Build models
         buildPhoneModel()
         buildGroundPlane()
         buildHighlightModel()
         buildScatterPointModel()
+        buildHumanoid()
 
         isReady = true
     }
@@ -136,8 +174,8 @@ class SalahVisualization3D(
             updatePlayback(delta)
         }
 
-        // Clear screen
-        Gdx.gl.glClearColor(0.04f, 0.04f, 0.1f, 1f)
+        // Clear screen — warm charcoal background
+        Gdx.gl.glClearColor(0.11f, 0.11f, 0.13f, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
 
         // Enable depth testing
@@ -169,6 +207,13 @@ class SalahVisualization3D(
         highlightModel?.dispose()
         scatterPointModel?.dispose()
         gravityArrowModels.forEach { it.dispose() }
+        headModel?.dispose()
+        torsoModel?.dispose()
+        upperArmModel?.dispose()
+        forearmModel?.dispose()
+        upperLegModel?.dispose()
+        lowerLegModel?.dispose()
+        prayerMatModel?.dispose()
     }
 
     // ============================================
@@ -208,7 +253,12 @@ class SalahVisualization3D(
             when (mode) {
                 VisualizationMode.GRAVITY_VECTOR -> buildGravityVectors()
                 VisualizationMode.SCATTER -> rebuildScatterInstances()
-                else -> { /* No special setup */ }
+                VisualizationMode.PHONE_MODEL -> {
+                    // Position camera for humanoid view
+                    camera.position.set(8f, 5f, 10f)
+                    camera.lookAt(0f, 2.5f, 0f)
+                    camera.update()
+                }
             }
         }
     }
@@ -299,45 +349,24 @@ class SalahVisualization3D(
         if (playbackIndex !in dataPoints.indices) return
 
         val sample = dataPoints[playbackIndex]
-        val pitch = sample.pitch
-        val roll = sample.roll
 
-        // Update phone orientation
-        phoneInstance?.let { instance ->
-            instance.transform.idt()
-            instance.transform.rotate(Vector3.X, pitch)
-            instance.transform.rotate(Vector3.Z, roll)
+        // Pose humanoid based on current posture
+        poseHumanoid(sample.posture)
 
-            // Update phone color based on posture
-            val postureColor = getPostureColor(sample.posture)
-            val material = instance.materials.first()
-            material.set(ColorAttribute.createDiffuse(postureColor))
-        }
-
-        // Render phone and ground
+        // Render humanoid and prayer mat
         modelBatch.begin(camera)
-        phoneInstance?.let { modelBatch.render(it, environment) }
-        groundInstance?.let { modelBatch.render(it, environment) }
+        prayerMatInstance?.let { modelBatch.render(it, environment) }
+        headInstance?.let { modelBatch.render(it, environment) }
+        torsoInstance?.let { modelBatch.render(it, environment) }
+        leftUpperArmInstance?.let { modelBatch.render(it, environment) }
+        rightUpperArmInstance?.let { modelBatch.render(it, environment) }
+        leftForearmInstance?.let { modelBatch.render(it, environment) }
+        rightForearmInstance?.let { modelBatch.render(it, environment) }
+        leftUpperLegInstance?.let { modelBatch.render(it, environment) }
+        rightUpperLegInstance?.let { modelBatch.render(it, environment) }
+        leftLowerLegInstance?.let { modelBatch.render(it, environment) }
+        rightLowerLegInstance?.let { modelBatch.render(it, environment) }
         modelBatch.end()
-
-        // Draw orientation info using shape renderer
-        shapeRenderer.projectionMatrix = camera.combined
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Line)
-
-        // Draw pitch arc
-        shapeRenderer.setColor(1f, 0f, 0f, 0.5f)
-        val pitchRadius = 5f
-        for (i in 0..20) {
-            val angle1 = (i / 20f) * pitch
-            val angle2 = ((i + 1) / 20f) * pitch
-            val x1 = pitchRadius * sin(Math.toRadians(angle1.toDouble())).toFloat()
-            val y1 = pitchRadius * cos(Math.toRadians(angle1.toDouble())).toFloat()
-            val x2 = pitchRadius * sin(Math.toRadians(angle2.toDouble())).toFloat()
-            val y2 = pitchRadius * cos(Math.toRadians(angle2.toDouble())).toFloat()
-            shapeRenderer.line(0f, y1, x1, 0f, y2, x2)
-        }
-
-        shapeRenderer.end()
     }
 
     private fun renderGravity() {
@@ -427,7 +456,7 @@ class SalahVisualization3D(
     private fun renderGrid() {
         shapeRenderer.projectionMatrix = camera.combined
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line)
-        shapeRenderer.setColor(0.15f, 0.15f, 0.15f, 1f)
+        shapeRenderer.setColor(0.22f, 0.22f, 0.24f, 1f)
 
         val gridSize = 40
         val gridSpacing = 2f
@@ -570,6 +599,338 @@ class SalahVisualization3D(
         ).sphere(1f, 1f, 1f, 8, 8)
 
         scatterPointModel = modelBuilder.end()
+    }
+
+    // ============================================
+    // Humanoid model building and posing
+    // ============================================
+
+    /**
+     * Build a simple humanoid figure from pill-shaped (capsule) parts.
+     * Each body part is a cylinder capped with spheres at both ends,
+     * approximated by using a capsule shape (cylinder + 2 spheres).
+     * LibGDX ModelBuilder doesn't have a native capsule, so we build
+     * each part as a single cylinder — the visual effect is close enough.
+     */
+    private fun buildHumanoid() {
+        val mb = ModelBuilder()
+        val attrs = (VertexAttributes.Usage.Position or VertexAttributes.Usage.Normal).toLong()
+
+        // Skin color — warm tone
+        val skinColor = Color(0.85f, 0.7f, 0.55f, 1f)
+        val clothColor = Color(0.95f, 0.95f, 0.95f, 1f)   // white thobe/clothing
+        val pantsColor = Color(0.3f, 0.3f, 0.35f, 1f)     // dark pants
+
+        val skinMat = Material(
+            ColorAttribute.createDiffuse(skinColor),
+            ColorAttribute.createSpecular(Color(0.3f, 0.3f, 0.3f, 1f))
+        )
+        val clothMat = Material(
+            ColorAttribute.createDiffuse(clothColor),
+            ColorAttribute.createSpecular(Color(0.4f, 0.4f, 0.4f, 1f))
+        )
+        val pantsMat = Material(
+            ColorAttribute.createDiffuse(pantsColor),
+            ColorAttribute.createSpecular(Color(0.2f, 0.2f, 0.2f, 1f))
+        )
+
+        // Head — sphere (radius ~0.5)
+        mb.begin()
+        mb.part("head", GL20.GL_TRIANGLES, attrs, skinMat)
+            .sphere(1f, 1f, 1f, 12, 12)
+        headModel = mb.end()
+        headInstance = ModelInstance(headModel)
+
+        // Torso — tall cylinder (clothing color)
+        mb.begin()
+        mb.part("torso", GL20.GL_TRIANGLES, attrs, clothMat)
+            .capsule(0.6f, 3f, 12)
+        torsoModel = mb.end()
+        torsoInstance = ModelInstance(torsoModel)
+
+        // Upper arm — cylinder
+        mb.begin()
+        mb.part("upper_arm", GL20.GL_TRIANGLES, attrs, clothMat)
+            .capsule(0.22f, 1.6f, 8)
+        upperArmModel = mb.end()
+        leftUpperArmInstance = ModelInstance(upperArmModel)
+        rightUpperArmInstance = ModelInstance(upperArmModel)
+
+        // Forearm — cylinder (skin)
+        mb.begin()
+        mb.part("forearm", GL20.GL_TRIANGLES, attrs, skinMat)
+            .capsule(0.18f, 1.4f, 8)
+        forearmModel = mb.end()
+        leftForearmInstance = ModelInstance(forearmModel)
+        rightForearmInstance = ModelInstance(forearmModel)
+
+        // Upper leg — cylinder (pants)
+        mb.begin()
+        mb.part("upper_leg", GL20.GL_TRIANGLES, attrs, pantsMat)
+            .capsule(0.28f, 2f, 8)
+        upperLegModel = mb.end()
+        leftUpperLegInstance = ModelInstance(upperLegModel)
+        rightUpperLegInstance = ModelInstance(upperLegModel)
+
+        // Lower leg — cylinder (pants)
+        mb.begin()
+        mb.part("lower_leg", GL20.GL_TRIANGLES, attrs, pantsMat)
+            .capsule(0.22f, 1.8f, 8)
+        lowerLegModel = mb.end()
+        leftLowerLegInstance = ModelInstance(lowerLegModel)
+        rightLowerLegInstance = ModelInstance(lowerLegModel)
+
+        // Prayer mat — flat box (green)
+        mb.begin()
+        val matMaterial = Material(
+            ColorAttribute.createDiffuse(Color(0.18f, 0.55f, 0.34f, 1f)),
+            ColorAttribute.createSpecular(Color(0.1f, 0.1f, 0.1f, 1f))
+        )
+        mb.part("prayer_mat", GL20.GL_TRIANGLES, attrs, matMaterial)
+            .box(3f, 0.05f, 6f)
+        prayerMatModel = mb.end()
+        prayerMatInstance = ModelInstance(prayerMatModel)
+        prayerMatInstance?.transform?.setToTranslation(0f, -0.025f, 0f)
+    }
+
+    /**
+     * Position all humanoid body parts based on the current salah posture.
+     *
+     * Coordinate system: Y is up, X is right, Z is toward viewer.
+     * The figure faces the -Z direction (toward Qibla).
+     *
+     * Body proportions (approximate):
+     *   Head center:      y = torsoTop + 0.5
+     *   Shoulder center:  y = torsoTop
+     *   Hip center:       y = torsoBottom
+     *   Knee:             y = hipY - upperLegLength
+     *   Foot:             y = kneeY - lowerLegLength
+     */
+    private fun poseHumanoid(posture: SalahPosture) {
+        when (posture) {
+            SalahPosture.QIYAM, SalahPosture.QIYAM_RISING -> poseStanding()
+            SalahPosture.RUKU -> poseRuku()
+            SalahPosture.GOING_TO_SUJUD -> poseGoingToSujud()
+            SalahPosture.SUJUD -> poseSujud()
+            SalahPosture.JALSA -> poseJalsa()
+            SalahPosture.TASHAHHUD -> poseTashahhud()
+            else -> poseStanding()
+        }
+    }
+
+    /** Standing upright — Qiyam position, arms at sides */
+    private fun poseStanding() {
+        // Torso: centered, standing upright
+        val torsoY = 3.5f  // center of torso
+        torsoInstance?.transform?.setToTranslation(0f, torsoY, 0f)
+
+        // Head: on top of torso
+        headInstance?.transform?.setToTranslation(0f, torsoY + 2f, 0f)
+
+        // Arms hanging at sides
+        // Left upper arm
+        leftUpperArmInstance?.transform?.idt()
+        leftUpperArmInstance?.transform?.setToTranslation(-0.9f, torsoY + 0.7f, 0f)
+
+        // Right upper arm
+        rightUpperArmInstance?.transform?.idt()
+        rightUpperArmInstance?.transform?.setToTranslation(0.9f, torsoY + 0.7f, 0f)
+
+        // Left forearm
+        leftForearmInstance?.transform?.idt()
+        leftForearmInstance?.transform?.setToTranslation(-0.9f, torsoY - 0.6f, 0f)
+
+        // Right forearm
+        rightForearmInstance?.transform?.idt()
+        rightForearmInstance?.transform?.setToTranslation(0.9f, torsoY - 0.6f, 0f)
+
+        // Legs
+        val hipY = torsoY - 1.5f
+        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, hipY - 1f, 0f)
+        rightUpperLegInstance?.transform?.setToTranslation(0.4f, hipY - 1f, 0f)
+        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, hipY - 2.9f, 0f)
+        rightLowerLegInstance?.transform?.setToTranslation(0.4f, hipY - 2.9f, 0f)
+    }
+
+    /** Bowing — Ruku position: torso bent ~90 degrees forward, hands on knees */
+    private fun poseRuku() {
+        val hipY = 2f
+
+        // Torso: tilted forward 90 degrees
+        torsoInstance?.transform?.idt()
+        torsoInstance?.transform?.setToTranslation(0f, hipY + 0.3f, -0.8f)
+        torsoInstance?.transform?.rotate(Vector3.X, 90f)
+
+        // Head: in front of torso (bent forward)
+        headInstance?.transform?.setToTranslation(0f, hipY + 0.3f, -2.8f)
+
+        // Arms reaching down to knees
+        leftUpperArmInstance?.transform?.idt()
+        leftUpperArmInstance?.transform?.setToTranslation(-0.5f, hipY - 0.2f, -1f)
+        leftUpperArmInstance?.transform?.rotate(Vector3.X, 45f)
+
+        rightUpperArmInstance?.transform?.idt()
+        rightUpperArmInstance?.transform?.setToTranslation(0.5f, hipY - 0.2f, -1f)
+        rightUpperArmInstance?.transform?.rotate(Vector3.X, 45f)
+
+        leftForearmInstance?.transform?.idt()
+        leftForearmInstance?.transform?.setToTranslation(-0.5f, hipY - 0.8f, -0.6f)
+
+        rightForearmInstance?.transform?.idt()
+        rightForearmInstance?.transform?.setToTranslation(0.5f, hipY - 0.8f, -0.6f)
+
+        // Legs: straight
+        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, hipY - 1f, 0f)
+        rightUpperLegInstance?.transform?.setToTranslation(0.4f, hipY - 1f, 0f)
+        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, hipY - 2.9f, 0f)
+        rightLowerLegInstance?.transform?.setToTranslation(0.4f, hipY - 2.9f, 0f)
+    }
+
+    /** Transitioning down — partway between standing and prostration */
+    private fun poseGoingToSujud() {
+        val hipY = 1.5f
+
+        // Torso tilted forward ~45 degrees, descending
+        torsoInstance?.transform?.idt()
+        torsoInstance?.transform?.setToTranslation(0f, hipY + 0.5f, -0.5f)
+        torsoInstance?.transform?.rotate(Vector3.X, 45f)
+
+        headInstance?.transform?.setToTranslation(0f, hipY + 1f, -1.8f)
+
+        // Arms reaching forward
+        leftUpperArmInstance?.transform?.idt()
+        leftUpperArmInstance?.transform?.setToTranslation(-0.7f, hipY, -1f)
+        leftUpperArmInstance?.transform?.rotate(Vector3.X, 60f)
+
+        rightUpperArmInstance?.transform?.idt()
+        rightUpperArmInstance?.transform?.setToTranslation(0.7f, hipY, -1f)
+        rightUpperArmInstance?.transform?.rotate(Vector3.X, 60f)
+
+        leftForearmInstance?.transform?.idt()
+        leftForearmInstance?.transform?.setToTranslation(-0.7f, hipY - 0.5f, -1.5f)
+        leftForearmInstance?.transform?.rotate(Vector3.X, 70f)
+
+        rightForearmInstance?.transform?.idt()
+        rightForearmInstance?.transform?.setToTranslation(0.7f, hipY - 0.5f, -1.5f)
+        rightForearmInstance?.transform?.rotate(Vector3.X, 70f)
+
+        // Legs bending
+        leftUpperLegInstance?.transform?.idt()
+        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, hipY - 0.5f, 0.3f)
+        leftUpperLegInstance?.transform?.rotate(Vector3.X, -30f)
+
+        rightUpperLegInstance?.transform?.idt()
+        rightUpperLegInstance?.transform?.setToTranslation(0.4f, hipY - 0.5f, 0.3f)
+        rightUpperLegInstance?.transform?.rotate(Vector3.X, -30f)
+
+        leftLowerLegInstance?.transform?.idt()
+        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, hipY - 2f, 0.8f)
+        leftLowerLegInstance?.transform?.rotate(Vector3.X, -60f)
+
+        rightLowerLegInstance?.transform?.idt()
+        rightLowerLegInstance?.transform?.setToTranslation(0.4f, hipY - 2f, 0.8f)
+        rightLowerLegInstance?.transform?.rotate(Vector3.X, -60f)
+    }
+
+    /** Prostration — Sujud: face on ground, back arched, knees on ground */
+    private fun poseSujud() {
+        val groundY = 0f
+
+        // Torso: heavily tilted forward, close to ground
+        torsoInstance?.transform?.idt()
+        torsoInstance?.transform?.setToTranslation(0f, groundY + 0.8f, -0.5f)
+        torsoInstance?.transform?.rotate(Vector3.X, 120f)
+
+        // Head: touching the ground
+        headInstance?.transform?.setToTranslation(0f, groundY + 0.3f, -2.5f)
+
+        // Arms: on ground, palms down beside head
+        leftUpperArmInstance?.transform?.idt()
+        leftUpperArmInstance?.transform?.setToTranslation(-0.7f, groundY + 0.4f, -1.5f)
+        leftUpperArmInstance?.transform?.rotate(Vector3.X, 90f)
+
+        rightUpperArmInstance?.transform?.idt()
+        rightUpperArmInstance?.transform?.setToTranslation(0.7f, groundY + 0.4f, -1.5f)
+        rightUpperArmInstance?.transform?.rotate(Vector3.X, 90f)
+
+        leftForearmInstance?.transform?.idt()
+        leftForearmInstance?.transform?.setToTranslation(-0.7f, groundY + 0.2f, -2.3f)
+
+        rightForearmInstance?.transform?.idt()
+        rightForearmInstance?.transform?.setToTranslation(0.7f, groundY + 0.2f, -2.3f)
+
+        // Legs: knees on ground, lower legs folded back
+        leftUpperLegInstance?.transform?.idt()
+        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, groundY + 0.6f, 1f)
+        leftUpperLegInstance?.transform?.rotate(Vector3.X, -60f)
+
+        rightUpperLegInstance?.transform?.idt()
+        rightUpperLegInstance?.transform?.setToTranslation(0.4f, groundY + 0.6f, 1f)
+        rightUpperLegInstance?.transform?.rotate(Vector3.X, -60f)
+
+        leftLowerLegInstance?.transform?.idt()
+        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, groundY + 0.15f, 2f)
+        leftLowerLegInstance?.transform?.rotate(Vector3.X, -90f)
+
+        rightLowerLegInstance?.transform?.idt()
+        rightLowerLegInstance?.transform?.setToTranslation(0.4f, groundY + 0.15f, 2f)
+        rightLowerLegInstance?.transform?.rotate(Vector3.X, -90f)
+    }
+
+    /** Sitting between prostrations — Jalsa: kneeling upright */
+    private fun poseJalsa() {
+        val groundY = 0f
+        val seatY = groundY + 1.2f
+
+        // Torso: upright but lower (sitting)
+        torsoInstance?.transform?.idt()
+        torsoInstance?.transform?.setToTranslation(0f, seatY + 1f, 0f)
+
+        // Head: on top
+        headInstance?.transform?.setToTranslation(0f, seatY + 2.5f, 0f)
+
+        // Arms: resting on thighs
+        leftUpperArmInstance?.transform?.idt()
+        leftUpperArmInstance?.transform?.setToTranslation(-0.8f, seatY + 1.2f, 0f)
+
+        rightUpperArmInstance?.transform?.idt()
+        rightUpperArmInstance?.transform?.setToTranslation(0.8f, seatY + 1.2f, 0f)
+
+        leftForearmInstance?.transform?.idt()
+        leftForearmInstance?.transform?.setToTranslation(-0.6f, seatY + 0.2f, -0.4f)
+        leftForearmInstance?.transform?.rotate(Vector3.X, 30f)
+
+        rightForearmInstance?.transform?.idt()
+        rightForearmInstance?.transform?.setToTranslation(0.6f, seatY + 0.2f, -0.4f)
+        rightForearmInstance?.transform?.rotate(Vector3.X, 30f)
+
+        // Legs folded underneath
+        leftUpperLegInstance?.transform?.idt()
+        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, seatY - 0.3f, 0.3f)
+        leftUpperLegInstance?.transform?.rotate(Vector3.X, -90f)
+
+        rightUpperLegInstance?.transform?.idt()
+        rightUpperLegInstance?.transform?.setToTranslation(0.4f, seatY - 0.3f, 0.3f)
+        rightUpperLegInstance?.transform?.rotate(Vector3.X, -90f)
+
+        leftLowerLegInstance?.transform?.idt()
+        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, groundY + 0.15f, 1.3f)
+        leftLowerLegInstance?.transform?.rotate(Vector3.X, -90f)
+
+        rightLowerLegInstance?.transform?.idt()
+        rightLowerLegInstance?.transform?.setToTranslation(0.4f, groundY + 0.15f, 1.3f)
+        rightLowerLegInstance?.transform?.rotate(Vector3.X, -90f)
+    }
+
+    /** Final sitting — Tashahhud: similar to Jalsa but right index finger extended */
+    private fun poseTashahhud() {
+        // Tashahhud is very similar to Jalsa posture
+        poseJalsa()
+
+        // Right forearm slightly angled forward (pointing finger)
+        rightForearmInstance?.transform?.idt()
+        rightForearmInstance?.transform?.setToTranslation(0.5f, 1.4f, -0.8f)
+        rightForearmInstance?.transform?.rotate(Vector3.X, 40f)
     }
 
     private fun buildGravityVectors() {

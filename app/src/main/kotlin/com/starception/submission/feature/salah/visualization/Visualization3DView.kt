@@ -1,19 +1,19 @@
 package com.starception.submission.feature.salah.visualization
 
+import android.annotation.SuppressLint
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
+import kotlinx.coroutines.delay
 
 /**
  * Jetpack Compose wrapper for LibGDX SalahVisualization3D renderer.
@@ -31,62 +31,103 @@ fun Visualization3DView(
     var visualizationRef by remember { mutableStateOf<SalahVisualization3D?>(null) }
     var fragmentRef by remember { mutableStateOf<LibGDXFragment?>(null) }
 
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
+    // Keep latest references for the factory callback (avoids stale closure)
+    val currentState by rememberUpdatedState(state)
+    val currentOnStateChange by rememberUpdatedState(onStateChange)
 
-    // Update data when samples change
-    LaunchedEffect(samples) {
-        visualizationRef?.takeIf { it.isReady }?.setData(samples)
+    val context = LocalContext.current
+
+    // Helper: suspends until the renderer's GL context is ready
+    suspend fun awaitReady(viz: SalahVisualization3D) {
+        while (!viz.isReady) delay(50)
+    }
+
+    // Update data when samples change or renderer becomes available
+    LaunchedEffect(samples, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setData(samples)
     }
 
     // Update visualization mode
-    LaunchedEffect(state.mode) {
-        visualizationRef?.takeIf { it.isReady }?.setMode(state.mode)
+    LaunchedEffect(state.mode, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setMode(state.mode)
     }
 
     // Update visible postures filter
-    LaunchedEffect(state.visiblePostures) {
-        visualizationRef?.takeIf { it.isReady }?.setVisiblePostures(state.visiblePostures)
+    LaunchedEffect(state.visiblePostures, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setVisiblePostures(state.visiblePostures)
     }
 
     // Update playback state
-    LaunchedEffect(state.isPlaying) {
-        visualizationRef?.takeIf { it.isReady }?.setPlaying(state.isPlaying)
+    LaunchedEffect(state.isPlaying, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setPlaying(state.isPlaying)
     }
 
-    LaunchedEffect(state.playbackSpeed) {
-        visualizationRef?.takeIf { it.isReady }?.setPlaybackSpeed(state.playbackSpeed)
+    LaunchedEffect(state.playbackSpeed, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setPlaybackSpeed(state.playbackSpeed)
     }
 
     // Update axis mapping for scatter plot mode
-    LaunchedEffect(state.axisX, state.axisY, state.axisZ) {
-        visualizationRef?.takeIf { it.isReady }?.setAxisMapping(state.axisX, state.axisY, state.axisZ)
+    LaunchedEffect(state.axisX, state.axisY, state.axisZ, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setAxisMapping(state.axisX, state.axisY, state.axisZ)
     }
 
     // Update point size
-    LaunchedEffect(state.pointSize) {
-        visualizationRef?.takeIf { it.isReady }?.setPointSize(state.pointSize)
+    LaunchedEffect(state.pointSize, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setPointSize(state.pointSize)
     }
 
     // Manual playback index changes (from step buttons)
-    LaunchedEffect(state.playbackIndex) {
+    LaunchedEffect(state.playbackIndex, visualizationRef) {
         if (!state.isPlaying) {
-            visualizationRef?.takeIf { it.isReady }?.setPlaybackIndex(state.playbackIndex)
+            val viz = visualizationRef ?: return@LaunchedEffect
+            awaitReady(viz)
+            viz.setPlaybackIndex(state.playbackIndex)
         }
     }
 
     AndroidView(
         factory = { ctx ->
-            val container = FrameLayout(ctx).apply {
+            // Custom FrameLayout that prevents LazyColumn from stealing touch events.
+            // Without this, the Compose scrollable parent intercepts drags/pinches
+            // before the LibGDX GL surface can process them for camera orbit/zoom.
+            @SuppressLint("ClickableViewAccessibility")
+            val container = object : FrameLayout(ctx) {
+                override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+                    // Tell all ancestors not to intercept our touch events
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    return super.dispatchTouchEvent(ev)
+                }
+
+                override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+                    // Don't intercept — let the GL surface child handle all touches
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    return false
+                }
+            }.apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
             }
 
-            // Callback for LibGDX to update Compose state during playback
+            // Callback for LibGDX to update Compose state during playback.
+            // Uses rememberUpdatedState refs to avoid stale closure over initial state.
             val onPlaybackUpdate = { index: Int, posture: SalahPosture?, pitch: Float, roll: Float, accelMag: Float, gyroMag: Float ->
-                onStateChange(state.copy(
+                currentOnStateChange(currentState.copy(
                     playbackIndex = index,
                     currentPosture = posture,
                     currentPitch = pitch,
@@ -120,24 +161,15 @@ fun Visualization3DView(
             val containerId = View.generateViewId()
             container.id = containerId
 
-            // Add LibGDX fragment to container
+            // Add LibGDX fragment to container.
+            // The FragmentManager handles the fragment's lifecycle (onResume/onPause)
+            // automatically — do NOT add a manual LifecycleEventObserver that calls
+            // fragment.onResume()/onPause(), as double-pausing causes LibGDX's
+            // AndroidGraphics to deadlock waiting for GL thread pause synchronization,
+            // which kills the process with SIGKILL.
             fragmentActivity.supportFragmentManager.beginTransaction()
                 .add(containerId, fragment, "salah_viz_3d_${containerId}")
                 .commitAllowingStateLoss()
-
-            // Lifecycle observer for proper OpenGL surface management
-            val observer = LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_RESUME -> {
-                        try { fragment.onResume() } catch (_: Exception) {}
-                    }
-                    Lifecycle.Event.ON_PAUSE -> {
-                        try { fragment.onPause() } catch (_: Exception) {}
-                    }
-                    else -> {}
-                }
-            }
-            lifecycleOwner.lifecycle.addObserver(observer)
 
             container
         },
