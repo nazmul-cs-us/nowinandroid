@@ -16,7 +16,7 @@ from typing import List, Tuple, Dict, Optional
 
 
 # Posture labels matching the Android enum
-POSTURE_LABELS = ["QIYAM", "RUKU", "SUJUD", "JALSA", "TASHAHHUD"]
+POSTURE_LABELS = ["QIYAM", "RUKU", "GOING_TO_SUJUD", "SUJUD", "JALSA", "TASHAHHUD", "QIYAM_RISING"]
 POSTURE_TO_INDEX = {p: i for i, p in enumerate(POSTURE_LABELS)}
 NUM_CLASSES = len(POSTURE_LABELS)
 

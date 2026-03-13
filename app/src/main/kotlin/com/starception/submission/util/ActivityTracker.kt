@@ -307,6 +307,24 @@ object ActivityTracker {
                 }
             }
 
+            // Set up salah posture callback for real-time posture updates
+            activityDetectionService?.setSalahPostureCallback(
+                object : ActivityDetectionService.SalahPostureCallback {
+                    override fun onPostureChanged(
+                        posture: com.starception.submission.ml.SalahPosture,
+                        confidence: Float,
+                        prayerState: com.starception.submission.ml.SalahSequenceValidator.PrayerState,
+                        rakahCount: Int
+                    ) {
+                        // Update activity display with current posture and rak'ah count
+                        if (prayerState == com.starception.submission.ml.SalahSequenceValidator.PrayerState.CONFIRMED) {
+                            val rakahText = if (rakahCount > 0) " - Rak'ah $rakahCount" else ""
+                            _currentActivity.value = "Praying (${posture.displayName})$rakahText"
+                        }
+                    }
+                }
+            )
+
             // Start activity detection with handler for background operation
             // If sensorHandler is set (from foreground service), sensors will work in background
             if (sensorHandler != null) {
@@ -586,6 +604,17 @@ object ActivityTracker {
             ActivityDetectionService.ActivityType.WALKING -> "Walking"
             ActivityDetectionService.ActivityType.RUNNING -> "Running"
             ActivityDetectionService.ActivityType.DRIVING -> "Driving"
+            ActivityDetectionService.ActivityType.PRAYING -> {
+                // Include posture details and rak'ah count if available
+                val posture = activityDetectionService?.currentSalahPosture
+                val rakahCount = activityDetectionService?.currentRakahCount ?: 0
+                if (posture != null) {
+                    val rakahText = if (rakahCount > 0) " - Rak'ah $rakahCount" else ""
+                    "Praying (${posture.displayName})$rakahText"
+                } else {
+                    "Praying"
+                }
+            }
             ActivityDetectionService.ActivityType.UNKNOWN -> "Unknown"
         }
     }

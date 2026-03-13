@@ -12,6 +12,7 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.app.NotificationManager;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -19,11 +20,25 @@ import android.os.PowerManager;
 import androidx.core.content.ContextCompat;
 import android.util.Log;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.Deque;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.starception.submission.ml.SalahDataSample;
+import com.starception.submission.ml.SalahDetectionEngine;
+import com.starception.submission.ml.SalahPosture;
+import com.starception.submission.ml.SalahSequenceValidator;
 
 /**
  * ENHANCED ACTIVITY DETECTION SERVICE: Multi-sensor activity recognition
@@ -155,7 +170,42 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     // Confidence scoring (0.0 - 1.0)
     private float currentConfidence = 0f;
     private ActivityType lastConfidentActivity = ActivityType.UNKNOWN;
-    
+
+    // Salah (prayer) posture detection via TFLite ML model
+    private SalahDetectionEngine salahDetectionEngine;
+    private SalahSequenceValidator salahSequenceValidator;
+    private boolean salahDetectionEnabled = true;
+    private static final int SALAH_WINDOW_SIZE = 5; // 5 samples per 100ms window (matching training)
+    private final List<float[]> salahAccelWindow = new ArrayList<>(); // [x,y,z] per sample
+    private final List<float[]> salahGyroWindow = new ArrayList<>();  // [x,y,z] per sample
+    private SalahPosture currentSalahPosture = null;
+    private float currentSalahConfidence = 0f;
+    private boolean isPrayerActive = false;
+    private long lastSalahInferenceTime = 0;
+
+    // File-based salah detection logging (for testing with phone in pocket)
+    private BufferedWriter salahLogWriter = null;
+    private File salahLogFile = null;
+    private SimpleDateFormat logDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
+    private SimpleDateFormat fileNameDateFormat = new SimpleDateFormat("yyyy-MM-dd_HHmmss", Locale.US);
+    private long salahLogLineCount = 0;
+
+    // Callback for prayer posture changes
+    private SalahPostureCallback salahPostureCallback;
+
+    // Do Not Disturb (DND) management during prayer
+    private NotificationManager notificationManager;
+    private int previousInterruptionFilter = NotificationManager.INTERRUPTION_FILTER_ALL;
+    private boolean dndEnabledByPrayer = false;
+
+    /**
+     * Callback interface for salah posture changes
+     */
+    public interface SalahPostureCallback {
+        void onPostureChanged(SalahPosture posture, float confidence,
+                              SalahSequenceValidator.PrayerState prayerState, int rakahCount);
+    }
+
     // Data collection
     private ConcurrentLinkedQueue<AccelerometerData> accelData;
     private ConcurrentLinkedQueue<GyroscopeData> gyroData;
@@ -253,6 +303,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         WALKING,     // User is walking
         RUNNING,     // User is running
         DRIVING,     // User is in a vehicle
+        PRAYING,     // User is performing salah (detected via ML model)
         UNKNOWN      // Activity cannot be determined
     }
     
@@ -310,6 +361,21 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         Log.i(TAG, "  Step Counter: " + (stepCounter != null ? "✓" : "✗"));
         Log.i(TAG, "  Step Detector: " + (stepDetector != null ? "✓" : "✗"));
         Log.i(TAG, "  Linear Accelerometer: " + (linearAccelerometer != null ? "✓" : "✗"));
+
+        // Initialize salah posture detection ML engine
+        try {
+            salahDetectionEngine = new SalahDetectionEngine(context);
+            salahSequenceValidator = new SalahSequenceValidator();
+            Log.i(TAG, "  🕌 Salah Detection Engine: ✓");
+        } catch (Exception e) {
+            Log.e(TAG, "  🕌 Salah Detection Engine: ✗ (" + e.getMessage() + ")");
+            salahDetectionEngine = null;
+            salahSequenceValidator = null;
+            salahDetectionEnabled = false;
+        }
+
+        // Initialize NotificationManager for DND control during prayer
+        this.notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
 
         // Load driving speed threshold from user settings
         loadDrivingSpeedThreshold();
@@ -523,6 +589,21 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         accelData.clear();
         gyroData.clear();
         locationData.clear();
+
+        // Restore DND if prayer was active
+        disablePrayerDnd();
+
+        // Close salah log file before cleanup
+        closeSalahLogFile();
+
+        // Clean up salah detection
+        synchronized (salahAccelWindow) { salahAccelWindow.clear(); }
+        synchronized (salahGyroWindow) { salahGyroWindow.clear(); }
+        isPrayerActive = false;
+        currentSalahPosture = null;
+        currentSalahConfidence = 0f;
+        if (salahSequenceValidator != null) salahSequenceValidator.reset();
+        if (salahDetectionEngine != null) salahDetectionEngine.reset();
 
         Log.i(TAG, "Activity detection stopped");
     }
@@ -1384,6 +1465,29 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
                 break;
         }
 
+        // Feed raw sensor data to salah posture detection (uses unfiltered values for ML)
+        if (salahDetectionEnabled && salahDetectionEngine != null) {
+            switch (event.sensor.getType()) {
+                case Sensor.TYPE_ACCELEROMETER:
+                    synchronized (salahAccelWindow) {
+                        salahAccelWindow.add(new float[]{event.values[0], event.values[1], event.values[2]});
+                    }
+                    break;
+                case Sensor.TYPE_GYROSCOPE:
+                    synchronized (salahGyroWindow) {
+                        salahGyroWindow.add(new float[]{event.values[0], event.values[1], event.values[2]});
+                    }
+                    break;
+            }
+            // Check if we have a full salah window (5 accel + 5 gyro samples)
+            boolean salahAccelReady, salahGyroReady;
+            synchronized (salahAccelWindow) { salahAccelReady = salahAccelWindow.size() >= SALAH_WINDOW_SIZE; }
+            synchronized (salahGyroWindow) { salahGyroReady = salahGyroWindow.size() >= SALAH_WINDOW_SIZE; }
+            if (salahAccelReady && salahGyroReady) {
+                processSalahWindow();
+            }
+        }
+
         // Clean old data periodically
         if (accelData.size() > 300) { // ~5 seconds at 60Hz
             cleanOldData();
@@ -1772,5 +1876,372 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
      */
     public boolean isRunning() {
         return isRunning.get();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // SALAH (PRAYER) POSTURE DETECTION
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * Process a complete 100ms sensor window through the salah ML model.
+     * Called from onSensorChanged when both accel and gyro buffers have 5+ samples.
+     */
+    private void processSalahWindow() {
+        float[] ax, ay, az, gx, gy, gz;
+
+        synchronized (salahAccelWindow) {
+            if (salahAccelWindow.size() < SALAH_WINDOW_SIZE) return;
+            ax = new float[SALAH_WINDOW_SIZE];
+            ay = new float[SALAH_WINDOW_SIZE];
+            az = new float[SALAH_WINDOW_SIZE];
+            for (int i = 0; i < SALAH_WINDOW_SIZE; i++) {
+                float[] sample = salahAccelWindow.get(i);
+                ax[i] = sample[0];
+                ay[i] = sample[1];
+                az[i] = sample[2];
+            }
+            // Remove consumed samples (keep overflow for next window)
+            for (int i = 0; i < SALAH_WINDOW_SIZE; i++) {
+                salahAccelWindow.remove(0);
+            }
+        }
+
+        synchronized (salahGyroWindow) {
+            if (salahGyroWindow.size() < SALAH_WINDOW_SIZE) return;
+            gx = new float[SALAH_WINDOW_SIZE];
+            gy = new float[SALAH_WINDOW_SIZE];
+            gz = new float[SALAH_WINDOW_SIZE];
+            for (int i = 0; i < SALAH_WINDOW_SIZE; i++) {
+                float[] sample = salahGyroWindow.get(i);
+                gx[i] = sample[0];
+                gy[i] = sample[1];
+                gz[i] = sample[2];
+            }
+            for (int i = 0; i < SALAH_WINDOW_SIZE; i++) {
+                salahGyroWindow.remove(0);
+            }
+        }
+
+        // Compute summary features for the sample
+        float avgAx = mean(ax), avgAy = mean(ay), avgAz = mean(az);
+        float avgGx = mean(gx), avgGy = mean(gy), avgGz = mean(gz);
+        float pitch = (float) Math.toDegrees(Math.atan2(avgAy, avgAz));
+        float roll = (float) Math.toDegrees(Math.atan2(avgAx, avgAz));
+        float accelMag = (float) Math.sqrt(avgAx * avgAx + avgAy * avgAy + avgAz * avgAz);
+        float gyroMag = (float) Math.sqrt(avgGx * avgGx + avgGy * avgGy + avgGz * avgGz);
+
+        // Create sample and run inference
+        SalahDataSample sample = new SalahDataSample(
+                System.currentTimeMillis(), "live", SalahPosture.NOT_PRAYING,
+                ax, ay, az, gx, gy, gz,
+                pitch, roll, accelMag, gyroMag
+        );
+
+        SalahDetectionEngine.ClassificationResult result = salahDetectionEngine.addSampleAndClassify(sample);
+        if (result == null) return;
+
+        // Open log file on first inference if not already open
+        if (salahLogWriter == null) {
+            openSalahLogFile();
+        }
+
+        long now = System.currentTimeMillis();
+        SalahPosture detectedPosture = result.getPosture();
+        float confidence = result.getConfidence();
+
+        // Run through sequence validator
+        SalahSequenceValidator.ValidationResult validation =
+                salahSequenceValidator.processDetection(detectedPosture, confidence, now);
+
+        // Log EVERY detection to file (accepted or not) for analysis
+        writeSalahLog(detectedPosture, confidence,
+                validation.getAccepted(),
+                validation.getConfirmedPosture(),
+                validation.getPrayerState(),
+                validation.getRakahCount(),
+                pitch, roll, accelMag, gyroMag);
+
+        if (validation.getAccepted() && validation.getConfirmedPosture() != null) {
+            SalahPosture confirmed = validation.getConfirmedPosture();
+            boolean wasActive = isPrayerActive;
+            currentSalahPosture = confirmed;
+            currentSalahConfidence = confidence;
+
+            // Override activity type to PRAYING when prayer is confirmed
+            if (validation.getPrayerState() == SalahSequenceValidator.PrayerState.CONFIRMED ||
+                validation.getPrayerState() == SalahSequenceValidator.PrayerState.DETECTING) {
+                isPrayerActive = true;
+
+                // Only change activity type if confirmed (not just detecting)
+                if (validation.getPrayerState() == SalahSequenceValidator.PrayerState.CONFIRMED) {
+                    // Enable DND when prayer is confirmed
+                    enablePrayerDnd();
+
+                    if (currentActivity != ActivityType.PRAYING) {
+                        ActivityType previousActivity = currentActivity;
+                        currentActivity = ActivityType.PRAYING;
+                        lastActivityChange = now;
+                        Log.i(TAG, "🕌 Activity changed: " + previousActivity + " -> PRAYING (" +
+                                confirmed.getDisplayName() + " " + String.format("%.0f%%", confidence * 100) + ")");
+                        writeSalahLogEvent("ACTIVITY CHANGED: " + previousActivity + " -> PRAYING");
+                        if (callback != null) {
+                            callback.onActivityChanged(ActivityType.PRAYING, previousActivity);
+                        }
+                    }
+                }
+            }
+
+            // Notify posture callback
+            if (salahPostureCallback != null) {
+                salahPostureCallback.onPostureChanged(
+                        confirmed, confidence,
+                        validation.getPrayerState(), validation.getRakahCount());
+            }
+
+            // Log significant posture changes
+            if (now - lastSalahInferenceTime > 500) { // Throttle logging to every 500ms
+                Log.d(TAG, "🕌 Posture: " + confirmed.getDisplayName() +
+                        " (" + String.format("%.0f%%", confidence * 100) + ")" +
+                        " | Prayer: " + validation.getPrayerState() +
+                        " | Rak'ah: " + validation.getRakahCount());
+                lastSalahInferenceTime = now;
+            }
+        }
+
+        // Check if prayer ended (was active, now not getting valid detections for a while)
+        if (isPrayerActive && currentSalahPosture != null) {
+            // If no confirmed posture in last 10 seconds, prayer likely ended
+            if (now - lastSalahInferenceTime > 10000 && lastSalahInferenceTime > 0) {
+                isPrayerActive = false;
+                // Disable DND when prayer ends
+                disablePrayerDnd();
+                salahSequenceValidator.completePrayer();
+                String summary = salahSequenceValidator.getSessionSummary();
+                Log.i(TAG, "🕌 Prayer ended. " + summary);
+                writeSalahLogEvent("PRAYER ENDED. " + summary);
+                closeSalahLogFile(); // Close log file when prayer ends
+                salahSequenceValidator.reset();
+                salahDetectionEngine.reset();
+                currentSalahPosture = null;
+                currentSalahConfidence = 0f;
+            }
+        }
+    }
+
+    private float mean(float[] arr) {
+        float sum = 0;
+        for (float v : arr) sum += v;
+        return sum / arr.length;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // SALAH DETECTION FILE LOGGING (for testing)
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * Open a log file for salah detection events.
+     * File is stored in app's external files directory for easy retrieval.
+     * Path: /sdcard/Android/data/com.starception.submission/files/salah_detection_logs/
+     */
+    private void openSalahLogFile() {
+        try {
+            File logDir = new File(context.getExternalFilesDir(null), "salah_detection_logs");
+            if (!logDir.exists()) {
+                logDir.mkdirs();
+            }
+            String timestamp = fileNameDateFormat.format(new Date());
+            salahLogFile = new File(logDir, "salah_detection_" + timestamp + ".log");
+            salahLogWriter = new BufferedWriter(new FileWriter(salahLogFile, true));
+            salahLogLineCount = 0;
+
+            // Write header
+            salahLogWriter.write("=== SALAH DETECTION LOG ===\n");
+            salahLogWriter.write("Started: " + logDateFormat.format(new Date()) + "\n");
+            salahLogWriter.write("Format: timestamp | detected_posture | confidence | accepted | confirmed_posture | prayer_state | rakah_count | pitch | roll | accel_mag | gyro_mag\n");
+            salahLogWriter.write("==========================================\n");
+            salahLogWriter.flush();
+
+            Log.i(TAG, "🕌 Salah log file opened: " + salahLogFile.getAbsolutePath());
+        } catch (IOException e) {
+            Log.e(TAG, "🕌 Failed to open salah log file: " + e.getMessage());
+            salahLogWriter = null;
+        }
+    }
+
+    /**
+     * Write a salah detection event to the log file.
+     */
+    private void writeSalahLog(SalahPosture detected, float confidence, boolean accepted,
+                                SalahPosture confirmed, SalahSequenceValidator.PrayerState prayerState,
+                                int rakahCount, float pitch, float roll, float accelMag, float gyroMag) {
+        if (salahLogWriter == null) return;
+        try {
+            String line = String.format(Locale.US,
+                    "%s | %-14s | %.3f | %s | %-14s | %-10s | %d | %7.1f | %7.1f | %5.2f | %5.3f\n",
+                    logDateFormat.format(new Date()),
+                    detected != null ? detected.name() : "null",
+                    confidence,
+                    accepted ? "YES" : "NO ",
+                    confirmed != null ? confirmed.name() : "-",
+                    prayerState != null ? prayerState.name() : "-",
+                    rakahCount,
+                    pitch, roll, accelMag, gyroMag);
+            salahLogWriter.write(line);
+            salahLogLineCount++;
+
+            // Flush every 10 lines to avoid data loss if app crashes
+            if (salahLogLineCount % 10 == 0) {
+                salahLogWriter.flush();
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "🕌 Failed to write salah log: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Write a general event/message to the salah log file.
+     */
+    private void writeSalahLogEvent(String event) {
+        if (salahLogWriter == null) return;
+        try {
+            salahLogWriter.write(logDateFormat.format(new Date()) + " | EVENT: " + event + "\n");
+            salahLogWriter.flush();
+        } catch (IOException e) {
+            Log.e(TAG, "🕌 Failed to write salah log event: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Close the salah log file.
+     */
+    private void closeSalahLogFile() {
+        if (salahLogWriter != null) {
+            try {
+                salahLogWriter.write("==========================================\n");
+                salahLogWriter.write("Ended: " + logDateFormat.format(new Date()) + "\n");
+                salahLogWriter.write("Total lines: " + salahLogLineCount + "\n");
+                salahLogWriter.flush();
+                salahLogWriter.close();
+                Log.i(TAG, "🕌 Salah log file closed: " + salahLogFile.getAbsolutePath() +
+                        " (" + salahLogLineCount + " lines)");
+            } catch (IOException e) {
+                Log.e(TAG, "🕌 Failed to close salah log file: " + e.getMessage());
+            }
+            salahLogWriter = null;
+            salahLogFile = null;
+        }
+    }
+
+    /**
+     * Set the callback for salah posture changes
+     */
+    public void setSalahPostureCallback(SalahPostureCallback callback) {
+        this.salahPostureCallback = callback;
+    }
+
+    /**
+     * Enable or disable salah detection
+     */
+    public void setSalahDetectionEnabled(boolean enabled) {
+        this.salahDetectionEnabled = enabled && salahDetectionEngine != null;
+        if (!enabled) {
+            // Restore DND if disabling salah detection during active prayer
+            disablePrayerDnd();
+            isPrayerActive = false;
+            currentSalahPosture = null;
+            currentSalahConfidence = 0f;
+            if (salahSequenceValidator != null) salahSequenceValidator.reset();
+            if (salahDetectionEngine != null) salahDetectionEngine.reset();
+        }
+        Log.i(TAG, "🕌 Salah detection " + (this.salahDetectionEnabled ? "enabled" : "disabled"));
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // DO NOT DISTURB (DND) CONTROL DURING PRAYER
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * Enable Do Not Disturb mode when prayer is detected.
+     * Saves the current DND state so it can be restored after prayer ends.
+     */
+    private void enablePrayerDnd() {
+        if (dndEnabledByPrayer) return; // Already enabled by prayer
+        if (notificationManager == null) return;
+
+        try {
+            // Check if we have DND policy access
+            if (!notificationManager.isNotificationPolicyAccessGranted()) {
+                Log.w(TAG, "🔇 DND: Cannot enable - notification policy access not granted");
+                return;
+            }
+
+            // Save current interruption filter to restore later
+            previousInterruptionFilter = notificationManager.getCurrentInterruptionFilter();
+
+            // Enable DND - allow only alarms (so prayer alarm can still ring if needed)
+            notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALARMS);
+            dndEnabledByPrayer = true;
+            Log.i(TAG, "🔇 DND ENABLED for prayer (previous filter: " + previousInterruptionFilter + ")");
+        } catch (SecurityException e) {
+            Log.e(TAG, "🔇 DND: SecurityException - policy access denied", e);
+        } catch (Exception e) {
+            Log.e(TAG, "🔇 DND: Failed to enable", e);
+        }
+    }
+
+    /**
+     * Disable Do Not Disturb mode when prayer ends.
+     * Restores the previous DND state that was saved when prayer started.
+     */
+    private void disablePrayerDnd() {
+        if (!dndEnabledByPrayer) return; // DND was not enabled by prayer
+        if (notificationManager == null) return;
+
+        try {
+            if (!notificationManager.isNotificationPolicyAccessGranted()) {
+                Log.w(TAG, "🔇 DND: Cannot restore - notification policy access not granted");
+                dndEnabledByPrayer = false;
+                return;
+            }
+
+            // Restore previous interruption filter
+            notificationManager.setInterruptionFilter(previousInterruptionFilter);
+            dndEnabledByPrayer = false;
+            Log.i(TAG, "🔇 DND DISABLED - restored to previous filter: " + previousInterruptionFilter);
+        } catch (SecurityException e) {
+            Log.e(TAG, "🔇 DND: SecurityException - policy access denied", e);
+        } catch (Exception e) {
+            Log.e(TAG, "🔇 DND: Failed to restore", e);
+        }
+    }
+
+    /** Whether salah detection is enabled */
+    public boolean isSalahDetectionEnabled() {
+        return salahDetectionEnabled;
+    }
+
+    /** Whether a prayer is currently being detected */
+    public boolean isPrayerActive() {
+        return isPrayerActive;
+    }
+
+    /** Get current detected salah posture (null if not praying) */
+    public SalahPosture getCurrentSalahPosture() {
+        return currentSalahPosture;
+    }
+
+    /** Get confidence of current salah posture detection */
+    public float getCurrentSalahConfidence() {
+        return currentSalahConfidence;
+    }
+
+    /** Get the current rak'ah count from the sequence validator */
+    public int getCurrentRakahCount() {
+        return salahSequenceValidator != null ? salahSequenceValidator.getCompletedRakahs() : 0;
+    }
+
+    /** Get the sequence validator for prayer state info */
+    public SalahSequenceValidator getSalahSequenceValidator() {
+        return salahSequenceValidator;
     }
 }

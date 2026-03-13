@@ -391,6 +391,45 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     }
 
     /**
+     * Delete a specific training data file by name.
+     * @return true if the file was deleted
+     */
+    fun deleteFile(fileName: String): Boolean {
+        val file = File(getDataDirectory(), fileName)
+        val deleted = file.delete()
+        if (deleted) {
+            Log.i(TAG, "Deleted file: $fileName")
+        } else {
+            Log.w(TAG, "Failed to delete file: $fileName")
+        }
+        return deleted
+    }
+
+    /**
+     * Get posture counts for a specific data file.
+     * Returns a map of posture name to sample count.
+     */
+    fun getFilePostureCounts(fileName: String): Map<String, Int> {
+        val file = File(getDataDirectory(), fileName)
+        if (!file.exists()) return emptyMap()
+        val counts = mutableMapOf<String, Int>()
+        try {
+            file.bufferedReader().useLines { lines ->
+                lines.forEach { line ->
+                    if (line.isBlank()) return@forEach
+                    try {
+                        val posture = JSONObject(line).optString("posture", "")
+                        if (posture.isNotEmpty()) {
+                            counts[posture] = (counts[posture] ?: 0) + 1
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        } catch (_: Exception) {}
+        return counts
+    }
+
+    /**
      * Get current session stats.
      */
     fun getSessionStats(): Pair<Map<SalahPosture, Int>, Int> {

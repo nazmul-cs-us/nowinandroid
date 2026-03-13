@@ -3,9 +3,11 @@ package com.starception.submission.feature.salah.datacollection
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.starception.submission.feature.salah.visualization.VisualizationState
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
 import com.starception.submission.sensor.SalahDataCollectionService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 data class SalahDataCollectionUiState(
     val isRecording: Boolean = false,
@@ -33,7 +36,9 @@ data class SalahDataCollectionUiState(
 data class DataFileInfo(
     val name: String,
     val sizeKb: Long,
-    val lastModified: Long
+    val lastModified: Long,
+    val postureCounts: Map<String, Int> = emptyMap(),
+    val totalSamples: Int = 0
 )
 
 class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(application) {
@@ -47,6 +52,13 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
 
     private val _uiState = MutableStateFlow(SalahDataCollectionUiState())
     val uiState: StateFlow<SalahDataCollectionUiState> = _uiState.asStateFlow()
+
+    // 3D Visualization state
+    private val _vizState = MutableStateFlow(VisualizationState())
+    val vizState: StateFlow<VisualizationState> = _vizState.asStateFlow()
+
+    private val _allSamples = MutableStateFlow<List<SalahDataSample>>(emptyList())
+    val allSamples: StateFlow<List<SalahDataSample>> = _allSamples.asStateFlow()
 
     private var countdownJob: Job? = null
 
@@ -128,12 +140,20 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         refreshFileList()
     }
 
+    fun deleteFile(fileName: String) {
+        collectionService.deleteFile(fileName)
+        refreshFileList()
+    }
+
     private fun refreshFileList() {
         val files = collectionService.listDataFiles().map { file ->
+            val counts = collectionService.getFilePostureCounts(file.name)
             DataFileInfo(
                 name = file.name,
                 sizeKb = file.length() / 1024,
-                lastModified = file.lastModified()
+                lastModified = file.lastModified(),
+                postureCounts = counts,
+                totalSamples = counts.values.sum()
             )
         }
         val (globalCounts, globalTotal) = collectionService.getGlobalPostureCounts()
@@ -145,6 +165,32 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                 globalTotalSamples = globalTotal
             )
         }
+    }
+
+    // 3D Visualization methods
+
+    fun loadAllSamples() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val samples = mutableListOf<SalahDataSample>()
+            collectionService.listDataFiles().forEach { file ->
+                file.bufferedReader().useLines { lines ->
+                    lines.forEach { line ->
+                        if (line.isNotBlank()) {
+                            try {
+                                samples.add(SalahDataSample.fromJson(JSONObject(line)))
+                            } catch (_: Exception) { }
+                        }
+                    }
+                }
+            }
+            val sorted = samples.sortedBy { it.timestamp }
+            _allSamples.value = sorted
+            _vizState.update { it.copy(totalSamples = sorted.size) }
+        }
+    }
+
+    fun updateVizState(state: VisualizationState) {
+        _vizState.value = state
     }
 
     override fun onCleared() {

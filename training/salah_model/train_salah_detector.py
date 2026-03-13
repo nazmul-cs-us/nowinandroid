@@ -1,9 +1,9 @@
 """
 Train a salah posture detection model.
 
-Architecture: 1D CNN-LSTM
+Architecture: 1D CNN (TFLite-compatible, no LSTM/RNN ops)
 Input: sequences of 20 windows x 30 features (2 seconds of sensor data)
-Output: 5-class classification (QIYAM, RUKU, SUJUD, JALSA, TASHAHHUD)
+Output: 7-class classification (QIYAM, RUKU, GOING_TO_SUJUD, SUJUD, JALSA, TASHAHHUD, QIYAM_RISING)
 
 Usage:
     python train_salah_detector.py --data_dir ../data
@@ -36,20 +36,20 @@ def build_model(
     n_classes: int = NUM_CLASSES
 ) -> keras.Model:
     """
-    Build a 1D CNN-LSTM model for salah posture classification.
+    Build a pure 1D CNN model for salah posture classification.
+    Uses only TFLite-native ops (no LSTM/RNN) for clean conversion.
 
     Architecture:
-        Conv1D(32) -> ReLU -> BatchNorm -> Dropout(0.3)
-        Conv1D(64) -> ReLU -> BatchNorm -> Dropout(0.3)
-        LSTM(64, return_sequences=True)
-        LSTM(32)
-        Dropout(0.4)
-        Dense(64, ReLU) -> Dropout(0.3)
+        Conv1D(32, k=3) -> ReLU -> BatchNorm -> Dropout(0.3)
+        Conv1D(64, k=3) -> ReLU -> BatchNorm -> Dropout(0.3)
+        Conv1D(128, k=3) -> ReLU -> BatchNorm -> Dropout(0.3)
+        GlobalAveragePooling1D
+        Dense(64, ReLU) -> Dropout(0.4)
         Dense(n_classes, Softmax)
     """
     inputs = keras.Input(shape=(seq_length, n_features), name="sensor_input")
 
-    # CNN feature extraction
+    # CNN feature extraction - multi-scale temporal patterns
     x = layers.Conv1D(32, kernel_size=3, padding='same', activation='relu')(inputs)
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.3)(x)
@@ -58,14 +58,16 @@ def build_model(
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.3)(x)
 
-    # LSTM temporal modeling
-    x = layers.LSTM(64, return_sequences=True)(x)
-    x = layers.LSTM(32)(x)
-    x = layers.Dropout(0.4)(x)
+    x = layers.Conv1D(128, kernel_size=3, padding='same', activation='relu')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.3)(x)
+
+    # Global pooling to aggregate temporal info
+    x = layers.GlobalAveragePooling1D()(x)
 
     # Classification head
     x = layers.Dense(64, activation='relu')(x)
-    x = layers.Dropout(0.3)(x)
+    x = layers.Dropout(0.4)(x)
     outputs = layers.Dense(n_classes, activation='softmax', name="posture_output")(x)
 
     model = keras.Model(inputs=inputs, outputs=outputs, name="salah_detector")

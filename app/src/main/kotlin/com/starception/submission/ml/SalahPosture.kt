@@ -8,15 +8,17 @@ package com.starception.submission.ml
 enum class SalahPosture(val displayName: String, val arabicName: String) {
     QIYAM("Standing", "قيام"),
     RUKU("Bowing", "ركوع"),
+    GOING_TO_SUJUD("Going Down", "هوي"),
     SUJUD("Prostration", "سجود"),
     JALSA("Sitting", "جلسة"),
     TASHAHHUD("Final Sitting", "تشهد"),
+    QIYAM_RISING("Rising Up", "قيام"),
     TRANSITION("Transition", "انتقال"),
     NOT_PRAYING("Not Praying", "");
 
     companion object {
-        /** Postures used for ML classification (excludes NOT_PRAYING) */
-        val classificationLabels = listOf(QIYAM, RUKU, SUJUD, JALSA, TASHAHHUD)
+        /** Postures used for ML classification (excludes TRANSITION and NOT_PRAYING) */
+        val classificationLabels = listOf(QIYAM, RUKU, GOING_TO_SUJUD, SUJUD, JALSA, TASHAHHUD, QIYAM_RISING)
 
         fun fromIndex(index: Int): SalahPosture {
             return classificationLabels.getOrElse(index) { NOT_PRAYING }

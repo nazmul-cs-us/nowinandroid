@@ -121,7 +121,12 @@ import kotlinx.coroutines.delay
  * - Modify service startup sequence
  */
 @AndroidEntryPoint
-class MainActivity : FragmentActivity() {
+class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.AndroidFragmentApplication.Callbacks {
+
+    override fun exit() {
+        // Required by LibGDX AndroidFragmentApplication.Callbacks
+        // No-op: we don't want LibGDX to exit the activity
+    }
 
     // LAZY DEPENDENCY INJECTION - Prevents main thread blocking during startup
     @Inject

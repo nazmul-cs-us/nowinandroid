@@ -308,7 +308,7 @@ private fun ModernSettingsTopBar(
         navigationIcon = {
             Surface(
                 modifier = Modifier
-                    .padding(start = 8.dp)
+                    .padding(start = 8.dp, end = 8.dp)
                     .size(40.dp),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest

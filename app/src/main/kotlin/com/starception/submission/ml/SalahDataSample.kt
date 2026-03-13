@@ -62,4 +62,50 @@ data class SalahDataSample(
         result = 31 * result + posture.hashCode()
         return result
     }
+
+    /** Mean of the 5 accel X samples */
+    val meanAccelX: Float get() = accelX.average().toFloat()
+    val meanAccelY: Float get() = accelY.average().toFloat()
+    val meanAccelZ: Float get() = accelZ.average().toFloat()
+    val meanGyroX: Float get() = gyroX.average().toFloat()
+    val meanGyroY: Float get() = gyroY.average().toFloat()
+    val meanGyroZ: Float get() = gyroZ.average().toFloat()
+
+    fun getAxisValue(axis: String): Float = when (axis) {
+        "pitch" -> pitch
+        "roll" -> roll
+        "ax" -> meanAccelX
+        "ay" -> meanAccelY
+        "az" -> meanAccelZ
+        "am" -> accelMagnitude
+        "gx" -> meanGyroX
+        "gy" -> meanGyroY
+        "gz" -> meanGyroZ
+        "gm" -> gyroMagnitude
+        else -> 0f
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): SalahDataSample {
+            return SalahDataSample(
+                timestamp = json.getLong("timestamp"),
+                sessionId = json.getString("session_id"),
+                posture = SalahPosture.valueOf(json.getString("posture")),
+                accelX = json.getJSONArray("accel_x").toFloatArray(),
+                accelY = json.getJSONArray("accel_y").toFloatArray(),
+                accelZ = json.getJSONArray("accel_z").toFloatArray(),
+                gyroX = json.getJSONArray("gyro_x").toFloatArray(),
+                gyroY = json.getJSONArray("gyro_y").toFloatArray(),
+                gyroZ = json.getJSONArray("gyro_z").toFloatArray(),
+                pitch = json.getDouble("pitch").toFloat(),
+                roll = json.getDouble("roll").toFloat(),
+                accelMagnitude = json.getDouble("accel_magnitude").toFloat(),
+                gyroMagnitude = json.optDouble("gyro_magnitude", 0.0).toFloat()
+            )
+        }
+
+        private fun JSONArray.toFloatArray(): FloatArray {
+            return FloatArray(length()) { i -> getDouble(i).toFloat() }
+        }
+    }
 }
