@@ -2,25 +2,23 @@ package com.starception.submission.core.qurandatabase
 
 import android.content.Context
 import android.util.Log
-import dagger.hilt.android.qualifiers.ApplicationContext
+import com.starception.submission.download.AssetRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Repository for accessing Quran data
  * Provides a clean API for the UI layer
  */
-@Singleton
-class QuranRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+class QuranRepository(
+    private val context: Context,
+    private val assetRepository: AssetRepository? = null,
 ) {
 
     private val database: QuranDatabase by lazy {
-        QuranDatabase.getInstance(context)
+        QuranDatabase.getInstance(context, assetRepository)
     }
 
     private val quranDao: QuranDao by lazy {

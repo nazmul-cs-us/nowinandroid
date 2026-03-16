@@ -126,14 +126,15 @@ fun Visualization3DView(
 
             // Callback for LibGDX to update Compose state during playback.
             // Uses rememberUpdatedState refs to avoid stale closure over initial state.
-            val onPlaybackUpdate = { index: Int, posture: SalahPosture?, pitch: Float, roll: Float, accelMag: Float, gyroMag: Float ->
+            val onPlaybackUpdate = { index: Int, posture: SalahPosture?, pitch: Float, roll: Float, accelMag: Float, gyroMag: Float, playing: Boolean ->
                 currentOnStateChange(currentState.copy(
                     playbackIndex = index,
                     currentPosture = posture,
                     currentPitch = pitch,
                     currentRoll = roll,
                     currentAccelMag = accelMag,
-                    currentGyroMag = gyroMag
+                    currentGyroMag = gyroMag,
+                    isPlaying = playing
                 ))
             }
 

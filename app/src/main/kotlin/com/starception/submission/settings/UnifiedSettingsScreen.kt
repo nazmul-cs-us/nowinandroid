@@ -63,9 +63,11 @@ import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
 import com.starception.submission.settings.components.TravelDuaSection
+import com.starception.submission.settings.components.ContentManagementSection
 import com.starception.submission.settings.components.TtsSettingsSection
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.settings.components.VoiceSettingsSection
+import androidx.compose.material.icons.outlined.Storage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +88,8 @@ fun UnifiedSettingsScreen(
     val developerSettings by viewModel.developerSettings.collectAsStateWithLifecycle()
     val voiceSettings by viewModel.voiceSettings.collectAsStateWithLifecycle()
     val ttsSettings by viewModel.ttsSettings.collectAsStateWithLifecycle()
+    val contentCategories by viewModel.contentCategories.collectAsStateWithLifecycle()
+    val totalDownloadedSize by viewModel.totalDownloadedSize.collectAsStateWithLifecycle()
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         rememberTopAppBarState()
@@ -222,7 +226,9 @@ fun UnifiedSettingsScreen(
                             state = voiceSettings,
                             onEngineSelected = viewModel::updateVoiceSettings,
                             onTestVoice = viewModel::startVoiceTest,
-                            onStopTest = viewModel::stopVoiceTest
+                            onStopTest = viewModel::stopVoiceTest,
+                            downloadManager = viewModel.getDownloadManager(),
+                            onDownloadComplete = viewModel::refreshAfterModelDownload
                         )
                     }
                 }
@@ -241,8 +247,30 @@ fun UnifiedSettingsScreen(
                             onTestTts = viewModel::startTtsTest,
                             onStopTts = viewModel::stopTts,
                             onVoiceChanged = viewModel::updateTtsVoice,
-                            onSpeakerChanged = viewModel::updateTtsSpeakerId
+                            onSpeakerChanged = viewModel::updateTtsSpeakerId,
+                            downloadManager = viewModel.getDownloadManager(),
+                            onDownloadComplete = viewModel::refreshAfterModelDownload
                         )
+                    }
+                }
+
+                // Content Management Section
+                if (contentCategories.isNotEmpty()) {
+                    item {
+                        SettingsSection(
+                            title = "Content & Storage",
+                            subtitle = "Manage downloaded content",
+                            icon = Icons.Outlined.Storage,
+                            isExpanded = expandedSections.contains("content"),
+                            onToggleExpanded = { viewModel.toggleSection("content") }
+                        ) {
+                            ContentManagementSection(
+                                categories = contentCategories,
+                                totalDownloadedSize = totalDownloadedSize,
+                                onDownloadCategory = viewModel::downloadContent,
+                                onDeleteCategory = viewModel::deleteContent,
+                            )
+                        }
                     }
                 }
 

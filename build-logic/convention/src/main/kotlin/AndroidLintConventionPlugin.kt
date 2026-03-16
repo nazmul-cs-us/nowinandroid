@@ -46,4 +46,5 @@ private fun Lint.configure() {
     sarifReport = true
     checkDependencies = true
     disable += "GradleDependency"
+    disable += "ResourceName"
 }

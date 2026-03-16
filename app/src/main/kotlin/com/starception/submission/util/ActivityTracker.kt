@@ -23,18 +23,22 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import android.speech.tts.UtteranceProgressListener
+import com.starception.submission.download.AssetRepository
 import com.starception.submission.sensor.ActivityDetectionService
 import com.starception.submission.config.ActivityDetectionConfig
 import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.feature.course.CourseProgressTracker
 import com.starception.submission.core.hadithdatabase.HadithRepository
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.voice.VoiceCompletionManager
 import com.starception.submission.voice.WhisperVoiceService
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.SherpaOnnxKwsService
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
-import dagger.hilt.android.EntryPointAccessors
 import com.starception.submission.feature.course.QuranListeningProgress
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.feature.quran.QuranData
@@ -67,6 +71,17 @@ enum class NotificationMode {
  * - Automatically loads saved preference on initialization
  */
 object ActivityTracker {
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface AssetRepoEntryPoint {
+        fun assetRepository(): AssetRepository
+    }
+
+    private fun getAssetRepository(ctx: Context): AssetRepository =
+        EntryPointAccessors.fromApplication(ctx.applicationContext, AssetRepoEntryPoint::class.java)
+            .assetRepository()
+
     private const val PREFS_NAME = "activity_tracker_prefs"
     private const val KEY_NOTIFICATION_MODE = "notification_mode"
     
@@ -1341,7 +1356,7 @@ object ActivityTracker {
                 // Initialize voice services if needed
                 if (whisperVoiceService == null) {
                     Log.i("ActivityTracker", "🎤 Initializing Whisper voice service...")
-                    whisperVoiceService = WhisperVoiceService(ctx)
+                    whisperVoiceService = WhisperVoiceService(ctx, getAssetRepository(ctx))
                     val modelLoaded = whisperVoiceService?.loadModel() ?: false
                     if (!modelLoaded) {
                         Log.e("ActivityTracker", "🎤 Failed to load Whisper model")
@@ -1353,7 +1368,7 @@ object ActivityTracker {
                 val ttsService = getSharedTtsService(ctx)
 
                 if (sherpaOnnxKwsService == null) {
-                    sherpaOnnxKwsService = SherpaOnnxKwsService(ctx)
+                    sherpaOnnxKwsService = SherpaOnnxKwsService(ctx, getAssetRepository(ctx))
                 }
 
                 if (voiceCompletionManager == null) {
@@ -1606,7 +1621,7 @@ object ActivityTracker {
                 // Initialize voice services if needed
                 if (whisperVoiceService == null) {
                     Log.i("ActivityTracker", "🕌 Initializing Whisper voice service...")
-                    whisperVoiceService = WhisperVoiceService(ctx)
+                    whisperVoiceService = WhisperVoiceService(ctx, getAssetRepository(ctx))
                     val modelLoaded = whisperVoiceService?.loadModel() ?: false
                     if (!modelLoaded) {
                         Log.e("ActivityTracker", "🕌 Failed to load Whisper model - auto-completing")
@@ -1620,7 +1635,7 @@ object ActivityTracker {
                 val ttsService = getSharedTtsService(ctx)
 
                 if (sherpaOnnxKwsService == null) {
-                    sherpaOnnxKwsService = SherpaOnnxKwsService(ctx)
+                    sherpaOnnxKwsService = SherpaOnnxKwsService(ctx, getAssetRepository(ctx))
                 }
 
                 if (voiceCompletionManager == null) {
@@ -1799,7 +1814,7 @@ object ActivityTracker {
                     // Initialize voice services if needed
                     if (whisperVoiceService == null) {
                         Log.i("ActivityTracker", "🧪 Initializing Whisper...")
-                        whisperVoiceService = WhisperVoiceService(ctx)
+                        whisperVoiceService = WhisperVoiceService(ctx, getAssetRepository(ctx))
                         val modelLoaded = whisperVoiceService?.loadModel() ?: false
                         if (!modelLoaded) {
                             Log.e("ActivityTracker", "🧪 Failed to load Whisper model")
@@ -1813,7 +1828,7 @@ object ActivityTracker {
                     Log.i("ActivityTracker", "🧪 Using shared Sherpa-ONNX TTS service")
 
                     if (sherpaOnnxKwsService == null) {
-                        sherpaOnnxKwsService = SherpaOnnxKwsService(ctx)
+                        sherpaOnnxKwsService = SherpaOnnxKwsService(ctx, getAssetRepository(ctx))
                     }
 
                     if (voiceCompletionManager == null) {
@@ -1845,7 +1860,7 @@ object ActivityTracker {
                     // Initialize KWS service if needed
                     if (sherpaOnnxKwsService == null) {
                         Log.i("ActivityTracker", "🧪 Initializing Sherpa-ONNX KWS...")
-                        sherpaOnnxKwsService = SherpaOnnxKwsService(ctx)
+                        sherpaOnnxKwsService = SherpaOnnxKwsService(ctx, getAssetRepository(ctx))
                         val modelLoaded = sherpaOnnxKwsService?.loadModel() ?: false
                         if (!modelLoaded) {
                             Log.e("ActivityTracker", "🧪 Failed to load KWS model")

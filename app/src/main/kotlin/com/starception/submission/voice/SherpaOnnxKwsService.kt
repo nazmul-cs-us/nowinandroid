@@ -37,6 +37,7 @@ import com.k2fsa.sherpa.onnx.KeywordSpotterConfig
 import com.k2fsa.sherpa.onnx.OnlineModelConfig
 import com.k2fsa.sherpa.onnx.OnlineStream
 import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
+import com.starception.submission.download.AssetRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -64,7 +65,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class SherpaOnnxKwsService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val assetRepository: AssetRepository,
 ) {
     companion object {
         private const val TAG = "SherpaOnnxKwsService"
@@ -236,7 +238,9 @@ class SherpaOnnxKwsService @Inject constructor(
         return try {
             outputFile.parentFile?.mkdirs()
 
-            context.assets.open("kws/$fileName").use { input ->
+            val inputStream = assetRepository.openAsset("models/kws/$fileName")
+                ?: context.assets.open("kws/$fileName")
+            inputStream.use { input ->
                 FileOutputStream(outputFile).use { output ->
                     input.copyTo(output)
                 }

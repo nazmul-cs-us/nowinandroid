@@ -12,8 +12,6 @@ import com.whispertflite.utils.WhisperUtil;
 import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.Tensor;
-import org.tensorflow.lite.gpu.CompatibilityList;
-import org.tensorflow.lite.gpu.GpuDelegate;
 //import org.tensorflow.lite.nnapi.NnApiDelegate;
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
 
@@ -30,7 +28,6 @@ public class WhisperEngineJava implements WhisperEngine {
     private final Context mContext;
     private boolean mIsInitialized = false;
     private Interpreter mInterpreter = null;
-    private GpuDelegate gpuDelegate = null;
 
     public WhisperEngineJava(Context context) {
         mContext = context;
@@ -67,10 +64,6 @@ public class WhisperEngineJava implements WhisperEngine {
             mInterpreter.close();
             mInterpreter = null;
         }
-        if (gpuDelegate != null) {
-            gpuDelegate.close();
-            gpuDelegate = null;
-        }
     }
 
     @Override
@@ -105,21 +98,6 @@ public class WhisperEngineJava implements WhisperEngine {
         options.setNumThreads(Runtime.getRuntime().availableProcessors());
         // Enable XNNPACK for faster CPU inference
         options.setUseXNNPACK(true);
-
-        // Try to use GPU delegate for faster inference
-        try {
-            CompatibilityList compatList = new CompatibilityList();
-            if (compatList.isDelegateSupportedOnThisDevice()) {
-                Log.d(TAG, "GPU delegate is supported, enabling...");
-                GpuDelegate.Options gpuOptions = new GpuDelegate.Options();
-                gpuDelegate = new GpuDelegate(gpuOptions);
-                options.addDelegate(gpuDelegate);
-            } else {
-                Log.d(TAG, "GPU delegate not supported, using CPU with XNNPACK");
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to initialize GPU delegate, using CPU: " + e.getMessage());
-        }
 
         mInterpreter = new Interpreter(tfliteModel, options);
     }

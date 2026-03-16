@@ -111,7 +111,9 @@ data class VoiceSettingsState(
     val testState: VoiceTestState = VoiceTestState.IDLE,
     val testResult: String? = null,
     val testError: String? = null,
-    val amplitude: Float = 0f
+    val amplitude: Float = 0f,
+    val needsDownload: Boolean = false,
+    val downloadCategory: String? = null,
 )
 
 // Google colors for the dots
@@ -129,6 +131,8 @@ fun VoiceSettingsSection(
     onEngineSelected: (VoiceRecognitionEngine) -> Unit,
     onTestVoice: () -> Unit = {},
     onStopTest: () -> Unit = {},
+    downloadManager: com.starception.submission.download.AssetDownloadManager? = null,
+    onDownloadComplete: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -159,23 +163,41 @@ fun VoiceSettingsSection(
             }
         }
 
-        // Voice test section
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "Test Voice Recognition",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary
+        // Download prompt when model is missing
+        if (state.needsDownload && state.downloadCategory != null && downloadManager != null) {
+            com.starception.submission.download.MissingContentCard(
+                resourceName = when (state.selectedEngine) {
+                    VoiceRecognitionEngine.WHISPER -> "Whisper STT Engine"
+                    VoiceRecognitionEngine.SHERPA_KWS -> "Keyword Detection Model"
+                },
+                category = state.downloadCategory,
+                description = when (state.selectedEngine) {
+                    VoiceRecognitionEngine.WHISPER -> "Download the speech recognition model for full transcription"
+                    VoiceRecognitionEngine.SHERPA_KWS -> "Download the keyword detection model for fast voice commands"
+                },
+                downloadManager = downloadManager,
+                onDownloadComplete = onDownloadComplete,
+                modifier = Modifier.padding(horizontal = 0.dp)
             )
+        } else {
+            // Voice test section (only show when model is available)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Test Voice Recognition",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary
+                )
 
-            ModernVoiceTestCard(
-                testState = state.testState,
-                testResult = state.testResult,
-                testError = state.testError,
-                amplitude = state.amplitude,
-                onTestVoice = onTestVoice,
-                onStopTest = onStopTest
-            )
+                ModernVoiceTestCard(
+                    testState = state.testState,
+                    testResult = state.testResult,
+                    testError = state.testError,
+                    amplitude = state.amplitude,
+                    onTestVoice = onTestVoice,
+                    onStopTest = onStopTest
+                )
+            }
         }
     }
 }

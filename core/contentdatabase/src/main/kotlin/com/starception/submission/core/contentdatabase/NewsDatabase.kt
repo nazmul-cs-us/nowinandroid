@@ -6,10 +6,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import java.io.File
 
 /**
  * Room Database for News Resources
- * Pre-populated from assets/databases/news.db
+ * Created empty by Room and populated via regenerateFromSources()
  *
  * Features:
  * - News resources with topics
@@ -31,22 +32,38 @@ abstract class NewsDatabase : RoomDatabase() {
 
     companion object {
         private const val DATABASE_NAME = "news.db"
+        private const val CDN_KEY = "databases/news.db"
         private const val TAG = "NewsDatabase"
 
         @Volatile
         private var INSTANCE: NewsDatabase? = null
 
+        // Store resolved DB file for internal re-creation (refreshFromAssets)
+        private var resolvedDbFile: File? = null
+
         /**
          * Get the singleton instance of NewsDatabase
+         * @param preResolvedDbFile Optional pre-resolved File from CDN/extracted assets
          */
-        fun getInstance(context: Context): NewsDatabase {
+        fun getInstance(context: Context, preResolvedDbFile: File? = null): NewsDatabase {
+            if (preResolvedDbFile != null) resolvedDbFile = preResolvedDbFile
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
+                val builder = Room.databaseBuilder(
                     context.applicationContext,
                     NewsDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .createFromAsset("databases/$DATABASE_NAME")
+
+                // Try pre-resolved file first; if unavailable, let Room create empty DB
+                // (news.db is regenerated from source databases at runtime)
+                val dbFile = preResolvedDbFile ?: resolvedDbFile
+                if (dbFile != null && dbFile.exists()) {
+                    builder.createFromFile(dbFile)
+                }
+                // No bundled fallback needed - Room will create empty schema,
+                // then regenerateFromSources() populates it from quran.db, fortress_of_the_muslim.db, etc.
+
+                val instance = builder
                     .fallbackToDestructiveMigration()
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {

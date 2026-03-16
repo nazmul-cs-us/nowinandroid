@@ -23,6 +23,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.media.session.MediaButtonReceiver
 import com.starception.submission.R
+import com.starception.submission.download.AudioDownloadHelper
 import java.io.File
 
 class QuranPlaybackService : Service() {
@@ -38,13 +39,20 @@ class QuranPlaybackService : Service() {
     private var audioLanguage = AudioLanguage.ARABIC_ONLY
     private var wasPlayingBeforeChange = false
 
+    // Legacy SD card paths (fallback only)
     private val quranArabicPath = "/sdcard/Quran/Arabic"
     private val quranBengaliPath = "/sdcard/Quran/Bengali"
     private val quranEnglishPath = "/sdcard/Quran/English"
 
+    // AudioDownloadHelper for CDN-first file resolution
+    private var audioDownloadHelper: AudioDownloadHelper? = null
+
     var onPlaybackStateChanged: ((Boolean) -> Unit)? = null
     var onSurahChanged: ((Int) -> Unit)? = null
     var onProgressChanged: ((Int, Int) -> Unit)? = null
+
+    // Callback when audio file needs downloading (cdnKey, fileSize)
+    var onAudioNeedsDownload: ((String, Long?) -> Unit)? = null
 
     // Course mode callbacks and state
     var onPositionChanged: ((Int) -> Unit)? = null
@@ -170,12 +178,19 @@ class QuranPlaybackService : Service() {
         try {
             // Save the current playing state before changing tracks
             wasPlayingBeforeChange = shouldAutoPlay
-            
-            currentSurahIndex = index
-            val audioFile = getAudioFile(index)
 
-            if (!audioFile.exists()) {
-                Log.e("QuranService", "Audio file not found: ${audioFile.absolutePath}")
+            currentSurahIndex = index
+            val audioFile = resolveAudioFile(index)
+
+            if (audioFile == null || !audioFile.exists()) {
+                // File not available locally - trigger on-demand download
+                val cdnKey = audioDownloadHelper?.getQuranCdnKey(index, audioLanguage)
+                if (cdnKey != null && onAudioNeedsDownload != null) {
+                    Log.i("QuranService", "Audio not found, requesting download: $cdnKey")
+                    onAudioNeedsDownload?.invoke(cdnKey, null)
+                } else {
+                    Log.e("QuranService", "Audio file not found and no download handler available")
+                }
                 return
             }
 
@@ -192,6 +207,15 @@ class QuranPlaybackService : Service() {
         } catch (e: Exception) {
             Log.e("QuranService", "Failed to play surah", e)
         }
+    }
+
+    /**
+     * Re-resolve and play after a download completes.
+     * Called by the ViewModel once the on-demand download finishes.
+     */
+    fun playAfterDownload(index: Int) {
+        Log.i("QuranService", "Playing after download: surah $index")
+        playSurah(index, shouldAutoPlay = true)
     }
 
     fun togglePlayPause() {
@@ -234,6 +258,10 @@ class QuranPlaybackService : Service() {
 
     fun setAudioLanguage(language: AudioLanguage) {
         audioLanguage = language
+    }
+
+    fun setAudioDownloadHelper(helper: AudioDownloadHelper) {
+        audioDownloadHelper = helper
     }
 
     fun isPlaying(): Boolean = mediaPlayer?.isPlaying ?: false
@@ -314,13 +342,16 @@ class QuranPlaybackService : Service() {
             wasPlayingBeforeChange = true // Always auto-play for course
             currentSurahIndex = surahIndex
 
-            val audioFile = getAudioFile(surahIndex)
+            val audioFile = resolveAudioFile(surahIndex)
 
-            if (!audioFile.exists()) {
-                Log.e("QuranService", "🕌 Audio file not found for course: ${audioFile.absolutePath}")
-                // Skip to next surah
-                if (forCourse) {
-                    val nextIndex = (surahIndex + 1) % QuranData.surahs.size
+            if (audioFile == null || !audioFile.exists()) {
+                Log.e("QuranService", "🕌 Audio file not found for course")
+                // For course mode, try triggering download, otherwise skip
+                val cdnKey = audioDownloadHelper?.getQuranCdnKey(surahIndex, audioLanguage)
+                if (cdnKey != null && onAudioNeedsDownload != null) {
+                    Log.i("QuranService", "🕌 Course: requesting download for $cdnKey")
+                    onAudioNeedsDownload?.invoke(cdnKey, null)
+                } else if (forCourse) {
                     onSurahCompleted?.invoke(surahIndex) // Treat as completed to advance
                 }
                 return
@@ -408,9 +439,20 @@ class QuranPlaybackService : Service() {
 
     // ==================== End Course Mode Methods ====================
 
-    private fun getAudioFile(index: Int): File {
-        val surah = QuranData.surahs[index]
-        return when (audioLanguage) {
+    /**
+     * Resolve audio file using AudioDownloadHelper (CDN first, then SD card).
+     * Falls back to legacy SD card logic if helper is not set.
+     * Returns null if file is not available locally.
+     */
+    private fun resolveAudioFile(index: Int): File? {
+        // Use AudioDownloadHelper if available (CDN-first resolution)
+        audioDownloadHelper?.let { helper ->
+            return helper.resolveQuranAudioFile(index, audioLanguage)
+        }
+
+        // Fallback: legacy SD card resolution
+        val surah = QuranData.surahs.getOrNull(index) ?: return null
+        val file = when (audioLanguage) {
             AudioLanguage.ARABIC_ONLY -> {
                 val fileName = String.format("%03d", surah.number) + "-" + surah.nameEnglish.lowercase().replace(" ", "-") + ".ogg"
                 File(quranArabicPath, fileName)
@@ -418,15 +460,15 @@ class QuranPlaybackService : Service() {
             AudioLanguage.BENGALI_TRANSLATION -> {
                 val bengaliDir = File(quranBengaliPath)
                 val allFiles = bengaliDir.listFiles()?.sortedBy { it.name } ?: emptyList()
-                if (index < allFiles.size) allFiles[index] else File("")
+                if (index < allFiles.size) allFiles[index] else null
             }
             AudioLanguage.ENGLISH_TRANSLATION -> {
                 val englishDir = File(quranEnglishPath)
                 val pattern = String.format("%03d", surah.number)
                 englishDir.listFiles()?.find { it.name.startsWith(pattern) }
-                    ?: File(englishDir, "${pattern} ${surah.nameEnglish.lowercase().replace(" ", "_")}.ogg")
             }
         }
+        return if (file != null && file.exists() && file.length() > 0) file else null
     }
 
     private fun updateMediaSessionMetadata() {

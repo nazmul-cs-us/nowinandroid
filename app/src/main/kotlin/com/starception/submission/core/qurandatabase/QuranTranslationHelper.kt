@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import android.util.Log
+import com.starception.submission.download.AssetRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -28,33 +29,40 @@ object QuranTranslationHelper {
      * @return QuranDatabase instance for the requested translation
      */
     @Synchronized
-    fun getDatabase(context: Context, translationCode: String = "ar"): QuranDatabase {
+    fun getDatabase(context: Context, translationCode: String = "ar", assetRepository: AssetRepository? = null): QuranDatabase {
         // Check if already in cache
         if (databaseCache.containsKey(translationCode)) {
             Log.d(TAG, "♻️ Using cached database for translation: $translationCode")
             return databaseCache[translationCode]!!
         }
-        
-        // Determine database filename
+
+        // Determine database filename and CDN key
         val dbFileName = when (translationCode) {
             "ar" -> "quran.db"
             else -> "quran_$translationCode.db"
         }
-        
+
         val dbAssetPath = "databases/$dbFileName"
-        
+        val cdnKey = "databases/quran/$dbFileName"
+
         Log.d(TAG, "📖 Loading Quran database: $translationCode from $dbAssetPath")
-        
+
             try {
-                // Create database instance
-                // Entity now matches translation DB schema (nullable columns)
-                // Room can read from Arabic DB (NOT NULL) into nullable entity fields
-                val database = Room.databaseBuilder(
+                val builder = Room.databaseBuilder(
                     context.applicationContext,
                     QuranDatabase::class.java,
                     "quran_${translationCode}_instance"
                 )
-                    .createFromAsset(dbAssetPath)
+
+                // Try CDN/extracted file first, fall back to bundled asset
+                val dbFile = assetRepository?.getDatabaseFile(cdnKey)
+                if (dbFile != null) {
+                    builder.createFromFile(dbFile)
+                } else {
+                    builder.createFromAsset(dbAssetPath)
+                }
+
+                val database = builder
                     .fallbackToDestructiveMigration()
                     .build()
 
@@ -69,7 +77,7 @@ object QuranTranslationHelper {
                 Log.e(TAG, "❌ Failed to load database for translation: $translationCode", e)
                 Log.e(TAG, "❌ Database path: $dbAssetPath", e)
                 e.printStackTrace()
-                throw e // Re-throw to let caller handle the error
+                throw e
             }
     }
     
@@ -133,12 +141,13 @@ object QuranTranslationHelper {
  */
 class QuranTranslationRepository(
     private val context: Context,
-    private val translationCode: String = "ar"
+    private val translationCode: String = "ar",
+    private val assetRepository: AssetRepository? = null
 ) {
-    
+
     private val database: QuranDatabase by lazy {
         try {
-            QuranTranslationHelper.getDatabase(context, translationCode)
+            QuranTranslationHelper.getDatabase(context, translationCode, assetRepository)
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to initialize database for translation: $translationCode", e)
             throw e

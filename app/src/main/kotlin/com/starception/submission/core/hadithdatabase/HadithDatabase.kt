@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.starception.submission.download.AssetRepository
 
 /**
  * Room Database for Hadith collections
@@ -44,16 +45,23 @@ abstract class HadithDatabase : RoomDatabase() {
             "Darimi" to "sunan_darimi.db"
         )
 
+        // Stored AssetRepository reference for database creation
+        private var assetRepo: AssetRepository? = null
+
         /**
          * Get database instance for a specific collection file
          * @param context Application context
          * @param databaseFile Database filename (e.g., "sahih_bukhari.db")
+         * @param assetRepository Optional AssetRepository for CDN asset support
          */
-        fun getInstance(context: Context, databaseFile: String): HadithDatabase {
-            return instances.getOrPut(databaseFile) {
-                synchronized(this) {
-                    createDatabase(context, databaseFile)
-                }
+        fun getInstance(context: Context, databaseFile: String, assetRepository: AssetRepository? = null): HadithDatabase {
+            if (assetRepository != null) assetRepo = assetRepository
+            instances[databaseFile]?.let { return it }
+            return synchronized(this) {
+                instances[databaseFile]?.let { return it }
+                val db = createDatabase(context, databaseFile)
+                instances[databaseFile] = db
+                db
             }
         }
 
@@ -61,25 +69,49 @@ abstract class HadithDatabase : RoomDatabase() {
          * Get database instance by collection name
          * @param context Application context
          * @param collectionName Collection name (e.g., "Bukhari", "Muslim")
+         * @param assetRepository Optional AssetRepository for CDN asset support
          */
-        fun getInstanceByCollectionName(context: Context, collectionName: String): HadithDatabase? {
+        fun getInstanceByCollectionName(context: Context, collectionName: String, assetRepository: AssetRepository? = null): HadithDatabase? {
             val dbFile = collectionToFile[collectionName] ?: return null
-            return getInstance(context, dbFile)
+            return getInstance(context, dbFile, assetRepository)
         }
 
         /**
-         * Create database from assets
+         * Create database from CDN download or bundled assets
          */
         private fun createDatabase(context: Context, databaseFile: String): HadithDatabase {
             val assetPath = "$HADITH_DB_PATH$databaseFile"
+            val cdnKey = "$HADITH_DB_PATH$databaseFile"
             android.util.Log.d(TAG, "📖 Opening hadith database: $databaseFile")
 
-            return Room.databaseBuilder(
+            val builder = Room.databaseBuilder(
                 context.applicationContext,
                 HadithDatabase::class.java,
-                "hadith_$databaseFile" // Unique database name
+                "hadith_$databaseFile"
             )
-                .createFromAsset(assetPath)
+
+            // Try CDN/extracted file first, fall back to bundled asset
+            val dbFile = assetRepo?.getDatabaseFile(cdnKey)
+                ?: run {
+                    // Direct fallback: check cdn_assets directory even when assetRepo is null
+                    // This handles the case where HadithRepository was created without AssetRepository
+                    val cdnFile = java.io.File(context.applicationContext.filesDir, "cdn_assets/$cdnKey")
+                    if (cdnFile.exists()) {
+                        android.util.Log.d(TAG, "📂 Found CDN-downloaded DB directly: ${cdnFile.absolutePath}")
+                        cdnFile
+                    } else {
+                        null
+                    }
+                }
+            if (dbFile != null) {
+                android.util.Log.d(TAG, "📂 Using file-based DB: ${dbFile.absolutePath}")
+                builder.createFromFile(dbFile)
+            } else {
+                android.util.Log.d(TAG, "📦 Using bundled asset: $assetPath")
+                builder.createFromAsset(assetPath)
+            }
+
+            return builder
                 .fallbackToDestructiveMigration()
                 .setJournalMode(JournalMode.TRUNCATE)
                 .addCallback(object : Callback() {
@@ -158,6 +190,35 @@ abstract class HadithDatabase : RoomDatabase() {
          */
         fun getCollectionNameFromFile(databaseFile: String): String {
             return collectionToFile.entries.find { it.value == databaseFile }?.key ?: databaseFile
+        }
+
+        /**
+         * Clear a cached instance so it will be recreated on next access.
+         * Call this after downloading a database from CDN to ensure
+         * the new file is used instead of a previously failed instance.
+         */
+        fun clearInstance(context: Context, databaseFile: String) {
+            synchronized(this) {
+                val existing = instances.remove(databaseFile)
+                if (existing != null) {
+                    try {
+                        existing.close()
+                    } catch (_: Exception) {}
+                }
+                // Delete Room's cached DB so it recreates from the CDN-downloaded file
+                val roomDbName = "hadith_$databaseFile"
+                val dbPath = context.getDatabasePath(roomDbName)
+                if (dbPath.exists()) {
+                    dbPath.delete()
+                    android.util.Log.d(TAG, "🗑️ Deleted cached Room DB: $roomDbName")
+                }
+                // Also delete WAL and SHM files
+                val walFile = java.io.File(dbPath.absolutePath + "-wal")
+                val shmFile = java.io.File(dbPath.absolutePath + "-shm")
+                if (walFile.exists()) walFile.delete()
+                if (shmFile.exists()) shmFile.delete()
+                android.util.Log.d(TAG, "🔄 Cleared instance for: $databaseFile")
+            }
         }
 
         /**

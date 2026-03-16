@@ -119,6 +119,8 @@ import androidx.compose.animation.scaleIn
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 import com.starception.submission.settings.components.TtsVoice
+import com.starception.submission.download.AudioDownloadHelper
+import com.starception.submission.download.AssetDownloadManager
 import dagger.hilt.android.EntryPointAccessors
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.fadeIn
@@ -188,14 +190,16 @@ fun HadithDetailScreen(
     val translationService = remember { TranslationService.getInstance(context) }
     val bukhariTranslationRepo = remember { BukhariLocalTranslationRepository.getInstance(context) }
 
-    // Get Sherpa-ONNX TTS service via Hilt entry point
-    val sherpaOnnxTts = remember {
-        val entryPoint = EntryPointAccessors.fromApplication(
+    // Get Sherpa-ONNX TTS service and download manager via Hilt entry point
+    val entryPoint = remember {
+        EntryPointAccessors.fromApplication(
             context.applicationContext,
             SherpaOnnxTtsEntryPoint::class.java
         )
-        entryPoint.sherpaOnnxTtsService()
     }
+    val sherpaOnnxTts = remember { entryPoint.sherpaOnnxTtsService() }
+    val downloadManager = remember { entryPoint.assetDownloadManager() }
+    val audioDownloadHelper = remember { entryPoint.audioDownloadHelper() }
 
     // Load user's TTS preferences from SharedPreferences
     val ttsPrefs = remember {
@@ -218,6 +222,9 @@ fun HadithDetailScreen(
     var hadith by remember { mutableStateOf<Hadith?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var showDownloadPrompt by remember { mutableStateOf(false) }
+    var downloadCategory by remember { mutableStateOf("") }
+    var reloadTrigger by remember { mutableStateOf(0) }
 
     // Translation state
     var translatedArabic by remember { mutableStateOf<String?>(null) }
@@ -244,6 +251,10 @@ fun HadithDetailScreen(
     var textToSpeech by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsInitialized by remember { mutableStateOf(false) }
 
+    // On-demand audio download state
+    var isDownloadingAudio by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableStateOf(0f) }
+
     // Cleanup on dispose
     androidx.compose.runtime.DisposableEffect(Unit) {
         onDispose {
@@ -255,8 +266,8 @@ fun HadithDetailScreen(
         }
     }
 
-    // Load hadith
-    LaunchedEffect(databaseFile, hadithNumber) {
+    // Load hadith (reloadTrigger forces re-execution after CDN download completes)
+    LaunchedEffect(databaseFile, hadithNumber, reloadTrigger) {
         isLoading = true
         error = null
         translatedText = null
@@ -267,8 +278,23 @@ fun HadithDetailScreen(
                 error = "Hadith not found"
             }
         } catch (e: Exception) {
-            error = e.message ?: "Error loading hadith"
             android.util.Log.e("HadithDetailScreen", "Error loading hadith", e)
+            // Check if it's a database-not-found error (asset or file missing)
+            val isDbMissing = e.message?.contains("Cannot copy asset", ignoreCase = true) == true ||
+                e.message?.contains("Unable to copy database", ignoreCase = true) == true ||
+                e.message?.contains("not found", ignoreCase = true) == true ||
+                e.message?.contains("doesn't exist", ignoreCase = true) == true ||
+                e.cause is java.io.FileNotFoundException ||
+                e is IllegalStateException
+            if (isDbMissing) {
+                // Map database filename to CDN category
+                val dbName = databaseFile.removeSuffix(".db").replace("_", " ")
+                downloadCategory = "hadith_${databaseFile.removeSuffix(".db")}"
+                showDownloadPrompt = true
+                error = "Database not available"
+            } else {
+                error = e.message ?: "Error loading hadith"
+            }
         }
         isLoading = false
     }
@@ -378,6 +404,49 @@ fun HadithDetailScreen(
                 isLoading -> {
                     HadithShimmerLoading(onBackClick = wrappedOnBackClick, isLandscape = isLandscape)
                 }
+                error != null && showDownloadPrompt -> {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            com.starception.submission.download.MissingContentCard(
+                                resourceName = "$collectionName Hadith Collection",
+                                category = downloadCategory,
+                                description = "This hadith collection database needs to be downloaded.",
+                                downloadManager = downloadManager,
+                                onDownloadComplete = {
+                                    // Clear cached broken DB instance and Room's corrupted DB file
+                                    com.starception.submission.core.hadithdatabase.HadithDatabase.clearInstance(context, databaseFile)
+                                    android.util.Log.i("HadithDetailScreen", "Download complete, cleared DB cache for: $databaseFile")
+                                    showDownloadPrompt = false
+                                    error = null
+                                    isLoading = true
+                                    hadith = null
+                                    // Increment trigger to force LaunchedEffect re-execution
+                                    reloadTrigger++
+                                },
+                            )
+                        }
+                        // Back button
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(8.dp)
+                                .size(40.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                        ) {
+                            IconButton(onClick = wrappedOnBackClick) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
                 error != null -> {
                     HadithErrorContent(
                         error = error!!,
@@ -412,19 +481,13 @@ fun HadithDetailScreen(
                                 // Start playback
                                 val isBukhari = databaseFile.contains("bukhari", ignoreCase = true)
 
-                                // For Bengali language and Bukhari, use audio files from SD card
+                                // For Bengali language and Bukhari, use audio files (CDN → SD card → download → TTS fallback)
                                 if (selectedLanguage == "bn" && isBukhari) {
-                                    // Try to play from SD card
-                                    val formattedNumber = String.format("%04d", hadithNumber)
-                                    val bukhariPath = "/sdcard/Bukhari/bukhari_audio_bn"
-                                    val possibleFiles = listOf(
-                                        java.io.File(bukhariPath, "bukhari_$formattedNumber.ogg"),
-                                        java.io.File(bukhariPath, "bukhari_$formattedNumber.mp3")
-                                    )
+                                    // Resolve audio: check cdn_assets first, then SD card
+                                    val audioFile = audioDownloadHelper.resolveHadithAudioFile(hadithNumber)
 
-                                    var audioPlayed = false
-                                    for (audioFile in possibleFiles) {
-                                        if (!audioFile.exists()) continue
+                                    if (audioFile != null) {
+                                        // File found locally - play it
                                         try {
                                             mediaPlayer = MediaPlayer().apply {
                                                 setDataSource(audioFile.absolutePath)
@@ -443,25 +506,121 @@ fun HadithDetailScreen(
                                                 start()
                                             }
                                             isPlaying = true
-                                            audioPlayed = true
-                                            android.util.Log.i("HadithDetailScreen", "▶️ Playing Bengali audio: ${audioFile.absolutePath}")
-                                            break
+                                            android.util.Log.i("HadithDetailScreen", "Playing Bengali audio: ${audioFile.absolutePath}")
                                         } catch (e: Exception) {
                                             android.util.Log.e("HadithDetailScreen", "Error playing audio: ${e.message}")
+                                            // Fall back to TTS on playback error
+                                            playWithSherpaOnnxTts(
+                                                sherpaOnnxTts = sherpaOnnxTts,
+                                                text = translatedText ?: hadith!!.textPlain ?: "",
+                                                hadithNumber = hadithNumber,
+                                                selectedVoice = selectedVoice,
+                                                speakerId = selectedSpeakerId,
+                                                onPlayingChanged = { isPlaying = it }
+                                            )
                                         }
-                                    }
+                                    } else {
+                                        // File not available locally - attempt on-demand download
+                                        val cdnKey = audioDownloadHelper.getHadithCdnKey(hadithNumber)
+                                        android.util.Log.i("HadithDetailScreen", "Bengali audio not found for hadith #$hadithNumber, downloading: $cdnKey")
+                                        isDownloadingAudio = true
+                                        downloadProgress = 0f
 
-                                    // Fall back to Sherpa-ONNX TTS if no audio file found
-                                    if (!audioPlayed) {
-                                        android.util.Log.w("HadithDetailScreen", "No Bengali audio for hadith #$hadithNumber, using Sherpa-ONNX TTS")
-                                        playWithSherpaOnnxTts(
-                                            sherpaOnnxTts = sherpaOnnxTts,
-                                            text = translatedText ?: hadith!!.textPlain ?: "",
-                                            hadithNumber = hadithNumber,
-                                            selectedVoice = selectedVoice,
-                                            speakerId = selectedSpeakerId,
-                                            onPlayingChanged = { isPlaying = it }
-                                        )
+                                        CoroutineScope(Dispatchers.Main).launch {
+                                            try {
+                                                // Collect download progress in background
+                                                val progressJob = launch {
+                                                    audioDownloadHelper.getDownloadProgress(cdnKey).collect { state ->
+                                                        when (state) {
+                                                            is AssetDownloadManager.DownloadState.Downloading -> {
+                                                                downloadProgress = state.progress
+                                                            }
+                                                            is AssetDownloadManager.DownloadState.Completed -> {
+                                                                downloadProgress = 1f
+                                                            }
+                                                            else -> {}
+                                                        }
+                                                    }
+                                                }
+
+                                                val result = audioDownloadHelper.downloadAudio(cdnKey)
+                                                progressJob.cancel()
+                                                isDownloadingAudio = false
+                                                downloadProgress = 0f
+
+                                                when (result) {
+                                                    is AssetDownloadManager.DownloadState.Completed -> {
+                                                        // Download successful - resolve and play
+                                                        val downloadedFile = audioDownloadHelper.resolveHadithAudioFile(hadithNumber)
+                                                        if (downloadedFile != null) {
+                                                            android.util.Log.i("HadithDetailScreen", "Download complete, playing: ${downloadedFile.absolutePath}")
+                                                            mediaPlayer = MediaPlayer().apply {
+                                                                setDataSource(downloadedFile.absolutePath)
+                                                                setOnCompletionListener { mp ->
+                                                                    mp.release()
+                                                                    mediaPlayer = null
+                                                                    isPlaying = false
+                                                                }
+                                                                setOnErrorListener { mp, _, _ ->
+                                                                    mp.release()
+                                                                    mediaPlayer = null
+                                                                    isPlaying = false
+                                                                    true
+                                                                }
+                                                                prepare()
+                                                                start()
+                                                            }
+                                                            isPlaying = true
+                                                        } else {
+                                                            // Shouldn't happen but fall back to TTS
+                                                            playWithSherpaOnnxTts(
+                                                                sherpaOnnxTts = sherpaOnnxTts,
+                                                                text = translatedText ?: hadith!!.textPlain ?: "",
+                                                                hadithNumber = hadithNumber,
+                                                                selectedVoice = selectedVoice,
+                                                                speakerId = selectedSpeakerId,
+                                                                onPlayingChanged = { isPlaying = it }
+                                                            )
+                                                        }
+                                                    }
+                                                    is AssetDownloadManager.DownloadState.Failed -> {
+                                                        android.util.Log.w("HadithDetailScreen", "Download failed: ${result.error}, using TTS fallback")
+                                                        playWithSherpaOnnxTts(
+                                                            sherpaOnnxTts = sherpaOnnxTts,
+                                                            text = translatedText ?: hadith!!.textPlain ?: "",
+                                                            hadithNumber = hadithNumber,
+                                                            selectedVoice = selectedVoice,
+                                                            speakerId = selectedSpeakerId,
+                                                            onPlayingChanged = { isPlaying = it }
+                                                        )
+                                                    }
+                                                    else -> {
+                                                        // Unexpected state - fall back to TTS
+                                                        playWithSherpaOnnxTts(
+                                                            sherpaOnnxTts = sherpaOnnxTts,
+                                                            text = translatedText ?: hadith!!.textPlain ?: "",
+                                                            hadithNumber = hadithNumber,
+                                                            selectedVoice = selectedVoice,
+                                                            speakerId = selectedSpeakerId,
+                                                            onPlayingChanged = { isPlaying = it }
+                                                        )
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                android.util.Log.e("HadithDetailScreen", "Download error", e)
+                                                isDownloadingAudio = false
+                                                downloadProgress = 0f
+                                                // Fall back to TTS on download error
+                                                playWithSherpaOnnxTts(
+                                                    sherpaOnnxTts = sherpaOnnxTts,
+                                                    text = translatedText ?: hadith!!.textPlain ?: "",
+                                                    hadithNumber = hadithNumber,
+                                                    selectedVoice = selectedVoice,
+                                                    speakerId = selectedSpeakerId,
+                                                    onPlayingChanged = { isPlaying = it }
+                                                )
+                                            }
+                                        }
                                     }
                                 } else {
                                     // Use Sherpa-ONNX TTS (user-selected voice) for English

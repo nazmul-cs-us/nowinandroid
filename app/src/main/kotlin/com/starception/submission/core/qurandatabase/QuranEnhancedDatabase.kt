@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.starception.submission.download.AssetRepository
 
 /**
  * Room Database for Enhanced Quran
@@ -30,6 +31,7 @@ abstract class QuranEnhancedDatabase : RoomDatabase() {
 
     companion object {
         private const val DATABASE_NAME = "quran_enhanced.db"
+        private const val CDN_KEY = "databases/quran/quran_enhanced.db"
 
         @Volatile
         private var INSTANCE: QuranEnhancedDatabase? = null
@@ -37,15 +39,24 @@ abstract class QuranEnhancedDatabase : RoomDatabase() {
         /**
          * Get the singleton instance of QuranEnhancedDatabase
          */
-        fun getInstance(context: Context): QuranEnhancedDatabase {
+        fun getInstance(context: Context, assetRepository: AssetRepository? = null): QuranEnhancedDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
+                val builder = Room.databaseBuilder(
                     context.applicationContext,
                     QuranEnhancedDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .createFromAsset("databases/$DATABASE_NAME") // Load from assets
-                    .fallbackToDestructiveMigration() // For development
+
+                // Try CDN/extracted file first, fall back to bundled asset
+                val dbFile = assetRepository?.getDatabaseFile(CDN_KEY)
+                if (dbFile != null) {
+                    builder.createFromFile(dbFile)
+                } else {
+                    builder.createFromAsset("databases/$DATABASE_NAME")
+                }
+
+                val instance = builder
+                    .fallbackToDestructiveMigration()
                     .setJournalMode(JournalMode.TRUNCATE) // Simplify for pre-packaged DB
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {

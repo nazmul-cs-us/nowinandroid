@@ -38,7 +38,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Original Project**: Forked from Google's Now in Android (NiA) sample app
 - **Current Name**: Starception Submission
 - **Base Package**: `com.starception.submission`
-- **Purpose**: Android app combining news reader functionality with comprehensive Islamic prayer times calculator
+- **Purpose**: Android app combining news reader functionality with comprehensive Islamic prayer times calculator, salah posture ML detection, and driving mode audio
 - **Architecture**: Clean Architecture with MVVM, fully modularized following Google's official guidance
 - **Total Modules**: 25+ modules (16 core, 6 feature, 2 sync, plus supporting modules)
 
@@ -47,14 +47,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Root Level Organization
 ```
 nowinandroid/
-├── app/                      # Main application module (36,441+ lines)
+├── app/                      # Main application module (40,000+ lines)
 ├── build-logic/              # Gradle convention plugins
 │   └── convention/           # Build configuration plugins
 ├── core/                     # 16 core modules
 ├── feature/                  # 6 feature modules
 ├── sync/                     # Sync modules
+├── training/                 # ML training pipeline (Python)
+│   └── salah_model/          # Salah posture detection model training
 ├── benchmarks/              # Performance benchmarking
-├── docs/                    # 14 technical documentation files
+├── docs/                    # 25+ technical documentation files
 ├── gradle/                  # Gradle wrapper and dependencies
 ├── lint/                    # Custom lint rules
 ├── tools/                   # Development tools
@@ -123,7 +125,11 @@ app/src/main/kotlin/com/starception/submission/
 │   │   ├── animations/    # Prayer animations
 │   │   └── data/          # Prayer time calculations
 │   ├── quran/             # Quran player and data
-│   └── surah/             # Surah display
+│   ├── surah/             # Surah display
+│   ├── course/            # Course features with voice recording
+│   └── salah/             # Salah ML features
+│       ├── datacollection/  # ML training data collection UI & ViewModel
+│       └── visualization/   # LibGDX 3D visualization (scatter, humanoid, gravity)
 ├── prayer/                # Core Prayer System (Clean Architecture)
 │   ├── model/             # Prayer data models
 │   ├── calculator/        # Astronomical calculations
@@ -136,6 +142,19 @@ app/src/main/kotlin/com/starception/submission/
 │   ├── worker/            # Background workers
 │   ├── cache/             # Location caching
 │   └── util/              # Prayer utilities
+├── ml/                    # Machine Learning (Salah posture detection)
+│   ├── SalahPosture.kt        # Posture enum (7 ML + 2 non-ML)
+│   ├── SalahDataSample.kt     # Sensor window data class
+│   ├── SalahFeatureExtractor.kt # 30-feature extraction
+│   ├── SalahDetectionEngine.kt  # TFLite inference engine
+│   └── SalahSequenceValidator.kt # Posture transition state machine
+├── sensor/                # Sensor services
+│   └── SalahDataCollectionService.kt # 50Hz accelerometer + gyroscope recording
+├── voice/                 # Voice system
+│   ├── VoiceModule.kt          # Hilt DI module
+│   ├── SherpaVoiceService.kt   # Sherpa ONNX text-to-speech
+│   ├── WhisperVoiceService.kt  # Whisper speech recognition
+│   └── VoiceCompletionManager.kt # Voice interaction flows
 ├── islamic/               # Islamic features (Clean Architecture)
 │   ├── salah/             # Salah (prayer) feature
 │   │   ├── domain/        # Business logic layer
@@ -145,15 +164,25 @@ app/src/main/kotlin/com/starception/submission/
 │   │   └── presentation/  # Qibla UI layer
 │   │       └── component/ # QiblaGlobeView.kt (3D globe with WorldWind)
 │   └── shared/            # Shared Islamic utilities
-└── services/              # Background services & notifications
+├── services/              # Background services & notifications
+│   └── DrivingAudioService.kt # Foreground service with MediaSession
+├── settings/              # App settings
+│   └── components/        # Settings UI components (VoiceSettingsSection, etc.)
+└── util/                  # Utility classes
+    └── DebugDrivingReceiver.kt # ADB-triggered driving mode testing
 ```
 
 ### Asset Organization
 ```
 app/src/main/assets/
 ├── country_prayer_methods.json  # 80+ countries prayer calculation methods
+├── salah_detector.tflite        # 177KB ML model for posture detection
+├── salah_norm_params.json       # Normalization parameters (30 features)
+├── whisper/                     # Whisper speech recognition model
+│   └── whisper-tiny.en.tflite   # English language recognition
 ├── databases/                   # Quran translation databases
 │   ├── quran.db                # Main Arabic text (7.2MB)
+│   ├── quran_enhanced.db       # Enhanced DB with Tafseer + word meanings (30MB)
 │   ├── quran_english.db        # English translation
 │   ├── quran_bengali.db        # Bengali translation
 │   └── [10+ translation DBs]    # Multiple language translations
@@ -196,7 +225,13 @@ build-logic/convention/
 - **Database**: Room 2.7.2
 - **Preferences**: Proto DataStore
 - **Networking**: Retrofit
-- **3D Visualization**: NASA WorldWind Android v0.8.0 (3D globe for Qibla direction)
+- **3D Visualization (Qibla)**: NASA WorldWind Android v0.8.0 (3D globe for Qibla direction)
+- **3D Visualization (Salah ML)**: LibGDX 1.12.1 (scatter plot, humanoid model, gravity vectors)
+- **ML Inference**: TensorFlow Lite (1D CNN salah posture detection, 177KB model)
+- **TTS**: Sherpa ONNX (on-device text-to-speech for Hadith reading)
+- **Speech Recognition**: Whisper TFLite (on-device English speech recognition)
+- **ML Training**: Python + TensorFlow/Keras (offline training pipeline in `training/`)
+- **Media**: MediaSession + Foreground Service (driving mode audio chain)
 - **Testing**: JUnit4, Espresso, Roborazzi
 - **Background**: WorkManager
 - **Min SDK**: 24
@@ -298,21 +333,13 @@ The app uses `com.starception.submission` as the base package (originally forked
 - `gradle.properties` - Optimized Gradle configuration with memory settings
 - `app/src/main/kotlin/com/starception/submission/prayer/` - Core prayer times system
 - `app/src/main/kotlin/com/starception/submission/feature/prayertimes/PrayerTimesScreen.kt` - Main prayer times UI
+- `app/src/main/kotlin/com/starception/submission/ml/` - Salah ML posture detection engine
+- `app/src/main/kotlin/com/starception/submission/voice/` - Voice system (TTS + speech recognition)
+- `app/src/main/kotlin/com/starception/submission/services/DrivingAudioService.kt` - Driving mode audio
+- `training/salah_model/` - Python ML training pipeline
 
 ### Documentation
-- `docs/PRAYER_TIMES_TECHNICAL_GUIDE.md` - Comprehensive technical guide for the prayer times system
-- `docs/PRAYER_CALCULATION_METHODOLOGY.md` - Detailed explanation of Islamic prayer time calculations
-- `docs/INTERACTIVE_PRAYER_DIAL_GUIDE.md` - Complete technical guide for interactive prayer time adjustment feature
-- `docs/PRAYER_TIMES_DEBUG_LOGGING_GUIDE.md` - Debug logging and troubleshooting guide
-- `docs/AUTO_DETECTION_LOGGING_GUIDE.md` - Auto-detection system logging guide
-- `docs/NOTIFICATION_SYSTEM_VERIFICATION.md` - Notification system verification and testing
-- `docs/QURAN_DATABASE_GUIDE.md` - Quran database architecture and management
-- `docs/COMPASS_INTEGRATION_GUIDE.md` - Qibla compass integration and implementation
-- `docs/RELIABLE_PRAYER_NOTIFICATIONS_GUIDE.md` - Reliable notification delivery system
-- `docs/TIME_SIMULATION_TESTING_GUIDE.md` - Time simulation for testing prayer calculations
-- `docs/ACTIVITY_DETECTION_TECHNICAL_GUIDE.md` - Activity detection and tracking
-- `docs/ANR_PREVENTION_GUIDE.md` - Application Not Responding prevention strategies
-- `README.md` - Updated with detailed prayer time features and capabilities
+All documentation is in the `docs/` directory. See the full listing in the "Documentation Files" section below.
 
 ## UI Design System
 
@@ -777,24 +804,46 @@ PrayerSettings_PREF_VERIFY: ❌ FAILED | key='invalid_key' | expected_type=Strin
 - **Smart Content**: AI-powered Islamic content suggestions
 - **Swipeable Tiles**: Interactive prayer time tiles with gestures
 
-#### 4. Enhanced Location Services
+#### 4. Salah ML Posture Detection
+- **On-Device ML**: 1D CNN model (177KB TFLite) detecting 7 prayer postures from phone-in-pocket sensors
+- **Data Collection**: In-app recording at 50Hz with quality feedback and auto-trimming
+- **Training Pipeline**: Python scripts for feature engineering, augmentation, training, and TFLite export
+- **Sequence Validation**: State machine for filtering false positives and counting rak'ahs
+- **3D Visualization**: LibGDX 1.12.1 engine with scatter plot, animated humanoid, and gravity vector modes
+- **Feature Engineering**: 30 statistical features (accelerometer + gyroscope) per 100ms window
+
+#### 5. Driving Mode & Voice System
+- **Driving Audio Service**: Foreground service with MediaSession playing Travel Dua -> Hadith -> Quran -> Voice prompt
+- **Sherpa ONNX TTS**: On-device text-to-speech for reading Hadith text
+- **Whisper Recognition**: On-device English speech recognition for voice commands
+- **Activity Detection**: Accelerometer + gyroscope based driving/walking detection
+- **Media Controls**: Lock screen, notification, and Bluetooth audio support
+
+#### 6. Word Study & Tafseer
+- **Enhanced Quran Database**: 30MB database with word meanings and 3 Tafseer books
+- **Interactive Word Study**: Tap any ayah to see detailed Arabic word meanings
+- **3 Tafseer Books**: As-Sa'di, Al-Moyassar, Al-Baghawi with filter chip switching
+
+#### 8. Enhanced Location Services
 - **Smart Timeouts**: 3-second timeout to prevent UI blocking
 - **Location Caching**: Efficient location data caching
 - **Country Detection**: Automatic country detection for prayer methods
 - **Fallback Mechanisms**: Multiple fallback strategies for location failures
 
-#### 5. Advanced Notification System
+#### 9. Advanced Notification System
 - **Prayer Notifications**: Timely alerts for all prayer times
 - **Background Workers**: Reliable notification delivery using WorkManager
 - **Boot Receivers**: Notifications persist after device restart
 - **Custom Sounds**: Support for custom notification sounds
 
 ### File & Directory Count Summary
-- **Total Kotlin Files**: 402 files
-- **Total Lines of Code**: ~50,000+ lines (app module: 36,441)
-- **Documentation Files**: 14 comprehensive guides
+- **Total Kotlin Files**: 420+ files
+- **Total Lines of Code**: ~55,000+ lines (app module: 40,000+)
+- **Documentation Files**: 31 comprehensive guides in `docs/`
 - **Build Configurations**: 30+ Gradle files
-- **Asset Databases**: 12 Quran translation databases
+- **Asset Databases**: 12 Quran translation databases + 1 enhanced Tafseer DB
+- **ML Models**: 2 TFLite models (salah posture + Whisper speech)
+- **Python Training Scripts**: 4 scripts in `training/salah_model/`
 - **Module Count**: 25+ modules
 
 ### Development Scripts & Tools
@@ -810,20 +859,37 @@ scripts/
 ### Documentation Files
 ```
 docs/
-├── ACTIVITY_DETECTION_TECHNICAL_GUIDE.md      # Activity detection and tracking
-├── ANR_PREVENTION_GUIDE.md                     # Application Not Responding prevention
-├── AUTO_DETECTION_LOGGING_GUIDE.md             # Auto-detection logging system
-├── ArchitectureLearningJourney.md              # Official Android architecture guide
-├── COMPASS_INTEGRATION_GUIDE.md                # Qibla compass implementation
-├── INTERACTIVE_PRAYER_DIAL_GUIDE.md            # Interactive prayer time adjustment
-├── ModularizationLearningJourney.md            # Modularization best practices
-├── NOTIFICATION_SYSTEM_VERIFICATION.md         # Notification testing and verification
-├── PRAYER_CALCULATION_METHODOLOGY.md           # Islamic prayer time calculations
-├── PRAYER_TIMES_DEBUG_LOGGING_GUIDE.md         # Debug logging for prayer times
-├── PRAYER_TIMES_TECHNICAL_GUIDE.md             # Comprehensive prayer system guide
-├── QURAN_DATABASE_GUIDE.md                     # Quran database architecture
-├── RELIABLE_PRAYER_NOTIFICATIONS_GUIDE.md      # Reliable notification delivery
-└── TIME_SIMULATION_TESTING_GUIDE.md            # Time simulation for testing
+├── ACTIVITY_DETECTION_IMPROVEMENTS.md          # Gyroscope-based detection improvements
+├── ACTIVITY_DETECTION_TECHNICAL_GUIDE.md       # Activity detection full technical guide
+├── ACTIVITY_NOTIFICATION_PERSISTENCE.md        # Notification mode persistence
+├── AGENT.md                                     # Agent configuration
+├── ANR_PREVENTION_GUIDE.md                      # Application Not Responding prevention
+├── ASSET_INVENTORY.md                           # Complete asset inventory
+├── AUTO_DETECTION_LOGGING_GUIDE.md              # Auto-detection logging system
+├── ArchitectureLearningJourney.md               # Official Android architecture guide
+├── CLAUDE_MEMORY.md                             # Claude context memory
+├── CODE_ORGANIZATION.md                         # Code organization patterns
+├── COMPASS_INTEGRATION_GUIDE.md                 # Qibla compass implementation
+├── DRIVING_VOICE_FEATURES_GUIDE.md              # Driving mode audio & voice system
+├── EXPRESSIVE_DESIGN_INTEGRATION_GUIDE.md       # Material 3 expressive design
+├── INTERACTIVE_PRAYER_DIAL_GUIDE.md             # Interactive prayer time adjustment
+├── LIBGDX_3D_VISUALIZATION_GUIDE.md             # LibGDX 3D sensor data visualization
+├── ModularizationLearningJourney.md             # Modularization best practices
+├── NOTIFICATION_SYSTEM_READY.md                 # Notification system status & fixes
+├── NOTIFICATION_SYSTEM_VERIFICATION.md          # Notification testing and verification
+├── PICKUP_FALSE_DETECTION_FIX.md                # False walking detection fix
+├── PRAYER_CALCULATION_METHODOLOGY.md            # Islamic prayer time calculations
+├── PRAYER_TIMES_DEBUG_LOGGING_GUIDE.md          # Debug logging for prayer times
+├── PRAYER_TIMES_TECHNICAL_GUIDE.md              # Comprehensive prayer system guide
+├── QURAN_DATABASE_GUIDE.md                      # Quran database architecture
+├── QURAN_DATABASE_INTEGRATION_SUMMARY.md        # Quran DB integration & usage status
+├── QURAN_ENHANCED_DATABASE_GUIDE.md             # Enhanced DB with Tafseer & meanings
+├── QURAN_NEWS_INTEGRATION.md                    # Quran news feature integration
+├── QURAN_TRANSLATION_DATABASES_GUIDE.md         # 12-language translation databases
+├── RELIABLE_PRAYER_NOTIFICATIONS_GUIDE.md       # Reliable notification delivery
+├── SALAH_ML_TRAINING_GUIDE.md                   # ML posture detection training pipeline
+├── TIME_SIMULATION_TESTING_GUIDE.md             # Time simulation for testing
+└── WORD_STUDY_TAFSEER_FEATURE_SUMMARY.md        # Word study & Tafseer features
 ```
 
 ## Key Differences from Original Now in Android
@@ -831,9 +897,13 @@ docs/
 ### Architectural Additions
 1. **Islamic Domain Layer**: Complete domain layer for Islamic features
 2. **Prayer Calculation Engine**: Astronomical calculation algorithms
-3. **Multi-Database Support**: SQLite databases for Quran translations
+3. **Multi-Database Support**: SQLite databases for Quran translations + enhanced Tafseer DB
 4. **Enhanced Services**: Location, notification, and calculation services
 5. **Country Database**: JSON-based country prayer method configurations
+6. **ML Pipeline**: Complete data collection -> training -> on-device inference pipeline
+7. **Voice System**: Sherpa ONNX TTS + Whisper speech recognition with Hilt DI
+8. **3D Visualization**: LibGDX rendering engine embedded in Jetpack Compose
+9. **Driving Audio**: Foreground service with MediaSession and audio chain management
 
 ### UI/UX Enhancements
 1. **Interactive Dials**: Circular timer UI with drag gestures
@@ -841,6 +911,8 @@ docs/
 3. **Popup Windows**: Compass and prayer bubble popups
 4. **Material 3 Extensions**: Custom shapes and animations
 5. **Haptic Feedback**: Enhanced tactile responses
+6. **3D Data Visualization**: Interactive scatter plot, humanoid model, gravity vectors
+7. **Word Study & Tafseer**: In-context Quran study with expandable ayah actions
 
 ### Technical Improvements
 1. **Comprehensive Logging**: Structured emoji-based logging system
@@ -848,3 +920,5 @@ docs/
 3. **Error Recovery**: Robust fallback mechanisms
 4. **State Persistence**: Enhanced preference management
 5. **Testing Infrastructure**: Extended test coverage for Islamic features
+6. **On-Device ML**: TFLite inference with sequence validation state machine
+7. **Python Training Pipeline**: Feature engineering, augmentation, and model export

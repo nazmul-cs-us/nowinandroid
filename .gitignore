@@ -76,3 +76,19 @@ app/src/main/assets/tts/espeak-ng-data/
 
 # Local AAR libraries
 app/libs/*.aar
+
+# Release keystore and signing credentials
+app/keystore.properties
+app/release-keystore.jks
+*.jks
+*.keystore
+
+# Audio files pulled from device for CDN upload (now on Cloudflare R2)
+audio/
+
+# Wrangler (Cloudflare CLI) local state
+.wrangler/
+
+# Python cache
+__pycache__/
+*.pyc

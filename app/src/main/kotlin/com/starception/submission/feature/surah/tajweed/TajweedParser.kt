@@ -2,6 +2,7 @@ package com.starception.submission.feature.surah.tajweed
 
 import android.content.Context
 import android.util.Log
+import com.starception.submission.download.AssetRepository
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -17,12 +18,14 @@ object TajweedParser {
      * Parse the Tajweed JSON file and return a map of annotations.
      * Key format: "surahNumber:ayahNumber" (e.g., "1:1", "2:255")
      */
-    fun parse(context: Context): Map<String, List<TajweedAnnotation>> {
+    fun parse(context: Context, assetRepository: AssetRepository? = null): Map<String, List<TajweedAnnotation>> {
         val startTime = System.currentTimeMillis()
         val resultMap = mutableMapOf<String, List<TajweedAnnotation>>()
 
         try {
-            val jsonString = context.assets.open(TAJWEED_FILE).bufferedReader().use { it.readText() }
+            val inputStream = assetRepository?.openAsset("json/$TAJWEED_FILE")
+                ?: context.assets.open(TAJWEED_FILE)
+            val jsonString = inputStream.bufferedReader().use { it.readText() }
             val jsonArray = JSONArray(jsonString)
 
             Log.d(TAG, "📖 Parsing ${jsonArray.length()} ayahs from tajweed.json")
@@ -67,12 +70,14 @@ object TajweedParser {
     /**
      * Parse Tajweed data for a single surah (memory-efficient for large files).
      */
-    fun parseForSurah(context: Context, surahNumber: Int): Map<Int, List<TajweedAnnotation>> {
+    fun parseForSurah(context: Context, surahNumber: Int, assetRepository: AssetRepository? = null): Map<Int, List<TajweedAnnotation>> {
         val startTime = System.currentTimeMillis()
         val resultMap = mutableMapOf<Int, List<TajweedAnnotation>>()
 
         try {
-            val jsonString = context.assets.open(TAJWEED_FILE).bufferedReader().use { it.readText() }
+            val inputStream = assetRepository?.openAsset("json/$TAJWEED_FILE")
+                ?: context.assets.open(TAJWEED_FILE)
+            val jsonString = inputStream.bufferedReader().use { it.readText() }
             val jsonArray = JSONArray(jsonString)
 
             for (i in 0 until jsonArray.length()) {

@@ -28,6 +28,7 @@ import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig
+import com.starception.submission.download.AssetRepository
 import com.starception.submission.settings.components.TtsModelType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -54,7 +55,8 @@ import kotlin.coroutines.resume
  */
 @Singleton
 class SherpaOnnxTtsService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val assetRepository: AssetRepository,
 ) {
     companion object {
         private const val TAG = "SherpaOnnxTtsService"
@@ -933,7 +935,9 @@ class SherpaOnnxTtsService @Inject constructor(
         return try {
             outputFile.parentFile?.mkdirs()
 
-            context.assets.open("tts/$assetPath").use { input ->
+            val inputStream = assetRepository.openAsset("models/tts/$assetPath")
+                ?: context.assets.open("tts/$assetPath")
+            inputStream.use { input ->
                 FileOutputStream(outputFile).use { output ->
                     input.copyTo(output)
                 }
@@ -976,7 +980,9 @@ class SherpaOnnxTtsService @Inject constructor(
                     extractAssetDirRecursive("tts/$assetPath", outputFile)
                 } else {
                     // Extract file
-                    context.assets.open("tts/$assetPath").use { input ->
+                    val inputStream = assetRepository.openAsset("models/tts/$assetPath")
+                        ?: context.assets.open("tts/$assetPath")
+                    inputStream.use { input ->
                         FileOutputStream(outputFile).use { output ->
                             input.copyTo(output)
                         }
@@ -1008,7 +1014,11 @@ class SherpaOnnxTtsService @Inject constructor(
             if (subFiles != null && subFiles.isNotEmpty()) {
                 extractAssetDirRecursive(fullAssetPath, outputFile)
             } else {
-                context.assets.open(fullAssetPath).use { input ->
+                // Convert tts/... path to models/tts/... CDN key
+                val cdnKey = "models/$fullAssetPath"
+                val inputStream = assetRepository.openAsset(cdnKey)
+                    ?: context.assets.open(fullAssetPath)
+                inputStream.use { input ->
                     FileOutputStream(outputFile).use { output ->
                         input.copyTo(output)
                     }

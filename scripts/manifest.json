@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
+  "total_size": 1419217,
+  "total_files": 1,
+  "categories": {
+    "other": {
+      "total_size": 1419217,
+      "file_count": 1,
+      "required": false
+    }
+  },
+  "assets": {
+    "json/manifest.json": {
+      "size": 1419217,
+      "sha256": "3025b0d8eea48626dde86c39a7244e11bbf766d531449d34ae93160d80ebad62",
+      "category": "other",
+      "required": false
+    }
+  }
+}

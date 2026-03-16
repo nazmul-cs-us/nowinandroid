@@ -810,6 +810,25 @@ fun SurahDetailScreen(
                     )
                 }
             }
+            is SurahDetailUiState.NeedsDownload -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    com.starception.submission.download.MissingContentCard(
+                        resourceName = state.resourceName,
+                        category = state.category,
+                        description = state.description,
+                        downloadManager = viewModel.downloadManager,
+                        onDownloadComplete = {
+                            // Clear database cache so Room re-opens with new file
+                            com.starception.submission.core.qurandatabase.QuranTranslationHelper.clearCache()
+                            viewModel.loadSurah(surahNumber, currentTranslation)
+                        },
+                    )
+                }
+            }
         }
     }
 

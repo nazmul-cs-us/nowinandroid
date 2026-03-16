@@ -68,19 +68,14 @@ class LibGDXFragment : AndroidFragmentApplication() {
         view.isFocusableInTouchMode = true
         view.requestFocus()
 
-        // Prevent parent scroll views (LazyColumn) from intercepting touch events.
-        // This is critical — without it, vertical drags get stolen by the scrollable parent.
-        view.setOnTouchListener { v, event ->
-            // Claim all touches for this view's entire gesture
-            v.parent?.requestDisallowInterceptTouchEvent(true)
-            // Walk up the view hierarchy to block all ancestors
-            var parent = v.parent
-            while (parent != null) {
-                parent.requestDisallowInterceptTouchEvent(true)
-                parent = if (parent is View) (parent as View).parent else null
-            }
-            false // Let LibGDX handle the actual touch through its input processor
-        }
+        // DO NOT call view.setOnTouchListener here — initializeForView() sets
+        // AndroidInput as the touch listener, which processes all camera gestures
+        // (orbit, zoom, pan). Setting another listener would overwrite it since
+        // View.setOnTouchListener() only supports one listener.
+        //
+        // Parent scroll interception (LazyColumn) is handled by the container
+        // FrameLayout in Visualization3DView.kt which overrides dispatchTouchEvent()
+        // to call requestDisallowInterceptTouchEvent(true).
 
         return view
     }

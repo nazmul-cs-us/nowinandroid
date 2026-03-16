@@ -16,16 +16,21 @@
 
 package com.starception.submission.voice
 
+import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.download.AudioDownloadHelper
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 
 /**
- * Entry Point for accessing SherpaOnnxTtsService from Composable functions
- * that don't have direct access to Hilt injection.
+ * Entry Point for accessing SherpaOnnxTtsService, AssetDownloadManager,
+ * and AudioDownloadHelper from Composable functions that don't have
+ * direct access to Hilt injection.
  */
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface SherpaOnnxTtsEntryPoint {
     fun sherpaOnnxTtsService(): SherpaOnnxTtsService
+    fun assetDownloadManager(): AssetDownloadManager
+    fun audioDownloadHelper(): AudioDownloadHelper
 }

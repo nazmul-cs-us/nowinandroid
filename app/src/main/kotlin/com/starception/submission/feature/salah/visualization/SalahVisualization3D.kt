@@ -42,7 +42,7 @@ import kotlin.math.sqrt
  * - Real-time updates via callback
  */
 class SalahVisualization3D(
-    private val onPlaybackUpdate: (Int, SalahPosture?, Float, Float, Float, Float) -> Unit
+    private val onPlaybackUpdate: (Int, SalahPosture?, Float, Float, Float, Float, Boolean) -> Unit
 ) : ApplicationAdapter() {
 
     // Camera
@@ -254,9 +254,9 @@ class SalahVisualization3D(
                 VisualizationMode.GRAVITY_VECTOR -> buildGravityVectors()
                 VisualizationMode.SCATTER -> rebuildScatterInstances()
                 VisualizationMode.PHONE_MODEL -> {
-                    // Position camera for humanoid view
-                    camera.position.set(8f, 5f, 10f)
-                    camera.lookAt(0f, 2.5f, 0f)
+                    // Position camera for humanoid view (figure is ~7 units tall)
+                    camera.position.set(10f, 6f, 12f)
+                    camera.lookAt(0f, 3.5f, 0f)
                     camera.update()
                 }
             }
@@ -505,7 +505,8 @@ class SalahVisualization3D(
                 sample.pitch,
                 sample.roll,
                 sample.accelMagnitude,
-                sample.gyroMagnitude
+                sample.gyroMagnitude,
+                isPlaying
             )
         }
     }
@@ -720,43 +721,50 @@ class SalahVisualization3D(
 
     /** Standing upright — Qiyam position, arms at sides */
     private fun poseStanding() {
-        // Torso: centered, standing upright
-        val torsoY = 3.5f  // center of torso
-        torsoInstance?.transform?.setToTranslation(0f, torsoY, 0f)
+        // Build upward from ground (y=0 = feet level)
+        // Lower leg capsule h=1.8 → center at 0.9
+        // Upper leg capsule h=2.0 → center at 0.9+1.8/2+2.0/2 = 0.9+0.9+1.0 = 2.8
+        // Hip ≈ 3.8, torso capsule h=3.0 → center at 3.8+1.5 = 5.3
+        // Head sphere r=0.5 → center at 5.3+1.5+0.5 = 7.3
+        val groundY = 0f
+        val lowerLegY = groundY + 0.9f     // center of lower leg
+        val upperLegY = groundY + 2.8f     // center of upper leg
+        val hipY = groundY + 3.8f          // hip joint
+        val torsoY = hipY + 1.5f           // center of torso (5.3)
+        val headY = torsoY + 2f            // center of head (7.3)
 
-        // Head: on top of torso
-        headInstance?.transform?.setToTranslation(0f, torsoY + 2f, 0f)
+        torsoInstance?.transform?.setToTranslation(0f, torsoY, 0f)
+        headInstance?.transform?.setToTranslation(0f, headY, 0f)
 
         // Arms hanging at sides
-        // Left upper arm
         leftUpperArmInstance?.transform?.idt()
         leftUpperArmInstance?.transform?.setToTranslation(-0.9f, torsoY + 0.7f, 0f)
 
-        // Right upper arm
         rightUpperArmInstance?.transform?.idt()
         rightUpperArmInstance?.transform?.setToTranslation(0.9f, torsoY + 0.7f, 0f)
 
-        // Left forearm
         leftForearmInstance?.transform?.idt()
         leftForearmInstance?.transform?.setToTranslation(-0.9f, torsoY - 0.6f, 0f)
 
-        // Right forearm
         rightForearmInstance?.transform?.idt()
         rightForearmInstance?.transform?.setToTranslation(0.9f, torsoY - 0.6f, 0f)
 
         // Legs
-        val hipY = torsoY - 1.5f
-        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, hipY - 1f, 0f)
-        rightUpperLegInstance?.transform?.setToTranslation(0.4f, hipY - 1f, 0f)
-        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, hipY - 2.9f, 0f)
-        rightLowerLegInstance?.transform?.setToTranslation(0.4f, hipY - 2.9f, 0f)
+        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, upperLegY, 0f)
+        rightUpperLegInstance?.transform?.setToTranslation(0.4f, upperLegY, 0f)
+        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, lowerLegY, 0f)
+        rightLowerLegInstance?.transform?.setToTranslation(0.4f, lowerLegY, 0f)
     }
 
     /** Bowing — Ruku position: torso bent ~90 degrees forward, hands on knees */
     private fun poseRuku() {
-        val hipY = 2f
+        // Same leg geometry as standing — feet at ground
+        val groundY = 0f
+        val lowerLegY = groundY + 0.9f
+        val upperLegY = groundY + 2.8f
+        val hipY = groundY + 3.8f
 
-        // Torso: tilted forward 90 degrees
+        // Torso: tilted forward 90 degrees from hip
         torsoInstance?.transform?.idt()
         torsoInstance?.transform?.setToTranslation(0f, hipY + 0.3f, -0.8f)
         torsoInstance?.transform?.rotate(Vector3.X, 90f)
@@ -779,16 +787,18 @@ class SalahVisualization3D(
         rightForearmInstance?.transform?.idt()
         rightForearmInstance?.transform?.setToTranslation(0.5f, hipY - 0.8f, -0.6f)
 
-        // Legs: straight
-        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, hipY - 1f, 0f)
-        rightUpperLegInstance?.transform?.setToTranslation(0.4f, hipY - 1f, 0f)
-        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, hipY - 2.9f, 0f)
-        rightLowerLegInstance?.transform?.setToTranslation(0.4f, hipY - 2.9f, 0f)
+        // Legs: straight, feet on ground
+        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, upperLegY, 0f)
+        rightUpperLegInstance?.transform?.setToTranslation(0.4f, upperLegY, 0f)
+        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, lowerLegY, 0f)
+        rightLowerLegInstance?.transform?.setToTranslation(0.4f, lowerLegY, 0f)
     }
 
     /** Transitioning down — partway between standing and prostration */
     private fun poseGoingToSujud() {
-        val hipY = 1.5f
+        // Hip is lowering — person bending knees to go down
+        val groundY = 0f
+        val hipY = 2.5f  // partway between standing (3.8) and kneeling (1.2)
 
         // Torso tilted forward ~45 degrees, descending
         torsoInstance?.transform?.idt()
@@ -814,22 +824,22 @@ class SalahVisualization3D(
         rightForearmInstance?.transform?.setToTranslation(0.7f, hipY - 0.5f, -1.5f)
         rightForearmInstance?.transform?.rotate(Vector3.X, 70f)
 
-        // Legs bending
+        // Legs bending — knees going forward, feet on ground
         leftUpperLegInstance?.transform?.idt()
-        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, hipY - 0.5f, 0.3f)
-        leftUpperLegInstance?.transform?.rotate(Vector3.X, -30f)
+        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, hipY - 0.8f, 0.5f)
+        leftUpperLegInstance?.transform?.rotate(Vector3.X, -40f)
 
         rightUpperLegInstance?.transform?.idt()
-        rightUpperLegInstance?.transform?.setToTranslation(0.4f, hipY - 0.5f, 0.3f)
-        rightUpperLegInstance?.transform?.rotate(Vector3.X, -30f)
+        rightUpperLegInstance?.transform?.setToTranslation(0.4f, hipY - 0.8f, 0.5f)
+        rightUpperLegInstance?.transform?.rotate(Vector3.X, -40f)
 
         leftLowerLegInstance?.transform?.idt()
-        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, hipY - 2f, 0.8f)
-        leftLowerLegInstance?.transform?.rotate(Vector3.X, -60f)
+        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, groundY + 0.5f, 1.0f)
+        leftLowerLegInstance?.transform?.rotate(Vector3.X, -70f)
 
         rightLowerLegInstance?.transform?.idt()
-        rightLowerLegInstance?.transform?.setToTranslation(0.4f, hipY - 2f, 0.8f)
-        rightLowerLegInstance?.transform?.rotate(Vector3.X, -60f)
+        rightLowerLegInstance?.transform?.setToTranslation(0.4f, groundY + 0.5f, 1.0f)
+        rightLowerLegInstance?.transform?.rotate(Vector3.X, -70f)
     }
 
     /** Prostration — Sujud: face on ground, back arched, knees on ground */

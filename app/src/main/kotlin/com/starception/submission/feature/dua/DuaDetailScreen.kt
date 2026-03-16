@@ -541,18 +541,15 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                 val sortedDuas = withContext(Dispatchers.IO) {
                     val duas = mutableListOf<DuaItem>()
 
-                    val dbPath = context.getDatabasePath("news_resources_topic_temp.db")
-                    if (dbPath.exists()) dbPath.delete()
-
-                    context.assets.open("databases/news.db").use { inputStream ->
-                        dbPath.parentFile?.mkdirs()
-                        java.io.FileOutputStream(dbPath).use { outputStream ->
-                            inputStream.copyTo(outputStream)
-                        }
+                    // Use Room-managed news.db (populated via regenerateFromSources at startup)
+                    val roomDbPath = context.getDatabasePath("news.db")
+                    if (!roomDbPath.exists()) {
+                        android.util.Log.w("DuaDetailViewModel", "Room news.db not found, triggering regeneration")
+                        com.starception.submission.core.contentdatabase.NewsDatabase.regenerateFromSources(context)
                     }
 
                     val db = android.database.sqlite.SQLiteDatabase.openDatabase(
-                        dbPath.absolutePath,
+                        roomDbPath.absolutePath,
                         null,
                         android.database.sqlite.SQLiteDatabase.OPEN_READONLY
                     )
@@ -607,7 +604,6 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
 
                     cursor.close()
                     db.close()
-                    dbPath.delete()
 
                     duas.sortedBy { it.duaNumber }
                 }
@@ -638,19 +634,15 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                 val sortedDuas = withContext(Dispatchers.IO) {
                     val duas = mutableListOf<DuaItem>()
 
-                    // Open news_resources.db from assets
-                    val dbPath = context.getDatabasePath("news_resources_temp.db")
-                    if (dbPath.exists()) dbPath.delete()
-
-                    context.assets.open("databases/news.db").use { inputStream ->
-                        dbPath.parentFile?.mkdirs()
-                        java.io.FileOutputStream(dbPath).use { outputStream ->
-                            inputStream.copyTo(outputStream)
-                        }
+                    // Use Room-managed news.db (populated via regenerateFromSources at startup)
+                    val roomDbPath = context.getDatabasePath("news.db")
+                    if (!roomDbPath.exists()) {
+                        android.util.Log.w("DuaDetailViewModel", "Room news.db not found, triggering regeneration")
+                        com.starception.submission.core.contentdatabase.NewsDatabase.regenerateFromSources(context)
                     }
 
                     val db = android.database.sqlite.SQLiteDatabase.openDatabase(
-                        dbPath.absolutePath,
+                        roomDbPath.absolutePath,
                         null,
                         android.database.sqlite.SQLiteDatabase.OPEN_READONLY
                     )
@@ -702,7 +694,6 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
 
                     cursor.close()
                     db.close()
-                    dbPath.delete()
 
                     duas.sortedBy { it.duaNumber }
                 }

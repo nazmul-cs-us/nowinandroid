@@ -32,6 +32,7 @@ import com.k2fsa.sherpa.onnx.OnlineModelConfig
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.EndpointConfig
 import com.k2fsa.sherpa.onnx.EndpointRule
+import com.starception.submission.download.AssetRepository
 import com.starception.submission.feature.search.VoiceSearchService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,7 +56,8 @@ import java.io.FileOutputStream
  * Model: sherpa-onnx-streaming-zipformer-en-20M (42MB int8)
  */
 class SherpaVoiceService(
-    private val context: Context
+    private val context: Context,
+    private val assetRepository: AssetRepository? = null,
 ) {
     companion object {
         private const val TAG = "SherpaVoiceService"
@@ -187,7 +189,11 @@ class SherpaVoiceService(
             return outFile
         }
 
-        context.assets.open(assetPath).use { input ->
+        // Convert sherpa/... path to models/sherpa/... CDN key
+        val cdnKey = "models/$assetPath"
+        val inputStream = assetRepository?.openAsset(cdnKey)
+            ?: context.assets.open(assetPath)
+        inputStream.use { input ->
             FileOutputStream(outFile).use { output ->
                 input.copyTo(output)
             }

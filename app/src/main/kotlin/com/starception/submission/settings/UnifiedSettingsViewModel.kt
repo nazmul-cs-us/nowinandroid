@@ -28,6 +28,9 @@ import com.starception.submission.settings.components.VoiceTestState
 import com.starception.submission.settings.components.TtsSettingsState
 import com.starception.submission.settings.components.TtsTestState
 import com.starception.submission.settings.components.TtsVoice
+import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.download.AssetDownloadViewModel
+import com.starception.submission.download.CategoryDownloadState
 import com.starception.submission.voice.SherpaOnnxKwsService
 import com.starception.submission.voice.WhisperVoiceService
 import com.starception.submission.voice.SherpaOnnxTtsService
@@ -60,6 +63,7 @@ class UnifiedSettingsViewModel @Inject constructor(
     private val whisperVoiceService: WhisperVoiceService,
     private val sherpaOnnxKwsService: SherpaOnnxKwsService,
     private val ttsService: SherpaOnnxTtsService,
+    private val downloadManager: AssetDownloadManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -126,6 +130,13 @@ class UnifiedSettingsViewModel @Inject constructor(
     private val _ttsSettings = MutableStateFlow(TtsSettingsState())
     val ttsSettings: StateFlow<TtsSettingsState> = _ttsSettings.asStateFlow()
 
+    // Content management
+    private val _contentCategories = MutableStateFlow<List<CategoryDownloadState>>(emptyList())
+    val contentCategories: StateFlow<List<CategoryDownloadState>> = _contentCategories.asStateFlow()
+
+    private val _totalDownloadedSize = MutableStateFlow(0L)
+    val totalDownloadedSize: StateFlow<Long> = _totalDownloadedSize.asStateFlow()
+
     init {
         loadPrayerSettings()
         loadNotificationPreferences()
@@ -133,6 +144,7 @@ class UnifiedSettingsViewModel @Inject constructor(
         loadDatabaseInfo()
         loadVoiceSettings()
         loadTtsSettings()
+        loadContentManagement()
     }
 
     private fun loadPrayerSettings() {
@@ -716,8 +728,14 @@ class UnifiedSettingsViewModel @Inject constructor(
                 } catch (e: Exception) {
                     VoiceRecognitionEngine.SHERPA_KWS
                 }
-                _voiceSettings.value = VoiceSettingsState(selectedEngine = engine)
-                Log.i(TAG, "Voice settings loaded: engine=${engine.name}")
+                val needsDownload = !checkVoiceModelAvailable(engine)
+                val downloadCategory = if (needsDownload) voiceEngineDownloadCategory(engine) else null
+                _voiceSettings.value = VoiceSettingsState(
+                    selectedEngine = engine,
+                    needsDownload = needsDownload,
+                    downloadCategory = downloadCategory,
+                )
+                Log.i(TAG, "Voice settings loaded: engine=${engine.name}, needsDownload=$needsDownload")
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading voice settings", e)
             }
@@ -727,7 +745,13 @@ class UnifiedSettingsViewModel @Inject constructor(
     fun updateVoiceSettings(engine: VoiceRecognitionEngine) {
         viewModelScope.launch {
             try {
-                _voiceSettings.value = _voiceSettings.value.copy(selectedEngine = engine)
+                val needsDownload = !checkVoiceModelAvailable(engine)
+                val downloadCategory = if (needsDownload) voiceEngineDownloadCategory(engine) else null
+                _voiceSettings.value = _voiceSettings.value.copy(
+                    selectedEngine = engine,
+                    needsDownload = needsDownload,
+                    downloadCategory = downloadCategory,
+                )
 
                 // Save to SharedPreferences
                 val prefs = context.getSharedPreferences("voice_settings", Context.MODE_PRIVATE)
@@ -735,7 +759,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                     .putString("voice_engine", engine.name)
                     .apply()
 
-                Log.i(TAG, "Voice settings saved: engine=${engine.name}")
+                Log.i(TAG, "Voice settings saved: engine=${engine.name}, needsDownload=$needsDownload")
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving voice settings", e)
             }
@@ -761,11 +785,15 @@ class UnifiedSettingsViewModel @Inject constructor(
                     TtsVoice.KOKORO_EN
                 }
 
+                val needsDownload = !checkTtsModelAvailable(voice)
+                val downloadCategory = if (needsDownload) ttsVoiceDownloadCategory(voice) else null
                 _ttsSettings.value = _ttsSettings.value.copy(
                     selectedVoice = voice,
-                    selectedSpeakerId = speakerId
+                    selectedSpeakerId = speakerId,
+                    needsDownload = needsDownload,
+                    downloadCategory = downloadCategory,
                 )
-                Log.i(TAG, "TTS settings loaded: voice=${voice.name}, speakerId=$speakerId")
+                Log.i(TAG, "TTS settings loaded: voice=${voice.name}, speakerId=$speakerId, needsDownload=$needsDownload")
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading TTS settings", e)
             }
@@ -1043,9 +1071,13 @@ class UnifiedSettingsViewModel @Inject constructor(
     fun updateTtsVoice(voice: TtsVoice) {
         viewModelScope.launch {
             Log.i(TAG, "🔊 Updating TTS voice to: ${voice.displayName}")
+            val needsDownload = !checkTtsModelAvailable(voice)
+            val downloadCategory = if (needsDownload) ttsVoiceDownloadCategory(voice) else null
             _ttsSettings.value = _ttsSettings.value.copy(
                 selectedVoice = voice,
-                selectedSpeakerId = 0  // Reset speaker ID when changing voice
+                selectedSpeakerId = 0,  // Reset speaker ID when changing voice
+                needsDownload = needsDownload,
+                downloadCategory = downloadCategory,
             )
 
             // Save preference
@@ -1056,6 +1088,7 @@ class UnifiedSettingsViewModel @Inject constructor(
 
             // Update service with new voice (this will release and prepare for re-init)
             ttsService.setVoice(voice)
+            Log.i(TAG, "TTS voice updated: ${voice.name}, needsDownload=$needsDownload")
         }
     }
 
@@ -1073,6 +1106,141 @@ class UnifiedSettingsViewModel @Inject constructor(
         prefs.edit()
             .putInt("selected_speaker_id", speakerId)
             .apply()
+    }
+
+    // ==================== Content Management ====================
+
+    private fun loadContentManagement() {
+        viewModelScope.launch {
+            try {
+                val manifest = downloadManager.loadManifest() ?: return@launch
+                refreshContentCategories(manifest)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading content management", e)
+            }
+        }
+    }
+
+    private fun refreshContentCategories(manifest: com.starception.submission.download.AssetManifest? = null) {
+        viewModelScope.launch {
+            try {
+                val m = manifest ?: downloadManager.loadManifest() ?: return@launch
+                val categories = m.categories.map { (key, info) ->
+                    val downloadedSize = downloadManager.getCategoryDownloadedSize(key, m)
+                    val isComplete = downloadManager.isCategoryComplete(key, m)
+                    CategoryDownloadState(
+                        categoryKey = key,
+                        displayName = AssetDownloadViewModel.formatCategoryName(key),
+                        description = AssetDownloadViewModel.categoryDescription(key),
+                        totalSize = info.totalSize,
+                        downloadedSize = downloadedSize,
+                        fileCount = info.fileCount,
+                        required = info.required,
+                        isComplete = isComplete,
+                        progress = if (info.totalSize > 0) downloadedSize.toFloat() / info.totalSize else 0f,
+                    )
+                }.sortedWith(
+                    compareByDescending<CategoryDownloadState> { it.required }
+                        .thenBy { it.displayName }
+                )
+
+                _contentCategories.value = categories
+                _totalDownloadedSize.value = downloadManager.getTotalDownloadedSize()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error refreshing content categories", e)
+            }
+        }
+    }
+
+    fun downloadContent(categoryKey: String) {
+        viewModelScope.launch {
+            try {
+                val manifest = downloadManager.loadManifest() ?: return@launch
+                downloadManager.downloadCategory(categoryKey, manifest) { _, _, _ ->
+                    viewModelScope.launch { refreshContentCategories(manifest) }
+                }
+                refreshContentCategories(manifest)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error downloading category $categoryKey", e)
+            }
+        }
+    }
+
+    fun deleteContent(categoryKey: String) {
+        viewModelScope.launch {
+            try {
+                val manifest = downloadManager.loadManifest() ?: return@launch
+                downloadManager.deleteCategory(categoryKey, manifest)
+                refreshContentCategories(manifest)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting category $categoryKey", e)
+            }
+        }
+    }
+
+    // ==================== Model Availability Checks ====================
+
+    fun getDownloadManager(): AssetDownloadManager = downloadManager
+
+    private fun checkVoiceModelAvailable(engine: VoiceRecognitionEngine): Boolean {
+        return try {
+            when (engine) {
+                VoiceRecognitionEngine.WHISPER -> {
+                    // Whisper model: models/ggml-tiny.en.bin
+                    context.assets.open("models/ggml-tiny.en.bin").use { it.available() > 0 }
+                }
+                VoiceRecognitionEngine.SHERPA_KWS -> {
+                    // Sherpa KWS: sherpa/encoder.int8.onnx
+                    context.assets.open("sherpa/encoder.int8.onnx").use { it.available() > 0 }
+                }
+            }
+        } catch (e: Exception) {
+            // Check CDN download location as fallback
+            try {
+                val cdnDir = java.io.File(context.filesDir, "cdn_assets")
+                when (engine) {
+                    VoiceRecognitionEngine.WHISPER ->
+                        java.io.File(cdnDir, "models/ggml-tiny.en.bin").exists()
+                    VoiceRecognitionEngine.SHERPA_KWS ->
+                        java.io.File(cdnDir, "models/sherpa/encoder.int8.onnx").exists()
+                }
+            } catch (_: Exception) {
+                false
+            }
+        }
+    }
+
+    private fun checkTtsModelAvailable(voice: TtsVoice): Boolean {
+        val modelFile = voice.modelFile // e.g. "kokoro-int8-en-v0_19/model.int8.onnx"
+        return try {
+            // Check bundled assets first
+            context.assets.open("tts/$modelFile").use { it.available() > 0 }
+        } catch (e: Exception) {
+            // Check CDN download location
+            try {
+                val cdnDir = java.io.File(context.filesDir, "cdn_assets")
+                java.io.File(cdnDir, "models/tts/$modelFile").exists()
+            } catch (_: Exception) {
+                false
+            }
+        }
+    }
+
+    private fun voiceEngineDownloadCategory(engine: VoiceRecognitionEngine): String = when (engine) {
+        VoiceRecognitionEngine.WHISPER -> "model_whisper"
+        VoiceRecognitionEngine.SHERPA_KWS -> "model_kws"
+    }
+
+    private fun ttsVoiceDownloadCategory(voice: TtsVoice): String = when (voice) {
+        TtsVoice.KOKORO_EN -> "model_tts_kokoro"
+        TtsVoice.VITS_VCTK -> "model_tts_vits"
+    }
+
+    fun refreshAfterModelDownload() {
+        Log.i(TAG, "Refreshing settings after model download...")
+        loadVoiceSettings()
+        loadTtsSettings()
+        refreshContentCategories()
     }
 }
 

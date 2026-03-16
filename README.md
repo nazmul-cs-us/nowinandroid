@@ -3,13 +3,11 @@
 Starception Submission App
 ==========================
 
-**An enhanced Android app based on Google's Now in Android architecture, featuring comprehensive Islamic prayer times functionality.**
+**A comprehensive Islamic lifestyle Android app featuring prayer times, Quran reader, salah posture ML detection, driving mode audio, and 3D visualization - built on Google's Now in Android architecture.**
 
-This repository contains the **Starception Submission** app - a fully functional Android application built entirely with Kotlin and Jetpack Compose. It extends Google's Now in Android sample with a complete Islamic prayer times system while maintaining all original functionality.
+This repository contains the **Starception Submission** app - a fully functional Android application built entirely with Kotlin and Jetpack Compose. It extends Google's Now in Android sample with comprehensive Islamic features including prayer times, Quran with Tafseer, on-device ML posture detection, driving mode audio with voice integration, and 3D sensor data visualization.
 
 **Learn about the original architecture in the [architecture learning journey](docs/ArchitectureLearningJourney.md) and [modularization learning journey](docs/ModularizationLearningJourney.md).**
-
-The app demonstrates modern Android development practices and serves as both a functional news app and a comprehensive prayer times calculator for Muslims worldwide.
 
 # Features
 
@@ -85,11 +83,52 @@ Each prayer follows specific astronomical criteria:
 - **±180 Minute Range**: Full 6-hour adjustment range with 6-degree-per-minute precision
 - **Haptic Feedback**: Tactile response during drag interactions for enhanced user experience
 
+## Quran Reader & Study
+- **12 Language Translations**: Arabic + English, Bengali, Chinese, Spanish, French, Indonesian, Russian, Swedish, Turkish, Urdu, and transliteration
+- **Audio Player**: Full Quran audio playback with surah navigation and bookmarks
+- **Word Study**: Tap any ayah to see detailed Arabic word meanings
+- **3 Tafseer Books**: As-Sa'di, Al-Moyassar, Al-Baghawi with instant switching
+- **Enhanced Database**: 30MB database with word meanings and scholarly interpretations
+- **Search**: Cross-translation text search across all languages
+- **See**: [Quran Translation Guide](docs/QURAN_TRANSLATION_DATABASES_GUIDE.md), [Word Study & Tafseer](docs/WORD_STUDY_TAFSEER_FEATURE_SUMMARY.md)
+
+## Salah ML Posture Detection
+**On-device machine learning system that detects 7 Islamic prayer postures using phone sensors.**
+
+- **7 Posture Classes**: Qiyam, Ruku, Going to Sujud, Sujud, Jalsa, Tashahhud, Qiyam Rising
+- **Phone-in-Pocket Design**: Uses accelerometer + gyroscope at 50Hz from phone in pocket
+- **1D CNN Model**: 177KB TFLite model with 30 statistical features per 100ms window
+- **Training Pipeline**: Python scripts for feature engineering, augmentation, and TFLite export
+- **Sequence Validation**: State machine filters false positives and counts rak'ahs
+- **Data Collection UI**: In-app recording with quality feedback, auto-trimming, and progress tracking
+- **3D Visualization**: LibGDX 1.12.1 engine with scatter plot, animated humanoid model, and gravity vector modes
+- **See**: [Salah ML Guide](docs/SALAH_ML_TRAINING_GUIDE.md), [LibGDX Visualization Guide](docs/LIBGDX_3D_VISUALIZATION_GUIDE.md)
+
+## Driving Mode & Voice Features
+**Foreground audio service with voice integration for Islamic content during driving.**
+
+- **Audio Chain**: Travel Dua -> Hadith (audio or TTS) -> Quran recitation -> Voice completion prompt
+- **MediaSession Integration**: Lock screen controls, notification playback, Bluetooth audio support
+- **Sherpa ONNX TTS**: On-device text-to-speech for reading Hadith text when no audio recording is available
+- **Whisper Recognition**: On-device English speech recognition for voice commands
+- **Activity Detection**: Accelerometer + gyroscope based driving/walking detection triggers driving mode
+- **Wake Lock**: Prevents CPU sleep during playback
+- **See**: [Driving & Voice Guide](docs/DRIVING_VOICE_FEATURES_GUIDE.md)
+
+## Qibla Direction
+- **3D Globe**: NASA WorldWind visualization showing great circle path from user to Kaaba
+- **Compass**: Real-time direction finder with Material 3 theming
+- **Custom Markers**: User location and Kaaba markers on 3D globe
+- **Device Rotation**: Globe rotates based on device compass heading
+- **See**: [Compass Integration Guide](docs/COMPASS_INTEGRATION_GUIDE.md)
+
 ### Technical Features
 - **Offline-first Architecture**: Works without internet connection
 - **Background Services**: Automatic prayer time updates and notifications
 - **Performance Optimized**: Efficient calculations with smart caching
 - **Memory Efficient**: Proper resource management and leak prevention
+- **On-Device ML**: All ML inference runs locally, no server required
+- **On-Device Voice**: TTS and speech recognition work completely offline
 
 ## Screenshots
 
@@ -147,24 +186,39 @@ this time, there is not a public backend available.
 For normal development use the `demoDebug` variant. For UI performance testing use the
 `demoRelease` variant.
 
-## Prayer Times Development
-The Islamic prayer times functionality is fully integrated into the existing architecture:
+## Technology Stack
+- **Language**: Kotlin 2.0.21
+- **UI**: Jetpack Compose with Compose BOM 2025.02.00
+- **Design**: Material 3 Design System
+- **DI**: Hilt 2.56
+- **Database**: Room 2.7.2
+- **3D (Qibla)**: NASA WorldWind Android v0.8.0
+- **3D (Salah ML)**: LibGDX 1.12.1
+- **ML**: TensorFlow Lite (on-device inference)
+- **TTS**: Sherpa ONNX (on-device)
+- **Speech**: Whisper TFLite (on-device)
+- **Training**: Python + TensorFlow/Keras
+- **Min SDK**: 24 | **Target SDK**: 35
+
+## Islamic Features Development
+All Islamic features are fully integrated into the existing architecture:
 
 ### Build Configuration
-- All prayer times code is included in both `demo` and `prod` flavors
+- All features included in both `demo` and `prod` flavors
 - Uses the same modular architecture as the original app
-- Prayer times work offline and don't require backend connectivity
+- Prayer times, ML, and voice features work offline
 
-### Key Build Commands for Prayer Times
-- `./gradlew assembleDemoDebug` - Build with prayer times functionality
-- `./gradlew installDemoDebug` - Install on device for testing prayer times
-- `adb -s 4B221FDAP002T6 install -r app/build/outputs/apk/demo/debug/app-demo-debug.apk` - Install on specific Pixel 9 Pro device
+### Key Build Commands
+- `./gradlew assembleDemoDebug` - Build with all features
+- `./gradlew installDemoDebug` - Install on device for testing
+- `adb -s 4B221FDAP002T6 install -r app/build/outputs/apk/demo/debug/app-demo-debug.apk` - Install on Pixel 9 Pro
 
-### Testing Prayer Times
-- Prayer times use real GPS location when available
-- Falls back to default location (Mecca) when GPS is unavailable
-- Manual location testing available through settings
-- All calculation methods can be tested and compared 
+### ML Training Pipeline
+```bash
+cd training/salah_model/
+python3 train_salah_detector.py --data_dir ./data/ --output_dir ./output --epochs 150 --augment
+python3 export_tflite.py --model_path ./output/salah_detector.keras --deploy_to ../../app/src/main/assets/
+```
 
 # Testing
 
@@ -286,6 +340,26 @@ The reports files will be added to [build/compose-reports](build/compose-reports
 added to [build/compose-metrics](build/compose-metrics).
 
 For more information on Compose compiler metrics, see [this blog post](https://medium.com/androiddevelopers/jetpack-compose-stability-explained-79c10db270c8).
+
+# Documentation
+
+All technical documentation is in the `docs/` directory:
+
+| Guide | Description |
+|-------|-------------|
+| [Salah ML Training Guide](docs/SALAH_ML_TRAINING_GUIDE.md) | ML posture detection: data collection, training, inference |
+| [LibGDX 3D Visualization Guide](docs/LIBGDX_3D_VISUALIZATION_GUIDE.md) | 3D sensor data visualization engine |
+| [Driving & Voice Guide](docs/DRIVING_VOICE_FEATURES_GUIDE.md) | Driving mode audio and voice integration |
+| [Prayer Times Technical Guide](docs/PRAYER_TIMES_TECHNICAL_GUIDE.md) | Prayer times system architecture |
+| [Prayer Calculation Methodology](docs/PRAYER_CALCULATION_METHODOLOGY.md) | Islamic prayer time calculations |
+| [Quran Translation Guide](docs/QURAN_TRANSLATION_DATABASES_GUIDE.md) | 12-language Quran database system |
+| [Word Study & Tafseer](docs/WORD_STUDY_TAFSEER_FEATURE_SUMMARY.md) | Word study and Tafseer features |
+| [Compass Integration Guide](docs/COMPASS_INTEGRATION_GUIDE.md) | Qibla compass and 3D globe |
+| [Activity Detection Guide](docs/ACTIVITY_DETECTION_TECHNICAL_GUIDE.md) | Driving/walking activity detection |
+| [Architecture Journey](docs/ArchitectureLearningJourney.md) | Android architecture patterns |
+| [Modularization Journey](docs/ModularizationLearningJourney.md) | Modularization best practices |
+
+See `docs/` for the complete list of 31 documentation files.
 
 # License
 

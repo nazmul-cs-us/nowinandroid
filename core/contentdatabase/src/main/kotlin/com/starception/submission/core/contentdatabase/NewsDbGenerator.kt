@@ -465,7 +465,14 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
         val now = getCurrentTimestamp()
 
         try {
-            val jsonString = context.assets.open("sahih_bukhari.json").bufferedReader().use { it.readText() }
+            // Check CDN-downloaded file first, then fall back to bundled asset
+            val cdnJsonFile = File(context.filesDir, "cdn_assets/json/sahih_bukhari.json")
+            val jsonString = if (cdnJsonFile.exists() && cdnJsonFile.length() > 0) {
+                Log.d(TAG, "Using CDN-downloaded sahih_bukhari.json (${cdnJsonFile.length()} bytes)")
+                cdnJsonFile.readText()
+            } else {
+                context.assets.open("sahih_bukhari.json").bufferedReader().use { it.readText() }
+            }
             val jsonArray = org.json.JSONArray(jsonString)
 
             for (volIndex in 0 until jsonArray.length()) {
@@ -521,9 +528,19 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
     }
 
     /**
-     * Copy asset database to a readable location and return the path
+     * Copy asset database to a readable location and return the path.
+     * Checks CDN-downloaded files first, then falls back to bundled APK assets.
      */
     private fun getAssetDbPath(context: Context, dbName: String): String? {
+        // Check CDN-downloaded file first (matches AssetDownloadManager path convention)
+        val cdnKey = "databases/quran/$dbName"
+        val cdnFile = File(context.filesDir, "cdn_assets/$cdnKey")
+        if (cdnFile.exists() && cdnFile.length() > 0) {
+            Log.d(TAG, "Using CDN-downloaded database: $dbName (${cdnFile.length()} bytes)")
+            return cdnFile.absolutePath
+        }
+
+        // Fall back to bundled APK asset
         return try {
             val cacheDir = File(context.cacheDir, "temp_dbs")
             cacheDir.mkdirs()
@@ -539,7 +556,7 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
 
             outFile.absolutePath
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to copy asset database: $dbName", e)
+            Log.e(TAG, "Database not available (CDN or bundled): $dbName", e)
             null
         }
     }
@@ -774,7 +791,14 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
             // Generate Bukhari Hadiths from JSON
             var bukhariCount = 0
             try {
-                val jsonString = context.assets.open("sahih_bukhari.json").bufferedReader().use { it.readText() }
+                // Check CDN-downloaded file first, then fall back to bundled asset
+                val cdnJsonFile = File(context.filesDir, "cdn_assets/json/sahih_bukhari.json")
+                val jsonString = if (cdnJsonFile.exists() && cdnJsonFile.length() > 0) {
+                    Log.d(TAG, "Using CDN-downloaded sahih_bukhari.json (${cdnJsonFile.length()} bytes)")
+                    cdnJsonFile.readText()
+                } else {
+                    context.assets.open("sahih_bukhari.json").bufferedReader().use { it.readText() }
+                }
                 val jsonArray = org.json.JSONArray(jsonString)
                 var newsId = 3001
 

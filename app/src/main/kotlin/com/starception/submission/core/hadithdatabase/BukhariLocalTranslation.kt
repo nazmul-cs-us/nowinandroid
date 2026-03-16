@@ -1,6 +1,7 @@
 package com.starception.submission.core.hadithdatabase
 
 import android.content.Context
+import com.starception.submission.download.AssetRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -20,7 +21,10 @@ data class BukhariTranslation(
 /**
  * Repository for loading local Bukhari English translations from JSON asset
  */
-class BukhariLocalTranslationRepository private constructor(private val context: Context) {
+class BukhariLocalTranslationRepository private constructor(
+    private val context: Context,
+    private val assetRepository: AssetRepository? = null,
+) {
 
     private var translationsMap: Map<Int, BukhariTranslation>? = null
     private var isLoaded = false
@@ -33,7 +37,9 @@ class BukhariLocalTranslationRepository private constructor(private val context:
 
         return withContext(Dispatchers.IO) {
             try {
-                val jsonString = context.assets.open("sahih_bukhari.json").bufferedReader().use { it.readText() }
+                val inputStream = assetRepository?.openAsset("json/sahih_bukhari.json")
+                    ?: context.assets.open("sahih_bukhari.json")
+                val jsonString = inputStream.bufferedReader().use { it.readText() }
                 val jsonArray = JSONArray(jsonString)
                 val map = mutableMapOf<Int, BukhariTranslation>()
 
@@ -131,9 +137,9 @@ class BukhariLocalTranslationRepository private constructor(private val context:
         @Volatile
         private var INSTANCE: BukhariLocalTranslationRepository? = null
 
-        fun getInstance(context: Context): BukhariLocalTranslationRepository {
+        fun getInstance(context: Context, assetRepository: AssetRepository? = null): BukhariLocalTranslationRepository {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: BukhariLocalTranslationRepository(context.applicationContext).also {
+                INSTANCE ?: BukhariLocalTranslationRepository(context.applicationContext, assetRepository).also {
                     INSTANCE = it
                 }
             }

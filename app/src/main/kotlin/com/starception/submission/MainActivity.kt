@@ -33,6 +33,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -93,6 +94,9 @@ import android.app.NotificationManager
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import com.starception.submission.download.AssetDownloadScreen
+import com.starception.submission.download.AssetDownloadViewModel
+import com.starception.submission.download.DownloadScreenState
 
 /**
  * MAIN ACTIVITY: Entry point for the Islamic prayer times app
@@ -202,6 +206,7 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
 
         // Initialize ViewModel for theme handling (but without splash screen blocking)
         val viewModel: MainActivityViewModel by viewModels()
+        val downloadViewModel: AssetDownloadViewModel by viewModels()
 
         // Handle deep link for course sharing
         val deepLinkCourseId = handleCourseDeepLink(intent)
@@ -219,18 +224,21 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
                 }
             }
         }
-        
+
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val isSystemDarkTheme = resources.configuration.isSystemInDarkTheme
 
-            // Debug logging
-            when (uiState) {
-                is MainActivityUiState.Success -> {
-                    Log.d("MainActivity", "Theme state - Brand: ${uiState.themeBrand}, DarkTheme: ${uiState.shouldUseDarkTheme(isSystemDarkTheme)}, DynamicColor: ${!uiState.shouldDisableDynamicTheming}")
-                }
-                is MainActivityUiState.Loading -> {
-                    Log.d("MainActivity", "Theme state - Loading with defaults")
+            // Track whether download screen has been passed
+            var contentReady by remember { mutableStateOf(false) }
+
+            // Check download state
+            val downloadState by downloadViewModel.screenState.collectAsStateWithLifecycle()
+
+            // Auto-skip download screen if all assets are ready (bundled fallback works)
+            LaunchedEffect(downloadState) {
+                if (downloadState is DownloadScreenState.AllReady) {
+                    contentReady = true
                 }
             }
 
@@ -266,11 +274,18 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
                     LocalAnalyticsHelper provides analyticsHelper,
                     LocalTimeZone provides currentTimeZone,
                 ) {
-                    NiaApp(
-                        appState = appState,
-                        mainViewModel = viewModel,
-                        deepLinkCourseId = deepLinkCourseId,
-                    )
+                    if (contentReady) {
+                        NiaApp(
+                            appState = appState,
+                            mainViewModel = viewModel,
+                            deepLinkCourseId = deepLinkCourseId,
+                        )
+                    } else {
+                        AssetDownloadScreen(
+                            viewModel = downloadViewModel,
+                            onReady = { contentReady = true },
+                        )
+                    }
                 }
             }
         }

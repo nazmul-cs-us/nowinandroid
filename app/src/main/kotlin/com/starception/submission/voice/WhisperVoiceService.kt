@@ -28,6 +28,7 @@ import androidx.core.content.ContextCompat
 import com.whispercpp.media.decodeWaveFile
 import com.whispercpp.recorder.Recorder
 import com.whispercpp.whisper.WhisperContext
+import com.starception.submission.download.AssetRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +48,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class WhisperVoiceService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val assetRepository: AssetRepository,
 ) {
     companion object {
         private const val TAG = "WhisperVoiceService"

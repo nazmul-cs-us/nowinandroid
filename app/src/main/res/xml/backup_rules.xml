@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Backup rules for Android 11 and below (API 30-).
+    Controls what data is backed up to Google's cloud backup service.
+    When <include> is specified, only those domains/paths are backed up.
+-->
+<full-backup-content>
+    <!-- Back up shared preferences only (prayer settings, app preferences) -->
+    <include domain="sharedpref" path="." />
+</full-backup-content>

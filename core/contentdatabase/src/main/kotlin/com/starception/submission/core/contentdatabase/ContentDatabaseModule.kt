@@ -31,15 +31,8 @@ object ContentDatabaseModule {
         return database.topicsDao()
     }
 
-    // ============= News Database =============
-
-    @Provides
-    @Singleton
-    fun provideNewsDatabase(
-        @ApplicationContext context: Context
-    ): NewsDatabase {
-        return NewsDatabase.getInstance(context)
-    }
+    // News Database is provided by NewsDatabaseModule in app module
+    // to enable CDN asset resolution via AssetRepository
 
     @Provides
     @Singleton

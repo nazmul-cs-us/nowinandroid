@@ -13,6 +13,8 @@ import com.starception.submission.core.topicsdatabase.TopicsDatabase
 import com.starception.submission.core.topicsdatabase.toTopic
 import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.translation.TranslationService
+import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.download.AssetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +27,9 @@ import javax.inject.Inject
 class SurahDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val quranEnhancedRepository: com.starception.submission.core.qurandatabase.QuranEnhancedRepository,
-    private val tajweedRepository: com.starception.submission.feature.surah.tajweed.TajweedRepository
+    private val tajweedRepository: com.starception.submission.feature.surah.tajweed.TajweedRepository,
+    private val assetRepository: AssetRepository,
+    val downloadManager: AssetDownloadManager,
 ) : ViewModel() {
 
     // Topics for the current news resource
@@ -87,7 +91,7 @@ class SurahDetailViewModel @Inject constructor(
     private val translations = QuranTranslationHelper.getAvailableTranslations()
 
     fun getRepository(translationCode: String): QuranTranslationRepository {
-        return QuranTranslationRepository(context, translationCode)
+        return QuranTranslationRepository(context, translationCode, assetRepository)
     }
 
     fun loadSurah(surahNumber: Int) {
@@ -171,15 +175,27 @@ class SurahDetailViewModel @Inject constructor(
                     getRepository(translationCode)
                 } catch (e: Exception) {
                     android.util.Log.e("SurahDetail", "❌ Failed to create repository for translation: $translationCode", e)
-                    _uiState.value = SurahDetailUiState.Error("Failed to load translation database: ${e.message}")
+                    val translationName = QuranTranslationHelper.getTranslationName(translationCode)
+                    val category = if (translationCode == "ar") "quran_core" else "quran_translation"
+                    _uiState.value = SurahDetailUiState.NeedsDownload(
+                        category = category,
+                        resourceName = "$translationName Quran Translation",
+                        description = "This translation database needs to be downloaded to view the Quran in $translationName."
+                    )
                     return@launch
                 }
 
                 val surah = repository.getSurahByNumber(surahNumber)
 
                 if (surah == null) {
-                    android.util.Log.e("SurahDetail", "❌ Surah $surahNumber not found in translation: $translationCode")
-                    _uiState.value = SurahDetailUiState.Error("Surah not found in $translationCode translation")
+                    android.util.Log.e("SurahDetail", "❌ Surah $surahNumber not found in translation: $translationCode (database may be empty/corrupt)")
+                    val translationName = QuranTranslationHelper.getTranslationName(translationCode)
+                    val category = if (translationCode == "ar") "quran_core" else "quran_translation"
+                    _uiState.value = SurahDetailUiState.NeedsDownload(
+                        category = category,
+                        resourceName = "$translationName Quran Translation",
+                        description = "The $translationName translation database appears to be empty or incomplete. Please download it to view the Quran."
+                    )
                     return@launch
                 }
 
@@ -584,4 +600,9 @@ sealed interface SurahDetailUiState {
     data object Loading : SurahDetailUiState
     data class Success(val surah: Surah, val ayahs: List<Ayah>) : SurahDetailUiState
     data class Error(val message: String) : SurahDetailUiState
+    data class NeedsDownload(
+        val category: String,
+        val resourceName: String,
+        val description: String,
+    ) : SurahDetailUiState
 }

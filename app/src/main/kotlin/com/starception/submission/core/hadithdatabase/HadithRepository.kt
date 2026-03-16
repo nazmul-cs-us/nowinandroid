@@ -4,6 +4,7 @@ import android.content.Context
 import com.starception.submission.core.duadatabase.DuaDatabase
 import com.starception.submission.core.duadatabase.HadithReference
 import com.starception.submission.core.duadatabase.toHadithReference
+import com.starception.submission.download.AssetRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -11,7 +12,10 @@ import kotlinx.coroutines.withContext
  * Repository for accessing hadith data across collections
  * Coordinates between fortress_of_the_muslim references and individual hadith databases
  */
-class HadithRepository(private val context: Context) {
+class HadithRepository(
+    private val context: Context,
+    private val assetRepository: AssetRepository? = null,
+) {
 
     private val duaDatabase by lazy { DuaDatabase.getInstance(context) }
 
@@ -39,26 +43,25 @@ class HadithRepository(private val context: Context) {
      */
     suspend fun getHadith(databaseFile: String, hadithNumber: Int): Hadith? {
         return withContext(Dispatchers.IO) {
-            try {
-                val hadithDb = HadithDatabase.getInstance(context, databaseFile)
-                val entity = hadithDb.hadithDao().getHadithById(hadithNumber)
+            // Let exceptions propagate so callers (e.g. HadithDetailScreen) can
+            // detect missing database files and show a download prompt
+            val hadithDb = HadithDatabase.getInstance(context, databaseFile, assetRepository)
+            val entity = hadithDb.hadithDao().getHadithById(hadithNumber)
 
-                if (entity != null) {
-                    // Get metadata for collection info
-                    val metadata = HadithDatabase.getCollectionMetadata(context, databaseFile)
-                    entity.toHadith(
-                        collectionName = metadata?.name ?: HadithDatabase.getCollectionNameFromFile(databaseFile),
-                        collectionNameArabic = metadata?.nameArabic ?: "",
-                        collectionNameEnglish = metadata?.nameEnglish ?: "",
-                        author = metadata?.author ?: "",
-                        authorArabic = metadata?.authorArabic ?: ""
-                    )
-                } else {
-                    android.util.Log.w(TAG, "⚠️ Hadith not found: $databaseFile #$hadithNumber")
-                    null
-                }
-            } catch (e: Exception) {
-                android.util.Log.e(TAG, "❌ Error getting hadith: $databaseFile #$hadithNumber", e)
+            if (entity != null) {
+                // Get metadata for collection info
+                val metadata = try {
+                    HadithDatabase.getCollectionMetadata(context, databaseFile)
+                } catch (_: Exception) { null }
+                entity.toHadith(
+                    collectionName = metadata?.name ?: HadithDatabase.getCollectionNameFromFile(databaseFile),
+                    collectionNameArabic = metadata?.nameArabic ?: "",
+                    collectionNameEnglish = metadata?.nameEnglish ?: "",
+                    author = metadata?.author ?: "",
+                    authorArabic = metadata?.authorArabic ?: ""
+                )
+            } else {
+                android.util.Log.w(TAG, "⚠️ Hadith not found: $databaseFile #$hadithNumber")
                 null
             }
         }
@@ -105,7 +108,7 @@ class HadithRepository(private val context: Context) {
                 if (results.size >= limit) break
 
                 try {
-                    val hadithDb = HadithDatabase.getInstance(context, dbFile)
+                    val hadithDb = HadithDatabase.getInstance(context, dbFile, assetRepository)
                     val metadata = HadithDatabase.getCollectionMetadata(context, dbFile)
                     val hadiths = hadithDb.hadithDao().searchHadiths(query, limit - results.size)
 
@@ -155,9 +158,9 @@ class HadithRepository(private val context: Context) {
         @Volatile
         private var INSTANCE: HadithRepository? = null
 
-        fun getInstance(context: Context): HadithRepository {
+        fun getInstance(context: Context, assetRepository: AssetRepository? = null): HadithRepository {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: HadithRepository(context.applicationContext).also {
+                INSTANCE ?: HadithRepository(context.applicationContext, assetRepository).also {
                     INSTANCE = it
                 }
             }

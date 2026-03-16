@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.starception.submission.download.AssetRepository
 import java.io.File
 import java.io.FileOutputStream
 
@@ -32,6 +33,7 @@ abstract class QuranDatabase : RoomDatabase() {
     
     companion object {
         private const val DATABASE_NAME = "quran.db"
+        private const val CDN_KEY = "databases/quran/quran.db"
 
         @Volatile
         private var INSTANCE: QuranDatabase? = null
@@ -95,16 +97,25 @@ abstract class QuranDatabase : RoomDatabase() {
         /**
          * Get the singleton instance of QuranDatabase
          */
-        fun getInstance(context: Context): QuranDatabase {
+        fun getInstance(context: Context, assetRepository: AssetRepository? = null): QuranDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
+                val builder = Room.databaseBuilder(
                     context.applicationContext,
                     QuranDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .createFromAsset("databases/$DATABASE_NAME") // Load from assets
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3) // Add migrations for schema updates
-                    .setJournalMode(JournalMode.TRUNCATE) // Simplify for pre-packaged DB
+
+                // Try CDN/extracted file first, fall back to bundled asset
+                val dbFile = assetRepository?.getDatabaseFile(CDN_KEY)
+                if (dbFile != null) {
+                    builder.createFromFile(dbFile)
+                } else {
+                    builder.createFromAsset("databases/$DATABASE_NAME")
+                }
+
+                val instance = builder
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .setJournalMode(JournalMode.TRUNCATE)
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)

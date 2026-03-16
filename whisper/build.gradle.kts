@@ -49,15 +49,12 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     // whisper.cpp AAR (native C++ implementation)
-    implementation(files("libs/whisper-cpp.aar"))
+    // Use api() so WhisperContext and other classes are transitively visible to consumers
+    api(files("libs/whisper-cpp.aar"))
 
-    // TensorFlow Lite for Whisper inference (legacy)
-    implementation("org.tensorflow:tensorflow-lite:2.14.0")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
-
-    // GPU delegate for faster inference (legacy)
-    implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
-    implementation("org.tensorflow:tensorflow-lite-gpu-api:2.14.0")
+    // LiteRT (successor to TFLite) for Whisper inference (legacy) - 16KB page aligned
+    implementation("com.google.ai.edge.litert:litert:1.2.0")
+    implementation("com.google.ai.edge.litert:litert-support:1.2.0")
 
     // JTransforms for fast FFT calculations (legacy)
     implementation("com.github.wendykierp:JTransforms:3.1")

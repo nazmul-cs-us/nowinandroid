@@ -137,7 +137,47 @@ internal fun TopicScreen(
                     )
                 }
 
-                TopicUiState.Error -> TODO()
+                TopicUiState.Error -> {
+                    item {
+                        TopicToolbar(
+                            showBackButton = showBackButton,
+                            onBackClick = onBackClick,
+                            onFollowClick = {},
+                            uiState = FollowableTopic(
+                                topic = com.starception.submission.core.model.data.Topic(
+                                    id = "",
+                                    name = "",
+                                    shortDescription = "",
+                                    longDescription = "",
+                                    url = "",
+                                    imageUrl = "",
+                                ),
+                                isFollowed = false,
+                            ),
+                        )
+                    }
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 48.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text(
+                                text = "Unable to load topic",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Text(
+                                text = "The content database may need to be downloaded. Please check your connection and try again.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            )
+                        }
+                    }
+                }
                 is TopicUiState.Success -> {
                     item {
                         TopicToolbar(
@@ -188,7 +228,7 @@ private fun topicItemsSize(
     topicUiState: TopicUiState,
     newsUiState: NewsUiState,
 ) = when (topicUiState) {
-    TopicUiState.Error -> 0 // Nothing
+    TopicUiState.Error -> 2 // Toolbar + error message
     TopicUiState.Loading -> 1 // Loading bar
     is TopicUiState.Success -> when (newsUiState) {
         NewsUiState.Error -> 0 // Nothing
@@ -270,7 +310,25 @@ private fun LazyListScope.userNewsResourceCards(
         }
 
         else -> item {
-            Text("Error") // TODO
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Unable to load content",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Text(
+                    text = "The news database may need to be downloaded. Please visit Settings to manage content downloads.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+            }
         }
     }
 }

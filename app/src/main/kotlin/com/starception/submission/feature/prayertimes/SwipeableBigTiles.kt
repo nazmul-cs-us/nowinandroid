@@ -186,6 +186,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.QuranPlayerViewModel
+import com.starception.submission.download.AudioDownloadHelper
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -205,6 +212,15 @@ import com.starception.submission.core.qurandatabase.AyahNoteEntity
 
 
 
+
+/**
+ * Hilt entry point to access AudioDownloadHelper from non-Hilt composables.
+ */
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface AudioDownloadHelperEntryPoint {
+    fun audioDownloadHelper(): AudioDownloadHelper
+}
 
 /**
  * Request activity detection permissions
@@ -2174,8 +2190,19 @@ private fun DailyStatsTile(
 ) {
     val view = LocalView.current
     val context = LocalContext.current
+    val audioDownloadHelper = remember {
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                AudioDownloadHelperEntryPoint::class.java
+            )
+            entryPoint.audioDownloadHelper()
+        } catch (e: Exception) {
+            null
+        }
+    }
     val viewModel: QuranPlayerViewModel = viewModel {
-        QuranPlayerViewModel(context)
+        QuranPlayerViewModel(context, audioDownloadHelper)
     }
 
     // QuranRepository for notes search
@@ -2753,8 +2780,85 @@ private fun DailyStatsTile(
                         }
                     }
                 }
-                }
 
+                // Download progress overlay - replaces slider when downloading
+                if (viewModel.isDownloading) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudDownload,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Downloading... ${(viewModel.downloadProgress * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress = { viewModel.downloadProgress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = MaterialTheme.colorScheme.tertiary,
+                            trackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
+                        )
+                    }
+                } else if (viewModel.downloadError != null) {
+                    // Download error with retry
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "Download failed",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 10.sp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            onClick = { viewModel.retryDownload() },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.height(24.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Retry",
+                                    tint = MaterialTheme.colorScheme.onTertiary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = "Retry",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onTertiary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+                } else {
                 // Bottom section: Seek slider with time display - pushed to bottom
                 if (isLandscape) {
                     // Landscape: Time labels inline with slider to save vertical space
@@ -2842,6 +2946,8 @@ private fun DailyStatsTile(
                                 .aiTextGlow()
                         )
                     }
+                }
+                }
                 }
             }
         }

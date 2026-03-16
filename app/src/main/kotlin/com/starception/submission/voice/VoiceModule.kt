@@ -17,6 +17,7 @@
 package com.starception.submission.voice
 
 import android.content.Context
+import com.starception.submission.download.AssetRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -34,12 +35,14 @@ object VoiceModule {
     @Provides
     @Singleton
     fun provideWhisperVoiceService(
-        @ApplicationContext context: Context
-    ): WhisperVoiceService = WhisperVoiceService(context)
+        @ApplicationContext context: Context,
+        assetRepository: AssetRepository,
+    ): WhisperVoiceService = WhisperVoiceService(context, assetRepository)
 
     @Provides
     @Singleton
     fun provideSherpaOnnxTtsService(
-        @ApplicationContext context: Context
-    ): SherpaOnnxTtsService = SherpaOnnxTtsService(context)
+        @ApplicationContext context: Context,
+        assetRepository: AssetRepository,
+    ): SherpaOnnxTtsService = SherpaOnnxTtsService(context, assetRepository)
 }

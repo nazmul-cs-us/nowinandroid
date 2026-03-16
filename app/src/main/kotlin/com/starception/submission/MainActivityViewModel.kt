@@ -28,6 +28,7 @@ import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.model.data.UserData
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
+import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.SherpaOnnxTtsService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,6 +46,7 @@ import javax.inject.Inject
 class MainActivityViewModel @Inject constructor(
     private val userDataRepository: UserDataRepository,
     private val sherpaOnnxTts: SherpaOnnxTtsService,
+    private val downloadManager: AssetDownloadManager,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -60,6 +62,10 @@ class MainActivityViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<MainActivityUiState>(Success(cachedTheme))
     val uiState: StateFlow<MainActivityUiState> = _uiState.asStateFlow()
+
+    // Global content download progress (from singleton AssetDownloadManager)
+    val isContentDownloading: StateFlow<Boolean> = downloadManager.isGloballyDownloading
+    val contentDownloadProgress: StateFlow<Float> = downloadManager.globalDownloadProgress
 
     /**
      * Load theme from SharedPreferences cache (SYNCHRONOUS - no flash!)

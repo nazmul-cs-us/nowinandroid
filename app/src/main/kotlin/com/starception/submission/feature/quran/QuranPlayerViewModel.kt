@@ -13,11 +13,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.download.AudioDownloadHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-class QuranPlayerViewModel(private val context: Context) : ViewModel() {
+class QuranPlayerViewModel(
+    private val context: Context,
+    private val audioDownloadHelper: AudioDownloadHelper? = null,
+) : ViewModel() {
 
     private var playbackService: QuranPlaybackService? = null
     private var serviceBound = false
@@ -50,6 +55,16 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
     private var _audioLanguage = mutableStateOf(AudioLanguage.ARABIC_ONLY)
     val audioLanguage: AudioLanguage get() = _audioLanguage.value
 
+    // Download state for on-demand audio downloading
+    private var _downloadProgress = mutableStateOf(0f)
+    val downloadProgress: Float get() = _downloadProgress.value
+
+    private var _isDownloading = mutableStateOf(false)
+    val isDownloading: Boolean get() = _isDownloading.value
+
+    private var _downloadError = mutableStateOf<String?>(null)
+    val downloadError: String? get() = _downloadError.value
+
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             val myBinder = binder as QuranPlaybackService.QuranBinder
@@ -66,6 +81,17 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
             playbackService?.onProgressChanged = { position, duration ->
                 _currentPosition.value = position
                 _duration.value = duration
+            }
+
+            // Wire up on-demand download callback
+            playbackService?.onAudioNeedsDownload = { cdnKey, _ ->
+                Log.i("QuranPlayerViewModel", "Audio needs download: $cdnKey")
+                triggerOnDemandDownload(cdnKey)
+            }
+
+            // Pass AudioDownloadHelper to service
+            audioDownloadHelper?.let { helper ->
+                playbackService?.setAudioDownloadHelper(helper)
             }
 
             // Set initial language
@@ -109,14 +135,10 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
 
     fun playSurah(index: Int) {
         if (index < 0 || index >= QuranData.surahs.size) return
-        
-        if (!hasAudioPermission()) {
-            _needsAudioPermission.value = true
-            _errorMessage.value = "Audio permission needed to play Quran files from SD card"
-            return
-        }
-        
-        _needsAudioPermission.value = false
+
+        // Clear any previous download error
+        _downloadError.value = null
+
         _isLoading.value = true
         _errorMessage.value = null
         _currentSurahIndex.value = index
@@ -142,13 +164,8 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
 
     fun togglePlayPause() {
         if (currentPosition == 0 && duration == 0 && !isPlaying) {
-            // First time playing - check permission first
-            if (!hasAudioPermission()) {
-                _needsAudioPermission.value = true
-                _errorMessage.value = "Audio permission needed to play Quran files from SD card"
-                return
-            }
-            _needsAudioPermission.value = false
+            // First time playing - try to play
+            _downloadError.value = null
             playSurah(currentSurahIndex)
         } else {
             playbackService?.togglePlayPause()
@@ -179,6 +196,78 @@ class QuranPlayerViewModel(private val context: Context) : ViewModel() {
     fun clearPermissionError() {
         _needsAudioPermission.value = false
         _errorMessage.value = null
+    }
+
+    /**
+     * Trigger on-demand download for missing audio file.
+     * Called when service reports audio needs downloading.
+     */
+    private fun triggerOnDemandDownload(cdnKey: String) {
+        if (audioDownloadHelper == null) {
+            Log.e("QuranPlayerViewModel", "AudioDownloadHelper not available for download")
+            _downloadError.value = "Download service not available"
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _isDownloading.value = true
+                _downloadProgress.value = 0f
+                _downloadError.value = null
+                Log.i("QuranPlayerViewModel", "Starting on-demand download: $cdnKey")
+
+                // Collect download progress
+                val progressJob = launch {
+                    audioDownloadHelper.getDownloadProgress(cdnKey).collect { state ->
+                        when (state) {
+                            is AssetDownloadManager.DownloadState.Downloading -> {
+                                _downloadProgress.value = state.progress
+                            }
+                            is AssetDownloadManager.DownloadState.Completed -> {
+                                _downloadProgress.value = 1f
+                            }
+                            else -> {}
+                        }
+                    }
+                }
+
+                val result = audioDownloadHelper.downloadAudio(cdnKey)
+                progressJob.cancel()
+
+                when (result) {
+                    is AssetDownloadManager.DownloadState.Completed -> {
+                        Log.i("QuranPlayerViewModel", "Download completed: $cdnKey")
+                        _isDownloading.value = false
+                        _downloadProgress.value = 0f
+                        // Auto-play after download
+                        playbackService?.playAfterDownload(currentSurahIndex)
+                    }
+                    is AssetDownloadManager.DownloadState.Failed -> {
+                        Log.e("QuranPlayerViewModel", "Download failed: ${result.error}")
+                        _isDownloading.value = false
+                        _downloadProgress.value = 0f
+                        _downloadError.value = result.error
+                    }
+                    else -> {
+                        _isDownloading.value = false
+                        _downloadProgress.value = 0f
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("QuranPlayerViewModel", "Download error", e)
+                _isDownloading.value = false
+                _downloadProgress.value = 0f
+                _downloadError.value = e.message ?: "Download failed"
+            }
+        }
+    }
+
+    /**
+     * Retry a failed download
+     */
+    fun retryDownload() {
+        _downloadError.value = null
+        playSurah(currentSurahIndex)
     }
 
     /**

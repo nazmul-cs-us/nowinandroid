@@ -141,7 +141,9 @@ data class TtsSettingsState(
     val selectedVoice: TtsVoice = TtsVoice.KOKORO_EN,
     val selectedSpeakerId: Int = 0,
     val availableVoices: List<TtsVoice> = listOf(TtsVoice.KOKORO_EN, TtsVoice.VITS_VCTK),
-    val amplitude: Float = 0f  // Real-time audio amplitude (0.0 to 1.0)
+    val amplitude: Float = 0f,  // Real-time audio amplitude (0.0 to 1.0)
+    val needsDownload: Boolean = false,
+    val downloadCategory: String? = null,
 )
 
 // Subtle accent colors for TTS visualization
@@ -158,6 +160,8 @@ fun TtsSettingsSection(
     onStopTts: () -> Unit = {},
     onVoiceChanged: (TtsVoice) -> Unit = {},
     onSpeakerChanged: (Int) -> Unit = {},
+    downloadManager: com.starception.submission.download.AssetDownloadManager? = null,
+    onDownloadComplete: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -188,43 +192,61 @@ fun TtsSettingsSection(
             }
         }
 
-        // Speaker Selection (only for multi-speaker models)
-        if (state.selectedVoice.isMultiSpeaker) {
+        // Download prompt when model is missing
+        if (state.needsDownload && state.downloadCategory != null && downloadManager != null) {
+            com.starception.submission.download.MissingContentCard(
+                resourceName = when (state.selectedVoice) {
+                    TtsVoice.KOKORO_EN -> "Kokoro TTS Engine"
+                    TtsVoice.VITS_VCTK -> "VITS TTS Engine"
+                },
+                category = state.downloadCategory,
+                description = when (state.selectedVoice) {
+                    TtsVoice.KOKORO_EN -> "Download the Kokoro neural voice model for high-quality speech"
+                    TtsVoice.VITS_VCTK -> "Download the VITS multi-speaker voice model"
+                },
+                downloadManager = downloadManager,
+                onDownloadComplete = onDownloadComplete,
+                modifier = Modifier.padding(horizontal = 0.dp)
+            )
+        } else {
+            // Speaker Selection (only for multi-speaker models)
+            if (state.selectedVoice.isMultiSpeaker) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Speaker Voice",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    ModernSpeakerSelector(
+                        selectedSpeaker = state.selectedSpeakerId,
+                        totalSpeakers = state.selectedVoice.totalSpeakers,
+                        onSpeakerChanged = { speaker ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSpeakerChanged(speaker)
+                        }
+                    )
+                }
+            }
+
+            // Test TTS section
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Speaker Voice",
+                    text = "Test Voice Output",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                ModernSpeakerSelector(
-                    selectedSpeaker = state.selectedSpeakerId,
-                    totalSpeakers = state.selectedVoice.totalSpeakers,
-                    onSpeakerChanged = { speaker ->
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onSpeakerChanged(speaker)
-                    }
+                ModernTtsTestCard(
+                    testState = state.testState,
+                    testError = state.testError,
+                    amplitude = state.amplitude,
+                    onTestTts = onTestTts,
+                    onStopTts = onStopTts
                 )
             }
-        }
-
-        // Test TTS section
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "Test Voice Output",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            ModernTtsTestCard(
-                testState = state.testState,
-                testError = state.testError,
-                amplitude = state.amplitude,
-                onTestTts = onTestTts,
-                onStopTts = onStopTts
-            )
         }
     }
 }

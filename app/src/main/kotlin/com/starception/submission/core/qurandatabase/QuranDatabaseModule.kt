@@ -1,6 +1,7 @@
 package com.starception.submission.core.qurandatabase
 
 import android.content.Context
+import com.starception.submission.download.AssetRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,9 +23,10 @@ object QuranDatabaseModule {
     @Provides
     @Singleton
     fun provideQuranDatabase(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        assetRepository: AssetRepository,
     ): QuranDatabase {
-        return QuranDatabase.getInstance(context)
+        return QuranDatabase.getInstance(context, assetRepository)
     }
 
     /**
@@ -42,9 +44,10 @@ object QuranDatabaseModule {
     @Provides
     @Singleton
     fun provideQuranEnhancedDatabase(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        assetRepository: AssetRepository,
     ): QuranEnhancedDatabase {
-        return QuranEnhancedDatabase.getInstance(context)
+        return QuranEnhancedDatabase.getInstance(context, assetRepository)
     }
 
     /**
@@ -62,9 +65,10 @@ object QuranDatabaseModule {
     @Provides
     @Singleton
     fun provideQuranRepository(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        assetRepository: AssetRepository,
     ): QuranRepository {
-        return QuranRepository(context)
+        return QuranRepository(context, assetRepository)
     }
 
     /**
