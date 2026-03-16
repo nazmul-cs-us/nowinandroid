@@ -1186,43 +1186,47 @@ class UnifiedSettingsViewModel @Inject constructor(
         return try {
             when (engine) {
                 VoiceRecognitionEngine.WHISPER -> {
-                    // Whisper model: models/ggml-tiny.en.bin
+                    // 1. Check CDN download location
+                    val cdnFile = java.io.File(java.io.File(context.filesDir, "cdn_assets"), "models/ggml-tiny.en.bin")
+                    if (cdnFile.exists() && cdnFile.length() > 1024) return true
+                    // 2. Check bundled assets
                     context.assets.open("models/ggml-tiny.en.bin").use { it.available() > 0 }
                 }
                 VoiceRecognitionEngine.SHERPA_KWS -> {
-                    // Sherpa KWS: sherpa/encoder.int8.onnx
-                    context.assets.open("sherpa/encoder.int8.onnx").use { it.available() > 0 }
+                    // 1. Check extracted model cache (SherpaOnnxKwsService extracts to kws_model/)
+                    val extractedFile = java.io.File(java.io.File(context.filesDir, "kws_model"), "encoder.int8.onnx")
+                    if (extractedFile.exists() && extractedFile.length() > 1024) return true
+                    // 2. Check CDN download location (CDN key: models/kws/encoder.int8.onnx)
+                    val cdnFile = java.io.File(java.io.File(context.filesDir, "cdn_assets"), "models/kws/encoder.int8.onnx")
+                    if (cdnFile.exists() && cdnFile.length() > 1024) return true
+                    // 3. Check bundled assets
+                    context.assets.open("kws/encoder.int8.onnx").use { it.available() > 0 }
                 }
             }
         } catch (e: Exception) {
-            // Check CDN download location as fallback
-            try {
-                val cdnDir = java.io.File(context.filesDir, "cdn_assets")
-                when (engine) {
-                    VoiceRecognitionEngine.WHISPER ->
-                        java.io.File(cdnDir, "models/ggml-tiny.en.bin").exists()
-                    VoiceRecognitionEngine.SHERPA_KWS ->
-                        java.io.File(cdnDir, "models/sherpa/encoder.int8.onnx").exists()
-                }
-            } catch (_: Exception) {
-                false
-            }
+            false
         }
     }
 
     private fun checkTtsModelAvailable(voice: TtsVoice): Boolean {
         val modelFile = voice.modelFile // e.g. "kokoro-int8-en-v0_19/model.int8.onnx"
         return try {
-            // Check bundled assets first
+            // 1. Check previously extracted model cache (same location SherpaOnnxTtsService uses)
+            val extractedFile = java.io.File(java.io.File(context.filesDir, "tts_model"), modelFile)
+            if (extractedFile.exists() && extractedFile.length() > 1024) {
+                return true
+            }
+
+            // 2. Check CDN download location
+            val cdnFile = java.io.File(java.io.File(context.filesDir, "cdn_assets"), "models/tts/$modelFile")
+            if (cdnFile.exists() && cdnFile.length() > 1024) {
+                return true
+            }
+
+            // 3. Check bundled assets
             context.assets.open("tts/$modelFile").use { it.available() > 0 }
         } catch (e: Exception) {
-            // Check CDN download location
-            try {
-                val cdnDir = java.io.File(context.filesDir, "cdn_assets")
-                java.io.File(cdnDir, "models/tts/$modelFile").exists()
-            } catch (_: Exception) {
-                false
-            }
+            false
         }
     }
 

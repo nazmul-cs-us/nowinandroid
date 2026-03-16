@@ -102,7 +102,8 @@ class WhisperVoiceService @Inject constructor(
     }
 
     /**
-     * Load the Whisper model from assets.
+     * Load the Whisper model from assets or CDN download location.
+     * Checks: 1) Bundled assets  2) CDN downloaded file (cdn_assets/)
      * Should be called once before using recognition.
      */
     suspend fun loadModel(): Boolean = withContext(Dispatchers.IO) {
@@ -112,14 +113,42 @@ class WhisperVoiceService @Inject constructor(
         }
 
         try {
-            Log.i(TAG, "Loading whisper.cpp model from: $MODEL_ASSET_PATH")
+            Log.i(TAG, "Loading whisper.cpp model...")
             Log.i(TAG, "System info: ${WhisperContext.getSystemInfo()}")
 
-            // Load model directly from assets using whisper.cpp
-            whisperContext = WhisperContext.createContextFromAsset(
-                context.assets,
-                MODEL_ASSET_PATH
-            )
+            // Try loading from bundled assets first
+            var loaded = false
+            try {
+                Log.i(TAG, "Trying bundled assets: $MODEL_ASSET_PATH")
+                whisperContext = WhisperContext.createContextFromAsset(
+                    context.assets,
+                    MODEL_ASSET_PATH
+                )
+                loaded = true
+                Log.i(TAG, "Loaded model from bundled assets")
+            } catch (assetError: Exception) {
+                Log.w(TAG, "Model not in bundled assets: ${assetError.message}")
+            }
+
+            // If not in assets, check CDN download location
+            if (!loaded) {
+                val cdnFile = File(File(context.filesDir, "cdn_assets"), MODEL_ASSET_PATH)
+                Log.i(TAG, "Checking CDN path: ${cdnFile.absolutePath} (exists=${cdnFile.exists()}, size=${if (cdnFile.exists()) cdnFile.length() else 0})")
+
+                if (cdnFile.exists() && cdnFile.length() > 100_000) {
+                    Log.i(TAG, "Loading model from CDN download: ${cdnFile.absolutePath}")
+                    whisperContext = WhisperContext.createContextFromFile(cdnFile.absolutePath)
+                    loaded = true
+                    Log.i(TAG, "Loaded model from CDN file (${cdnFile.length()} bytes)")
+                } else {
+                    Log.e(TAG, "Model not found in assets or CDN. Download the Whisper model from Settings > Content & Storage.")
+                }
+            }
+
+            if (!loaded) {
+                isModelLoaded = false
+                return@withContext false
+            }
 
             // Initialize recorder with AudioManager for preferred device selection
             recorder = Recorder(audioManager)

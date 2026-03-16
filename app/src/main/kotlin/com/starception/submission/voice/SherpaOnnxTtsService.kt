@@ -196,6 +196,42 @@ class SherpaOnnxTtsService @Inject constructor(
                 Log.d(TAG, "Lexicon path: ${lexiconPath ?: "N/A"}")
                 Log.d(TAG, "Voices path: ${voicesPath ?: "N/A"}")
 
+                // Pre-validate extracted model files before passing to native code.
+                // The native OfflineTts() constructor will SIGABRT if given invalid/corrupt
+                // model files, and native signals bypass Kotlin try/catch.
+                val modelFile = java.io.File(modelPath)
+                val tokensFile = java.io.File(tokensPath)
+                val MIN_MODEL_SIZE = 100_000L // ONNX models should be at least 100KB
+                val MIN_TOKENS_SIZE = 100L    // tokens.txt should be at least 100 bytes
+
+                if (!modelFile.exists() || modelFile.length() < MIN_MODEL_SIZE) {
+                    Log.e(TAG, "Model file validation failed: exists=${modelFile.exists()}, size=${modelFile.length()} bytes (min=$MIN_MODEL_SIZE)")
+                    // Delete stale/corrupt extracted file so next attempt re-extracts
+                    modelFile.delete()
+                    isInitializing = false
+                    return@withContext false
+                }
+
+                if (!tokensFile.exists() || tokensFile.length() < MIN_TOKENS_SIZE) {
+                    Log.e(TAG, "Tokens file validation failed: exists=${tokensFile.exists()}, size=${tokensFile.length()} bytes (min=$MIN_TOKENS_SIZE)")
+                    tokensFile.delete()
+                    isInitializing = false
+                    return@withContext false
+                }
+
+                // Validate voices file for Kokoro (required, ~4MB)
+                if (currentVoice.modelType == TtsModelType.KOKORO && !voicesPath.isNullOrEmpty()) {
+                    val voicesFile = java.io.File(voicesPath)
+                    if (!voicesFile.exists() || voicesFile.length() < MIN_MODEL_SIZE) {
+                        Log.e(TAG, "Voices file validation failed: exists=${voicesFile.exists()}, size=${voicesFile.length()} bytes (min=$MIN_MODEL_SIZE)")
+                        voicesFile.delete()
+                        isInitializing = false
+                        return@withContext false
+                    }
+                }
+
+                Log.i(TAG, "Model file validation passed: model=${modelFile.length()} bytes, tokens=${tokensFile.length()} bytes")
+
                 // Configure TTS model based on type
                 val modelConfig = when (currentVoice.modelType) {
                     TtsModelType.KOKORO -> {

@@ -52,6 +52,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -136,6 +142,29 @@ fun VoiceSettingsSection(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+
+    // Permission launcher for RECORD_AUDIO
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            onTestVoice()
+        }
+    }
+
+    // Wrapper that checks/requests permission before starting voice test
+    val onTestVoiceWithPermission: () -> Unit = {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            onTestVoice()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
 
     Column(
         modifier = modifier,
@@ -194,7 +223,7 @@ fun VoiceSettingsSection(
                     testResult = state.testResult,
                     testError = state.testError,
                     amplitude = state.amplitude,
-                    onTestVoice = onTestVoice,
+                    onTestVoice = onTestVoiceWithPermission,
                     onStopTest = onStopTest
                 )
             }
