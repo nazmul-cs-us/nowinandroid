@@ -989,57 +989,120 @@ class SherpaOnnxTtsService @Inject constructor(
 
     /**
      * Extract a directory from assets to internal storage.
+     * Checks CDN downloads first, then falls back to bundled assets.
+     * Only creates the .extracted marker if actual files were extracted.
      */
     private fun extractAssetDir(assetDir: String): String? {
         val outputDir = File(modelDir, assetDir)
-
-        // Check if already extracted (look for marker file)
         val markerFile = File(outputDir, ".extracted")
+
+        // Validate existing marker - if directory only has .extracted and no real files,
+        // the marker is stale (created when no source files were available)
         if (markerFile.exists()) {
-            return outputDir.absolutePath
+            val realFiles = outputDir.listFiles { f -> f.name != ".extracted" }
+            if (realFiles != null && realFiles.isNotEmpty()) {
+                return outputDir.absolutePath
+            }
+            // Stale marker - directory is empty, delete and re-extract
+            Log.w(TAG, "Stale .extracted marker found in empty dir: $assetDir, re-extracting...")
+            markerFile.delete()
         }
 
         return try {
             outputDir.mkdirs()
+            var extractedCount = 0
 
-            // List and extract all files in the directory
-            val files = context.assets.list("tts/$assetDir") ?: return null
+            // Strategy 1: Check CDN download directory for files
+            // CDN files are at: cdn_assets/models/tts/{assetDir}/
+            val cdnDir = File(File(context.filesDir, "cdn_assets"), "models/tts/$assetDir")
+            if (cdnDir.exists() && cdnDir.isDirectory) {
+                Log.i(TAG, "Found CDN directory: ${cdnDir.absolutePath}")
+                extractedCount += copyDirRecursive(cdnDir, outputDir)
+            }
 
-            for (file in files) {
-                val assetPath = "$assetDir/$file"
-                val outputFile = File(outputDir, file)
+            // Strategy 2: Check bundled assets (may not exist if in .gitignore)
+            if (extractedCount == 0) {
+                val bundledFiles = try {
+                    context.assets.list("tts/$assetDir")
+                } catch (e: Exception) {
+                    null
+                }
 
-                // Check if it's a directory
-                val subFiles = context.assets.list("tts/$assetPath")
-                if (subFiles != null && subFiles.isNotEmpty()) {
-                    // Recursively extract subdirectory
-                    extractAssetDirRecursive("tts/$assetPath", outputFile)
-                } else {
-                    // Extract file
-                    val inputStream = assetRepository.openAsset("models/tts/$assetPath")
-                        ?: context.assets.open("tts/$assetPath")
-                    inputStream.use { input ->
-                        FileOutputStream(outputFile).use { output ->
-                            input.copyTo(output)
+                if (bundledFiles != null && bundledFiles.isNotEmpty()) {
+                    Log.i(TAG, "Found ${bundledFiles.size} bundled asset files in tts/$assetDir")
+                    for (file in bundledFiles) {
+                        val assetPath = "$assetDir/$file"
+                        val outputFile = File(outputDir, file)
+
+                        val subFiles = context.assets.list("tts/$assetPath")
+                        if (subFiles != null && subFiles.isNotEmpty()) {
+                            extractAssetDirRecursive("tts/$assetPath", outputFile)
+                            extractedCount++
+                        } else {
+                            val inputStream = assetRepository.openAsset("models/tts/$assetPath")
+                                ?: context.assets.open("tts/$assetPath")
+                            inputStream.use { input ->
+                                FileOutputStream(outputFile).use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            extractedCount++
                         }
                     }
                 }
             }
 
-            // Create marker file
-            markerFile.createNewFile()
-
-            Log.d(TAG, "Extracted directory: $assetDir -> ${outputDir.absolutePath}")
-            outputDir.absolutePath
+            // Only create marker if files were actually extracted
+            if (extractedCount > 0) {
+                markerFile.createNewFile()
+                Log.i(TAG, "Extracted directory: $assetDir ($extractedCount files) -> ${outputDir.absolutePath}")
+                outputDir.absolutePath
+            } else {
+                Log.e(TAG, "No files found to extract for directory: $assetDir (CDN not downloaded yet?)")
+                null
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to extract asset directory: $assetDir", e)
             null
         }
     }
 
+    /**
+     * Recursively copy a directory from source to destination.
+     * Used for copying CDN-downloaded directory trees to the extraction cache.
+     */
+    private fun copyDirRecursive(srcDir: File, destDir: File): Int {
+        destDir.mkdirs()
+        var count = 0
+        val files = srcDir.listFiles() ?: return 0
+        for (file in files) {
+            val destFile = File(destDir, file.name)
+            if (file.isDirectory) {
+                count += copyDirRecursive(file, destFile)
+            } else {
+                file.inputStream().use { input ->
+                    FileOutputStream(destFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                count++
+            }
+        }
+        Log.d(TAG, "Copied $count files from ${srcDir.name} to ${destDir.absolutePath}")
+        return count
+    }
+
     private fun extractAssetDirRecursive(assetPath: String, outputDir: File) {
         outputDir.mkdirs()
 
+        // Try CDN directory first
+        val cdnDir = File(File(context.filesDir, "cdn_assets"), "models/$assetPath")
+        if (cdnDir.exists() && cdnDir.isDirectory) {
+            copyDirRecursive(cdnDir, outputDir)
+            return
+        }
+
+        // Fall back to bundled assets
         val files = context.assets.list(assetPath) ?: return
 
         for (file in files) {
