@@ -69,6 +69,7 @@ fun NiaNavHost(
     appState: NiaAppState,
     onShowSnackbar: suspend (String, String?) -> Boolean,
     modifier: Modifier = Modifier,
+    onTopAppBarActionClick: () -> Unit = {},
     mainViewModel: MainActivityViewModel? = null,
     deepLinkCourseId: String? = null,
 ) {
@@ -255,6 +256,8 @@ fun NiaNavHost(
             },
         )
         prayerTimesScreen(
+            onSearchClick = { appState.navigateToSearch() },
+            onSettingsClick = onTopAppBarActionClick,
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
             onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) }
         )

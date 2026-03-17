@@ -58,6 +58,9 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.res.stringResource
+import com.starception.submission.R
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Notifications
@@ -142,6 +145,11 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 
 
 
@@ -273,6 +281,8 @@ private fun getSelectedArabicFontFamily(context: Context): androidx.compose.ui.t
 @Composable
 fun PrayerTimesScreen(
     modifier: Modifier = Modifier,
+    onSearchClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onSurahClick: (Int) -> Unit = {},
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> }
 ) {
@@ -1372,6 +1382,35 @@ fun PrayerTimesScreen(
                 modifier = Modifier.fillMaxSize()
             ) { wobbleState ->
             Column(modifier = Modifier.fillMaxSize()) {
+            // Top bar inside WobblePullToRefresh - pushes down with content (like Fitbit)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                    .padding(horizontal = 4.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onSearchClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = "Search",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.prayer_times_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                IconButton(onClick = onSettingsClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
             // Show pull instruction ONLY when dragging with smooth animation
             AnimatedVisibility(
                 visible = wobbleState.dragDistance > 30f && !isRefreshing,

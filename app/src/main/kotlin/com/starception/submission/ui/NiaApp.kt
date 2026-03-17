@@ -363,6 +363,9 @@ private fun NiaMainContent(
             // Show the top app bar on top level destinations
             // Hide top bar for ForYou and Bookmarks in landscape mode (two-pane layout)
             val destination = appState.currentTopLevelDestination
+            // Hide top bar for HOME (PrayerTimes) - it renders its own top bar inside WobblePullToRefresh
+            // so the entire page pushes down together (like Fitbit)
+            val hideTopBarForPrayerTimes = destination == TopLevelDestination.HOME
             val hideTopBarForTwoPane = isLandscape && (
                 destination == TopLevelDestination.FOR_YOU ||
                 destination == TopLevelDestination.BOOKMARKS
@@ -430,7 +433,7 @@ private fun NiaMainContent(
                 }
             }
 
-            if (destination != null && !hideTopBarForTwoPane) {
+            if (destination != null && !hideTopBarForTwoPane && !hideTopBarForPrayerTimes) {
                 shouldShowTopAppBar = true
                 NiaTopAppBar(
                     titleRes = destination.titleTextId,
@@ -469,6 +472,7 @@ private fun NiaMainContent(
                             duration = Short,
                         ) == ActionPerformed
                     },
+                    onTopAppBarActionClick = onTopAppBarActionClick,
                     mainViewModel = mainViewModel,
                     deepLinkCourseId = deepLinkCourseId,
                 )
