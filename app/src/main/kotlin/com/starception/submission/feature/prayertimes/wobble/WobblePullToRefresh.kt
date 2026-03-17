@@ -4,6 +4,7 @@
  */
 package com.starception.submission.feature.prayertimes.wobble
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -13,6 +14,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -20,6 +24,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -31,7 +36,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,8 +45,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -53,7 +55,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.shape.RoundedCornerShape
 import kotlin.math.abs
 
 /**
@@ -86,8 +90,11 @@ fun WobblePullToRefresh(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    downloadProgress: Float = 0f,
+    downloadLabel: String = "",
     content: @Composable (wobbleState: WobbleState) -> Unit
 ) {
+    val isDownloading = downloadProgress > 0f
     val hapticFeedback = LocalHapticFeedback.current
 
     // Wobble state management
@@ -96,41 +103,60 @@ fun WobblePullToRefresh(
     var lastHapticDistance by remember { mutableStateOf(0f) }
     var isVerticalDrag by remember { mutableStateOf(false) }
 
-    // Animated drag distance with spring physics
+    // Animated drag distance with smooth settle (no bounce, like Fitbit)
     val dragDistanceAnimated by animateFloatAsState(
         targetValue = if (dragDistance > 0f) dragDistance else 0f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
         )
     )
 
-    // Refreshing state: animate to a held-down position
-    val refreshingOffset by animateFloatAsState(
-        targetValue = if (isRefreshing) 0.28f else 0f,
+    // Refreshing/downloading state: Animatable for instant snap-to when refreshing starts
+    // This eliminates the gap where wobbleIntensity would drop between drag release and refresh hold
+    val refreshingOffset = remember { Animatable(0f) }
+    LaunchedEffect(isRefreshing, isDownloading) {
+        if (isRefreshing || isDownloading) {
+            // SNAP instantly to held position — no gap, like Fitbit
+            refreshingOffset.snapTo(0.35f)
+        } else {
+            // Smooth settle back when sync completes
+            refreshingOffset.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+        }
+    }
+
+    // Animated download progress for smooth horizontal fill
+    val animatedDownloadProgress by animateFloatAsState(
+        targetValue = downloadProgress.coerceIn(0f, 1f),
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessLow
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
         )
     )
 
     // Calculate wobble intensity (0 to 1)
-    // When refreshing, use the refreshing offset; when dragging, use drag distance
+    // When refreshing/downloading, use the refreshing offset; when dragging, use drag distance
     val rawWobbleIntensity = (dragDistanceAnimated / maxDragDistance).coerceIn(0f, 1f)
-    val wobbleIntensity = maxOf(rawWobbleIntensity, refreshingOffset)
+    val wobbleIntensity = maxOf(rawWobbleIntensity, refreshingOffset.value)
 
     // --- Fitbit-style visual parameters ---
     // PRIMARY: Large vertical translation (content pushes down)
     val contentOffsetY = (wobbleIntensity * 220f).dp
 
-    // Progressive rounded corners (TOP ONLY like Fitbit): 0dp at rest -> 28dp fully pulled
+    // Progressive rounded top corners: 0dp at rest -> 28dp fully pulled
     val cornerRadius = (wobbleIntensity * 28f).dp
-
-    // Progressive horizontal margins: 0dp at rest -> 12dp fully pulled
-    val horizontalMargin = (wobbleIntensity * 12f).dp
 
     // Fitbit flat muted sage/gray-green background
     val fitbitBgColor = Color(0xFFD2D6CC)
+
+    // Slightly darker sage for the progress fill (horizontal sweep)
+    val progressFillColor = Color(0xFFC5CAB9)
 
     // Indicator text color
     val indicatorColor = Color(0xFF4A5042)
@@ -228,7 +254,18 @@ fun WobblePullToRefresh(
                 }
             }
     ) {
-        // Indicator area: shows pull/release/syncing status above content card
+        // Horizontal progress fill: sweeps left-to-right across the sage background
+        if (isDownloading && wobbleIntensity > 0.01f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(animatedDownloadProgress)
+                    .fillMaxHeight()
+                    .background(progressFillColor)
+                    .align(Alignment.CenterStart)
+            )
+        }
+
+        // Indicator area: shows pull/release/syncing/downloading status above content card
         if (wobbleIntensity > 0.05f) {
             Column(
                 modifier = Modifier
@@ -237,12 +274,46 @@ fun WobblePullToRefresh(
                     .padding(top = (wobbleIntensity * 20f).dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (isRefreshing) {
+                if (isDownloading) {
+                    // Download state: spinning arc + label with percentage
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Canvas(
+                            modifier = Modifier.size(18.dp)
+                        ) {
+                            val strokeWidth = 2.dp.toPx()
+                            drawArc(
+                                color = Color(0xFF4A5042),
+                                startAngle = spinAngle,
+                                sweepAngle = 270f,
+                                useCenter = false,
+                                style = Stroke(
+                                    width = strokeWidth,
+                                    cap = StrokeCap.Round
+                                ),
+                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+                                size = androidx.compose.ui.geometry.Size(
+                                    size.width - strokeWidth,
+                                    size.height - strokeWidth
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        val pct = (animatedDownloadProgress * 100).toInt()
+                        val label = if (downloadLabel.isNotEmpty()) downloadLabel else "Downloading"
+                        Text(
+                            text = "$label $pct%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontSize = 14.sp,
+                            color = indicatorColor
+                        )
+                    }
+                } else if (isRefreshing) {
                     // Syncing state: spinning arc + "Syncing your data"
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Spinning arc indicator (like Fitbit's half-circle spinner)
                         Canvas(
                             modifier = Modifier.size(18.dp)
                         ) {
@@ -316,36 +387,18 @@ fun WobblePullToRefresh(
             }
         }
 
-        // Inner content: pushes down, clips to rounded card shape
+        // Inner content: pushes down, full width, rounded top corners
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(
-                    start = horizontalMargin,
-                    end = horizontalMargin,
-                    top = contentOffsetY,
-                    bottom = 0.dp
-                )
-                .then(
-                    if (wobbleIntensity > 0.01f) {
-                        // Top-only rounded corners like Fitbit (bottom stays flat)
-                        val topOnlyShape = RoundedCornerShape(
-                            topStart = cornerRadius,
-                            topEnd = cornerRadius,
-                            bottomStart = 0.dp,
-                            bottomEnd = 0.dp
-                        )
-                        Modifier
-                            .shadow(
-                                elevation = (wobbleIntensity * 8f).dp,
-                                shape = topOnlyShape,
-                                ambientColor = Color.Black.copy(alpha = 0.08f),
-                                spotColor = Color.Black.copy(alpha = 0.06f)
-                            )
-                            .clip(topOnlyShape)
-                    } else {
-                        Modifier
-                    }
+                .padding(top = contentOffsetY)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = cornerRadius,
+                        topEnd = cornerRadius,
+                        bottomStart = 0.dp,
+                        bottomEnd = 0.dp
+                    )
                 )
                 .background(MaterialTheme.colorScheme.background)
         ) {
