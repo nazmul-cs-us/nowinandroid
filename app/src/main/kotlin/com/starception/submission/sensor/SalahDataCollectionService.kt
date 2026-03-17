@@ -55,7 +55,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
 
     // Current posture label (set by UI)
     @Volatile
-    var currentPosture: SalahPosture = SalahPosture.NOT_PRAYING
+    var currentPosture: SalahPosture = SalahPosture.QIYAM
 
     // Session tracking
     var sessionId: String = ""
@@ -249,8 +249,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     fun isRecording(): Boolean = isRecording
 
     override fun onSensorChanged(event: SensorEvent) {
-        // In live mode, allow recording even when currentPosture is NOT_PRAYING (defaults to QIYAM)
-        if (!isRecording || (!isLiveMode && currentPosture == SalahPosture.NOT_PRAYING)) return
+        if (!isRecording) return
 
         when (event.sensor.type) {
             Sensor.TYPE_ACCELEROMETER -> {
@@ -369,7 +368,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         }
 
         posture = currentPosture
-        if (posture == SalahPosture.NOT_PRAYING) return
+        // Record sample with current posture label
 
         // Convert sensor timestamp (nanoseconds since boot) to wall clock milliseconds
         val windowTimestampMs = wallClockAtBoot + (windowTimestampNs - sensorBootTimeNs) / 1_000_000
@@ -536,7 +535,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         Log.i(TAG, "   File size: ${outputFile?.length()?.let { it / 1024 }} KB")
 
         val filePath = outputFile?.absolutePath
-        currentPosture = SalahPosture.NOT_PRAYING // Reset posture
+        currentPosture = SalahPosture.QIYAM // Reset posture
         return filePath
     }
 

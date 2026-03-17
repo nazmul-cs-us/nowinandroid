@@ -37,21 +37,23 @@ class SalahDetectionEngine(context: Context) : Closeable {
         const val MODEL_VERSION = 2
         const val EXPECTED_FEATURES = 30
 
-        // Per-posture confidence thresholds: distinctive postures can use lower thresholds,
-        // brief transitions need higher confidence to avoid false positives
+        // Per-posture confidence thresholds: lowered to improve recall.
+        // The sequence validator provides additional filtering, so thresholds here
+        // should favor passing detections through rather than suppressing them.
         private val POSTURE_CONFIDENCE_THRESHOLDS = mapOf(
-            SalahPosture.QIYAM to 0.50f,          // Standing is distinctive (upright orientation)
-            SalahPosture.RUKU to 0.55f,            // Bowing is distinctive (forward lean)
-            SalahPosture.GOING_TO_SUJUD to 0.65f,  // Brief transition, needs higher confidence
-            SalahPosture.SUJUD to 0.50f,           // Prostration is very distinctive (inverted)
-            SalahPosture.JALSA to 0.60f,           // Sitting between sujuds
-            SalahPosture.TASHAHHUD to 0.60f,       // Final sitting (similar to JALSA)
-            SalahPosture.QIYAM_RISING to 0.65f     // Brief transition
+            SalahPosture.QIYAM to 0.35f,          // Standing is distinctive (upright orientation)
+            SalahPosture.RUKU to 0.35f,            // Bowing is distinctive (forward lean)
+            SalahPosture.GOING_TO_SUJUD to 0.40f,  // Brief transition
+            SalahPosture.SUJUD to 0.35f,           // Prostration is very distinctive (inverted)
+            SalahPosture.JALSA to 0.40f,           // Sitting between sujuds
+            SalahPosture.TASHAHHUD to 0.40f,       // Final sitting (similar to JALSA)
+            SalahPosture.QIYAM_RISING to 0.40f     // Brief transition
         )
-        private const val DEFAULT_CONFIDENCE = 0.60f
+        private const val DEFAULT_CONFIDENCE = 0.40f
 
         // EMA smoothing factor: higher = more responsive, lower = smoother
-        private const val EMA_ALPHA = 0.3f
+        // Increased from 0.3 to 0.6 so new detections carry more weight than history
+        private const val EMA_ALPHA = 0.6f
 
         // Minimum windows before first inference (half of sequence length for faster start)
         private const val MIN_WINDOWS_FOR_INFERENCE = 10
@@ -224,6 +226,13 @@ class SalahDetectionEngine(context: Context) : Closeable {
         // Use per-posture confidence threshold
         val posture = SalahPosture.fromIndex(bestIndex)
         val threshold = POSTURE_CONFIDENCE_THRESHOLDS[posture] ?: DEFAULT_CONFIDENCE
+
+        // Debug: log raw ML output vs smoothed output for diagnosis
+        val labels = SalahPosture.classificationLabels
+        val rawStr = rawProbabilities.mapIndexed { i, p -> "${labels.getOrElse(i){"?"}}: %.2f".format(p) }.joinToString(" | ")
+        val smoothStr = probabilities.mapIndexed { i, p -> "${labels.getOrElse(i){"?"}}: %.2f".format(p) }.joinToString(" | ")
+        Log.d(TAG, "RAW[$rawStr] EMA[$smoothStr] best=${posture.displayName} conf=%.3f thr=%.2f ${if (bestProb < threshold) "REJECTED" else "ACCEPTED"}".format(bestProb, threshold))
+
         if (bestProb < threshold) return null
 
         return ClassificationResult(posture, bestProb, probabilities, isPartialSequence)

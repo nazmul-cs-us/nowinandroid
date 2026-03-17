@@ -12,16 +12,13 @@ enum class SalahPosture(val displayName: String, val arabicName: String) {
     SUJUD("Prostration", "سجود"),
     JALSA("Sitting", "جلسة"),
     TASHAHHUD("Final Sitting", "تشهد"),
-    QIYAM_RISING("Rising Up", "قيام"),
-    TRANSITION("Transition", "انتقال"),
-    NOT_PRAYING("Not Praying", "");
+    QIYAM_RISING("Rising Up", "قيام");
 
     companion object {
-        /** Postures used for ML classification (excludes TRANSITION and NOT_PRAYING) */
         val classificationLabels = listOf(QIYAM, RUKU, GOING_TO_SUJUD, SUJUD, JALSA, TASHAHHUD, QIYAM_RISING)
 
         fun fromIndex(index: Int): SalahPosture {
-            return classificationLabels.getOrElse(index) { NOT_PRAYING }
+            return classificationLabels.getOrElse(index) { QIYAM }
         }
     }
 }

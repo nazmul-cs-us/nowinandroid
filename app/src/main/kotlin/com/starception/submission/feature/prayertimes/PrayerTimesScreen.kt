@@ -614,6 +614,8 @@ fun PrayerTimesScreen(
     // REFRESH LOGIC - Handle pull-to-refresh action with location service checking
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
+            // Track visual start time — ensures minimum 3s hold for sync progress animation
+            val visualStartTime = System.currentTimeMillis()
             try {
                 // LOCATION SERVICE CHECK: Verify location services before proceeding
                 android.util.Log.d("PullToRefresh", "=== STARTING PULL-TO-REFRESH DEBUG ===")
@@ -669,9 +671,10 @@ fun PrayerTimesScreen(
                     // Continue anyway - calculation may still work with cached data
                 }
                 
-                // Set loading state
-                isLoading = true
-                
+                // Don't set isLoading = true here — WobblePullToRefresh already shows
+                // "Syncing your data" with a spinner. Setting isLoading replaces the
+                // prayer tiles with a loading spinner, causing a visual blink.
+
                 // Calculate with 3-second timeout to prevent infinite loading
                 android.util.Log.d("PullToRefresh", "STEP 2: Starting prayer time calculation with 3-second timeout...")
                 android.util.Log.d("PullToRefresh", "CURRENT LOCATION BEFORE REFRESH: \"$location\"")
@@ -710,7 +713,14 @@ fun PrayerTimesScreen(
                 // Handle any other errors gracefully
                 android.util.Log.e("PullToRefresh", "Error during refresh: ${e.message}")
             } finally {
-                // Always reset loading and refresh states after timeout
+                // Ensure minimum 3s visual hold for Fitbit-style sync progress animation
+                val elapsed = System.currentTimeMillis() - visualStartTime
+                val minVisualDuration = 3000L
+                if (elapsed < minVisualDuration) {
+                    android.util.Log.d("PullToRefresh", "⏳ Holding sync animation for ${minVisualDuration - elapsed}ms more (elapsed: ${elapsed}ms)")
+                    delay(minVisualDuration - elapsed)
+                }
+                // Always reset loading and refresh states after visual hold
                 isLoading = false
                 isRefreshing = false
             }
@@ -1380,7 +1390,7 @@ fun PrayerTimesScreen(
                 onRefresh = { isRefreshing = true },
                 modifier = Modifier.fillMaxSize()
             ) { wobbleState ->
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             // Top bar inside WobblePullToRefresh - pushes down with content (like Fitbit)
             Row(
                 modifier = Modifier

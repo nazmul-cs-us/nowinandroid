@@ -1,12 +1,16 @@
 package com.starception.submission.feature.salah.datacollection
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.feature.salah.visualization.VisualizationState
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
 import com.starception.submission.sensor.SalahDataCollectionService
+import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import com.starception.submission.voice.SherpaOnnxTtsService
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -15,14 +19,26 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONObject
+import kotlin.coroutines.resume
+
+enum class GuidedRecordingState {
+    IDLE,
+    WELCOME,
+    COUNTDOWN,
+    RECORDING_POSTURE,
+    POSTURE_TRANSITION,
+    COMPLETED,
+    CANCELLED
+}
 
 data class SalahDataCollectionUiState(
     val isRecording: Boolean = false,
     val isCountingDown: Boolean = false,
     val countdownSeconds: Int = 0,
     val sessionId: String = "",
-    val currentPosture: SalahPosture = SalahPosture.NOT_PRAYING,
+    val currentPosture: SalahPosture = SalahPosture.QIYAM,
     val totalSamples: Int = 0,
     val postureCounts: Map<SalahPosture, Int> = emptyMap(),
     val lastSample: SalahDataSample? = null,
@@ -30,7 +46,16 @@ data class SalahDataCollectionUiState(
     val totalDataSizeKb: Long = 0,
     val trimmedSamples: Int = 0,
     val globalPostureCounts: Map<String, Int> = emptyMap(),
-    val globalTotalSamples: Int = 0
+    val globalTotalSamples: Int = 0,
+    // Guided recording state
+    val guidedState: GuidedRecordingState = GuidedRecordingState.IDLE,
+    val guidedCurrentPosture: SalahPosture? = null,
+    val guidedPostureIndex: Int = 0,
+    val guidedPostureTimeRemaining: Int = 0,
+    val guidedPostureDuration: Int = 0,
+    val guidedTotalPostures: Int = GUIDED_POSTURE_SEQUENCE.size,
+    val guidedSelectedDuration: Int = 15,
+    val guidedMessage: String = ""
 )
 
 data class DataFileInfo(
@@ -40,6 +65,25 @@ data class DataFileInfo(
     val postureCounts: Map<String, Int> = emptyMap(),
     val totalSamples: Int = 0
 )
+
+/**
+ * Posture sequence for guided recording.
+ * Each pair is (posture, isTransition).
+ * Transition postures use a fixed 8s duration; static postures use user-selected duration.
+ */
+val GUIDED_POSTURE_SEQUENCE: List<Pair<SalahPosture, Boolean>> = listOf(
+    SalahPosture.QIYAM to false,
+    SalahPosture.RUKU to false,
+    SalahPosture.GOING_TO_SUJUD to true,
+    SalahPosture.SUJUD to false,
+    SalahPosture.JALSA to false,
+    SalahPosture.SUJUD to false,           // Second sujud
+    SalahPosture.QIYAM_RISING to true,
+    SalahPosture.TASHAHHUD to false
+)
+
+private const val TRANSITION_DURATION = 8 // seconds for transition postures
+private const val TAG = "GuidedRecording"
 
 class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -61,6 +105,22 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     val allSamples: StateFlow<List<SalahDataSample>> = _allSamples.asStateFlow()
 
     private var countdownJob: Job? = null
+    private var guidedJob: Job? = null
+
+    // Lazy TTS service via Hilt EntryPoint
+    private var ttsService: SherpaOnnxTtsService? = null
+
+    private fun getTtsService(): SherpaOnnxTtsService {
+        if (ttsService == null) {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                getApplication<Application>().applicationContext,
+                SherpaOnnxTtsEntryPoint::class.java
+            )
+            ttsService = entryPoint.sherpaOnnxTtsService()
+            Log.i(TAG, "TTS service obtained via EntryPoint")
+        }
+        return ttsService!!
+    }
 
     init {
         // Set up callbacks
@@ -80,7 +140,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     fun startRecording() {
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
-            // Countdown phase — user puts phone in pocket
+            // Countdown phase - user puts phone in pocket
             _uiState.update { it.copy(isCountingDown = true, countdownSeconds = COUNTDOWN_SECONDS, trimmedSamples = 0) }
             for (i in COUNTDOWN_SECONDS downTo 1) {
                 _uiState.update { it.copy(countdownSeconds = i) }
@@ -119,7 +179,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         _uiState.update { state ->
             state.copy(
                 isRecording = false,
-                currentPosture = SalahPosture.NOT_PRAYING,
+                currentPosture = SalahPosture.QIYAM,
                 totalSamples = afterCount,
                 postureCounts = collectionService.getSessionStats().first,
                 trimmedSamples = trimmed
@@ -167,6 +227,188 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         }
     }
 
+    // ═══════════════════════════════════════════════════════
+    // GUIDED RECORDING
+    // ═══════════════════════════════════════════════════════
+
+    fun setGuidedDuration(seconds: Int) {
+        _uiState.update { it.copy(guidedSelectedDuration = seconds) }
+    }
+
+    fun startGuidedRecording() {
+        guidedJob?.cancel()
+        guidedJob = viewModelScope.launch {
+            val duration = _uiState.value.guidedSelectedDuration
+            Log.i(TAG, "Starting guided recording (duration=$duration s per posture)")
+
+            // 1. WELCOME
+            _uiState.update {
+                it.copy(
+                    guidedState = GuidedRecordingState.WELCOME,
+                    guidedMessage = "Place your phone in your pocket and get ready.",
+                    guidedPostureIndex = 0,
+                    trimmedSamples = 0
+                )
+            }
+            speakAndWait("Guided salah recording is starting. Place your phone in your pocket and get ready.")
+
+            // 2. Start sensor recording
+            collectionService.startRecording()
+            _uiState.update {
+                it.copy(
+                    isRecording = true,
+                    sessionId = collectionService.sessionId,
+                    totalSamples = 0,
+                    postureCounts = emptyMap(),
+                    lastSample = null
+                )
+            }
+
+            // 3. COUNTDOWN
+            _uiState.update { it.copy(guidedState = GuidedRecordingState.COUNTDOWN, guidedMessage = "Starting in...") }
+            speakAndWait("3")
+            _uiState.update { it.copy(countdownSeconds = 3) }
+            delay(800)
+            speakAndWait("2")
+            _uiState.update { it.copy(countdownSeconds = 2) }
+            delay(800)
+            speakAndWait("1")
+            _uiState.update { it.copy(countdownSeconds = 1) }
+            delay(800)
+            _uiState.update { it.copy(countdownSeconds = 0) }
+
+            // 4. Loop through posture sequence
+            for ((index, entry) in GUIDED_POSTURE_SEQUENCE.withIndex()) {
+                val (posture, isTransition) = entry
+                val postureDuration = if (isTransition) TRANSITION_DURATION else duration
+
+                // Set posture label on collection service
+                collectionService.currentPosture = posture
+
+                // Update UI
+                _uiState.update {
+                    it.copy(
+                        guidedState = GuidedRecordingState.RECORDING_POSTURE,
+                        guidedCurrentPosture = posture,
+                        guidedPostureIndex = index,
+                        guidedPostureDuration = postureDuration,
+                        guidedPostureTimeRemaining = postureDuration,
+                        guidedMessage = posture.displayName,
+                        currentPosture = posture
+                    )
+                }
+
+                // Speak posture instruction
+                val instruction = if (isTransition) {
+                    "Now perform ${posture.displayName}."
+                } else {
+                    "Now perform ${posture.displayName}. Hold this position."
+                }
+                speakAndWait(instruction)
+
+                // Count down the posture duration
+                for (remaining in postureDuration downTo 1) {
+                    _uiState.update { it.copy(guidedPostureTimeRemaining = remaining) }
+
+                    // Alert at 5 seconds remaining (only for longer durations)
+                    if (remaining == 5 && postureDuration > 8) {
+                        speakAndWait("5 seconds remaining.")
+                    }
+
+                    delay(1000)
+                }
+                _uiState.update { it.copy(guidedPostureTimeRemaining = 0) }
+
+                // Transition announcement (if not the last posture)
+                if (index < GUIDED_POSTURE_SEQUENCE.size - 1) {
+                    val nextPosture = GUIDED_POSTURE_SEQUENCE[index + 1].first
+                    _uiState.update {
+                        it.copy(
+                            guidedState = GuidedRecordingState.POSTURE_TRANSITION,
+                            guidedMessage = "Next: ${nextPosture.displayName}"
+                        )
+                    }
+                    speakAndWait("Get ready for ${nextPosture.displayName}.")
+                    delay(1500)
+                }
+            }
+
+            // 5. COMPLETED
+            Log.i(TAG, "Guided recording completed")
+            val beforeCount = collectionService.getSessionStats().second
+            collectionService.stopRecording(trimLastMs = 0) // No trim for guided - data is clean
+            val afterCount = collectionService.getSessionStats().second
+
+            _uiState.update {
+                it.copy(
+                    guidedState = GuidedRecordingState.COMPLETED,
+                    guidedMessage = "Recording complete!",
+                    isRecording = false,
+                    totalSamples = afterCount,
+                    postureCounts = collectionService.getSessionStats().first,
+                    currentPosture = SalahPosture.QIYAM
+                )
+            }
+
+            speakAndWait("Recording complete. You can take your phone out now.")
+            refreshFileList()
+        }
+    }
+
+    fun cancelGuidedRecording() {
+        Log.i(TAG, "Guided recording cancelled")
+        guidedJob?.cancel()
+        guidedJob = null
+
+        // Stop TTS
+        try {
+            ttsService?.stopSpeaking()
+        } catch (_: Exception) {}
+
+        // Stop recording if active
+        if (collectionService.isRecording()) {
+            collectionService.stopRecording(trimLastMs = TRIM_LAST_MS)
+        }
+
+        _uiState.update {
+            it.copy(
+                guidedState = GuidedRecordingState.CANCELLED,
+                isRecording = false,
+                currentPosture = SalahPosture.QIYAM
+            )
+        }
+        refreshFileList()
+    }
+
+    fun resetGuidedState() {
+        _uiState.update { it.copy(guidedState = GuidedRecordingState.IDLE, guidedMessage = "") }
+    }
+
+    private suspend fun speakAndWait(text: String) {
+        try {
+            val tts = getTtsService()
+            suspendCancellableCoroutine { continuation ->
+                viewModelScope.launch {
+                    tts.speak(
+                        text = text,
+                        onComplete = {
+                            if (continuation.isActive) {
+                                continuation.resume(Unit)
+                            }
+                        }
+                    )
+                }
+                continuation.invokeOnCancellation {
+                    tts.stopSpeaking()
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "TTS speak failed: ${e.message}")
+            // Continue even if TTS fails - timing is more important
+            delay(500) // Brief pause as fallback
+        }
+    }
+
     // 3D Visualization methods
 
     fun loadAllSamples() {
@@ -195,6 +437,10 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
 
     override fun onCleared() {
         super.onCleared()
+        guidedJob?.cancel()
+        try {
+            ttsService?.stopSpeaking()
+        } catch (_: Exception) {}
         if (collectionService.isRecording()) {
             collectionService.stopRecording()
         }

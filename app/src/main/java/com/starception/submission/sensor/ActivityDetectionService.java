@@ -1932,7 +1932,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
 
         // Create sample and run inference
         SalahDataSample sample = new SalahDataSample(
-                System.currentTimeMillis(), "live", SalahPosture.NOT_PRAYING,
+                System.currentTimeMillis(), "live", SalahPosture.QIYAM,
                 ax, ay, az, gx, gy, gz,
                 pitch, roll, accelMag, gyroMag
         );

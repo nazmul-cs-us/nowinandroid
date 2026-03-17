@@ -61,6 +61,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -203,6 +204,8 @@ fun SalahDataCollectionScreen(
                     if (!uiState.isRecording && !uiState.isCountingDown) {
                         item { LivePrayerRecordingCard(onNavigateToLiveRecording) }
                     }
+                    // Guided recording card
+                    item { GuidedRecordingCard(uiState, viewModel) }
                     item { RecordingHero(uiState, viewModel) }
                     // Capture quality feedback during recording
                     if (uiState.isRecording && uiState.lastSample != null) {
@@ -254,6 +257,8 @@ fun SalahDataCollectionScreen(
                 if (!uiState.isRecording && !uiState.isCountingDown) {
                     item { LivePrayerRecordingCard(onNavigateToLiveRecording) }
                 }
+                // Guided recording card
+                item { GuidedRecordingCard(uiState, viewModel) }
                 // Quick guide when no data and not recording
                 if (!uiState.isRecording && !uiState.isCountingDown && uiState.dataFiles.isEmpty()) {
                     item { QuickGuide() }
@@ -462,6 +467,446 @@ private fun LivePrayerRecordingCard(onNavigateToLiveRecording: () -> Unit) {
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                     lineHeight = 16.sp
                 )
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// GUIDED RECORDING CARD
+// ═══════════════════════════════════════════════════════
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GuidedRecordingCard(
+    uiState: SalahDataCollectionUiState,
+    viewModel: SalahDataCollectionViewModel
+) {
+    val guidedState = uiState.guidedState
+    val hapticFeedback = LocalHapticFeedback.current
+
+    // Hide when manual recording is active (non-guided)
+    if ((uiState.isRecording || uiState.isCountingDown) && guidedState == GuidedRecordingState.IDLE) {
+        return
+    }
+
+    // Hide when fully idle and manual recording just finished
+    if (guidedState == GuidedRecordingState.IDLE && uiState.trimmedSamples > 0) {
+        return
+    }
+
+    val cardColor = when (guidedState) {
+        GuidedRecordingState.IDLE -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+        GuidedRecordingState.WELCOME, GuidedRecordingState.COUNTDOWN -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+        GuidedRecordingState.RECORDING_POSTURE -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        GuidedRecordingState.POSTURE_TRANSITION -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+        GuidedRecordingState.COMPLETED -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        GuidedRecordingState.CANCELLED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = if (guidedState != GuidedRecordingState.IDLE) 6.dp else 3.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f),
+                spotColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f)
+            )
+            .animateContentSize(tween(300))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            when (guidedState) {
+                GuidedRecordingState.IDLE -> {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(13.dp))
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.tertiaryContainer,
+                                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+                                        )
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Guided Recording",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "TTS walks you through each posture automatically",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+
+                    // Duration selector
+                    Text(
+                        text = "Hold duration per posture",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(10, 15, 20, 30).forEach { duration ->
+                            val isSelected = uiState.guidedSelectedDuration == duration
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        viewModel.setGuidedDuration(duration)
+                                    },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.tertiary
+                                else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                shadowElevation = if (isSelected) 2.dp else 0.dp
+                            ) {
+                                Text(
+                                    text = "${duration}s",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onTertiary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Start button
+                    Button(
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            viewModel.startGuidedRecording()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Start Guided Recording", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                GuidedRecordingState.WELCOME -> {
+                    val infiniteTransition = rememberInfiniteTransition(label = "welcome_pulse")
+                    val pulseAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.6f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "welcome_alpha"
+                    )
+
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary.copy(alpha = pulseAlpha),
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Text(
+                        text = "Get Ready",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                    Text(
+                        text = uiState.guidedMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    OutlinedButton(
+                        onClick = { viewModel.cancelGuidedRecording() },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+
+                GuidedRecordingState.COUNTDOWN -> {
+                    val infiniteTransition = rememberInfiniteTransition(label = "cd_pulse")
+                    val countdownScale by infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.2f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(500, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "cd_scale"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .scale(countdownScale)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (uiState.countdownSeconds > 0) "${uiState.countdownSeconds}" else "Go!",
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                    Text(
+                        text = "Put phone in pocket!",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                    OutlinedButton(
+                        onClick = { viewModel.cancelGuidedRecording() },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+
+                GuidedRecordingState.RECORDING_POSTURE -> {
+                    val posture = uiState.guidedCurrentPosture
+                    val timeRemaining = uiState.guidedPostureTimeRemaining
+                    val totalDuration = uiState.guidedPostureDuration
+                    val progress = if (totalDuration > 0) {
+                        1f - (timeRemaining.toFloat() / totalDuration)
+                    } else 0f
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = progress,
+                        animationSpec = tween(300),
+                        label = "guided_progress"
+                    )
+
+                    // Pulsing recording indicator
+                    val infiniteTransition = rememberInfiniteTransition(label = "rec_indicator")
+                    val recAlpha by infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 0.3f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "rec_dot"
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.error.copy(alpha = recAlpha))
+                        )
+                        Text(
+                            text = "RECORDING",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = "${uiState.guidedPostureIndex + 1} / ${uiState.guidedTotalPostures}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    // Circular progress with posture name
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(120.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier = Modifier.size(120.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            strokeWidth = 6.dp,
+                            strokeCap = StrokeCap.Round
+                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "${timeRemaining}s",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    // Posture name
+                    if (posture != null) {
+                        Text(
+                            text = posture.displayName,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        if (posture.arabicName.isNotEmpty()) {
+                            Text(
+                                text = posture.arabicName,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                fontSize = 20.sp
+                            )
+                        }
+                    }
+
+                    // Cancel button
+                    OutlinedButton(
+                        onClick = { viewModel.cancelGuidedRecording() },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Cancel Guided Recording")
+                    }
+                }
+
+                GuidedRecordingState.POSTURE_TRANSITION -> {
+                    val infiniteTransition = rememberInfiniteTransition(label = "transition_pulse")
+                    val transAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.5f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(600, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "transition_alpha"
+                    )
+
+                    Text(
+                        text = uiState.guidedMessage,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = transAlpha),
+                        textAlign = TextAlign.Center
+                    )
+
+                    OutlinedButton(
+                        onClick = { viewModel.cancelGuidedRecording() },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+
+                GuidedRecordingState.COMPLETED -> {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "\u2714",
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Text(
+                        text = "Recording Complete!",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "${uiState.totalSamples} samples across ${uiState.postureCounts.size} postures",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Button(
+                        onClick = { viewModel.resetGuidedState() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Done", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                GuidedRecordingState.CANCELLED -> {
+                    Text(
+                        text = "Recording Cancelled",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    if (uiState.totalSamples > 0) {
+                        Text(
+                            text = "${uiState.totalSamples} samples saved before cancellation",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = { viewModel.resetGuidedState() },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Dismiss")
+                    }
+                }
             }
         }
     }
@@ -711,34 +1156,32 @@ private fun RecordingHero(
                 }
 
                 // Current posture display
-                if (uiState.currentPosture != SalahPosture.NOT_PRAYING) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp)
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Text(
+                            text = uiState.currentPosture.displayName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        if (uiState.currentPosture.arabicName.isNotEmpty()) {
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = uiState.currentPosture.displayName,
+                                text = uiState.currentPosture.arabicName,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                fontSize = 18.sp
                             )
-                            if (uiState.currentPosture.arabicName.isNotEmpty()) {
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = uiState.currentPosture.arabicName,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                    fontSize = 18.sp
-                                )
-                            }
                         }
                     }
                 }
@@ -866,19 +1309,17 @@ private fun PostureSelector(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                if (uiState.currentPosture != SalahPosture.NOT_PRAYING) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Text(
-                            text = uiState.currentPosture.displayName,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                        )
-                    }
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        text = uiState.currentPosture.displayName,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                    )
                 }
             }
 
@@ -892,8 +1333,7 @@ private fun PostureSelector(
             SalahPosture.SUJUD,
             SalahPosture.JALSA,
             SalahPosture.TASHAHHUD,
-            SalahPosture.QIYAM_RISING,
-            SalahPosture.TRANSITION
+            SalahPosture.QIYAM_RISING
         )
 
             // Row 1: first 3
@@ -934,7 +1374,7 @@ private fun PostureSelector(
             }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            // Row 3: last 2 + Not Praying
+            // Row 3: last posture
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -949,41 +1389,6 @@ private fun PostureSelector(
                         globalCount = uiState.globalPostureCounts[posture.name] ?: 0,
                         onClick = { viewModel.setPosture(posture) }
                     )
-                }
-            }
-            // Not Praying in same row
-            val npSelected = uiState.currentPosture == SalahPosture.NOT_PRAYING
-            Box(modifier = Modifier.weight(1f)) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(72.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .border(
-                            1.5.dp,
-                            if (npSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                            RoundedCornerShape(16.dp)
-                        )
-                        .clickable { viewModel.setPosture(SalahPosture.NOT_PRAYING) },
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (npSelected) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceContainerLow
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Text(
-                            text = "Not\nPraying",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (npSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (npSelected) FontWeight.Bold else FontWeight.Medium,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 16.sp
-                        )
-                    }
                 }
             }
             }
@@ -1225,7 +1630,7 @@ private fun SessionStats(uiState: SalahDataCollectionUiState) {
                     StatPill("Postures", "${uiState.postureCounts.size}", MaterialTheme.colorScheme.tertiary)
                     StatPill(
                         "Active",
-                        if (uiState.currentPosture != SalahPosture.NOT_PRAYING) uiState.currentPosture.displayName else "-",
+                        uiState.currentPosture.displayName,
                         MaterialTheme.colorScheme.secondary
                     )
                 }
@@ -1751,9 +2156,7 @@ private fun DataFileItem(file: DataFileInfo, onDelete: () -> Unit) {
         "SUJUD" to "Sujud",
         "JALSA" to "Jalsa",
         "TASHAHHUD" to "Tashahhud",
-        "QIYAM_RISING" to "Rising",
-        "TRANSITION" to "Transition",
-        "NOT_PRAYING" to "Idle"
+        "QIYAM_RISING" to "Rising"
     )
 
     Card(
@@ -2282,8 +2685,6 @@ private fun isPostureOrientationOk(posture: SalahPosture, pitch: Float, roll: Fl
         SalahPosture.JALSA -> abs(pitch) < 45f
         SalahPosture.TASHAHHUD -> abs(pitch) < 45f
         SalahPosture.QIYAM_RISING -> true  // movement expected
-        SalahPosture.TRANSITION -> true
-        SalahPosture.NOT_PRAYING -> true
     }
 }
 

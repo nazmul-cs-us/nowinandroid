@@ -15,11 +15,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,7 +26,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -40,7 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,14 +47,16 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.RoundedCornerShape
-import kotlin.math.abs
 
 /**
  * Data class to hold wobble state and configuration
@@ -72,18 +70,17 @@ data class WobbleState(
 
 /**
  * Fitbit-inspired pull-to-refresh container.
- * When the user pulls down:
+ * Uses nestedScroll to properly integrate with scrollable content.
+ * When the user pulls down (and content is at the top):
  * - Content translates DOWN significantly (primary effect)
  * - A flat muted sage/green-gray background is revealed behind
- * - Content gets rounded corners and becomes a floating card
- * - Horizontal margins appear progressively
- * - "Release to sync" indicator appears above the card
- * - Elastic spring bounce-back when released
+ * - "Release to sync" indicator appears above the content
+ * - Smooth spring settle-back when released
  *
  * When syncing (isRefreshing = true):
  * - Content stays pushed down
  * - "Syncing your data" with spinning arc indicator
- * - Sage background remains visible
+ * - Sage background sweeps in from left to right
  */
 @Composable
 fun WobblePullToRefresh(
@@ -99,9 +96,61 @@ fun WobblePullToRefresh(
 
     // Wobble state management
     val maxDragDistance = with(LocalDensity.current) { 600.dp.toPx() }
-    var dragDistance by remember { mutableStateOf(0f) }
-    var lastHapticDistance by remember { mutableStateOf(0f) }
-    var isVerticalDrag by remember { mutableStateOf(false) }
+    var dragDistance by remember { mutableFloatStateOf(0f) }
+    var lastHapticDistance by remember { mutableFloatStateOf(0f) }
+
+    // NestedScroll connection: properly integrates with scrollable content
+    // Only activates pull-to-refresh when content is already scrolled to the top
+    val nestedScrollConnection = remember(isRefreshing) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // When user scrolls UP while pull-to-refresh is partially pulled,
+                // consume the scroll to reduce drag distance first
+                if (dragDistance > 0f && available.y < 0f) {
+                    val consumed = available.y
+                    dragDistance = (dragDistance + consumed).coerceAtLeast(0f)
+                    return Offset(0f, consumed)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                // When content can't scroll up anymore (at top) and user pulls DOWN
+                if (available.y > 0f && !isRefreshing && source == NestedScrollSource.UserInput) {
+                    val resistance = 1f - (dragDistance / maxDragDistance * 0.5f).coerceIn(0f, 0.5f)
+                    dragDistance += available.y * resistance
+                    if (dragDistance >= maxDragDistance) {
+                        dragDistance = maxDragDistance
+                    }
+
+                    // Progressive haptic feedback every 50 pixels
+                    val hapticInterval = 50f
+                    if (dragDistance - lastHapticDistance >= hapticInterval) {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        lastHapticDistance = dragDistance - (dragDistance % hapticInterval)
+                    }
+
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                // When user lifts finger, check if drag was enough to trigger refresh
+                if (dragDistance > 150f && !isRefreshing) {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onRefresh()
+                }
+                dragDistance = 0f
+                lastHapticDistance = 0f
+                return Velocity.Zero
+            }
+        }
+    }
 
     // Animated drag distance with smooth settle (no bounce, like Fitbit)
     val dragDistanceAnimated by animateFloatAsState(
@@ -118,15 +167,13 @@ fun WobblePullToRefresh(
     LaunchedEffect(isRefreshing, isDownloading) {
         if (isRefreshing || isDownloading) {
             // SNAP instantly to held position — no gap, like Fitbit
-            refreshingOffset.snapTo(0.35f)
+            // 0.45 matches Fitbit's ~15% screen-height hold during sync
+            refreshingOffset.snapTo(0.45f)
         } else {
-            // Smooth settle back when sync completes
+            // Slow, gentle settle back when sync completes — gives user time to see result
             refreshingOffset.animateTo(
                 targetValue = 0f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
+                animationSpec = tween(durationMillis = 600)
             )
         }
     }
@@ -140,6 +187,20 @@ fun WobblePullToRefresh(
         )
     )
 
+    // Animated sync progress: fills from 0 to 1 over 3 seconds during syncing
+    val syncProgress = remember { Animatable(0f) }
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            syncProgress.snapTo(0f)
+            syncProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 3000, easing = LinearEasing)
+            )
+        } else {
+            syncProgress.snapTo(0f)
+        }
+    }
+
     // Calculate wobble intensity (0 to 1)
     // When refreshing/downloading, use the refreshing offset; when dragging, use drag distance
     val rawWobbleIntensity = (dragDistanceAnimated / maxDragDistance).coerceIn(0f, 1f)
@@ -149,17 +210,15 @@ fun WobblePullToRefresh(
     // PRIMARY: Large vertical translation (content pushes down)
     val contentOffsetY = (wobbleIntensity * 220f).dp
 
-    // Progressive rounded top corners: 0dp at rest -> 28dp fully pulled
-    val cornerRadius = (wobbleIntensity * 28f).dp
+    // Fitbit-style rounded top corners on content card when pushed down
+    val cornerRadius = (wobbleIntensity * 24f).dp.coerceAtMost(24.dp)
+    val horizontalMargin = 0.dp
 
-    // Fitbit flat muted sage/gray-green background
-    val fitbitBgColor = Color(0xFFD2D6CC)
+    // Fitbit flat muted sage/gray-green background (matched from Fitbit screenshot)
+    val fitbitBgColor = Color(0xFF96A08E)
 
-    // Slightly darker sage for the progress fill (horizontal sweep)
-    val progressFillColor = Color(0xFFC5CAB9)
-
-    // Indicator text color
-    val indicatorColor = Color(0xFF4A5042)
+    // Indicator text color (dark enough for contrast on sage)
+    val indicatorColor = Color(0xFF2F3729)
 
     // Spinning animation for syncing state
     val infiniteTransition = rememberInfiniteTransition(label = "sync_spinner")
@@ -181,86 +240,25 @@ fun WobblePullToRefresh(
         wobbleIntensity = wobbleIntensity
     )
 
-    // Outer Box: shows the flat sage background when content pushes down
+    // Outer Box: sage only during active pull; during sync the sweep reveals it progressively
     Box(
         modifier = modifier
             .fillMaxSize()
+            .nestedScroll(nestedScrollConnection)
             .background(
-                if (wobbleIntensity > 0.01f) fitbitBgColor
+                if (rawWobbleIntensity > 0.01f) fitbitBgColor
                 else MaterialTheme.colorScheme.background
             )
-            .pointerInput(isRefreshing) {
-                detectDragGestures(
-                    onDragStart = {
-                        isVerticalDrag = false
-                        dragDistance = 0f
-                        lastHapticDistance = 0f
-                    },
-                    onDragEnd = {
-                        if (isVerticalDrag && dragDistance > 150f && !isRefreshing) {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onRefresh()
-                        }
-
-                        dragDistance = 0f
-                        lastHapticDistance = 0f
-                        isVerticalDrag = false
-                    },
-                    onDragCancel = {
-                        dragDistance = 0f
-                        lastHapticDistance = 0f
-                        isVerticalDrag = false
-                    }
-                ) { _, dragAmount ->
-                    if (isRefreshing) {
-                        return@detectDragGestures
-                    }
-
-                    val deltaX = dragAmount.x
-                    val deltaY = dragAmount.y
-
-                    if (!isVerticalDrag && dragDistance < 10f) {
-                        val absX = abs(deltaX)
-                        val absY = abs(deltaY)
-
-                        if (absY > absX * 2f && absY > 5f) {
-                            isVerticalDrag = true
-                        } else if (absX > absY && absX > 5f) {
-                            return@detectDragGestures
-                        }
-                    }
-
-                    if (isVerticalDrag) {
-                        // Apply resistance: drag gets progressively harder
-                        val resistance = 1f - (dragDistance / maxDragDistance * 0.5f).coerceIn(0f, 0.5f)
-                        dragDistance += deltaY * resistance
-
-                        if (dragDistance < 0f) {
-                            dragDistance = 0f
-                            lastHapticDistance = 0f
-                            return@detectDragGestures
-                        }
-                        if (dragDistance >= maxDragDistance) {
-                            dragDistance = maxDragDistance
-                        }
-
-                        // Progressive haptic feedback every 50 pixels
-                        val hapticInterval = 50f
-                        if (dragDistance - lastHapticDistance >= hapticInterval) {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            lastHapticDistance = dragDistance - (dragDistance % hapticInterval)
-                        }
-                    }
-                }
-            }
     ) {
-        // Horizontal progress fill: sweeps left-to-right across the sage background
-        if (isDownloading && wobbleIntensity > 0.01f) {
+        // Horizontal progress fill: sweeps sage color left-to-right (background hidden until sweep covers it)
+        // Shows during both syncing (timed 3s fill) and downloading (explicit progress)
+        if ((isRefreshing || isDownloading) && wobbleIntensity > 0.01f) {
+            val fillProgress = if (isDownloading) animatedDownloadProgress else syncProgress.value
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(animatedDownloadProgress)
+                    .fillMaxWidth(fillProgress)
                     .fillMaxHeight()
-                    .background(progressFillColor)
+                    .background(fitbitBgColor)
                     .align(Alignment.CenterStart)
             )
         }
@@ -284,7 +282,7 @@ fun WobblePullToRefresh(
                         ) {
                             val strokeWidth = 2.dp.toPx()
                             drawArc(
-                                color = Color(0xFF4A5042),
+                                color = indicatorColor,
                                 startAngle = spinAngle,
                                 sweepAngle = 270f,
                                 useCenter = false,
@@ -319,7 +317,7 @@ fun WobblePullToRefresh(
                         ) {
                             val strokeWidth = 2.dp.toPx()
                             drawArc(
-                                color = Color(0xFF4A5042),
+                                color = indicatorColor,
                                 startAngle = spinAngle,
                                 sweepAngle = 270f,
                                 useCenter = false,
@@ -360,7 +358,7 @@ fun WobblePullToRefresh(
                         ) {
                             val strokeWidth = 2.dp.toPx()
                             drawArc(
-                                color = Color(0xFF4A5042),
+                                color = indicatorColor,
                                 startAngle = -90f,
                                 sweepAngle = 270f,
                                 useCenter = false,
@@ -387,11 +385,11 @@ fun WobblePullToRefresh(
             }
         }
 
-        // Inner content: pushes down, full width, rounded top corners
+        // Inner content: pushes down flat (like Fitbit)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = contentOffsetY)
+                .padding(top = contentOffsetY, start = horizontalMargin, end = horizontalMargin)
                 .clip(
                     RoundedCornerShape(
                         topStart = cornerRadius,
@@ -406,4 +404,3 @@ fun WobblePullToRefresh(
         }
     }
 }
-

@@ -673,8 +673,7 @@ fun getPostureColor(posture: SalahPosture): Color {
         SalahPosture.SUJUD -> Color(0xFF32CD32)
         SalahPosture.JALSA -> Color(0xFF9370DB)
         SalahPosture.TASHAHHUD -> Color(0xFFFF4500)
-        SalahPosture.TRANSITION -> Color.Gray
-        SalahPosture.NOT_PRAYING -> Color.LightGray
+        else -> Color.Gray
     }
 }
 

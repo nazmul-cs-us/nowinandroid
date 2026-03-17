@@ -26,18 +26,25 @@ class SalahSequenceValidator {
         private const val TAG = "SalahSequenceValidator"
 
         // Minimum time (ms) a posture must be held before transitioning
-        // Reduced from 800ms - with ~200ms inference rate, 400ms = 2 stable readings
-        private const val MIN_POSTURE_DURATION_MS = 400L
+        // Reduced from 400ms to 200ms: with ~100ms inference rate, 200ms = 2 readings.
+        // The EMA smoothing in SalahDetectionEngine already provides temporal stability,
+        // so this duration gate can be shorter without increasing false positives.
+        private const val MIN_POSTURE_DURATION_MS = 200L
 
         // Minimum consecutive detections at same posture to confirm it
-        // Reduced from 3 to 2 for faster response
-        private const val MIN_STABLE_COUNT = 2
+        // Reduced from 2 to 1: the EMA smoothing (alpha=0.6) in SalahDetectionEngine
+        // already requires sustained signal to flip the argmax, so requiring additional
+        // stability here was double-filtering and suppressing real transitions.
+        private const val MIN_STABLE_COUNT = 1
 
         // Prayer timeout: auto-complete if no posture change for 10 minutes
         private const val PRAYER_TIMEOUT_MS = 10 * 60 * 1000L
 
-        // High-confidence override threshold (lowered from 0.9 to 0.8, restricted to adjacent transitions)
-        private const val HIGH_CONFIDENCE_OVERRIDE = 0.80f
+        // High-confidence override threshold: allows skip-one-step transitions when
+        // confidence is high enough. Lowered from 0.80 to 0.65 because the EMA
+        // smoothing already prevents spurious spikes - if a posture reaches 0.65
+        // through the EMA filter, it's a genuine signal.
+        private const val HIGH_CONFIDENCE_OVERRIDE = 0.65f
 
         // Valid transitions: tightened to enforce real prayer order.
         // Removed invalid shortcuts (e.g., QIYAM directly to SUJUD).
