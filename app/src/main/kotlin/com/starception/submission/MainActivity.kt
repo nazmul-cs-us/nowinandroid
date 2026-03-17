@@ -64,6 +64,8 @@ import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.prayer.service.CountryPrayerMethodService
 import com.starception.submission.prayer.model.CalculationMethod
 import android.location.Location as AndroidLocation
+import com.starception.submission.download.AssetDownloadScreen
+import com.starception.submission.download.AssetDownloadViewModel
 import com.starception.submission.util.isSystemInDarkTheme
 import com.starception.submission.util.PermissionManager
 import com.starception.submission.util.ActivityBasedDuaHelper
@@ -94,9 +96,6 @@ import android.app.NotificationManager
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
-import com.starception.submission.download.AssetDownloadScreen
-import com.starception.submission.download.AssetDownloadViewModel
-import com.starception.submission.download.DownloadScreenState
 
 /**
  * MAIN ACTIVITY: Entry point for the Islamic prayer times app
@@ -207,7 +206,6 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
         // Initialize ViewModel for theme handling (but without splash screen blocking)
         val viewModel: MainActivityViewModel by viewModels()
         val downloadViewModel: AssetDownloadViewModel by viewModels()
-
         // Handle deep link for course sharing
         val deepLinkCourseId = handleCourseDeepLink(intent)
 
@@ -229,19 +227,6 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val isSystemDarkTheme = resources.configuration.isSystemInDarkTheme
 
-            // Track whether download screen has been passed
-            var contentReady by remember { mutableStateOf(false) }
-
-            // Check download state
-            val downloadState by downloadViewModel.screenState.collectAsStateWithLifecycle()
-
-            // Auto-skip download screen if all assets are ready (bundled fallback works)
-            LaunchedEffect(downloadState) {
-                if (downloadState is DownloadScreenState.AllReady) {
-                    contentReady = true
-                }
-            }
-
             // IMPORTANT: rememberNiaAppState must be OUTSIDE NiaTheme to prevent
             // navigation state loss when theme changes. Theme recomposition inside
             // NiaTheme was causing the NavHost to be recreated, losing the Settings screen.
@@ -260,7 +245,7 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
                 },
                 themeBrand = when (uiState) {
                     is MainActivityUiState.Success -> uiState.themeBrand
-                    is MainActivityUiState.Loading -> ThemeBrand.DEFAULT
+                    is MainActivityUiState.Loading -> ThemeBrand.COASTAL
                 },
                 disableDynamicTheming = when (uiState) {
                     is MainActivityUiState.Success -> uiState.shouldDisableDynamicTheming
@@ -269,6 +254,8 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
             ) {
                 // Update theme color bridge so View-based components can access theme colors
                 com.starception.submission.util.ThemeColorBridge.UpdateColors()
+
+                var contentReady by remember { mutableStateOf(false) }
 
                 CompositionLocalProvider(
                     LocalAnalyticsHelper provides analyticsHelper,

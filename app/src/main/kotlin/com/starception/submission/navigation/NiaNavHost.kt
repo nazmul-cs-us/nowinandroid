@@ -46,7 +46,11 @@ import com.starception.submission.feature.dua.navigateToDuaDetail
 import com.starception.submission.feature.hadith.hadithDetailScreen
 import com.starception.submission.feature.hadith.navigateToHadithDetail
 import com.starception.submission.feature.salah.datacollection.navigateToSalahDataCollection
+import com.starception.submission.feature.salah.datacollection.navigateToSalahLiveRecording
+import com.starception.submission.feature.salah.datacollection.navigateToSalahPrayerReview
 import com.starception.submission.feature.salah.datacollection.salahDataCollectionScreen
+import com.starception.submission.feature.salah.datacollection.salahLiveRecordingScreen
+import com.starception.submission.feature.salah.datacollection.salahPrayerReviewScreen
 import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.settings.navigation.settingsScreen
 import com.starception.submission.ui.NiaAppState
@@ -292,6 +296,18 @@ fun NiaNavHost(
         )
         // Salah data collection screen (developer tool)
         salahDataCollectionScreen(
+            onBackClick = navController::popBackStack,
+            onNavigateToLiveRecording = navController::navigateToSalahLiveRecording
+        )
+        // Live prayer recording screen
+        salahLiveRecordingScreen(
+            onNavigateToReview = { filePath ->
+                navController.navigateToSalahPrayerReview(filePath)
+            },
+            onBackClick = navController::popBackStack
+        )
+        // Prayer review & labeling screen
+        salahPrayerReviewScreen(
             onBackClick = navController::popBackStack
         )
         // Hadith detail screen

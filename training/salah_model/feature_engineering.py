@@ -73,8 +73,8 @@ def extract_window_features(sample: dict) -> np.ndarray:
      18-19: roll_mean, roll_var (from precomputed roll)
      20-21: accel_min, accel_max (magnitude range)
      22-23: gyro_min, gyro_max (magnitude range)
-     24:    pitch (precomputed by Android)
-     25:    roll (precomputed by Android)
+     24:    pitch_range (max - min of per-sample pitch across window)
+     25:    roll_range (max - min of per-sample roll across window)
      26:    accel_magnitude (precomputed by Android)
      27:    gyro_magnitude (precomputed by Android)
      28:    accel_energy (sum of squares / N)
@@ -129,6 +129,10 @@ def extract_window_features(sample: dict) -> np.ndarray:
     accel_energy = (ax**2 + ay**2 + az**2).mean()
     gyro_energy = (gx**2 + gy**2 + gz**2).mean()
 
+    # Pitch/roll range (max - min across window samples)
+    pitch_range = pitches.max() - pitches.min()
+    roll_range = rolls.max() - rolls.min()
+
     features = np.array([
         accel_mean[0], accel_mean[1], accel_mean[2],   # 0-2
         accel_std[0], accel_std[1], accel_std[2],       # 3-5
@@ -140,7 +144,7 @@ def extract_window_features(sample: dict) -> np.ndarray:
         roll, roll_var,                                   # 18-19
         accel_min, accel_max,                             # 20-21
         gyro_min, gyro_max,                               # 22-23
-        pitch, roll,                                      # 24-25
+        pitch_range, roll_range,                          # 24-25
         accel_magnitude, gyro_magnitude,                  # 26-27
         accel_energy, gyro_energy,                        # 28-29
     ], dtype=np.float32)

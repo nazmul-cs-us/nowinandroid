@@ -1252,7 +1252,7 @@ class UnifiedSettingsViewModel @Inject constructor(
  * Theme settings state
  */
 data class ThemeSettingsState(
-    val brand: ThemeBrand = ThemeBrand.DEFAULT,
+    val brand: ThemeBrand = ThemeBrand.COASTAL,
     val useDynamicColor: Boolean = false,
     val darkThemeConfig: DarkThemeConfig = DarkThemeConfig.FOLLOW_SYSTEM
 )

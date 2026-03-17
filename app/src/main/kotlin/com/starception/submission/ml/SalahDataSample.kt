@@ -53,13 +53,35 @@ data class SalahDataSample(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is SalahDataSample) return false
-        return timestamp == other.timestamp && sessionId == other.sessionId && posture == other.posture
+        return timestamp == other.timestamp &&
+            sessionId == other.sessionId &&
+            posture == other.posture &&
+            accelX.contentEquals(other.accelX) &&
+            accelY.contentEquals(other.accelY) &&
+            accelZ.contentEquals(other.accelZ) &&
+            gyroX.contentEquals(other.gyroX) &&
+            gyroY.contentEquals(other.gyroY) &&
+            gyroZ.contentEquals(other.gyroZ) &&
+            pitch == other.pitch &&
+            roll == other.roll &&
+            accelMagnitude == other.accelMagnitude &&
+            gyroMagnitude == other.gyroMagnitude
     }
 
     override fun hashCode(): Int {
         var result = timestamp.hashCode()
         result = 31 * result + sessionId.hashCode()
         result = 31 * result + posture.hashCode()
+        result = 31 * result + accelX.contentHashCode()
+        result = 31 * result + accelY.contentHashCode()
+        result = 31 * result + accelZ.contentHashCode()
+        result = 31 * result + gyroX.contentHashCode()
+        result = 31 * result + gyroY.contentHashCode()
+        result = 31 * result + gyroZ.contentHashCode()
+        result = 31 * result + pitch.hashCode()
+        result = 31 * result + roll.hashCode()
+        result = 31 * result + accelMagnitude.hashCode()
+        result = 31 * result + gyroMagnitude.hashCode()
         return result
     }
 

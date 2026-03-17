@@ -33,58 +33,57 @@ class SalahSequenceValidator {
         // Reduced from 3 to 2 for faster response
         private const val MIN_STABLE_COUNT = 2
 
-        // Valid transitions: permissive to handle ML model uncertainty.
-        // The model has 7 classes and doesn't always fire them in textbook order.
+        // Prayer timeout: auto-complete if no posture change for 10 minutes
+        private const val PRAYER_TIMEOUT_MS = 10 * 60 * 1000L
+
+        // High-confidence override threshold (lowered from 0.9 to 0.8, restricted to adjacent transitions)
+        private const val HIGH_CONFIDENCE_OVERRIDE = 0.80f
+
+        // Valid transitions: tightened to enforce real prayer order.
+        // Removed invalid shortcuts (e.g., QIYAM directly to SUJUD).
         // QIYAM_RISING is treated as equivalent to QIYAM for transition purposes.
         private val VALID_TRANSITIONS: Map<SalahPosture, Set<SalahPosture>> = mapOf(
             SalahPosture.QIYAM to setOf(
                 SalahPosture.RUKU,
-                SalahPosture.GOING_TO_SUJUD,
-                SalahPosture.SUJUD,           // May skip RUKU detection (fast bowing)
                 SalahPosture.QIYAM_RISING     // Model may alternate between QIYAM/QIYAM_RISING
             ),
             SalahPosture.RUKU to setOf(
                 SalahPosture.QIYAM_RISING,
-                SalahPosture.QIYAM,
-                SalahPosture.GOING_TO_SUJUD,  // May go directly to sujud from ruku
-                SalahPosture.SUJUD            // May skip intermediate postures
+                SalahPosture.GOING_TO_SUJUD   // May go directly to sujud from ruku
             ),
             SalahPosture.QIYAM_RISING to setOf(
                 SalahPosture.QIYAM,
-                SalahPosture.RUKU,
                 SalahPosture.GOING_TO_SUJUD,
-                SalahPosture.SUJUD,
-                SalahPosture.TASHAHHUD         // Model may detect sitting from rising
+                SalahPosture.RUKU
             ),
             SalahPosture.GOING_TO_SUJUD to setOf(
                 SalahPosture.SUJUD,
-                SalahPosture.TASHAHHUD,        // May detect sitting before full sujud
-                SalahPosture.JALSA,            // May detect sitting
-                SalahPosture.QIYAM_RISING,     // Rising back up (aborted sujud or model noise)
-                SalahPosture.QIYAM,            // Standing back up
-                SalahPosture.RUKU              // Model confusion between bowing states
+                SalahPosture.QIYAM_RISING     // Rising back up (aborted sujud)
             ),
             SalahPosture.SUJUD to setOf(
                 SalahPosture.JALSA,
                 SalahPosture.TASHAHHUD,
-                SalahPosture.GOING_TO_SUJUD,   // Brief rise between two sujuds
-                SalahPosture.QIYAM_RISING,     // Rising for next rak'ah
-                SalahPosture.QIYAM             // Rising for next rak'ah (skipping QIYAM_RISING)
+                SalahPosture.QIYAM_RISING     // Rising for next rak'ah
             ),
             SalahPosture.JALSA to setOf(
-                SalahPosture.SUJUD,
-                SalahPosture.GOING_TO_SUJUD,
-                SalahPosture.QIYAM,
-                SalahPosture.QIYAM_RISING,
-                SalahPosture.TASHAHHUD          // Model may confuse JALSA/TASHAHHUD
+                SalahPosture.SUJUD,           // Second sujud
+                SalahPosture.QIYAM_RISING,    // Rising for next rak'ah
+                SalahPosture.TASHAHHUD         // Model may confuse JALSA/TASHAHHUD
             ),
             SalahPosture.TASHAHHUD to setOf(
-                SalahPosture.QIYAM,
-                SalahPosture.QIYAM_RISING,
-                SalahPosture.SUJUD,            // Some prayers have sujud after tashahhud
-                SalahPosture.GOING_TO_SUJUD,
-                SalahPosture.JALSA             // Model confusion between sitting postures
+                SalahPosture.QIYAM,           // Next rak'ah
+                SalahPosture.QIYAM_RISING     // Rising for next rak'ah
             )
+        )
+
+        // Adjacent transitions (one step away in prayer flow) - used for high-confidence override
+        // These are transitions that skip exactly one step and are plausible in real prayers
+        private val ADJACENT_OVERRIDES: Map<SalahPosture, Set<SalahPosture>> = mapOf(
+            SalahPosture.QIYAM to setOf(SalahPosture.GOING_TO_SUJUD),      // Skipped RUKU detection
+            SalahPosture.RUKU to setOf(SalahPosture.SUJUD),                 // Skipped GOING_TO_SUJUD
+            SalahPosture.SUJUD to setOf(SalahPosture.QIYAM),               // Skipped JALSA/QIYAM_RISING
+            SalahPosture.JALSA to setOf(SalahPosture.GOING_TO_SUJUD),      // Going to second sujud
+            SalahPosture.GOING_TO_SUJUD to setOf(SalahPosture.JALSA)       // Brief transition
         )
     }
 
@@ -122,6 +121,9 @@ class SalahSequenceValidator {
     private var seenSujudInRakah = false
     private var seenStandingInSession = false
 
+    // Prayer timeout tracking
+    private var lastPostureChangeTime: Long = 0L
+
     /**
      * Process a new posture detection from the ML model.
      *
@@ -135,6 +137,15 @@ class SalahSequenceValidator {
         confidence: Float,
         timestampMs: Long
     ): ValidationResult {
+
+        // Prayer timeout: auto-complete if no posture change for 10 minutes
+        if (prayerState == PrayerState.CONFIRMED && lastPostureChangeTime > 0L) {
+            val timeSinceLastChange = timestampMs - lastPostureChangeTime
+            if (timeSinceLastChange > PRAYER_TIMEOUT_MS) {
+                Log.d(TAG, "Prayer timeout: no posture change for ${timeSinceLastChange / 1000}s")
+                return completePrayer()
+            }
+        }
 
         // Count consecutive same-posture detections for stability
         if (detectedPosture == lastRawPosture) {
@@ -205,11 +216,14 @@ class SalahSequenceValidator {
                 reset()
                 return handleFirstPosture(detectedPosture, timestampMs)
             }
-            // If prayer is confirmed, try accepting anyway if confidence is high
-            // (real prayers don't always follow textbook sequences perfectly)
-            if (confidence >= 0.9f) {
-                Log.d(TAG, "Accepting high-confidence override: ${currentPosture?.displayName} → ${detectedPosture.displayName} (conf=$confidence)")
-                return acceptTransition(detectedPosture, timestampMs)
+            // If prayer is confirmed, allow high-confidence override ONLY for adjacent transitions
+            // (skip-one-step transitions that are plausible in real prayers)
+            if (confidence >= HIGH_CONFIDENCE_OVERRIDE) {
+                val adjacentAllowed = ADJACENT_OVERRIDES[currentPosture] ?: emptySet()
+                if (detectedPosture in adjacentAllowed) {
+                    Log.d(TAG, "Adjacent override: ${currentPosture?.displayName} → ${detectedPosture.displayName} (conf=$confidence)")
+                    return acceptTransition(detectedPosture, timestampMs)
+                }
             }
             return ValidationResult(
                 accepted = false,
@@ -233,6 +247,7 @@ class SalahSequenceValidator {
         if (posture == SalahPosture.QIYAM || posture == SalahPosture.QIYAM_RISING) {
             currentPosture = posture
             currentPostureStartTime = timestampMs
+            lastPostureChangeTime = timestampMs
             prayerState = PrayerState.DETECTING
             postureHistory.add(posture)
             seenStandingInSession = true
@@ -260,6 +275,7 @@ class SalahSequenceValidator {
         val oldPosture = currentPosture
         currentPosture = newPosture
         currentPostureStartTime = timestampMs
+        lastPostureChangeTime = timestampMs
         postureHistory.add(newPosture)
 
         Log.d(TAG, "Transition: ${oldPosture?.displayName} → ${newPosture.displayName}")
@@ -386,6 +402,7 @@ class SalahSequenceValidator {
     fun reset() {
         currentPosture = null
         currentPostureStartTime = 0L
+        lastPostureChangeTime = 0L
         stableCount = 0
         lastRawPosture = null
         prayerState = PrayerState.IDLE

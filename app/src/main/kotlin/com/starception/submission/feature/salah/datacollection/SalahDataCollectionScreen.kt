@@ -7,10 +7,12 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -19,6 +21,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,13 +46,16 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -77,10 +83,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -105,6 +116,7 @@ import java.util.Locale
 @Composable
 fun SalahDataCollectionScreen(
     onBackClick: () -> Unit,
+    onNavigateToLiveRecording: () -> Unit = {},
     viewModel: SalahDataCollectionViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -187,6 +199,10 @@ fun SalahDataCollectionScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Live prayer recording button (always visible when not recording)
+                    if (!uiState.isRecording && !uiState.isCountingDown) {
+                        item { LivePrayerRecordingCard(onNavigateToLiveRecording) }
+                    }
                     item { RecordingHero(uiState, viewModel) }
                     // Capture quality feedback during recording
                     if (uiState.isRecording && uiState.lastSample != null) {
@@ -234,6 +250,10 @@ fun SalahDataCollectionScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // Live prayer recording button (always visible when not recording)
+                if (!uiState.isRecording && !uiState.isCountingDown) {
+                    item { LivePrayerRecordingCard(onNavigateToLiveRecording) }
+                }
                 // Quick guide when no data and not recording
                 if (!uiState.isRecording && !uiState.isCountingDown && uiState.dataFiles.isEmpty()) {
                     item { QuickGuide() }
@@ -368,6 +388,86 @@ fun SalahDataCollectionScreen(
 }
 
 // ═══════════════════════════════════════════════════════
+// LIVE PRAYER RECORDING CARD
+// ═══════════════════════════════════════════════════════
+
+@Composable
+private fun LivePrayerRecordingCard(onNavigateToLiveRecording: () -> Unit) {
+    val hapticFeedback = LocalHapticFeedback.current
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        ),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 4.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(
+                    bounded = true,
+                    color = MaterialTheme.colorScheme.primary
+                ),
+                onClick = {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onNavigateToLiveRecording()
+                }
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Record Live Prayer",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Pray normally with phone in pocket. ML detects postures automatically.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    lineHeight = 16.sp
+                )
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════
 // QUICK GUIDE
 // ═══════════════════════════════════════════════════════
 
@@ -378,7 +478,14 @@ private fun QuickGuide() {
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
         ),
         shape = RoundedCornerShape(20.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 2.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            )
     ) {
         Column(
             modifier = Modifier
@@ -400,6 +507,27 @@ private fun QuickGuide() {
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            // Gradient divider
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    MaterialTheme.colorScheme.outlineVariant,
+                                    MaterialTheme.colorScheme.outlineVariant,
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                        .padding(vertical = 0.5.dp)
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
             val steps = listOf(
@@ -414,19 +542,26 @@ private fun QuickGuide() {
                     modifier = Modifier.padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        modifier = Modifier.size(24.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text(
-                                text = "${index + 1}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
+                        Text(
+                            text = "${index + 1}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
@@ -449,6 +584,12 @@ private fun RecordingHero(
     uiState: SalahDataCollectionUiState,
     viewModel: SalahDataCollectionViewModel
 ) {
+    val shadowElevation = when {
+        uiState.isRecording -> 8.dp
+        uiState.isCountingDown -> 6.dp
+        else -> 3.dp
+    }
+
     Card(
         colors = CardDefaults.cardColors(
             containerColor = when {
@@ -460,6 +601,12 @@ private fun RecordingHero(
         shape = RoundedCornerShape(24.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(
+                elevation = shadowElevation,
+                shape = RoundedCornerShape(24.dp),
+                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            )
             .animateContentSize(tween(300))
     ) {
         Column(
@@ -666,38 +813,78 @@ private fun PostureSelector(
     uiState: SalahDataCollectionUiState,
     viewModel: SalahDataCollectionViewModel
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Select Posture",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 2.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
             )
-            if (uiState.currentPosture != SalahPosture.NOT_PRAYING) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Column(modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FiberManualRecord,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                     Text(
-                        text = uiState.currentPosture.displayName,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                        text = "Select Posture",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
                     )
                 }
+                if (uiState.currentPosture != SalahPosture.NOT_PRAYING) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = uiState.currentPosture.displayName,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                        )
+                    }
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-        // Prayer postures in 3-column grid (all visible at once)
+            // Prayer postures in 3-column grid (all visible at once)
         val prayerPostures = listOf(
             SalahPosture.QIYAM,
             SalahPosture.RUKU,
@@ -709,13 +896,11 @@ private fun PostureSelector(
             SalahPosture.TRANSITION
         )
 
-        // Row 1: first 3
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+            // Row 1: first 3
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
             prayerPostures.take(3).forEach { posture ->
                 Box(modifier = Modifier.weight(1f)) {
                     PostureChip(
@@ -728,15 +913,13 @@ private fun PostureSelector(
                     )
                 }
             }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        // Row 2: next 3
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            // Row 2: next 3
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
             prayerPostures.drop(3).take(3).forEach { posture ->
                 Box(modifier = Modifier.weight(1f)) {
                     PostureChip(
@@ -749,15 +932,13 @@ private fun PostureSelector(
                     )
                 }
             }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        // Row 3: last 2 + Not Praying
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            // Row 3: last 2 + Not Praying
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
             prayerPostures.drop(6).forEach { posture ->
                 Box(modifier = Modifier.weight(1f)) {
                     PostureChip(
@@ -805,6 +986,7 @@ private fun PostureSelector(
                     }
                 }
             }
+            }
         }
     }
 }
@@ -818,14 +1000,8 @@ private fun PostureChip(
     globalCount: Int,
     onClick: () -> Unit
 ) {
-    val backgroundColor by animateColorAsState(
-        targetValue = when {
-            isSelected && isRecording -> MaterialTheme.colorScheme.primary
-            isSelected -> MaterialTheme.colorScheme.primaryContainer
-            else -> MaterialTheme.colorScheme.surfaceContainerLow
-        },
-        label = "bg"
-    )
+    val hapticFeedback = LocalHapticFeedback.current
+
     val textColor by animateColorAsState(
         targetValue = when {
             isSelected && isRecording -> MaterialTheme.colorScheme.onPrimary
@@ -842,17 +1018,72 @@ private fun PostureChip(
         label = "border"
     )
 
-    Surface(
+    val shadowElevation by animateFloatAsState(
+        targetValue = if (isSelected) 4f else 0f,
+        label = "shadowElevation"
+    )
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(72.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.5.dp, borderColor, RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        color = backgroundColor,
-        shadowElevation = if (isSelected) 4.dp else 0.dp
+            .shadow(
+                elevation = shadowElevation.dp,
+                shape = RoundedCornerShape(16.dp),
+                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            )
     ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.5.dp, borderColor, RoundedCornerShape(16.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(
+                        bounded = true,
+                        color = MaterialTheme.colorScheme.primary
+                    ),
+                    onClick = {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    }
+                ),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.Transparent
+        ) {
+            // Background with gradient for selected+recording
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isSelected && isRecording) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                    )
+                                )
+                            )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                color = when {
+                                    isSelected -> MaterialTheme.colorScheme.primaryContainer
+                                    else -> MaterialTheme.colorScheme.surfaceContainerLow
+                                }
+                            )
+                    )
+                }
+            }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -894,6 +1125,7 @@ private fun PostureChip(
                 )
             }
         }
+        }
     }
 }
 
@@ -913,19 +1145,77 @@ private fun SessionStats(uiState: SalahDataCollectionUiState) {
                 containerColor = MaterialTheme.colorScheme.surface
             ),
             shape = RoundedCornerShape(20.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 3.dp,
+                    shape = RoundedCornerShape(20.dp),
+                    ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-                Text(
-                    text = "Session",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FiberManualRecord,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Text(
+                        text = "Session",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (uiState.postureCounts.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    // Gradient divider
+                    Box(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            MaterialTheme.colorScheme.outlineVariant,
+                                            MaterialTheme.colorScheme.outlineVariant,
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                                .padding(vertical = 0.5.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1020,7 +1310,14 @@ private fun SensorPreview(uiState: SalahDataCollectionUiState) {
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
                 shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 2.dp,
+                        shape = RoundedCornerShape(20.dp),
+                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    )
             ) {
                 Column(
                     modifier = Modifier
@@ -1073,6 +1370,22 @@ private fun SensorValue(label: String, value: String) {
 
 @Composable
 private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
+    var isTrainingExpanded by remember { mutableStateOf(true) }
+
+    val rotationAngle by animateFloatAsState(
+        targetValue = if (isTrainingExpanded) 180f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "chevronRotation"
+    )
+
+    val shadowElevation by animateFloatAsState(
+        targetValue = if (isTrainingExpanded) 5f else 2f,
+        label = "shadowElevation"
+    )
+
     AnimatedVisibility(
         visible = uiState.globalTotalSamples > 0,
         enter = fadeIn() + expandVertically(),
@@ -1083,15 +1396,30 @@ private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
                 containerColor = MaterialTheme.colorScheme.surface
             ),
             shape = RoundedCornerShape(20.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(
+                    elevation = shadowElevation.dp,
+                    shape = RoundedCornerShape(20.dp),
+                    ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                )
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(
+                                bounded = true,
+                                color = MaterialTheme.colorScheme.primary
+                            ),
+                            onClick = { isTrainingExpanded = !isTrainingExpanded }
+                        )
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1100,21 +1428,89 @@ private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${uiState.globalTotalSamples} total",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = "${uiState.globalTotalSamples} total",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                        Surface(
+                            modifier = Modifier.size(28.dp),
+                            shape = CircleShape,
+                            color = if (isTrainingExpanded)
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.ExpandMore,
+                                    contentDescription = if (isTrainingExpanded) "Collapse" else "Expand",
+                                    tint = if (isTrainingExpanded)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .rotate(rotationAngle)
+                                )
+                            }
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                AnimatedVisibility(
+                    visible = isTrainingExpanded,
+                    enter = expandVertically(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + fadeIn(),
+                    exit = shrinkVertically(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeOut()
+                ) {
+                    Column {
+                        // Gradient divider
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.horizontalGradient(
+                                            colors = listOf(
+                                                Color.Transparent,
+                                                MaterialTheme.colorScheme.outlineVariant,
+                                                MaterialTheme.colorScheme.outlineVariant,
+                                                Color.Transparent
+                                            )
+                                        )
+                                    )
+                                    .padding(vertical = 0.5.dp)
+                            )
+                        }
+
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
 
                 val target = 500
                 val postureOrder = listOf("QIYAM", "RUKU", "GOING_TO_SUJUD", "SUJUD", "JALSA", "TASHAHHUD", "QIYAM_RISING")
@@ -1217,6 +1613,9 @@ private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
                             fontWeight = if (minCollected >= target) FontWeight.Bold else FontWeight.Normal,
                             textAlign = TextAlign.Center
                         )
+                    }
+                }
+                        }
                     }
                 }
             }
@@ -1362,7 +1761,14 @@ private fun DataFileItem(file: DataFileInfo, onDelete: () -> Unit) {
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
         shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 1.dp,
+                shape = RoundedCornerShape(16.dp),
+                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            )
     ) {
         Row(
             modifier = Modifier
@@ -1370,20 +1776,27 @@ private fun DataFileItem(file: DataFileInfo, onDelete: () -> Unit) {
                 .padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // File icon
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                modifier = Modifier.size(36.dp)
+            // File icon with gradient
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        imageVector = Icons.Default.Description,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Description,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
             }
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -1477,12 +1890,24 @@ private fun Visualization3DCard(
     onToggleVisualization: (Boolean) -> Unit,
     onVizStateChange: (VisualizationState) -> Unit
 ) {
+    val shadowElevation by animateFloatAsState(
+        targetValue = if (showVisualization) 5f else 2f,
+        label = "shadowElevation"
+    )
+
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = shadowElevation.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Header row
@@ -1498,22 +1923,26 @@ private fun Visualization3DCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                        modifier = Modifier.size(36.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ViewInAr,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.ViewInAr,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                     Column {
                         Text(
@@ -1562,6 +1991,26 @@ private fun Visualization3DCard(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Gradient divider
+                    Box(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            MaterialTheme.colorScheme.outlineVariant,
+                                            MaterialTheme.colorScheme.outlineVariant,
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                                .padding(vertical = 0.5.dp)
+                        )
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
 
                     if (allSamples.isEmpty()) {
@@ -1693,11 +2142,29 @@ private fun CaptureQualityCard(uiState: SalahDataCollectionUiState) {
         CaptureQuality.BAD -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
     }
 
+    val shadowElevation = when (overallQuality) {
+        CaptureQuality.GREAT -> 4.dp
+        CaptureQuality.OK -> 3.dp
+        CaptureQuality.BAD -> 2.dp
+    }
+
+    val shadowColor = when (overallQuality) {
+        CaptureQuality.GREAT -> Color(0xFF43A047).copy(alpha = 0.12f)
+        CaptureQuality.OK -> Color(0xFFFFB300).copy(alpha = 0.12f)
+        CaptureQuality.BAD -> Color(0xFFE53935).copy(alpha = 0.12f)
+    }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = cardColor),
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(
+                elevation = shadowElevation,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = shadowColor,
+                spotColor = shadowColor
+            )
             .animateContentSize(tween(300))
     ) {
         Column(

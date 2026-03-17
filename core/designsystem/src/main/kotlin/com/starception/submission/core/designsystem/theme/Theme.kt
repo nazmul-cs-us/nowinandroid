@@ -286,7 +286,7 @@ val DarkCoastalBackgroundTheme = BackgroundTheme(color = Color(0xFF0F130E))
 @Composable
 fun NiaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    themeBrand: ThemeBrand = ThemeBrand.DEFAULT,
+    themeBrand: ThemeBrand = ThemeBrand.COASTAL,
     disableDynamicTheming: Boolean = true,
     content: @Composable () -> Unit,
 ) {

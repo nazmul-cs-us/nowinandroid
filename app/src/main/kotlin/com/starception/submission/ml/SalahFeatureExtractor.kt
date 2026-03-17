@@ -18,7 +18,7 @@ import kotlin.math.sqrt
  *  18-19: roll (precomputed), roll_var (from raw)
  *  20-21: accel_mag_min, accel_mag_max
  *  22-23: gyro_mag_min, gyro_mag_max
- *  24-25: pitch (precomputed), roll (precomputed)
+ *  24-25: pitch_range, roll_range (max - min across window)
  *  26-27: accel_magnitude (precomputed), gyro_magnitude (precomputed)
  *  28-29: accel_energy, gyro_energy
  */
@@ -89,6 +89,10 @@ object SalahFeatureExtractor {
         val accelMagnitude = sample.accelMagnitude
         val gyroMagnitude = sample.gyroMagnitude
 
+        // Pitch/roll range (max - min across window samples)
+        val pitchRange = (pitches.maxOrNull() ?: 0f) - (pitches.minOrNull() ?: 0f)
+        val rollRange = (rolls.maxOrNull() ?: 0f) - (rolls.minOrNull() ?: 0f)
+
         // Energy (sum of squares / N)
         var accelEnergySum = 0f
         for (i in ax.indices) {
@@ -113,7 +117,7 @@ object SalahFeatureExtractor {
             roll, rollVar,                              // 18-19
             accelMin, accelMax,                         // 20-21
             gyroMin, gyroMax,                           // 22-23
-            pitch, roll,                                // 24-25
+            pitchRange, rollRange,                      // 24-25
             accelMagnitude, gyroMagnitude,              // 26-27
             accelEnergy, gyroEnergy                     // 28-29
         )

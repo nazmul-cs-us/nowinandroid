@@ -96,11 +96,16 @@ def train(args):
         print("Could not create sequences. Need longer continuous recordings per posture.")
         return
 
-    # Split data
-    X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
+    # Split data into train/val/test (70/15/15)
+    # First split: 85% train+val, 15% test
+    X_trainval, X_test, y_trainval, y_test = train_test_split(
+        X, y, test_size=0.15, random_state=42, stratify=y
     )
-    print(f"\nTrain: {len(X_train)}, Validation: {len(X_val)}")
+    # Second split: split train+val into 82.35% train, 17.65% val (gives ~70/15 overall)
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_trainval, y_trainval, test_size=0.1765, random_state=42, stratify=y_trainval
+    )
+    print(f"\nTrain: {len(X_train)} (~70%), Validation: {len(X_val)} (~15%), Test: {len(X_test)} (~15%)")
 
     # Balance classes
     X_train, y_train = balance_classes(X_train, y_train, strategy="oversample")
@@ -113,11 +118,14 @@ def train(args):
             include_original=True
         )
 
-    # Normalize
+    # Normalize (also normalize test set using train statistics)
     X_train, X_val, feat_mean, feat_std = normalize_features(X_train, X_val)
+    # Normalize test set using training mean/std
+    X_test = (X_test - feat_mean) / (feat_std + 1e-8)
 
     print(f"\nFinal training set: {X_train.shape}")
     print(f"Final validation set: {X_val.shape}")
+    print(f"Final test set: {X_test.shape}")
 
     # Build model
     model = build_model(
@@ -176,21 +184,39 @@ def train(args):
     print("Evaluation Results")
     print("=" * 60)
 
+    # Validation set evaluation
     val_loss, val_acc = model.evaluate(X_val, y_val, verbose=0)
-    print(f"Validation Accuracy: {val_acc:.4f}")
+    print(f"\nValidation Accuracy: {val_acc:.4f}")
     print(f"Validation Loss: {val_loss:.4f}")
 
-    # Classification report
-    y_pred = model.predict(X_val, verbose=0).argmax(axis=1)
-    print("\nClassification Report:")
-    print(classification_report(y_val, y_pred, target_names=POSTURE_LABELS))
+    y_val_pred = model.predict(X_val, verbose=0).argmax(axis=1)
+    print("\nValidation Classification Report:")
+    print(classification_report(y_val, y_val_pred, target_names=POSTURE_LABELS))
 
-    print("Confusion Matrix:")
-    cm = confusion_matrix(y_val, y_pred)
-    print(cm)
+    print("\nValidation Confusion Matrix:")
+    cm_val = confusion_matrix(y_val, y_val_pred)
+    print(cm_val)
+
+    # Test set evaluation (held-out data)
+    print("\n" + "=" * 60)
+    print("Test Set Results (Held-Out Data)")
+    print("=" * 60)
+
+    test_loss, test_acc = model.evaluate(X_test, y_test, verbose=0)
+    print(f"\nTest Accuracy: {test_acc:.4f}")
+    print(f"Test Loss: {test_loss:.4f}")
+
+    y_test_pred = model.predict(X_test, verbose=0).argmax(axis=1)
+    print("\nTest Classification Report:")
+    print(classification_report(y_test, y_test_pred, target_names=POSTURE_LABELS))
+
+    print("\nTest Confusion Matrix:")
+    cm_test = confusion_matrix(y_test, y_test_pred)
+    print(cm_test)
 
     # Save normalization parameters
     norm_params = {
+        "model_version": 2,
         "mean": feat_mean.tolist(),
         "std": feat_std.tolist(),
         "posture_labels": POSTURE_LABELS,
@@ -234,9 +260,9 @@ def main():
     parser.add_argument("--stride", type=int, default=10,
                         help="Stride for sequence creation")
     parser.add_argument("--augment", action="store_true", default=True,
-                        help="Apply data augmentation")
-    parser.add_argument("--no_augment", dest="augment", action="store_false",
-                        help="Disable data augmentation")
+                        help="Apply data augmentation (default: enabled)")
+    parser.add_argument("--no-augment", dest="augment", action="store_false",
+                        help="Disable data augmentation for debugging")
     parser.add_argument("--augment_factor", type=int, default=4,
                         help="Number of augmented copies per original")
 

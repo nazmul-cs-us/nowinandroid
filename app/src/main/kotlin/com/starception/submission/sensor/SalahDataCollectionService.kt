@@ -42,6 +42,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         private const val SENSOR_DELAY_US = 20_000 // 50Hz = 20ms between samples
         private const val WINDOW_SIZE = 5 // 5 samples per 100ms window at 50Hz
         private const val DATA_DIR_NAME = "salah_training_data"
+        private const val MAX_PRAYER_DURATION_MS = 30 * 60 * 1000L // 30 minutes
     }
 
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -60,14 +61,25 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     var sessionId: String = ""
         private set
     private var isRecording = false
+    private var isLiveMode: Boolean = false
 
-    // Accumulation buffers for current window
+    // Live mode auto-stop timer
+    private var liveAutoStopHandler: Handler? = null
+    private var liveAutoStopRunnable: Runnable? = null
+
+    // Accumulation buffers for current window (with timestamps for synchronization)
     private val accelXBuffer = mutableListOf<Float>()
     private val accelYBuffer = mutableListOf<Float>()
     private val accelZBuffer = mutableListOf<Float>()
+    private val accelTimestamps = mutableListOf<Long>() // nanoseconds from event.timestamp
     private val gyroXBuffer = mutableListOf<Float>()
     private val gyroYBuffer = mutableListOf<Float>()
     private val gyroZBuffer = mutableListOf<Float>()
+    private val gyroTimestamps = mutableListOf<Long>() // nanoseconds from event.timestamp
+
+    // Boot-time reference for converting sensor nanoseconds to wall clock
+    private var sensorBootTimeNs = 0L
+    private var wallClockAtBoot = 0L
 
     // Output file writer
     private var writer: BufferedWriter? = null
@@ -80,6 +92,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     // Callbacks
     var onSampleRecorded: ((SalahDataSample) -> Unit)? = null
     var onStatsUpdated: ((Map<SalahPosture, Int>, Int) -> Unit)? = null
+    var onLivePostureDetected: ((SalahPosture, Float) -> Unit)? = null
 
     /**
      * Start recording sensor data for a new session.
@@ -102,6 +115,10 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         outputFile = File(dataDir, "salah_data_${timestamp}_$sessionId.jsonl")
         writer = BufferedWriter(FileWriter(outputFile, true))
+
+        // Initialize sensor timestamp reference for converting to wall clock
+        sensorBootTimeNs = android.os.SystemClock.elapsedRealtimeNanos()
+        wallClockAtBoot = System.currentTimeMillis()
 
         Log.i(TAG, "🕌 Starting salah data collection")
         Log.i(TAG, "   Session: $sessionId")
@@ -232,7 +249,8 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     fun isRecording(): Boolean = isRecording
 
     override fun onSensorChanged(event: SensorEvent) {
-        if (!isRecording || currentPosture == SalahPosture.NOT_PRAYING) return
+        // In live mode, allow recording even when currentPosture is NOT_PRAYING (defaults to QIYAM)
+        if (!isRecording || (!isLiveMode && currentPosture == SalahPosture.NOT_PRAYING)) return
 
         when (event.sensor.type) {
             Sensor.TYPE_ACCELEROMETER -> {
@@ -240,6 +258,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
                     accelXBuffer.add(event.values[0])
                     accelYBuffer.add(event.values[1])
                     accelZBuffer.add(event.values[2])
+                    accelTimestamps.add(event.timestamp) // nanoseconds since boot
                 }
             }
             Sensor.TYPE_GYROSCOPE -> {
@@ -247,6 +266,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
                     gyroXBuffer.add(event.values[0])
                     gyroYBuffer.add(event.values[1])
                     gyroZBuffer.add(event.values[2])
+                    gyroTimestamps.add(event.timestamp) // nanoseconds since boot
                 }
             }
         }
@@ -266,6 +286,11 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
 
     /**
      * Flush accumulated sensor data into a labeled sample and write to file.
+     *
+     * Uses timestamp-based pairing: takes the WINDOW_SIZE most recent accel and gyro
+     * samples, ensuring they are temporally close (within 10ms of each other).
+     * Uses sensor event timestamps (monotonic nanoseconds) converted to wall clock
+     * for accurate timing in JSONL output.
      */
     private fun flushWindow() {
         val ax: FloatArray
@@ -274,35 +299,80 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         val gx: FloatArray
         val gy: FloatArray
         val gz: FloatArray
+        val windowTimestampNs: Long
         val posture: SalahPosture
 
+        // Lock both buffers together to get synchronized snapshot
         synchronized(accelXBuffer) {
-            if (accelXBuffer.size < WINDOW_SIZE) return
-            ax = accelXBuffer.take(WINDOW_SIZE).toFloatArray()
-            ay = accelYBuffer.take(WINDOW_SIZE).toFloatArray()
-            az = accelZBuffer.take(WINDOW_SIZE).toFloatArray()
-            // Remove consumed samples (keep any overflow for next window)
-            repeat(WINDOW_SIZE) {
-                accelXBuffer.removeFirstOrNull()
-                accelYBuffer.removeFirstOrNull()
-                accelZBuffer.removeFirstOrNull()
-            }
-        }
+            synchronized(gyroXBuffer) {
+                if (accelXBuffer.size < WINDOW_SIZE || gyroXBuffer.size < WINDOW_SIZE) return
 
-        synchronized(gyroXBuffer) {
-            if (gyroXBuffer.size < WINDOW_SIZE) return
-            gx = gyroXBuffer.take(WINDOW_SIZE).toFloatArray()
-            gy = gyroYBuffer.take(WINDOW_SIZE).toFloatArray()
-            gz = gyroZBuffer.take(WINDOW_SIZE).toFloatArray()
-            repeat(WINDOW_SIZE) {
-                gyroXBuffer.removeFirstOrNull()
-                gyroYBuffer.removeFirstOrNull()
-                gyroZBuffer.removeFirstOrNull()
+                // Check temporal alignment: last accel and last gyro timestamps should be
+                // within 10ms of each other. If not, discard older samples until they align.
+                val accelLastTs = accelTimestamps[accelTimestamps.size - 1]
+                val gyroLastTs = gyroTimestamps[gyroTimestamps.size - 1]
+                val MAX_DRIFT_NS = 10_000_000L // 10ms in nanoseconds
+
+                if (kotlin.math.abs(accelLastTs - gyroLastTs) > MAX_DRIFT_NS) {
+                    // Sensors drifted - discard the older buffer's excess samples
+                    if (accelLastTs < gyroLastTs) {
+                        // Accel is behind - discard oldest accel to catch up
+                        val discard = (accelXBuffer.size - WINDOW_SIZE).coerceAtMost(accelXBuffer.size - 1).coerceAtLeast(0)
+                        if (discard > 0) {
+                            repeat(discard) {
+                                accelXBuffer.removeFirstOrNull()
+                                accelYBuffer.removeFirstOrNull()
+                                accelZBuffer.removeFirstOrNull()
+                                accelTimestamps.removeFirstOrNull()
+                            }
+                        }
+                    } else {
+                        // Gyro is behind - discard oldest gyro to catch up
+                        val discard = (gyroXBuffer.size - WINDOW_SIZE).coerceAtMost(gyroXBuffer.size - 1).coerceAtLeast(0)
+                        if (discard > 0) {
+                            repeat(discard) {
+                                gyroXBuffer.removeFirstOrNull()
+                                gyroYBuffer.removeFirstOrNull()
+                                gyroZBuffer.removeFirstOrNull()
+                                gyroTimestamps.removeFirstOrNull()
+                            }
+                        }
+                    }
+                    // Re-check if we still have enough
+                    if (accelXBuffer.size < WINDOW_SIZE || gyroXBuffer.size < WINDOW_SIZE) return
+                }
+
+                ax = accelXBuffer.take(WINDOW_SIZE).toFloatArray()
+                ay = accelYBuffer.take(WINDOW_SIZE).toFloatArray()
+                az = accelZBuffer.take(WINDOW_SIZE).toFloatArray()
+                gx = gyroXBuffer.take(WINDOW_SIZE).toFloatArray()
+                gy = gyroYBuffer.take(WINDOW_SIZE).toFloatArray()
+                gz = gyroZBuffer.take(WINDOW_SIZE).toFloatArray()
+
+                // Use the median timestamp of the window for accurate timing
+                val accelWindowTs = accelTimestamps.take(WINDOW_SIZE)
+                val gyroWindowTs = gyroTimestamps.take(WINDOW_SIZE)
+                windowTimestampNs = (accelWindowTs[WINDOW_SIZE / 2] + gyroWindowTs[WINDOW_SIZE / 2]) / 2
+
+                // Remove consumed samples (keep overflow for next window)
+                repeat(WINDOW_SIZE) {
+                    accelXBuffer.removeFirstOrNull()
+                    accelYBuffer.removeFirstOrNull()
+                    accelZBuffer.removeFirstOrNull()
+                    accelTimestamps.removeFirstOrNull()
+                    gyroXBuffer.removeFirstOrNull()
+                    gyroYBuffer.removeFirstOrNull()
+                    gyroZBuffer.removeFirstOrNull()
+                    gyroTimestamps.removeFirstOrNull()
+                }
             }
         }
 
         posture = currentPosture
         if (posture == SalahPosture.NOT_PRAYING) return
+
+        // Convert sensor timestamp (nanoseconds since boot) to wall clock milliseconds
+        val windowTimestampMs = wallClockAtBoot + (windowTimestampNs - sensorBootTimeNs) / 1_000_000
 
         // Compute summary features
         val avgAccelY = ay.average().toFloat()
@@ -321,7 +391,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         )
 
         val sample = SalahDataSample(
-            timestamp = System.currentTimeMillis(),
+            timestamp = windowTimestampMs,
             sessionId = sessionId,
             posture = posture,
             accelX = ax,
@@ -355,6 +425,119 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         } catch (e: Exception) {
             Log.e(TAG, "Error writing sample: ${e.message}")
         }
+    }
+
+    /**
+     * Start live prayer recording mode.
+     * Records continuously without requiring a posture label.
+     * Sets currentPosture to QIYAM as default (will be relabeled later).
+     * Creates file named salah_live_{timestamp}_{sessionId}.jsonl
+     * Auto-stops after 30 minutes.
+     */
+    fun startLivePrayerRecording() {
+        if (isRecording) {
+            Log.w(TAG, "Already recording")
+            return
+        }
+
+        sessionId = UUID.randomUUID().toString().take(8)
+        totalSamplesWritten = 0
+        postureCounts.clear()
+        isLiveMode = true
+        currentPosture = SalahPosture.QIYAM // Default posture for live mode
+
+        // Create output directory
+        val dataDir = getDataDirectory()
+        dataDir.mkdirs()
+
+        // Create output file with "live" prefix
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        outputFile = File(dataDir, "salah_live_${timestamp}_$sessionId.jsonl")
+        writer = BufferedWriter(FileWriter(outputFile, true))
+
+        // Initialize sensor timestamp reference
+        sensorBootTimeNs = android.os.SystemClock.elapsedRealtimeNanos()
+        wallClockAtBoot = System.currentTimeMillis()
+
+        Log.i(TAG, "🕌 Starting LIVE salah prayer recording")
+        Log.i(TAG, "   Session: $sessionId")
+        Log.i(TAG, "   Output: ${outputFile?.absolutePath}")
+        Log.i(TAG, "   Auto-stop: 30 minutes")
+
+        // Start sensor thread
+        sensorThread = HandlerThread("SalahSensorThread").apply { start() }
+        sensorHandler = Handler(sensorThread!!.looper)
+
+        // Register sensors
+        accelerometer?.let {
+            sensorManager.registerListener(this, it, SENSOR_DELAY_US, sensorHandler)
+            Log.i(TAG, "   Accelerometer registered @ 50Hz")
+        }
+        gyroscope?.let {
+            sensorManager.registerListener(this, it, SENSOR_DELAY_US, sensorHandler)
+            Log.i(TAG, "   Gyroscope registered @ 50Hz")
+        }
+
+        isRecording = true
+
+        // Start 30-minute auto-stop timer
+        liveAutoStopHandler = Handler(android.os.Looper.getMainLooper())
+        liveAutoStopRunnable = Runnable {
+            Log.i(TAG, "Live recording auto-stop (30 minutes reached)")
+            stopLivePrayerRecording()
+        }
+        liveAutoStopHandler?.postDelayed(liveAutoStopRunnable!!, MAX_PRAYER_DURATION_MS)
+    }
+
+    /**
+     * Stop live prayer recording with auto-trim of last 3 seconds.
+     * Returns the output file path.
+     */
+    fun stopLivePrayerRecording(): String? {
+        if (!isRecording || !isLiveMode) {
+            Log.w(TAG, "Not in live recording mode")
+            return null
+        }
+
+        // Cancel auto-stop timer
+        liveAutoStopRunnable?.let { liveAutoStopHandler?.removeCallbacks(it) }
+        liveAutoStopHandler = null
+        liveAutoStopRunnable = null
+
+        isRecording = false
+        isLiveMode = false
+        sensorManager.unregisterListener(this)
+
+        sensorThread?.quitSafely()
+        sensorThread = null
+        sensorHandler = null
+
+        // Flush remaining buffer
+        flushWindow()
+
+        // Close writer
+        try {
+            writer?.flush()
+            writer?.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error closing writer: ${e.message}")
+        }
+        writer = null
+
+        // Auto-trim last 3 seconds (to remove noise from pulling phone out)
+        val trimMs = 3000L
+        if (outputFile != null) {
+            trimFileEnd(outputFile!!, trimMs)
+        }
+
+        Log.i(TAG, "🕌 Live salah recording stopped")
+        Log.i(TAG, "   Total samples: $totalSamplesWritten")
+        Log.i(TAG, "   File: ${outputFile?.absolutePath}")
+        Log.i(TAG, "   File size: ${outputFile?.length()?.let { it / 1024 }} KB")
+
+        val filePath = outputFile?.absolutePath
+        currentPosture = SalahPosture.NOT_PRAYING // Reset posture
+        return filePath
     }
 
     /**

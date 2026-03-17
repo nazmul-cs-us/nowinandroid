@@ -78,7 +78,7 @@ class NiaPreferencesDataSource @Inject constructor(
                     ThemeBrandProto.THEME_BRAND_UNSPECIFIED,
                     ThemeBrandProto.UNRECOGNIZED,
                     ThemeBrandProto.THEME_BRAND_DEFAULT,
-                    -> ThemeBrand.DEFAULT
+                    -> ThemeBrand.COASTAL
                     ThemeBrandProto.THEME_BRAND_ANDROID -> ThemeBrand.ANDROID
                     ThemeBrandProto.THEME_BRAND_COASTAL -> ThemeBrand.COASTAL
                 },
