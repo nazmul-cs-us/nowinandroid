@@ -4,6 +4,8 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.download.AssetManifest
 import com.starception.submission.feature.salah.visualization.VisualizationState
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import kotlin.coroutines.resume
 
@@ -55,7 +58,12 @@ data class SalahDataCollectionUiState(
     val guidedPostureDuration: Int = 0,
     val guidedTotalPostures: Int = GUIDED_POSTURE_SEQUENCE.size,
     val guidedSelectedDuration: Int = 15,
-    val guidedMessage: String = ""
+    val guidedMessage: String = "",
+    // TTS download state
+    val isTtsAvailable: Boolean = false,
+    val isTtsDownloading: Boolean = false,
+    val ttsDownloadProgress: Float = 0f,
+    val ttsDownloadError: String? = null
 )
 
 data class DataFileInfo(
@@ -107,19 +115,30 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     private var countdownJob: Job? = null
     private var guidedJob: Job? = null
 
-    // Lazy TTS service via Hilt EntryPoint
+    // Lazy TTS service and download manager via Hilt EntryPoint
     private var ttsService: SherpaOnnxTtsService? = null
+    private var downloadManager: AssetDownloadManager? = null
+    private var ttsDownloadJob: Job? = null
+
+    private fun getEntryPoint(): SherpaOnnxTtsEntryPoint =
+        EntryPointAccessors.fromApplication(
+            getApplication<Application>().applicationContext,
+            SherpaOnnxTtsEntryPoint::class.java
+        )
 
     private fun getTtsService(): SherpaOnnxTtsService {
         if (ttsService == null) {
-            val entryPoint = EntryPointAccessors.fromApplication(
-                getApplication<Application>().applicationContext,
-                SherpaOnnxTtsEntryPoint::class.java
-            )
-            ttsService = entryPoint.sherpaOnnxTtsService()
+            ttsService = getEntryPoint().sherpaOnnxTtsService()
             Log.i(TAG, "TTS service obtained via EntryPoint")
         }
         return ttsService!!
+    }
+
+    private fun getDownloadManager(): AssetDownloadManager {
+        if (downloadManager == null) {
+            downloadManager = getEntryPoint().assetDownloadManager()
+        }
+        return downloadManager!!
     }
 
     init {
@@ -135,6 +154,98 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             }
         }
         refreshFileList()
+        checkTtsAvailability()
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // TTS DOWNLOAD MANAGEMENT
+    // ═══════════════════════════════════════════════════════
+
+    fun checkTtsAvailability() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val dm = getDownloadManager()
+                val manifest = dm.loadManifest()
+                if (manifest == null) {
+                    Log.w(TAG, "Could not load manifest for TTS check")
+                    _uiState.update { it.copy(isTtsAvailable = false) }
+                    return@launch
+                }
+                val kokoroReady = dm.isCategoryComplete("model_tts_kokoro", manifest)
+                val espeakReady = dm.isCategoryComplete("model_tts_espeak", manifest)
+                val available = kokoroReady && espeakReady
+                Log.i(TAG, "TTS availability: kokoro=$kokoroReady, espeak=$espeakReady, available=$available")
+                _uiState.update { it.copy(isTtsAvailable = available, ttsDownloadError = null) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error checking TTS availability", e)
+                _uiState.update { it.copy(isTtsAvailable = false) }
+            }
+        }
+    }
+
+    fun downloadTtsEngine() {
+        if (_uiState.value.isTtsDownloading) return
+        ttsDownloadJob?.cancel()
+        ttsDownloadJob = viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isTtsDownloading = true, ttsDownloadProgress = 0f, ttsDownloadError = null) }
+            try {
+                val dm = getDownloadManager()
+                val manifest = dm.loadManifest()
+                if (manifest == null) {
+                    _uiState.update { it.copy(isTtsDownloading = false, ttsDownloadError = "Could not load manifest") }
+                    return@launch
+                }
+
+                // Download espeak first (smaller, ~18MB), then kokoro (~158MB)
+                val categories = listOf("model_tts_espeak", "model_tts_kokoro")
+                val totalCategories = categories.size
+                var completedCategories = 0
+
+                for (category in categories) {
+                    if (dm.isCategoryComplete(category, manifest)) {
+                        completedCategories++
+                        continue
+                    }
+                    Log.i(TAG, "Downloading TTS category: $category")
+                    val baseProgress = completedCategories.toFloat() / totalCategories
+                    val categoryWeight = 1f / totalCategories
+
+                    val success = dm.downloadCategory(category, manifest) { progress, downloaded, total ->
+                        val overallProgress = baseProgress + (progress * categoryWeight)
+                        _uiState.update { it.copy(ttsDownloadProgress = overallProgress) }
+                    }
+
+                    if (!success) {
+                        _uiState.update {
+                            it.copy(
+                                isTtsDownloading = false,
+                                ttsDownloadError = "Failed to download $category"
+                            )
+                        }
+                        return@launch
+                    }
+                    completedCategories++
+                }
+
+                Log.i(TAG, "TTS engine download complete")
+                _uiState.update {
+                    it.copy(
+                        isTtsDownloading = false,
+                        isTtsAvailable = true,
+                        ttsDownloadProgress = 1f,
+                        ttsDownloadError = null
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "TTS download failed", e)
+                _uiState.update {
+                    it.copy(
+                        isTtsDownloading = false,
+                        ttsDownloadError = e.message ?: "Download failed"
+                    )
+                }
+            }
+        }
     }
 
     fun startRecording() {
