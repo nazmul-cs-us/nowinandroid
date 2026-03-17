@@ -62,7 +62,6 @@ data class SalahDataCollectionUiState(
     // TTS download state
     val isTtsAvailable: Boolean = false,
     val isTtsDownloading: Boolean = false,
-    val ttsDownloadProgress: Float = 0f,
     val ttsDownloadError: String? = null
 )
 
@@ -187,7 +186,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         if (_uiState.value.isTtsDownloading) return
         ttsDownloadJob?.cancel()
         ttsDownloadJob = viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update { it.copy(isTtsDownloading = true, ttsDownloadProgress = 0f, ttsDownloadError = null) }
+            _uiState.update { it.copy(isTtsDownloading = true, ttsDownloadError = null) }
             try {
                 val dm = getDownloadManager()
                 val manifest = dm.loadManifest()
@@ -207,13 +206,8 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                         continue
                     }
                     Log.i(TAG, "Downloading TTS category: $category")
-                    val baseProgress = completedCategories.toFloat() / totalCategories
-                    val categoryWeight = 1f / totalCategories
-
-                    val success = dm.downloadCategory(category, manifest) { progress, downloaded, total ->
-                        val overallProgress = baseProgress + (progress * categoryWeight)
-                        _uiState.update { it.copy(ttsDownloadProgress = overallProgress) }
-                    }
+                    // Progress tracked globally by AssetDownloadManager's top banner
+                    val success = dm.downloadCategory(category, manifest) { _, _, _ -> }
 
                     if (!success) {
                         _uiState.update {
@@ -232,7 +226,6 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                     it.copy(
                         isTtsDownloading = false,
                         isTtsAvailable = true,
-                        ttsDownloadProgress = 1f,
                         ttsDownloadError = null
                     )
                 }

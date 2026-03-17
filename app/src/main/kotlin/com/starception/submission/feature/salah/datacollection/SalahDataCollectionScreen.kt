@@ -647,24 +647,9 @@ private fun GuidedRecordingCard(
                                 )
 
                                 if (uiState.isTtsDownloading) {
-                                    // Download in progress
-                                    val animatedProgress by animateFloatAsState(
-                                        targetValue = uiState.ttsDownloadProgress,
-                                        animationSpec = tween(300),
-                                        label = "tts_dl_progress"
-                                    )
-                                    LinearProgressIndicator(
-                                        progress = { animatedProgress },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(6.dp)
-                                            .clip(RoundedCornerShape(3.dp)),
-                                        color = MaterialTheme.colorScheme.tertiary,
-                                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                        strokeCap = StrokeCap.Round
-                                    )
+                                    // Download in progress - progress shown via pull-down indicator
                                     Text(
-                                        text = "Downloading... ${(uiState.ttsDownloadProgress * 100).toInt()}%",
+                                        text = "Downloading... pull down to see progress",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )

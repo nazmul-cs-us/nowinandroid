@@ -17,16 +17,9 @@
 package com.starception.submission.ui
 
 import android.content.res.Configuration
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -34,21 +27,15 @@ import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration.Indefinite
@@ -65,7 +52,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -86,7 +72,6 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.component.NiaBackground
 import com.starception.submission.core.designsystem.component.NiaGradientBackground
-import com.starception.submission.core.designsystem.component.NiaNavigationRail
 import com.starception.submission.core.designsystem.component.NiaNavigationRailItem
 import com.starception.submission.core.designsystem.component.NiaNavigationSuiteScaffold
 import com.starception.submission.core.designsystem.component.NiaTopAppBar
@@ -98,6 +83,7 @@ import com.starception.submission.settings.navigation.navigateToSettings
 import com.starception.submission.navigation.TopLevelDestination
 import kotlin.reflect.KClass
 import com.starception.submission.MainActivityViewModel
+import com.starception.submission.feature.prayertimes.wobble.WobblePullToRefresh
 import com.starception.submission.feature.settings.R as settingsR
 
 @Composable
@@ -341,8 +327,21 @@ private fun NiaMainContent(
             )
         },
     ) { padding ->
-        Column(
-            Modifier
+        // Download progress from AssetDownloadManager via MainActivityViewModel
+        val downloadProgress = if (mainViewModel != null) {
+            val isDownloading by mainViewModel.isContentDownloading.collectAsStateWithLifecycle()
+            val dlProgress by mainViewModel.contentDownloadProgress.collectAsStateWithLifecycle()
+            if (isDownloading) dlProgress else 0f
+        } else {
+            0f
+        }
+
+        WobblePullToRefresh(
+            isRefreshing = false,
+            onRefresh = {},
+            downloadProgress = downloadProgress,
+            downloadLabel = "Downloading content",
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .consumeWindowInsets(padding)
@@ -359,6 +358,9 @@ private fun NiaMainContent(
                         )
                     }
                 ),
+        ) { _ ->
+        Column(
+            Modifier.fillMaxSize(),
         ) {
             // Show the top app bar on top level destinations
             // Hide top bar for ForYou and Bookmarks in landscape mode (two-pane layout)
@@ -371,67 +373,6 @@ private fun NiaMainContent(
                 destination == TopLevelDestination.BOOKMARKS
             )
             var shouldShowTopAppBar = false
-
-            // Global content download progress banner
-            if (mainViewModel != null) {
-                val isDownloading by mainViewModel.isContentDownloading.collectAsStateWithLifecycle()
-                val downloadProgress by mainViewModel.contentDownloadProgress.collectAsStateWithLifecycle()
-                val animatedProgress by animateFloatAsState(
-                    targetValue = downloadProgress,
-                    label = "download_progress",
-                )
-                AnimatedVisibility(
-                    visible = isDownloading,
-                    enter = expandVertically(),
-                    exit = shrinkVertically(),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.CloudDownload,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                )
-                                Text(
-                                    text = "Downloading content...",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                )
-                            }
-                            Text(
-                                text = "${(animatedProgress * 100).toInt()}%",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        LinearProgressIndicator(
-                            progress = { animatedProgress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f),
-                        )
-                    }
-                }
-            }
 
             if (destination != null && !hideTopBarForTwoPane && !hideTopBarForPrayerTimes) {
                 shouldShowTopAppBar = true
@@ -480,6 +421,7 @@ private fun NiaMainContent(
 
             // TODO: We may want to add padding or spacer when the snackbar is shown so that
             //  content doesn't display behind it.
+        }
         }
     }
 }
