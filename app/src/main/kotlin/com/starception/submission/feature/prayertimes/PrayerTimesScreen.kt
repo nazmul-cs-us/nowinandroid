@@ -117,7 +117,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import com.starception.submission.feature.prayertimes.components.ElasticTopShape
 import com.starception.submission.feature.prayertimes.wobble.WobblePullToRefresh
-import com.starception.submission.feature.prayertimes.wobble.wobbleTransform
 import com.starception.submission.feature.prayertimes.utils.convertToArabicNumerals
 import android.os.Build
 import android.os.VibrationEffect
@@ -1411,83 +1410,7 @@ fun PrayerTimesScreen(
                     )
                 }
             }
-            // Show pull instruction ONLY when dragging with smooth animation
-            AnimatedVisibility(
-                visible = wobbleState.dragDistance > 30f && !isRefreshing,
-                enter = fadeIn(
-                    animationSpec = tween(
-                        durationMillis = 300,
-                        easing = FastOutSlowInEasing
-                    )
-                ) + slideInVertically(
-                    initialOffsetY = { -it / 2 },
-                    animationSpec = tween(
-                        durationMillis = 300,
-                        easing = FastOutSlowInEasing
-                    )
-                ),
-                exit = fadeOut(
-                    animationSpec = tween(
-                        durationMillis = 200,
-                        easing = LinearOutSlowInEasing
-                    )
-                ) + slideOutVertically(
-                    targetOffsetY = { -it / 2 },
-                    animationSpec = tween(
-                        durationMillis = 200,
-                        easing = LinearOutSlowInEasing
-                    )
-                )
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Text(
-                        text = if (wobbleState.dragDistance >= 800f) {
-                            "Release to refresh location"
-                        } else {
-                            "Keep pulling down to refresh location"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                    )
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            // Refreshing indicator
-            AnimatedVisibility(
-                visible = isRefreshing,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp)
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Refreshing location...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
+            // Pull-to-refresh indicator is handled by WobblePullToRefresh in the sage background
             // Home page content with wobble transformation applied to actual content
             Box(
                 modifier = Modifier
@@ -1528,8 +1451,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-                        .wobbleTransform(wobbleState.wobbleIntensity),
+                        .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Left column: Swipeable tiles + Location info
@@ -1748,20 +1670,18 @@ fun PrayerTimesScreen(
                     .fillMaxSize()
                     .padding(horizontal = 24.dp)
                     .padding(
-                        top = 8.dp + (wobbleState.wobbleIntensity * 30f).dp, // Simple wobble spacing
+                        top = 8.dp,
                         bottom = 0.dp
-                    )
-                    .wobbleTransform(wobbleState.wobbleIntensity),
+                    ),
                 verticalArrangement = Arrangement.Top
             ) {
 
 
                 
-                // Swipeable Big Tiles with simple wobble
+                // Swipeable Big Tiles
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .wobbleTransform(wobbleState.wobbleIntensity, offsetMultiplier = 0.33f, scaleMultiplier = 0.6f)
                 ) {
                     SwipeableBigTiles(
                     prayerTimes = prayerTimes,
@@ -1809,18 +1729,11 @@ fun PrayerTimesScreen(
                 // Spacer between swipeable tiles and adjust prayer times info card
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Instruction banner for prayer time adjustment with wobble
+                // Instruction banner for prayer time adjustment
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp) // Match big tiles horizontal constraint
-                        .offset(
-                            y = (wobbleState.wobbleIntensity * 3f).dp
-                        )
-                        .graphicsLayer {
-                            scaleX = 1f + (wobbleState.wobbleIntensity * 0.02f)
-                            scaleY = 1f + (wobbleState.wobbleIntensity * 0.03f)
-                        },
+                        .padding(horizontal = 10.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
                     ),
@@ -1940,18 +1853,11 @@ fun PrayerTimesScreen(
                     result
                 }
 
-                // First row: First 2 prayers from ordered list (most relevant) with wobble
+                // First row: First 2 prayers from ordered list (most relevant)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
-                        .offset(
-                            y = (wobbleState.wobbleIntensity * 4f).dp
-                        )
-                        .graphicsLayer {
-                            scaleX = 1f + (wobbleState.wobbleIntensity * 0.02f)
-                            scaleY = 1f + (wobbleState.wobbleIntensity * 0.03f)
-                        },
+                        .padding(horizontal = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // First prayer tile
@@ -2039,18 +1945,11 @@ fun PrayerTimesScreen(
                     }
                 }
 
-                // Second row: Remaining 2 prayers from ordered list with wobble
+                // Second row: Remaining 2 prayers from ordered list
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
-                        .offset(
-                            y = (wobbleState.wobbleIntensity * 6f).dp
-                        )
-                        .graphicsLayer {
-                            scaleX = 1f + (wobbleState.wobbleIntensity * 0.025f)
-                            scaleY = 1f + (wobbleState.wobbleIntensity * 0.02f)
-                        },
+                        .padding(horizontal = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Third prayer tile

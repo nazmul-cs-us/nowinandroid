@@ -21,12 +21,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -119,14 +123,11 @@ fun WobblePullToRefresh(
     // PRIMARY: Large vertical translation (content pushes down)
     val contentOffsetY = (wobbleIntensity * 220f).dp
 
-    // Progressive rounded corners: 0dp at rest -> 24dp fully pulled
-    val cornerRadius = (wobbleIntensity * 24f).dp
+    // Progressive rounded corners (TOP ONLY like Fitbit): 0dp at rest -> 28dp fully pulled
+    val cornerRadius = (wobbleIntensity * 28f).dp
 
     // Progressive horizontal margins: 0dp at rest -> 12dp fully pulled
     val horizontalMargin = (wobbleIntensity * 12f).dp
-
-    // Very subtle scale: only 2% at max (barely noticeable, Fitbit-like)
-    val contentScale = 1f - (wobbleIntensity * 0.02f)
 
     // Fitbit flat muted sage/gray-green background
     val fitbitBgColor = Color(0xFFD2D6CC)
@@ -232,7 +233,8 @@ fun WobblePullToRefresh(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = (wobbleIntensity * 60f).dp),
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                    .padding(top = (wobbleIntensity * 20f).dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (isRefreshing) {
@@ -270,41 +272,46 @@ fun WobblePullToRefresh(
                         )
                     }
                 } else {
-                    // Pull/release state: rotating refresh arc + pull text
-                    Canvas(
-                        modifier = Modifier
-                            .size(18.dp)
-                            .graphicsLayer {
-                                rotationZ = wobbleIntensity * 360f
-                                alpha = (wobbleIntensity * 2f).coerceIn(0f, 1f)
-                            }
+                    // Pull/release state: symmetric Row layout matching Fitbit style
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.graphicsLayer {
+                            alpha = (wobbleIntensity * 2.5f).coerceIn(0f, 1f)
+                        }
                     ) {
-                        val strokeWidth = 2.dp.toPx()
-                        drawArc(
-                            color = Color(0xFF4A5042),
-                            startAngle = -90f,
-                            sweepAngle = 270f,
-                            useCenter = false,
-                            style = Stroke(
-                                width = strokeWidth,
-                                cap = StrokeCap.Round
-                            ),
-                            topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
-                            size = androidx.compose.ui.geometry.Size(
-                                size.width - strokeWidth,
-                                size.height - strokeWidth
+                        // Rotating refresh arc (same style as syncing spinner)
+                        Canvas(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .graphicsLayer {
+                                    rotationZ = wobbleIntensity * 360f
+                                }
+                        ) {
+                            val strokeWidth = 2.dp.toPx()
+                            drawArc(
+                                color = Color(0xFF4A5042),
+                                startAngle = -90f,
+                                sweepAngle = 270f,
+                                useCenter = false,
+                                style = Stroke(
+                                    width = strokeWidth,
+                                    cap = StrokeCap.Round
+                                ),
+                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+                                size = androidx.compose.ui.geometry.Size(
+                                    size.width - strokeWidth,
+                                    size.height - strokeWidth
+                                )
                             )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (wobbleIntensity > 0.4f) "Release to sync" else "Pull to sync",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontSize = 14.sp,
+                            color = indicatorColor
                         )
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = if (wobbleIntensity > 0.4f) "Release to sync" else "Pull to sync",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 12.sp,
-                        color = indicatorColor.copy(
-                            alpha = (wobbleIntensity * 2.5f).coerceIn(0f, 1f)
-                        )
-                    )
                 }
             }
         }
@@ -321,22 +328,25 @@ fun WobblePullToRefresh(
                 )
                 .then(
                     if (wobbleIntensity > 0.01f) {
+                        // Top-only rounded corners like Fitbit (bottom stays flat)
+                        val topOnlyShape = RoundedCornerShape(
+                            topStart = cornerRadius,
+                            topEnd = cornerRadius,
+                            bottomStart = 0.dp,
+                            bottomEnd = 0.dp
+                        )
                         Modifier
                             .shadow(
                                 elevation = (wobbleIntensity * 8f).dp,
-                                shape = RoundedCornerShape(cornerRadius),
+                                shape = topOnlyShape,
                                 ambientColor = Color.Black.copy(alpha = 0.08f),
                                 spotColor = Color.Black.copy(alpha = 0.06f)
                             )
-                            .clip(RoundedCornerShape(cornerRadius))
+                            .clip(topOnlyShape)
                     } else {
                         Modifier
                     }
                 )
-                .graphicsLayer {
-                    scaleX = contentScale
-                    scaleY = contentScale
-                }
                 .background(MaterialTheme.colorScheme.background)
         ) {
             content(wobbleState)
@@ -344,16 +354,3 @@ fun WobblePullToRefresh(
     }
 }
 
-/**
- * Apply wobble transformations to a composable (kept for backward compatibility)
- */
-fun Modifier.wobbleTransform(
-    wobbleIntensity: Float,
-    offsetMultiplier: Float = 1f,
-    scaleMultiplier: Float = 1f
-): Modifier = this
-    .offset(y = (wobbleIntensity * 3f * offsetMultiplier).dp)
-    .graphicsLayer {
-        scaleY = 1f + (wobbleIntensity * 0.005f * scaleMultiplier)
-        scaleX = 1f + (wobbleIntensity * 0.005f * scaleMultiplier)
-    }
