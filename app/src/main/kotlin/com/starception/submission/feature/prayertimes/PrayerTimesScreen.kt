@@ -1390,7 +1390,9 @@ fun PrayerTimesScreen(
                 onRefresh = { isRefreshing = true },
                 modifier = Modifier.fillMaxSize()
             ) { wobbleState ->
-            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            val outerConfiguration = LocalConfiguration.current
+            val outerIsLandscape = outerConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            Column(modifier = Modifier.fillMaxSize().then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
             // Top bar inside WobblePullToRefresh - pushes down with content (like Fitbit)
             Row(
                 modifier = Modifier
