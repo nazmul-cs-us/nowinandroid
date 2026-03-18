@@ -167,8 +167,8 @@ fun WobblePullToRefresh(
     LaunchedEffect(isRefreshing, isDownloading) {
         if (isRefreshing || isDownloading) {
             // SNAP instantly to held position — no gap, like Fitbit
-            // 0.45 matches Fitbit's ~15% screen-height hold during sync
-            refreshingOffset.snapTo(0.45f)
+            // 0.50 gives ~110dp total offset (~60dp visible below camera cutout on Pixel 9 Pro)
+            refreshingOffset.snapTo(0.50f)
         } else {
             // Slow, gentle settle back when sync completes — gives user time to see result
             refreshingOffset.animateTo(
@@ -211,7 +211,7 @@ fun WobblePullToRefresh(
     val contentOffsetY = (wobbleIntensity * 220f).dp
 
     // Fitbit-style rounded top corners on content card when pushed down
-    val cornerRadius = (wobbleIntensity * 24f).dp.coerceAtMost(24.dp)
+    val cornerRadius = (wobbleIntensity * 16f).dp.coerceAtMost(16.dp)
     val horizontalMargin = 0.dp
 
     // Fitbit flat muted sage/gray-green background (matched from Fitbit screenshot)
@@ -269,7 +269,7 @@ fun WobblePullToRefresh(
                 modifier = Modifier
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-                    .padding(top = (wobbleIntensity * 20f).dp),
+                    .padding(top = (wobbleIntensity * 8f).dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (isDownloading) {

@@ -82,6 +82,12 @@ import com.starception.submission.navigation.NiaNavHost
 import com.starception.submission.settings.navigation.navigateToSettings
 import com.starception.submission.navigation.TopLevelDestination
 import kotlin.reflect.KClass
+import android.app.Activity
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.starception.submission.MainActivityViewModel
 import com.starception.submission.feature.prayertimes.wobble.WobblePullToRefresh
 import com.starception.submission.feature.settings.R as settingsR
@@ -156,6 +162,23 @@ internal fun NiaAppContent(
 
     // Check if we should hide the bottom navigation bar (for detail screens)
     val shouldHideBottomBar = appState.shouldHideBottomBar
+
+    // Status bar visibility: show on parent tabs, hide on detail screens
+    val view = LocalView.current
+    DisposableEffect(shouldHideBottomBar) {
+        val window = (view.context as? Activity)?.window ?: return@DisposableEffect onDispose {}
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        if (shouldHideBottomBar) {
+            // Detail screens: hide status bar (immersive)
+            insetsController.hide(WindowInsetsCompat.Type.statusBars())
+            insetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            // Parent tabs: show status bar
+            insetsController.show(WindowInsetsCompat.Type.statusBars())
+        }
+        onDispose {}
+    }
 
     // When bottom bar should be hidden, render content directly without navigation scaffold
     if (shouldHideBottomBar) {
