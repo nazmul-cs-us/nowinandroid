@@ -1396,7 +1396,7 @@ fun PrayerTimesScreen(
             // Calculate dynamic top inset: full at rest, collapsed during pull (Fitbit-style)
             val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
                 .asPaddingValues().calculateTopPadding()
-            val dynamicTopInset = statusBarInset * (1f - wobbleState.wobbleIntensity)
+            val dynamicTopInset = statusBarInset * (1f - (wobbleState.wobbleIntensity * 2f).coerceAtMost(1f))
             Column(modifier = Modifier.fillMaxSize().then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
             // Top bar inside WobblePullToRefresh - pushes down with content (like Fitbit)
             Row(

@@ -212,7 +212,7 @@ fun WobblePullToRefresh(
     val contentOffsetY = (wobbleIntensity * 220f).dp
 
     // Fitbit-style rounded top corners on content card when pushed down
-    val cornerRadius = (wobbleIntensity * 16f).dp.coerceAtMost(16.dp)
+    val cornerRadius = (wobbleIntensity * 28f).dp.coerceAtMost(28.dp)
     val horizontalMargin = 0.dp
 
     // Fitbit flat muted sage/gray-green background (matched from Fitbit screenshot)
