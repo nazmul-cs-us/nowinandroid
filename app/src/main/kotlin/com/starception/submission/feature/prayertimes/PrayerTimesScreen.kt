@@ -146,6 +146,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -1392,12 +1393,16 @@ fun PrayerTimesScreen(
             ) { wobbleState ->
             val outerConfiguration = LocalConfiguration.current
             val outerIsLandscape = outerConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            // Calculate dynamic top inset: full at rest, collapsed during pull (Fitbit-style)
+            val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+                .asPaddingValues().calculateTopPadding()
+            val dynamicTopInset = statusBarInset * (1f - wobbleState.wobbleIntensity)
             Column(modifier = Modifier.fillMaxSize().then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
             // Top bar inside WobblePullToRefresh - pushes down with content (like Fitbit)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                    .padding(top = dynamicTopInset)
                     .padding(horizontal = 4.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,

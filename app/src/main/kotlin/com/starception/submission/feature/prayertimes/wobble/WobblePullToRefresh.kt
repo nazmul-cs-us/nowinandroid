@@ -207,7 +207,8 @@ fun WobblePullToRefresh(
     val wobbleIntensity = maxOf(rawWobbleIntensity, refreshingOffset.value)
 
     // --- Fitbit-style visual parameters ---
-    // PRIMARY: Large vertical translation (content pushes down)
+    // PRIMARY: Vertical translation (content pushes down)
+    // Compact like Fitbit — indicator is anchored above this offset
     val contentOffsetY = (wobbleIntensity * 220f).dp
 
     // Fitbit-style rounded top corners on content card when pushed down
