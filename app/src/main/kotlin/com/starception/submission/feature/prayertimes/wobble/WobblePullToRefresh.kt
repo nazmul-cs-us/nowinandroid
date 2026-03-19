@@ -215,11 +215,12 @@ fun WobblePullToRefresh(
     val cornerRadius = (wobbleIntensity * 28f).dp.coerceAtMost(28.dp)
     val horizontalMargin = 0.dp
 
-    // Fitbit flat muted sage/gray-green background (matched from Fitbit screenshot)
-    val fitbitBgColor = Color(0xFF96A08E)
+    // Two-tone pull-to-refresh background using theme colors (Fitbit-style)
+    val fitbitBgColor = MaterialTheme.colorScheme.primaryContainer
+    val fitbitBgColorLight = MaterialTheme.colorScheme.tertiaryContainer
 
-    // Indicator text color (dark enough for contrast on sage)
-    val indicatorColor = Color(0xFF2F3729)
+    // Indicator text color from theme
+    val indicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
 
     // Spinning animation for syncing state
     val infiniteTransition = rememberInfiniteTransition(label = "sync_spinner")
@@ -247,8 +248,11 @@ fun WobblePullToRefresh(
             .fillMaxSize()
             .nestedScroll(nestedScrollConnection)
             .background(
-                if (rawWobbleIntensity > 0.01f) fitbitBgColor
-                else MaterialTheme.colorScheme.background
+                when {
+                    rawWobbleIntensity > 0.01f -> fitbitBgColor
+                    isRefreshing || isDownloading -> fitbitBgColorLight
+                    else -> MaterialTheme.colorScheme.background
+                }
             )
     ) {
         // Horizontal progress fill: sweeps sage color left-to-right (background hidden until sweep covers it)
