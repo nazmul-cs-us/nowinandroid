@@ -89,7 +89,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.starception.submission.MainActivityViewModel
-import com.starception.submission.feature.prayertimes.wobble.WobblePullToRefresh
+import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.feature.settings.R as settingsR
 
 @Composable
@@ -359,7 +359,7 @@ private fun NiaMainContent(
             0f
         }
 
-        WobblePullToRefresh(
+        PullToSyncContainer(
             isRefreshing = false,
             onRefresh = {},
             downloadProgress = downloadProgress,
@@ -388,7 +388,7 @@ private fun NiaMainContent(
             // Show the top app bar on top level destinations
             // Hide top bar for ForYou and Bookmarks in landscape mode (two-pane layout)
             val destination = appState.currentTopLevelDestination
-            // Hide top bar for HOME (PrayerTimes) - it renders its own top bar inside WobblePullToRefresh
+            // Hide top bar for HOME (PrayerTimes) - it renders its own top bar inside PullToSyncContainer
             // so the entire page pushes down together (like Fitbit)
             val hideTopBarForPrayerTimes = destination == TopLevelDestination.HOME
             val hideTopBarForTwoPane = isLandscape && (

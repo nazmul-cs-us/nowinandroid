@@ -116,7 +116,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import com.starception.submission.feature.prayertimes.components.ElasticTopShape
-import com.starception.submission.feature.prayertimes.wobble.WobblePullToRefresh
+import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.feature.prayertimes.utils.convertToArabicNumerals
 import android.os.Build
 import android.os.VibrationEffect
@@ -672,7 +672,7 @@ fun PrayerTimesScreen(
                     // Continue anyway - calculation may still work with cached data
                 }
                 
-                // Don't set isLoading = true here — WobblePullToRefresh already shows
+                // Don't set isLoading = true here — PullToSyncContainer already shows
                 // "Syncing your data" with a spinner. Setting isLoading replaces the
                 // prayer tiles with a loading spinner, causing a visual blink.
 
@@ -1355,7 +1355,7 @@ fun PrayerTimesScreen(
         label = "controlCenterProgress"
     )
 
-    // Use WobblePullToRefresh component wrapped in Box for Control Center overlay
+    // Use PullToSyncContainer component wrapped in Box for Control Center overlay
     Box(modifier = modifier.fillMaxSize()) {
         // Main content - wrapped in Box with layerBackdrop to capture for Control Center glass effect
         // Blur and dim animate smoothly based on Control Center progress
@@ -1386,19 +1386,19 @@ fun PrayerTimesScreen(
                     }
                 )
         ) {
-            WobblePullToRefresh(
+            PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = { isRefreshing = true },
                 modifier = Modifier.fillMaxSize()
-            ) { wobbleState ->
+            ) { syncState ->
             val outerConfiguration = LocalConfiguration.current
             val outerIsLandscape = outerConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
             // Calculate dynamic top inset: full at rest, collapsed during pull (Fitbit-style)
             val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
                 .asPaddingValues().calculateTopPadding()
-            val dynamicTopInset = statusBarInset * (1f - (wobbleState.wobbleIntensity * 2f).coerceAtMost(1f))
+            val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
             Column(modifier = Modifier.fillMaxSize().then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
-            // Top bar inside WobblePullToRefresh - pushes down with content (like Fitbit)
+            // Top bar inside PullToSyncContainer - pushes down with content (like Fitbit)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1427,7 +1427,7 @@ fun PrayerTimesScreen(
                     )
                 }
             }
-            // Pull-to-refresh indicator is handled by WobblePullToRefresh in the sage background
+            // Pull-to-refresh indicator is handled by PullToSyncContainer in the sage background
             // Home page content with wobble transformation applied to actual content
             Box(
                 modifier = Modifier
@@ -1457,7 +1457,7 @@ fun PrayerTimesScreen(
             }
         } else {
             // Main content with simple wobble transformations
-            // Use wobbleState.wobbleIntensity from wobbleState
+            // Use syncState.wobbleIntensity from syncState
 
             // Detect orientation for adaptive layout
             val configuration = LocalConfiguration.current
@@ -2510,18 +2510,18 @@ fun PrayerTimesScreen(
         )
     }
 
-        } // Close Column inside WobblePullToRefresh
-        } // Close WobblePullToRefresh lambda
+        } // Close Column inside PullToSyncContainer
+        } // Close PullToSyncContainer lambda
         } // Close Box with layerBackdrop
 
-        // INTERACTIVE PRAYER DIAL POPUP - Control Center overlay (OUTSIDE WobblePullToRefresh, inside Box)
+        // INTERACTIVE PRAYER DIAL POPUP - Control Center overlay (OUTSIDE PullToSyncContainer, inside Box)
         // Debug logging for popup state
         LaunchedEffect(popupDialState) {
             android.util.Log.w("PrayerDialPopup", "🎯 popupDialState changed to: $popupDialState")
             android.util.Log.w("PrayerDialPopup", "   Visible = ${popupDialState != null}")
         }
 
-        // Control Center overlay - renders on top of WobblePullToRefresh content
+        // Control Center overlay - renders on top of PullToSyncContainer content
         if (popupDialState != null) {
             val safePrayerName = popupDialState ?: "Dhuhr"
             Log.d("PrayerTimes", "Control Center active for $safePrayerName")

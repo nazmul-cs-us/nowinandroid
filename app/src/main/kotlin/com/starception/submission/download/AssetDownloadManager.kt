@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -35,7 +37,11 @@ class AssetDownloadManager @Inject constructor(
 
     private val cdnAssetsDir = File(context.filesDir, CDN_ASSETS_DIR)
     private val downloadStates = mutableMapOf<String, MutableStateFlow<DownloadState>>()
+    private val downloadMutexes = mutableMapOf<String, Mutex>()
     private var cachedManifest: AssetManifest? = null
+
+    private fun getOrCreateMutex(cdnKey: String): Mutex =
+        synchronized(downloadMutexes) { downloadMutexes.getOrPut(cdnKey) { Mutex() } }
 
     // Global download progress tracking (persists across ViewModel lifecycles)
     private val _globalDownloadProgress = MutableStateFlow(0f)
@@ -88,14 +94,40 @@ class AssetDownloadManager @Inject constructor(
             return@withContext DownloadState.Completed
         }
 
+        // Prevent concurrent downloads of the same file
+        val mutex = getOrCreateMutex(cdnKey)
+        mutex.withLock {
+            // Re-check after acquiring lock (another caller may have completed it)
+            if (isAssetAvailable(cdnKey)) {
+                stateFlow.value = DownloadState.Completed
+                return@withContext DownloadState.Completed
+            }
+            downloadAssetInternal(cdnKey, manifest, stateFlow)
+        }
+    }
+
+    private suspend fun downloadAssetInternal(
+        cdnKey: String,
+        manifest: AssetManifest,
+        stateFlow: MutableStateFlow<DownloadState>,
+    ): DownloadState {
+
         val entry = manifest.assets[cdnKey]
-            ?: return@withContext DownloadState.Failed("Asset not in manifest: $cdnKey")
+            ?: return DownloadState.Failed("Asset not in manifest: $cdnKey").also {
+                stateFlow.value = it
+            }
 
         val url = manifest.getAssetUrl(cdnKey)
         val targetFile = File(cdnAssetsDir, cdnKey)
         val tmpFile = File(cdnAssetsDir, "$cdnKey.tmp")
 
         targetFile.parentFile?.mkdirs()
+
+        // Track in global download state so UI shows progress
+        synchronized(activeDownloadLock) {
+            activeDownloadCount++
+            _isGloballyDownloading.value = true
+        }
 
         var lastError: String? = null
         for (attempt in 1..MAX_RETRIES) {
@@ -136,16 +168,30 @@ class AssetDownloadManager @Inject constructor(
                             val progress = if (totalBytes > 0) {
                                 bytesDownloaded.toFloat() / totalBytes
                             } else 0f
+                            val clampedProgress = progress.coerceIn(0f, 1f)
                             stateFlow.value = DownloadState.Downloading(
-                                progress.coerceIn(0f, 1f),
+                                clampedProgress,
                                 bytesDownloaded,
                                 totalBytes,
                             )
+                            _globalDownloadProgress.value = clampedProgress
                         }
                     }
                 }
 
                 response.close()
+
+                // Verify download size before checksum
+                val actualSize = tmpFile.length()
+                if (actualSize != entry.size) {
+                    tmpFile.delete()
+                    lastError = "Size mismatch: expected ${entry.size} bytes, got $actualSize bytes"
+                    Log.w(TAG, "Incomplete download for $cdnKey: $lastError")
+                    if (attempt < MAX_RETRIES) {
+                        kotlinx.coroutines.delay(RETRY_DELAY_MS * attempt)
+                    }
+                    continue
+                }
 
                 // Verify SHA-256
                 val actualHash = sha256(tmpFile)
@@ -162,8 +208,16 @@ class AssetDownloadManager @Inject constructor(
                 // Atomic rename
                 if (tmpFile.renameTo(targetFile)) {
                     Log.i(TAG, "Downloaded $cdnKey (${bytesDownloaded / 1024}KB)")
+                    synchronized(activeDownloadLock) {
+                        activeDownloadCount--
+                        if (activeDownloadCount <= 0) {
+                            activeDownloadCount = 0
+                            _isGloballyDownloading.value = false
+                            _globalDownloadProgress.value = 0f
+                        }
+                    }
                     stateFlow.value = DownloadState.Completed
-                    return@withContext DownloadState.Completed
+                    return DownloadState.Completed
                 } else {
                     tmpFile.delete()
                     lastError = "Failed to rename temp file"
@@ -178,9 +232,17 @@ class AssetDownloadManager @Inject constructor(
             }
         }
 
+        synchronized(activeDownloadLock) {
+            activeDownloadCount--
+            if (activeDownloadCount <= 0) {
+                activeDownloadCount = 0
+                _isGloballyDownloading.value = false
+                _globalDownloadProgress.value = 0f
+            }
+        }
         val finalError = lastError ?: "Unknown error"
         stateFlow.value = DownloadState.Failed(finalError)
-        return@withContext DownloadState.Failed(finalError)
+        return DownloadState.Failed(finalError)
     }
 
     suspend fun downloadCategory(

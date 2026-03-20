@@ -59,9 +59,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
- * Data class to hold wobble state and configuration
+ * Data class to hold sync container state and configuration
  */
-data class WobbleState(
+data class SyncContainerState(
     val dragDistance: Float = 0f,
     val isWobbling: Boolean = false,
     val maxDragDistance: Float = 0f,
@@ -69,27 +69,31 @@ data class WobbleState(
 )
 
 /**
- * Fitbit-inspired pull-to-refresh container.
+ * Pull-to-sync container with download progress visualization.
  * Uses nestedScroll to properly integrate with scrollable content.
  * When the user pulls down (and content is at the top):
- * - Content translates DOWN significantly (primary effect)
- * - A flat muted sage/green-gray background is revealed behind
+ * - Content translates DOWN with rounded top corners (Fitbit-style)
+ * - A two-tone themed background is revealed behind
  * - "Release to sync" indicator appears above the content
  * - Smooth spring settle-back when released
  *
  * When syncing (isRefreshing = true):
  * - Content stays pushed down
  * - "Syncing your data" with spinning arc indicator
- * - Sage background sweeps in from left to right
+ * - Two-tone background sweep from left to right
+ *
+ * When downloading (downloadProgress > 0):
+ * - Shows download progress with percentage
+ * - Two-tone sweep visualizes download completion
  */
 @Composable
-fun WobblePullToRefresh(
+fun PullToSyncContainer(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     downloadProgress: Float = 0f,
     downloadLabel: String = "",
-    content: @Composable (wobbleState: WobbleState) -> Unit
+    content: @Composable (syncState: SyncContainerState) -> Unit
 ) {
     val isDownloading = downloadProgress > 0f
     val hapticFeedback = LocalHapticFeedback.current
@@ -234,8 +238,8 @@ fun WobblePullToRefresh(
         label = "spin_angle"
     )
 
-    // Create wobble state for content
-    val wobbleState = WobbleState(
+    // Create sync container state for content
+    val syncState = SyncContainerState(
         dragDistance = dragDistanceAnimated,
         isWobbling = wobbleIntensity > 0.01f,
         maxDragDistance = maxDragDistance,
@@ -249,7 +253,7 @@ fun WobblePullToRefresh(
             .nestedScroll(nestedScrollConnection)
             .background(
                 when {
-                    rawWobbleIntensity > 0.01f -> fitbitBgColor
+                    rawWobbleIntensity > 0.01f -> fitbitBgColorLight
                     isRefreshing || isDownloading -> fitbitBgColorLight
                     else -> MaterialTheme.colorScheme.background
                 }
@@ -405,7 +409,7 @@ fun WobblePullToRefresh(
                 )
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            content(wobbleState)
+            content(syncState)
         }
     }
 }
