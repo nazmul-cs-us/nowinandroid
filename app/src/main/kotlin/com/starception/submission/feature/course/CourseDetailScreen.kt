@@ -643,17 +643,11 @@ fun CourseDetailScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         )
 
-        // Floating Course title that moves from header to toolbar when scrolling
         run {
             val statusBarInsets = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val statusBarPadding = if (statusBarInsets > 0.dp) statusBarInsets else 8.dp
-            val headerYPx = with(density) { (statusBarPadding + 72.dp).toPx() }
-
-            val isTitleShort = course.title.length <= 15
-            val toolbarYPx = with(density) {
-                if (isTitleShort) (statusBarPadding + 18.dp).toPx()
-                else (statusBarPadding + 14.dp).toPx()
-            }
+            val headerYPx = with(density) { (statusBarPadding + 64.dp).toPx() }
+            val toolbarYPx = with(density) { 24.dp.toPx() }
             val startXPx = with(density) { 20.dp.toPx() }
             val endXPx = with(density) { 56.dp.toPx() }
 
@@ -665,26 +659,17 @@ fun CourseDetailScreen(
                         headerYPx
                     }
                     val titleY = (headerYPx - scrollOff).coerceAtLeast(toolbarYPx)
-                    val prog = ((headerYPx - titleY) / (headerYPx - toolbarYPx)).coerceIn(0f, 1f)
-                    Triple(titleY, prog, startXPx + (prog * (endXPx - startXPx)))
+                    val progress = ((headerYPx - titleY) / (headerYPx - toolbarYPx)).coerceIn(0f, 1f)
+                    Triple(titleY, progress, startXPx + (progress * (endXPx - startXPx)))
                 }
             }
 
             val (titleYPx, progress, xOffsetPx) = floatingState
-            val scale = 1f - (progress * 0.3f)
-
-            val titleColor by animateColorAsState(
-                targetValue = if (progress > 0.5f) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface,
-                animationSpec = tween(150),
-                label = "titleColor"
-            )
-            val subtitleColor by animateColorAsState(
-                targetValue = if (progress > 0.5f) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant,
-                animationSpec = tween(150),
-                label = "subtitleColor"
-            )
-
-            val isInToolbar = progress > 0.5f
+            val scale = 1f - (progress * 0.4f)
+            val subtitleAlpha = (1f - (progress / 0.7f)).coerceIn(0f, 1f)
+            val compactWidth = 264.dp - (56.dp * progress)
+            val titleSpacing = 8.dp * (1f - progress)
+            val contentColor = MaterialTheme.colorScheme.onSurface
 
             Box(
                 modifier = Modifier
@@ -695,25 +680,26 @@ fun CourseDetailScreen(
                         scaleY = scale
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                     }
-                    .width(220.dp)
+                    .width(compactWidth)
             ) {
-                Column {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(titleSpacing),
+                ) {
                     Text(
                         text = course.title,
-                        style = MaterialTheme.typography.headlineSmall.copy(lineHeight = 28.sp),
+                        style = MaterialTheme.typography.headlineMedium.copy(lineHeight = 34.sp),
                         fontWeight = FontWeight.Bold,
-                        color = titleColor,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        color = contentColor,
+                        maxLines = if (progress > 0.5f) 1 else 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    val shouldShowSubtitle = course.subtitle.isNotBlank() && (!isInToolbar || isTitleShort)
-                    if (shouldShowSubtitle) {
+                    if (course.subtitle.isNotBlank() && subtitleAlpha > 0f) {
                         Text(
                             text = course.subtitle,
-                            style = if (isInToolbar) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
-                            color = subtitleColor,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = contentColor.copy(alpha = 0.72f * subtitleAlpha),
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -772,16 +758,14 @@ private fun CourseDetailTopBar(
     onBookmarkClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Smooth transition based on collapseProgress (0 = transparent, 1 = solid)
     val backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = collapseProgress)
 
-    // Content color transitions from white (over colored header) to onSurface (over solid background)
     val surfaceColor = MaterialTheme.colorScheme.onSurface
     val contentColor = Color(
         red = 1f + (surfaceColor.red - 1f) * collapseProgress,
         green = 1f + (surfaceColor.green - 1f) * collapseProgress,
         blue = 1f + (surfaceColor.blue - 1f) * collapseProgress,
-        alpha = 1f
+        alpha = 1f,
     )
 
     Surface(
@@ -789,7 +773,7 @@ private fun CourseDetailTopBar(
         tonalElevation = (4 * collapseProgress).dp,
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 8.dp)
+            .padding(top = 8.dp),
     ) {
         Row(
             modifier = Modifier
@@ -798,15 +782,20 @@ private fun CourseDetailTopBar(
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = contentColor,
-                )
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = contentColor.copy(alpha = 0.15f),
+            ) {
+                IconButton(onClick = onBackClick) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = contentColor,
+                    )
+                }
             }
 
-            // Spacer for floating title (title is handled by floating title overlay)
             Spacer(modifier = Modifier.weight(1f))
 
             IconButton(onClick = onShareClick) {
@@ -919,40 +908,35 @@ private fun CourseHeroSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top,
             ) {
-                // Left side: Tagline and description (title is handled by floating title)
                 Column(
                     modifier = Modifier.weight(1f),
                 ) {
-                    // Reserve space for floating title
-                    // Single-line title ~28dp, 2-line title ~56dp, subtitle ~20dp, gap ~12dp
-                    val isTitleLong = course.title.length > 15 // Titles longer than 15 chars likely wrap
+                    val isTitleLong = course.title.length > 18
                     val hasSubtitle = course.subtitle.isNotBlank()
                     val titleSpacerHeight = when {
-                        isTitleLong && hasSubtitle -> 88.dp  // 2-line title + subtitle
-                        isTitleLong && !hasSubtitle -> 68.dp // 2-line title only
-                        !isTitleLong && hasSubtitle -> 60.dp // 1-line title + subtitle
-                        else -> 40.dp                         // 1-line title only
+                        isTitleLong && hasSubtitle -> 176.dp
+                        isTitleLong && !hasSubtitle -> 148.dp
+                        !isTitleLong && hasSubtitle -> 128.dp
+                        else -> 96.dp
                     }
                     Spacer(modifier = Modifier.height(titleSpacerHeight))
+
+                    Text(
+                        text = courseTagline,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = accentColor,
+                        fontWeight = FontWeight.SemiBold,
+                    )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = courseTagline,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = accentColor,
-                        fontWeight = FontWeight.Medium,
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
                         text = course.description,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
-                        lineHeight = 18.sp,
+                        lineHeight = 20.sp,
                     )
                 }
 
@@ -1380,9 +1364,9 @@ private fun ContinueLearningCard(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .clickable { onLessonClick(nextLesson, nextLessonIndex) },
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(16.dp),
             color = Color.Transparent,
-            shadowElevation = 6.dp,
+            shadowElevation = 4.dp,
         ) {
             Box(
                 modifier = Modifier
@@ -1394,7 +1378,7 @@ private fun ContinueLearningCard(
                                 MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
                             ),
                         ),
-                        shape = RoundedCornerShape(24.dp),
+                        shape = RoundedCornerShape(16.dp),
                     ),
             ) {
                 Row(
@@ -1745,16 +1729,42 @@ private fun SyllabusHeader(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 16.dp),
     ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.MenuBook,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = "Learning path",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         Text(
             text = "Course Syllabus",
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = "$totalModules modules • $totalLessons lessons • ${estimatedHours}h estimated",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -1788,34 +1798,44 @@ private fun EnhancedModuleCard(
     val isModuleComplete = completedInModule == totalInModule
 
     val borderColor by animateColorAsState(
-        targetValue = if (isModuleComplete) accentColor.copy(alpha = 0.5f)
-        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+        targetValue = when {
+            isModuleComplete -> accentColor.copy(alpha = 0.42f)
+            isExpanded -> accentColor.copy(alpha = 0.22f)
+            else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+        },
         label = "borderColor"
     )
+    val cardColor by animateColorAsState(
+        targetValue = when {
+            isModuleComplete -> accentColor.copy(alpha = 0.08f)
+            isExpanded -> MaterialTheme.colorScheme.surfaceContainerLow
+            else -> MaterialTheme.colorScheme.surfaceContainerLowest
+        },
+        label = "cardColor"
+    )
 
-    // Material 3 Expressive Module Card
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
             .animateContentSize(
                 animationSpec = tween(300, easing = FastOutSlowInEasing)
             ),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(28.dp),
+        color = cardColor,
         border = androidx.compose.foundation.BorderStroke(
-            width = 1.5.dp,
+            width = 1.dp,
             color = borderColor,
         ),
-        shadowElevation = if (isModuleComplete) 4.dp else 2.dp,
+        tonalElevation = if (isExpanded) 3.dp else 1.dp,
+        shadowElevation = 0.dp,
     ) {
         Column {
-            // Module Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { isExpanded = !isExpanded }
-                    .padding(16.dp),
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Module Number/Check with progress ring
@@ -1823,17 +1843,16 @@ private fun EnhancedModuleCard(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.size(44.dp),
                 ) {
-                    // Progress ring
                     androidx.compose.foundation.Canvas(
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     ) {
                         drawArc(
-                            color = accentColor.copy(alpha = 0.2f),
+                            color = accentColor.copy(alpha = 0.18f),
                             startAngle = -90f,
                             sweepAngle = 360f,
                             useCenter = false,
                             style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                width = 3.dp.toPx(),
+                                width = 2.5.dp.toPx(),
                                 cap = StrokeCap.Round,
                             ),
                         )
@@ -1843,41 +1862,45 @@ private fun EnhancedModuleCard(
                             sweepAngle = 360f * moduleProgress,
                             useCenter = false,
                             style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                width = 3.dp.toPx(),
+                                width = 2.5.dp.toPx(),
                                 cap = StrokeCap.Round,
                             ),
                         )
                     }
 
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isModuleComplete) accentColor
-                                else MaterialTheme.colorScheme.surfaceContainerHigh
-                            ),
-                        contentAlignment = Alignment.Center,
+                    Surface(
+                        modifier = Modifier.size(30.dp),
+                        shape = CircleShape,
+                        color = if (isModuleComplete) accentColor else MaterialTheme.colorScheme.surface,
+                        border = if (isModuleComplete) null else androidx.compose.foundation.BorderStroke(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        ),
                     ) {
-                        if (isModuleComplete) {
-                            Icon(
-                                imageVector = Icons.Filled.CheckCircle,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        } else {
-                            Text(
-                                text = "${moduleIndex + 1}",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (isModuleComplete) {
+                                Icon(
+                                    imageVector = Icons.Filled.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            } else {
+                                Text(
+                                    text = "${moduleIndex + 1}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -1894,48 +1917,66 @@ private fun EnhancedModuleCard(
                     )
                 }
 
-                Icon(
-                    imageVector = Icons.Default.ExpandMore,
-                    contentDescription = if (isExpanded) "Collapse" else "Expand",
-                    modifier = Modifier
-                        .rotate(rotationAngle)
-                        .size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = if (isExpanded) 2.dp else 0.dp,
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            modifier = Modifier
+                                .rotate(rotationAngle)
+                                .size(22.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
 
-            // Lessons List (when expanded)
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = expandVertically(animationSpec = tween(300)) + fadeIn(),
                 exit = shrinkVertically(animationSpec = tween(300)) + fadeOut(),
             ) {
-                Column(
-                    modifier = Modifier.padding(bottom = 8.dp),
+                Surface(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp)
+                        .padding(bottom = 12.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp,
+                    shadowElevation = 0.dp,
                 ) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    module.lessons.forEachIndexed { index, lesson ->
-                        val isCompleted = lesson.id in completedLessons
-                        val lessonMemProgress = memorizationProgress[lesson.id]
-                        val lessonTimeSpent = timeSpentPerLesson[lesson.id] ?: 0
-                        EnhancedLessonItem(
-                            lesson = lesson.copy(isCompleted = isCompleted),
-                            lessonIndex = index,
-                            accentColor = accentColor,
-                            isEnrolled = isEnrolled,
-                            isMemorizationCourse = isMemorizationCourse,
-                            memorizedAyahs = lessonMemProgress?.memorizedAyahs ?: emptySet(),
-                            timeSpentMinutes = lessonTimeSpent,
-                            onClick = { onLessonClick(lesson) },
-                            onMarkComplete = { onMarkComplete(lesson) },
-                            onAyahToggle = { ayahNumber -> onAyahToggle(lesson.id, ayahNumber) },
+                    Column(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    ) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
                         )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        module.lessons.forEachIndexed { index, lesson ->
+                            val isCompleted = lesson.id in completedLessons
+                            val lessonMemProgress = memorizationProgress[lesson.id]
+                            val lessonTimeSpent = timeSpentPerLesson[lesson.id] ?: 0
+                            EnhancedLessonItem(
+                                lesson = lesson.copy(isCompleted = isCompleted),
+                                lessonIndex = index,
+                                accentColor = accentColor,
+                                isEnrolled = isEnrolled,
+                                isMemorizationCourse = isMemorizationCourse,
+                                memorizedAyahs = lessonMemProgress?.memorizedAyahs ?: emptySet(),
+                                timeSpentMinutes = lessonTimeSpent,
+                                onClick = { onLessonClick(lesson) },
+                                onMarkComplete = { onMarkComplete(lesson) },
+                                onAyahToggle = { ayahNumber -> onAyahToggle(lesson.id, ayahNumber) },
+                            )
+                        }
                     }
                 }
             }
@@ -2238,7 +2279,7 @@ private fun ReviewCard(review: Review) {
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -2363,7 +2404,7 @@ private fun EnhancedBottomBar(
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
                     Text(
                         text = if (progressPercent >= 100f) "Course Completed" else "Continue Learning",
                         style = MaterialTheme.typography.titleMedium,
@@ -2396,17 +2437,29 @@ private fun EnhancedBottomBar(
 
                 Button(
                     onClick = onEnroll,
-                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(52.dp),
+                    shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White,
                     ),
-                    modifier = Modifier.height(52.dp),
-                    contentPadding = PaddingValues(horizontal = 32.dp),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Enroll Now",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
                     )
                 }
             }
