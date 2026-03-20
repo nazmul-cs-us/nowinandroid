@@ -23,5 +23,6 @@ data class VisualizationState(
     val currentPitch: Float = 0f,
     val currentRoll: Float = 0f,
     val currentAccelMag: Float = 0f,
-    val currentGyroMag: Float = 0f
+    val currentGyroMag: Float = 0f,
+    val cameraResetToken: Int = 0
 )

@@ -20,7 +20,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
 
 from feature_engineering import (
@@ -28,6 +27,91 @@ from feature_engineering import (
     POSTURE_LABELS, NUM_CLASSES, SEQUENCE_LENGTH, FEATURES_PER_WINDOW
 )
 from data_augmentation import augment_dataset, balance_classes
+
+
+def _choose_split_counts(n_groups: int, test_ratio: float = 0.15, val_ratio: float = 0.15) -> tuple[int, int]:
+    if n_groups <= 1:
+        return 0, 0
+    if n_groups == 2:
+        return 1, 0
+
+    test_count = int(round(n_groups * test_ratio))
+    val_count = int(round(n_groups * val_ratio))
+
+    if test_count == 0:
+        test_count = 1
+    if val_count == 0 and n_groups - test_count >= 2:
+        val_count = 1
+
+    while test_count + val_count >= n_groups:
+        if test_count >= val_count and test_count > 1:
+            test_count -= 1
+        elif val_count > 0:
+            val_count -= 1
+        else:
+            test_count = max(0, test_count - 1)
+
+    return test_count, val_count
+
+
+def split_by_group(
+    X: np.ndarray,
+    y: np.ndarray,
+    groups: np.ndarray,
+    random_state: int = 42
+):
+    """Split sequences by contiguous posture-group id to avoid overlap leakage."""
+    unique_groups, first_indices = np.unique(groups, return_index=True)
+    group_labels = y[first_indices]
+
+    rng = np.random.default_rng(random_state)
+    train_groups, val_groups, test_groups = [], [], []
+
+    print("\nGrouped split by contiguous posture segments (leakage-safe)")
+    for class_index, posture_name in enumerate(POSTURE_LABELS):
+        class_groups = unique_groups[group_labels == class_index].copy()
+        rng.shuffle(class_groups)
+        n_groups = len(class_groups)
+        test_count, val_count = _choose_split_counts(n_groups)
+        train_count = n_groups - test_count - val_count
+
+        if train_count <= 0 and n_groups > 0:
+            train_count = 1
+            if test_count > val_count and test_count > 0:
+                test_count -= 1
+            elif val_count > 0:
+                val_count -= 1
+
+        train_groups.extend(class_groups[:train_count])
+        val_groups.extend(class_groups[train_count:train_count + val_count])
+        test_groups.extend(class_groups[train_count + val_count:])
+
+        print(
+            f"  {posture_name}: groups={n_groups}, "
+            f"train={train_count}, val={val_count}, test={test_count}"
+        )
+
+    train_groups = np.array(train_groups)
+    val_groups = np.array(val_groups)
+    test_groups = np.array(test_groups)
+
+    train_mask = np.isin(groups, train_groups)
+    val_mask = np.isin(groups, val_groups)
+    test_mask = np.isin(groups, test_groups)
+
+    X_train, y_train = X[train_mask], y[train_mask]
+    X_val, y_val = X[val_mask], y[val_mask]
+    X_test, y_test = X[test_mask], y[test_mask]
+
+    print(
+        f"\nSequence split sizes: train={len(X_train)}, val={len(X_val)}, test={len(X_test)}"
+    )
+    print(
+        f"Unique groups: train={len(np.unique(groups[train_mask]))}, "
+        f"val={len(np.unique(groups[val_mask]))}, test={len(np.unique(groups[test_mask]))}"
+    )
+
+    return X_train, X_val, X_test, y_train, y_val, y_test
 
 
 def build_model(
@@ -89,23 +173,25 @@ def train(args):
             print("Too few samples. Collect more data first.")
             return
 
-    # Create sequences
-    X, y = create_sequences(samples, sequence_length=args.seq_length, stride=args.stride)
+    # Create sequences grouped by contiguous posture segments to avoid leakage
+    X, y, groups = create_sequences(
+        samples,
+        sequence_length=args.seq_length,
+        stride=args.stride,
+        return_groups=True
+    )
 
     if len(X) == 0:
         print("Could not create sequences. Need longer continuous recordings per posture.")
         return
 
-    # Split data into train/val/test (70/15/15)
-    # First split: 85% train+val, 15% test
-    X_trainval, X_test, y_trainval, y_test = train_test_split(
-        X, y, test_size=0.15, random_state=42, stratify=y
+    X_train, X_val, X_test, y_train, y_val, y_test = split_by_group(
+        X, y, groups, random_state=42
     )
-    # Second split: split train+val into 82.35% train, 17.65% val (gives ~70/15 overall)
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_trainval, y_trainval, test_size=0.1765, random_state=42, stratify=y_trainval
-    )
-    print(f"\nTrain: {len(X_train)} (~70%), Validation: {len(X_val)} (~15%), Test: {len(X_test)} (~15%)")
+
+    if len(X_train) == 0 or len(X_val) == 0 or len(X_test) == 0:
+        print("Grouped split produced an empty partition. Collect more sessions per posture.")
+        return
 
     # Balance classes
     X_train, y_train = balance_classes(X_train, y_train, strategy="oversample")

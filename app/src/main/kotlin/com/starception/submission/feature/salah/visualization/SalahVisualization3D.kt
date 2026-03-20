@@ -18,6 +18,7 @@ import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Vector3
+import kotlin.math.max
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
 import kotlin.math.abs
@@ -118,11 +119,9 @@ class SalahVisualization3D(
     override fun create() {
         // Setup camera
         camera = PerspectiveCamera(67f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
-        camera.position.set(20f, 20f, 20f)
-        camera.lookAt(0f, 0f, 0f)
         camera.near = 0.1f
         camera.far = 300f
-        camera.update()
+        resetCameraForMode()
 
         // Setup camera controller — override pinch zoom to dolly (move camera)
         // instead of changing field-of-view, which feels unresponsive on mobile
@@ -243,6 +242,8 @@ class SalahVisualization3D(
             if (currentMode == VisualizationMode.SCATTER) {
                 rebuildScatterInstances()
             }
+
+            resetCameraForMode()
         }
     }
 
@@ -253,13 +254,9 @@ class SalahVisualization3D(
             when (mode) {
                 VisualizationMode.GRAVITY_VECTOR -> buildGravityVectors()
                 VisualizationMode.SCATTER -> rebuildScatterInstances()
-                VisualizationMode.PHONE_MODEL -> {
-                    // Position camera for humanoid view (figure is ~7 units tall)
-                    camera.position.set(10f, 6f, 12f)
-                    camera.lookAt(0f, 3.5f, 0f)
-                    camera.update()
-                }
+                VisualizationMode.PHONE_MODEL -> Unit
             }
+            resetCameraForMode()
         }
     }
 
@@ -271,6 +268,10 @@ class SalahVisualization3D(
             // Rebuild instances for scatter mode
             if (currentMode == VisualizationMode.SCATTER) {
                 rebuildScatterInstances()
+            }
+
+            if (currentMode != VisualizationMode.PHONE_MODEL) {
+                resetCameraForMode()
             }
         }
     }
@@ -304,6 +305,7 @@ class SalahVisualization3D(
             // Rebuild scatter instances with new mapping
             if (currentMode == VisualizationMode.SCATTER) {
                 rebuildScatterInstances()
+                resetCameraForMode()
             }
         }
     }
@@ -316,6 +318,12 @@ class SalahVisualization3D(
             if (currentMode == VisualizationMode.SCATTER) {
                 rebuildScatterInstances()
             }
+        }
+    }
+
+    fun resetCamera() {
+        safePostRunnable {
+            resetCameraForMode()
         }
     }
 
@@ -508,6 +516,74 @@ class SalahVisualization3D(
                 sample.gyroMagnitude,
                 isPlaying
             )
+        }
+    }
+
+    private fun resetCameraForMode() {
+        when (currentMode) {
+            VisualizationMode.PHONE_MODEL -> {
+                camera.position.set(10f, 6f, 12f)
+                camera.lookAt(0f, 3.5f, 0f)
+            }
+            VisualizationMode.SCATTER -> fitCameraToScatterData()
+            VisualizationMode.GRAVITY_VECTOR -> fitCameraToGravityData()
+        }
+        camera.up.set(Vector3.Y)
+        camera.update()
+        if (::cameraController.isInitialized) {
+            cameraController.target.set(cameraPositionTarget())
+        }
+    }
+
+    private fun fitCameraToScatterData() {
+        val points = filteredPoints.ifEmpty { dataPoints }
+        if (points.isEmpty()) {
+            camera.position.set(20f, 20f, 20f)
+            camera.lookAt(0f, 0f, 0f)
+            return
+        }
+
+        val xs = points.map { it.getAxisValue(axisX) }
+        val ys = points.map { it.getAxisValue(axisY) }
+        val zs = points.map { it.getAxisValue(axisZ) }
+
+        val centerX = (xs.minOrNull()!! + xs.maxOrNull()!!) / 2f
+        val centerY = (ys.minOrNull()!! + ys.maxOrNull()!!) / 2f
+        val centerZ = (zs.minOrNull()!! + zs.maxOrNull()!!) / 2f
+        val radius = max(
+            6f,
+            max(xs.maxOrNull()!! - xs.minOrNull()!!, max(ys.maxOrNull()!! - ys.minOrNull()!!, zs.maxOrNull()!! - zs.minOrNull()!!)) * 0.9f
+        )
+
+        camera.position.set(centerX + radius, centerY + radius * 0.7f, centerZ + radius)
+        camera.lookAt(centerX, centerY, centerZ)
+    }
+
+    private fun fitCameraToGravityData() {
+        val arrows = gravityArrowInstances.map { it.second.transform.getTranslation(Vector3()) }
+        if (arrows.isEmpty()) {
+            camera.position.set(18f, 14f, 18f)
+            camera.lookAt(0f, 0f, 0f)
+            return
+        }
+
+        val maxExtent = max(12f, arrows.maxOf { kotlin.math.sqrt(it.x * it.x + it.y * it.y + it.z * it.z) } * 1.8f)
+        camera.position.set(maxExtent, maxExtent * 0.8f, maxExtent)
+        camera.lookAt(0f, 0f, 0f)
+    }
+
+    private fun cameraPositionTarget(): Vector3 {
+        return when (currentMode) {
+            VisualizationMode.PHONE_MODEL -> Vector3(0f, 3.5f, 0f)
+            VisualizationMode.SCATTER -> {
+                val points = filteredPoints.ifEmpty { dataPoints }
+                if (points.isEmpty()) Vector3.Zero.cpy() else Vector3(
+                    (points.minOf { it.getAxisValue(axisX) } + points.maxOf { it.getAxisValue(axisX) }) / 2f,
+                    (points.minOf { it.getAxisValue(axisY) } + points.maxOf { it.getAxisValue(axisY) }) / 2f,
+                    (points.minOf { it.getAxisValue(axisZ) } + points.maxOf { it.getAxisValue(axisZ) }) / 2f
+                )
+            }
+            VisualizationMode.GRAVITY_VECTOR -> Vector3.Zero.cpy()
         }
     }
 

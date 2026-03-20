@@ -155,8 +155,9 @@ def extract_window_features(sample: dict) -> np.ndarray:
 def create_sequences(
     samples: List[dict],
     sequence_length: int = SEQUENCE_LENGTH,
-    stride: int = 10
-) -> Tuple[np.ndarray, np.ndarray]:
+    stride: int = 10,
+    return_groups: bool = False
+):
     """
     Group consecutive windows into fixed-length sequences for temporal modeling.
 
@@ -168,6 +169,7 @@ def create_sequences(
     Returns:
         X: (N, sequence_length, FEATURES_PER_WINDOW) feature sequences
         y: (N,) integer labels
+        groups: (N,) session ids when return_groups=True
     """
     # Group samples by session
     sessions: Dict[str, List[dict]] = {}
@@ -177,6 +179,7 @@ def create_sequences(
 
     X_list = []
     y_list = []
+    group_list = []
 
     for session_id, session_samples in sessions.items():
         # Sort by timestamp within session
@@ -198,15 +201,21 @@ def create_sequences(
 
             # Create sequences from this posture group
             if len(group) >= sequence_length:
+                group_id = f"{session_id}:{posture}:{group[0]['timestamp']}"
                 for start in range(0, len(group) - sequence_length + 1, stride):
                     window = group[start:start + sequence_length]
                     features = np.array([extract_window_features(w) for w in window])
                     X_list.append(features)
                     y_list.append(POSTURE_TO_INDEX[posture])
+                    group_list.append(group_id)
 
     if not X_list:
         print("Warning: No sequences could be created. Need more data.")
-        return np.array([]).reshape(0, sequence_length, FEATURES_PER_WINDOW), np.array([])
+        empty_x = np.array([]).reshape(0, sequence_length, FEATURES_PER_WINDOW)
+        empty_y = np.array([])
+        if return_groups:
+            return empty_x, empty_y, np.array([])
+        return empty_x, empty_y
 
     X = np.array(X_list, dtype=np.float32)
     y = np.array(y_list, dtype=np.int32)
@@ -217,6 +226,11 @@ def create_sequences(
     for label, name in enumerate(POSTURE_LABELS):
         count = (y == label).sum()
         print(f"  {name}: {count} ({100*count/len(y):.1f}%)")
+
+    if return_groups:
+        groups = np.array(group_list)
+        print(f"Unique session groups: {len(np.unique(groups))}")
+        return X, y, groups
 
     return X, y
 
@@ -303,7 +317,7 @@ if __name__ == "__main__":
     X_single, y_single = extract_single_window_features(samples)
 
     # Create sequences
-    X_seq, y_seq = create_sequences(samples)
+    X_seq, y_seq, group_seq = create_sequences(samples, return_groups=True)
 
     # Save processed data
     output_dir = Path(data_dir) / "processed"
@@ -313,7 +327,9 @@ if __name__ == "__main__":
     np.save(output_dir / "y_single.npy", y_single)
     np.save(output_dir / "X_sequences.npy", X_seq)
     np.save(output_dir / "y_sequences.npy", y_seq)
+    np.save(output_dir / "groups_sequences.npy", group_seq)
 
     print(f"\nSaved processed data to {output_dir}")
     print(f"  X_single: {X_single.shape}")
     print(f"  X_sequences: {X_seq.shape}")
+    print(f"  groups_sequences: {group_seq.shape}")

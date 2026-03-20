@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -86,7 +87,23 @@ fun VisualizationControls(
         )
 
         // ── Posture Filters ────────────────────────────
-        SectionHeader("Postures")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SectionHeader("Postures")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuickActionButton(
+                    label = "All",
+                    onClick = { onStateChange(state.copy(visiblePostures = SalahPosture.classificationLabels.toSet())) }
+                )
+                QuickActionButton(
+                    label = "None",
+                    onClick = { onStateChange(state.copy(visiblePostures = emptySet<SalahPosture>())) }
+                )
+            }
+        }
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -105,6 +122,24 @@ fun VisualizationControls(
                         }
                         onStateChange(state.copy(visiblePostures = newPostures))
                     }
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            FilledIconButton(
+                onClick = { onStateChange(state.copy(cameraResetToken = state.cameraResetToken + 1)) },
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CenterFocusStrong,
+                    contentDescription = "Reset camera"
                 )
             }
         }
@@ -150,6 +185,22 @@ fun VisualizationControls(
         }
     }
 }
+
+@Composable
+private fun QuickActionButton(
+    label: String,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+    ) {
+        Text(text = label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+    }
+}
+
 
 // ═══════════════════════════════════════════════════════
 // Section Header

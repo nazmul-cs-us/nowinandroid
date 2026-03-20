@@ -90,6 +90,13 @@ fun Visualization3DView(
         viz.setPointSize(state.pointSize)
     }
 
+    // Reset camera / auto-fit request
+    LaunchedEffect(state.cameraResetToken, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.resetCamera()
+    }
+
     // Manual playback index changes (from step buttons)
     LaunchedEffect(state.playbackIndex, visualizationRef) {
         if (!state.isPlaying) {

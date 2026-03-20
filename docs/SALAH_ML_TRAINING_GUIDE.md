@@ -171,6 +171,11 @@ python3 train_salah_detector.py \
 - Learning rate reduction (patience 5, factor 0.5)
 - Model checkpointing (save best)
 
+### Evaluation Safety
+- Sequences are highly overlapping, so random sequence-level train/test splits can leak near-duplicate windows across partitions.
+- The training pipeline should split by contiguous posture group/session before augmentation and normalization.
+- Expect validation/test accuracy to drop after this fix; that lower number is more trustworthy and closer to production behavior.
+
 ### Training Results
 - Final training accuracy: ~93.5%
 - Final validation accuracy: ~97-100%

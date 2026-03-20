@@ -45,7 +45,9 @@ import com.starception.submission.R
 import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.feature.course.CourseProgressTracker
 import com.starception.submission.feature.course.QuranListeningProgress
+import com.starception.submission.feature.quran.AudioLanguage
 import com.starception.submission.feature.quran.QuranData
+import com.starception.submission.download.AudioDownloadHelper
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.VoiceCompletionManager
@@ -76,6 +78,9 @@ class DrivingAudioService : Service() {
 
     @Inject
     lateinit var voiceCompletionManager: VoiceCompletionManager
+
+    @Inject
+    lateinit var audioDownloadHelper: AudioDownloadHelper
 
     private val binder = DrivingAudioBinder()
     private var mediaPlayer: MediaPlayer? = null
@@ -916,51 +921,82 @@ class DrivingAudioService : Service() {
      */
     fun playQuranSurah(surahIndex: Int, startPositionMs: Int = 0) {
         try {
-            currentQuranSurahIndex = surahIndex
-
-            // Get surah info
             if (surahIndex < 0 || surahIndex >= QuranData.surahs.size) {
                 Log.e(TAG, "🕌 Invalid surah index: $surahIndex")
                 onQuranComplete()
                 return
             }
 
-            val surah = QuranData.surahs[surahIndex]
-            Log.i(TAG, "🕌 Playing Quran: Surah ${surah.number} - ${surah.nameEnglish} (${surah.nameArabic})")
-
-            // Release existing player
+            // Release existing player once before scanning for a playable surah.
             mediaPlayer?.release()
+            mediaPlayer = null
 
-            // Resolve audio file from the same persisted language setting used by Surah detail.
             val selectedAudioLanguage = getSelectedQuranAudioLanguage()
-            var audioFile = getQuranAudioFileForLanguage(surahIndex, surah, selectedAudioLanguage)
+            val selectedPlaybackLanguage = selectedAudioLanguage.toPlaybackLanguage()
+            var candidateIndex = surahIndex
+            var candidateStartPositionMs = startPositionMs
+            var attempts = 0
+            var resolvedSurahIndex = -1
+            var resolvedSurah = QuranData.surahs[surahIndex]
+            var resolvedAudioFile: File? = null
 
-            if (!audioFile.exists() && selectedAudioLanguage != ChainQuranAudioLanguage.ARABIC_ONLY) {
-                val fallbackArabicFile = getQuranAudioFileForLanguage(
-                    surahIndex = surahIndex,
-                    surah = surah,
-                    language = ChainQuranAudioLanguage.ARABIC_ONLY
-                )
-                if (fallbackArabicFile.exists()) {
-                    Log.w(
-                        TAG,
-                        "🕌 Selected Quran audio ($selectedAudioLanguage) missing for Surah ${surah.number}; falling back to Arabic"
+            while (attempts < QuranData.surahs.size) {
+                val surah = QuranData.surahs[candidateIndex]
+                var audioFile = audioDownloadHelper.resolveQuranAudioFile(candidateIndex, selectedPlaybackLanguage)
+
+                if (audioFile == null && selectedPlaybackLanguage != AudioLanguage.ARABIC_ONLY) {
+                    val fallbackArabicFile = audioDownloadHelper.resolveQuranAudioFile(
+                        candidateIndex,
+                        AudioLanguage.ARABIC_ONLY
                     )
-                    audioFile = fallbackArabicFile
+                    if (fallbackArabicFile != null) {
+                        Log.w(
+                            TAG,
+                            "🕌 Selected Quran audio ($selectedAudioLanguage) missing for Surah ${surah.number}; falling back to Arabic"
+                        )
+                        audioFile = fallbackArabicFile
+                    }
                 }
+
+                if (audioFile != null) {
+                    resolvedSurahIndex = candidateIndex
+                    resolvedSurah = surah
+                    resolvedAudioFile = audioFile
+                    break
+                }
+
+                val selectedCdnKey = audioDownloadHelper.getQuranCdnKey(candidateIndex, selectedPlaybackLanguage)
+                val fallbackCdnKey = if (selectedPlaybackLanguage != AudioLanguage.ARABIC_ONLY) {
+                    audioDownloadHelper.getQuranCdnKey(candidateIndex, AudioLanguage.ARABIC_ONLY)
+                } else null
+                Log.w(
+                    TAG,
+                    "🕌 Quran audio missing for Surah ${surah.number}. selected=$selectedAudioLanguage key=${selectedCdnKey ?: "n/a"} fallback=${fallbackCdnKey ?: "n/a"}"
+                )
+                val nextIndex = CourseProgressTracker.completeCurrentSurah(this)
+                if (nextIndex == candidateIndex) {
+                    break
+                }
+                candidateIndex = nextIndex
+                candidateStartPositionMs = 0
+                attempts++
             }
 
-            if (!audioFile.exists()) {
-                Log.w(TAG, "🕌 Quran audio file not found: ${audioFile.absolutePath}")
-                // Try next surah
-                val nextIndex = CourseProgressTracker.completeCurrentSurah(this)
-                if (nextIndex != surahIndex) {
-                    playQuranSurah(nextIndex, 0)
-                } else {
-                    onQuranComplete()
-                }
+            if (resolvedSurahIndex == -1) {
+                Log.e(TAG, "🕌 No playable Quran audio found after checking ${attempts.coerceAtLeast(1)} surahs; ending chain")
+                onQuranComplete()
                 return
             }
+
+            currentQuranSurahIndex = resolvedSurahIndex
+            val surah = resolvedSurah
+            val audioFile = resolvedAudioFile ?: run {
+                Log.e(TAG, "🕌 Resolved audio file unexpectedly null for Surah ${surah.number}")
+                onQuranComplete()
+                return
+            }
+
+            Log.i(TAG, "🕌 Playing Quran: Surah ${surah.number} - ${surah.nameEnglish} (${surah.nameArabic})")
 
             mediaPlayer = MediaPlayer().apply {
                 setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
@@ -968,9 +1004,9 @@ class DrivingAudioService : Service() {
 
                 setOnPreparedListener { mp ->
                     // Seek to saved position if resuming
-                    if (startPositionMs > 0 && startPositionMs < mp.duration) {
-                        mp.seekTo(startPositionMs)
-                        Log.d(TAG, "🕌 Seeked to saved position: ${startPositionMs / 1000}s")
+                    if (candidateStartPositionMs > 0 && candidateStartPositionMs < mp.duration) {
+                        mp.seekTo(candidateStartPositionMs)
+                        Log.d(TAG, "🕌 Seeked to saved position: ${candidateStartPositionMs / 1000}s")
                     }
                     mp.start()
                     startQuranPositionUpdates()
@@ -1019,26 +1055,11 @@ class DrivingAudioService : Service() {
         }
     }
 
-    private fun getQuranAudioFileForLanguage(
-        surahIndex: Int,
-        surah: com.starception.submission.feature.quran.Surah,
-        language: ChainQuranAudioLanguage
-    ): File {
-        return when (language) {
-            ChainQuranAudioLanguage.ARABIC_ONLY -> File(QURAN_ARABIC_PATH, surah.fileName)
-
-            ChainQuranAudioLanguage.BENGALI_TRANSLATION -> {
-                val bengaliDir = File(QURAN_BENGALI_PATH)
-                val allFiles = bengaliDir.listFiles()?.sortedBy { it.name } ?: emptyList()
-                allFiles.getOrNull(surahIndex) ?: File("")
-            }
-
-            ChainQuranAudioLanguage.ENGLISH_TRANSLATION -> {
-                val englishDir = File(QURAN_ENGLISH_PATH)
-                val pattern = String.format("%03d", surah.number)
-                englishDir.listFiles()?.find { it.name.startsWith(pattern) }
-                    ?: File(englishDir, "${pattern} ${surah.nameEnglish.lowercase().replace(" ", "_")}.ogg")
-            }
+    private fun ChainQuranAudioLanguage.toPlaybackLanguage(): AudioLanguage {
+        return when (this) {
+            ChainQuranAudioLanguage.ARABIC_ONLY -> AudioLanguage.ARABIC_ONLY
+            ChainQuranAudioLanguage.BENGALI_TRANSLATION -> AudioLanguage.BENGALI_TRANSLATION
+            ChainQuranAudioLanguage.ENGLISH_TRANSLATION -> AudioLanguage.ENGLISH_TRANSLATION
         }
     }
 
