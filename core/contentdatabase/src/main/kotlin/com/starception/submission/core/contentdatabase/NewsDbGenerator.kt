@@ -505,7 +505,7 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                         newsDb.execSQL(
                             """INSERT INTO news_resources (id, title, content, url, header_image_url, publish_date, type, is_system, is_user_created, source, created_at, updated_at)
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                            arrayOf(newsId, title, content, url, "drawable://ic_bukhari", now, "Hadith 📖", 1, 0, "Sahih Bukhari", now, now)
+                            arrayOf(newsId, title, content, url, "drawable://masjid_al_nawabi", now, "Hadith 📖", 1, 0, "Sahih Bukhari", now, now)
                         )
 
                         newsDb.execSQL(
@@ -834,7 +834,7 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                                 title = title,
                                 content = content,
                                 url = url,
-                                headerImageUrl = "drawable://ic_bukhari",
+                                headerImageUrl = "drawable://masjid_al_nawabi",
                                 publishDate = now,
                                 type = "Hadith 📖",
                                 isSystem = 1,
