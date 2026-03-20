@@ -97,7 +97,8 @@ class VoiceCompletionManager @Inject constructor(
      * @param lessonId The lesson ID
      * @param lessonTitle The lesson title (for voice prompt)
      * @param onComplete Callback when user says "yes"
-     * @param onSkipped Callback when user says "no" or timeout
+     * @param onSkipped Callback when user explicitly says "no"
+     * @param onInconclusive Callback when capture/hearing was inconclusive (timeout/unrecognized)
      * @param onError Callback for errors
      */
     fun promptForCompletion(
@@ -106,6 +107,7 @@ class VoiceCompletionManager @Inject constructor(
         lessonTitle: String,
         onComplete: () -> Unit,
         onSkipped: () -> Unit,
+        onInconclusive: (String) -> Unit,
         onError: (String) -> Unit
     ) {
         if (isPromptInProgress) {
@@ -177,6 +179,11 @@ class VoiceCompletionManager @Inject constructor(
                         restoreAudioState()
                         // Confirmation already spoken in listenForResponse
                         onSkipped()
+                        isPromptInProgress = false
+                    },
+                    onInconclusive = { reason ->
+                        restoreAudioState()
+                        onInconclusive(reason)
                         isPromptInProgress = false
                     },
                     onError = { error ->
@@ -596,11 +603,12 @@ class VoiceCompletionManager @Inject constructor(
     private suspend fun listenForResponse(
         onYes: () -> Unit,
         onNo: () -> Unit,
+        onInconclusive: (String) -> Unit,
         onError: (String) -> Unit
     ) {
         // Reset retry count at start of new listening session
         currentRetryCount = 0
-        listenForResponseInternal(onYes, onNo, onError)
+        listenForResponseInternal(onYes, onNo, onInconclusive, onError)
     }
 
     /**
@@ -610,6 +618,7 @@ class VoiceCompletionManager @Inject constructor(
     private suspend fun listenForResponseInternal(
         onYes: () -> Unit,
         onNo: () -> Unit,
+        onInconclusive: (String) -> Unit,
         onError: (String) -> Unit
     ) {
         val selectedEngine = getSelectedEngine()
@@ -629,10 +638,10 @@ class VoiceCompletionManager @Inject constructor(
 
         when (selectedEngine) {
             VoiceRecognitionEngine.SHERPA_KWS -> {
-                listenWithSherpaKws(onYes, onNo, onError, listeningDuration)
+                listenWithSherpaKws(onYes, onNo, onInconclusive, onError, listeningDuration)
             }
             VoiceRecognitionEngine.WHISPER -> {
-                listenWithWhisper(onYes, onNo, onError, listeningDuration)
+                listenWithWhisper(onYes, onNo, onInconclusive, onError, listeningDuration)
             }
         }
     }
@@ -646,6 +655,7 @@ class VoiceCompletionManager @Inject constructor(
         reason: String,
         onYes: () -> Unit,
         onNo: () -> Unit,
+        onInconclusive: (String) -> Unit,
         onError: (String) -> Unit
     ): Boolean {
         if (currentRetryCount < MAX_RETRY_ATTEMPTS) {
@@ -660,7 +670,7 @@ class VoiceCompletionManager @Inject constructor(
                     speakRetryPrompt {
                         scope.launch {
                             delay(PROMPT_DELAY_MS)
-                            listenForResponseInternal(onYes, onNo, onError)
+                            listenForResponseInternal(onYes, onNo, onInconclusive, onError)
                         }
                     }
                 }
@@ -771,6 +781,7 @@ class VoiceCompletionManager @Inject constructor(
     private fun listenWithSherpaKws(
         onYes: () -> Unit,
         onNo: () -> Unit,
+        onInconclusive: (String) -> Unit,
         onError: (String) -> Unit,
         durationMs: Long = LISTENING_DURATION_MS
     ) {
@@ -797,19 +808,19 @@ class VoiceCompletionManager @Inject constructor(
                             is SherpaOnnxKwsService.VoiceResult.Timeout -> {
                                 Log.d(TAG, "⏱️ KWS timeout - no keyword detected")
                                 // Try retry before giving up
-                                val retried = handleRetry("timeout - no speech detected", onYes, onNo, onError)
+                                val retried = handleRetry("timeout - no speech detected", onYes, onNo, onInconclusive, onError)
                                 if (!retried) {
                                     Log.i(TAG, "🔁 KWS retries exhausted, falling back to Whisper once")
-                                    listenWithWhisper(onYes, onNo, onError, durationMs)
+                                    listenWithWhisper(onYes, onNo, onInconclusive, onError, durationMs)
                                 }
                             }
                             is SherpaOnnxKwsService.VoiceResult.Unrecognized -> {
                                 Log.d(TAG, "❓ KWS unrecognized: ${result.text}")
                                 // Try retry before giving up
-                                val retried = handleRetry("unrecognized: ${result.text}", onYes, onNo, onError)
+                                val retried = handleRetry("unrecognized: ${result.text}", onYes, onNo, onInconclusive, onError)
                                 if (!retried) {
                                     Log.i(TAG, "🔁 KWS unrecognized after retries, falling back to Whisper once")
-                                    listenWithWhisper(onYes, onNo, onError, durationMs)
+                                    listenWithWhisper(onYes, onNo, onInconclusive, onError, durationMs)
                                 }
                             }
                             is SherpaOnnxKwsService.VoiceResult.Error -> {
@@ -842,6 +853,7 @@ class VoiceCompletionManager @Inject constructor(
     private fun listenWithWhisper(
         onYes: () -> Unit,
         onNo: () -> Unit,
+        onInconclusive: (String) -> Unit,
         onError: (String) -> Unit,
         durationMs: Long = LISTENING_DURATION_MS
     ) {
@@ -868,20 +880,20 @@ class VoiceCompletionManager @Inject constructor(
                         is WhisperVoiceService.VoiceResult.Timeout -> {
                             Log.d(TAG, "⏱️ No speech detected (timeout)")
                             // Try retry before giving up
-                            val retried = handleRetry("timeout - no speech detected", onYes, onNo, onError)
+                            val retried = handleRetry("timeout - no speech detected", onYes, onNo, onInconclusive, onError)
                             if (!retried) {
-                                speakConfirmation("No response detected after multiple tries. Skipping.") {
-                                    onNo()
+                                speakConfirmation("I could not clearly hear a response.") {
+                                    onInconclusive("timeout - no speech detected")
                                 }
                             }
                         }
                         is WhisperVoiceService.VoiceResult.Unrecognized -> {
                             Log.d(TAG, "❓ Unrecognized speech: ${result.text}")
                             // Try retry before giving up
-                            val retried = handleRetry("unrecognized: ${result.text}", onYes, onNo, onError)
+                            val retried = handleRetry("unrecognized: ${result.text}", onYes, onNo, onInconclusive, onError)
                             if (!retried) {
-                                speakConfirmation("Sorry, I couldn't understand. Skipping.") {
-                                    onNo()
+                                speakConfirmation("I could not clearly understand the response.") {
+                                    onInconclusive("unrecognized: ${result.text}")
                                 }
                             }
                         }
@@ -1061,7 +1073,11 @@ class VoiceCompletionManager @Inject constructor(
                 Log.i(TAG, "🧪 ========== VOICE COMPLETION TEST FINISHED ==========")
             },
             onSkipped = {
-                Log.i(TAG, "🧪 ⏭️ TEST RESULT: User said NO or timeout - lesson skipped")
+                Log.i(TAG, "🧪 ⏭️ TEST RESULT: User said NO - lesson skipped")
+                Log.i(TAG, "🧪 ========== VOICE COMPLETION TEST FINISHED ==========")
+            },
+            onInconclusive = { reason ->
+                Log.w(TAG, "🧪 ⚠️ TEST RESULT: Inconclusive response - $reason")
                 Log.i(TAG, "🧪 ========== VOICE COMPLETION TEST FINISHED ==========")
             },
             onError = { error ->

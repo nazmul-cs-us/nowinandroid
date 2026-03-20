@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -343,21 +344,15 @@ private fun RecordButton(
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(14.dp),
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Mic,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Record Your Recitation")
+            Text("Add Voice Note")
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "(Optional - verify your understanding)",
+            text = "Optional — add a short reflection or proof of completion.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -423,32 +418,20 @@ private fun RecordingIndicator(
             // Cancel button
             OutlinedButton(
                 onClick = onCancel,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Cancel",
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(4.dp))
                 Text("Cancel")
             }
 
             // Stop button
             Button(
                 onClick = onStop,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Red,
+                    containerColor = MaterialTheme.colorScheme.error,
                 ),
             ) {
-                Icon(
-                    imageVector = Icons.Default.Stop,
-                    contentDescription = "Stop",
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Stop")
+                Text("Stop Recording")
             }
         }
     }
@@ -491,29 +474,17 @@ private fun RecordingPlayback(
             // Play/Stop button
             FilledTonalButton(
                 onClick = if (isPlaying) onStop else onPlay,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
             ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Stop" else "Play",
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(if (isPlaying) "Stop" else "Play")
+                Text(if (isPlaying) "Stop Playback" else "Play Recording")
             }
 
             // Delete button
             OutlinedButton(
                 onClick = onDelete,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Delete",
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Delete")
+                Text("Remove")
             }
         }
     }
@@ -576,6 +547,12 @@ fun LessonCompletionDialog(
         }
     }
 
+    val recordingSurfaceColor = when {
+        isRecording -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.28f)
+        hasRecording -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+
     AlertDialog(
         onDismissRequest = {
             Log.d("CompletionDialog_TRACE", "🚪 onDismissRequest")
@@ -586,161 +563,238 @@ fun LessonCompletionDialog(
         },
         properties = DialogProperties(
             dismissOnBackPress = true,
-            dismissOnClickOutside = false, // Prevent accidental dismissal
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false,
         ),
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(28.dp),
         modifier = Modifier
             .fillMaxWidth(0.95f)
             .padding(16.dp),
         title = null,
         text = {
+            val recordingUiState = when {
+                isRecording -> "recording"
+                hasRecording -> "saved"
+                else -> "idle"
+            }
+
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Header Icon
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center,
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp),
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Complete Lesson",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Confirm this lesson and optionally save a short voice note.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Title
-                Text(
-                    text = "Complete Lesson",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Lesson name
-                Text(
-                    text = lessonTitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center,
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Question
-                Text(
-                    text = "Did you complete this lesson?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Recording Section
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = "Lesson",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = lessonTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "Did you complete this lesson?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = recordingSurfaceColor,
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        AnimatedContent(
-                            targetState = isRecording,
-                            label = "recording_state",
-                        ) { recording ->
-                            if (recording) {
-                                RecordingIndicator(
-                                    seconds = recordingSeconds,
-                                    onStop = {
-                                        recordingManager.stopRecording()
-                                        isRecording = false
-                                        hasRecording = true
-                                    },
-                                    onCancel = {
-                                        recordingManager.cancelRecording()
-                                        isRecording = false
-                                    },
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surface),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = if (hasRecording || isRecording) Icons.Filled.Mic else Icons.Outlined.Mic,
+                                    contentDescription = null,
+                                    tint = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp),
                                 )
-                            } else if (hasRecording) {
-                                RecordingPlayback(
-                                    isPlaying = isPlaying,
-                                    onPlay = {
-                                        isPlaying = recordingManager.startPlayback(courseId, lessonId) {
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Voice note",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = if (hasRecording) {
+                                        "Recording saved for this lesson."
+                                    } else {
+                                        "Optional: add a short reflection or proof of completion."
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 116.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            AnimatedContent(
+                                targetState = recordingUiState,
+                                label = "recording_state",
+                            ) { state ->
+                                when (state) {
+                                    "recording" -> RecordingIndicator(
+                                        seconds = recordingSeconds,
+                                        onStop = {
+                                            recordingManager.stopRecording()
+                                            isRecording = false
+                                            hasRecording = true
+                                        },
+                                        onCancel = {
+                                            recordingManager.cancelRecording()
+                                            isRecording = false
+                                        },
+                                    )
+
+                                    "saved" -> RecordingPlayback(
+                                        isPlaying = isPlaying,
+                                        onPlay = {
+                                            isPlaying = recordingManager.startPlayback(courseId, lessonId) {
+                                                isPlaying = false
+                                            }
+                                        },
+                                        onStop = {
+                                            recordingManager.stopPlayback()
                                             isPlaying = false
-                                        }
-                                    },
-                                    onStop = {
-                                        recordingManager.stopPlayback()
-                                        isPlaying = false
-                                    },
-                                    onDelete = {
-                                        recordingManager.deleteRecording(courseId, lessonId)
-                                        hasRecording = false
-                                    },
-                                )
-                            } else {
-                                RecordButton(
-                                    hasPermission = audioPermissionState.status.isGranted,
-                                    onRequestPermission = {
-                                        audioPermissionState.launchPermissionRequest()
-                                    },
-                                    onStartRecording = {
-                                        if (recordingManager.startRecording(courseId, lessonId)) {
-                                            isRecording = true
-                                        }
-                                    },
-                                )
+                                        },
+                                        onDelete = {
+                                            recordingManager.deleteRecording(courseId, lessonId)
+                                            hasRecording = false
+                                        },
+                                    )
+
+                                    else -> RecordButton(
+                                        hasPermission = audioPermissionState.status.isGranted,
+                                        onRequestPermission = {
+                                            audioPermissionState.launchPermissionRequest()
+                                        },
+                                        onStartRecording = {
+                                            if (recordingManager.startRecording(courseId, lessonId)) {
+                                                isRecording = true
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
                 }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Button(
+                        onClick = {
+                            Log.d("CompletionDialog_TRACE", "✅ Completed clicked")
+                            onComplete(hasRecording)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                        ),
+                    ) {
+                        Text(
+                            text = "Mark Complete",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+
+                    FilledTonalButton(
+                        onClick = {
+                            Log.d("CompletionDialog_TRACE", "❌ Not Yet clicked")
+                            onDismiss()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Text(
+                            text = "Not Now",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
             }
         },
-        confirmButton = {
-            Button(
-                onClick = {
-                    Log.d("CompletionDialog_TRACE", "✅ Completed clicked")
-                    onComplete(hasRecording)
-                },
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                ),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CheckCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Completed")
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = {
-                    Log.d("CompletionDialog_TRACE", "❌ Not Yet clicked")
-                    onDismiss()
-                },
-                shape = RoundedCornerShape(12.dp),
-            ) {
-                Text("Not Yet")
-            }
-        },
+        confirmButton = {},
+        dismissButton = {},
     )
 }

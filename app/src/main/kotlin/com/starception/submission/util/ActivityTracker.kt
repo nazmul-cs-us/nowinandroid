@@ -1398,16 +1398,25 @@ object ActivityTracker {
                         }
                     },
                     onSkipped = {
-                        Log.i("ActivityTracker", "⏭️ Voice completion: User said NO or timeout - skipped")
+                        Log.i("ActivityTracker", "⏭️ Voice completion: User said NO - skipped")
 
-                        // Give audio feedback that lesson was skipped
                         speakFeedback(ctx, "Lesson skipped.") {
-                            // Still chain Quran listening after hadith even if skipped
                             if (courseId == "daily_bukhari") {
                                 Log.i("ActivityTracker", "📚➡️🕌 Hadith skipped - chaining to Quran listening anyway")
                                 playQuranListeningIfEnrolled(ctx)
                             } else {
-                                // Reset manual trigger mode when chain ends
+                                isManualTriggerMode = false
+                            }
+                        }
+                    },
+                    onInconclusive = { reason ->
+                        Log.w("ActivityTracker", "⚠️ Voice completion inconclusive: $reason")
+                        CourseProgressTracker.setPendingCompletion(ctx, courseId, lessonId, lessonTitle)
+                        speakFeedback(ctx, "Could not confirm by voice. Please open the app later to confirm.") {
+                            if (courseId == "daily_bukhari") {
+                                Log.i("ActivityTracker", "📚➡️🕌 Hadith confirmation pending - chaining to Quran listening")
+                                playQuranListeningIfEnrolled(ctx)
+                            } else {
                                 isManualTriggerMode = false
                             }
                         }
@@ -1657,12 +1666,18 @@ object ActivityTracker {
                     },
                     onSkipped = {
                         Log.i("ActivityTracker", "🕌 ⏭️ Voice completion: User said NO - saving position and stopping")
-                        // Give audio feedback
                         speakFeedback(ctx, "Quran listening session ended.") {
-                            // End session but don't mark as complete
                             CourseProgressTracker.endQuranListeningSession(ctx)
                             quranService?.stopCourseMode()
-                            // Reset manual trigger mode when user explicitly stops
+                            isManualTriggerMode = false
+                        }
+                    },
+                    onInconclusive = { reason ->
+                        Log.w("ActivityTracker", "🕌 ⚠️ Voice completion inconclusive: $reason")
+                        CourseProgressTracker.setPendingCompletion(ctx, "complete_quran_listening", lessonId, lessonTitle)
+                        speakFeedback(ctx, "Could not confirm by voice. Please open the app later to confirm.") {
+                            CourseProgressTracker.endQuranListeningSession(ctx)
+                            quranService?.stopCourseMode()
                             isManualTriggerMode = false
                         }
                     },

@@ -127,6 +127,8 @@ class DrivingAudioService : Service() {
         private const val TAG = "DrivingAudioService"
         private const val NOTIFICATION_ID = 3001
         private const val CHANNEL_ID = "driving_audio_channel"
+        private const val CONFIRMATION_CHANNEL_ID = "driving_completion_channel"
+        private const val PENDING_CONFIRMATION_NOTIFICATION_ID = 3002
 
         const val ACTION_PLAY = "com.starception.submission.DRIVING_PLAY"
         const val ACTION_PAUSE = "com.starception.submission.DRIVING_PAUSE"
@@ -173,6 +175,7 @@ class DrivingAudioService : Service() {
         super.onCreate()
         Log.d(TAG, "Service created")
         createNotificationChannel()
+        createCompletionNotificationChannel()
         acquireWakeLock()
         initializeMediaSession()
     }
@@ -279,6 +282,86 @@ class DrivingAudioService : Service() {
      * We start with only MEDIA_PLAYBACK (no RECORD_AUDIO needed) and upgrade here
      * right before we need mic access. This prevents SecurityException during playTravelDua().
      */
+    private fun hasRecordAudioPermission(): Boolean {
+        return checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun startForegroundForPlayback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val serviceType = if (hasRecordAudioPermission()) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            } else {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            }
+
+            try {
+                startForeground(
+                    NOTIFICATION_ID,
+                    createNotification(),
+                    serviceType
+                )
+                Log.i(
+                    TAG,
+                    if (serviceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0) {
+                        "🚗 Foreground service started with mediaPlayback + microphone"
+                    } else {
+                        "🚗 Foreground service started with mediaPlayback only"
+                    }
+                )
+            } catch (e: SecurityException) {
+                Log.w(TAG, "🚗 Failed to start with microphone type, falling back to mediaPlayback: ${e.message}")
+                startForeground(
+                    NOTIFICATION_ID,
+                    createNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            }
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification())
+            Log.i(TAG, "🚗 Foreground service started")
+        }
+    }
+
+    private fun queuePendingCompletion(courseId: String, lessonId: String, lessonTitle: String, reason: String) {
+        Log.w(TAG, "📝 Queueing pending completion for $lessonId ($reason)")
+        CourseProgressTracker.setPendingCompletion(this, courseId, lessonId, lessonTitle)
+        showPendingCompletionNotification(courseId, lessonTitle)
+        updateState(PlaybackState.VOICE_PROMPT, "Open app to confirm", lessonTitle)
+        updateNotification()
+    }
+
+    private fun showPendingCompletionNotification(courseId: String, lessonTitle: String) {
+        val courseIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("starception://course/$courseId")).apply {
+            `package` = packageName
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val requestCode = courseId.hashCode() and 0x7fffffff
+        val coursePendingIntent = PendingIntent.getActivity(
+            this,
+            requestCode,
+            courseIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val notification = NotificationCompat.Builder(this, CONFIRMATION_CHANNEL_ID)
+            .setSmallIcon(R.drawable.transparent_greyscaled)
+            .setContentTitle("Confirm lesson completion")
+            .setContentText("Tap to confirm $lessonTitle")
+            .setSubText("Driving Mode")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setAutoCancel(true)
+            .setContentIntent(coursePendingIntent)
+            .addAction(0, "Open", coursePendingIntent)
+            .build()
+
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.notify(PENDING_CONFIRMATION_NOTIFICATION_ID, notification)
+    }
+
     private fun upgradeForegroundServiceForMicrophone() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             // Check if RECORD_AUDIO is granted before trying to include microphone type
@@ -352,20 +435,10 @@ class DrivingAudioService : Service() {
             }
 
             updateState(PlaybackState.PLAYING_TRAVEL_DUA, "Travel Dua", "دعاء السفر")
-            // Start foreground with ONLY mediaPlayback type. Including microphone type
-            // requires RECORD_AUDIO to be granted BEFORE startForeground(), and if it's not,
-            // a SecurityException kills the entire chain. We upgrade to include microphone
-            // type later, right before voice recording starts.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    createNotification(),
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, createNotification())
-            }
-            Log.i(TAG, "🚗 Foreground service started (mediaPlayback only)")
+            // If RECORD_AUDIO is already granted while the app is visible, start the
+            // foreground service with microphone capability immediately. This preserves
+            // background mic access later when the chain reaches the YES/NO prompt.
+            startForegroundForPlayback()
 
             mediaPlayer?.start()
             isPaused = false
@@ -790,10 +863,14 @@ class DrivingAudioService : Service() {
                 startQuranPlaybackIfEnrolled(hadithNumber)
             },
             onSkipped = {
-                Log.i(TAG, "⏭️ Lesson skipped via voice")
-                // NOW start pre-generating next hadiths (after voice prompt done)
+                Log.i(TAG, "⏭️ Lesson explicitly skipped via voice")
                 markHadithPlayed(hadithNumber)
-                // Continue to Quran playback if enrolled
+                startQuranPlaybackIfEnrolled(hadithNumber)
+            },
+            onInconclusive = { reason ->
+                Log.w(TAG, "⚠️ Voice completion inconclusive for $lessonId: $reason")
+                queuePendingCompletion(courseId, lessonId, "Hadith #$hadithNumber", reason)
+                markHadithPlayed(hadithNumber)
                 startQuranPlaybackIfEnrolled(hadithNumber)
             },
             onError = { error ->
@@ -1003,7 +1080,12 @@ class DrivingAudioService : Service() {
                 continueToNextSurahAfterCompletion(surahIndex)
             },
             onSkipped = {
-                Log.i(TAG, "🕌 ⏭️ User skipped completion for $lessonId - ending Quran flow")
+                Log.i(TAG, "🕌 ⏭️ User explicitly skipped completion for $lessonId - ending Quran flow")
+                onQuranComplete()
+            },
+            onInconclusive = { reason ->
+                Log.w(TAG, "🕌 ⚠️ Voice completion inconclusive for $lessonId: $reason")
+                queuePendingCompletion("complete_quran_listening", lessonId, lessonTitle, reason)
                 onQuranComplete()
             },
             onError = { error ->
@@ -1250,6 +1332,23 @@ class DrivingAudioService : Service() {
             ).apply {
                 description = "Travel dua and hadith playback during driving"
                 setShowBadge(false)
+            }
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun createCompletionNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CONFIRMATION_CHANNEL_ID,
+                "Driving Completion Confirmation",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Prompts to confirm lesson completion after background playback"
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                enableVibration(true)
+                setShowBadge(true)
             }
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(channel)
