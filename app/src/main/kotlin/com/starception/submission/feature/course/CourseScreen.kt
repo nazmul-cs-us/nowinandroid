@@ -42,7 +42,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.BorderStroke
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
+import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.hadithdatabase.HadithRepository
+import com.starception.submission.download.MissingContentCard
 import com.starception.submission.settings.components.TtsVoice
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -68,7 +70,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import dagger.hilt.android.EntryPointAccessors
 import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 
 /**
  * Course data model
@@ -110,6 +114,13 @@ fun CourseScreen(
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("course_progress", Context.MODE_PRIVATE) }
+    val entryPoint = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            SherpaOnnxTtsEntryPoint::class.java
+        )
+    }
+    val downloadManager = remember { entryPoint.assetDownloadManager() }
 
     // Enrolled courses
     var enrolledCourseIds by remember {
@@ -125,12 +136,20 @@ fun CourseScreen(
 
     // Track progress updates to trigger recomposition
     var progressUpdateTrigger by remember { mutableStateOf(0) }
+    var pendingBukhariEnrollment by rememberSaveable { mutableStateOf(false) }
 
     // Get progress for each enrolled course (reactive to changes)
     val courseProgress = remember(enrolledCourseIds, progressUpdateTrigger) {
         myCourses.associate { course ->
             course.id to prefs.getInt("progress_${course.id}", 0)
         }
+    }
+
+    fun enrollCourse(courseId: String) {
+        val newSet = enrolledCourseIds.toMutableSet()
+        newSet.add(courseId)
+        enrolledCourseIds = newSet
+        prefs.edit().putStringSet("enrolled_courses", newSet).apply()
     }
 
     // State for showing completion dialog - use rememberSaveable to survive predictive back
@@ -301,20 +320,38 @@ fun CourseScreen(
         }
 
         items(exploreCourses) { course ->
-            CourseCard(
-                course = course,
-                onClick = {
-                    // Preview course before enrolling
-                    onCourseClick(course.id)
-                },
-                onEnroll = {
-                    val newSet = enrolledCourseIds.toMutableSet()
-                    newSet.add(course.id)
-                    enrolledCourseIds = newSet
-                    prefs.edit().putStringSet("enrolled_courses", newSet).apply()
-                },
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
-            )
+            Column {
+                CourseCard(
+                    course = course,
+                    onClick = {
+                        // Preview course before enrolling
+                        onCourseClick(course.id)
+                    },
+                    onEnroll = {
+                        if (course.id == "daily_bukhari" && !HadithDatabase.isDatabaseAvailable(context, "sahih_bukhari.db")) {
+                            pendingBukhariEnrollment = true
+                        } else {
+                            enrollCourse(course.id)
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
+                )
+
+                if (course.id == "daily_bukhari" && pendingBukhariEnrollment) {
+                    MissingContentCard(
+                        resourceName = "Sahih Bukhari",
+                        category = "hadith_sahih_bukhari",
+                        description = "Download Sahih Bukhari to enable Daily Hadith enrollment and play the hadith automatically after travel dua when you start the audio chain.",
+                        downloadManager = downloadManager,
+                        onDownloadComplete = {
+                            HadithDatabase.clearInstance(context, "sahih_bukhari.db")
+                            pendingBukhariEnrollment = false
+                            enrollCourse(course.id)
+                        },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+            }
         }
 
         // All Courses enrolled - Rich achievement section
@@ -2053,7 +2090,7 @@ internal fun getAvailableCourses(): List<Course> {
             id = "daily_bukhari",
             title = "Daily Hadith",
             subtitle = "Sahih Al-Bukhari",
-            description = "Read one authentic hadith from Sahih Al-Bukhari every day and build a consistent learning habit.",
+            description = "Read one authentic hadith from Sahih Al-Bukhari every day. When enabled, it can also play automatically after travel dua during the driving audio chain.",
             icon = Icons.Outlined.MenuBook,
             totalLessons = 365,
             estimatedDays = 365,

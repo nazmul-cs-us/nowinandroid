@@ -848,6 +848,11 @@ object ActivityTracker {
                 return null
             }
 
+            if (!prefs.getBoolean("play_daily_bukhari_after_travel_dua", true)) {
+                Log.d("ActivityTracker", "📚 Daily Hadith travel playback opted out")
+                return null
+            }
+
             // Find next uncompleted hadith
             val completedLessons = CourseProgressTracker.getCompletedLessons(ctx, "daily_bukhari")
             var nextHadithNumber = 1
@@ -1361,6 +1366,20 @@ object ActivityTracker {
             return
         }
 
+        if (!CourseProgressTracker.isCompletionConfirmationMandatory(ctx, courseId)) {
+            Log.i("ActivityTracker", "✅ Completion confirmation optional for $lessonId - auto-marking complete")
+            CourseProgressTracker.markLessonCompleted(ctx, courseId, lessonId)
+            speakFeedback(ctx, "Lesson marked complete!") {
+                if (courseId == "daily_bukhari") {
+                    Log.i("ActivityTracker", "📚➡️🕌 Hadith auto-complete - chaining to Quran listening")
+                    playQuranListeningIfEnrolled(ctx)
+                } else {
+                    isManualTriggerMode = false
+                }
+            }
+            return
+        }
+
         scope.launch {
             try {
                 // Initialize voice services if needed
@@ -1635,6 +1654,14 @@ object ActivityTracker {
             return
         }
 
+        if (!CourseProgressTracker.isCompletionConfirmationMandatory(ctx, "complete_quran_listening")) {
+            Log.i("ActivityTracker", "🕌 Completion confirmation optional for $lessonId - auto-marking complete")
+            speakFeedback(ctx, "Surah marked complete!") {
+                completeQuranLessonAndContinue(ctx, surahIndex)
+            }
+            return
+        }
+
         scope.launch {
             try {
                 // Initialize voice services if needed
@@ -1775,9 +1802,13 @@ object ActivityTracker {
      */
     fun testDailyHadithPlayback() {
         Log.i("ActivityTracker", "🧪 ========== TEST: Daily Hadith Playback ==========")
+        isManualTriggerMode = true
         context?.let { ctx ->
             playDailyHadithIfEnrolled(ctx)
-        } ?: Log.e("ActivityTracker", "🧪 TEST FAILED: Context is null - call initialize() first")
+        } ?: run {
+            isManualTriggerMode = false
+            Log.e("ActivityTracker", "🧪 TEST FAILED: Context is null - call initialize() first")
+        }
     }
 
     /**

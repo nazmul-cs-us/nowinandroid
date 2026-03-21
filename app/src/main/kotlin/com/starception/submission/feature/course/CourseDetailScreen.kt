@@ -36,6 +36,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -102,6 +103,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -239,6 +241,15 @@ fun CourseDetailScreen(
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("course_progress", Context.MODE_PRIVATE) }
     val listState = rememberLazyListState()
+    var playDailyHadithAfterTravelDua by rememberSaveable(course.id) {
+        mutableStateOf(prefs.getBoolean("play_daily_bukhari_after_travel_dua", true))
+    }
+    var playQuranListeningInDrivingChain by rememberSaveable(course.id) {
+        mutableStateOf(prefs.getBoolean("play_quran_listening_in_driving_chain", true))
+    }
+    var completionConfirmationMandatory by rememberSaveable(course.id) {
+        mutableStateOf(CourseProgressTracker.isCompletionConfirmationMandatory(context, course.id))
+    }
 
     // Check if enrolled
     var isEnrolled by remember {
@@ -489,6 +500,52 @@ fun CourseDetailScreen(
                     outcomes = learningOutcomes,
                     accentColor = MaterialTheme.colorScheme.primary,
                 )
+            }
+
+            if (course.id == "daily_bukhari") {
+                item {
+                    DrivingChainPlaybackCard(
+                        title = "Driving audio playback",
+                        description = "When Daily Hadith is enrolled, the next Sahih Bukhari hadith can play automatically after travel dua in the driving audio chain.",
+                        enabled = playDailyHadithAfterTravelDua,
+                        onEnabledChange = { enabled ->
+                            playDailyHadithAfterTravelDua = enabled
+                            prefs.edit().putBoolean("play_daily_bukhari_after_travel_dua", enabled).apply()
+                        },
+                        enabledSummary = "On: travel dua → Daily Hadith → Quran (if enrolled).",
+                        disabledSummary = "Off: travel dua skips Daily Hadith during driving. You can still open the course and read hadith manually.",
+                    )
+                }
+            }
+
+            if (course.id == "complete_quran_listening") {
+                item {
+                    DrivingChainPlaybackCard(
+                        title = "Driving audio playback",
+                        description = "When Complete Quran Listening is enrolled, Quran playback can continue in the driving audio chain after travel dua and Daily Hadith when those are enabled.",
+                        enabled = playQuranListeningInDrivingChain,
+                        onEnabledChange = { enabled ->
+                            playQuranListeningInDrivingChain = enabled
+                            prefs.edit().putBoolean("play_quran_listening_in_driving_chain", enabled).apply()
+                        },
+                        enabledSummary = "On: travel dua → Daily Hadith (if enabled) → Quran Listening.",
+                        disabledSummary = "Off: the driving audio chain ends after travel dua or Daily Hadith. You can still listen from the course manually.",
+                    )
+                }
+            }
+
+            if (course.id == "daily_bukhari" || course.id == "complete_quran_listening") {
+                item {
+                    CompletionConfirmationCard(
+                        mandatory = completionConfirmationMandatory,
+                        onMandatoryChange = { mandatory ->
+                            completionConfirmationMandatory = mandatory
+                            CourseProgressTracker.setCompletionConfirmationMandatory(context, course.id, mandatory)
+                        },
+                        retryAttempts = CourseProgressTracker.getCompletionConfirmationRetryAttempts(),
+                        totalAttempts = CourseProgressTracker.getCompletionConfirmationTotalAttempts(),
+                    )
+                }
             }
 
             // Syllabus Header
@@ -1100,6 +1157,75 @@ private fun CourseHeroSection(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CompletionConfirmationCard(
+    mandatory: Boolean,
+    onMandatoryChange: (Boolean) -> Unit,
+    retryAttempts: Int,
+    totalAttempts: Int,
+) {
+    DrivingChainPlaybackCard(
+        title = "Completion confirmation",
+        description = "Choose whether voice confirmation is required before the course marks a lesson complete after playback.",
+        enabled = mandatory,
+        onEnabledChange = onMandatoryChange,
+        enabledSummary = "Mandatory: asks for YES/NO and retries up to $retryAttempts times ($totalAttempts attempts total) before leaving completion pending.",
+        disabledSummary = "Optional: if playback finishes, the lesson is marked complete automatically without waiting for voice confirmation.",
+    )
+}
+
+@Composable
+private fun DrivingChainPlaybackCard(
+    title: String,
+    description: String,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    enabledSummary: String,
+    disabledSummary: String,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = enabled, onCheckedChange = onEnabledChange)
+            }
+            Text(
+                text = if (enabled) enabledSummary else disabledSummary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

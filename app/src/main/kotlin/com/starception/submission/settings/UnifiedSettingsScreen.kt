@@ -2,12 +2,16 @@ package com.starception.submission.settings
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +24,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,22 +42,21 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -92,8 +96,27 @@ fun UnifiedSettingsScreen(
     val contentCategories by viewModel.contentCategories.collectAsStateWithLifecycle()
     val totalDownloadedSize by viewModel.totalDownloadedSize.collectAsStateWithLifecycle()
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
-        rememberTopAppBarState()
+    val listState = rememberLazyListState()
+    val density = LocalDensity.current
+    val headerHeight = 156.dp
+    val headerHeightPx = with(density) { headerHeight.toPx() }
+    val toolbarHeight = 64.dp
+    val toolbarHeightPx = with(density) { toolbarHeight.toPx() }
+    val scrollOffset by remember {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) headerHeightPx
+            else listState.firstVisibleItemScrollOffset.toFloat()
+        }
+    }
+    val collapseProgress by remember {
+        derivedStateOf {
+            (scrollOffset / (headerHeightPx - toolbarHeightPx)).coerceIn(0f, 1f)
+        }
+    }
+    val toolbarTitleAlpha by animateFloatAsState(
+        targetValue = collapseProgress,
+        animationSpec = tween(150),
+        label = "settingsToolbarTitleAlpha",
     )
 
     LaunchedEffect(Unit) {
@@ -103,11 +126,10 @@ fun UnifiedSettingsScreen(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             ModernSettingsTopBar(
                 onBackClick = onBackClick,
-                scrollBehavior = scrollBehavior
+                titleAlpha = toolbarTitleAlpha,
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -142,12 +164,17 @@ fun UnifiedSettingsScreen(
             exit = fadeOut()
         ) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                item {
+                    SettingsHeroSection(collapseProgress = collapseProgress)
+                }
+
                 // Appearance Section
                 item {
                     SettingsSection(
@@ -328,39 +355,97 @@ fun UnifiedSettingsScreen(
 @Composable
 private fun ModernSettingsTopBar(
     onBackClick: () -> Unit,
-    scrollBehavior: TopAppBarScrollBehavior
+    titleAlpha: Float,
 ) {
-    LargeTopAppBar(
-        title = {
-            Column {
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
-        navigationIcon = {
+    Surface(
+        color = MaterialTheme.colorScheme.surface.copy(alpha = titleAlpha),
+        tonalElevation = (4 * titleAlpha).dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Surface(
-                modifier = Modifier
-                    .padding(start = 8.dp, end = 8.dp)
-                    .size(40.dp),
+                modifier = Modifier.size(40.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f + (0.07f * titleAlpha)),
             ) {
                 IconButton(onClick = onBackClick) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
-        },
-        colors = TopAppBarDefaults.largeTopAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            scrolledContainerColor = MaterialTheme.colorScheme.surface
-        ),
-        scrollBehavior = scrollBehavior
-    )
+
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.graphicsLayer { alpha = titleAlpha },
+                )
+            }
+
+            Spacer(modifier = Modifier.size(40.dp))
+        }
+    }
+}
+
+@Composable
+private fun SettingsHeroSection(
+    collapseProgress: Float,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                translationY = collapseProgress * 40f
+                alpha = 1f - collapseProgress
+            }
+            .clip(RoundedCornerShape(32.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.surface,
+                    ),
+                ),
+            ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = 24.dp,
+                    end = 24.dp,
+                    top = 96.dp,
+                    bottom = 24.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Personalize prayer times, audio, notifications, and offline content.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }

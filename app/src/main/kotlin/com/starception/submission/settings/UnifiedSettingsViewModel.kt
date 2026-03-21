@@ -1169,10 +1169,16 @@ class UnifiedSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val manifest = downloadManager.loadManifest() ?: return@launch
-                downloadManager.downloadCategory(categoryKey, manifest) { _, _, _ ->
-                    viewModelScope.launch { refreshContentCategories(manifest) }
-                }
-                refreshContentCategories(manifest)
+                downloadManager.launchCategoryDownload(
+                    category = categoryKey,
+                    manifest = manifest,
+                    onProgress = { _, _, _ ->
+                        viewModelScope.launch { refreshContentCategories(manifest) }
+                    },
+                    onFinished = {
+                        viewModelScope.launch { refreshContentCategories(manifest) }
+                    },
+                )
             } catch (e: Exception) {
                 Log.e(TAG, "Error downloading category $categoryKey", e)
             }

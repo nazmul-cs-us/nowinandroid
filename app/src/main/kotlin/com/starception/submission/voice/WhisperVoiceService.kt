@@ -181,14 +181,18 @@ class WhisperVoiceService @Inject constructor(
     suspend fun startListening(
         durationMs: Long = DEFAULT_LISTENING_DURATION_MS,
         callback: VoiceRecognitionCallback
-    ) = withContext(Dispatchers.Main) {
+    ) = withContext(Dispatchers.IO) {
         // Check model is loaded
         if (!isModelReady()) {
             Log.e(TAG, "Model not loaded, attempting to load...")
-            callback.onStatusUpdate("Loading speech model...")
-            val loaded = withContext(Dispatchers.IO) { loadModel() }
+            withContext(Dispatchers.Main) {
+                callback.onStatusUpdate("Loading speech model...")
+            }
+            val loaded = loadModel()
             if (!loaded) {
-                callback.onResult(VoiceResult.Error("Failed to load speech recognition model"))
+                withContext(Dispatchers.Main) {
+                    callback.onResult(VoiceResult.Error("Failed to load speech recognition model"))
+                }
                 return@withContext
             }
         }
@@ -198,13 +202,17 @@ class WhisperVoiceService @Inject constructor(
             != PackageManager.PERMISSION_GRANTED
         ) {
             Log.e(TAG, "Audio recording permission not granted")
-            callback.onResult(VoiceResult.Error("Microphone permission not granted"))
+            withContext(Dispatchers.Main) {
+                callback.onResult(VoiceResult.Error("Microphone permission not granted"))
+            }
             return@withContext
         }
 
         try {
-            callback.onListeningStarted()
-            callback.onStatusUpdate("Listening...")
+            withContext(Dispatchers.Main) {
+                callback.onListeningStarted()
+                callback.onStatusUpdate("Listening...")
+            }
 
             // Record audio for the specified duration
             val recordingFile = getRecordingFile()
@@ -222,40 +230,41 @@ class WhisperVoiceService @Inject constructor(
                     }
                 },
                 onAmplitude = { amplitude ->
-                    // Forward amplitude to callback on main thread
                     scope.launch(Dispatchers.Main) {
                         callback.onAmplitudeUpdate(amplitude)
                     }
                 }
             )
 
-            // Wait for the specified duration
             delay(durationMs)
 
-            // Stop recording
             isRecording = false
             recorder?.stopRecording()
             Log.i(TAG, "Recording stopped after ${durationMs}ms")
 
-            callback.onStatusUpdate("Processing...")
-
-            // Transcribe
-            val transcription = withContext(Dispatchers.IO) {
-                transcribeAudio(recordingFile)
+            withContext(Dispatchers.Main) {
+                callback.onStatusUpdate("Processing...")
             }
 
-            callback.onListeningStopped()
+            val transcription = transcribeAudio(recordingFile)
 
-            // Parse result
+            withContext(Dispatchers.Main) {
+                callback.onListeningStopped()
+            }
+
             val result = parseYesNo(transcription)
             Log.i(TAG, "Transcription: '$transcription' -> $result")
 
-            callback.onResult(result)
+            withContext(Dispatchers.Main) {
+                callback.onResult(result)
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "Error during voice recognition", e)
-            callback.onListeningStopped()
-            callback.onResult(VoiceResult.Error(e.message ?: "Unknown error"))
+            withContext(Dispatchers.Main) {
+                callback.onListeningStopped()
+                callback.onResult(VoiceResult.Error(e.message ?: "Unknown error"))
+            }
         }
     }
 

@@ -47,6 +47,8 @@ object CourseProgressTracker {
     private const val PREFS_NAME = "course_progress"
     private const val COMPLETED_LESSONS_PREFIX = "completed_lessons_"
     private const val PENDING_COMPLETION_PREFIX = "pending_completion_"
+    private const val COMPLETION_CONFIRMATION_MANDATORY_PREFIX = "completion_confirmation_mandatory_"
+    private const val COMPLETION_CONFIRMATION_RETRY_ATTEMPTS = 2
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -84,6 +86,20 @@ object CourseProgressTracker {
         val key = "$COMPLETED_LESSONS_PREFIX$courseId"
         return prefs.getStringSet(key, emptySet()) ?: emptySet()
     }
+
+    fun isCompletionConfirmationMandatory(context: Context, courseId: String): Boolean {
+        val prefs = getPrefs(context)
+        return prefs.getBoolean("$COMPLETION_CONFIRMATION_MANDATORY_PREFIX$courseId", false)
+    }
+
+    fun setCompletionConfirmationMandatory(context: Context, courseId: String, mandatory: Boolean) {
+        val prefs = getPrefs(context)
+        prefs.edit().putBoolean("$COMPLETION_CONFIRMATION_MANDATORY_PREFIX$courseId", mandatory).apply()
+    }
+
+    fun getCompletionConfirmationRetryAttempts(): Int = COMPLETION_CONFIRMATION_RETRY_ATTEMPTS
+
+    fun getCompletionConfirmationTotalAttempts(): Int = COMPLETION_CONFIRMATION_RETRY_ATTEMPTS + 1
 
     // ==================== Pending Completion Methods ====================
 

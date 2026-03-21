@@ -132,8 +132,6 @@ class DrivingAudioService : Service() {
         private const val TAG = "DrivingAudioService"
         private const val NOTIFICATION_ID = 3001
         private const val CHANNEL_ID = "driving_audio_channel"
-        private const val CONFIRMATION_CHANNEL_ID = "driving_completion_channel"
-        private const val PENDING_CONFIRMATION_NOTIFICATION_ID = 3002
 
         const val ACTION_PLAY = "com.starception.submission.DRIVING_PLAY"
         const val ACTION_PAUSE = "com.starception.submission.DRIVING_PAUSE"
@@ -180,7 +178,6 @@ class DrivingAudioService : Service() {
         super.onCreate()
         Log.d(TAG, "Service created")
         createNotificationChannel()
-        createCompletionNotificationChannel()
         acquireWakeLock()
         initializeMediaSession()
     }
@@ -332,39 +329,8 @@ class DrivingAudioService : Service() {
     private fun queuePendingCompletion(courseId: String, lessonId: String, lessonTitle: String, reason: String) {
         Log.w(TAG, "📝 Queueing pending completion for $lessonId ($reason)")
         CourseProgressTracker.setPendingCompletion(this, courseId, lessonId, lessonTitle)
-        showPendingCompletionNotification(courseId, lessonTitle)
-        updateState(PlaybackState.VOICE_PROMPT, "Open app to confirm", lessonTitle)
+        updateState(PlaybackState.VOICE_PROMPT, lessonTitle, "Couldn't hear YES/NO — open app to confirm")
         updateNotification()
-    }
-
-    private fun showPendingCompletionNotification(courseId: String, lessonTitle: String) {
-        val courseIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("starception://course/$courseId")).apply {
-            `package` = packageName
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val requestCode = courseId.hashCode() and 0x7fffffff
-        val coursePendingIntent = PendingIntent.getActivity(
-            this,
-            requestCode,
-            courseIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
-        val notification = NotificationCompat.Builder(this, CONFIRMATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.transparent_greyscaled)
-            .setContentTitle("Confirm lesson completion")
-            .setContentText("Tap to confirm $lessonTitle")
-            .setSubText("Driving Mode")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(true)
-            .setContentIntent(coursePendingIntent)
-            .addAction(0, "Open", coursePendingIntent)
-            .build()
-
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(PENDING_CONFIRMATION_NOTIFICATION_ID, notification)
     }
 
     private fun upgradeForegroundServiceForMicrophone() {
@@ -854,6 +820,14 @@ class DrivingAudioService : Service() {
         val courseId = pendingCourseId ?: "daily_bukhari"
         val lessonId = pendingLessonId ?: "hadith_$hadithNumber"
 
+        if (!CourseProgressTracker.isCompletionConfirmationMandatory(this, courseId)) {
+            Log.i(TAG, "✅ Completion confirmation optional for $lessonId - auto-marking complete")
+            CourseProgressTracker.markLessonCompleted(this@DrivingAudioService, courseId, lessonId)
+            markHadithPlayed(hadithNumber)
+            startQuranPlaybackIfEnrolled(hadithNumber)
+            return
+        }
+
         voiceCompletionManager.promptForCompletion(
             courseId = courseId,
             lessonId = lessonId,
@@ -899,6 +873,14 @@ class DrivingAudioService : Service() {
         val isEnrolled = CourseProgressTracker.isEnrolledInQuranListening(this)
         if (!isEnrolled) {
             Log.i(TAG, "🕌 User not enrolled in Quran listening course, finishing flow")
+            onPlaybackComplete?.invoke()
+            updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+            return
+        }
+
+        val coursePrefs = getSharedPreferences("course_progress", Context.MODE_PRIVATE)
+        if (!coursePrefs.getBoolean("play_quran_listening_in_driving_chain", true)) {
+            Log.i(TAG, "🕌 Quran listening driving-chain playback opted out, finishing flow")
             onPlaybackComplete?.invoke()
             updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
             return
@@ -1085,6 +1067,12 @@ class DrivingAudioService : Service() {
 
         // Upgrade foreground service type to include MICROPHONE before voice recording.
         upgradeForegroundServiceForMicrophone()
+
+        if (!CourseProgressTracker.isCompletionConfirmationMandatory(this, "complete_quran_listening")) {
+            Log.i(TAG, "🕌 Completion confirmation optional for $lessonId - auto-marking complete")
+            continueToNextSurahAfterCompletion(surahIndex)
+            return
+        }
 
         updateState(PlaybackState.VOICE_PROMPT, "Say YES or NO", "Mark Surah complete?")
         updateNotification()
@@ -1353,23 +1341,6 @@ class DrivingAudioService : Service() {
             ).apply {
                 description = "Travel dua and hadith playback during driving"
                 setShowBadge(false)
-            }
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
-        }
-    }
-
-    private fun createCompletionNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CONFIRMATION_CHANNEL_ID,
-                "Driving Completion Confirmation",
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = "Prompts to confirm lesson completion after background playback"
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                enableVibration(true)
-                setShowBadge(true)
             }
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(channel)

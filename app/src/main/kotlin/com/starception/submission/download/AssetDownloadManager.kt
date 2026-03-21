@@ -3,7 +3,11 @@ package com.starception.submission.download
 import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +40,7 @@ class AssetDownloadManager @Inject constructor(
     }
 
     private val cdnAssetsDir = File(context.filesDir, CDN_ASSETS_DIR)
+    private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val downloadStates = mutableMapOf<String, MutableStateFlow<DownloadState>>()
     private val downloadMutexes = mutableMapOf<String, Mutex>()
     private var cachedManifest: AssetManifest? = null
@@ -52,6 +57,38 @@ class AssetDownloadManager @Inject constructor(
 
     private var activeDownloadCount = 0
     private val activeDownloadLock = Any()
+
+    private fun beginGlobalDownload() {
+        synchronized(activeDownloadLock) {
+            activeDownloadCount++
+            _isGloballyDownloading.value = true
+        }
+    }
+
+    private fun endGlobalDownload() {
+        synchronized(activeDownloadLock) {
+            activeDownloadCount = (activeDownloadCount - 1).coerceAtLeast(0)
+            if (activeDownloadCount == 0) {
+                _isGloballyDownloading.value = false
+                _globalDownloadProgress.value = 0f
+            }
+        }
+    }
+
+    fun launchCategoryDownload(
+        category: String,
+        manifest: AssetManifest,
+        onProgress: ((Float, Long, Long) -> Unit)? = null,
+        onFinished: ((Boolean) -> Unit)? = null,
+    ): Job = downloadScope.launch {
+        val success = try {
+            downloadCategory(category, manifest, onProgress)
+        } catch (e: Exception) {
+            Log.e(TAG, "Background category download failed for $category", e)
+            false
+        }
+        onFinished?.invoke(success)
+    }
 
     init {
         cdnAssetsDir.mkdirs()
@@ -123,15 +160,12 @@ class AssetDownloadManager @Inject constructor(
 
         targetFile.parentFile?.mkdirs()
 
-        // Track in global download state so UI shows progress
-        synchronized(activeDownloadLock) {
-            activeDownloadCount++
-            _isGloballyDownloading.value = true
-        }
+        beginGlobalDownload()
 
         var lastError: String? = null
-        for (attempt in 1..MAX_RETRIES) {
-            try {
+        try {
+            for (attempt in 1..MAX_RETRIES) {
+                try {
                 stateFlow.value = DownloadState.Downloading(0f, 0, entry.size)
 
                 val request = Request.Builder().url(url).build()
@@ -208,14 +242,6 @@ class AssetDownloadManager @Inject constructor(
                 // Atomic rename
                 if (tmpFile.renameTo(targetFile)) {
                     Log.i(TAG, "Downloaded $cdnKey (${bytesDownloaded / 1024}KB)")
-                    synchronized(activeDownloadLock) {
-                        activeDownloadCount--
-                        if (activeDownloadCount <= 0) {
-                            activeDownloadCount = 0
-                            _isGloballyDownloading.value = false
-                            _globalDownloadProgress.value = 0f
-                        }
-                    }
                     stateFlow.value = DownloadState.Completed
                     return DownloadState.Completed
                 } else {
@@ -232,17 +258,12 @@ class AssetDownloadManager @Inject constructor(
             }
         }
 
-        synchronized(activeDownloadLock) {
-            activeDownloadCount--
-            if (activeDownloadCount <= 0) {
-                activeDownloadCount = 0
-                _isGloballyDownloading.value = false
-                _globalDownloadProgress.value = 0f
-            }
+            val finalError = lastError ?: "Unknown error"
+            stateFlow.value = DownloadState.Failed(finalError)
+            return DownloadState.Failed(finalError)
+        } finally {
+            endGlobalDownload()
         }
-        val finalError = lastError ?: "Unknown error"
-        stateFlow.value = DownloadState.Failed(finalError)
-        return DownloadState.Failed(finalError)
     }
 
     suspend fun downloadCategory(
@@ -253,16 +274,14 @@ class AssetDownloadManager @Inject constructor(
         val assets = manifest.getAssetsByCategory(category)
         if (assets.isEmpty()) return@withContext true
 
-        synchronized(activeDownloadLock) {
-            activeDownloadCount++
-            _isGloballyDownloading.value = true
-        }
+        beginGlobalDownload()
 
-        val totalBytes = assets.sumOf { it.size }
-        var downloadedBytes = 0L
-        var allSuccess = true
+        try {
+            val totalBytes = assets.sumOf { it.size }
+            var downloadedBytes = 0L
+            var allSuccess = true
 
-        for (asset in assets) {
+            for (asset in assets) {
             if (isAssetAvailable(asset.cdnKey)) {
                 downloadedBytes += asset.size
                 val progress = downloadedBytes.toFloat() / totalBytes
@@ -282,16 +301,10 @@ class AssetDownloadManager @Inject constructor(
             onProgress?.invoke(progress, downloadedBytes, totalBytes)
         }
 
-        synchronized(activeDownloadLock) {
-            activeDownloadCount--
-            if (activeDownloadCount <= 0) {
-                activeDownloadCount = 0
-                _isGloballyDownloading.value = false
-                _globalDownloadProgress.value = 0f
-            }
+            return@withContext allSuccess
+        } finally {
+            endGlobalDownload()
         }
-
-        return@withContext allSuccess
     }
 
     suspend fun loadManifest(): AssetManifest? = withContext(Dispatchers.IO) {
