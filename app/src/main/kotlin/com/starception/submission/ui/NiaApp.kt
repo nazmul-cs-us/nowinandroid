@@ -162,13 +162,14 @@ internal fun NiaAppContent(
     // Check if we should hide the bottom navigation bar (for detail screens)
     val shouldHideBottomBar = appState.shouldHideBottomBar
 
-    // Status bar visibility: show on parent tabs, hide on detail screens
+    // Status bar visibility: show on parent tabs, hide on detail screens and Settings
     val view = LocalView.current
-    DisposableEffect(shouldHideBottomBar) {
+    val shouldHideStatusBar = appState.shouldHideStatusBar
+    DisposableEffect(shouldHideStatusBar) {
         val window = (view.context as? Activity)?.window ?: return@DisposableEffect onDispose {}
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        if (shouldHideBottomBar) {
-            // Detail screens: hide status bar (immersive)
+        if (shouldHideStatusBar) {
+            // Detail screens and Settings: hide status bar (immersive)
             insetsController.hide(WindowInsetsCompat.Type.statusBars())
             insetsController.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

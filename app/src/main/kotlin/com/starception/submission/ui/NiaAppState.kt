@@ -47,6 +47,7 @@ import com.starception.submission.navigation.TopLevelDestination.FOR_YOU
 import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.navigation.TopLevelDestination.HOME
 import com.starception.submission.feature.surah.navigation.SurahRoute
+import com.starception.submission.settings.navigation.SettingsRoute
 import com.starception.submission.feature.course.navigation.CourseDetailRoute
 import com.starception.submission.feature.dua.DuaDetailRoute
 import com.starception.submission.feature.hadith.HadithDetailRoute
@@ -127,6 +128,16 @@ class NiaAppState(
                    destination.hasRoute<CourseDetailRoute>() ||
                    destination.hasRoute<DuaDetailRoute>() ||
                    destination.hasRoute<HadithDetailRoute>()
+        }
+
+    val shouldHideStatusBar: Boolean
+        @Composable get() {
+            val destination = currentDestination ?: return false
+            return destination.hasRoute<SurahRoute>() ||
+                   destination.hasRoute<CourseDetailRoute>() ||
+                   destination.hasRoute<DuaDetailRoute>() ||
+                   destination.hasRoute<HadithDetailRoute>() ||
+                   destination.hasRoute<SettingsRoute>()
         }
 
     val isOffline = networkMonitor.isOnline
