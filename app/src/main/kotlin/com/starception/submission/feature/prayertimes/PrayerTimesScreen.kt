@@ -284,7 +284,9 @@ fun PrayerTimesScreen(
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onSurahClick: (Int) -> Unit = {},
-    onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> }
+    onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    downloadProgress: Float = 0f,
+    downloadLabel: String = "Downloading content",
 ) {
     val screenContext = LocalContext.current
     
@@ -1389,6 +1391,8 @@ fun PrayerTimesScreen(
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = { isRefreshing = true },
+                downloadProgress = downloadProgress,
+                downloadLabel = downloadLabel,
                 modifier = Modifier.fillMaxSize()
             ) { syncState ->
             val outerConfiguration = LocalConfiguration.current

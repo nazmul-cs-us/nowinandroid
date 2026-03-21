@@ -17,14 +17,18 @@ fun NavGraphBuilder.prayerTimesScreen(
     onSettingsClick: () -> Unit = {},
     locationService: EnhancedLocationService? = null,
     onSurahClick: (Int) -> Unit = {},
-    onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> }
+    onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    downloadProgress: Float = 0f,
+    downloadLabel: String = "Downloading content",
 ) {
     composable<PrayerTimesRoute> {
         PrayerTimesScreen(
             onSearchClick = onSearchClick,
             onSettingsClick = onSettingsClick,
             onSurahClick = onSurahClick,
-            onSurahClickWithAyah = onSurahClickWithAyah
+            onSurahClickWithAyah = onSurahClickWithAyah,
+            downloadProgress = downloadProgress,
+            downloadLabel = downloadLabel,
         )
     }
 }

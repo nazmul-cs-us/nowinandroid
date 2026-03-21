@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.feature.search.SearchNote
 import androidx.navigation.compose.composable
@@ -76,6 +77,13 @@ fun NiaNavHost(
     val navController = appState.navController
     val context = LocalContext.current
     val quranRepository = remember { QuranRepository(context) }
+    val homeDownloadProgress = if (mainViewModel != null) {
+        val isDownloading by mainViewModel.isContentDownloading.collectAsStateWithLifecycle()
+        val downloadProgress by mainViewModel.contentDownloadProgress.collectAsStateWithLifecycle()
+        if (isDownloading) downloadProgress else 0f
+    } else {
+        0f
+    }
 
     // Handle deep link for course
     var deepLinkHandled by remember { mutableStateOf(false) }
@@ -259,7 +267,9 @@ fun NiaNavHost(
             onSearchClick = { appState.navigateToSearch() },
             onSettingsClick = onTopAppBarActionClick,
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
-            onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) }
+            onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) },
+            downloadProgress = homeDownloadProgress,
+            downloadLabel = "Downloading content",
         )
         courseScreen(
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },

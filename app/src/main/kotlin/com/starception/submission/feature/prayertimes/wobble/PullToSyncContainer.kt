@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 
@@ -93,6 +94,8 @@ fun PullToSyncContainer(
     modifier: Modifier = Modifier,
     downloadProgress: Float = 0f,
     downloadLabel: String = "",
+    refreshingHoldFraction: Float = 0.50f,
+    downloadingHoldFraction: Float = 0.50f,
     content: @Composable (syncState: SyncContainerState) -> Unit
 ) {
     val isDownloading = downloadProgress > 0f
@@ -170,9 +173,12 @@ fun PullToSyncContainer(
     val refreshingOffset = remember { Animatable(0f) }
     LaunchedEffect(isRefreshing, isDownloading) {
         if (isRefreshing || isDownloading) {
-            // SNAP instantly to held position — no gap, like Fitbit
-            // 0.50 gives ~110dp total offset (~60dp visible below camera cutout on Pixel 9 Pro)
-            refreshingOffset.snapTo(0.50f)
+            // Snap instantly to held position.
+            // Keep the full hold height so the pull/download indicator stays readable,
+            // then independently reduce only the content drop for download-only status.
+            refreshingOffset.snapTo(
+                if (isDownloading) downloadingHoldFraction else refreshingHoldFraction,
+            )
         } else {
             // Slow, gentle settle back when sync completes — gives user time to see result
             refreshingOffset.animateTo(
@@ -212,7 +218,8 @@ fun PullToSyncContainer(
 
     // --- Fitbit-style visual parameters ---
     // PRIMARY: Vertical translation (content pushes down)
-    // Compact like Fitbit — indicator is anchored above this offset
+    // Download uses the same sheet geometry as sync so the banner-to-title spacing
+    // matches the pull-to-sync state exactly.
     val contentOffsetY = (wobbleIntensity * 220f).dp
 
     // Fitbit-style rounded top corners on content card when pushed down
@@ -272,17 +279,36 @@ fun PullToSyncContainer(
             )
         }
 
-        // Indicator area: shows pull/release/syncing/downloading status above content card
+        // Inner content: pushes down flat (like Fitbit)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = contentOffsetY, start = horizontalMargin, end = horizontalMargin)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = cornerRadius,
+                        topEnd = cornerRadius,
+                        bottomStart = 0.dp,
+                        bottomEnd = 0.dp
+                    )
+                )
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            content(syncState)
+        }
+
+        // Indicator area: render above the content sheet so download text stays visible
+        // even when we reduce the page drop to keep the title gap compact.
         if (wobbleIntensity > 0.05f) {
             Column(
                 modifier = Modifier
+                    .zIndex(1f)
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
                     .padding(top = (wobbleIntensity * 8f).dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (isDownloading) {
-                    // Download state: spinning arc + label with percentage
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -317,7 +343,6 @@ fun PullToSyncContainer(
                         )
                     }
                 } else if (isRefreshing) {
-                    // Syncing state: spinning arc + "Syncing your data"
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -350,14 +375,12 @@ fun PullToSyncContainer(
                         )
                     }
                 } else {
-                    // Pull/release state: symmetric Row layout matching Fitbit style
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.graphicsLayer {
                             alpha = (wobbleIntensity * 2.5f).coerceIn(0f, 1f)
                         }
                     ) {
-                        // Rotating refresh arc (same style as syncing spinner)
                         Canvas(
                             modifier = Modifier
                                 .size(18.dp)
@@ -392,24 +415,6 @@ fun PullToSyncContainer(
                     }
                 }
             }
-        }
-
-        // Inner content: pushes down flat (like Fitbit)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = contentOffsetY, start = horizontalMargin, end = horizontalMargin)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = cornerRadius,
-                        topEnd = cornerRadius,
-                        bottomStart = 0.dp,
-                        bottomEnd = 0.dp
-                    )
-                )
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            content(syncState)
         }
     }
 }

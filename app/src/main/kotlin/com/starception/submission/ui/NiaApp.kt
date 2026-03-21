@@ -351,12 +351,17 @@ private fun NiaMainContent(
         },
     ) { padding ->
         // Download progress from AssetDownloadManager via MainActivityViewModel
-        val downloadProgress = if (mainViewModel != null) {
+        val rawDownloadProgress = if (mainViewModel != null) {
             val isDownloading by mainViewModel.isContentDownloading.collectAsStateWithLifecycle()
             val dlProgress by mainViewModel.contentDownloadProgress.collectAsStateWithLifecycle()
             if (isDownloading) dlProgress else 0f
         } else {
             0f
+        }
+        val downloadProgress = if (appState.currentTopLevelDestination == TopLevelDestination.HOME) {
+            0f
+        } else {
+            rawDownloadProgress
         }
 
         PullToSyncContainer(
