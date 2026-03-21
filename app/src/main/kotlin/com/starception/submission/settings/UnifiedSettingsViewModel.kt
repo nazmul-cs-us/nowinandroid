@@ -212,6 +212,19 @@ class UnifiedSettingsViewModel @Inject constructor(
         return _expandedSections.value.contains(sectionId)
     }
 
+    fun expandSection(sectionId: String) {
+        _expandedSections.value = setOf(sectionId)
+    }
+
+    fun consumePendingSectionRequest(): String? {
+        val prefs = context.getSharedPreferences("content_prompt_prefs", Context.MODE_PRIVATE)
+        val section = prefs.getString("pending_settings_section", null)
+        if (section != null) {
+            prefs.edit().remove("pending_settings_section").apply()
+        }
+        return section
+    }
+
     // Theme settings updates
     fun updateThemeBrand(themeBrand: ThemeBrand) {
         Log.d(TAG, "Updating theme brand to: $themeBrand")

@@ -81,7 +81,6 @@ abstract class HadithDatabase : RoomDatabase() {
          */
         private fun createDatabase(context: Context, databaseFile: String): HadithDatabase {
             val assetPath = "$HADITH_DB_PATH$databaseFile"
-            val cdnKey = "$HADITH_DB_PATH$databaseFile"
             android.util.Log.d(TAG, "📖 Opening hadith database: $databaseFile")
 
             val builder = Room.databaseBuilder(
@@ -91,24 +90,17 @@ abstract class HadithDatabase : RoomDatabase() {
             )
 
             // Try CDN/extracted file first, fall back to bundled asset
-            val dbFile = assetRepo?.getDatabaseFile(cdnKey)
-                ?: run {
-                    // Direct fallback: check cdn_assets directory even when assetRepo is null
-                    // This handles the case where HadithRepository was created without AssetRepository
-                    val cdnFile = java.io.File(context.applicationContext.filesDir, "cdn_assets/$cdnKey")
-                    if (cdnFile.exists()) {
-                        android.util.Log.d(TAG, "📂 Found CDN-downloaded DB directly: ${cdnFile.absolutePath}")
-                        cdnFile
-                    } else {
-                        null
-                    }
-                }
+            val dbFile = resolveDownloadedDatabaseFile(context, databaseFile)
             if (dbFile != null) {
                 android.util.Log.d(TAG, "📂 Using file-based DB: ${dbFile.absolutePath}")
                 builder.createFromFile(dbFile)
-            } else {
+            } else if (hasBundledAsset(context, databaseFile)) {
                 android.util.Log.d(TAG, "📦 Using bundled asset: $assetPath")
                 builder.createFromAsset(assetPath)
+            } else {
+                throw IllegalStateException(
+                    "Hadith database missing: $databaseFile. Download the required content assets and try again."
+                )
             }
 
             return builder
@@ -221,6 +213,11 @@ abstract class HadithDatabase : RoomDatabase() {
             }
         }
 
+        fun isDatabaseAvailable(context: Context, databaseFile: String): Boolean {
+            return resolveDownloadedDatabaseFile(context, databaseFile) != null ||
+                hasBundledAsset(context, databaseFile)
+        }
+
         /**
          * Close all database instances
          */
@@ -234,6 +231,29 @@ abstract class HadithDatabase : RoomDatabase() {
                 }
             }
             instances.clear()
+        }
+
+        private fun resolveDownloadedDatabaseFile(context: Context, databaseFile: String): java.io.File? {
+            val cdnKey = "$HADITH_DB_PATH$databaseFile"
+            return assetRepo?.getDatabaseFile(cdnKey)
+                ?: run {
+                    val cdnFile = java.io.File(context.applicationContext.filesDir, "cdn_assets/$cdnKey")
+                    if (cdnFile.exists()) {
+                        android.util.Log.d(TAG, "📂 Found CDN-downloaded DB directly: ${cdnFile.absolutePath}")
+                        cdnFile
+                    } else {
+                        null
+                    }
+                }
+        }
+
+        private fun hasBundledAsset(context: Context, databaseFile: String): Boolean {
+            val assetPath = "$HADITH_DB_PATH$databaseFile"
+            return try {
+                context.assets.open(assetPath).use { true }
+            } catch (_: Exception) {
+                false
+            }
         }
     }
 }

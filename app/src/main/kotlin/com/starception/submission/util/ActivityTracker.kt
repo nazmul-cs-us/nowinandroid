@@ -28,6 +28,7 @@ import com.starception.submission.sensor.ActivityDetectionService
 import com.starception.submission.config.ActivityDetectionConfig
 import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.feature.course.CourseProgressTracker
+import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.hadithdatabase.HadithRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -855,6 +856,15 @@ object ActivityTracker {
                     nextHadithNumber = i
                     break
                 }
+            }
+
+            if (!HadithDatabase.isDatabaseAvailable(ctx, "sahih_bukhari.db")) {
+                ctx.getSharedPreferences("content_prompt_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("missing_bukhari_prompt", true)
+                    .apply()
+                Log.w("ActivityTracker", "📚 Daily Bukhari database missing - prompting user to download assets")
+                return null
             }
 
             // Check user's selected language for audio vs TTS

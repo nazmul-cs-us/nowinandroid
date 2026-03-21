@@ -41,6 +41,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -125,6 +126,10 @@ import kotlinx.coroutines.delay
 @AndroidEntryPoint
 class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.AndroidFragmentApplication.Callbacks {
 
+    private val viewModel: MainActivityViewModel by lazy {
+        ViewModelProvider(this)[MainActivityViewModel::class.java]
+    }
+
     override fun exit() {
         // Required by LibGDX AndroidFragmentApplication.Callbacks
         // No-op: we don't want LibGDX to exit the activity
@@ -203,7 +208,6 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
         // }
 
         // Initialize ViewModel for theme handling (but without splash screen blocking)
-        val viewModel: MainActivityViewModel by viewModels()
         val downloadViewModel: AssetDownloadViewModel by viewModels()
         // Handle deep link for course sharing
         val deepLinkCourseId = handleCourseDeepLink(intent)
@@ -319,6 +323,7 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
 
     override fun onResume() {
         super.onResume()
+        viewModel.refreshMissingBukhariPrompt()
 
         // NON-BLOCKING: Access JankStats lazily in background
         lifecycleScope.launch {

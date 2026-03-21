@@ -28,6 +28,7 @@ import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.model.data.UserData
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
+import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.SherpaOnnxTtsService
@@ -55,6 +56,10 @@ class MainActivityViewModel @Inject constructor(
         private const val KEY_THEME_BRAND = "cached_theme_brand"
         private const val KEY_DARK_THEME_CONFIG = "cached_dark_theme_config"
         private const val KEY_USE_DYNAMIC_COLOR = "cached_use_dynamic_color"
+        private const val CONTENT_PROMPT_PREFS = "content_prompt_prefs"
+        private const val KEY_MISSING_BUKHARI_PROMPT = "missing_bukhari_prompt"
+        private const val KEY_PENDING_SETTINGS_SECTION = "pending_settings_section"
+        const val SETTINGS_SECTION_CONTENT = "content"
     }
 
     // Load cached theme SYNCHRONOUSLY to prevent flash
@@ -66,6 +71,9 @@ class MainActivityViewModel @Inject constructor(
     // Global content download progress (from singleton AssetDownloadManager)
     val isContentDownloading: StateFlow<Boolean> = downloadManager.isGloballyDownloading
     val contentDownloadProgress: StateFlow<Float> = downloadManager.globalDownloadProgress
+
+    private val _showMissingBukhariPrompt = MutableStateFlow(false)
+    val showMissingBukhariPrompt: StateFlow<Boolean> = _showMissingBukhariPrompt.asStateFlow()
 
     /**
      * Load theme from SharedPreferences cache (SYNCHRONOUS - no flash!)
@@ -123,11 +131,33 @@ class MainActivityViewModel @Inject constructor(
             }
         }
 
+        refreshMissingBukhariPrompt()
+
         // Pre-generate TTS for next 3 hadiths if enrolled in daily_bukhari
         // This ensures cache is ready for driving mode or manual playback
         viewModelScope.launch(Dispatchers.IO) {
             preGenerateHadithTtsOnStartup()
         }
+    }
+
+    fun refreshMissingBukhariPrompt() {
+        val prefs = context.getSharedPreferences(CONTENT_PROMPT_PREFS, Context.MODE_PRIVATE)
+        _showMissingBukhariPrompt.value = prefs.getBoolean(KEY_MISSING_BUKHARI_PROMPT, false)
+    }
+
+    fun dismissMissingBukhariPrompt() {
+        val prefs = context.getSharedPreferences(CONTENT_PROMPT_PREFS, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_MISSING_BUKHARI_PROMPT, false).apply()
+        _showMissingBukhariPrompt.value = false
+    }
+
+    fun prepareContentSectionNavigation() {
+        val prefs = context.getSharedPreferences(CONTENT_PROMPT_PREFS, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean(KEY_MISSING_BUKHARI_PROMPT, false)
+            .putString(KEY_PENDING_SETTINGS_SECTION, SETTINGS_SECTION_CONTENT)
+            .apply()
+        _showMissingBukhariPrompt.value = false
     }
 
     /**
@@ -142,6 +172,11 @@ class MainActivityViewModel @Inject constructor(
 
             if ("daily_bukhari" !in enrolledCourses) {
                 Log.d("MainActivityViewModel", "📚 Not enrolled in daily_bukhari, skipping TTS pre-generation")
+                return
+            }
+
+            if (!HadithDatabase.isDatabaseAvailable(context, "sahih_bukhari.db")) {
+                Log.w("MainActivityViewModel", "📚 Bukhari database missing, skipping TTS pre-generation")
                 return
             }
 
