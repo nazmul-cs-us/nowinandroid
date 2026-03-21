@@ -38,6 +38,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -117,6 +118,8 @@ class UnifiedSettingsViewModel @Inject constructor(
     // Audio chain playing state
     private val _isAudioChainPlaying = MutableStateFlow(false)
     val isAudioChainPlaying: StateFlow<Boolean> = _isAudioChainPlaying.asStateFlow()
+
+    private var contentRefreshJob: Job? = null
 
     // Developer settings state
     private val _developerSettings = MutableStateFlow(DeveloperSettingsState())
@@ -1135,7 +1138,8 @@ class UnifiedSettingsViewModel @Inject constructor(
     }
 
     private fun refreshContentCategories(manifest: com.starception.submission.download.AssetManifest? = null) {
-        viewModelScope.launch {
+        contentRefreshJob?.cancel()
+        contentRefreshJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val m = manifest ?: downloadManager.loadManifest() ?: return@launch
                 val categories = m.categories.map { (key, info) ->
@@ -1157,8 +1161,10 @@ class UnifiedSettingsViewModel @Inject constructor(
                         .thenBy { it.displayName }
                 )
 
+                val totalDownloadedSize = downloadManager.getTotalDownloadedSize()
+
                 _contentCategories.value = categories
-                _totalDownloadedSize.value = downloadManager.getTotalDownloadedSize()
+                _totalDownloadedSize.value = totalDownloadedSize
             } catch (e: Exception) {
                 Log.e(TAG, "Error refreshing content categories", e)
             }
@@ -1173,10 +1179,10 @@ class UnifiedSettingsViewModel @Inject constructor(
                     category = categoryKey,
                     manifest = manifest,
                     onProgress = { _, _, _ ->
-                        viewModelScope.launch { refreshContentCategories(manifest) }
+                        refreshContentCategories(manifest)
                     },
                     onFinished = {
-                        viewModelScope.launch { refreshContentCategories(manifest) }
+                        refreshContentCategories(manifest)
                     },
                 )
             } catch (e: Exception) {
