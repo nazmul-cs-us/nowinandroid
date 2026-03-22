@@ -1358,7 +1358,7 @@ private fun NextPrayerTile(
     if (mainPrayer != null || prayerTimes != null) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(32.dp),
+            shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
             border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
             tonalElevation = 4.dp
@@ -1555,20 +1555,17 @@ private fun NextPrayerTile(
                     // Dynamic compass size based on orientation
                     val compassSize = if (isLandscape) 85.dp else 120.dp
 
-                    // Wrap compass - pushed to right edge to give more room for text
-                    Box(
-                        modifier = Modifier
-                            .then(if (isLandscape) Modifier.fillMaxHeight() else Modifier)
-                            .wrapContentSize(Alignment.CenterEnd)
-                            .offset(x = if (isLandscape) 4.dp else 12.dp),  // Push compass closer to right edge
-                        contentAlignment = Alignment.CenterEnd
-                    ) {
+                    // Outer padding pulls compass away from tile rounded corners.
+                    // Inner Box is exactly compassSize so the compass draws correctly.
+                    Box(modifier = Modifier.padding(top = 6.dp, end = 6.dp)) {
                         Box(
                             modifier = Modifier
                                 .size(compassSize)
                                 .graphicsLayer {
                                     scaleX = compassScale
                                     scaleY = compassScale
+                                    clip = true
+                                    shape = CircleShape
                                 }
                                 .pointerInput(Unit) {
                                     detectTapGestures(
@@ -1585,17 +1582,18 @@ private fun NextPrayerTile(
                                             onCompassClick()
                                         }
                                     )
-                                }
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                        CompassProgressIndicator(
-                            progress = 0.7f,
-                            modifier = Modifier.fillMaxSize(),
-                            size = compassSize,
-                            locationService = locationService,
-                            userLatitude = prayerTimes?.location?.latitude ?: 0.0,
-                            userLongitude = prayerTimes?.location?.longitude ?: 0.0,
-                            showGlobe = true
-                        )
+                            CompassProgressIndicator(
+                                progress = 0.7f,
+                                modifier = Modifier.fillMaxSize(),
+                                size = compassSize,
+                                locationService = locationService,
+                                userLatitude = prayerTimes?.location?.latitude ?: 0.0,
+                                userLongitude = prayerTimes?.location?.longitude ?: 0.0,
+                                showGlobe = true
+                            )
                         }
                     }
                 }

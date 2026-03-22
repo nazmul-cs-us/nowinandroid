@@ -327,56 +327,108 @@ fun CompassProgressIndicator(
     
     val accuracyColor = if (isInitializing) Color(0xFF10B981) else getAccuracyColor(sensorAccuracy)
     val needsCalibration = !isInitializing && sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
-    
+
+    // Pre-compute alignment — needed by glow before the Box
+    val qiblaAngleEarly = animatedCompassDegree
+    val normalizedAngleEarly = ((qiblaAngleEarly % 360f) + 360f) % 360f
+    val angularDistance = minOf(
+        kotlin.math.abs(normalizedAngleEarly),
+        kotlin.math.abs(normalizedAngleEarly - 360f)
+    )
+    val isNearQibla = angularDistance <= 5f
+
     // ENHANCED DESIGN - Better Qibla identification with accuracy feedback
     Box(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
-        // Clean original background with subtle directional guidance
-        Canvas(
-            modifier = Modifier.size(size)
-        ) {
-            val center = Offset(this.size.width / 2, this.size.height / 2)
-            val backgroundRadius = (this.size.minDimension / 2) - 1.dp.toPx()  // Moved outward
-            
-            // Perfect circle background
-            drawCircle(
-                color = Color.White,
-                radius = backgroundRadius,
-                center = center
-            )
-            
-            // Accuracy indication border (changes color based on sensor strength)
-            drawCircle(
-                color = accuracyColor.copy(alpha = 0.6f),
-                radius = backgroundRadius,
-                center = center,
-                style = Stroke(width = 3.dp.toPx())
-            )
-            
-            // Inner border for definition
-            drawCircle(
-                color = Color.Black.copy(alpha = 0.1f),
-                radius = backgroundRadius - 2.dp.toPx(),
-                center = center,
-                style = Stroke(width = 1.dp.toPx())
-            )
-            
-        }
-        
-        // Calculate if user is facing Qibla (with hysteresis to prevent rapid toggling)
-        val qiblaAngle = animatedCompassDegree
-        val normalizedAngle = ((qiblaAngle % 360f) + 360f) % 360f
+        // Animated glow intensity — blooms fully when aligned, dims when far off
+        val glowAlpha by animateFloatAsState(
+            targetValue = when {
+                isInitializing    -> 0f
+                needsCalibration  -> 0f
+                isNearQibla       -> 1f
+                angularDistance < 45f -> 0.55f
+                angularDistance < 90f -> 0.30f
+                else              -> 0.15f
+            },
+            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+            label = "glowAlpha"
+        )
+        val glowColor = if (isNearQibla) Color(0xFF10B981) else accuracyColor
 
-        // Calculate circular angular distance from 0° (handles both sides symmetrically)
-        val angularDistance = minOf(
-            kotlin.math.abs(normalizedAngle),
-            kotlin.math.abs(normalizedAngle - 360f)
+        // Directional glow beam — rotates with the compass to point toward Qibla.
+        // Drawn as a swept arc gradient: narrow at center, wide at the rim, like a spotlight.
+        Canvas(
+            modifier = Modifier
+                .size(size)
+                .rotate(animatedCompassDegree)   // beam always points toward Qibla
+        ) {
+            val center = Offset(this.size.width / 2f, this.size.height / 2f)
+            val radius = (this.size.minDimension / 2f) - 1.dp.toPx()
+
+            if (glowAlpha > 0f) {
+                // Outer halo: wide soft sweep (±40°) around the Qibla direction (12 o'clock = -90°)
+                val sweepDeg = 80f
+                val startDeg = -90f - sweepDeg / 2f
+                drawArc(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            glowColor.copy(alpha = 0f),
+                            glowColor.copy(alpha = glowAlpha * 0.18f),
+                            glowColor.copy(alpha = 0f),
+                        ),
+                        center = center,
+                        radius = radius,
+                    ),
+                    startAngle = startDeg,
+                    sweepAngle = sweepDeg,
+                    useCenter = true,
+                    size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
+                    topLeft = Offset(center.x - radius, center.y - radius),
+                )
+
+                // Inner core beam: narrow focused beam (±15°) — sharper, brighter
+                val coreSweep = 30f
+                val coreStart = -90f - coreSweep / 2f
+                drawArc(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            glowColor.copy(alpha = glowAlpha * 0.55f),
+                            glowColor.copy(alpha = glowAlpha * 0.25f),
+                            glowColor.copy(alpha = 0f),
+                        ),
+                        center = center,
+                        radius = radius,
+                    ),
+                    startAngle = coreStart,
+                    sweepAngle = coreSweep,
+                    useCenter = true,
+                    size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
+                    topLeft = Offset(center.x - radius, center.y - radius),
+                )
+            }
+        }
+
+        // Arc animations — declared here before canvas usage
+        val arcAlpha by animateFloatAsState(
+            targetValue = if (isNearQibla) 0f else 1f,
+            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+            label = "arcAlpha"
+        )
+        val arcScale by animateFloatAsState(
+            targetValue = if (isNearQibla) 0.2f else 1f,
+            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+            label = "arcScale"
+        )
+        val arcProgress by animateFloatAsState(
+            targetValue = if (isNearQibla) 0.03f else 0.15f,
+            animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+            label = "arcProgress"
         )
 
-        // Simple alignment check - no threshold/hysteresis
-        val isNearQibla = angularDistance <= 5f // User is facing Qibla when within 5°
+        // Stroke width scales with compass size: ~3.5% of diameter, clamped 3–6dp
+        val ringStrokeWidth = (size.value * 0.035f).coerceIn(3f, 6f).dp
 
         // Continuous radar-style haptic feedback while aligned with Qibla
         val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -399,7 +451,7 @@ fun CompassProgressIndicator(
         }
 
         // Debug logging for alignment detection
-        android.util.Log.d("QiblaAlignment", "animatedCompassDegree=$animatedCompassDegree, normalizedAngle=$normalizedAngle, angularDistance=$angularDistance, isNearQibla=$isNearQibla, needsCalibration=$needsCalibration")
+        android.util.Log.d("QiblaAlignment", "animatedCompassDegree=$animatedCompassDegree, normalizedAngle=$normalizedAngleEarly, angularDistance=$angularDistance, isNearQibla=$isNearQibla, needsCalibration=$needsCalibration")
         
         // Stable rotation direction with time-based debounce to prevent rapid toggling
         val stableDirection = remember { mutableStateOf<Boolean?>(null) }
@@ -407,7 +459,7 @@ fun CompassProgressIndicator(
         val currentTime = System.currentTimeMillis()
 
         // Determine the raw direction (shortest path)
-        val rawNeedsClockwise = normalizedAngle <= 180f
+        val rawNeedsClockwise = normalizedAngleEarly <= 180f
 
         // Only change direction if:
         // 1. It's been at least 800ms since last change, OR
@@ -421,8 +473,8 @@ fun CompassProgressIndicator(
         } else if (stableDirection.value != rawNeedsClockwise) {
             // Direction wants to change
             val timeSinceLastChange = currentTime - lastDirectionChangeTime.value
-            val isVeryClearDirection = normalizedAngle < 30f || normalizedAngle > 330f ||
-                                       (normalizedAngle > 150f && normalizedAngle < 210f)
+            val isVeryClearDirection = normalizedAngleEarly < 30f || normalizedAngleEarly > 330f ||
+                                       (normalizedAngleEarly > 150f && normalizedAngleEarly < 210f)
 
             if (timeSinceLastChange > 800 || isVeryClearDirection) {
                 // Allow the change
@@ -438,25 +490,6 @@ fun CompassProgressIndicator(
             rawNeedsClockwise
         }
         
-        // ANIMATION: Professional surface tension effect
-        // Smooth, subtle transitions - arc merges elegantly into Kaaba
-
-        val arcAlpha by animateFloatAsState(
-            targetValue = if (isNearQibla) 0f else 1f,
-            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
-            label = "arcAlpha"
-        )
-        val arcScale by animateFloatAsState(
-            targetValue = if (isNearQibla) 0.2f else 1f,
-            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
-            label = "arcScale"
-        )
-        // Arc progress animates smoothly
-        val arcProgress by animateFloatAsState(
-            targetValue = if (isNearQibla) 0.03f else 0.1f, // Arc shrinks to small dot
-            animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-            label = "arcProgress"
-        )
         val kaabaScale by animateFloatAsState(
             targetValue = if (isNearQibla) 1.35f else 1f, // Subtle scale increase
             animationSpec = spring(
@@ -483,39 +516,14 @@ fun CompassProgressIndicator(
         )
         val effectiveKaabaScale = if (isNearQibla) kaabaScale * kaabaPulse else kaabaScale
 
-        // Original elegant Qibla direction indicator with surface tension animation
-        // Arc centered between outer accuracy circle and globe container
-        CircularProgressIndicator(
-            progress = { arcProgress }, // Animated progress - shrinks to dot when aligned
-            modifier = Modifier
-                .size(size - 12.dp)  // Moved outward, closer to accuracy circle
-                .rotate(animatedCompassDegree - 18f) // Offset by -18° (half of 36°) so arc CENTER aligns with Kaaba when facing Qibla
-                .graphicsLayer {
-                    alpha = arcAlpha
-                    scaleX = arcScale
-                    scaleY = arcScale
-                },
-            color = if (isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH) {
-                // When aligned with Qibla AND high accuracy, show bright green
-                Color(0xFF00C853) // Bright green - aligned with high accuracy!
-            } else if (needsCalibration) {
-                Color(0xFFFF4444) // Red when needs calibration
-            } else {
-                // Use accuracy-based color (orange for medium, green for high when not aligned)
-                accuracyColor
-            },
-            strokeWidth = if (isNearQibla) 6.dp else 5.dp, // Thinner arc to give globe more space
-            trackColor = Color.Black.copy(alpha = 0.1f),
-            strokeCap = StrokeCap.Round,
-        )
 
         // Kaaba icon positioned INSIDE the compass (not on arc track)
         // Hide when showing globe (globe has its own Kaaba marker)
         // Shows as target indicator - arc rotates around it
         // ANIMATION: Kaaba grows and glows when arc aligns with it
         if (!needsCalibration && !showGlobe) {
-            // Position Kaaba inside the arc track (closer to center)
-            val radiusOffset = (size / 2) - (if (size >= 260.dp) 48.dp else 28.dp) // More inward
+            // Arc indicator size is (size - 2.dp), so its center radius = (size - 2.dp) / 2
+            val radiusOffset = (size - 2.dp) / 2
 
             // Fixed at top (12 o'clock position) = -90° in math coordinates
             val topAngleRad = Math.toRadians(-90.0)
@@ -559,25 +567,35 @@ fun CompassProgressIndicator(
         // Enhanced center content with integrated facing status or globe
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(if (showGlobe) 0.dp else 16.dp),  // No padding for globe
+                .size(size)
+                .padding(if (showGlobe) 0.dp else 16.dp),
             contentAlignment = Alignment.Center
         ) {
             if (showGlobe && userLatitude != 0.0 && userLongitude != 0.0) {
-                // Show simple 3D globe inside the arc
-                // Smaller container to create gap from arc
-                val globeSize = size - 28.dp
-                Box(
-                    modifier = Modifier
-                        .size(globeSize)
-                        .clip(CircleShape)
-                ) {
-                    SimpleGlobeView(
-                        userLatitude = userLatitude,
-                        userLongitude = userLongitude,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                // Globe is a FrameLayout[WorldWindow + RingOverlayView].
+                // The ring/arc are drawn by RingOverlayView inside the same Android
+                // window so the OS compositor always places them above the GL surface.
+                // ViewOutlineProvider clips the GLSurfaceView to a circle at the View level.
+                val sw = with(androidx.compose.ui.platform.LocalDensity.current) { ringStrokeWidth.toPx() }
+                val arcColorInt = when {
+                    isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH ->
+                        0xFF00C853.toInt()
+                    needsCalibration -> 0xFFFF4444.toInt()
+                    else -> glowColor.toArgb()
                 }
+                SimpleGlobeView(
+                    userLatitude       = userLatitude,
+                    userLongitude      = userLongitude,
+                    modifier           = Modifier.size(size),
+                    ringStrokeWidthPx  = sw,
+                    ringColor          = 0xFFFFFFFF.toInt(),
+                    ringTintColor      = glowColor.copy(alpha = if (isNearQibla) 0.4f else 0.3f).toArgb(),
+                    arcColor           = arcColorInt,
+                    arcStartAngleDeg   = -90f,
+                    arcSweepDeg        = arcProgress * 360f,
+                    arcRotationDeg     = animatedCompassDegree - 18f,
+                    showArc            = arcAlpha > 0.01f,
+                )
             } else {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -642,9 +660,55 @@ fun CompassProgressIndicator(
             }
         }
         
+        // Ring and arc Compose Canvases — only used in non-globe mode.
+        // In globe mode the ring/arc are drawn by RingOverlayView inside SimpleGlobeView,
+        // because Compose Canvas siblings are invisible behind the GLSurfaceView GL overlay.
+        if (!showGlobe) Canvas(modifier = Modifier.size(size)) {
+            val center = Offset(this.size.width / 2f, this.size.height / 2f)
+            val sw = ringStrokeWidth.toPx()
+            // Outer edge sits just inside the clip boundary: radius + sw/2 = halfSize - 0.5px
+            val ringRadius = (this.size.minDimension / 2f) - sw / 2f - 0.5f
+
+            // White base track
+            drawCircle(color = Color.White, radius = ringRadius, center = center, style = Stroke(width = sw))
+            // Accuracy tint overlay
+            drawCircle(color = glowColor.copy(alpha = if (isNearQibla) 0.4f else 0.3f), radius = ringRadius, center = center, style = Stroke(width = sw))
+        }
+
+        // Rotating arc canvas — only in non-globe mode (globe uses RingOverlayView)
+        if (!showGlobe) Canvas(
+            modifier = Modifier
+                .size(size)
+                .rotate(animatedCompassDegree - 18f)
+                .graphicsLayer {
+                    alpha = arcAlpha
+                    scaleX = arcScale
+                    scaleY = arcScale
+                }
+        ) {
+            val center = Offset(this.size.width / 2f, this.size.height / 2f)
+            val sw = ringStrokeWidth.toPx()
+            val ringRadius = (this.size.minDimension / 2f) - sw / 2f - 0.5f
+
+            val arcColor = when {
+                isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> Color(0xFF00C853)
+                needsCalibration -> Color(0xFFFF4444)
+                else -> accuracyColor
+            }
+            drawArc(
+                color = arcColor,
+                startAngle = -90f,
+                sweepAngle = arcProgress * 360f,
+                useCenter = false,
+                topLeft = Offset(center.x - ringRadius, center.y - ringRadius),
+                size = androidx.compose.ui.geometry.Size(ringRadius * 2, ringRadius * 2),
+                style = Stroke(width = sw, cap = StrokeCap.Round)
+            )
+        }
+
         // Note: Calibration message removed - now handled by CompassPopupScreen
         // The popup will automatically show when sensor accuracy is poor
-        
+
     }
 }
 
