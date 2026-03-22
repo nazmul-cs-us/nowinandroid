@@ -52,8 +52,15 @@ class AssetDownloadManager @Inject constructor(
     private val _globalDownloadProgress = MutableStateFlow(0f)
     val globalDownloadProgress: StateFlow<Float> = _globalDownloadProgress.asStateFlow()
 
+    // Last emitted progress value — used to throttle StateFlow updates to ≥1% change
+    // so the main thread isn't flooded with recompositions on every 8KB buffer read.
+    private var lastEmittedProgress = 0f
+
     private val _isGloballyDownloading = MutableStateFlow(false)
     val isGloballyDownloading: StateFlow<Boolean> = _isGloballyDownloading.asStateFlow()
+
+    private val _globalDownloadLabel = MutableStateFlow("")
+    val globalDownloadLabel: StateFlow<String> = _globalDownloadLabel.asStateFlow()
 
     private var activeDownloadCount = 0
     private val activeDownloadLock = Any()
@@ -71,6 +78,8 @@ class AssetDownloadManager @Inject constructor(
             if (activeDownloadCount == 0) {
                 _isGloballyDownloading.value = false
                 _globalDownloadProgress.value = 0f
+                _globalDownloadLabel.value = ""
+                lastEmittedProgress = 0f
             }
         }
     }
@@ -139,7 +148,14 @@ class AssetDownloadManager @Inject constructor(
                 stateFlow.value = DownloadState.Completed
                 return@withContext DownloadState.Completed
             }
-            downloadAssetInternal(cdnKey, manifest, stateFlow)
+            val category = manifest.assets[cdnKey]?.category ?: ""
+            _globalDownloadLabel.value = AssetDownloadViewModel.formatCategoryName(category)
+            beginGlobalDownload()
+            try {
+                downloadAssetInternal(cdnKey, manifest, stateFlow)
+            } finally {
+                endGlobalDownload()
+            }
         }
     }
 
@@ -147,6 +163,10 @@ class AssetDownloadManager @Inject constructor(
         cdnKey: String,
         manifest: AssetManifest,
         stateFlow: MutableStateFlow<DownloadState>,
+        // When called from downloadCategory, batchOffset + perFileProgress*batchScale
+        // gives smooth cumulative progress instead of per-file 0→1 resets.
+        batchOffset: Float = 0f,
+        batchScale: Float = 1f,
     ): DownloadState {
 
         val entry = manifest.assets[cdnKey]
@@ -160,12 +180,9 @@ class AssetDownloadManager @Inject constructor(
 
         targetFile.parentFile?.mkdirs()
 
-        beginGlobalDownload()
-
         var lastError: String? = null
-        try {
-            for (attempt in 1..MAX_RETRIES) {
-                try {
+        for (attempt in 1..MAX_RETRIES) {
+            try {
                 stateFlow.value = DownloadState.Downloading(0f, 0, entry.size)
 
                 val request = Request.Builder().url(url).build()
@@ -203,12 +220,18 @@ class AssetDownloadManager @Inject constructor(
                                 bytesDownloaded.toFloat() / totalBytes
                             } else 0f
                             val clampedProgress = progress.coerceIn(0f, 1f)
-                            stateFlow.value = DownloadState.Downloading(
-                                clampedProgress,
-                                bytesDownloaded,
-                                totalBytes,
-                            )
-                            _globalDownloadProgress.value = clampedProgress
+                            val globalProgress = (batchOffset + clampedProgress * batchScale).coerceIn(0f, 1f)
+                            // Only emit when global progress advances by ≥1% to avoid
+                            // flooding the main thread with recompositions on every 8KB chunk.
+                            if (globalProgress - lastEmittedProgress >= 0.01f || globalProgress >= 1f) {
+                                stateFlow.value = DownloadState.Downloading(
+                                    clampedProgress,
+                                    bytesDownloaded,
+                                    totalBytes,
+                                )
+                                _globalDownloadProgress.value = globalProgress
+                                lastEmittedProgress = globalProgress
+                            }
                         }
                     }
                 }
@@ -258,12 +281,9 @@ class AssetDownloadManager @Inject constructor(
             }
         }
 
-            val finalError = lastError ?: "Unknown error"
-            stateFlow.value = DownloadState.Failed(finalError)
-            return DownloadState.Failed(finalError)
-        } finally {
-            endGlobalDownload()
-        }
+        val finalError = lastError ?: "Unknown error"
+        stateFlow.value = DownloadState.Failed(finalError)
+        return DownloadState.Failed(finalError)
     }
 
     suspend fun downloadCategory(
@@ -274,6 +294,7 @@ class AssetDownloadManager @Inject constructor(
         val assets = manifest.getAssetsByCategory(category)
         if (assets.isEmpty()) return@withContext true
 
+        _globalDownloadLabel.value = AssetDownloadViewModel.formatCategoryName(category)
         beginGlobalDownload()
 
         try {
@@ -282,24 +303,40 @@ class AssetDownloadManager @Inject constructor(
             var allSuccess = true
 
             for (asset in assets) {
-            if (isAssetAvailable(asset.cdnKey)) {
-                downloadedBytes += asset.size
+                if (isAssetAvailable(asset.cdnKey)) {
+                    downloadedBytes += asset.size
+                    val progress = downloadedBytes.toFloat() / totalBytes
+                    _globalDownloadProgress.value = progress
+                    onProgress?.invoke(progress, downloadedBytes, totalBytes)
+                    continue
+                }
+
+                // Calculate where this file sits in the overall batch so progress
+                // advances smoothly from batchOffset to batchOffset+batchScale
+                // instead of resetting 0→1 for every individual file.
+                val batchOffset = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
+                val batchScale = if (totalBytes > 0) asset.size.toFloat() / totalBytes else 1f
+
+                val stateFlow = getOrCreateStateFlow(asset.cdnKey)
+                val mutex = getOrCreateMutex(asset.cdnKey)
+                val result = mutex.withLock {
+                    if (isAssetAvailable(asset.cdnKey)) {
+                        stateFlow.value = DownloadState.Completed
+                        DownloadState.Completed
+                    } else {
+                        downloadAssetInternal(asset.cdnKey, manifest, stateFlow, batchOffset, batchScale)
+                    }
+                }
+
+                if (result is DownloadState.Completed) {
+                    downloadedBytes += asset.size
+                } else {
+                    allSuccess = false
+                }
                 val progress = downloadedBytes.toFloat() / totalBytes
                 _globalDownloadProgress.value = progress
                 onProgress?.invoke(progress, downloadedBytes, totalBytes)
-                continue
             }
-
-            val result = downloadAsset(asset.cdnKey, manifest)
-            if (result is DownloadState.Completed) {
-                downloadedBytes += asset.size
-            } else {
-                allSuccess = false
-            }
-            val progress = downloadedBytes.toFloat() / totalBytes
-            _globalDownloadProgress.value = progress
-            onProgress?.invoke(progress, downloadedBytes, totalBytes)
-        }
 
             return@withContext allSuccess
         } finally {

@@ -27,6 +27,7 @@ import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.model.data.UserData
+import com.starception.submission.core.data.util.SyncManager
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.download.AssetDownloadManager
@@ -48,6 +49,7 @@ class MainActivityViewModel @Inject constructor(
     private val userDataRepository: UserDataRepository,
     private val sherpaOnnxTts: SherpaOnnxTtsService,
     private val downloadManager: AssetDownloadManager,
+    private val syncManager: SyncManager,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -71,6 +73,10 @@ class MainActivityViewModel @Inject constructor(
     // Global content download progress (from singleton AssetDownloadManager)
     val isContentDownloading: StateFlow<Boolean> = downloadManager.isGloballyDownloading
     val contentDownloadProgress: StateFlow<Float> = downloadManager.globalDownloadProgress
+    val contentDownloadLabel: StateFlow<String> = downloadManager.globalDownloadLabel
+
+    // Triggers a background sync via WorkManager — used by app-level pull-to-sync
+    fun requestSync() = syncManager.requestSync()
 
     private val _showMissingBukhariPrompt = MutableStateFlow(false)
     val showMissingBukhariPrompt: StateFlow<Boolean> = _showMissingBukhariPrompt.asStateFlow()

@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
@@ -92,6 +93,7 @@ fun PullToSyncContainer(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     downloadProgress: Float = 0f,
     downloadLabel: String = "",
     refreshingHoldFraction: Float = 0.50f,
@@ -107,10 +109,12 @@ fun PullToSyncContainer(
     var lastHapticDistance by remember { mutableFloatStateOf(0f) }
 
     // NestedScroll connection: properly integrates with scrollable content
-    // Only activates pull-to-refresh when content is already scrolled to the top
-    val nestedScrollConnection = remember(isRefreshing) {
+    // Only activates pull-to-refresh when content is already scrolled to the top.
+    // When enabled=false all gestures pass through untouched (download-only mode).
+    val nestedScrollConnection = remember(isRefreshing, enabled) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (!enabled) return Offset.Zero
                 // When user scrolls UP while pull-to-refresh is partially pulled,
                 // consume the scroll to reduce drag distance first
                 if (dragDistance > 0f && available.y < 0f) {
@@ -126,6 +130,7 @@ fun PullToSyncContainer(
                 available: Offset,
                 source: NestedScrollSource
             ): Offset {
+                if (!enabled) return Offset.Zero
                 // When content can't scroll up anymore (at top) and user pulls DOWN
                 if (available.y > 0f && !isRefreshing && source == NestedScrollSource.UserInput) {
                     val resistance = 1f - (dragDistance / maxDragDistance * 0.5f).coerceIn(0f, 0.5f)
@@ -147,6 +152,7 @@ fun PullToSyncContainer(
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
+                if (!enabled) return Velocity.Zero
                 // When user lifts finger, check if drag was enough to trigger refresh
                 if (dragDistance > 150f && !isRefreshing) {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -309,6 +315,8 @@ fun PullToSyncContainer(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (isDownloading) {
+                    val pct = (animatedDownloadProgress * 100).toInt()
+                    val label = if (downloadLabel.isNotEmpty()) downloadLabel else "Downloading"
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -333,13 +341,13 @@ fun PullToSyncContainer(
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        val pct = (animatedDownloadProgress * 100).toInt()
-                        val label = if (downloadLabel.isNotEmpty()) downloadLabel else "Downloading"
                         Text(
-                            text = "$label $pct%",
+                            text = "$label  $pct%",
                             style = MaterialTheme.typography.labelMedium,
                             fontSize = 14.sp,
-                            color = indicatorColor
+                            color = indicatorColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 } else if (isRefreshing) {

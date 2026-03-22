@@ -84,6 +84,12 @@ fun NiaNavHost(
     } else {
         0f
     }
+    val homeDownloadLabel = if (mainViewModel != null) {
+        val label by mainViewModel.contentDownloadLabel.collectAsStateWithLifecycle()
+        label
+    } else {
+        ""
+    }
 
     // Handle deep link for course
     var deepLinkHandled by remember { mutableStateOf(false) }
@@ -269,7 +275,7 @@ fun NiaNavHost(
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
             onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) },
             downloadProgress = homeDownloadProgress,
-            downloadLabel = "Downloading content",
+            downloadLabel = homeDownloadLabel,
         )
         courseScreen(
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },

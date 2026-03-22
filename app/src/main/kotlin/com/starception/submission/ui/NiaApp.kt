@@ -50,8 +50,10 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -351,24 +353,42 @@ private fun NiaMainContent(
         },
     ) { padding ->
         // Download progress from AssetDownloadManager via MainActivityViewModel
-        val rawDownloadProgress = if (mainViewModel != null) {
+        // Suppress the app-level banner on HOME — the inner PullToSyncContainer
+        // inside PrayerTimesScreen already shows it there. All other pages show it here.
+        // Home has its own PullToSyncContainer — suppress app-level banner and
+        // pull-to-sync there to avoid doubles. All other pages get both.
+        val isOnHome = appState.currentTopLevelDestination == TopLevelDestination.HOME
+        val downloadProgress = if (mainViewModel != null && !isOnHome) {
             val isDownloading by mainViewModel.isContentDownloading.collectAsStateWithLifecycle()
             val dlProgress by mainViewModel.contentDownloadProgress.collectAsStateWithLifecycle()
             if (isDownloading) dlProgress else 0f
         } else {
             0f
         }
-        val downloadProgress = if (appState.currentTopLevelDestination == TopLevelDestination.HOME) {
-            0f
+        val downloadLabel = if (mainViewModel != null) {
+            val label by mainViewModel.contentDownloadLabel.collectAsStateWithLifecycle()
+            label
         } else {
-            rawDownloadProgress
+            ""
+        }
+        // Local refresh state — driven by pull gesture, not WorkManager's isSyncing.
+        // WorkManager's state is unreliable for UI (KEEP policy, conflated flow, instant worker).
+        // Instead we hold the banner for a minimum 2s so the animation is always visible.
+        var isRefreshing by remember { mutableStateOf(false) }
+        LaunchedEffect(isRefreshing) {
+            if (isRefreshing) {
+                mainViewModel?.requestSync()
+                delay(2000L)
+                isRefreshing = false
+            }
         }
 
         PullToSyncContainer(
-            isRefreshing = false,
-            onRefresh = {},
+            isRefreshing = if (isOnHome) false else isRefreshing,
+            onRefresh = { if (!isOnHome) isRefreshing = true },
+            enabled = !isOnHome,
             downloadProgress = downloadProgress,
-            downloadLabel = "Downloading content",
+            downloadLabel = downloadLabel,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
