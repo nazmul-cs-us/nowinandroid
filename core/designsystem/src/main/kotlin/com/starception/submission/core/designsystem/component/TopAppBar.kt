@@ -19,7 +19,10 @@
 package com.starception.submission.core.designsystem.component
 
 import androidx.annotation.StringRes
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,15 +31,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.designsystem.theme.NiaTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NiaTopAppBar(
     @StringRes titleRes: Int,
@@ -48,30 +53,37 @@ fun NiaTopAppBar(
     colors: TopAppBarColors = TopAppBarDefaults.topAppBarColors(),
     onNavigationClick: () -> Unit = {},
     onActionClick: () -> Unit = {},
+    topInset: Dp = Dp.Unspecified,
 ) {
-    CenterAlignedTopAppBar(
-        title = { Text(text = stringResource(id = titleRes)) },
-        navigationIcon = {
-            IconButton(onClick = onNavigationClick) {
-                Icon(
-                    imageVector = navigationIcon,
-                    contentDescription = navigationIconContentDescription,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        },
-        actions = {
-            IconButton(onClick = onActionClick) {
-                Icon(
-                    imageVector = actionIcon,
-                    contentDescription = actionIconContentDescription,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        },
-        colors = colors,
-        modifier = modifier.testTag("niaTopAppBar"),
-    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = if (topInset != Dp.Unspecified) topInset else 0.dp)
+            .padding(horizontal = 4.dp, vertical = 8.dp)
+            .testTag("niaTopAppBar"),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onNavigationClick) {
+            Icon(
+                imageVector = navigationIcon,
+                contentDescription = navigationIconContentDescription,
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Text(
+            text = stringResource(id = titleRes),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        IconButton(onClick = onActionClick) {
+            Icon(
+                imageVector = actionIcon,
+                contentDescription = actionIconContentDescription,
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

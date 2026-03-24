@@ -63,7 +63,7 @@ enum class TopLevelDestination(
         selectedIcon = NiaIcons.Upcoming,
         unselectedIcon = NiaIcons.UpcomingBorder,
         iconTextId = forYouR.string.feature_foryou_title,
-        titleTextId = R.string.app_name,
+        titleTextId = forYouR.string.feature_foryou_title,
         route = ForYouRoute::class,
     ),
     BOOKMARKS(

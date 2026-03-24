@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -406,7 +407,7 @@ private fun NiaMainContent(
                         )
                     }
                 ),
-        ) { _ ->
+        ) { syncState ->
         Column(
             Modifier.fillMaxSize(),
         ) {
@@ -424,6 +425,12 @@ private fun NiaMainContent(
 
             if (destination != null && !hideTopBarForTwoPane && !hideTopBarForPrayerTimes) {
                 shouldShowTopAppBar = true
+                // Dynamic top inset: collapses during download/sync (like Home screen)
+                // When PullToSyncContainer pushes content down, the banner covers the
+                // status bar area so the toolbar doesn't need its own status bar padding.
+                val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+                    .asPaddingValues().calculateTopPadding()
+                val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
                 NiaTopAppBar(
                     titleRes = destination.titleTextId,
                     navigationIcon = NiaIcons.Search,
@@ -439,6 +446,7 @@ private fun NiaMainContent(
                     ),
                     onActionClick = { onTopAppBarActionClick() },
                     onNavigationClick = { appState.navigateToSearch() },
+                    topInset = dynamicTopInset,
                 )
             }
 
