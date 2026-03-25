@@ -602,10 +602,33 @@ class DrivingAudioService : Service() {
         val hadithText = pendingHadithText
 
         if (hadithNum != null && hadithNum > 0) {
-            if (hadithText != null) {
+            // Check user's selected translation language
+            val translationService = com.starception.submission.core.translation.TranslationService.getInstance(this)
+            val selectedLang = translationService.getSelectedLanguage()
+            Log.i(TAG, "📚 Hadith #$hadithNum - selected language: $selectedLang")
+
+            if (selectedLang == "bn") {
+                // Bengali: try Bukhari Bengali audio file first, fall back to TTS
+                val audioFile = audioDownloadHelper.resolveHadithAudioFile(hadithNum)
+                if (audioFile != null) {
+                    Log.i(TAG, "📚 Bengali audio file found for #$hadithNum, playing audio")
+                    playHadithAudio(hadithNum)
+                } else if (hadithText != null) {
+                    Log.i(TAG, "📚 No Bengali audio for #$hadithNum, falling back to TTS")
+                    playHadithTts(hadithNum, hadithText)
+                } else {
+                    Log.w(TAG, "📚 No audio or text for #$hadithNum, skipping")
+                    onPlaybackComplete?.invoke()
+                    updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+                }
+            } else if (hadithText != null) {
+                // Other languages: use TTS directly
+                Log.i(TAG, "📚 Playing hadith #$hadithNum via TTS (language: $selectedLang)")
                 playHadithTts(hadithNum, hadithText)
             } else {
-                playHadithAudio(hadithNum)
+                Log.w(TAG, "📚 No text for #$hadithNum, skipping")
+                onPlaybackComplete?.invoke()
+                updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
             }
         } else {
             // No hadith pending, complete
@@ -623,19 +646,23 @@ class DrivingAudioService : Service() {
 
             mediaPlayer?.release()
 
-            val formattedNumber = String.format("%04d", hadithNumber)
-            val possibleFiles = listOf(
-                File(BUKHARI_AUDIO_PATH, "bukhari_$formattedNumber.ogg"),
-                File(BUKHARI_AUDIO_PATH, "bukhari_$formattedNumber.mp3")
-            )
-
-            val audioFile = possibleFiles.find { it.exists() }
+            // Use AudioDownloadHelper to check CDN downloads + legacy SD card
+            var audioFile = audioDownloadHelper.resolveHadithAudioFile(hadithNumber)
             if (audioFile == null) {
-                Log.w(TAG, "📚 Hadith audio not found for #$hadithNumber")
-                // Fall back to TTS or skip
-                onHadithComplete(hadithNumber)
-                return
+                // Fallback: check legacy path directly
+                val formattedNumber = String.format("%04d", hadithNumber)
+                val legacyFiles = listOf(
+                    File(BUKHARI_AUDIO_PATH, "bukhari_$formattedNumber.ogg"),
+                    File(BUKHARI_AUDIO_PATH, "bukhari_$formattedNumber.mp3")
+                )
+                audioFile = legacyFiles.find { it.exists() }
+                if (audioFile == null) {
+                    Log.w(TAG, "📚 Hadith audio not found for #$hadithNumber")
+                    onHadithComplete(hadithNumber)
+                    return
+                }
             }
+            Log.i(TAG, "📚 Playing hadith audio from: ${audioFile.absolutePath}")
 
             mediaPlayer = MediaPlayer().apply {
                 setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
