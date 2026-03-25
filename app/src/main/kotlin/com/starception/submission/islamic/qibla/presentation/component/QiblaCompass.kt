@@ -73,6 +73,9 @@ fun QiblaCompass(
     var qiblaDirection by remember { mutableFloatStateOf(0f) }
     var userLocation by remember { mutableStateOf<android.location.Location?>(null) }
     var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
+    var pendingAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
+    var pendingAccuracySince by remember { mutableLongStateOf(0L) }
+    val ACCURACY_DEBOUNCE_MS = 2000L // Only change displayed accuracy after 2s of stability
     var isInitializing by remember { mutableStateOf(true) }
     var magneticFieldStrength by remember { mutableFloatStateOf(0f) } // For accuracy detection
     var magneticDeclination by remember { mutableFloatStateOf(0f) } // Magnetic declination correction
@@ -110,13 +113,20 @@ fun QiblaCompass(
                         val strength = sqrt(x * x + y * y + z * z)
                         magneticFieldStrength = strength
 
-                        // Update accuracy based on field strength
+                        // Debounce: only change displayed accuracy after 2s of stability
                         if (!isInitializing) {
-                            sensorAccuracy = when {
+                            val newAccuracy = when {
                                 strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
                                 strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
                                 strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
                                 else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
+                            }
+                            val now = System.currentTimeMillis()
+                            if (newAccuracy != pendingAccuracy) {
+                                pendingAccuracy = newAccuracy
+                                pendingAccuracySince = now
+                            } else if (newAccuracy != sensorAccuracy && (now - pendingAccuracySince) >= ACCURACY_DEBOUNCE_MS) {
+                                sensorAccuracy = newAccuracy
                             }
                         }
                     }
@@ -154,10 +164,7 @@ fun QiblaCompass(
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // Update accuracy from system if needed
-                if (!isInitializing && magneticFieldStrength == 0f) {
-                    sensorAccuracy = accuracy
-                }
+                // Debounced via onSensorChanged — no direct update here
             }
         }
     }

@@ -127,6 +127,10 @@ fun SimpleGlobeView(
                         }).apply { altitudeMode = WorldWind.ABSOLUTE }
                     )
 
+                    // Inset the globe by the ring stroke width so the ring sits outside the globe
+                    val inset = ringStrokeWidthPx.toInt()
+                    val globeSizePx = sidePx - inset * 2
+
                     // Clip GLSurfaceView to a perfect circle at the View level.
                     ww.outlineProvider = object : ViewOutlineProvider() {
                         override fun getOutline(view: View, outline: Outline) {
@@ -134,7 +138,10 @@ fun SimpleGlobeView(
                         }
                     }
                     ww.clipToOutline = true
-                    frame.addView(ww, ViewGroup.LayoutParams(sidePx, sidePx))
+                    val wwLp = FrameLayout.LayoutParams(globeSizePx, globeSizePx).apply {
+                        gravity = android.view.Gravity.CENTER
+                    }
+                    frame.addView(ww, wwLp)
 
                     // ── Ring + arc overlay ─────────────────────────────────
                     val overlay = RingOverlayView(ctx).apply {

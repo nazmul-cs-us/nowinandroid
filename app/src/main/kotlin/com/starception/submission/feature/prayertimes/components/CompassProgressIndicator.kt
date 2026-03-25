@@ -96,9 +96,12 @@ fun CompassProgressIndicator(
     var qiblaDirection by remember { mutableFloatStateOf(0f) } // Direction to Qibla from North
     var userLocation by remember { mutableStateOf<android.location.Location?>(null) }
     var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
+    var pendingAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
+    var pendingAccuracySince by remember { mutableLongStateOf(0L) }
+    val ACCURACY_DEBOUNCE_MS = 2000L // Only change displayed accuracy after 2s of stability
     var isInitializing by remember { mutableStateOf(true) }
     var magneticFieldStrength by remember { mutableFloatStateOf(0f) } // For accuracy detection
-    var isInForeground by remember { mutableStateOf(true) } // Track if app is in foreground for haptic control
+    var isInForeground by remember { mutableStateOf(true) } // Track if app is in foreground
 
     // Throttling for compass updates to prevent flickering
     var lastCompassUpdateTime by remember { mutableLongStateOf(0L) }
@@ -130,10 +133,7 @@ fun CompassProgressIndicator(
             }
             
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // TYPE_ORIENTATION may not report accuracy reliably, but update if it does
-                if (!isInitializing && accuracy != SensorManager.SENSOR_STATUS_UNRELIABLE) {
-                    sensorAccuracy = accuracy
-                }
+                // Debounced via magnetic field listener — no direct update here
             }
         }
     }
@@ -156,43 +156,26 @@ fun CompassProgressIndicator(
 
                 // Determine accuracy based on magnetic field strength
                 // Typical Earth magnetic field: ~25-65 microteslas
-                // Adjusted thresholds based on real-world measurements
+                // Debounce: only change displayed accuracy after 2s of stability
                 if (!isInitializing) {
-                    sensorAccuracy = when {
-                        strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too weak
-                        strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW // Too strong (interference)
-                        strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM // Weak field
-                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH // Normal range (25-100)
+                    val newAccuracy = when {
+                        strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                        strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                        strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
                     }
-                    android.util.Log.d("CompassMagField", "Sensor accuracy: ${when(sensorAccuracy) {
-                        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> "HIGH"
-                        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> "MEDIUM"
-                        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> "LOW"
-                        else -> "UNRELIABLE"
-                    }}")
+                    val now = System.currentTimeMillis()
+                    if (newAccuracy != pendingAccuracy) {
+                        pendingAccuracy = newAccuracy
+                        pendingAccuracySince = now
+                    } else if (newAccuracy != sensorAccuracy && (now - pendingAccuracySince) >= ACCURACY_DEBOUNCE_MS) {
+                        sensorAccuracy = newAccuracy
+                    }
                 }
             }
             
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // Magnetic field sensor reports accuracy more reliably
-                if (!isInitializing) {
-                    // Combine reported accuracy with strength-based accuracy
-                    val strengthBasedAccuracy = when {
-                        magneticFieldStrength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
-                        magneticFieldStrength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
-                        magneticFieldStrength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
-                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
-                    }
-
-                    // Prioritize strength-based accuracy over system-reported accuracy
-                    // System often reports MEDIUM even when field strength is perfectly normal
-                    sensorAccuracy = if (magneticFieldStrength > 0f) {
-                        strengthBasedAccuracy // Trust our calculation
-                    } else {
-                        minOf(accuracy, strengthBasedAccuracy) // Fallback to conservative approach
-                    }
-                    android.util.Log.d("CompassMagField", "onAccuracyChanged: reported=$accuracy, strengthBased=$strengthBasedAccuracy, final=$sensorAccuracy, fieldStrength=$magneticFieldStrength")
-                }
+                // Debounced via onSensorChanged — no direct update here
             }
         }
     }
@@ -427,28 +410,10 @@ fun CompassProgressIndicator(
             label = "arcProgress"
         )
 
-        // Stroke width scales with compass size: ~3.5% of diameter, clamped 3–6dp
-        val ringStrokeWidth = (size.value * 0.035f).coerceIn(3f, 6f).dp
+        // Stroke width scales with compass size: ~3.5% of diameter, clamped 7–10dp
+        val ringStrokeWidth = (size.value * 0.035f).coerceIn(7f, 10f).dp
 
-        // Continuous radar-style haptic feedback while aligned with Qibla
-        val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
         val currentlyAligned = isNearQibla && !needsCalibration
-
-        // Continuous pulsing haptic feedback every second while aligned (like radar confirmation)
-        // Only trigger haptic when app is in foreground to avoid background vibration annoyance
-        LaunchedEffect(currentlyAligned, isInForeground) {
-            if (size >= 260.dp && currentlyAligned && isInForeground) {
-                android.util.Log.d("QiblaAlignment", "🎯 ALIGNED! Starting radar-style haptic loop (foreground)")
-                while (currentlyAligned && isInForeground) {
-                    // Strong haptic pulse
-                    hapticFeedback.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                    android.util.Log.d("QiblaAlignment", "📡 Haptic pulse (radar ping)")
-                    // Wait 1 second before next pulse
-                    kotlinx.coroutines.delay(1000)
-                }
-                android.util.Log.d("QiblaAlignment", "⏸️ Stopped haptic loop (not aligned or backgrounded)")
-            }
-        }
 
         // Debug logging for alignment detection
         android.util.Log.d("QiblaAlignment", "animatedCompassDegree=$animatedCompassDegree, normalizedAngle=$normalizedAngleEarly, angularDistance=$angularDistance, isNearQibla=$isNearQibla, needsCalibration=$needsCalibration")
