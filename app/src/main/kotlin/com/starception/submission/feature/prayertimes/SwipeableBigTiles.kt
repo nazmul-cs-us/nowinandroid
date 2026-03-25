@@ -1369,7 +1369,7 @@ private fun NextPrayerTile(
                     .padding(
                         start = if (isLandscape) 16.dp else 24.dp,
                         top = if (isLandscape) 16.dp else 24.dp,
-                        end = if (isLandscape) 4.dp else 4.dp,
+                        end = if (isLandscape) 2.dp else 0.dp,
                         bottom = if (isLandscape) 16.dp else 24.dp
                     ),
                 verticalArrangement = Arrangement.SpaceBetween
