@@ -1366,7 +1366,12 @@ private fun NextPrayerTile(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(if (isLandscape) 16.dp else 24.dp),
+                    .padding(
+                        start = if (isLandscape) 16.dp else 24.dp,
+                        top = if (isLandscape) 16.dp else 24.dp,
+                        end = if (isLandscape) 4.dp else 4.dp,
+                        bottom = if (isLandscape) 16.dp else 24.dp
+                    ),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 // Header: Icon + Title (matching Quran Player style)
@@ -1403,7 +1408,7 @@ private fun NextPrayerTile(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(end = if (isLandscape) 8.dp else 4.dp),
+                            .padding(end = if (isLandscape) 8.dp else 8.dp),
                         verticalArrangement = if (isLandscape) Arrangement.Center else Arrangement.Top
                     ) {
                         // Get notification-synchronized content using the SAME currentTime that updates every minute
@@ -1557,7 +1562,7 @@ private fun NextPrayerTile(
 
                     // Outer padding pulls compass away from tile rounded corners.
                     // Inner Box is exactly compassSize so the compass draws correctly.
-                    Box(modifier = Modifier.padding(top = 6.dp, end = 6.dp)) {
+                    Box(modifier = Modifier.padding(top = 6.dp)) {
                         Box(
                             modifier = Modifier
                                 .size(compassSize)
