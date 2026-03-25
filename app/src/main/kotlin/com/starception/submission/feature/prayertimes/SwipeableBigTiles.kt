@@ -45,6 +45,7 @@
 package com.starception.submission.feature.prayertimes
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -1557,14 +1558,15 @@ private fun NextPrayerTile(
                         label = "compassElevation"
                     )
                     
-                    // Dynamic compass size based on orientation
-                    val compassSize = if (isLandscape) 85.dp else 180.dp
+                    // Compass fills available Row height; aspectRatio keeps it circular
+                    val compassSizeFallback = if (isLandscape) 85.dp else 150.dp
 
-                    // Push compass slightly beyond tile padding so it sits flush at the right edge
-                    Box(modifier = Modifier.padding(top = 6.dp).offset(x = 22.dp)) {
+                    // Position compass near the right edge (within rounded corner safe area)
+                    Box(modifier = Modifier.offset(x = (-10).dp)) {
                         Box(
                             modifier = Modifier
-                                .size(compassSize)
+                                .fillMaxHeight()
+                                .aspectRatio(1f)
                                 .graphicsLayer {
                                     scaleX = compassScale
                                     scaleY = compassScale
@@ -1592,7 +1594,7 @@ private fun NextPrayerTile(
                             CompassProgressIndicator(
                                 progress = 0.7f,
                                 modifier = Modifier.fillMaxSize(),
-                                size = compassSize,
+                                size = compassSizeFallback,
                                 locationService = locationService,
                                 userLatitude = prayerTimes?.location?.latitude ?: 0.0,
                                 userLongitude = prayerTimes?.location?.longitude ?: 0.0,
