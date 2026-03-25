@@ -560,6 +560,7 @@ fun CompassProgressIndicator(
                     arcSweepDeg        = arcProgress * 360f,
                     arcRotationDeg     = animatedCompassDegree - 18f,
                     showArc            = arcAlpha > 0.01f,
+                    deviceHeadingDeg   = compassDegree,
                 )
             } else {
                 Column(

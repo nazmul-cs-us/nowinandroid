@@ -60,6 +60,7 @@ fun SimpleGlobeView(
     arcSweepDeg:       Float = 54f,
     arcRotationDeg:    Float = 0f,
     showArc:           Boolean = true,
+    deviceHeadingDeg:  Float = 0f,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val density        = LocalDensity.current
@@ -70,13 +71,25 @@ fun SimpleGlobeView(
     // Stable reference to the overlay so we can push arc updates without recreating views
     val overlayRef = remember { mutableStateOf<RingOverlayView?>(null) }
 
+    // Pre-compute the camera heading (user→Kaaba azimuth) so the overlay knows
+    // where the user dot sits relative to center.
+    // The camera looks at the midpoint with this heading, so the user dot
+    // is offset downward (opposite of heading) from center on screen.
+    val cameraHeadingDeg = remember(userLatitude, userLongitude) {
+        val userPos = Position.fromDegrees(userLatitude, userLongitude, 0.0)
+        val kaabaPos = Position.fromDegrees(makkahLatitude, makkahLongitude, 0.0)
+        userPos.greatCircleAzimuth(kaabaPos).toFloat()
+    }
+
     // Push updated arc params into the overlay on recomposition
-    LaunchedEffect(arcRotationDeg, arcSweepDeg, arcColor, ringTintColor, showArc) {
+    LaunchedEffect(arcRotationDeg, arcSweepDeg, arcColor, ringTintColor, showArc, deviceHeadingDeg) {
         overlayRef.value?.apply {
-            this.arcRotationDeg = arcRotationDeg
-            this.arcSweepDeg    = arcSweepDeg
-            this.arcColor       = arcColor
-            this.showArc        = showArc
+            this.arcRotationDeg    = arcRotationDeg
+            this.arcSweepDeg       = arcSweepDeg
+            this.arcColor          = arcColor
+            this.showArc           = showArc
+            this.deviceHeadingDeg  = deviceHeadingDeg
+            this.cameraHeadingDeg  = cameraHeadingDeg
             invalidate()
         }
     }
@@ -145,14 +158,18 @@ fun SimpleGlobeView(
 
                     // ── Ring + arc overlay ─────────────────────────────────
                     val overlay = RingOverlayView(ctx).apply {
-                        this.ringStrokeWidthPx = ringStrokeWidthPx
-                        this.ringColor         = ringColor
-                        this.ringTintColor     = ringTintColor
-                        this.arcColor          = arcColor
-                        this.arcStartAngleDeg  = arcStartAngleDeg
-                        this.arcSweepDeg       = arcSweepDeg
-                        this.arcRotationDeg    = arcRotationDeg
-                        this.showArc           = showArc
+                        this.ringStrokeWidthPx  = ringStrokeWidthPx
+                        this.ringColor          = ringColor
+                        this.ringTintColor      = ringTintColor
+                        this.arcColor           = arcColor
+                        this.arcStartAngleDeg   = arcStartAngleDeg
+                        this.arcSweepDeg        = arcSweepDeg
+                        this.arcRotationDeg     = arcRotationDeg
+                        this.showArc            = showArc
+                        this.deviceHeadingDeg   = deviceHeadingDeg
+                        this.cameraHeadingDeg   = cameraHeadingDeg
+                        this.userLatitude       = userLatitude
+                        this.userLongitude      = userLongitude
                     }
                     overlayRef.value = overlay
                     frame.addView(overlay, ViewGroup.LayoutParams(sidePx, sidePx))
@@ -190,10 +207,12 @@ fun SimpleGlobeView(
                 ),
                 update = { _ ->
                     overlayRef.value?.let { ov ->
-                        ov.arcRotationDeg = arcRotationDeg
-                        ov.arcSweepDeg    = arcSweepDeg
-                        ov.arcColor       = arcColor
-                        ov.showArc        = showArc
+                        ov.arcRotationDeg   = arcRotationDeg
+                        ov.arcSweepDeg      = arcSweepDeg
+                        ov.arcColor         = arcColor
+                        ov.showArc          = showArc
+                        ov.deviceHeadingDeg = deviceHeadingDeg
+                        ov.cameraHeadingDeg = cameraHeadingDeg
                         ov.invalidate()
                     }
                 },
@@ -219,12 +238,23 @@ class RingOverlayView(ctx: Context) : View(ctx) {
     var arcSweepDeg:       Float   = 54f
     var arcRotationDeg:    Float   = 0f
     var showArc:           Boolean = true
+    var deviceHeadingDeg:  Float   = 0f
+    var cameraHeadingDeg:  Float   = 0f
+    var userLatitude:      Double  = 0.0
+    var userLongitude:     Double  = 0.0
+    var makkahLatitude:    Double  = 21.4225
+    var makkahLongitude:   Double  = 39.8262
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style     = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
     }
+    private val radarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
     private val oval = android.graphics.RectF()
+    private val radarOval = android.graphics.RectF()
+    private val radarPath = android.graphics.Path()
 
     override fun onDraw(canvas: Canvas) {
         val sw     = ringStrokeWidthPx
@@ -232,6 +262,78 @@ class RingOverlayView(ctx: Context) : View(ctx) {
         val cx     = width  / 2f
         val cy     = height / 2f
         oval.set(cx - radius, cy - radius, cx + radius, cy + radius)
+
+        // --- Radar direction cone from user location ---
+        // The globe (WorldWindow) is inset by ringStrokeWidthPx on each side,
+        // so the globe's visual radius is smaller than the ring radius.
+        val globeRadius = (minOf(width, height) / 2f) - sw - 1f
+
+        // Compute user dot screen position from great-circle geometry.
+        // Camera looks at midpoint(user, Kaaba) with range = earthRadius * 1.05
+        // and heading = azimuth(user→Kaaba).  User is half the angular distance
+        // below center (opposite heading = downward on screen).
+        //
+        // Angular distance between user and Kaaba (haversine):
+        val lat1 = Math.toRadians(userLatitude)
+        val lat2 = Math.toRadians(makkahLatitude)
+        val dLat = lat2 - lat1
+        val dLon = Math.toRadians(makkahLongitude - userLongitude)
+        val a = Math.sin(dLat / 2).let { it * it } +
+                Math.cos(lat1) * Math.cos(lat2) *
+                Math.sin(dLon / 2).let { it * it }
+        val angularDistRad = 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+        // Camera FOV ≈ 45°.  The half-angular-distance projected onto the viewport:
+        // screenOffset = globeRadius * tan(halfAngDist) / tan(FOV/2)
+        // With FOV=45°, tan(22.5°)≈0.4142
+        val halfAngDist = angularDistRad / 2.0
+        val fovHalfTan = 0.4142
+        val userOffsetFromCenter = (globeRadius * Math.tan(halfAngDist) / fovHalfTan)
+            .toFloat()
+            .coerceIn(0f, globeRadius * 0.85f)   // safety clamp
+
+        val userDotX = cx
+        val userDotY = cy + userOffsetFromCenter
+
+        android.util.Log.d("RadarCone", "cx=$cx cy=$cy globeRadius=$globeRadius offset=$userOffsetFromCenter userDotY=$userDotY viewW=$width viewH=$height angDist=${Math.toDegrees(angularDistRad)}°")
+
+        val radarRadius = globeRadius * 0.6f
+        val coneSweep = 55f // Google Maps style wider cone
+        // Device heading relative to screen: camera heading aligns to "up" on screen,
+        // so on the canvas (where 0° = 3 o'clock) "up" = -90°.
+        // Device heading rotates from that baseline.
+        val screenHeading = -(deviceHeadingDeg - cameraHeadingDeg) - 90f
+        val coneStart = screenHeading - coneSweep / 2f
+
+        radarOval.set(
+            userDotX - radarRadius, userDotY - radarRadius,
+            userDotX + radarRadius, userDotY + radarRadius
+        )
+
+        android.util.Log.d("RadarCone", "deviceHeading=$deviceHeadingDeg cameraHeading=$cameraHeadingDeg screenHeading=$screenHeading coneStart=$coneStart")
+
+        // Clip radar cone to the globe circle so it doesn't bleed into the ring
+        canvas.save()
+        canvas.clipPath(android.graphics.Path().apply {
+            addCircle(cx, cy, globeRadius, android.graphics.Path.Direction.CW)
+        })
+
+        // Google Maps style: semi-transparent blue cone with gradient fade
+        val shader = android.graphics.RadialGradient(
+            userDotX, userDotY, radarRadius,
+            intArrayOf(0x664285F4.toInt(), 0x334285F4.toInt(), 0x004285F4.toInt()),
+            floatArrayOf(0f, 0.6f, 1f),
+            android.graphics.Shader.TileMode.CLAMP
+        )
+        radarPaint.shader = shader
+        radarPath.reset()
+        radarPath.moveTo(userDotX, userDotY)
+        radarPath.arcTo(radarOval, coneStart, coneSweep)
+        radarPath.close()
+        canvas.drawPath(radarPath, radarPaint)
+        radarPaint.shader = null
+
+        canvas.restore()
 
         paint.strokeWidth = sw
 
