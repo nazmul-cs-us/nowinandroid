@@ -1558,11 +1558,10 @@ private fun NextPrayerTile(
                     )
                     
                     // Dynamic compass size based on orientation
-                    val compassSize = if (isLandscape) 85.dp else 120.dp
+                    val compassSize = if (isLandscape) 85.dp else 180.dp
 
-                    // Outer padding pulls compass away from tile rounded corners.
-                    // Inner Box is exactly compassSize so the compass draws correctly.
-                    Box(modifier = Modifier.padding(top = 6.dp)) {
+                    // Push compass slightly beyond tile padding so it sits flush at the right edge
+                    Box(modifier = Modifier.padding(top = 6.dp).offset(x = 22.dp)) {
                         Box(
                             modifier = Modifier
                                 .size(compassSize)
