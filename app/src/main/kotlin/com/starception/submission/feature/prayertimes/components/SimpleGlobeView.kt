@@ -318,11 +318,12 @@ class RingOverlayView(ctx: Context) : View(ctx) {
             addCircle(cx, cy, globeRadius, android.graphics.Path.Direction.CW)
         })
 
-        // Vivid blue cone — fully opaque near dot, fading at edges
+        // Bright orange/amber cone — stands out against blue ocean on globe
+        val coneColor = 0xFFFF9800.toInt()  // Material Orange 500
         val shader = android.graphics.RadialGradient(
             userDotX, userDotY, radarRadius,
-            intArrayOf(0xFF4285F4.toInt(), 0xBB4285F4.toInt(), 0x554285F4.toInt(), 0x004285F4.toInt()),
-            floatArrayOf(0f, 0.25f, 0.6f, 1f),
+            intArrayOf(0xFFFF9800.toInt(), 0xCCFF9800.toInt(), 0x66FF9800.toInt(), 0x00FF9800.toInt()),
+            floatArrayOf(0f, 0.2f, 0.55f, 1f),
             android.graphics.Shader.TileMode.CLAMP
         )
         radarPaint.shader = shader
