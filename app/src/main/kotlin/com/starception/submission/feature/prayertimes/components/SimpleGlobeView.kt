@@ -62,6 +62,8 @@ fun SimpleGlobeView(
     showArc:           Boolean = true,
     deviceHeadingDeg:  Float = 0f,
 ) {
+    // Cone color matches the arc ring color (adapts to accuracy state + theme)
+    val coneColor = arcColor
     val lifecycleOwner = LocalLifecycleOwner.current
     val density        = LocalDensity.current
 
@@ -82,7 +84,7 @@ fun SimpleGlobeView(
     }
 
     // Push updated arc params into the overlay on recomposition
-    LaunchedEffect(arcRotationDeg, arcSweepDeg, arcColor, ringTintColor, showArc, deviceHeadingDeg) {
+    LaunchedEffect(arcRotationDeg, arcSweepDeg, arcColor, ringTintColor, showArc, deviceHeadingDeg, coneColor) {
         overlayRef.value?.apply {
             this.arcRotationDeg    = arcRotationDeg
             this.arcSweepDeg       = arcSweepDeg
@@ -90,6 +92,7 @@ fun SimpleGlobeView(
             this.showArc           = showArc
             this.deviceHeadingDeg  = deviceHeadingDeg
             this.cameraHeadingDeg  = cameraHeadingDeg
+            this.coneColor         = coneColor
             invalidate()
         }
     }
@@ -167,6 +170,7 @@ fun SimpleGlobeView(
                         this.userLatitude       = userLatitude
                         this.userLongitude      = userLongitude
                         this.globeViewportHalf  = globeSizePx / 2f
+                        this.coneColor          = coneColor
                     }
                     overlayRef.value = overlay
                     frame.addView(overlay, ViewGroup.LayoutParams(sidePx, sidePx))
@@ -242,6 +246,7 @@ class RingOverlayView(ctx: Context) : View(ctx) {
     var makkahLatitude:    Double  = 21.4225
     var makkahLongitude:   Double  = 39.8262
     var globeViewportHalf: Float   = 0f  // half of the WorldWindow viewport size in pixels
+    var coneColor:         Int     = 0xFF10B981.toInt()  // default green, overridden by theme
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style     = Paint.Style.STROKE
@@ -318,11 +323,19 @@ class RingOverlayView(ctx: Context) : View(ctx) {
             addCircle(cx, cy, globeRadius, android.graphics.Path.Direction.CW)
         })
 
-        // Bright orange/amber cone — stands out against blue ocean on globe
-        val coneColor = 0xFFFF9800.toInt()  // Material Orange 500
+        // Theme-colored cone with gradient fade
+        val cc = coneColor
+        val ccR = android.graphics.Color.red(cc)
+        val ccG = android.graphics.Color.green(cc)
+        val ccB = android.graphics.Color.blue(cc)
         val shader = android.graphics.RadialGradient(
             userDotX, userDotY, radarRadius,
-            intArrayOf(0xFFFF9800.toInt(), 0xCCFF9800.toInt(), 0x66FF9800.toInt(), 0x00FF9800.toInt()),
+            intArrayOf(
+                android.graphics.Color.argb(0xFF, ccR, ccG, ccB),
+                android.graphics.Color.argb(0xCC, ccR, ccG, ccB),
+                android.graphics.Color.argb(0x66, ccR, ccG, ccB),
+                android.graphics.Color.argb(0x00, ccR, ccG, ccB)
+            ),
             floatArrayOf(0f, 0.2f, 0.55f, 1f),
             android.graphics.Shader.TileMode.CLAMP
         )
@@ -334,12 +347,12 @@ class RingOverlayView(ctx: Context) : View(ctx) {
         canvas.drawPath(radarPath, radarPaint)
         radarPaint.shader = null
 
-        // Google Maps style user dot: white border ring + blue fill
+        // User dot: white border ring + theme-colored fill
         val dotRadius = minOf(width, height) / 38f  // scale with view size
         radarPaint.color = 0xFFFFFFFF.toInt()
         radarPaint.style = android.graphics.Paint.Style.FILL
         canvas.drawCircle(userDotX, userDotY, dotRadius + 2f, radarPaint)
-        radarPaint.color = 0xFF4285F4.toInt()
+        radarPaint.color = cc
         canvas.drawCircle(userDotX, userDotY, dotRadius, radarPaint)
 
         canvas.restore()
