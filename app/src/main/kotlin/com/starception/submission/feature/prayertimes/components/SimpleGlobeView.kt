@@ -127,12 +127,8 @@ fun SimpleGlobeView(
                     val userPos  = Position.fromDegrees(userLatitude,  userLongitude,  0.0)
                     val kaabaPos = Position.fromDegrees(makkahLatitude, makkahLongitude, 0.0)
 
-                    markersLayer.addRenderable(
-                        Placemark(userPos, PlacemarkAttributes().apply {
-                            imageSource = ImageSource.fromBitmap(makeUserDot())
-                            imageScale  = 0.45
-                        }).apply { altitudeMode = WorldWind.ABSOLUTE }
-                    )
+                    // User dot is drawn in the overlay (RingOverlayView) for exact
+                    // alignment with the radar direction cone.
                     markersLayer.addRenderable(
                         Placemark(kaabaPos, PlacemarkAttributes().apply {
                             imageSource = ImageSource.fromBitmap(emojiToBitmap("🕋", 48))
@@ -170,6 +166,7 @@ fun SimpleGlobeView(
                         this.cameraHeadingDeg   = cameraHeadingDeg
                         this.userLatitude       = userLatitude
                         this.userLongitude      = userLongitude
+                        this.globeViewportHalf  = globeSizePx / 2f
                     }
                     overlayRef.value = overlay
                     frame.addView(overlay, ViewGroup.LayoutParams(sidePx, sidePx))
@@ -244,6 +241,7 @@ class RingOverlayView(ctx: Context) : View(ctx) {
     var userLongitude:     Double  = 0.0
     var makkahLatitude:    Double  = 21.4225
     var makkahLongitude:   Double  = 39.8262
+    var globeViewportHalf: Float   = 0f  // half of the WorldWindow viewport size in pixels
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style     = Paint.Style.STROKE
@@ -263,17 +261,16 @@ class RingOverlayView(ctx: Context) : View(ctx) {
         val cy     = height / 2f
         oval.set(cx - radius, cy - radius, cx + radius, cy + radius)
 
-        // --- Radar direction cone from user location ---
-        // The globe (WorldWindow) is inset by ringStrokeWidthPx on each side,
-        // so the globe's visual radius is smaller than the ring radius.
+        // --- Radar direction cone from user location (Google Maps style) ---
+        // The globe (WorldWindow) is inset by ringStrokeWidthPx on each side.
         val globeRadius = (minOf(width, height) / 2f) - sw - 1f
 
-        // Compute user dot screen position from great-circle geometry.
-        // Camera looks at midpoint(user, Kaaba) with range = earthRadius * 1.05
-        // and heading = azimuth(user→Kaaba).  User is half the angular distance
-        // below center (opposite heading = downward on screen).
+        // ── Geometric user dot screen position ──
+        // Camera looks at midpoint(user, Kaaba) with tilt=0, heading=azimuth(user→Kaaba).
+        // On screen: heading direction points UP, user dot is directly below center
+        // at a distance proportional to half the great-circle angular distance.
         //
-        // Angular distance between user and Kaaba (haversine):
+        // Haversine for angular distance:
         val lat1 = Math.toRadians(userLatitude)
         val lat2 = Math.toRadians(makkahLatitude)
         val dLat = lat2 - lat1
@@ -282,27 +279,32 @@ class RingOverlayView(ctx: Context) : View(ctx) {
                 Math.cos(lat1) * Math.cos(lat2) *
                 Math.sin(dLon / 2).let { it * it }
         val angularDistRad = 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-
-        // Camera FOV ≈ 45°.  The half-angular-distance projected onto the viewport:
-        // screenOffset = globeRadius * tan(halfAngDist) / tan(FOV/2)
-        // With FOV=45°, tan(22.5°)≈0.4142
         val halfAngDist = angularDistRad / 2.0
-        val fovHalfTan = 0.4142
-        val userOffsetFromCenter = (globeRadius * Math.tan(halfAngDist) / fovHalfTan)
-            .toFloat()
-            .coerceIn(0f, globeRadius * 0.85f)   // safety clamp
 
+        // With range=1.05*R and FOV=45°, the sphere-to-viewport projection is:
+        //   NDC = sin(halfAngDist) * focalLen / (1.05 + cos(halfAngDist))
+        // where focalLen = 1/tan(FOV/2) = 1/tan(22.5°) ≈ 2.414
+        val focalLen = 1.0 / Math.tan(Math.toRadians(22.5))
+        val ndc = Math.sin(halfAngDist) * focalLen / (1.05 + Math.cos(halfAngDist))
+
+        // Map NDC to pixels (viewport half = globeSizePx/2)
+        val vpHalf = if (globeViewportHalf > 0f) globeViewportHalf else globeRadius
+        val offsetPx = (ndc * vpHalf).toFloat()
+
+        // User dot is offset from center DOWNWARD on screen (opposite of heading direction).
+        // On canvas: heading direction = "up" = -90° in canvas convention.
+        // So user dot is at canvas angle = +90° from center (straight down).
         val userDotX = cx
-        val userDotY = cy + userOffsetFromCenter
+        val userDotY = cy + offsetPx
 
-        android.util.Log.d("RadarCone", "cx=$cx cy=$cy globeRadius=$globeRadius offset=$userOffsetFromCenter userDotY=$userDotY viewW=$width viewH=$height angDist=${Math.toDegrees(angularDistRad)}°")
-
-        val radarRadius = globeRadius * 0.6f
-        val coneSweep = 55f // Google Maps style wider cone
-        // Device heading relative to screen: camera heading aligns to "up" on screen,
-        // so on the canvas (where 0° = 3 o'clock) "up" = -90°.
-        // Device heading rotates from that baseline.
-        val screenHeading = -(deviceHeadingDeg - cameraHeadingDeg) - 90f
+        val radarRadius = globeRadius * 0.75f
+        val coneSweep = 65f // wide, dominant cone
+        // On screen, camera heading points "up" (negative Y direction).
+        // Device heading is CW from magnetic north.
+        // Canvas angles: 0° = right (3 o'clock), 90° = down, -90° = up.
+        // Difference (deviceHeading - cameraHeading) = rotation from screen-up.
+        // Canvas angle = difference - 90° to convert compass→canvas convention.
+        val screenHeading = (deviceHeadingDeg - cameraHeadingDeg) - 90f
         val coneStart = screenHeading - coneSweep / 2f
 
         radarOval.set(
@@ -310,19 +312,17 @@ class RingOverlayView(ctx: Context) : View(ctx) {
             userDotX + radarRadius, userDotY + radarRadius
         )
 
-        android.util.Log.d("RadarCone", "deviceHeading=$deviceHeadingDeg cameraHeading=$cameraHeadingDeg screenHeading=$screenHeading coneStart=$coneStart")
-
         // Clip radar cone to the globe circle so it doesn't bleed into the ring
         canvas.save()
         canvas.clipPath(android.graphics.Path().apply {
             addCircle(cx, cy, globeRadius, android.graphics.Path.Direction.CW)
         })
 
-        // Google Maps style: semi-transparent blue cone with gradient fade
+        // Vivid blue cone — fully opaque near dot, fading at edges
         val shader = android.graphics.RadialGradient(
             userDotX, userDotY, radarRadius,
-            intArrayOf(0x664285F4.toInt(), 0x334285F4.toInt(), 0x004285F4.toInt()),
-            floatArrayOf(0f, 0.6f, 1f),
+            intArrayOf(0xFF4285F4.toInt(), 0xBB4285F4.toInt(), 0x554285F4.toInt(), 0x004285F4.toInt()),
+            floatArrayOf(0f, 0.25f, 0.6f, 1f),
             android.graphics.Shader.TileMode.CLAMP
         )
         radarPaint.shader = shader
@@ -332,6 +332,14 @@ class RingOverlayView(ctx: Context) : View(ctx) {
         radarPath.close()
         canvas.drawPath(radarPath, radarPaint)
         radarPaint.shader = null
+
+        // Google Maps style user dot: white border ring + blue fill
+        val dotRadius = minOf(width, height) / 38f  // scale with view size
+        radarPaint.color = 0xFFFFFFFF.toInt()
+        radarPaint.style = android.graphics.Paint.Style.FILL
+        canvas.drawCircle(userDotX, userDotY, dotRadius + 2f, radarPaint)
+        radarPaint.color = 0xFF4285F4.toInt()
+        canvas.drawCircle(userDotX, userDotY, dotRadius, radarPaint)
 
         canvas.restore()
 
@@ -354,16 +362,6 @@ class RingOverlayView(ctx: Context) : View(ctx) {
             canvas.restore()
         }
     }
-}
-
-private fun makeUserDot(): Bitmap {
-    val size  = 120
-    val bmp   = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val cv    = Canvas(bmp)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    paint.color = 0xFFFFFFFF.toInt(); cv.drawCircle(size/2f, size/2f, size*0.38f, paint)
-    paint.color = 0xFF4285F4.toInt(); cv.drawCircle(size/2f, size/2f, size*0.26f, paint)
-    return bmp
 }
 
 private fun emojiToBitmap(emoji: String, sizeDp: Int): Bitmap {
