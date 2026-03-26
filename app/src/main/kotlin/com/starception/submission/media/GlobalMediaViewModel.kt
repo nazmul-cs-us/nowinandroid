@@ -36,6 +36,13 @@ class GlobalMediaViewModel(
 
     companion object {
         private const val TAG = "GlobalMediaVM"
+
+        /**
+         * Static listener for hadith playback state changes from HadithDetailScreen.
+         * Set by GlobalMediaViewModel on init so the composable can notify it
+         * without needing a direct reference.
+         */
+        var onHadithPlaybackChanged: ((isPlaying: Boolean, hadithNumber: Int, collectionName: String, title: String) -> Unit)? = null
     }
 
     private val _controllerState = MutableStateFlow(MediaControllerUiState())
@@ -149,6 +156,15 @@ class GlobalMediaViewModel(
             Log.d(TAG, "DrivingAudioService started — auto-binding")
             onDrivingPlaybackStarted()
         }
+
+        // Register hadith playback listener so HadithDetailScreen can notify us
+        onHadithPlaybackChanged = { isPlaying, hadithNumber, collectionName, title ->
+            if (isPlaying) {
+                onHadithPlaybackStarted(hadithNumber, collectionName, title)
+            } else {
+                onHadithPlaybackStopped()
+            }
+        }
     }
 
     // --- Public API: called by services/ViewModels to show the controller ---
@@ -198,6 +214,37 @@ class GlobalMediaViewModel(
     }
 
     /**
+     * Called when hadith playback starts from HadithDetailScreen.
+     */
+    private fun onHadithPlaybackStarted(hadithNumber: Int, collectionName: String, title: String) {
+        activeSource = MediaSource.Hadith(hadithNumber = hadithNumber, collectionName = collectionName)
+        _controllerState.update { current ->
+            current.copy(
+                isVisible = true,
+                hasLanguageToggle = false,
+                playback = MediaPlaybackState(
+                    isPlaying = true,
+                    title = title,
+                    subtitle = collectionName,
+                    currentPosition = 0,
+                    duration = 0,
+                    source = activeSource,
+                ),
+            )
+        }
+        Log.d(TAG, "Hadith playback started: #$hadithNumber from $collectionName")
+    }
+
+    /**
+     * Called when hadith playback stops from HadithDetailScreen.
+     */
+    private fun onHadithPlaybackStopped() {
+        if (activeSource is MediaSource.Hadith) {
+            hideController()
+        }
+    }
+
+    /**
      * Called when playback stops from a source. Hides the controller.
      */
     fun onPlaybackStopped() {
@@ -223,6 +270,7 @@ class GlobalMediaViewModel(
         when (activeSource) {
             is MediaSource.Quran -> quranService?.togglePlayPause()
             is MediaSource.DrivingMode -> drivingService?.resume()
+            is MediaSource.Hadith -> {} // Hadith playback managed by HadithDetailScreen
             is MediaSource.None -> {}
         }
     }
@@ -231,6 +279,7 @@ class GlobalMediaViewModel(
         when (activeSource) {
             is MediaSource.Quran -> quranService?.togglePlayPause()
             is MediaSource.DrivingMode -> drivingService?.pause()
+            is MediaSource.Hadith -> {} // Hadith playback managed by HadithDetailScreen
             is MediaSource.None -> {}
         }
     }
@@ -239,6 +288,7 @@ class GlobalMediaViewModel(
         when (activeSource) {
             is MediaSource.Quran -> quranService?.playNext()
             is MediaSource.DrivingMode -> drivingService?.skipCurrent()
+            is MediaSource.Hadith -> {} // Hadith doesn't support skip
             is MediaSource.None -> {}
         }
     }
@@ -247,6 +297,7 @@ class GlobalMediaViewModel(
         when (activeSource) {
             is MediaSource.Quran -> quranService?.playPrevious()
             is MediaSource.DrivingMode -> {} // Driving mode doesn't support previous
+            is MediaSource.Hadith -> {} // Hadith doesn't support previous
             is MediaSource.None -> {}
         }
     }
@@ -255,6 +306,7 @@ class GlobalMediaViewModel(
         when (activeSource) {
             is MediaSource.Quran -> quranService?.seekTo(position)
             is MediaSource.DrivingMode -> {} // Driving mode doesn't support seek
+            is MediaSource.Hadith -> {} // Hadith doesn't support seek
             is MediaSource.None -> {}
         }
     }
@@ -263,6 +315,7 @@ class GlobalMediaViewModel(
         when (activeSource) {
             is MediaSource.Quran -> quranService?.setVolume(volume)
             is MediaSource.DrivingMode -> {} // Volume managed by system
+            is MediaSource.Hadith -> {} // Volume managed by system
             is MediaSource.None -> {}
         }
         _controllerState.update { it.copy(volume = volume) }

@@ -17,6 +17,12 @@ sealed class MediaSource {
         val phase: String = "",
     ) : MediaSource()
 
+    /** Hadith playback from HadithDetailScreen */
+    data class Hadith(
+        val hadithNumber: Int = 0,
+        val collectionName: String = "Sahih Al-Bukhari",
+    ) : MediaSource()
+
     /** No active media source */
     data object None : MediaSource()
 }

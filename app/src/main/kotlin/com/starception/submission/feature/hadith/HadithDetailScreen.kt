@@ -1,5 +1,6 @@
 package com.starception.submission.feature.hadith
 
+import com.starception.submission.media.GlobalMediaViewModel
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Spring
@@ -255,6 +256,12 @@ fun HadithDetailScreen(
     var isDownloadingAudio by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf(0f) }
 
+    // Notify global media controller when hadith playback state changes
+    androidx.compose.runtime.LaunchedEffect(isPlaying) {
+        val title = "Hadith #$hadithNumber"
+        GlobalMediaViewModel.onHadithPlaybackChanged?.invoke(isPlaying, hadithNumber, collectionName, title)
+    }
+
     // Cleanup on dispose
     androidx.compose.runtime.DisposableEffect(Unit) {
         onDispose {
@@ -263,6 +270,8 @@ fun HadithDetailScreen(
             textToSpeech?.stop()
             textToSpeech?.shutdown()
             textToSpeech = null
+            // Notify global media controller that hadith playback stopped
+            GlobalMediaViewModel.onHadithPlaybackChanged?.invoke(false, hadithNumber, collectionName, "")
         }
     }
 
