@@ -364,6 +364,7 @@ fun PullToSyncContainer(
                     MediaMiniBar(
                         state = mediaState,
                         onAction = onMediaAction,
+                        modifier = Modifier.padding(bottom = 6.dp),
                     )
                 }
             } else {
