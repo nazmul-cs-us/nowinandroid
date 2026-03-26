@@ -43,6 +43,11 @@ class GlobalMediaViewModel(
          * without needing a direct reference.
          */
         var onHadithPlaybackChanged: ((isPlaying: Boolean, hadithNumber: Int, collectionName: String, title: String) -> Unit)? = null
+
+        /**
+         * Static listener for hadith playback progress updates (position/duration in ms).
+         */
+        var onHadithProgressChanged: ((currentPosition: Int, duration: Int) -> Unit)? = null
     }
 
     private val _controllerState = MutableStateFlow(MediaControllerUiState())
@@ -163,6 +168,20 @@ class GlobalMediaViewModel(
                 onHadithPlaybackStarted(hadithNumber, collectionName, title)
             } else {
                 onHadithPlaybackStopped()
+            }
+        }
+
+        // Register hadith progress listener for horizontal sweep
+        onHadithProgressChanged = { currentPosition, duration ->
+            if (activeSource is MediaSource.Hadith) {
+                _controllerState.update { current ->
+                    current.copy(
+                        playback = current.playback.copy(
+                            currentPosition = currentPosition,
+                            duration = duration,
+                        )
+                    )
+                }
             }
         }
     }

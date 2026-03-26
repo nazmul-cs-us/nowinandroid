@@ -257,9 +257,26 @@ fun HadithDetailScreen(
     var downloadProgress by remember { mutableStateOf(0f) }
 
     // Notify global media controller when hadith playback state changes
+    // and poll progress while playing (for horizontal sweep in PullToSyncContainer)
     androidx.compose.runtime.LaunchedEffect(isPlaying) {
         val title = "Hadith #$hadithNumber"
         GlobalMediaViewModel.onHadithPlaybackChanged?.invoke(isPlaying, hadithNumber, collectionName, title)
+
+        // Poll MediaPlayer progress while playing
+        if (isPlaying) {
+            while (true) {
+                val mp = mediaPlayer
+                if (mp != null && mp.isPlaying) {
+                    try {
+                        GlobalMediaViewModel.onHadithProgressChanged?.invoke(
+                            mp.currentPosition,
+                            mp.duration,
+                        )
+                    } catch (_: Exception) { }
+                }
+                kotlinx.coroutines.delay(500)
+            }
+        }
     }
 
     // Cleanup on dispose
