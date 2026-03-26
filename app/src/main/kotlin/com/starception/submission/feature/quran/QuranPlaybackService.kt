@@ -51,6 +51,10 @@ class QuranPlaybackService : Service() {
     var onSurahChanged: ((Int) -> Unit)? = null
     var onProgressChanged: ((Int, Int) -> Unit)? = null
 
+    // Secondary callbacks for the global media controller (does not overwrite primary callbacks)
+    var onGlobalPlaybackStateChanged: ((Boolean) -> Unit)? = null
+    var onGlobalSurahChanged: ((Int) -> Unit)? = null
+
     // Callback when audio file needs downloading (cdnKey, fileSize)
     var onAudioNeedsDownload: ((String, Long?) -> Unit)? = null
 
@@ -155,12 +159,14 @@ class QuranPlaybackService : Service() {
                 if (wasPlayingBeforeChange) {
                     mp.start()
                     onPlaybackStateChanged?.invoke(true)
+                    onGlobalPlaybackStateChanged?.invoke(true)
                     updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
                     startProgressUpdates()
                     onProgressChanged?.invoke(mp.currentPosition, mp.duration)
                 } else {
                     // Stay paused
                     onPlaybackStateChanged?.invoke(false)
+                    onGlobalPlaybackStateChanged?.invoke(false)
                     updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
                 }
                 onProgressChanged?.invoke(0, mp.duration)
@@ -201,6 +207,7 @@ class QuranPlaybackService : Service() {
             }
 
             onSurahChanged?.invoke(index)
+            onGlobalSurahChanged?.invoke(index)
             updateMediaSessionMetadata()
             startForeground(NOTIFICATION_ID, createNotification())
 
@@ -223,6 +230,7 @@ class QuranPlaybackService : Service() {
             if (player.isPlaying) {
                 player.pause()
                 onPlaybackStateChanged?.invoke(false)
+                onGlobalPlaybackStateChanged?.invoke(false)
                 updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
                 updateNotification()
                 stopProgressUpdates()
@@ -230,6 +238,7 @@ class QuranPlaybackService : Service() {
             } else {
                 player.start()
                 onPlaybackStateChanged?.invoke(true)
+                onGlobalPlaybackStateChanged?.invoke(true)
                 updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     startForeground(NOTIFICATION_ID, createNotification())
@@ -371,6 +380,7 @@ class QuranPlaybackService : Service() {
                     }
                     mp.start()
                     onPlaybackStateChanged?.invoke(true)
+                    onGlobalPlaybackStateChanged?.invoke(true)
                     updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
                     startProgressUpdates()
 
@@ -388,6 +398,7 @@ class QuranPlaybackService : Service() {
             }
 
             onSurahChanged?.invoke(surahIndex)
+            onGlobalSurahChanged?.invoke(surahIndex)
             updateMediaSessionMetadata()
             startForeground(NOTIFICATION_ID, createNotification())
 

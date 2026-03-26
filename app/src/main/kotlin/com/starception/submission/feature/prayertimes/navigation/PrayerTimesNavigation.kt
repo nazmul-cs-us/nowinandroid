@@ -20,6 +20,8 @@ fun NavGraphBuilder.prayerTimesScreen(
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     downloadProgress: Float = 0f,
     downloadLabel: String = "Downloading content",
+    mediaState: com.starception.submission.media.MediaControllerUiState = com.starception.submission.media.MediaControllerUiState(),
+    onMediaAction: (com.starception.submission.media.MediaAction) -> Unit = {},
 ) {
     composable<PrayerTimesRoute> {
         PrayerTimesScreen(
@@ -29,6 +31,8 @@ fun NavGraphBuilder.prayerTimesScreen(
             onSurahClickWithAyah = onSurahClickWithAyah,
             downloadProgress = downloadProgress,
             downloadLabel = downloadLabel,
+            mediaState = mediaState,
+            onMediaAction = onMediaAction,
         )
     }
 }

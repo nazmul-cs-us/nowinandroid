@@ -90,6 +90,12 @@ fun NiaNavHost(
     } else {
         ""
     }
+    val homeMediaState = if (mainViewModel != null) {
+        val state by mainViewModel.globalMedia.controllerState.collectAsStateWithLifecycle()
+        state
+    } else {
+        com.starception.submission.media.MediaControllerUiState()
+    }
 
     // Handle deep link for course
     var deepLinkHandled by remember { mutableStateOf(false) }
@@ -276,6 +282,8 @@ fun NiaNavHost(
             onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) },
             downloadProgress = homeDownloadProgress,
             downloadLabel = homeDownloadLabel,
+            mediaState = homeMediaState,
+            onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
         )
         courseScreen(
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },

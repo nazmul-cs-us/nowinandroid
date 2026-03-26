@@ -17,12 +17,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,7 +44,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -50,6 +51,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Velocity
@@ -59,6 +61,9 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.starception.submission.media.MediaAction
+import com.starception.submission.media.MediaControllerUiState
+import com.starception.submission.media.MediaMiniBar
 
 /**
  * Data class to hold sync container state and configuration
@@ -98,6 +103,8 @@ fun PullToSyncContainer(
     downloadLabel: String = "",
     refreshingHoldFraction: Float = 0.50f,
     downloadingHoldFraction: Float = 0.50f,
+    mediaState: MediaControllerUiState = MediaControllerUiState(),
+    onMediaAction: (MediaAction) -> Unit = {},
     content: @Composable (syncState: SyncContainerState) -> Unit
 ) {
     val isDownloading = downloadProgress > 0f
@@ -174,19 +181,28 @@ fun PullToSyncContainer(
         )
     )
 
-    // Refreshing/downloading state: Animatable for instant snap-to when refreshing starts
-    // This eliminates the gap where wobbleIntensity would drop between drag release and refresh hold
+    // Refreshing/downloading/media state: Animatable for instant snap-to
+    // This eliminates the gap where wobbleIntensity would drop between drag release and hold
+    val mediaHoldFraction = 0.50f
     val refreshingOffset = remember { Animatable(0f) }
-    LaunchedEffect(isRefreshing, isDownloading) {
+    LaunchedEffect(isRefreshing, isDownloading, mediaState.isVisible) {
         if (isRefreshing || isDownloading) {
-            // Snap instantly to held position.
-            // Keep the full hold height so the pull/download indicator stays readable,
-            // then independently reduce only the content drop for download-only status.
+            // Snap instantly to held position for sync/download.
             refreshingOffset.snapTo(
                 if (isDownloading) downloadingHoldFraction else refreshingHoldFraction,
             )
+        } else if (mediaState.isVisible) {
+            // Media is playing: push content down to reveal media controls in sage area.
+            // Use spring animation for expand/collapse transitions.
+            refreshingOffset.animateTo(
+                targetValue = mediaHoldFraction,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            )
         } else {
-            // Slow, gentle settle back when sync completes — gives user time to see result
+            // Nothing active — settle back smoothly
             refreshingOffset.animateTo(
                 targetValue = 0f,
                 animationSpec = tween(durationMillis = 600)
@@ -268,17 +284,27 @@ fun PullToSyncContainer(
                 when {
                     rawWobbleIntensity > 0.01f -> fitbitBgColorLight
                     isRefreshing || isDownloading -> fitbitBgColorLight
+                    mediaState.isVisible -> fitbitBgColorLight
                     else -> MaterialTheme.colorScheme.background
                 }
             )
     ) {
         // Horizontal progress fill: sweeps sage color left-to-right (background hidden until sweep covers it)
-        // Shows during both syncing (timed 3s fill) and downloading (explicit progress)
-        if ((isRefreshing || isDownloading) && wobbleIntensity > 0.01f) {
-            val fillProgress = if (isDownloading) animatedDownloadProgress else syncProgress.value
+        // Shows during syncing, downloading, or media playback
+        val showSweep = (isRefreshing || isDownloading || mediaState.isVisible) && wobbleIntensity > 0.01f
+        if (showSweep) {
+            val fillProgress = when {
+                isDownloading -> animatedDownloadProgress
+                isRefreshing -> syncProgress.value
+                mediaState.isVisible && mediaState.playback.duration > 0 -> {
+                    (mediaState.playback.currentPosition.toFloat() / mediaState.playback.duration.toFloat())
+                        .coerceIn(0f, 1f)
+                }
+                else -> 0f
+            }
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(fillProgress)
+                    .fillMaxWidth(fillProgress.coerceAtLeast(0.001f))
                     .fillMaxHeight()
                     .background(fitbitBgColor)
                     .align(Alignment.CenterStart)
@@ -300,12 +326,47 @@ fun PullToSyncContainer(
                 )
                 .background(MaterialTheme.colorScheme.background)
         ) {
+            // Main screen content
             content(syncState)
         }
 
-        // Indicator area: render above the content sheet so download text stays visible
-        // even when we reduce the page drop to keep the title gap compact.
+        // Indicator / media area: render above the content sheet in the revealed sage background.
+        // Media controls, download text, and sync indicators all render here.
+        // For media, fill the full height of the revealed area and center content vertically.
         if (wobbleIntensity > 0.05f) {
+            if (mediaState.isVisible) {
+                // --- Media Mini-Bar fills the sage area ---
+                // Pull up on this area to dismiss the media controller.
+                Box(
+                    modifier = Modifier
+                        .zIndex(1f)
+                        .fillMaxWidth()
+                        .height(contentOffsetY)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                        .pointerInput(Unit) {
+                            var totalDrag = 0f
+                            detectVerticalDragGestures(
+                                onDragStart = { totalDrag = 0f },
+                                onVerticalDrag = { _, dragAmount ->
+                                    totalDrag += dragAmount
+                                },
+                                onDragEnd = {
+                                    // Pull up to dismiss
+                                    if (totalDrag < -80f) {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onMediaAction(MediaAction.Dismiss)
+                                    }
+                                },
+                            )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MediaMiniBar(
+                        state = mediaState,
+                        onAction = onMediaAction,
+                    )
+                }
+            } else {
             Column(
                 modifier = Modifier
                     .zIndex(1f)
@@ -423,6 +484,7 @@ fun PullToSyncContainer(
                     }
                 }
             }
-        }
+            } // close else (non-media indicator Column)
+        } // close if (wobbleIntensity > 0.05f)
     }
 }

@@ -31,6 +31,7 @@ import com.starception.submission.core.data.util.SyncManager
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.media.GlobalMediaViewModel
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.SherpaOnnxTtsService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -74,6 +75,9 @@ class MainActivityViewModel @Inject constructor(
     val isContentDownloading: StateFlow<Boolean> = downloadManager.isGloballyDownloading
     val contentDownloadProgress: StateFlow<Float> = downloadManager.globalDownloadProgress
     val contentDownloadLabel: StateFlow<String> = downloadManager.globalDownloadLabel
+
+    // Global media controller — persistent across all screens
+    val globalMedia = GlobalMediaViewModel(context, viewModelScope)
 
     // Triggers a background sync via WorkManager — used by app-level pull-to-sync
     fun requestSync() = syncManager.requestSync()
@@ -262,6 +266,11 @@ class MainActivityViewModel @Inject constructor(
             val isCurrentlyBookmarked = isNewsResourceBookmarked(newsResourceId)
             userDataRepository.setNewsResourceBookmarked(newsResourceId, !isCurrentlyBookmarked)
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        globalMedia.cleanup()
     }
 }
 

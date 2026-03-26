@@ -287,6 +287,8 @@ fun PrayerTimesScreen(
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     downloadProgress: Float = 0f,
     downloadLabel: String = "Downloading content",
+    mediaState: com.starception.submission.media.MediaControllerUiState = com.starception.submission.media.MediaControllerUiState(),
+    onMediaAction: (com.starception.submission.media.MediaAction) -> Unit = {},
 ) {
     val screenContext = LocalContext.current
     
@@ -1393,6 +1395,8 @@ fun PrayerTimesScreen(
                 onRefresh = { isRefreshing = true },
                 downloadProgress = downloadProgress,
                 downloadLabel = downloadLabel,
+                mediaState = mediaState,
+                onMediaAction = onMediaAction,
                 modifier = Modifier.fillMaxSize()
             ) { syncState ->
             val outerConfiguration = LocalConfiguration.current

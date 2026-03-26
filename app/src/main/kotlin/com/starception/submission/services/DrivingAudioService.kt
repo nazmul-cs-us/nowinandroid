@@ -108,6 +108,8 @@ class DrivingAudioService : Service() {
     // Callbacks
     var onPlaybackComplete: (() -> Unit)? = null
     var onStateChanged: ((PlaybackState) -> Unit)? = null
+    // Secondary callback for the global media controller (does not overwrite primary callback)
+    var onGlobalStateChanged: ((PlaybackState) -> Unit)? = null
 
     // Hadith TTS cache tracking - always maintain 3 hadiths in cache
     private val cachedHadithNumbers = mutableSetOf<Int>()
@@ -160,6 +162,12 @@ class DrivingAudioService : Service() {
         private const val KEY_AUDIO_LANGUAGE = "audio_language"
         private const val KEY_QURAN_AUDIO_LANGUAGE = "quran_audio_language"
         private const val KEY_LAST_DUA_PLAY_TIME = "last_dua_play_time"
+
+        /**
+         * Static listener for global media controller.
+         * Set by GlobalMediaViewModel so it can auto-detect when driving mode starts.
+         */
+        var onServiceStartedListener: (() -> Unit)? = null
     }
 
     private enum class ChainQuranAudioLanguage {
@@ -253,6 +261,8 @@ class DrivingAudioService : Service() {
                         pendingCourseId = intent.getStringExtra(EXTRA_COURSE_ID)
                         pendingLessonId = intent.getStringExtra(EXTRA_LESSON_ID)
                         playTravelDua()
+                        // Notify global media controller that driving audio has started
+                        onServiceStartedListener?.invoke()
                     }
                     TYPE_HADITH_AUDIO -> {
                         val hadithNumber = intent.getIntExtra(EXTRA_HADITH_NUMBER, 1)
@@ -1316,6 +1326,7 @@ class DrivingAudioService : Service() {
         currentSubtitle = subtitle
 
         onStateChanged?.invoke(state)
+        onGlobalStateChanged?.invoke(state)
         updateMediaSessionMetadata()
         updatePlaybackState()
     }

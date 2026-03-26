@@ -92,6 +92,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.starception.submission.MainActivityViewModel
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
+import com.starception.submission.media.MediaControllerUiState
 import com.starception.submission.feature.settings.R as settingsR
 
 @Composable
@@ -384,12 +385,26 @@ private fun NiaMainContent(
             }
         }
 
+        // Global media controller state
+        val mediaState = if (mainViewModel != null) {
+            val state by mainViewModel.globalMedia.controllerState.collectAsStateWithLifecycle()
+            state
+        } else {
+            MediaControllerUiState()
+        }
+
+        // Suppress media on HOME — PrayerTimesScreen has its own PullToSyncContainer
+        // that already shows the media controller to avoid doubles.
+        val appLevelMediaState = if (isOnHome) MediaControllerUiState() else mediaState
+
         PullToSyncContainer(
             isRefreshing = if (isOnHome) false else isRefreshing,
             onRefresh = { if (!isOnHome) isRefreshing = true },
             enabled = !isOnHome,
             downloadProgress = downloadProgress,
             downloadLabel = downloadLabel,
+            mediaState = appLevelMediaState,
+            onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
