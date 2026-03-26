@@ -1111,7 +1111,7 @@ fun SwipeableBigTiles(
     // Use dynamic height based on orientation - wrapped in Box for popup overlay
     Box(modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 2.dp else 8.dp),
             modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth()
         ) {
         // In landscape, pager takes most height but leaves room for indicators
@@ -1272,11 +1272,11 @@ fun SwipeableBigTiles(
             }
         }
 
-        // Professional swipe hint - compact in landscape, SWIPEABLE to navigate
+        // Professional swipe hint - hidden in landscape to maximize tile space, SWIPEABLE to navigate
+        if (!isLandscape) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = if (isLandscape) 2.dp else 0.dp)
                 .pointerInput(Unit) {
                     // Swipe gesture on the hint row
                     var totalDrag = 0f
@@ -1305,23 +1305,24 @@ fun SwipeableBigTiles(
                 imageVector = Icons.Default.ChevronLeft,
                 contentDescription = "Swipe left",
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.size(if (isLandscape) 14.dp else 18.dp)
+                modifier = Modifier.size(18.dp)
             )
-            Spacer(modifier = Modifier.width(if (isLandscape) 4.dp else 6.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = if (isLandscape) "Swipe" else "Swipe for more insights",
+                text = "Swipe for more insights",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 fontWeight = FontWeight.Medium,
-                fontSize = if (isLandscape) 10.sp else 12.sp
+                fontSize = 12.sp
             )
-            Spacer(modifier = Modifier.width(if (isLandscape) 4.dp else 6.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Swipe right",
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.size(if (isLandscape) 14.dp else 18.dp)
+                modifier = Modifier.size(18.dp)
             )
+        }
         }
     }
 
@@ -1359,248 +1360,254 @@ private fun NextPrayerTile(
     if (mainPrayer != null || prayerTimes != null) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
             border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
             tonalElevation = 4.dp
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(
-                        start = if (isLandscape) 16.dp else 16.dp,
-                        top = if (isLandscape) 16.dp else 16.dp,
-                        end = if (isLandscape) 2.dp else 0.dp,
-                        bottom = if (isLandscape) 16.dp else 16.dp
-                    ),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Header: Icon + Title (matching Quran Player style)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.BatchPrediction,
-                        contentDescription = "Smart Prediction",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(if (isLandscape) 16.dp else 20.dp)
-                    )
-                    Text(
-                        text = "Smart Prediction",
-                        style = if (isLandscape) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+            // Shared compass interaction state
+            var isPressed by remember { mutableStateOf(false) }
+            val compassScale by animateFloatAsState(
+                targetValue = if (isPressed) 0.95f else 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessHigh
+                ),
+                label = "compassPressScale"
+            )
+            val compassSizeFallback = if (isLandscape) 100.dp else 150.dp
 
-                Row(
+            // Shared sync content
+            val syncContent = remember(prayerTimes, currentTime, timeOffsets) {
+                SmartContentUtils.getNotificationSyncContent(prayerTimes, currentTime, timeOffsets)
+            }
+
+            // Shared compass composable
+            @Composable
+            fun CompassGlobe(modifier: Modifier = Modifier) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(
-                            top = if (isLandscape) 4.dp else 4.dp,
-                            bottom = if (isLandscape) 4.dp else 4.dp
-                        ),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .then(
+                            if (isLandscape) Modifier.fillMaxHeight(0.7f).aspectRatio(1f)
+                            else Modifier.fillMaxHeight().aspectRatio(1f)
+                        )
+                        .offset(x = if (isLandscape) 0.dp else (-10).dp)
                 ) {
-                    // Prayer info
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = if (isLandscape) 8.dp else 4.dp),
-                        verticalArrangement = if (isLandscape) Arrangement.Center else Arrangement.Top
-                    ) {
-                        // Get notification-synchronized content using the SAME currentTime that updates every minute
-                        // Pass timeOffsets to ensure smart prediction uses adjusted times (base + offset)
-                        val syncContent = remember(prayerTimes, currentTime, timeOffsets) {
-                            SmartContentUtils.getNotificationSyncContent(prayerTimes, currentTime, timeOffsets)
-                        }
-                        
-                        if (syncContent != null) {
-                            // Clean layout with readable fonts and optimized spacing
-                            // More compact spacing in landscape
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(if (isLandscape) 2.dp else 6.dp)
-                            ) {
-                                // Prayer phase title - compact and readable
-                                Text(
-                                    text = syncContent.title,
-                                    style = if (isLandscape) MaterialTheme.typography.labelMedium else MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                // Main prayer time content - sized to fit longest text "59 minutes since Maghrib"
-                                Text(
-                                    text = syncContent.content,
-                                    style = MaterialTheme.typography.headlineSmall.copy(
-                                        fontSize = if (isLandscape) 18.sp else 22.sp,
-                                        letterSpacing = (-0.4).sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = if (isLandscape) 1 else 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    lineHeight = if (isLandscape) 20.sp else 24.sp
-                                )
-
-                                // Next prayer info - enhanced with prominent chip styling and AI glow
-                                if (syncContent.nextPrayerInfo.isNotEmpty()) {
-                                    Surface(
-                                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.0f),
-                                        shape = RoundedCornerShape(10.dp),
-                                        modifier = Modifier
-                                            .padding(top = if (isLandscape) 0.dp else 2.dp)
-                                            .aiTextGlow()
-                                    ) {
-                                    Text(
-                                        text = syncContent.nextPrayerInfo,
-                                            style = MaterialTheme.typography.titleMedium.copy(
-                                                fontSize = if (isLandscape) 12.sp else 15.sp,
-                                                letterSpacing = (-0.2).sp
-                                            ),
-                                            color = MaterialTheme.colorScheme.tertiary,
-                                            fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = 0.dp, vertical = if (isLandscape) 2.dp else 4.dp)
-                                    )
+                    Box(
+                        modifier = modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = compassScale
+                                scaleY = compassScale
+                                clip = true
+                                shape = CircleShape
+                            }
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onPress = {
+                                        isPressed = true
+                                        tryAwaitRelease()
+                                        isPressed = false
+                                    },
+                                    onTap = {
+                                        view.performHapticFeedback(
+                                            HapticFeedbackConstants.CONTEXT_CLICK,
+                                            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                                        )
+                                        onCompassClick()
                                     }
-                                }
-                            }
-                        } else if (mainPrayer != null) {
-                            // Fallback: Show upcoming prayer in notification style
-                            val prayerName = mainPrayer.first
-                            val prayerStatus = getPrayerStatus(prayerName)
-                            val prayerTime = getPrayerTimeDisplay(prayerName)
-
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                // Title - notification style
-                            Text(
-                                    text = "Next Prayer: $prayerName",
-                                    style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
                                 )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CompassProgressIndicator(
+                            progress = 0.7f,
+                            modifier = Modifier.fillMaxSize(),
+                            size = compassSizeFallback,
+                            locationService = locationService,
+                            userLatitude = prayerTimes?.location?.latitude ?: 0.0,
+                            userLongitude = prayerTimes?.location?.longitude ?: 0.0,
+                            showGlobe = true
+                        )
+                    }
+                }
+            }
 
-                                // Main content - prayer time with status
-                            Text(
-                                    text = "$prayerStatus • $prayerTime",
-                                    style = MaterialTheme.typography.headlineSmall.copy(
-                                        fontSize = 22.sp,
-                                        letterSpacing = (-0.4).sp
-                                    ),
-                                color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    lineHeight = 24.sp
-                            )
-                            }
-                        } else if (prayerTimes != null) {
-                            // Show tomorrow's Fajr in notification style
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+            // Shared text content composable
+            @Composable
+            fun PrayerTextContent() {
+                if (syncContent != null) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 2.dp else 6.dp)
+                    ) {
+                        Text(
+                            text = syncContent.title,
+                            style = if (isLandscape) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = syncContent.content,
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontSize = if (isLandscape) 18.sp else 22.sp,
+                                letterSpacing = (-0.4).sp
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = if (isLandscape) 1 else 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = if (isLandscape) 20.sp else 24.sp
+                        )
+                        if (syncContent.nextPrayerInfo.isNotEmpty()) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.0f),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .padding(top = if (isLandscape) 0.dp else 2.dp)
+                                    .aiTextGlow()
                             ) {
-                                // Title - notification style
-                            Text(
-                                    text = "Next Prayer: Fajr",
-                                    style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                // Main content - tomorrow's Fajr time
-                            Text(
-                                    text = "Tomorrow • ${getPrayerTimeDisplay("Fajr")}",
-                                    style = MaterialTheme.typography.headlineSmall.copy(
-                                        fontSize = 22.sp,
-                                        letterSpacing = (-0.4).sp
+                                Text(
+                                    text = syncContent.nextPrayerInfo,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontSize = if (isLandscape) 14.sp else 15.sp,
+                                        letterSpacing = (-0.2).sp
                                     ),
-                                color = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.tertiary,
                                     fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
+                                    maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    lineHeight = 24.sp
-                            )
+                                    modifier = Modifier.padding(horizontal = 0.dp, vertical = if (isLandscape) 2.dp else 4.dp)
+                                )
                             }
                         }
                     }
-                    
-                    // Material 3 expressive compass with enhanced interaction feedback
-                    var isPressed by remember { mutableStateOf(false) }
-                    
-                    val compassScale by animateFloatAsState(
-                        targetValue = if (isPressed) 0.95f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessHigh
-                        ),
-                        label = "compassPressScale"
-                    )
-                    
-                    val compassElevation by animateDpAsState(
-                        targetValue = if (isPressed) 2.dp else 6.dp,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        label = "compassElevation"
-                    )
-                    
-                    // Compass fills available Row height; aspectRatio keeps it circular
-                    val compassSizeFallback = if (isLandscape) 85.dp else 150.dp
+                } else if (mainPrayer != null) {
+                    val prayerName = mainPrayer.first
+                    val prayerStatus = getPrayerStatus(prayerName)
+                    val prayerTime = getPrayerTimeDisplay(prayerName)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Next Prayer: $prayerName",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "$prayerStatus • $prayerTime",
+                            style = MaterialTheme.typography.headlineSmall.copy(fontSize = 22.sp, letterSpacing = (-0.4).sp),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 24.sp
+                        )
+                    }
+                } else if (prayerTimes != null) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Next Prayer: Fajr",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Tomorrow • ${getPrayerTimeDisplay("Fajr")}",
+                            style = MaterialTheme.typography.headlineSmall.copy(fontSize = 22.sp, letterSpacing = (-0.4).sp),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 24.sp
+                        )
+                    }
+                }
+            }
 
-                    // Position compass near the right edge (within rounded corner safe area)
-                    Box(modifier = Modifier.offset(x = (-10).dp)) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .aspectRatio(1f)
-                                .graphicsLayer {
-                                    scaleX = compassScale
-                                    scaleY = compassScale
-                                    clip = true
-                                    shape = CircleShape
-                                }
-                                .pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onPress = {
-                                            isPressed = true
-                                            tryAwaitRelease()
-                                            isPressed = false
-                                        },
-                                        onTap = {
-                                            view.performHapticFeedback(
-                                                HapticFeedbackConstants.CONTEXT_CLICK,
-                                                HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-                                            )
-                                            onCompassClick()
-                                        }
-                                    )
-                                },
-                            contentAlignment = Alignment.Center
+            if (isLandscape) {
+                // LANDSCAPE: Column(SpaceBetween) matching Smart Tracking layout
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Header at top
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.BatchPrediction,
+                            contentDescription = "Smart Prediction",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Smart Prediction",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    // Content in middle with text + compass
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f).padding(end = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            CompassProgressIndicator(
-                                progress = 0.7f,
-                                modifier = Modifier.fillMaxSize(),
-                                size = compassSizeFallback,
-                                locationService = locationService,
-                                userLatitude = prayerTimes?.location?.latitude ?: 0.0,
-                                userLongitude = prayerTimes?.location?.longitude ?: 0.0,
-                                showGlobe = true
-                            )
+                            PrayerTextContent()
                         }
+                        CompassGlobe()
+                    }
+                }
+            } else {
+                // PORTRAIT: Column with header on top, then Row(text + compass) filling space
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 16.dp, top = 16.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Header
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.BatchPrediction,
+                            contentDescription = "Smart Prediction",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "Smart Prediction",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    // Content Row with text + compass
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(top = 4.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f).padding(end = 4.dp),
+                            verticalArrangement = Arrangement.Top
+                        ) {
+                            PrayerTextContent()
+                        }
+                        CompassGlobe()
                     }
                 }
             }
