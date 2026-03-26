@@ -1368,10 +1368,10 @@ private fun NextPrayerTile(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
-                        start = if (isLandscape) 16.dp else 24.dp,
-                        top = if (isLandscape) 16.dp else 24.dp,
+                        start = if (isLandscape) 16.dp else 16.dp,
+                        top = if (isLandscape) 16.dp else 16.dp,
                         end = if (isLandscape) 2.dp else 0.dp,
-                        bottom = if (isLandscape) 16.dp else 24.dp
+                        bottom = if (isLandscape) 16.dp else 16.dp
                     ),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
@@ -1399,8 +1399,8 @@ private fun NextPrayerTile(
                         .fillMaxWidth()
                         .weight(1f)
                         .padding(
-                            top = if (isLandscape) 4.dp else 8.dp,
-                            bottom = if (isLandscape) 4.dp else 8.dp
+                            top = if (isLandscape) 4.dp else 4.dp,
+                            bottom = if (isLandscape) 4.dp else 4.dp
                         ),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -1409,7 +1409,7 @@ private fun NextPrayerTile(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(end = if (isLandscape) 8.dp else 8.dp),
+                            .padding(end = if (isLandscape) 8.dp else 4.dp),
                         verticalArrangement = if (isLandscape) Arrangement.Center else Arrangement.Top
                     ) {
                         // Get notification-synchronized content using the SAME currentTime that updates every minute
