@@ -1,6 +1,5 @@
 package com.starception.submission.media
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -27,10 +25,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
- * Compact media mini-bar for the PullToSyncContainer sage area.
- * Single-row layout consistent with the download/sync banner height.
+ * Media mini-bar for the PullToSyncContainer sage area.
+ * Single-row layout matching the same height as download/sync banners.
  *
- * Layout: [Title/Subtitle] [◀◀] [▶❚❚] [▶▶] [✕]
+ * Layout: [Title/Subtitle]  [◀◀] [▶❚❚] [▶▶]
  * Playback progress is shown via the PullToSyncContainer horizontal sweep.
  *
  * Renders with transparent background so it blends into the sage background,
@@ -51,7 +49,7 @@ fun MediaMiniBar(
     val contentColor = MaterialTheme.colorScheme.onPrimaryContainer
     val subtitleColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
 
-    // Single row: title area + controls + dismiss
+    // Single row: title area on left, controls on right
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -62,7 +60,7 @@ fun MediaMiniBar(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(end = 8.dp),
+                .padding(end = 12.dp),
         ) {
             Text(
                 text = playback.title,
@@ -83,71 +81,53 @@ fun MediaMiniBar(
         }
 
         // Controls: skip prev, play/pause, skip next
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(0.dp),
-        ) {
-            IconButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onAction(MediaAction.SkipPrevious)
-                },
-                modifier = Modifier.size(36.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SkipPrevious,
-                    contentDescription = "Previous",
-                    modifier = Modifier.size(22.dp),
-                    tint = contentColor,
-                )
-            }
-
-            IconButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    if (playback.isPlaying) onAction(MediaAction.Pause)
-                    else onAction(MediaAction.Play)
-                },
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    imageVector = if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (playback.isPlaying) "Pause" else "Play",
-                    modifier = Modifier.size(28.dp),
-                    tint = contentColor,
-                )
-            }
-
-            IconButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onAction(MediaAction.SkipNext)
-                },
-                modifier = Modifier.size(36.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SkipNext,
-                    contentDescription = "Next",
-                    modifier = Modifier.size(22.dp),
-                    tint = contentColor,
-                )
-            }
-        }
-
-        // Dismiss
-        Spacer(modifier = Modifier.width(4.dp))
         IconButton(
             onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onAction(MediaAction.Dismiss)
+                onAction(MediaAction.SkipPrevious)
             },
-            modifier = Modifier.size(28.dp),
+            modifier = Modifier.size(40.dp),
         ) {
             Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = "Dismiss",
-                modifier = Modifier.size(16.dp),
-                tint = subtitleColor,
+                imageVector = Icons.Default.SkipPrevious,
+                contentDescription = "Previous",
+                modifier = Modifier.size(24.dp),
+                tint = contentColor,
+            )
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        IconButton(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                if (playback.isPlaying) onAction(MediaAction.Pause)
+                else onAction(MediaAction.Play)
+            },
+            modifier = Modifier.size(44.dp),
+        ) {
+            Icon(
+                imageVector = if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = if (playback.isPlaying) "Pause" else "Play",
+                modifier = Modifier.size(32.dp),
+                tint = contentColor,
+            )
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        IconButton(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onAction(MediaAction.SkipNext)
+            },
+            modifier = Modifier.size(40.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.SkipNext,
+                contentDescription = "Next",
+                modifier = Modifier.size(24.dp),
+                tint = contentColor,
             )
         }
     }

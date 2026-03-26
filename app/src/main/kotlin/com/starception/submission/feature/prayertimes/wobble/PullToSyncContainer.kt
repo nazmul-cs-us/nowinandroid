@@ -183,7 +183,7 @@ fun PullToSyncContainer(
 
     // Refreshing/downloading/media state: Animatable for instant snap-to
     // This eliminates the gap where wobbleIntensity would drop between drag release and hold
-    val mediaHoldFraction = 0.50f
+    val mediaHoldFraction = refreshingHoldFraction
     val refreshingOffset = remember { Animatable(0f) }
     LaunchedEffect(isRefreshing, isDownloading, mediaState.isVisible) {
         if (isRefreshing || isDownloading) {
