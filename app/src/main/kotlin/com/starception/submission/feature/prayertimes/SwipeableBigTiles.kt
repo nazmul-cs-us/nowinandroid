@@ -2588,19 +2588,15 @@ private fun DailyStatsTile(
                 else -> QuranFonts.PDMSSaleem
             }
 
-            // PLAYER VIEW - Ultra-compact design optimized for tile height
+            // PLAYER VIEW
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = if (isLandscape) 10.dp else 14.dp, vertical = if (isLandscape) 4.dp else 10.dp),
+                    .padding(horizontal = 14.dp, vertical = if (isLandscape) 8.dp else 10.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Top section: Header and controls grouped together
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(if (isLandscape) 0.dp else 4.dp)
-                ) {
-                    // Header row: Title + Language badge + Surah info (all in one compact row)
-                    Row(
+                // Header row: Title + Language badge
+                Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -2614,11 +2610,11 @@ private fun DailyStatsTile(
                             imageVector = Icons.Default.AutoAwesome,
                             contentDescription = "Quran",
                             tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(if (isLandscape) 16.dp else 20.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Text(
                             text = "The Noble Quran",
-                            style = if (isLandscape) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onTertiaryContainer,
                             fontWeight = FontWeight.Bold
                         )
@@ -2652,7 +2648,7 @@ private fun DailyStatsTile(
                     }
                 }
 
-                // Surah info and playback controls in one integrated row
+                // Surah info and playback controls - fills middle space
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -2680,47 +2676,45 @@ private fun DailyStatsTile(
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
-                                modifier = Modifier.size(if (isLandscape) 24.dp else 28.dp)
+                                modifier = Modifier.size(28.dp)
                             ) {
             Text(
                                     text = "${viewModel.currentSurahIndex + 1}",
-                                    style = if (isLandscape) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
-                        // Surah names - very compact, single line (hide English in landscape)
+                        // Surah names
                         Column {
                             Text(
                                 text = QuranData.surahs[viewModel.currentSurahIndex].nameArabic,
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontFamily = arabicFontFamily,
                                     fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
-                                    fontSize = if (isLandscape) 12.sp else 14.sp
+                                    fontSize = 14.sp
                                 ),
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                                 maxLines = 1
                             )
-                            if (!isLandscape) {
-                                Text(
-                                    text = QuranData.surahs[viewModel.currentSurahIndex].nameEnglish,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
-                                    maxLines = 1,
-                                    fontSize = 10.sp
-                                )
-                            }
+                            Text(
+                                text = QuranData.surahs[viewModel.currentSurahIndex].nameEnglish,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                                maxLines = 1,
+                                fontSize = 10.sp
+                            )
                         }
                     }
 
                     // Right: Inline playback controls
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Previous button - tiny
+                        // Previous button
                         androidx.compose.material3.IconButton(
                             onClick = {
                                 view.performHapticFeedback(
@@ -2729,13 +2723,13 @@ private fun DailyStatsTile(
                                 )
                                 viewModel.playPrevious()
                             },
-                            modifier = Modifier.size(if (isLandscape) 24.dp else 32.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.SkipPrevious,
                                 contentDescription = "Previous",
                                 tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.size(if (isLandscape) 16.dp else 22.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                         }
 
@@ -2753,7 +2747,7 @@ private fun DailyStatsTile(
                                 }
                             },
                             modifier = Modifier
-                                .size(if (isLandscape) 32.dp else 42.dp)
+                                .size(42.dp)
                                 .compactGlow(),
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.tertiary
@@ -2766,12 +2760,12 @@ private fun DailyStatsTile(
                                     imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     contentDescription = if (viewModel.isPlaying) "Pause" else "Play",
                                     tint = MaterialTheme.colorScheme.onTertiary,
-                                    modifier = Modifier.size(if (isLandscape) 18.dp else 24.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
 
-                        // Next button - tiny
+                        // Next button
                         androidx.compose.material3.IconButton(
                             onClick = {
                                 view.performHapticFeedback(
@@ -2780,13 +2774,13 @@ private fun DailyStatsTile(
                                 )
                                 viewModel.playNext()
                             },
-                            modifier = Modifier.size(if (isLandscape) 24.dp else 32.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.SkipNext,
                                 contentDescription = "Next",
                                 tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.size(if (isLandscape) 16.dp else 22.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
@@ -2870,50 +2864,7 @@ private fun DailyStatsTile(
                         }
                     }
                 } else {
-                // Bottom section: Seek slider with time display - pushed to bottom
-                if (isLandscape) {
-                    // Landscape: Time labels inline with slider to save vertical space
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = formatTime(viewModel.currentPosition),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 9.sp
-                        )
-                        androidx.compose.material3.Slider(
-                            value = viewModel.currentPosition.toFloat(),
-                            onValueChange = { newValue ->
-                                view.performHapticFeedback(
-                                    HapticFeedbackConstants.TEXT_HANDLE_MOVE,
-                                    HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-                                )
-                                viewModel.seekTo(newValue.toInt())
-                            },
-                            valueRange = 0f..viewModel.duration.toFloat().coerceAtLeast(1f),
-                            colors = androidx.compose.material3.SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.tertiary,
-                                activeTrackColor = MaterialTheme.colorScheme.tertiary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f)
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(20.dp)
-                        )
-                        Text(
-                            text = formatTime(viewModel.duration),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 9.sp
-                        )
-                    }
-                } else {
-                    // Portrait: Time labels above slider
+                // Bottom section: Seek slider with time display
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
@@ -2957,8 +2908,6 @@ private fun DailyStatsTile(
                                 .aiTextGlow()
                         )
                     }
-                }
-                }
                 }
             }
         }
