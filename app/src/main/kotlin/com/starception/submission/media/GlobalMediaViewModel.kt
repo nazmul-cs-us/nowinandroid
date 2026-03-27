@@ -465,6 +465,33 @@ class GlobalMediaViewModel(
         }
     }
 
+    /**
+     * Re-check active services and restore the controller if something is still playing.
+     * Called on app resume so the mini-bar reappears after dismiss + background.
+     */
+    fun resync() {
+        // Check Quran service
+        val qs = quranService
+        if (qs != null && qs.isPlaying()) {
+            activeSource = MediaSource.Quran(
+                surahIndex = qs.getCurrentSurahIndex(),
+                audioLanguage = _controllerState.value.currentLanguage,
+            )
+            updateQuranState()
+            return
+        }
+
+        // Check Driving service
+        val ds = drivingService
+        if (ds != null) {
+            val state = ds.getCurrentState()
+            if (state != DrivingAudioService.PlaybackState.IDLE) {
+                updateDrivingState(state)
+                return
+            }
+        }
+    }
+
     fun cleanup() {
         // Remove static listener
         DrivingAudioService.onServiceStartedListener = null

@@ -393,6 +393,12 @@ private fun NiaMainContent(
             MediaControllerUiState()
         }
 
+        // Re-sync media controller on app resume (restores mini-bar after dismiss + background)
+        androidx.lifecycle.compose.LifecycleResumeEffect(mainViewModel) {
+            mainViewModel?.globalMedia?.resync()
+            onPauseOrDispose { }
+        }
+
         // Suppress media on HOME — PrayerTimesScreen has its own PullToSyncContainer
         // that already shows the media controller to avoid doubles.
         val appLevelMediaState = if (isOnHome) MediaControllerUiState() else mediaState

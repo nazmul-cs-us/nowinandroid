@@ -367,7 +367,9 @@ fun PullToSyncContainer(
                         modifier = Modifier.padding(bottom = 6.dp),
                     )
                 }
-            } else {
+            } else if (isRefreshing || isDownloading || rawWobbleIntensity > 0.01f) {
+            // Only show sync/download indicators when actively dragging or syncing/downloading.
+            // Skip during settle-back animation after media dismiss (rawWobbleIntensity == 0).
             Column(
                 modifier = Modifier
                     .zIndex(1f)

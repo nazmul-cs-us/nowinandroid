@@ -1375,7 +1375,7 @@ private fun NextPrayerTile(
                 ),
                 label = "compassPressScale"
             )
-            val compassSizeFallback = if (isLandscape) 100.dp else 150.dp
+            val compassSizeFallback = if (isLandscape) 140.dp else 150.dp
 
             // Shared sync content
             val syncContent = remember(prayerTimes, currentTime, timeOffsets) {
@@ -1388,7 +1388,7 @@ private fun NextPrayerTile(
                 Box(
                     modifier = Modifier
                         .then(
-                            if (isLandscape) Modifier.fillMaxHeight(0.7f).aspectRatio(1f)
+                            if (isLandscape) Modifier.fillMaxHeight(0.85f).aspectRatio(1f)
                             else Modifier.fillMaxHeight().aspectRatio(1f)
                         )
                         .offset(x = if (isLandscape) 0.dp else (-10).dp)
@@ -1438,11 +1438,11 @@ private fun NextPrayerTile(
             fun PrayerTextContent() {
                 if (syncContent != null) {
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 2.dp else 6.dp)
+                        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 6.dp)
                     ) {
                         Text(
                             text = syncContent.title,
-                            style = if (isLandscape) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontWeight = FontWeight.Medium,
                             maxLines = 1,
@@ -1451,14 +1451,14 @@ private fun NextPrayerTile(
                         Text(
                             text = syncContent.content,
                             style = MaterialTheme.typography.headlineSmall.copy(
-                                fontSize = if (isLandscape) 18.sp else 22.sp,
+                                fontSize = 22.sp,
                                 letterSpacing = (-0.4).sp
                             ),
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
-                            maxLines = if (isLandscape) 1 else 2,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                            lineHeight = if (isLandscape) 20.sp else 24.sp
+                            lineHeight = 24.sp
                         )
                         if (syncContent.nextPrayerInfo.isNotEmpty()) {
                             Surface(
@@ -1471,7 +1471,7 @@ private fun NextPrayerTile(
                                 Text(
                                     text = syncContent.nextPrayerInfo,
                                     style = MaterialTheme.typography.titleMedium.copy(
-                                        fontSize = if (isLandscape) 14.sp else 15.sp,
+                                        fontSize = 15.sp,
                                         letterSpacing = (-0.2).sp
                                     ),
                                     color = MaterialTheme.colorScheme.tertiary,
@@ -1540,11 +1540,11 @@ private fun NextPrayerTile(
                             imageVector = Icons.Default.BatchPrediction,
                             contentDescription = "Smart Prediction",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Text(
                             text = "Smart Prediction",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontWeight = FontWeight.Bold
                         )
@@ -1558,8 +1558,8 @@ private fun NextPrayerTile(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(
-                            modifier = Modifier.weight(1f).padding(end = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                            modifier = Modifier.weight(1f).padding(end = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             PrayerTextContent()
                         }
