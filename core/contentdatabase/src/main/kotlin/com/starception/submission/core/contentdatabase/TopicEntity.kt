@@ -32,10 +32,10 @@ data class TopicEntity(
     val icon: String?,
 
     @ColumnInfo(name = "is_system", defaultValue = "1")
-    val isSystem: Int = 1,
+    val isSystem: Int? = 1,
 
     @ColumnInfo(name = "is_user_created", defaultValue = "0")
-    val isUserCreated: Int = 0,
+    val isUserCreated: Int? = 0,
 
     @ColumnInfo(name = "created_at")
     val createdAt: String?,

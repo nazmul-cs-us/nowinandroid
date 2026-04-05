@@ -104,8 +104,25 @@ class AssetDownloadManager @Inject constructor(
     }
 
     fun isAssetAvailable(cdnKey: String): Boolean {
+        // First check if downloaded to cdn_assets directory
         val file = getAssetFile(cdnKey)
-        return file != null && file.exists() && file.length() > 0
+        if (file != null && file.exists() && file.length() > 0) {
+            return true
+        }
+
+        // Also check if bundled in APK assets
+        return isAssetBundled(cdnKey)
+    }
+
+    /**
+     * Check if an asset is bundled in the APK's assets folder.
+     */
+    private fun isAssetBundled(cdnKey: String): Boolean {
+        return try {
+            context.assets.open(cdnKey).use { it.available() > 0 }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun getAssetFile(cdnKey: String): File? {
@@ -393,6 +410,14 @@ class AssetDownloadManager @Inject constructor(
 
     fun isCategoryComplete(category: String, manifest: AssetManifest): Boolean =
         manifest.getAssetsByCategory(category).all { isAssetAvailable(it.cdnKey) }
+
+    /**
+     * Check if all assets in a category are bundled in the APK.
+     * Bundled categories should be hidden from the Content & Storage settings
+     * since users cannot delete or re-download them.
+     */
+    fun isCategoryFullyBundled(category: String, manifest: AssetManifest): Boolean =
+        manifest.getAssetsByCategory(category).all { isAssetBundled(it.cdnKey) }
 
     fun hasEssentialAssets(manifest: AssetManifest): Boolean =
         manifest.getRequiredAssets().all { isAssetAvailable(it.cdnKey) }

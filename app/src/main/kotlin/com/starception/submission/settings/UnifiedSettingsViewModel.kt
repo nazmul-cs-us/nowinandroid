@@ -1142,24 +1142,30 @@ class UnifiedSettingsViewModel @Inject constructor(
         contentRefreshJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val m = manifest ?: downloadManager.loadManifest() ?: return@launch
-                val categories = m.categories.map { (key, info) ->
-                    val downloadedSize = downloadManager.getCategoryDownloadedSize(key, m)
-                    val isComplete = downloadManager.isCategoryComplete(key, m)
-                    CategoryDownloadState(
-                        categoryKey = key,
-                        displayName = AssetDownloadViewModel.formatCategoryName(key),
-                        description = AssetDownloadViewModel.categoryDescription(key),
-                        totalSize = info.totalSize,
-                        downloadedSize = downloadedSize,
-                        fileCount = info.fileCount,
-                        required = info.required,
-                        isComplete = isComplete,
-                        progress = if (info.totalSize > 0) downloadedSize.toFloat() / info.totalSize else 0f,
+                val categories = m.categories
+                    .filterNot { (key, _) ->
+                        // Hide categories that are fully bundled in the APK
+                        // since users cannot delete or manage them
+                        downloadManager.isCategoryFullyBundled(key, m)
+                    }
+                    .map { (key, info) ->
+                        val downloadedSize = downloadManager.getCategoryDownloadedSize(key, m)
+                        val isComplete = downloadManager.isCategoryComplete(key, m)
+                        CategoryDownloadState(
+                            categoryKey = key,
+                            displayName = AssetDownloadViewModel.formatCategoryName(key),
+                            description = AssetDownloadViewModel.categoryDescription(key),
+                            totalSize = info.totalSize,
+                            downloadedSize = downloadedSize,
+                            fileCount = info.fileCount,
+                            required = info.required,
+                            isComplete = isComplete,
+                            progress = if (info.totalSize > 0) downloadedSize.toFloat() / info.totalSize else 0f,
+                        )
+                    }.sortedWith(
+                        compareByDescending<CategoryDownloadState> { it.required }
+                            .thenBy { it.displayName }
                     )
-                }.sortedWith(
-                    compareByDescending<CategoryDownloadState> { it.required }
-                        .thenBy { it.displayName }
-                )
 
                 val totalDownloadedSize = downloadManager.getTotalDownloadedSize()
 

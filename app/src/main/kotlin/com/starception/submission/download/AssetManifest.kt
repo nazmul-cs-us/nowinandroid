@@ -1,6 +1,7 @@
 package com.starception.submission.download
 
 import org.json.JSONObject
+import java.net.URLEncoder
 
 data class AssetEntry(
     val cdnKey: String,
@@ -31,8 +32,13 @@ data class AssetManifest(
     fun getRequiredAssets(): List<AssetEntry> =
         assets.values.filter { it.required }
 
-    fun getAssetUrl(cdnKey: String): String =
-        "${baseUrl.trimEnd('/')}/$cdnKey"
+    fun getAssetUrl(cdnKey: String): String {
+        // URL-encode each path segment to handle special characters like ! and spaces
+        val encodedPath = cdnKey.split("/").joinToString("/") { segment ->
+            URLEncoder.encode(segment, "UTF-8").replace("+", "%20")
+        }
+        return "${baseUrl.trimEnd('/')}/$encodedPath"
+    }
 
     companion object {
         fun fromJson(json: String): AssetManifest {

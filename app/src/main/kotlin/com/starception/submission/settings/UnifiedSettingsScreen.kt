@@ -467,9 +467,9 @@ private fun SettingsFloatingTitle(
     collapseProgress: Float,
     titleXPx: Float,
 ) {
+    // Single animated title that moves from hero position to toolbar position
+    // Scale down as it moves up (same pattern as SurahDetailScreen)
     val scale = 1f - (collapseProgress * 0.22f)
-    val compactWidth = 280.dp - (48.dp * collapseProgress)
-    val titleAlpha = collapseProgress.coerceIn(0f, 1f)
 
     Box(
         modifier = Modifier
@@ -478,10 +478,8 @@ private fun SettingsFloatingTitle(
                 translationY = titleYPx
                 scaleX = scale
                 scaleY = scale
-                alpha = titleAlpha
                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-            }
-            .width(compactWidth),
+            },
     ) {
         Text(
             text = "Settings",
@@ -502,10 +500,6 @@ private fun SettingsHeroSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                translationY = collapseProgress * 40f
-                alpha = 1f - collapseProgress
-            }
             .padding(
                 start = 24.dp,
                 end = 24.dp,
@@ -514,20 +508,26 @@ private fun SettingsHeroSection(
             ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // Invisible placeholder to track title start position
+        // The actual title is rendered by SettingsFloatingTitle and animates from here to toolbar
         Text(
             text = "Settings",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = Color.Transparent,
             maxLines = 1,
             modifier = Modifier.onGloballyPositioned { coordinates ->
                 onTitlePlaceholderPositioned(coordinates.positionInRoot())
             },
         )
+        // Subtitle fades out as user scrolls
         Text(
             text = "Personalize prayer times, audio, notifications, and offline content.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.graphicsLayer {
+                alpha = 1f - collapseProgress
+            },
         )
     }
 }
