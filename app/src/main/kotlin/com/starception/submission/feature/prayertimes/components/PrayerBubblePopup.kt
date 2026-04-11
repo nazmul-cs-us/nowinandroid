@@ -397,14 +397,17 @@ private fun IOSPrayerCard(
                     )
                 }
             } else {
-                // Filled button for mark action
+                // Filled button for mark action - disabled if prayer time hasn't arrived
                 Button(
                     onClick = { onTogglePrayer(true) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
+                    enabled = !isUpcoming, // Disable if prayer time is still upcoming
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     shape = RoundedCornerShape(12.dp),
                     elevation = ButtonDefaults.buttonElevation(
@@ -413,7 +416,7 @@ private fun IOSPrayerCard(
                     )
                 ) {
                     Text(
-                        text = "Mark as Prayed",
+                        text = if (isUpcoming) "Prayer Time Not Yet" else "Mark as Prayed",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
                     )
