@@ -427,10 +427,10 @@ private fun IOSPrayerCard(
 
             // Status message - subtle
             Text(
-                text = if (isPrayed) {
-                    "Prayer marked as complete"
-                } else {
-                    "Track your daily prayers"
+                text = when {
+                    isPrayed -> "Prayer marked as complete"
+                    isUpcoming -> "Can mark after prayer time"
+                    else -> "Track your daily prayers"
                 },
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Normal,

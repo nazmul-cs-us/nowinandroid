@@ -391,6 +391,9 @@ fun QiblaGlobeView(
                     val turnLeft = diff < 0
                     val angleDiff = kotlin.math.abs(diff)
 
+                    // Round angle to nearest 5 degrees for stable display
+                    val displayAngle = ((angleDiff / 5f).toInt() * 5)
+
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -415,7 +418,7 @@ fun QiblaGlobeView(
                                 fontSize = 9.sp
                             )
                             Text(
-                                text = "${angleDiff.toInt()}°",
+                                text = "${displayAngle}°",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
