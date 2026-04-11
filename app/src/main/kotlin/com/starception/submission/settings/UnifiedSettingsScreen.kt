@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -326,6 +327,21 @@ fun UnifiedSettingsScreen(
                     }
                 }
 
+                // Salah Training Section
+                item {
+                    SettingsSection(
+                        title = "Salah Training",
+                        subtitle = "ML posture detection training",
+                        icon = Icons.Outlined.FitnessCenter,
+                        isExpanded = expandedSections.contains("salah"),
+                        onToggleExpanded = { viewModel.toggleSection("salah") }
+                    ) {
+                        SalahTrainingSection(
+                            onNavigateToDataCollection = onNavigateToSalahDataCollection
+                        )
+                    }
+                }
+
                 // Content Management Section
                 if (contentCategories.isNotEmpty()) {
                     item {
@@ -374,8 +390,7 @@ fun UnifiedSettingsScreen(
                             onRefreshTopics = viewModel::refreshTopicsDatabase,
                             onRefreshDuas = viewModel::refreshDuasDatabase,
                             onRefreshQuranicDuas = viewModel::refreshQuranicDuasDatabase,
-                            onRefreshAll = viewModel::refreshAllDatabases,
-                            onNavigateToSalahDataCollection = onNavigateToSalahDataCollection
+                            onRefreshAll = viewModel::refreshAllDatabases
                         )
                     }
                 }
@@ -561,5 +576,39 @@ private fun SettingsHeroSection(
                 alpha = 1f - collapseProgress
             },
         )
+    }
+}
+
+@Composable
+private fun SalahTrainingSection(
+    onNavigateToDataCollection: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = "Collect sensor data to train the salah posture detection model. Record your prayer movements to improve ML accuracy.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        androidx.compose.material3.FilledTonalButton(
+            onClick = onNavigateToDataCollection,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.FitnessCenter,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Start Data Collection",
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
     }
 }
