@@ -305,24 +305,12 @@ fun QiblaGlobeView(
                     qiblaLayerRef = qiblaLayer
                     userMarkerPlacemark = headingCone
 
-                    // CRITICAL: Enable touch handling for WorldWindow (GLSurfaceView)
-                    worldWindow.isFocusable = true
-                    worldWindow.isFocusableInTouchMode = true
-                    worldWindow.isClickable = true
-
-                    // Handle touches directly and forward to controller
-                    // This is required because Compose's AndroidView doesn't properly forward
-                    // touch events to GLSurfaceView (WorldWindow) by default
-                    worldWindow.setOnTouchListener { v, event ->
-                        // Request parent to not intercept our touch events
-                        v.parent?.requestDisallowInterceptTouchEvent(true)
-
-                        // Forward touch event to WorldWindow's controller for gesture handling
-                        worldWindow.worldWindowController?.onTouchEvent(event)
-
-                        // Return true to claim the touch sequence and prevent cancellation
-                        true
-                    }
+                    // Disable touch interactions on globe to allow HorizontalPager swiping
+                    // The globe is display-only, compass rotation is automatic
+                    worldWindow.isFocusable = false
+                    worldWindow.isFocusableInTouchMode = false
+                    worldWindow.isClickable = false
+                    worldWindow.setOnTouchListener { _, _ -> false }
 
                     // Add lifecycle observer to properly manage GLSurfaceView
                     val observer = LifecycleEventObserver { _, event ->
@@ -542,8 +530,9 @@ private fun createWorldWindow(
     )
     android.util.Log.d("QiblaGlobeView", "🌍 WorldWindow created with explicit size: ${viewWidth}x${viewHeight}")
 
-    // Set up touch-tracking controller for pan/zoom with compass pause
-    worldWindow.worldWindowController = TouchTrackingController(onTouchStart, onTouchEnd)
+    // Use basic controller but touch events are not forwarded (see setOnTouchListener above)
+    // This allows the globe to render without crashing, but swiping works for HorizontalPager
+    worldWindow.worldWindowController = BasicWorldWindowController()
 
     // Add base layers for Earth imagery (CRITICAL - without these, globe is black!)
     worldWindow.layers.addLayer(BackgroundLayer())

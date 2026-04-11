@@ -174,7 +174,7 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     // Salah (prayer) posture detection via TFLite ML model
     private SalahDetectionEngine salahDetectionEngine;
     private SalahSequenceValidator salahSequenceValidator;
-    private boolean salahDetectionEnabled = true;
+    private boolean salahDetectionEnabled = false; // Disabled - ML model not accurate enough yet
     private static final int SALAH_WINDOW_SIZE = 5; // 5 samples per 100ms window (matching training)
     private final List<float[]> salahAccelWindow = new ArrayList<>(); // [x,y,z] per sample
     private final List<float[]> salahGyroWindow = new ArrayList<>();  // [x,y,z] per sample

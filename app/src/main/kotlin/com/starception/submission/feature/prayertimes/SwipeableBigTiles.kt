@@ -1718,7 +1718,7 @@ private fun SmartInfoTile(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1726,7 +1726,7 @@ private fun SmartInfoTile(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(end = 12.dp),
+                            .padding(end = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -1883,12 +1883,12 @@ private fun SmartInfoTile(
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
                             )
-                            
-                            // Phone Position Display (NEW - based on research paper)
+
+                            // Phone Position Display (text only, no icon)
                             val phonePositionFlow = com.starception.submission.util.ActivityTracker.phonePosition
                             val phonePosition by phonePositionFlow.collectAsStateWithLifecycle()
-                            
-                            // Position badge with icon
+
+                            // Position badge without icon
                             Row(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1900,27 +1900,6 @@ private fun SmartInfoTile(
                                     )
                                     .padding(horizontal = 10.dp, vertical = 4.dp)
                             ) {
-                                // Use custom drawable for HAND, Material icons for others
-                                if (phonePosition == "HAND") {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.mobile_hand_24),
-                                        contentDescription = "Phone Position",
-                                        tint = MaterialTheme.colorScheme.tertiary,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = when (phonePosition) {
-                                            "POCKET" -> Icons.Default.Checkroom
-                                            "DESK" -> Icons.Default.DesktopWindows
-                                            else -> Icons.Default.BubbleChart
-                                        },
-                                        contentDescription = "Phone Position",
-                                        tint = MaterialTheme.colorScheme.tertiary,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = when (phonePosition) {
                                         "HAND" -> "In Hand"
