@@ -53,14 +53,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.settings.components.AboutSection
@@ -115,23 +117,42 @@ fun UnifiedSettingsScreen(
             (scrollOffset / (headerHeightPx - toolbarHeightPx)).coerceIn(0f, 1f)
         }
     }
-    var heroTitleOrigin by remember { mutableStateOf<Offset?>(null) }
+
+    // Track positions - heroTitleOrigin is relative to the inner container
+    var heroTitleWindowPos by remember { mutableStateOf<Offset?>(null) }
+    var containerWindowPos by remember { mutableStateOf<Offset?>(null) }
     var toolbarTitleTarget by remember { mutableStateOf<Offset?>(null) }
+
+    // Calculate hero position relative to container (for local positioning of floating title)
+    val heroTitleLocalPos by remember {
+        derivedStateOf {
+            val hero = heroTitleWindowPos
+            val container = containerWindowPos
+            if (hero != null && container != null) {
+                Offset(hero.x - container.x, hero.y - container.y)
+            } else null
+        }
+    }
+
     val floatingTitleState by remember {
         derivedStateOf {
-            val start = heroTitleOrigin
+            val start = heroTitleLocalPos
             val end = toolbarTitleTarget
-            if (start != null && end != null) {
+            val container = containerWindowPos
+            if (start != null && end != null && container != null) {
+                // End position needs to be relative to container too
+                val endLocal = Offset(end.x - container.x, end.y - container.y)
                 Triple(
-                    start.y + ((end.y - start.y) * collapseProgress),
+                    start.y + ((endLocal.y - start.y) * collapseProgress),
                     collapseProgress,
-                    start.x + ((end.x - start.x) * collapseProgress),
+                    start.x + ((endLocal.x - start.x) * collapseProgress),
                 )
             } else {
                 Triple(0f, collapseProgress, 0f)
             }
         }
     }
+
 
     LaunchedEffect(Unit) {
         viewModel.consumePendingSectionRequest()?.let { sectionId ->
@@ -172,7 +193,14 @@ fun UnifiedSettingsScreen(
             ),
             exit = fadeOut()
         ) {
-            LazyColumn(
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onGloballyPositioned { coordinates ->
+                        containerWindowPos = coordinates.positionInWindow()
+                    }
+            ) {
+                LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -181,7 +209,7 @@ fun UnifiedSettingsScreen(
                 item {
                     SettingsHeroSection(
                         collapseProgress = collapseProgress,
-                        onTitlePlaceholderPositioned = { heroTitleOrigin = it },
+                        onTitlePositioned = { heroTitleWindowPos = it },
                     )
                 }
 
@@ -357,16 +385,19 @@ fun UnifiedSettingsScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                 }
             }
+
+            }
         }
 
         ModernSettingsTopBar(
             onBackClick = onBackClick,
-            collapseProgress = floatingTitleState.second,
+            collapseProgress = collapseProgress,
             onTitleTargetPositioned = { toolbarTitleTarget = it },
             modifier = Modifier.align(Alignment.TopCenter),
         )
 
-        if (heroTitleOrigin != null && toolbarTitleTarget != null) {
+        // Floating title rendered on top of toolbar - uses local coordinates relative to container
+        if (heroTitleLocalPos != null && toolbarTitleTarget != null && containerWindowPos != null) {
             SettingsFloatingTitle(
                 titleYPx = floatingTitleState.first,
                 collapseProgress = floatingTitleState.second,
@@ -438,11 +469,12 @@ private fun ModernSettingsTopBar(
                     .weight(1f)
                     .fillMaxHeight()
                     .onGloballyPositioned { coordinates ->
-                        titleSlotPosition = coordinates.positionInRoot()
+                        titleSlotPosition = coordinates.positionInWindow()
                         titleSlotSize = coordinates.size
                     },
                 contentAlignment = Alignment.CenterStart,
             ) {
+                // Invisible placeholder to measure toolbar title position
                 Text(
                     text = "Settings",
                     style = MaterialTheme.typography.headlineLarge,
@@ -467,8 +499,6 @@ private fun SettingsFloatingTitle(
     collapseProgress: Float,
     titleXPx: Float,
 ) {
-    // Single animated title that moves from hero position to toolbar position
-    // Scale down as it moves up (same pattern as SurahDetailScreen)
     val scale = 1f - (collapseProgress * 0.22f)
 
     Box(
@@ -478,7 +508,7 @@ private fun SettingsFloatingTitle(
                 translationY = titleYPx
                 scaleX = scale
                 scaleY = scale
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                transformOrigin = TransformOrigin(0f, 0f)
             },
     ) {
         Text(
@@ -495,7 +525,7 @@ private fun SettingsFloatingTitle(
 @Composable
 private fun SettingsHeroSection(
     collapseProgress: Float,
-    onTitlePlaceholderPositioned: (Offset) -> Unit,
+    onTitlePositioned: (Offset) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -508,8 +538,8 @@ private fun SettingsHeroSection(
             ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        // Invisible placeholder to track title start position
-        // The actual title is rendered by SettingsFloatingTitle and animates from here to toolbar
+        // Invisible placeholder - actual title is rendered by SettingsFloatingTitle
+        // Use positionInWindow for coordinates that work with the floating title's graphicsLayer
         Text(
             text = "Settings",
             style = MaterialTheme.typography.headlineLarge,
@@ -517,7 +547,9 @@ private fun SettingsHeroSection(
             color = Color.Transparent,
             maxLines = 1,
             modifier = Modifier.onGloballyPositioned { coordinates ->
-                onTitlePlaceholderPositioned(coordinates.positionInRoot())
+                // Get position relative to root so floating title can use absolute positioning
+                val posInWindow = coordinates.positionInWindow()
+                onTitlePositioned(posInWindow)
             },
         )
         // Subtitle fades out as user scrolls
