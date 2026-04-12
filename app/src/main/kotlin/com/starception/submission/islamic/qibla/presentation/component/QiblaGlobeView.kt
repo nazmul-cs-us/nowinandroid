@@ -6,11 +6,16 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.hardware.GeomagneticField
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBackIos
 import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
@@ -143,6 +148,13 @@ fun QiblaGlobeView(
     // Compass sensor state for dynamic rotation
     var deviceHeading by remember { mutableFloatStateOf(0f) }
     var lastUpdatedHeading by remember { mutableFloatStateOf(0f) }  // Track last heading used for update
+
+    // Smooth animated heading - same animation as Smart Prediction tile's CompassProgressIndicator
+    val animatedHeading by animateFloatAsState(
+        targetValue = deviceHeading,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        label = "smoothBeamHeading"
+    )
     var worldWindowRef by remember { mutableStateOf<WorldWindow?>(null) }
     var qiblaLayerRef by remember { mutableStateOf<RenderableLayer?>(null) }
     var isUserInteracting by remember { mutableStateOf(false) }
@@ -227,13 +239,11 @@ fun QiblaGlobeView(
                     val normalizedHeadingDiff = if (headingDiff > 180f) 360f - headingDiff else headingDiff
 
                     if (normalizedHeadingDiff > 1.5f) {
-                        // Update the heading state
+                        // Update heading state
                         deviceHeading = newHeading
                         lastUpdatedHeading = newHeading
 
-                        // Update user marker with RELATIVE heading to Qibla
-                        // When aligned (diff = 0), beam points UP toward Qibla
-                        // When not aligned, beam shows how much user needs to turn
+                        // Update user marker bitmap with new heading
                         userMarkerPlacemark?.let { placemark ->
                             val relativeHeading = newHeading - qiblaDirection
                             val newBitmap = createUserMarkerWithHeadingShadow(relativeHeading)
@@ -727,48 +737,51 @@ private fun createUserMarkerWithHeadingShadow(heading: Float): Bitmap {
         style = android.graphics.Paint.Style.FILL
     }
 
-    // Define white ring radius first (used by both beam and ring)
-    val whiteRingRadius = size * 0.09f
+    // EXACT COPY from SimpleGlobeView RingOverlayView beam
+    val coneColor = 0xFF10B981.toInt()  // Teal
+    val ccR = android.graphics.Color.red(coneColor)
+    val ccG = android.graphics.Color.green(coneColor)
+    val ccB = android.graphics.Color.blue(coneColor)
 
-    // 1. HEADING BEAM - Natural light beam that fades out gradually
-    canvas.save()
-    canvas.rotate(heading, centerX, centerY)
+    // Radar cone with gradient - SAME as Smart Prediction
+    val radarRadius = size * 0.48f
+    val coneSweep = 65f  // Same 65° sweep as Smart Prediction
+    val coneStart = heading - 90f - coneSweep / 2f  // Heading points up
 
-    // Draw multiple layered ovals that fade out - creates natural light beam effect
-    val beamColor = 0x4285F4  // Google blue (without alpha)
-    val numLayers = 12
-    val maxLength = size * 0.48f
-    val maxWidth = size * 0.32f
+    val radarOval = android.graphics.RectF(
+        centerX - radarRadius, centerY - radarRadius,
+        centerX + radarRadius, centerY + radarRadius
+    )
 
-    for (i in numLayers downTo 1) {
-        val progress = i.toFloat() / numLayers
-        val layerLength = maxLength * progress
-        val layerWidth = maxWidth * progress * 0.8f  // Narrower near center
+    // RadialGradient with SAME color stops as Smart Prediction
+    val shader = android.graphics.RadialGradient(
+        centerX, centerY, radarRadius,
+        intArrayOf(
+            android.graphics.Color.argb(0xFF, ccR, ccG, ccB),
+            android.graphics.Color.argb(0xCC, ccR, ccG, ccB),
+            android.graphics.Color.argb(0x66, ccR, ccG, ccB),
+            android.graphics.Color.argb(0x00, ccR, ccG, ccB)
+        ),
+        floatArrayOf(0f, 0.2f, 0.55f, 1f),
+        android.graphics.Shader.TileMode.CLAMP
+    )
 
-        // Alpha decreases as we go further (outer layers are more transparent)
-        val alpha = (200 * (1f - progress * 0.7f)).toInt().coerceIn(20, 200)
+    paint.style = android.graphics.Paint.Style.FILL
+    paint.shader = shader
 
-        paint.color = (alpha shl 24) or beamColor
+    val radarPath = android.graphics.Path()
+    radarPath.moveTo(centerX, centerY)
+    radarPath.arcTo(radarOval, coneStart, coneSweep)
+    radarPath.close()
+    canvas.drawPath(radarPath, paint)
+    paint.shader = null
 
-        // Draw oval for each layer - creates soft gradient effect
-        val ovalLeft = centerX - layerWidth / 2
-        val ovalTop = centerY - layerLength - whiteRingRadius * 0.5f
-        val ovalRight = centerX + layerWidth / 2
-        val ovalBottom = centerY - whiteRingRadius * 0.3f
-
-        canvas.drawOval(ovalLeft, ovalTop, ovalRight, ovalBottom, paint)
-    }
-
-    canvas.restore()
-
-    // 3. WHITE RING - around the center dot (uses whiteRingRadius defined above)
+    // User dot: white border + teal fill - SAME as Smart Prediction
+    val dotRadius = size * 0.055f
     paint.color = 0xFFFFFFFF.toInt()
-    canvas.drawCircle(centerX, centerY, whiteRingRadius, paint)
-
-    // 4. BLUE DOT - solid center
-    val blueDotRadius = size * 0.06f
-    paint.color = 0xFF4285F4.toInt()
-    canvas.drawCircle(centerX, centerY, blueDotRadius, paint)
+    canvas.drawCircle(centerX, centerY, dotRadius + 4f, paint)
+    paint.color = coneColor
+    canvas.drawCircle(centerX, centerY, dotRadius, paint)
 
     return bitmap
 }
