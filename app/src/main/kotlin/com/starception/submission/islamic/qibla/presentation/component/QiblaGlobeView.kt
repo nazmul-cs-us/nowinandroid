@@ -884,10 +884,10 @@ private fun createUserMarkerWithHeadingShadow(heading: Float, coneColor: Int = 0
     val ccG = android.graphics.Color.green(coneColor)
     val ccB = android.graphics.Color.blue(coneColor)
 
-    // ============ OUTER GLOW/HALO (like Smart Prediction) ============
-    // Wider, softer outer glow for depth
-    val outerRadius = size * 0.68f
-    val outerSweep = 90f  // Wider sweep for outer glow
+    // ============ OUTER HALO (SAME as Smart Prediction: 80° sweep) ============
+    // Wide soft sweep around the direction - matches CompassProgressIndicator
+    val outerRadius = size * 0.45f  // Matches Smart Prediction proportions
+    val outerSweep = 80f  // Same as Smart Prediction outer halo
     val outerStart = heading - 90f - outerSweep / 2f
 
     val outerOval = android.graphics.RectF(
@@ -895,15 +895,15 @@ private fun createUserMarkerWithHeadingShadow(heading: Float, coneColor: Int = 0
         centerX + outerRadius, centerY + outerRadius
     )
 
+    // Gradient matches Smart Prediction: transparent -> soft glow -> transparent
     val outerShader = android.graphics.RadialGradient(
         centerX, centerY, outerRadius,
         intArrayOf(
             android.graphics.Color.argb(0x00, ccR, ccG, ccB),  // Transparent at center
-            android.graphics.Color.argb(0x40, ccR, ccG, ccB),  // Soft glow in middle
-            android.graphics.Color.argb(0x20, ccR, ccG, ccB),
+            android.graphics.Color.argb(0x2E, ccR, ccG, ccB),  // ~18% alpha like Smart Prediction
             android.graphics.Color.argb(0x00, ccR, ccG, ccB)   // Fade out
         ),
-        floatArrayOf(0f, 0.3f, 0.7f, 1f),
+        floatArrayOf(0f, 0.5f, 1f),
         android.graphics.Shader.TileMode.CLAMP
     )
 
@@ -917,39 +917,37 @@ private fun createUserMarkerWithHeadingShadow(heading: Float, coneColor: Int = 0
     canvas.drawPath(outerPath, paint)
     paint.shader = null
 
-    // ============ MAIN BEAM (stronger, longer) ============
-    val radarRadius = size * 0.62f  // Longer beam
-    val coneSweep = 70f  // Focused cone
-    val coneStart = heading - 90f - coneSweep / 2f
+    // ============ INNER CORE BEAM (SAME as Smart Prediction: 30° sweep) ============
+    // Narrow focused beam - sharper, brighter - matches CompassProgressIndicator
+    val coreRadius = size * 0.45f  // Same radius as outer
+    val coreSweep = 30f  // Same as Smart Prediction inner core
+    val coreStart = heading - 90f - coreSweep / 2f
 
-    val radarOval = android.graphics.RectF(
-        centerX - radarRadius, centerY - radarRadius,
-        centerX + radarRadius, centerY + radarRadius
+    val coreOval = android.graphics.RectF(
+        centerX - coreRadius, centerY - coreRadius,
+        centerX + coreRadius, centerY + coreRadius
     )
 
-    // Stronger gradient with higher alpha values
-    val shader = android.graphics.RadialGradient(
-        centerX, centerY, radarRadius,
+    // Core gradient: brighter in middle, fading out - matches Smart Prediction
+    val coreShader = android.graphics.RadialGradient(
+        centerX, centerY, coreRadius,
         intArrayOf(
-            android.graphics.Color.argb(0xFF, ccR, ccG, ccB),  // Full opacity at center
-            android.graphics.Color.argb(0xDD, ccR, ccG, ccB),
-            android.graphics.Color.argb(0x99, ccR, ccG, ccB),
-            android.graphics.Color.argb(0x55, ccR, ccG, ccB),
-            android.graphics.Color.argb(0x20, ccR, ccG, ccB),
-            android.graphics.Color.argb(0x00, ccR, ccG, ccB)
+            android.graphics.Color.argb(0x8C, ccR, ccG, ccB),  // ~55% alpha at center
+            android.graphics.Color.argb(0x40, ccR, ccG, ccB),  // ~25% alpha mid
+            android.graphics.Color.argb(0x00, ccR, ccG, ccB)   // Transparent at edge
         ),
-        floatArrayOf(0f, 0.1f, 0.3f, 0.55f, 0.8f, 1f),
+        floatArrayOf(0f, 0.5f, 1f),
         android.graphics.Shader.TileMode.CLAMP
     )
 
     paint.style = android.graphics.Paint.Style.FILL
-    paint.shader = shader
+    paint.shader = coreShader
 
-    val radarPath = android.graphics.Path()
-    radarPath.moveTo(centerX, centerY)
-    radarPath.arcTo(radarOval, coneStart, coneSweep)
-    radarPath.close()
-    canvas.drawPath(radarPath, paint)
+    val corePath = android.graphics.Path()
+    corePath.moveTo(centerX, centerY)
+    corePath.arcTo(coreOval, coreStart, coreSweep)
+    corePath.close()
+    canvas.drawPath(corePath, paint)
     paint.shader = null
 
     // User dot: white border + teal fill - SAME as Smart Prediction
