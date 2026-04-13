@@ -165,6 +165,10 @@ fun QiblaGlobeView(
     var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
     var magneticFieldStrength by remember { mutableFloatStateOf(50f) } // For strength-based accuracy like Smart Prediction
 
+    // Debounce direction changes to prevent flickering when angle is near 180°
+    var stableDirection by remember { mutableStateOf<Boolean?>(null) } // true = turn right, false = turn left
+    var lastDirectionChangeTime by remember { mutableLongStateOf(0L) }
+
     // Calculate magnetic declination for location
     val magneticDeclination = remember(userLatitude, userLongitude) {
         val geoField = GeomagneticField(
@@ -431,8 +435,36 @@ fun QiblaGlobeView(
                     if (diff > 180f) diff -= 360f
                     if (diff < -180f) diff += 360f
 
-                    val turnLeft = diff < 0
+                    val rawTurnRight = diff > 0
                     val angleDiff = kotlin.math.abs(diff)
+
+                    // Debounce direction changes to prevent flickering near 180°
+                    val currentTime = System.currentTimeMillis()
+                    val turnRight = if (stableDirection == null) {
+                        // First time - set immediately
+                        stableDirection = rawTurnRight
+                        lastDirectionChangeTime = currentTime
+                        rawTurnRight
+                    } else if (stableDirection != rawTurnRight) {
+                        // Direction wants to change - only allow if:
+                        // 1. It's been at least 800ms since last change, OR
+                        // 2. The angle is very clear (far from 180°)
+                        val timeSinceLastChange = currentTime - lastDirectionChangeTime
+                        val isVeryClearDirection = angleDiff < 30f || angleDiff > 330f
+
+                        if (timeSinceLastChange > 800 || isVeryClearDirection) {
+                            stableDirection = rawTurnRight
+                            lastDirectionChangeTime = currentTime
+                            rawTurnRight
+                        } else {
+                            // Keep old direction (debounce)
+                            stableDirection!!
+                        }
+                    } else {
+                        rawTurnRight
+                    }
+
+                    val turnLeft = !turnRight
 
                     // Round angle to nearest 5 degrees for stable display
                     val displayAngle = ((angleDiff / 5f).toInt() * 5)
