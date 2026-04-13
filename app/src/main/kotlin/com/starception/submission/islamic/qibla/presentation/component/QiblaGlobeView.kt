@@ -162,6 +162,8 @@ fun QiblaGlobeView(
     var wasAlignedWithQibla by remember { mutableStateOf(false) }
     var userMarkerPlacemark by remember { mutableStateOf<Placemark?>(null) }
     var isInForeground by remember { mutableStateOf(true) } // Track if app is in foreground for haptic control
+    var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
+    var magneticFieldStrength by remember { mutableFloatStateOf(50f) } // For strength-based accuracy like Smart Prediction
 
     // Calculate magnetic declination for location
     val magneticDeclination = remember(userLatitude, userLongitude) {
@@ -214,6 +216,24 @@ fun QiblaGlobeView(
                     }
                     Sensor.TYPE_MAGNETIC_FIELD -> {
                         System.arraycopy(event.values, 0, geomagnetic, 0, 3)
+
+                        // Calculate magnetic field strength for accuracy detection
+                        // Same logic as CompassProgressIndicator in Smart Prediction tile
+                        val x = event.values[0]
+                        val y = event.values[1]
+                        val z = event.values[2]
+                        val strength = kotlin.math.sqrt(x * x + y * y + z * z)
+                        magneticFieldStrength = strength
+
+                        // Determine accuracy based on magnetic field strength
+                        // Typical Earth magnetic field: ~25-65 microteslas
+                        // This matches the Smart Prediction tile's accuracy calculation
+                        sensorAccuracy = when {
+                            strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                            strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                            strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+                            else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
+                        }
                     }
                 }
 
@@ -243,10 +263,19 @@ fun QiblaGlobeView(
                         deviceHeading = newHeading
                         lastUpdatedHeading = newHeading
 
-                        // Update user marker bitmap with new heading
+                        // Update user marker bitmap with new heading and accuracy-based color
                         userMarkerPlacemark?.let { placemark ->
                             val relativeHeading = newHeading - qiblaDirection
-                            val newBitmap = createUserMarkerWithHeadingShadow(relativeHeading)
+                            // Calculate color based on accuracy and alignment
+                            val isAligned = kotlin.math.abs(relativeHeading) <= 5f || kotlin.math.abs(relativeHeading) >= 355f
+                            val color = when {
+                                isAligned && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF00C853.toInt()
+                                sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF10B981.toInt()
+                                sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> 0xFFFFA500.toInt()
+                                sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_LOW -> 0xFFFF6B6B.toInt()
+                                else -> 0xFFFF4444.toInt()
+                            }
+                            val newBitmap = createUserMarkerWithHeadingShadow(relativeHeading, color)
                             placemark.attributes.imageSource = ImageSource.fromBitmap(newBitmap)
                             worldWindowRef?.requestRedraw()
                         }
@@ -257,7 +286,11 @@ fun QiblaGlobeView(
                 }
             }
 
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+                // Accuracy is now calculated from magnetic field strength in onSensorChanged
+                // This matches the Smart Prediction tile's CompassProgressIndicator behavior
+                // which uses strength-based detection (15-25µT = medium, 25-65µT = high)
+            }
         }
 
         // Register sensors
@@ -724,7 +757,7 @@ private fun updateGlobeViewForOptimalMarkerVisibility(
  * 3. White ring around center
  * 4. Solid blue dot (center)
  */
-private fun createUserMarkerWithHeadingShadow(heading: Float): Bitmap {
+private fun createUserMarkerWithHeadingShadow(heading: Float, coneColor: Int = 0xFF10B981.toInt()): Bitmap {
     val size = 400
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
@@ -737,15 +770,14 @@ private fun createUserMarkerWithHeadingShadow(heading: Float): Bitmap {
         style = android.graphics.Paint.Style.FILL
     }
 
-    // EXACT COPY from SimpleGlobeView RingOverlayView beam
-    val coneColor = 0xFF10B981.toInt()  // Teal
+    // Beam color from parameter - changes based on sensor accuracy
     val ccR = android.graphics.Color.red(coneColor)
     val ccG = android.graphics.Color.green(coneColor)
     val ccB = android.graphics.Color.blue(coneColor)
 
-    // Radar cone with gradient - SAME as Smart Prediction
-    val radarRadius = size * 0.48f
-    val coneSweep = 65f  // Same 65° sweep as Smart Prediction
+    // Radar cone with gradient - matching Smart Prediction shape
+    val radarRadius = size * 0.58f
+    val coneSweep = 75f  // Wider cone to match Smart Prediction look
     val coneStart = heading - 90f - coneSweep / 2f  // Heading points up
 
     val radarOval = android.graphics.RectF(
@@ -753,16 +785,17 @@ private fun createUserMarkerWithHeadingShadow(heading: Float): Bitmap {
         centerX + radarRadius, centerY + radarRadius
     )
 
-    // RadialGradient with SAME color stops as Smart Prediction
+    // RadialGradient with smoother fade like Smart Prediction
     val shader = android.graphics.RadialGradient(
         centerX, centerY, radarRadius,
         intArrayOf(
-            android.graphics.Color.argb(0xFF, ccR, ccG, ccB),
-            android.graphics.Color.argb(0xCC, ccR, ccG, ccB),
-            android.graphics.Color.argb(0x66, ccR, ccG, ccB),
+            android.graphics.Color.argb(0xEE, ccR, ccG, ccB),
+            android.graphics.Color.argb(0xAA, ccR, ccG, ccB),
+            android.graphics.Color.argb(0x55, ccR, ccG, ccB),
+            android.graphics.Color.argb(0x20, ccR, ccG, ccB),
             android.graphics.Color.argb(0x00, ccR, ccG, ccB)
         ),
-        floatArrayOf(0f, 0.2f, 0.55f, 1f),
+        floatArrayOf(0f, 0.15f, 0.4f, 0.7f, 1f),
         android.graphics.Shader.TileMode.CLAMP
     )
 
