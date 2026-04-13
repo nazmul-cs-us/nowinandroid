@@ -775,27 +775,61 @@ private fun createUserMarkerWithHeadingShadow(heading: Float, coneColor: Int = 0
     val ccG = android.graphics.Color.green(coneColor)
     val ccB = android.graphics.Color.blue(coneColor)
 
-    // Radar cone with gradient - matching Smart Prediction shape
-    val radarRadius = size * 0.58f
-    val coneSweep = 75f  // Wider cone to match Smart Prediction look
-    val coneStart = heading - 90f - coneSweep / 2f  // Heading points up
+    // ============ OUTER GLOW/HALO (like Smart Prediction) ============
+    // Wider, softer outer glow for depth
+    val outerRadius = size * 0.68f
+    val outerSweep = 90f  // Wider sweep for outer glow
+    val outerStart = heading - 90f - outerSweep / 2f
+
+    val outerOval = android.graphics.RectF(
+        centerX - outerRadius, centerY - outerRadius,
+        centerX + outerRadius, centerY + outerRadius
+    )
+
+    val outerShader = android.graphics.RadialGradient(
+        centerX, centerY, outerRadius,
+        intArrayOf(
+            android.graphics.Color.argb(0x00, ccR, ccG, ccB),  // Transparent at center
+            android.graphics.Color.argb(0x40, ccR, ccG, ccB),  // Soft glow in middle
+            android.graphics.Color.argb(0x20, ccR, ccG, ccB),
+            android.graphics.Color.argb(0x00, ccR, ccG, ccB)   // Fade out
+        ),
+        floatArrayOf(0f, 0.3f, 0.7f, 1f),
+        android.graphics.Shader.TileMode.CLAMP
+    )
+
+    paint.style = android.graphics.Paint.Style.FILL
+    paint.shader = outerShader
+
+    val outerPath = android.graphics.Path()
+    outerPath.moveTo(centerX, centerY)
+    outerPath.arcTo(outerOval, outerStart, outerSweep)
+    outerPath.close()
+    canvas.drawPath(outerPath, paint)
+    paint.shader = null
+
+    // ============ MAIN BEAM (stronger, longer) ============
+    val radarRadius = size * 0.62f  // Longer beam
+    val coneSweep = 70f  // Focused cone
+    val coneStart = heading - 90f - coneSweep / 2f
 
     val radarOval = android.graphics.RectF(
         centerX - radarRadius, centerY - radarRadius,
         centerX + radarRadius, centerY + radarRadius
     )
 
-    // RadialGradient with smoother fade like Smart Prediction
+    // Stronger gradient with higher alpha values
     val shader = android.graphics.RadialGradient(
         centerX, centerY, radarRadius,
         intArrayOf(
-            android.graphics.Color.argb(0xEE, ccR, ccG, ccB),
-            android.graphics.Color.argb(0xAA, ccR, ccG, ccB),
+            android.graphics.Color.argb(0xFF, ccR, ccG, ccB),  // Full opacity at center
+            android.graphics.Color.argb(0xDD, ccR, ccG, ccB),
+            android.graphics.Color.argb(0x99, ccR, ccG, ccB),
             android.graphics.Color.argb(0x55, ccR, ccG, ccB),
             android.graphics.Color.argb(0x20, ccR, ccG, ccB),
             android.graphics.Color.argb(0x00, ccR, ccG, ccB)
         ),
-        floatArrayOf(0f, 0.15f, 0.4f, 0.7f, 1f),
+        floatArrayOf(0f, 0.1f, 0.3f, 0.55f, 0.8f, 1f),
         android.graphics.Shader.TileMode.CLAMP
     )
 
