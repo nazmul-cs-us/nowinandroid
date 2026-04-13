@@ -6,9 +6,12 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.hardware.GeomagneticField
+import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -169,6 +172,14 @@ fun QiblaGlobeView(
     var stableDirection by remember { mutableStateOf<Boolean?>(null) } // true = turn right, false = turn left
     var lastDirectionChangeTime by remember { mutableLongStateOf(0L) }
 
+    // Throttling for sensor updates to prevent jitter (same as Smart Prediction - 50ms)
+    var lastSensorUpdateTime by remember { mutableLongStateOf(0L) }
+    val SENSOR_UPDATE_INTERVAL_MS = 50L
+
+    // Low-pass filter for smoothing sensor data (reduces jitter from noisy accelerometer/magnetometer)
+    var filteredHeading by remember { mutableFloatStateOf(0f) }
+    val SMOOTHING_FACTOR = 0.03f  // Very low = very smooth (raw data jumps 50-100° even when still!)
+
     // Calculate magnetic declination for location
     val magneticDeclination = remember(userLatitude, userLongitude) {
         val geoField = GeomagneticField(
@@ -206,107 +217,89 @@ fun QiblaGlobeView(
     // Sensor manager for compass - only active when user is NOT touching
     DisposableEffect(context) {
         val sensorManager = context.getSystemService(AndroidContext.SENSOR_SERVICE) as SensorManager
+        // Use TYPE_ORIENTATION for stable heading (same as Smart Prediction tile)
+        // TYPE_ORIENTATION is deprecated but provides pre-filtered, stable values
+        val orientationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION)
         val magneticSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-        val accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
-        val gravity = FloatArray(3)
-        val geomagnetic = FloatArray(3)
-
-        val sensorListener = object : SensorEventListener {
+        // Orientation sensor listener - for stable compass heading (like Smart Prediction)
+        val orientationListener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
-                when (event.sensor.type) {
-                    Sensor.TYPE_ACCELEROMETER -> {
-                        System.arraycopy(event.values, 0, gravity, 0, 3)
-                    }
-                    Sensor.TYPE_MAGNETIC_FIELD -> {
-                        System.arraycopy(event.values, 0, geomagnetic, 0, 3)
-
-                        // Calculate magnetic field strength for accuracy detection
-                        // Same logic as CompassProgressIndicator in Smart Prediction tile
-                        val x = event.values[0]
-                        val y = event.values[1]
-                        val z = event.values[2]
-                        val strength = kotlin.math.sqrt(x * x + y * y + z * z)
-                        magneticFieldStrength = strength
-
-                        // Determine accuracy based on magnetic field strength
-                        // Typical Earth magnetic field: ~25-65 microteslas
-                        // This matches the Smart Prediction tile's accuracy calculation
-                        sensorAccuracy = when {
-                            strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
-                            strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
-                            strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
-                            else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
-                        }
-                    }
+                // Throttle sensor updates (same as Smart Prediction - 50ms)
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastSensorUpdateTime < SENSOR_UPDATE_INTERVAL_MS) {
+                    return
                 }
+                lastSensorUpdateTime = currentTime
 
-                val rotationMatrix = FloatArray(9)
-                val success = SensorManager.getRotationMatrix(rotationMatrix, null, gravity, geomagnetic)
+                // Get pre-filtered heading from TYPE_ORIENTATION (much more stable than manual calculation)
+                val rawHeading = event.values[0] + magneticDeclination
 
-                if (success) {
-                    val orientation = FloatArray(3)
-                    SensorManager.getOrientation(rotationMatrix, orientation)
+                // Only update heading if change is significant (3° threshold like Smart Prediction)
+                val headingDiff = kotlin.math.abs(rawHeading - lastUpdatedHeading)
+                val normalizedHeadingDiff = if (headingDiff > 180f) 360f - headingDiff else headingDiff
 
-                    // Azimuth (heading) in radians, convert to degrees
-                    var azimuthDegrees = Math.toDegrees(orientation[0].toDouble()).toFloat()
-                    if (azimuthDegrees < 0) {
-                        azimuthDegrees += 360f
-                    }
+                if (normalizedHeadingDiff > 3f) {
+                    deviceHeading = rawHeading
+                    lastUpdatedHeading = rawHeading
 
-                    // Apply magnetic declination correction: magnetic north + declination = true north
-                    val newHeading = azimuthDegrees + magneticDeclination
-
-                    // Only update heading if change is significant (more than 1.5 degrees)
-                    // Threshold lowered for smoother, more professional movement
-                    val headingDiff = kotlin.math.abs(newHeading - lastUpdatedHeading)
-                    val normalizedHeadingDiff = if (headingDiff > 180f) 360f - headingDiff else headingDiff
-
-                    if (normalizedHeadingDiff > 1.5f) {
-                        // Update heading state
-                        deviceHeading = newHeading
-                        lastUpdatedHeading = newHeading
-
-                        // Update user marker bitmap with new heading and accuracy-based color
-                        userMarkerPlacemark?.let { placemark ->
-                            val relativeHeading = newHeading - qiblaDirection
-                            // Calculate color based on accuracy and alignment
-                            val isAligned = kotlin.math.abs(relativeHeading) <= 5f || kotlin.math.abs(relativeHeading) >= 355f
-                            val color = when {
-                                isAligned && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF00C853.toInt()
-                                sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF10B981.toInt()
-                                sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> 0xFFFFA500.toInt()
-                                sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_LOW -> 0xFFFF6B6B.toInt()
-                                else -> 0xFFFF4444.toInt()
-                            }
-                            val newBitmap = createUserMarkerWithHeadingShadow(relativeHeading, color)
-                            placemark.attributes.imageSource = ImageSource.fromBitmap(newBitmap)
-                            worldWindowRef?.requestRedraw()
+                    // Update user marker bitmap with new heading and accuracy-based color
+                    userMarkerPlacemark?.let { placemark ->
+                        val relativeHeading = rawHeading - qiblaDirection
+                        // Calculate color based on accuracy and alignment
+                        val isAligned = kotlin.math.abs(relativeHeading) <= 5f || kotlin.math.abs(relativeHeading) >= 355f
+                        val color = when {
+                            isAligned && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF00C853.toInt()
+                            sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF10B981.toInt()
+                            sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> 0xFFFFA500.toInt()
+                            sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_LOW -> 0xFFFF6B6B.toInt()
+                            else -> 0xFFFF4444.toInt()
                         }
+                        val newBitmap = createUserMarkerWithHeadingShadow(relativeHeading, color)
+                        placemark.attributes.imageSource = ImageSource.fromBitmap(newBitmap)
+                        worldWindowRef?.requestRedraw()
                     }
-
-                    // Globe rotation disabled - markers flip when camera heading changes
-                    // The blue heading wedge provides sufficient visual feedback for user rotation
                 }
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // Accuracy is now calculated from magnetic field strength in onSensorChanged
-                // This matches the Smart Prediction tile's CompassProgressIndicator behavior
-                // which uses strength-based detection (15-25µT = medium, 25-65µT = high)
+                // Not used - accuracy from magnetic field listener
             }
         }
 
-        // Register sensors
-        magneticSensor?.let {
-            sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_UI)
+        // Magnetic field listener - for accuracy detection only (same as Smart Prediction)
+        val magneticFieldListener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                // Calculate magnetic field strength for accuracy detection
+                val x = event.values[0]
+                val y = event.values[1]
+                val z = event.values[2]
+                val strength = kotlin.math.sqrt(x * x + y * y + z * z)
+                magneticFieldStrength = strength
+
+                // Determine accuracy based on magnetic field strength
+                sensorAccuracy = when {
+                    strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                    strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                    strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+                    else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
-        accelerometerSensor?.let {
-            sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_UI)
+
+        // Register sensors - SAME as Smart Prediction tile
+        orientationSensor?.let {
+            sensorManager.registerListener(orientationListener, it, SensorManager.SENSOR_DELAY_GAME)
+        }
+        magneticSensor?.let {
+            sensorManager.registerListener(magneticFieldListener, it, SensorManager.SENSOR_DELAY_GAME)
         }
 
         onDispose {
-            sensorManager.unregisterListener(sensorListener)
+            sensorManager.unregisterListener(orientationListener)
+            sensorManager.unregisterListener(magneticFieldListener)
         }
     }
 
@@ -428,8 +421,8 @@ fun QiblaGlobeView(
                     }
                 } else {
                     // Not aligned - show compact directional guidance
-                    // Calculate signed difference: positive = turn right, negative = turn left
-                    var diff = qiblaDirection - deviceHeading
+                    // Use animatedHeading for smooth, stable angle display (like Smart Prediction)
+                    var diff = qiblaDirection - animatedHeading
 
                     // Normalize to [-180, 180] for shortest path
                     if (diff > 180f) diff -= 360f
@@ -470,43 +463,127 @@ fun QiblaGlobeView(
                     val displayAngle = ((angleDiff / 5f).toInt() * 5)
 
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        // Direction arrow
-                        Icon(
-                            imageVector = if (turnLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
-                            contentDescription = if (turnLeft) "Turn left" else "Turn right",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        // Left arrow with horizontal slide animation
+                        AnimatedContent(
+                            targetState = turnLeft,
+                            transitionSpec = {
+                                // Slide horizontally - natural direction for arrows
+                                (slideInHorizontally { width -> -width } + fadeIn(
+                                    animationSpec = tween(200)
+                                )) togetherWith (slideOutHorizontally { width -> width } + fadeOut(
+                                    animationSpec = tween(200)
+                                ))
+                            },
+                            label = "leftArrow"
+                        ) { isLeft ->
+                            Icon(
+                                imageVector = if (isLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                                contentDescription = if (isLeft) "Turn left" else "Turn right",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
 
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = if (turnLeft) "LEFT" else "RIGHT",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontSize = 9.sp
-                            )
-                            Text(
-                                text = "${displayAngle}°",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                            // Direction text with horizontal slide (matches arrow direction)
+                            AnimatedContent(
+                                targetState = turnLeft,
+                                transitionSpec = {
+                                    // Slide in direction of turn
+                                    val slideDirection = if (targetState) -1 else 1
+                                    (slideInHorizontally { width -> slideDirection * width } + fadeIn(
+                                        animationSpec = tween(250)
+                                    )) togetherWith (slideOutHorizontally { width -> -slideDirection * width } + fadeOut(
+                                        animationSpec = tween(250)
+                                    ))
+                                },
+                                label = "directionText"
+                            ) { isLeft ->
+                                Text(
+                                    text = if (isLeft) "LEFT" else "RIGHT",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 7.sp
+                                )
+                            }
+
+                            // Airport-style scrolling angle display (compact)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Animate each digit separately for airport board effect
+                                val angleStr = displayAngle.toString().padStart(3, ' ')
+                                angleStr.forEach { char ->
+                                    if (char == ' ') {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                    } else {
+                                        AnimatedContent(
+                                            targetState = char,
+                                            transitionSpec = {
+                                                // Scroll up when increasing, down when decreasing
+                                                val direction = if (targetState > initialState) -1 else 1
+                                                slideInVertically(
+                                                    animationSpec = spring(
+                                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                                        stiffness = Spring.StiffnessMedium
+                                                    )
+                                                ) { height -> direction * height } + fadeIn() togetherWith
+                                                slideOutVertically(
+                                                    animationSpec = spring(
+                                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                                        stiffness = Spring.StiffnessMedium
+                                                    )
+                                                ) { height -> -direction * height } + fadeOut()
+                                            },
+                                            label = "digitScroll"
+                                        ) { digit ->
+                                            Text(
+                                                text = digit.toString(),
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White,
+                                                fontSize = 13.sp
+                                            )
+                                        }
+                                    }
+                                }
+                                Text(
+                                    text = "°",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 13.sp
+                                )
+                            }
                         }
 
-                        // Second arrow for emphasis
-                        Icon(
-                            imageVector = if (turnLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
-                            contentDescription = if (turnLeft) "Turn left" else "Turn right",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        // Second arrow with matching animation
+                        AnimatedContent(
+                            targetState = turnLeft,
+                            transitionSpec = {
+                                // Slide horizontally - opposite direction from first arrow
+                                (slideInHorizontally { width -> width } + fadeIn(
+                                    animationSpec = tween(200)
+                                )) togetherWith (slideOutHorizontally { width -> -width } + fadeOut(
+                                    animationSpec = tween(200)
+                                ))
+                            },
+                            label = "rightArrow"
+                        ) { isLeft ->
+                            Icon(
+                                imageVector = if (isLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                                contentDescription = if (isLeft) "Turn left" else "Turn right",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }
