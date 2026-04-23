@@ -316,7 +316,7 @@ private fun LazyStaggeredGridScope.onboarding(
                     ) {
                         NiaButton(
                             onClick = saveFollowedTopics,
-                            enabled = onboardingUiState.isDismissable,
+                            enabled = true,
                             modifier = Modifier
                                 .padding(horizontal = 24.dp)
                                 .widthIn(364.dp)

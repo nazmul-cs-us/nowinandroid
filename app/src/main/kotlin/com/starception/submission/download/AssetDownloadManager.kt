@@ -364,27 +364,56 @@ class AssetDownloadManager @Inject constructor(
     suspend fun loadManifest(): AssetManifest? = withContext(Dispatchers.IO) {
         cachedManifest?.let { return@withContext it }
 
-        // Try loading bundled manifest from assets first
+        val cachedFile = File(cdnAssetsDir, "manifest.json")
+
+        // 1. Try fetching latest manifest from CDN so hashes are always in sync with served files
         try {
-            val json = context.assets.open(MANIFEST_ASSET_PATH).bufferedReader().readText()
-            val manifest = AssetManifest.fromJson(json)
-            cachedManifest = manifest
-            return@withContext manifest
+            val bundledBaseUrl = context.assets.open(MANIFEST_ASSET_PATH).bufferedReader().use {
+                val json = it.readText()
+                AssetManifest.fromJson(json).baseUrl
+            }
+            val cdnManifestUrl = "${bundledBaseUrl.trimEnd('/')}/$MANIFEST_ASSET_PATH"
+            val request = okhttp3.Request.Builder().url(cdnManifestUrl).build()
+            val response = okHttpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                val json = response.body?.string()
+                if (!json.isNullOrBlank()) {
+                    val manifest = AssetManifest.fromJson(json)
+                    cachedFile.parentFile?.mkdirs()
+                    cachedFile.writeText(json)
+                    cachedManifest = manifest
+                    Log.i(TAG, "Loaded manifest from CDN (version=${manifest.version})")
+                    return@withContext manifest
+                }
+            }
+            response.close()
+            Log.w(TAG, "CDN manifest fetch failed: HTTP ${response.code}")
         } catch (e: Exception) {
-            Log.w(TAG, "No bundled manifest found: ${e.message}")
+            Log.w(TAG, "Could not fetch manifest from CDN, falling back: ${e.message}")
         }
 
-        // Try loading cached manifest from disk
-        val cachedFile = File(cdnAssetsDir, "manifest.json")
+        // 2. Fall back to disk-cached manifest (from a previous successful CDN fetch)
         if (cachedFile.exists()) {
             try {
                 val json = cachedFile.readText()
                 val manifest = AssetManifest.fromJson(json)
                 cachedManifest = manifest
+                Log.i(TAG, "Loaded manifest from disk cache (version=${manifest.version})")
                 return@withContext manifest
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to parse cached manifest", e)
             }
+        }
+
+        // 3. Last resort: bundled manifest in APK (may be stale, but better than nothing)
+        try {
+            val json = context.assets.open(MANIFEST_ASSET_PATH).bufferedReader().readText()
+            val manifest = AssetManifest.fromJson(json)
+            cachedManifest = manifest
+            Log.w(TAG, "Loaded bundled manifest (version=${manifest.version}) — hashes may be stale")
+            return@withContext manifest
+        } catch (e: Exception) {
+            Log.e(TAG, "No manifest available", e)
         }
 
         return@withContext null
