@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -2247,149 +2248,251 @@ fun DuaDetailScreen(
                 alpha = 1f
             )
 
+            // Bookmark state hoisted above Box so it's accessible in both icon groups
+                    val currentDuaNewsResourceId = if (duasList.isNotEmpty() && currentPage < duasList.size) {
+                        duasList[currentPage].id
+                    } else {
+                        initialNewsResourceId
+                    }
+                    var localBookmarkState by remember(currentDuaNewsResourceId) {
+                        mutableStateOf(isNiaBookmarked(currentDuaNewsResourceId))
+                    }
+                    val parentBookmarkState = isNiaBookmarked(currentDuaNewsResourceId)
+                    LaunchedEffect(parentBookmarkState) {
+                        localBookmarkState = parentBookmarkState
+                    }
+
+                    // Detect camera punch hole horizontal bounds to arrange icons around it
+                    val toolbarView = LocalView.current
+                    val toolbarDensity = LocalDensity.current
+                    val cutoutLeft = remember(toolbarView) {
+                        val cutout = toolbarView.rootWindowInsets?.displayCutout
+                        if (cutout != null && cutout.boundingRects.isNotEmpty()) {
+                            with(toolbarDensity) { cutout.boundingRects.minOf { it.left }.toDp() }
+                        } else 0.dp
+                    }
+                    val cutoutRight = remember(toolbarView) {
+                        val cutout = toolbarView.rootWindowInsets?.displayCutout
+                        if (cutout != null && cutout.boundingRects.isNotEmpty()) {
+                            with(toolbarDensity) { cutout.boundingRects.maxOf { it.right }.toDp() }
+                        } else 0.dp
+                    }
+                    val hasCutout = cutoutLeft > 0.dp && cutoutRight > cutoutLeft
+
+                    // Back button ends at 4dp(padding) + 40dp(button) + 8dp(gap) = 52dp
+                    val backButtonEndDp = 52.dp
+                    // Available width between back button and punch hole left edge
+                    val leftZoneWidth = if (hasCutout && cutoutLeft > backButtonEndDp)
+                        cutoutLeft - backButtonEndDp - 4.dp else 0.dp
+                    // How many action icons fit left of the punch hole:
+                    //   Language=40dp, +spacer8=48dp, +Font=40dp, +spacer4=92dp
+                    val iconsInLeftZone = when {
+                        leftZoneWidth >= 92.dp -> 2   // Language + Font both fit
+                        leftZoneWidth >= 48.dp -> 1   // Only Language fits
+                        else -> 0                      // All icons go to right group
+                    }
+
             Surface(
                 color = toolbarBackgroundColor,
                 tonalElevation = (4 * toolbarCollapseProgress).dp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .padding(top = 8.dp) // Minimal top padding to match SurahDetailScreen
+                    .statusBarsPadding()
             ) {
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(64.dp)
-                        .padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Back button
-                    Surface(
-                        modifier = Modifier.size(40.dp),
-                        shape = CircleShape,
-                        color = toolbarContentColor.copy(alpha = 0.15f)
+                    // Back button — always at the far left
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 4.dp)
                     ) {
-                        IconButton(onClick = wrappedOnBackClick) {
+                        Surface(
+                            modifier = Modifier.size(40.dp),
+                            shape = CircleShape,
+                            color = toolbarContentColor.copy(alpha = 0.15f)
+                        ) {
+                            IconButton(onClick = wrappedOnBackClick) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = toolbarContentColor
+                                )
+                            }
+                        }
+                    }
+
+                    // Left icon group — icons that fit before the punch hole (after back button)
+                    if (iconsInLeftZone > 0) {
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(start = backButtonEndDp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Language icon always first in left group
+                            Surface(
+                                onClick = { showTranslationDialog = true },
+                                modifier = Modifier.size(40.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                color = toolbarContentColor.copy(alpha = 0.12f),
+                                contentColor = toolbarContentColor
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Language,
+                                        contentDescription = "Translation",
+                                        tint = toolbarContentColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = translationCode,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = toolbarContentColor,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            // Font icon also in left group when space allows
+                            if (iconsInLeftZone >= 2) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    onClick = { showFontDialog = true },
+                                    modifier = Modifier.size(40.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = toolbarContentColor.copy(alpha = 0.12f),
+                                    contentColor = toolbarContentColor
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center,
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.TextFormat,
+                                            contentDescription = "Font selection",
+                                            tint = toolbarContentColor,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = fontDisplay,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = toolbarContentColor,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Right icon group — always at screen right edge (safely past the punch hole)
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Language icon goes here when it doesn't fit left of punch hole
+                        if (iconsInLeftZone == 0) {
+                            Surface(
+                                onClick = { showTranslationDialog = true },
+                                modifier = Modifier.size(40.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                color = toolbarContentColor.copy(alpha = 0.12f),
+                                contentColor = toolbarContentColor
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Language,
+                                        contentDescription = "Translation",
+                                        tint = toolbarContentColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = translationCode,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = toolbarContentColor,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        // Font icon goes here when only Language fit in the left zone
+                        if (iconsInLeftZone <= 1) {
+                            Surface(
+                                onClick = { showFontDialog = true },
+                                modifier = Modifier.size(40.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                color = toolbarContentColor.copy(alpha = 0.12f),
+                                contentColor = toolbarContentColor
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.TextFormat,
+                                        contentDescription = "Font selection",
+                                        tint = toolbarContentColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = fontDisplay,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = toolbarContentColor,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+                        // Tajweed, Bookmark, MoreVert always in the right group
+                        IconButton(onClick = { viewModel.toggleTajweed() }) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
+                                imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                                contentDescription = if (showTajweed) "Disable Tajweed" else "Enable Tajweed",
                                 tint = toolbarContentColor
                             )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    // Translation button with language indicator (matches SurahDetailScreen)
-                    Surface(
-                        onClick = { showTranslationDialog = true },
-                        modifier = Modifier.size(40.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        color = toolbarContentColor.copy(alpha = 0.12f),
-                        contentColor = toolbarContentColor
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxSize()
-                        ) {
+                        IconButton(onClick = {
+                            onToggleNiaBookmark(currentDuaNewsResourceId)
+                            localBookmarkState = !localBookmarkState
+                        }) {
                             Icon(
-                                imageVector = Icons.Default.Language,
-                                contentDescription = "Translation",
-                                tint = toolbarContentColor,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = translationCode,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = toolbarContentColor,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold
+                                imageVector = if (localBookmarkState) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                                contentDescription = if (localBookmarkState) "Remove Bookmark" else "Add Bookmark",
+                                tint = toolbarContentColor
                             )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // Font selection button with font hint (matches SurahDetailScreen)
-                    Surface(
-                        onClick = { showFontDialog = true },
-                        modifier = Modifier.size(40.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        color = toolbarContentColor.copy(alpha = 0.12f),
-                        contentColor = toolbarContentColor
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxSize()
+                        IconButton(
+                            onClick = { showFloatingToolbar = !showFloatingToolbar },
+                            modifier = Modifier.offset(x = (-8).dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.TextFormat,
-                                contentDescription = "Font selection",
-                                tint = toolbarContentColor,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = fontDisplay,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = toolbarContentColor,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More options",
+                                tint = toolbarContentColor
                             )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    // Tajweed toggle button
-                    IconButton(onClick = { viewModel.toggleTajweed() }) {
-                        Icon(
-                            imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
-                            contentDescription = if (showTajweed) "Disable Tajweed" else "Enable Tajweed",
-                            tint = toolbarContentColor
-                        )
-                    }
-
-                    // Bookmark button - uses current page's news resource ID
-                    val currentDuaNewsResourceId = if (duasList.isNotEmpty() && currentPage < duasList.size) {
-                        duasList[currentPage].id
-                    } else {
-                        initialNewsResourceId
-                    }
-
-                    // Use remembered state that syncs with parent's bookmark status
-                    var localBookmarkState by remember(currentDuaNewsResourceId) {
-                        mutableStateOf(isNiaBookmarked(currentDuaNewsResourceId))
-                    }
-
-                    // Sync with parent when it changes
-                    val parentBookmarkState = isNiaBookmarked(currentDuaNewsResourceId)
-                    LaunchedEffect(parentBookmarkState) {
-                        localBookmarkState = parentBookmarkState
-                    }
-
-                    IconButton(onClick = {
-                        onToggleNiaBookmark(currentDuaNewsResourceId)
-                        // Optimistically update local state for immediate UI feedback
-                        localBookmarkState = !localBookmarkState
-                    }) {
-                        Icon(
-                            imageVector = if (localBookmarkState) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                            contentDescription = if (localBookmarkState) "Remove Bookmark" else "Add Bookmark",
-                            tint = toolbarContentColor
-                        )
-                    }
-
-                    // More options button (vertical dots) - toggles bottom toolbar
-                    IconButton(
-                        onClick = { showFloatingToolbar = !showFloatingToolbar },
-                        modifier = Modifier.offset(x = (-8).dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "More options",
-                            tint = toolbarContentColor
-                        )
                     }
                 }
             }
@@ -3192,12 +3295,12 @@ private fun DuaShimmerLoadingContent(
         }
 
         // Toolbar overlay - transparent to show sky through
-        // Use fixed padding instead of statusBarsPadding() to prevent jump when immersive mode activates
+        // Use statusBarsPadding to properly position below status bar / camera cutout area
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .padding(top = 32.dp) // Fixed padding to clear camera punch hole area
+                .statusBarsPadding()
         ) {
             Row(
                 modifier = Modifier
