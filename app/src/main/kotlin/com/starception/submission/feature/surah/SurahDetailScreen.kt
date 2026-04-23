@@ -670,7 +670,13 @@ fun SurahDetailScreen(
                     showBismillahRow = showBismillahRow,
                     showTajweed = showTajweed,
                     tajweedAnnotations = tajweedAnnotations,
-                    onToggleTajweed = { viewModel.changeTajweed(!showTajweed) },
+                    onToggleTajweed = {
+                        if (!showTajweed && !viewModel.isTajweedAvailable) {
+                            Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
+                        } else {
+                            viewModel.changeTajweed(!showTajweed)
+                        }
+                    },
                     onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) },
                     onCycleAlignment = {
                         // Cycle through: start -> center -> end -> start
@@ -851,7 +857,13 @@ fun SurahDetailScreen(
             onBackClick = wrappedOnBackClick,
             onTranslationClick = { showTranslationDialog = true },
             onFontClick = { showFontDialog = true },
-            onTajweedClick = { viewModel.changeTajweed(!showTajweed) },
+            onTajweedClick = {
+                if (!showTajweed && !viewModel.isTajweedAvailable) {
+                    Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
+                } else {
+                    viewModel.changeTajweed(!showTajweed)
+                }
+            },
             onBookmarkClick = {
                 // Only toggle bookmark if we have a valid news resource ID
                 if (newsResourceId != null) {
@@ -1106,7 +1118,13 @@ fun SurahDetailScreen(
                     BottomToolbarItem(
                         icon = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
                         label = "Tajweed",
-                        onClick = { viewModel.changeTajweed(!showTajweed) },
+                        onClick = {
+                            if (!showTajweed && !viewModel.isTajweedAvailable) {
+                                Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
+                            } else {
+                                viewModel.changeTajweed(!showTajweed)
+                            }
+                        },
                         isActive = showTajweed
                     )
 

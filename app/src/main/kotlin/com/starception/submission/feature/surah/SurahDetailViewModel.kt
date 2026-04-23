@@ -513,13 +513,24 @@ class SurahDetailViewModel @Inject constructor(
     }
 
     // Tajweed methods
+    val isTajweedAvailable: Boolean
+        get() = assetRepository.isAvailable("json/tajweed.json")
+
     fun changeTajweed(enabled: Boolean) {
+        if (enabled && !isTajweedAvailable) {
+            android.util.Log.w("SurahDetailVM", "⚠️ Tajweed data not downloaded yet")
+            return
+        }
         _showTajweed.value = enabled
         prefs.edit().putBoolean("show_tajweed", enabled).apply()
         android.util.Log.d("SurahDetailVM", "🎨 Tajweed changed to: $enabled")
     }
 
     fun loadTajweedForSurah(surahNumber: Int) {
+        if (!isTajweedAvailable) {
+            android.util.Log.w("SurahDetailVM", "⚠️ Tajweed data not available, skipping load for surah $surahNumber")
+            return
+        }
         viewModelScope.launch {
             try {
                 val annotations = tajweedRepository.getAnnotationsForSurah(surahNumber)

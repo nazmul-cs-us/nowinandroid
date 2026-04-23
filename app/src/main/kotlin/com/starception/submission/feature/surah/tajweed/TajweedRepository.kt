@@ -2,6 +2,7 @@ package com.starception.submission.feature.surah.tajweed
 
 import android.content.Context
 import android.util.Log
+import com.starception.submission.download.AssetRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -16,7 +17,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class TajweedRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val assetRepository: AssetRepository,
 ) {
     private val TAG = "TajweedRepository"
 
@@ -37,7 +39,7 @@ class TajweedRepository @Inject constructor(
         mutex.withLock {
             if (tajweedData == null) {
                 Log.d(TAG, "🚀 Initializing Tajweed data...")
-                tajweedData = TajweedParser.parse(context)
+                tajweedData = TajweedParser.parse(context, assetRepository)
                 Log.d(TAG, "✅ Tajweed data initialized with ${tajweedData?.size ?: 0} entries")
             }
         }
