@@ -208,10 +208,11 @@ fun QiblaCompass(
         }
     }
     
-    // Qibla compass animation - needle points to Qibla direction
-    // Apply magnetic declination correction: magnetic north + declination = true north
+    // Compass rose animation - background counter-rotates with the device so the rose
+    // always shows cardinal directions in their real geographic positions (heads-up mode).
+    // The arc is fixed at the top representing the torch / camera direction.
     val trueNorth = compassDegree + magneticDeclination
-    val targetDegree = -(trueNorth - qiblaDirection)
+    val targetDegree = -trueNorth   // background rotates opposite to device heading
     val currentDegreeState = remember { mutableFloatStateOf(targetDegree) }
     
     // Calculate shortest rotation path
@@ -279,132 +280,140 @@ fun QiblaCompass(
     val accuracyColor = if (isInitializing) Color(0xFF10B981) else getAccuracyColor(sensorAccuracy)
     val needsCalibration = !isInitializing && sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
 
-    // Calculate if user is facing Qibla (within ±5 degrees for accuracy)
-    val qiblaAngle = animatedCompassDegree
-    val normalizedAngle = ((qiblaAngle % 360f) + 360f) % 360f
-
-    // Calculate circular angular distance from 0° (handles both sides symmetrically)
-    val angularDistance = minOf(
-        kotlin.math.abs(normalizedAngle),
-        kotlin.math.abs(normalizedAngle - 360f)
-    )
+    // isNearQibla: device torch is pointing toward Qibla when trueNorth ≈ qiblaDirection
+    val rawDeviation = (trueNorth - qiblaDirection + 360f) % 360f
+    val qiblaDeviation = if (rawDeviation > 180f) rawDeviation - 360f else rawDeviation
+    val angularDistance = kotlin.math.abs(qiblaDeviation)
     val isNearQibla = angularDistance <= 5f
 
-    // Debug logging - compare with QiblaGlobeAlignment
-    android.util.Log.d("QiblaCompassAlignment", "compassDegree=$compassDegree, trueNorth=$trueNorth, qiblaDirection=$qiblaDirection, targetDegree=$targetDegree, angularDistance=$angularDistance, isNearQibla=$isNearQibla, declination=$magneticDeclination")
+    android.util.Log.d("QiblaCompassAlignment", "trueNorth=$trueNorth, qiblaDirection=$qiblaDirection, deviation=$qiblaDeviation, isNearQibla=$isNearQibla, declination=$magneticDeclination")
 
     // Enhanced UI with better novice user guidance
     Box(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
-        // Enhanced compass background with directional labels
-        Canvas(
-            modifier = Modifier.size(size)
+        // ── Rotating compass rose ────────────────────────────────────────────────
+        // The entire rose (background + N/E/S/W labels + Qibla dot) counter-rotates
+        // with the device so cardinal directions stay geographically correct on screen.
+        // animatedCompassDegree == animated(-trueNorth).
+        Box(
+            modifier = Modifier
+                .size(size)
+                .rotate(animatedCompassDegree),
+            contentAlignment = Alignment.Center
         ) {
-            val center = Offset(this.size.width / 2, this.size.height / 2)
-            val backgroundRadius = (this.size.minDimension / 2) - 2.dp.toPx()
-            val labelRadius = backgroundRadius + 15.dp.toPx()
-            
-            // Gradient background for better depth
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color.White,
-                        Color(0xFFF8F9FA)
+            Canvas(
+                modifier = Modifier.size(size)
+            ) {
+                val center = Offset(this.size.width / 2, this.size.height / 2)
+                val backgroundRadius = (this.size.minDimension / 2) - 2.dp.toPx()
+
+                // Gradient background for better depth
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.White, Color(0xFFF8F9FA)),
+                        radius = backgroundRadius
                     ),
-                    radius = backgroundRadius
-                ),
-                radius = backgroundRadius,
-                center = center
-            )
-            
-            // Accuracy indication border with enhanced styling
-            drawCircle(
-                color = accuracyColor.copy(alpha = 0.8f),
-                radius = backgroundRadius,
-                center = center,
-                style = Stroke(width = 4.dp.toPx())
-            )
-            
-            // Inner definition border
-            drawCircle(
-                color = Color.Black.copy(alpha = 0.15f),
-                radius = backgroundRadius - 3.dp.toPx(),
-                center = center,
-                style = Stroke(width = 1.dp.toPx())
-            )
-            
-            // Cardinal direction markers and labels
-            val directions = listOf(
-                "N" to 0f,    // North (top)
-                "E" to 90f,   // East (right)
-                "S" to 180f,  // South (bottom)
-                "W" to 270f   // West (left)
-            )
-            
-            directions.forEach { (label, angle) ->
-                val angleRad = Math.toRadians(angle.toDouble())
-                
-                // Direction marker lines
-                val markerStart = Offset(
-                    x = center.x + cos(angleRad).toFloat() * (backgroundRadius - 10.dp.toPx()),
-                    y = center.y + sin(angleRad).toFloat() * (backgroundRadius - 10.dp.toPx())
+                    radius = backgroundRadius,
+                    center = center
                 )
-                val markerEnd = Offset(
-                    x = center.x + cos(angleRad).toFloat() * backgroundRadius,
-                    y = center.y + sin(angleRad).toFloat() * backgroundRadius
+
+                // Accuracy indication border
+                drawCircle(
+                    color = accuracyColor.copy(alpha = 0.8f),
+                    radius = backgroundRadius,
+                    center = center,
+                    style = Stroke(width = 4.dp.toPx())
                 )
-                
-                drawLine(
-                    color = Color.Black.copy(alpha = 0.4f),
-                    start = markerStart,
-                    end = markerEnd,
-                    strokeWidth = 3.dp.toPx(),
-                    cap = StrokeCap.Round
+
+                // Inner definition border
+                drawCircle(
+                    color = Color.Black.copy(alpha = 0.15f),
+                    radius = backgroundRadius - 3.dp.toPx(),
+                    center = center,
+                    style = Stroke(width = 1.dp.toPx())
+                )
+
+                // Cardinal direction tick marks
+                listOf(0f, 90f, 180f, 270f).forEach { angle ->
+                    val angleRad = Math.toRadians(angle.toDouble())
+                    drawLine(
+                        color = Color.Black.copy(alpha = 0.4f),
+                        start = Offset(
+                            x = center.x + cos(angleRad).toFloat() * (backgroundRadius - 10.dp.toPx()),
+                            y = center.y + sin(angleRad).toFloat() * (backgroundRadius - 10.dp.toPx())
+                        ),
+                        end = Offset(
+                            x = center.x + cos(angleRad).toFloat() * backgroundRadius,
+                            y = center.y + sin(angleRad).toFloat() * backgroundRadius
+                        ),
+                        strokeWidth = 3.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
+
+                // Qibla direction dot — fixed on the rose at the geographic Qibla bearing
+                // (sin/cos conversion: compass 0°=up, 90°=right → x=sin, y=-cos)
+                val qiblaRad = Math.toRadians(qiblaDirection.toDouble())
+                val dotRadius = backgroundRadius * 0.82f
+                val dotCenter = Offset(
+                    x = center.x + sin(qiblaRad).toFloat() * dotRadius,
+                    y = center.y - cos(qiblaRad).toFloat() * dotRadius
+                )
+                // Outer halo
+                drawCircle(
+                    color = if (isNearQibla) Color(0xFF00C853).copy(alpha = 0.35f) else Color(0xFF10B981).copy(alpha = 0.25f),
+                    radius = 9.dp.toPx(),
+                    center = dotCenter
+                )
+                // Solid dot
+                drawCircle(
+                    color = if (isNearQibla) Color(0xFF00C853) else Color(0xFF10B981),
+                    radius = 5.dp.toPx(),
+                    center = dotCenter
                 )
             }
-        }
-        
-        // Directional labels positioned outside the compass
-        if (size >= 120.dp) {
-            val directions = listOf(
-                "N" to Offset(0f, -1f),    // North (top)
-                "E" to Offset(1f, 0f),     // East (right)  
-                "S" to Offset(0f, 1f),     // South (bottom)
-                "W" to Offset(-1f, 0f)     // West (left)
-            )
-            
-            directions.forEach { (label, offset) ->
-                Box(
-                    modifier = Modifier
-                        .offset(
-                            x = (offset.x * (size.value / 2 + 20)).dp,
-                            y = (offset.y * (size.value / 2 + 20)).dp
+
+            // N/E/S/W labels — rotate with the rose so they always face their compass direction
+            if (size >= 120.dp) {
+                listOf(
+                    "N" to Offset(0f, -1f),
+                    "E" to Offset(1f, 0f),
+                    "S" to Offset(0f, 1f),
+                    "W" to Offset(-1f, 0f)
+                ).forEach { (label, offset) ->
+                    Box(
+                        modifier = Modifier
+                            .offset(
+                                x = (offset.x * (size.value / 2 + 20)).dp,
+                                y = (offset.y * (size.value / 2 + 20)).dp
+                            )
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
                         )
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .background(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
+                    }
                 }
             }
         }
-        
-        // Enhanced Qibla direction indicator with arrow
+        // ── End rotating compass rose ─────────────────────────────────────────────
+
+        // ── Fixed arc centered at top (torch / camera direction) ─────────────────
+        // CircularProgressIndicator starts at 12 o'clock and sweeps clockwise.
+        // Rotating by -(sweep/2) = -(0.15*360/2) = -27° centers the arc at 12 o'clock.
         Box(
             modifier = Modifier
                 .size(size - 16.dp)
-                .rotate(animatedCompassDegree),
+                .rotate(-27f),
             contentAlignment = Alignment.Center
         ) {
             // Qibla direction arc - color reflects sensor accuracy strength

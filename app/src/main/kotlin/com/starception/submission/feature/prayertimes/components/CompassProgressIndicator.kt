@@ -340,12 +340,10 @@ fun CompassProgressIndicator(
         )
         val glowColor = if (isNearQibla) Color(0xFF10B981) else accuracyColor
 
-        // Directional glow beam — rotates with the compass to point toward Qibla.
-        // Drawn as a swept arc gradient: narrow at center, wide at the rim, like a spotlight.
+        // Directional glow beam — fixed at top, always pointing where the torch is pointing.
         Canvas(
             modifier = Modifier
                 .size(size)
-                .rotate(animatedCompassDegree)   // beam always points toward Qibla
         ) {
             val center = Offset(this.size.width / 2f, this.size.height / 2f)
             val radius = (this.size.minDimension / 2f) - 1.dp.toPx()
@@ -490,10 +488,14 @@ fun CompassProgressIndicator(
             // Arc indicator size is (size - 2.dp), so its center radius = (size - 2.dp) / 2
             val radiusOffset = (size - 2.dp) / 2
 
-            // Fixed at top (12 o'clock position) = -90° in math coordinates
-            val topAngleRad = Math.toRadians(-90.0)
-            val offsetX = (radiusOffset.value * kotlin.math.cos(topAngleRad)).dp
-            val offsetY = (radiusOffset.value * kotlin.math.sin(topAngleRad)).dp
+            // Kaaba tracks the Qibla direction in screen space.
+            // animatedCompassDegree = animated(qiblaDirection - compassDegree) = angle of Qibla
+            // from the torch (screen top).  sin/cos converts compass angle to screen offset:
+            //   compass 0° → top (sin=0, -cos=-1)
+            //   compass 90° → right (sin=1, -cos=0)
+            val kaabaRad = Math.toRadians(animatedCompassDegree.toDouble())
+            val offsetX = (radiusOffset.value * kotlin.math.sin(kaabaRad)).dp
+            val offsetY = -(radiusOffset.value * kotlin.math.cos(kaabaRad)).dp
 
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -558,7 +560,7 @@ fun CompassProgressIndicator(
                     arcColor           = arcColorInt,
                     arcStartAngleDeg   = -90f,
                     arcSweepDeg        = arcProgress * 360f,
-                    arcRotationDeg     = animatedCompassDegree - 18f,
+                    arcRotationDeg     = 0f,   // arc fixed at top (torch direction)
                     showArc            = arcAlpha > 0.01f,
                     deviceHeadingDeg   = compassDegree,
                 )
@@ -641,11 +643,10 @@ fun CompassProgressIndicator(
             drawCircle(color = glowColor.copy(alpha = if (isNearQibla) 0.4f else 0.3f), radius = ringRadius, center = center, style = Stroke(width = sw))
         }
 
-        // Rotating arc canvas — only in non-globe mode (globe uses RingOverlayView)
+        // Arc canvas — fixed at top (torch direction), no longer rotates
         if (!showGlobe) Canvas(
             modifier = Modifier
                 .size(size)
-                .rotate(animatedCompassDegree - 18f)
                 .graphicsLayer {
                     alpha = arcAlpha
                     scaleX = arcScale
@@ -663,7 +664,7 @@ fun CompassProgressIndicator(
             }
             drawArc(
                 color = arcColor,
-                startAngle = -90f,
+                startAngle = -90f - arcProgress * 180f,  // center arc at 12 o'clock (top)
                 sweepAngle = arcProgress * 360f,
                 useCenter = false,
                 topLeft = Offset(center.x - ringRadius, center.y - ringRadius),
