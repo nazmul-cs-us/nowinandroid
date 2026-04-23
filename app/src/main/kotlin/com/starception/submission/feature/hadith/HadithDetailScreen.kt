@@ -417,7 +417,7 @@ fun HadithDetailScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = Color.Transparent,  // Transparent to let sky extend to top
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,  // Solid background to prevent sky showing through
         contentWindowInsets = WindowInsets(0, 0, 0, 0) // No padding for status bar in immersive mode
     ) { _ ->
         // Don't apply paddingValues - let content scroll under transparent toolbar like SurahDetailScreen

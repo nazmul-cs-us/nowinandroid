@@ -20,8 +20,8 @@ ENDPOINT = f"https://{ACCOUNT_ID}.r2.cloudflarestorage.com"
 REGION = "auto"
 SERVICE = "s3"
 
-ACCESS_KEY = "f76ef733701afd567441405cbb2e0cf1"
-SECRET_KEY = "bdd7ee043803545f05057ee9a607584b0bbb0ef1c348a39b7a5e58e09ddd1335"
+ACCESS_KEY = "de52f276c7a3a4b19e2a0aba392ea85e"
+SECRET_KEY = "e4681d6b8b96e999ec7e4a6e96a548e7aac6418cf349c32364008a22f8c842e0"
 
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_DIR = SCRIPT_DIR.parent

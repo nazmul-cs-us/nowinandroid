@@ -31,11 +31,11 @@ data class TopicEntity(
     @ColumnInfo(name = "icon")
     val icon: String?,
 
-    @ColumnInfo(name = "is_system")
-    val isSystem: Int = 1,
+    @ColumnInfo(name = "is_system", defaultValue = "1")
+    val isSystem: Int? = 1,
 
-    @ColumnInfo(name = "is_user_created")
-    val isUserCreated: Int = 0,
+    @ColumnInfo(name = "is_user_created", defaultValue = "0")
+    val isUserCreated: Int? = 0,
 
     @ColumnInfo(name = "created_at")
     val createdAt: String?,
@@ -70,8 +70,8 @@ fun TopicEntity.toTopic() = Topic(
     imageUrl = imageUrl ?: "",
     url = url ?: "",
     icon = icon,
-    isSystem = isSystem == 1,
-    isUserCreated = isUserCreated == 1
+    isSystem = (isSystem ?: 1) == 1,
+    isUserCreated = (isUserCreated ?: 0) == 1
 )
 
 /**
@@ -90,3 +90,4 @@ fun Topic.toEntity() = TopicEntity(
     createdAt = null,
     updatedAt = null
 )
+

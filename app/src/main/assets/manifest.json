@@ -1,18 +1,13 @@
 {
   "version": 1,
   "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
-  "total_size": 8128732554,
-  "total_files": 6426,
+  "total_size": 8129054037,
+  "total_files": 6427,
   "categories": {
     "json_data": {
-      "total_size": 9828824,
-      "file_count": 3,
+      "total_size": 10230232,
+      "file_count": 5,
       "required": true
-    },
-    "other": {
-      "total_size": 96309,
-      "file_count": 2,
-      "required": false
     },
     "news": {
       "total_size": 5869568,
@@ -137,12 +132,6 @@
       "category": "json_data",
       "required": true
     },
-    "json/manifest.json": {
-      "size": 96309,
-      "sha256": "4806c0b832a850d863a0c770e632e51e404da563283595cf59763ad81f2b9a91",
-      "category": "other",
-      "required": false
-    },
     "json/sahih_bukhari.json": {
       "size": 4118996,
       "sha256": "5c5d332eadc9a5b6b39e1eb93d79c3831d78969822fad106e1374d65293c8471",
@@ -156,15 +145,27 @@
       "required": true
     },
     "topics.db": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "category": "other",
-      "required": false
+      "size": 16384,
+      "sha256": "08fef4ca636b9ef622b64a7052e6eec435080cff6d7a70c7a0826dfc08fc1816",
+      "category": "json_data",
+      "required": true
     },
     "databases/news.db": {
       "size": 5869568,
       "sha256": "be224aecfb245a3008258c555216c452a9f221c9778cf8cc221ffea80d72e0f8",
       "category": "news",
+      "required": true
+    },
+    "databases/quranic_duas.db": {
+      "size": 40960,
+      "sha256": "dc69b759a2bb91eebc499912f123b64c1523f51af29ac0bff4477b1765d3743d",
+      "category": "json_data",
+      "required": true
+    },
+    "databases/fortress_of_the_muslim.db": {
+      "size": 360448,
+      "sha256": "7c7c83ee8245a9af01ea9be471a130562c4a49bdb0334786f87334c2715cd35f",
+      "category": "json_data",
       "required": true
     },
     "databases/quran/quran.db": {

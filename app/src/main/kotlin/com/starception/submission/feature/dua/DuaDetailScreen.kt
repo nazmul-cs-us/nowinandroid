@@ -110,6 +110,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -867,7 +868,20 @@ fun DuaDetailScreen(
     onHadithClick: ((collectionName: String, hadithNumber: Int, databaseFile: String) -> Unit)? = null
 ) {
     // Enable immersive full-screen mode (hides status bar)
-    ImmersiveFullScreenEffect()
+    // Don't restore on dispose to prevent status bar flash when navigating to surah detail
+    ImmersiveFullScreenEffect(restoreOnDispose = false)
+
+    // Create wrapped back click that restores status bar first
+    val view = androidx.compose.ui.platform.LocalView.current
+    val wrappedOnBackClick: () -> Unit = {
+        val window = (view.context as? android.app.Activity)?.window
+        val insetsController = window?.let {
+            androidx.core.view.WindowCompat.getInsetsController(it, view)
+        }
+        // Restore status bar before navigating back
+        insetsController?.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        onBackClick()
+    }
 
     val context = LocalContext.current
     val viewModel = remember { DuaDetailViewModel(context) }
@@ -1065,21 +1079,25 @@ fun DuaDetailScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = Color.Transparent,  // Transparent to let sky extend to top
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,  // Solid background to prevent sky showing through
         contentWindowInsets = WindowInsets(0, 0, 0, 0) // No padding for status bar in immersive mode
     ) { _ ->
         // Don't apply paddingValues - let content scroll under transparent toolbar like SurahDetailScreen
         Box(modifier = Modifier.fillMaxSize()) {
             android.util.Log.d("DuaScreen", "📦 BOX: duasList.isEmpty=${duasList.isEmpty()}")
 
-            // Show shimmer loading state while data loads
-            // Show shimmer only when no data is available at all (neither from pager nor fallback)
+            // Show simple loading state while data loads
             val hasContent = content.isNotBlank()
             if (duasList.isEmpty() && !hasContent) {
-                android.util.Log.d("DuaScreen", "⏳ SHOWING SHIMMER (no content)")
-                DuaShimmerLoadingContent(
-                    onBackClick = onBackClick
-                )
+                android.util.Log.d("DuaScreen", "⏳ SHOWING LOADING (no content)")
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
             }
 
             // Pager for duas - with custom drag gesture and edge indicators (no sliding)
@@ -2250,7 +2268,7 @@ fun DuaDetailScreen(
                         shape = CircleShape,
                         color = toolbarContentColor.copy(alpha = 0.15f)
                     ) {
-                        IconButton(onClick = onBackClick) {
+                        IconButton(onClick = wrappedOnBackClick) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back",
@@ -2761,58 +2779,21 @@ private fun SingleDuaContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Header with dynamic sky - matches the pager header style
-        val skyPeriod = getCurrentSkyPeriodForTheme()
+        // Header with mosque image - matches the pager header style
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp) // Shorter for fallback (no toolbar overlap needed)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
         ) {
-            // Dynamic sky background based on time of day
-            DynamicSkyHeader(
+            // Mosque image background only - no overlay text
+            Image(
+                painter = painterResource(R.drawable.masjid_al_nawabi),
+                contentDescription = "Masjid al-Nawabi",
                 modifier = Modifier.fillMaxSize(),
-                height = 220.dp,
-                period = skyPeriod
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.Center
             )
-            // Semi-transparent overlay for text readability
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.2f))
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 80.dp, bottom = 16.dp), // 80dp for toolbar
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Icon
-                Surface(
-                    modifier = Modifier.size(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White.copy(alpha = 0.25f)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.AutoStories,
-                            contentDescription = "Dua",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Dua",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         }
 
         // Content cards with padding

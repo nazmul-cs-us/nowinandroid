@@ -532,12 +532,18 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
      * Checks CDN-downloaded files first, then falls back to bundled APK assets.
      */
     private fun getAssetDbPath(context: Context, dbName: String): String? {
-        // Check CDN-downloaded file first (matches AssetDownloadManager path convention)
-        val cdnKey = "databases/quran/$dbName"
-        val cdnFile = File(context.filesDir, "cdn_assets/$cdnKey")
-        if (cdnFile.exists() && cdnFile.length() > 0) {
-            Log.d(TAG, "Using CDN-downloaded database: $dbName (${cdnFile.length()} bytes)")
-            return cdnFile.absolutePath
+        // Check CDN-downloaded files in multiple locations
+        val cdnPaths = listOf(
+            "databases/quran/$dbName",  // For quran.db, quran_enhanced.db
+            "databases/$dbName"          // For quranic_duas.db, fortress_of_the_muslim.db
+        )
+
+        for (cdnKey in cdnPaths) {
+            val cdnFile = File(context.filesDir, "cdn_assets/$cdnKey")
+            if (cdnFile.exists() && cdnFile.length() > 0) {
+                Log.d(TAG, "Using CDN-downloaded database: $dbName from $cdnKey (${cdnFile.length()} bytes)")
+                return cdnFile.absolutePath
+            }
         }
 
         // Fall back to bundled APK asset
