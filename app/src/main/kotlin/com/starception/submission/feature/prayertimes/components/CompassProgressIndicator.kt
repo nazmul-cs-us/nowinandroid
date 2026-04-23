@@ -340,10 +340,11 @@ fun CompassProgressIndicator(
         )
         val glowColor = if (isNearQibla) Color(0xFF10B981) else accuracyColor
 
-        // Directional glow beam — fixed at top, always pointing where the torch is pointing.
+        // Directional glow beam — rotates with the arc to point toward Qibla.
         Canvas(
             modifier = Modifier
                 .size(size)
+                .rotate(animatedCompassDegree)
         ) {
             val center = Offset(this.size.width / 2f, this.size.height / 2f)
             val radius = (this.size.minDimension / 2f) - 1.dp.toPx()
@@ -488,14 +489,9 @@ fun CompassProgressIndicator(
             // Arc indicator size is (size - 2.dp), so its center radius = (size - 2.dp) / 2
             val radiusOffset = (size - 2.dp) / 2
 
-            // Kaaba tracks the Qibla direction in screen space.
-            // animatedCompassDegree = animated(qiblaDirection - compassDegree) = angle of Qibla
-            // from the torch (screen top).  sin/cos converts compass angle to screen offset:
-            //   compass 0° → top (sin=0, -cos=-1)
-            //   compass 90° → right (sin=1, -cos=0)
-            val kaabaRad = Math.toRadians(animatedCompassDegree.toDouble())
-            val offsetX = (radiusOffset.value * kotlin.math.sin(kaabaRad)).dp
-            val offsetY = -(radiusOffset.value * kotlin.math.cos(kaabaRad)).dp
+            // Kaaba fixed at top (12 o'clock) — the arc flows toward it when facing Qibla
+            val offsetX = 0.dp
+            val offsetY = -radiusOffset
 
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -560,7 +556,7 @@ fun CompassProgressIndicator(
                     arcColor           = arcColorInt,
                     arcStartAngleDeg   = -90f,
                     arcSweepDeg        = arcProgress * 360f,
-                    arcRotationDeg     = 0f,   // arc fixed at top (torch direction)
+                    arcRotationDeg     = animatedCompassDegree,
                     showArc            = arcAlpha > 0.01f,
                     deviceHeadingDeg   = compassDegree,
                 )
@@ -643,10 +639,12 @@ fun CompassProgressIndicator(
             drawCircle(color = glowColor.copy(alpha = if (isNearQibla) 0.4f else 0.3f), radius = ringRadius, center = center, style = Stroke(width = sw))
         }
 
-        // Arc canvas — fixed at top (torch direction), no longer rotates
+        // Mercury-like arc — rotates to point toward Qibla, settles at 12 o'clock when aligned.
+        // startAngle is pre-centered so arc midpoint is at 12 o'clock when rotation = 0.
         if (!showGlobe) Canvas(
             modifier = Modifier
                 .size(size)
+                .rotate(animatedCompassDegree)
                 .graphicsLayer {
                     alpha = arcAlpha
                     scaleX = arcScale
