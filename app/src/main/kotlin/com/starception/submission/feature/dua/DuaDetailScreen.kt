@@ -2239,6 +2239,16 @@ fun DuaDetailScreen(
             // Smooth transition based on toolbarCollapseProgress (0 = transparent, 1 = solid)
             val toolbarBackgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = toolbarCollapseProgress)
 
+            // Hide toolbar until status bar is gone (ImmersiveFullScreenEffect fires after first frame,
+            // causing a brief window where both the status bar and toolbar are visible). Once the status
+            // bar insets drop to zero (bar is hidden), fade the toolbar in.
+            val statusBarVisible = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() > 0.dp
+            val toolbarAlpha by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (statusBarVisible) 0f else 1f,
+                animationSpec = androidx.compose.animation.core.tween(durationMillis = 150),
+                label = "toolbarAlpha"
+            )
+
             // Content color transitions from white (over image) to onSurface (over solid background)
             val surfaceColor = MaterialTheme.colorScheme.onSurface
             val toolbarContentColor = Color(
@@ -2298,7 +2308,8 @@ fun DuaDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .statusBarsPadding()
+                    .padding(top = 8.dp)
+                    .graphicsLayer { alpha = toolbarAlpha }
             ) {
                 Box(
                     modifier = Modifier
@@ -3295,7 +3306,6 @@ private fun DuaShimmerLoadingContent(
         }
 
         // Toolbar overlay - transparent to show sky through
-        // Use statusBarsPadding to properly position below status bar / camera cutout area
         Box(
             modifier = Modifier
                 .fillMaxWidth()
