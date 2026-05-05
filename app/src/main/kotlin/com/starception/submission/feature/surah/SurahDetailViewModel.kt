@@ -85,6 +85,12 @@ class SurahDetailViewModel @Inject constructor(
     )
     val showTajweed: StateFlow<Boolean> = _showTajweed.asStateFlow()
 
+    // Continuous (Mushaf) reading mode
+    private val _continuousReadingMode = MutableStateFlow(
+        prefs.getBoolean("continuous_reading_mode", false)
+    )
+    val continuousReadingMode: StateFlow<Boolean> = _continuousReadingMode.asStateFlow()
+
     private val _tajweedAnnotations = MutableStateFlow<Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>>(emptyMap())
     val tajweedAnnotations: StateFlow<Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>> = _tajweedAnnotations.asStateFlow()
 
@@ -313,6 +319,14 @@ class SurahDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _showTranslation.value = show
             prefs.edit().putBoolean("show_translation", show).apply()
+        }
+    }
+
+    fun toggleContinuousReadingMode() {
+        viewModelScope.launch {
+            val newValue = !_continuousReadingMode.value
+            _continuousReadingMode.value = newValue
+            prefs.edit().putBoolean("continuous_reading_mode", newValue).apply()
         }
     }
 
