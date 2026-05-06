@@ -37,6 +37,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -1571,6 +1572,33 @@ private fun AlbumPlayerContent(
         }
     }
 
+    // Magnetic snap: Mushaf must be fully visible when scrolled down (no partial view)
+    // Either show full header (top) OR full Mushaf - no middle state
+    LaunchedEffect(scrollState.isScrollInProgress) {
+        if (!scrollState.isScrollInProgress && continuousReadingMode && displayAyahs.isNotEmpty()) {
+            kotlinx.coroutines.delay(100)
+
+            val firstItem = scrollState.firstVisibleItemIndex
+            val offset = scrollState.firstVisibleItemScrollOffset
+
+            when {
+                // On header with some scroll - decide direction
+                firstItem == 0 && offset > 200 -> {
+                    // Scrolled enough - snap to full Mushaf
+                    scrollState.animateScrollToItem(index = 1, scrollOffset = 0)
+                }
+                firstItem == 0 && offset in 1..200 -> {
+                    // Small scroll - snap back to top
+                    scrollState.animateScrollToItem(index = 0, scrollOffset = 0)
+                }
+                // On Mushaf (item 1) with any offset - ensure it's at top of Mushaf
+                firstItem == 1 && offset > 0 -> {
+                    scrollState.animateScrollToItem(index = 1, scrollOffset = 0)
+                }
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -1622,9 +1650,13 @@ private fun AlbumPlayerContent(
                 }
             }
     ) {
+        // Snap fling behavior for Mushaf mode - snaps to item boundaries
+        val snapFlingBehavior = rememberSnapFlingBehavior(lazyListState = scrollState)
+
         LazyColumn(
             state = scrollState,
             contentPadding = PaddingValues(top = 0.dp), // No padding needed (status bar is hidden)
+            flingBehavior = if (continuousReadingMode) snapFlingBehavior else androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior(),
             modifier = Modifier.fillMaxSize()
         ) {
         // Album Header with either FAB+Info Card OR Music Player Controls
@@ -3600,7 +3632,7 @@ private fun ContinuousAyahsContent(
 }
 
 // ---------------------------------------------------------------------------
-// Mushaf page with decorative Islamic frame
+// Mushaf page without decorative frame (clean layout)
 // ---------------------------------------------------------------------------
 @Composable
 private fun MushafPageWithFrame(
@@ -3617,100 +3649,28 @@ private fun MushafPageWithFrame(
     modifier: Modifier = Modifier
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
-    val frameColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-    val frameColorLight = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val headerBgColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)
     val headerBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
-    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-    val density = LocalDensity.current
 
-    val frameMarginDp = 12.dp
-    val borderInsetDp = 5.dp
-    val innerPaddingDp = 8.dp
+    val contentPadding = 16.dp
     val surahHeaderHeightDp = if (showSurahHeader) 38.dp else 0.dp
     val pageFooterHeightDp = 24.dp
-
-    val totalHPad = frameMarginDp + borderInsetDp + innerPaddingDp
-    val totalTopPad = frameMarginDp + borderInsetDp + innerPaddingDp + surahHeaderHeightDp
-    val totalBottomPad = frameMarginDp + borderInsetDp + innerPaddingDp + pageFooterHeightDp
 
     Surface(
         modifier = modifier.fillMaxSize(),
         color = surfaceColor
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .drawBehind {
-                    val m = frameMarginDp.toPx()
-                    val bi = borderInsetDp.toPx()
-                    val bw1 = 1.5.dp.toPx()
-                    val bw2 = 1.dp.toPx()
-
-                    // Outer border
-                    drawRoundRect(
-                        color = frameColor,
-                        topLeft = Offset(m, m),
-                        size = androidx.compose.ui.geometry.Size(size.width - m * 2, size.height - m * 2),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(6.dp.toPx()),
-                        style = Stroke(width = bw1)
-                    )
-
-                    // Inner border
-                    val inM = m + bi
-                    drawRoundRect(
-                        color = frameColorLight,
-                        topLeft = Offset(inM, inM),
-                        size = androidx.compose.ui.geometry.Size(size.width - inM * 2, size.height - inM * 2),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()),
-                        style = Stroke(width = bw2)
-                    )
-
-                    // Corner ornaments — small circles at each corner between the two borders
-                    val cornerOffset = m + bi / 2
-                    val dotR = 2.5.dp.toPx()
-                    val corners = listOf(
-                        Offset(cornerOffset, cornerOffset),
-                        Offset(size.width - cornerOffset, cornerOffset),
-                        Offset(cornerOffset, size.height - cornerOffset),
-                        Offset(size.width - cornerOffset, size.height - cornerOffset)
-                    )
-                    corners.forEach { c ->
-                        drawCircle(color = frameColor, radius = dotR, center = c)
-                        drawCircle(color = surfaceColor, radius = dotR - 1.dp.toPx(), center = c)
-                        drawCircle(color = frameColor, radius = 1.dp.toPx(), center = c)
-                    }
-
-                    // Small lines extending from corner dots along edges
-                    val lineLen = 18.dp.toPx()
-                    val lineW = 0.8.dp.toPx()
-                    corners.forEachIndexed { i, c ->
-                        val hDir = if (i % 2 == 0) 1f else -1f
-                        val vDir = if (i < 2) 1f else -1f
-                        drawLine(frameColorLight, c, Offset(c.x + hDir * lineLen, c.y), strokeWidth = lineW)
-                        drawLine(frameColorLight, c, Offset(c.x, c.y + vDir * lineLen), strokeWidth = lineW)
-                    }
-
-                    // Footer separator line
-                    val footerY = size.height - m - bi - pageFooterHeightDp.toPx()
-                    val lineMargin = m + bi + 20.dp.toPx()
-                    drawLine(
-                        color = frameColorLight,
-                        start = Offset(lineMargin, footerY),
-                        end = Offset(size.width - lineMargin, footerY),
-                        strokeWidth = 0.5.dp.toPx()
-                    )
-                }
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             // Surah header banner
             if (showSurahHeader) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(
-                            start = totalHPad + 4.dp,
-                            end = totalHPad + 4.dp,
-                            top = frameMarginDp + borderInsetDp + 4.dp
+                            start = contentPadding,
+                            end = contentPadding,
+                            top = contentPadding
                         )
                         .height(surahHeaderHeightDp - 4.dp)
                         .clip(RoundedCornerShape(6.dp))
@@ -3734,7 +3694,7 @@ private fun MushafPageWithFrame(
                 }
             }
 
-            // Ayah text content — padded to sit inside the frame
+            // Ayah text content
             ContinuousAyahsContent(
                 ayahs = ayahs,
                 arabicFont = arabicFont,
@@ -3746,10 +3706,10 @@ private fun MushafPageWithFrame(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
-                        start = totalHPad,
-                        end = totalHPad,
-                        top = totalTopPad,
-                        bottom = totalBottomPad
+                        start = contentPadding,
+                        end = contentPadding,
+                        top = contentPadding + surahHeaderHeightDp,
+                        bottom = contentPadding + pageFooterHeightDp
                     )
             )
 
@@ -3757,7 +3717,7 @@ private fun MushafPageWithFrame(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = frameMarginDp + borderInsetDp + 4.dp),
+                    .padding(bottom = contentPadding),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -3824,7 +3784,7 @@ private fun MushafPagerView(
                 .pointerInput(parentScrollState, state) {
                     awaitEachGesture {
                         val firstDown = awaitFirstDown(requireUnconsumed = false)
-                        firstDown.consume()
+                        // Don't consume firstDown - let parent have a chance
                         var totalDx = 0f
                         var totalDy = 0f
                         var directionDecided = false
@@ -3841,7 +3801,6 @@ private fun MushafPagerView(
                             } else if (pointers.size == 1) {
                                 val change = pointers[0]
                                 val delta = change.position - change.previousPosition
-                                change.consume()
 
                                 if (!directionDecided) {
                                     totalDx += kotlin.math.abs(delta.x)
@@ -3853,9 +3812,12 @@ private fun MushafPagerView(
                                     }
                                 }
 
+                                // Only consume horizontal swipes, let vertical pass through
                                 if (directionDecided && !isVerticalScroll) {
+                                    change.consume()
                                     horizontalDragTotal += delta.x
                                 }
+                                // Vertical scrolls are NOT consumed - parent LazyColumn handles them
                             }
                         } while (event.changes.any { it.pressed })
 
