@@ -121,7 +121,16 @@ class AssetDownloadManager @Inject constructor(
         return try {
             context.assets.open(cdnKey).use { it.available() > 0 }
         } catch (e: Exception) {
-            false
+            // Try common subdirectories as fallback
+            if (!cdnKey.contains("/")) {
+                try {
+                    context.assets.open("databases/$cdnKey").use { it.available() > 0 }
+                } catch (_: Exception) {
+                    false
+                }
+            } else {
+                false
+            }
         }
     }
 
@@ -296,6 +305,13 @@ class AssetDownloadManager @Inject constructor(
                     kotlinx.coroutines.delay(RETRY_DELAY_MS * attempt)
                 }
             }
+        }
+
+        // CDN download failed — fall back to bundled asset if available
+        if (isAssetBundled(cdnKey)) {
+            Log.i(TAG, "CDN download failed for $cdnKey, using bundled asset as fallback")
+            stateFlow.value = DownloadState.Completed
+            return DownloadState.Completed
         }
 
         val finalError = lastError ?: "Unknown error"

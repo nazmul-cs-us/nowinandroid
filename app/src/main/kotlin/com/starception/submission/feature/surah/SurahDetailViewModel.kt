@@ -87,7 +87,7 @@ class SurahDetailViewModel @Inject constructor(
 
     // Continuous (Mushaf) reading mode
     private val _continuousReadingMode = MutableStateFlow(
-        prefs.getBoolean("continuous_reading_mode", false)
+        prefs.getBoolean("continuous_reading_mode", true)
     )
     val continuousReadingMode: StateFlow<Boolean> = _continuousReadingMode.asStateFlow()
 
@@ -111,7 +111,7 @@ class SurahDetailViewModel @Inject constructor(
      */
     private fun hasBismillah(ayahText: String): Boolean {
         val bismillahRegex = Regex(
-            "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*ا[ٱ]*لل[َّ]*ه[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ْۡ]*م[َٰ]*ن[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
+            "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*[اٱ]لل[َّ]*ه[ِ]*\\s*[اٱ]لر[َّ]*ح[ْۡ]*م[َٰ]*ن[ِ]*\\s*[اٱ]لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
             RegexOption.IGNORE_CASE
         )
 
@@ -123,7 +123,8 @@ class SurahDetailViewModel @Inject constructor(
             "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ",
             "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
             "بسم الله الرحمن الرحيم",
-            "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"
+            "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ",
+            "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"
         )
 
         return bismillahPatterns.any { ayahText.trim().startsWith(it) }
@@ -141,7 +142,7 @@ class SurahDetailViewModel @Inject constructor(
         // Use regex to match any Bismillah pattern with flexible diacritics and spacing
         // Pattern matches: بسم الله الرحمن الرحيم (with any combination of diacritics)
         val bismillahRegex = Regex(
-            "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*ا[ٱ]*لل[َّ]*ه[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ْۡ]*م[َٰ]*ن[ِ]*\\s*ا[ٱ]*لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
+            "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*[اٱ]لل[َّ]*ه[ِ]*\\s*[اٱ]لر[َّ]*ح[ْۡ]*م[َٰ]*ن[ِ]*\\s*[اٱ]لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
             RegexOption.IGNORE_CASE
         )
 

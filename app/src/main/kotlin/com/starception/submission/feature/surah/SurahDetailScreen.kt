@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.em
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.ui.input.pointer.positionChanged
 import kotlin.math.sqrt
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -64,6 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Brush
@@ -75,6 +75,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -82,6 +83,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -99,6 +101,7 @@ import com.starception.submission.core.qurandatabase.Surah
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.feature.quran.AudioLanguage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
@@ -809,6 +812,7 @@ fun SurahDetailScreen(
                     onFontSizeChange = { newSize -> viewModel.changeArabicFontSize(newSize) },
                     minFontSize = minFontSize,
                     maxFontSize = maxFontSize,
+                    onToggleContinuousReadingMode = { viewModel.toggleContinuousReadingMode() },
                     continuousReadingMode = continuousReadingMode,
                     modifier = Modifier
                 )
@@ -902,7 +906,6 @@ fun SurahDetailScreen(
         )
 
         // Floating Surah name that moves from info card to toolbar when scrolling
-        // Animates to position next to back button (left side), icons are on right side after camera
         if (uiState is SurahDetailUiState.Success) {
             val surah = (uiState as SurahDetailUiState.Success).surah
             val density = LocalDensity.current
@@ -1490,6 +1493,7 @@ private fun AlbumPlayerContent(
     onFontSizeChange: (Float) -> Unit = {},
     minFontSize: Float = 14f,
     maxFontSize: Float = 60f,
+    onToggleContinuousReadingMode: () -> Unit = {},
     continuousReadingMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -1553,6 +1557,18 @@ private fun AlbumPlayerContent(
     // Update local state when arabicFontSize changes externally (e.g. +/- buttons)
     LaunchedEffect(arabicFontSize) {
         currentFontSizeState = arabicFontSize
+    }
+
+    // Auto-scroll to Mushaf item whenever Mushaf mode is active and content is loaded.
+    // Keys on both so it fires on first open (default=true) once ayahs arrive,
+    // and again if the user toggles the mode on manually.
+    LaunchedEffect(continuousReadingMode, displayAyahs.size) {
+        if (continuousReadingMode && displayAyahs.isNotEmpty()) {
+            // Item 0 = AlbumHeader+InfoCard, item 1 = MushafPagerView.
+            // Small delay lets Compose finish layout before scrolling.
+            kotlinx.coroutines.delay(80)
+            scrollState.animateScrollToItem(index = 1, scrollOffset = 0)
+        }
     }
 
     Box(
@@ -1750,22 +1766,8 @@ private fun AlbumPlayerContent(
             }
         }
 
-        // Bismillah row - shown only if first ayah contains Bismillah in database
-        // This is determined by checking the actual ayah text in the database
-        if (showBismillahRow) {
-            item(key = "bismillah") {
-                BismillahRow(
-                    arabicFont = selectedArabicFont,
-                    arabicFontSize = arabicFontSize,
-                    textAlignment = textAlignment
-                )
-            }
-        }
-
-        // Ayah List (Track List) - use displayAyahs for current playing surah
+        // Ayah content — Mushaf pager in Mushaf mode, individual ayah items otherwise
         if (continuousReadingMode) {
-            // Mushaf pager sits as a LazyColumn item below the existing header.
-            // Height = screen height so it fills the viewport once the header scrolls out.
             item(key = "mushaf_pager_${displaySurah.number}") {
                 MushafPagerView(
                     ayahs = displayAyahs,
@@ -1774,19 +1776,28 @@ private fun AlbumPlayerContent(
                     showTajweed = showTajweed,
                     tajweedAnnotations = tajweedAnnotations,
                     surahName = displaySurah.nameArabic,
+                    showBismillah = showBismillahRow,
+                    textAlignment = textAlignment,
+                    parentScrollState = scrollState,
                     onAyahLongPress = { ayahNumber ->
                         selectedAyahForOptions = ayahNumber
                         showBottomSheet = true
                     },
-                    onFontSizeChange = onFontSizeChange,
-                    minFontSize = minFontSize,
-                    maxFontSize = maxFontSize,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(screenHeightDp)
                 )
             }
         } else {
+            if (showBismillahRow) {
+                item(key = "bismillah") {
+                    BismillahRow(
+                        arabicFont = selectedArabicFont,
+                        arabicFontSize = arabicFontSize,
+                        textAlignment = textAlignment
+                    )
+                }
+            }
             items(
                 items = displayAyahs,
                 key = { "${displaySurah.number}_${it.numberInSurah}" }
@@ -3440,85 +3451,18 @@ private fun BismillahRow(
     modifier: Modifier = Modifier
 ) {
     val bismillahText = "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ"
-    val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize * 1.15f)
-    val lineColor = MaterialTheme.colorScheme.outlineVariant
     val textColor = MaterialTheme.colorScheme.onSurface
+    val calligraphicStyle = getArabicFontStyle(arabicFont, arabicFontSize * 1.3f)
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Mushaf-style layout: decorative rules flanking the centered Bismillah text
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Left decorative rule with tapered ends (drawn via Canvas)
-            androidx.compose.foundation.Canvas(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(16.dp)
-            ) {
-                val y = size.height / 2f
-                // Main rule
-                drawLine(
-                    color = lineColor,
-                    start = androidx.compose.ui.geometry.Offset(0f, y),
-                    end = androidx.compose.ui.geometry.Offset(size.width, y),
-                    strokeWidth = 1.dp.toPx()
-                )
-                // Small diamond ornament at the inner end
-                val d = 4.dp.toPx()
-                val cx = size.width
-                drawLine(color = lineColor, start = androidx.compose.ui.geometry.Offset(cx - d, y - d / 2), end = androidx.compose.ui.geometry.Offset(cx, y), strokeWidth = 1.2.dp.toPx())
-                drawLine(color = lineColor, start = androidx.compose.ui.geometry.Offset(cx - d, y + d / 2), end = androidx.compose.ui.geometry.Offset(cx, y), strokeWidth = 1.2.dp.toPx())
-            }
-
-            // Bismillah text — centered, slightly larger than body
-            Text(
-                text = bismillahText,
-                style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle),
-                color = textColor,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Visible,
-                modifier = Modifier.padding(horizontal = 12.dp)
-            )
-
-            // Right decorative rule (mirrored)
-            androidx.compose.foundation.Canvas(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(16.dp)
-            ) {
-                val y = size.height / 2f
-                drawLine(
-                    color = lineColor,
-                    start = androidx.compose.ui.geometry.Offset(0f, y),
-                    end = androidx.compose.ui.geometry.Offset(size.width, y),
-                    strokeWidth = 1.dp.toPx()
-                )
-                val d = 4.dp.toPx()
-                val cx = 0f
-                drawLine(color = lineColor, start = androidx.compose.ui.geometry.Offset(cx + d, y - d / 2), end = androidx.compose.ui.geometry.Offset(cx, y), strokeWidth = 1.2.dp.toPx())
-                drawLine(color = lineColor, start = androidx.compose.ui.geometry.Offset(cx + d, y + d / 2), end = androidx.compose.ui.geometry.Offset(cx, y), strokeWidth = 1.2.dp.toPx())
-            }
-        }
-
-        // English translation — matches reference style (lighter, smaller, centered)
-        Text(
-            text = "In the Name of Allah—the Most Compassionate, Most Merciful",
-            style = MaterialTheme.typography.bodySmall,
-            color = textColor.copy(alpha = 0.55f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-    }
+    Text(
+        text = bismillahText,
+        style = calligraphicStyle,
+        color = textColor,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 2.dp)
+    )
 }
 
 @Composable
@@ -3528,6 +3472,7 @@ private fun ContinuousAyahsContent(
     arabicFontSize: Float = 22f,
     showTajweed: Boolean = false,
     tajweedAnnotations: Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>> = emptyMap(),
+    showBismillah: Boolean = false,
     onAyahLongPress: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -3540,8 +3485,14 @@ private fun ContinuousAyahsContent(
     // The marker uses 0.85.em (relative) so it always scales with the parent font size
     // without requiring a rebuild of the entire string on every pinch frame.
     val currentMarkerColor = markerColor
-    val annotatedString = remember(ayahs, showTajweed, tajweedAnnotations) {
+    val annotatedString = remember(ayahs, showTajweed, tajweedAnnotations, showBismillah) {
         buildAnnotatedString {
+            if (showBismillah) {
+                withStyle(SpanStyle(fontSize = 1.3.em)) {
+                    append("بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ")
+                }
+                append("\n")
+            }
             ayahs.forEachIndexed { index, ayah ->
                 val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
 
@@ -3576,7 +3527,10 @@ private fun ContinuousAyahsContent(
         }
     }
 
-    Box(
+    val lineSpacingMultiplier = 1.5f
+    val textMeasurer = rememberTextMeasurer()
+
+    BoxWithConstraints(
         modifier = modifier
             .pointerInput(ayahs) {
                 detectTapGestures(
@@ -3586,17 +3540,233 @@ private fun ContinuousAyahsContent(
                 )
             }
     ) {
+        val density = LocalDensity.current
+        val availableHeightPx = with(density) { maxHeight.toPx() }
+        val horizontalPaddingDp = 12.dp
+        val verticalPaddingDp = 8.dp
+        val availableWidthPx = with(density) { (maxWidth - horizontalPaddingDp * 2).toPx() }
+        val verticalPaddingPx = with(density) { (verticalPaddingDp * 2).toPx() }
+        val contentHeightPx = availableHeightPx - verticalPaddingPx
+
+        val baseStyle = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle)
+
+        fun measureHeight(fontSizeSp: Float): Int {
+            val style = baseStyle.copy(
+                fontSize = fontSizeSp.sp,
+                textAlign = TextAlign.End,
+                lineHeight = (fontSizeSp * lineSpacingMultiplier).sp
+            )
+            val result = textMeasurer.measure(
+                text = annotatedString,
+                style = style,
+                constraints = androidx.compose.ui.unit.Constraints(
+                    maxWidth = availableWidthPx.toInt()
+                ),
+                density = density
+            )
+            return result.size.height
+        }
+
+        val scaledFontSize = remember(annotatedString, arabicFontSize, availableHeightPx, availableWidthPx, arabicFont) {
+            if (availableHeightPx <= 0f || availableWidthPx <= 0f || annotatedString.text.isEmpty()) {
+                return@remember arabicFontSize
+            }
+            if (measureHeight(arabicFontSize) >= contentHeightPx) {
+                return@remember arabicFontSize
+            }
+            var lo = arabicFontSize
+            var hi = 150f
+            repeat(15) {
+                val mid = (lo + hi) / 2f
+                if (measureHeight(mid) <= contentHeightPx) lo = mid else hi = mid
+            }
+            lo
+        }
+
         Text(
             text = annotatedString,
             color = onSurfaceColor,
-            style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
+            style = baseStyle.copy(
+                fontSize = scaledFontSize.sp,
                 textAlign = TextAlign.End,
-                lineHeight = (arabicFontSize * 1.5f).sp
+                lineHeight = (scaledFontSize * lineSpacingMultiplier).sp
             ),
+            overflow = TextOverflow.Clip,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp)
+                .padding(horizontal = horizontalPaddingDp, vertical = verticalPaddingDp)
         )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Mushaf page with decorative Islamic frame
+// ---------------------------------------------------------------------------
+@Composable
+private fun MushafPageWithFrame(
+    ayahs: List<com.starception.submission.core.qurandatabase.Ayah>,
+    pageNumber: Int,
+    surahName: String,
+    showSurahHeader: Boolean,
+    arabicFont: String,
+    arabicFontSize: Float,
+    showTajweed: Boolean,
+    tajweedAnnotations: Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>,
+    showBismillah: Boolean,
+    onAyahLongPress: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val frameColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+    val frameColorLight = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)
+    val headerBgColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)
+    val headerBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val density = LocalDensity.current
+
+    val frameMarginDp = 12.dp
+    val borderInsetDp = 5.dp
+    val innerPaddingDp = 8.dp
+    val surahHeaderHeightDp = if (showSurahHeader) 38.dp else 0.dp
+    val pageFooterHeightDp = 24.dp
+
+    val totalHPad = frameMarginDp + borderInsetDp + innerPaddingDp
+    val totalTopPad = frameMarginDp + borderInsetDp + innerPaddingDp + surahHeaderHeightDp
+    val totalBottomPad = frameMarginDp + borderInsetDp + innerPaddingDp + pageFooterHeightDp
+
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = surfaceColor
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    val m = frameMarginDp.toPx()
+                    val bi = borderInsetDp.toPx()
+                    val bw1 = 1.5.dp.toPx()
+                    val bw2 = 1.dp.toPx()
+
+                    // Outer border
+                    drawRoundRect(
+                        color = frameColor,
+                        topLeft = Offset(m, m),
+                        size = androidx.compose.ui.geometry.Size(size.width - m * 2, size.height - m * 2),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(6.dp.toPx()),
+                        style = Stroke(width = bw1)
+                    )
+
+                    // Inner border
+                    val inM = m + bi
+                    drawRoundRect(
+                        color = frameColorLight,
+                        topLeft = Offset(inM, inM),
+                        size = androidx.compose.ui.geometry.Size(size.width - inM * 2, size.height - inM * 2),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()),
+                        style = Stroke(width = bw2)
+                    )
+
+                    // Corner ornaments — small circles at each corner between the two borders
+                    val cornerOffset = m + bi / 2
+                    val dotR = 2.5.dp.toPx()
+                    val corners = listOf(
+                        Offset(cornerOffset, cornerOffset),
+                        Offset(size.width - cornerOffset, cornerOffset),
+                        Offset(cornerOffset, size.height - cornerOffset),
+                        Offset(size.width - cornerOffset, size.height - cornerOffset)
+                    )
+                    corners.forEach { c ->
+                        drawCircle(color = frameColor, radius = dotR, center = c)
+                        drawCircle(color = surfaceColor, radius = dotR - 1.dp.toPx(), center = c)
+                        drawCircle(color = frameColor, radius = 1.dp.toPx(), center = c)
+                    }
+
+                    // Small lines extending from corner dots along edges
+                    val lineLen = 18.dp.toPx()
+                    val lineW = 0.8.dp.toPx()
+                    corners.forEachIndexed { i, c ->
+                        val hDir = if (i % 2 == 0) 1f else -1f
+                        val vDir = if (i < 2) 1f else -1f
+                        drawLine(frameColorLight, c, Offset(c.x + hDir * lineLen, c.y), strokeWidth = lineW)
+                        drawLine(frameColorLight, c, Offset(c.x, c.y + vDir * lineLen), strokeWidth = lineW)
+                    }
+
+                    // Footer separator line
+                    val footerY = size.height - m - bi - pageFooterHeightDp.toPx()
+                    val lineMargin = m + bi + 20.dp.toPx()
+                    drawLine(
+                        color = frameColorLight,
+                        start = Offset(lineMargin, footerY),
+                        end = Offset(size.width - lineMargin, footerY),
+                        strokeWidth = 0.5.dp.toPx()
+                    )
+                }
+        ) {
+            // Surah header banner
+            if (showSurahHeader) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = totalHPad + 4.dp,
+                            end = totalHPad + 4.dp,
+                            top = frameMarginDp + borderInsetDp + 4.dp
+                        )
+                        .height(surahHeaderHeightDp - 4.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(headerBgColor)
+                        .border(
+                            width = 0.5.dp,
+                            color = headerBorderColor,
+                            shape = RoundedCornerShape(6.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = surahName,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        ),
+                        color = onSurfaceColor.copy(alpha = 0.8f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            // Ayah text content — padded to sit inside the frame
+            ContinuousAyahsContent(
+                ayahs = ayahs,
+                arabicFont = arabicFont,
+                arabicFontSize = arabicFontSize,
+                showTajweed = showTajweed,
+                tajweedAnnotations = tajweedAnnotations,
+                showBismillah = showBismillah,
+                onAyahLongPress = onAyahLongPress,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        start = totalHPad,
+                        end = totalHPad,
+                        top = totalTopPad,
+                        bottom = totalBottomPad
+                    )
+            )
+
+            // Page number at bottom
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = frameMarginDp + borderInsetDp + 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = pageNumber.toArabicIndic(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = onSurfaceColor.copy(alpha = 0.5f)
+                )
+            }
+        }
     }
 }
 
@@ -3614,15 +3784,13 @@ private fun MushafPagerView(
     showTajweed: Boolean,
     tajweedAnnotations: Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>,
     surahName: String,
+    showBismillah: Boolean = false,
+    textAlignment: String = "start",
+    parentScrollState: androidx.compose.foundation.lazy.LazyListState? = null,
     onAyahLongPress: (Int) -> Unit,
-    onFontSizeChange: (Float) -> Unit,
-    minFontSize: Float = 14f,
-    maxFontSize: Float = 60f,
+    onPageChange: (current: Int, total: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
-    val view = androidx.compose.ui.platform.LocalView.current
-    var currentFontSizeState by remember { mutableStateOf(arabicFontSize) }
-    LaunchedEffect(arabicFontSize) { currentFontSizeState = arabicFontSize }
 
     // Group ayahs by their Mushaf page number (actual Quran page boundaries)
     val pages: List<List<com.starception.submission.core.qurandatabase.Ayah>> = remember(ayahs) {
@@ -3636,80 +3804,102 @@ private fun MushafPagerView(
 
     val state = eu.wewox.pagecurl.page.rememberPageCurlState()
     val surfaceColor = MaterialTheme.colorScheme.surface
-    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
 
-    Column(modifier = modifier.background(surfaceColor)) {
-        // Page indicator bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = surahName,
-                style = MaterialTheme.typography.labelLarge,
-                color = onSurfaceColor.copy(alpha = 0.7f),
-                fontFamily = getArabicFontFamily(arabicFont)
-            )
-            Text(
-                text = "${state.current + 1} / ${pages.size}",
-                style = MaterialTheme.typography.labelMedium,
-                color = onSurfaceColor.copy(alpha = 0.5f)
-            )
-        }
+    // Report page changes to parent so the top bar can show the correct X / Y counter
+    LaunchedEffect(state.current, pages.size) {
+        onPageChange(state.current, pages.size)
+    }
 
-        eu.wewox.pagecurl.page.PageCurl(
-            count = pages.size,
-            state = state,
+    Column(
+        modifier = modifier.background(surfaceColor)
+    ) {
+        // Reserve space for the floating toolbar so ayah text doesn't overlap it
+        Spacer(modifier = Modifier.height(80.dp))
+
+        val scope = rememberCoroutineScope()
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(minFontSize, maxFontSize) {
+                .pointerInput(parentScrollState, state) {
                     awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
-                        var previousDistance = 0f
-                        var isPinching = false
+                        val firstDown = awaitFirstDown(requireUnconsumed = false)
+                        firstDown.consume()
+                        var totalDx = 0f
+                        var totalDy = 0f
+                        var directionDecided = false
+                        var isVerticalScroll = false
+                        var horizontalDragTotal = 0f
+                        val touchSlop = viewConfiguration.touchSlop
+
                         do {
-                            val event = awaitPointerEvent()
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
                             val pointers = event.changes.filter { it.pressed }
+
                             if (pointers.size >= 2) {
-                                val dx = pointers[0].position.x - pointers[1].position.x
-                                val dy = pointers[0].position.y - pointers[1].position.y
-                                val dist = sqrt(dx * dx + dy * dy)
-                                if (!isPinching) {
-                                    isPinching = true
-                                } else if (previousDistance > 0f) {
-                                    val newSize = (currentFontSizeState * (dist / previousDistance))
-                                        .coerceIn(minFontSize, maxFontSize)
-                                    if (newSize != currentFontSizeState) {
-                                        currentFontSizeState = newSize
-                                        view.performHapticFeedback(android.view.HapticFeedbackConstants.TEXT_HANDLE_MOVE)
-                                        onFontSizeChange(newSize)
+                                pointers.forEach { it.consume() }
+                            } else if (pointers.size == 1) {
+                                val change = pointers[0]
+                                val delta = change.position - change.previousPosition
+                                change.consume()
+
+                                if (!directionDecided) {
+                                    totalDx += kotlin.math.abs(delta.x)
+                                    totalDy += kotlin.math.abs(delta.y)
+                                    val totalMove = sqrt(totalDx * totalDx + totalDy * totalDy)
+                                    if (totalMove > touchSlop) {
+                                        directionDecided = true
+                                        isVerticalScroll = totalDy > totalDx
                                     }
                                 }
-                                previousDistance = dist
-                                pointers.forEach { it.consume() }
-                            } else {
-                                if (isPinching) onFontSizeChange(currentFontSizeState)
-                                isPinching = false
-                                previousDistance = 0f
+
+                                if (directionDecided && !isVerticalScroll) {
+                                    horizontalDragTotal += delta.x
+                                }
                             }
                         } while (event.changes.any { it.pressed })
-                        if (isPinching) onFontSizeChange(currentFontSizeState)
+
+                        if (directionDecided && !isVerticalScroll) {
+                            val swipeThreshold = size.width * 0.15f
+                            if (horizontalDragTotal < -swipeThreshold) {
+                                scope.launch { state.next() }
+                            } else if (horizontalDragTotal > swipeThreshold) {
+                                scope.launch { state.prev() }
+                            }
+                        }
                     }
                 }
-        ) { pageIndex ->
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = surfaceColor
-            ) {
-                ContinuousAyahsContent(
-                    ayahs = pages[pageIndex],
+        ) {
+            val pageCurlConfig = eu.wewox.pagecurl.config.rememberPageCurlConfig(
+                dragForwardEnabled = false,
+                dragBackwardEnabled = false
+            )
+            eu.wewox.pagecurl.page.PageCurl(
+                count = pages.size,
+                state = state,
+                config = pageCurlConfig,
+                modifier = Modifier.fillMaxSize()
+            ) { pageIndex ->
+                val currentPageAyahs = pages[pageIndex]
+                val mushafPageNumber = currentPageAyahs.firstOrNull()?.page ?: 1
+                val showHeader = if (pageIndex == 0) {
+                    true
+                } else {
+                    val prevSurah = pages[pageIndex - 1].lastOrNull()?.surahNumber ?: 0
+                    val curSurah = currentPageAyahs.firstOrNull()?.surahNumber ?: 0
+                    curSurah != prevSurah
+                }
+
+                MushafPageWithFrame(
+                    ayahs = currentPageAyahs,
+                    pageNumber = mushafPageNumber,
+                    surahName = surahName,
+                    showSurahHeader = showHeader,
                     arabicFont = arabicFont,
-                    arabicFontSize = currentFontSizeState,
+                    arabicFontSize = arabicFontSize,
                     showTajweed = showTajweed,
                     tajweedAnnotations = tajweedAnnotations,
+                    showBismillah = showBismillah && pageIndex == 0,
                     onAyahLongPress = onAyahLongPress,
                     modifier = Modifier.fillMaxSize()
                 )

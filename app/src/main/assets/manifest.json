@@ -145,8 +145,8 @@
       "required": true
     },
     "topics.db": {
-      "size": 16384,
-      "sha256": "41bea809a7f8bd11691d748cef6380bedbe03188f3ebb3bd08bc96bd3585b239",
+      "size": 28672,
+      "sha256": "f919403c496a0c7278ff7c3567114120ca6d2d038aa729ebd519f6e4aea75275",
       "category": "json_data",
       "required": true
     },

@@ -82,6 +82,14 @@ class AssetDownloadViewModel @Inject constructor(
                     return@launch
                 }
 
+                // Also check if all required categories are individually complete
+                val requiredKeys = m.categories.filter { it.value.required }.keys
+                if (requiredKeys.all { downloadManager.isCategoryComplete(it, m) }) {
+                    _screenState.value = DownloadScreenState.AllReady
+                    Log.i(TAG, "All required categories complete, skipping download screen")
+                    return@launch
+                }
+
                 refreshCategoryStates()
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading manifest", e)
@@ -135,12 +143,35 @@ class AssetDownloadViewModel @Inject constructor(
         val m = manifest ?: return
         if (isCurrentlyDownloading) return
 
+        val requiredCategories = m.categories.filter { it.value.required }.keys
+        val allAlreadyComplete = requiredCategories.all { downloadManager.isCategoryComplete(it, m) }
+
+        if (allAlreadyComplete) {
+            Log.i(TAG, "All required categories already complete, skipping download")
+            viewModelScope.launch {
+                try {
+                    Log.i(TAG, "Regenerating news.db from downloaded sources...")
+                    val result = withContext(Dispatchers.IO) {
+                        NewsDatabase.regenerateFromSources(context)
+                    }
+                    if (result.success) {
+                        Log.i(TAG, "News.db regenerated: ${result.totalNewsResources} resources, ${result.topicMappings} mappings")
+                    } else {
+                        Log.e(TAG, "News.db regeneration failed: ${result.error}")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error regenerating news.db", e)
+                }
+                _screenState.value = DownloadScreenState.AllReady
+            }
+            return
+        }
+
         isCurrentlyDownloading = true
         updateDownloadingState(true)
 
         viewModelScope.launch {
             try {
-                val requiredCategories = m.categories.filter { it.value.required }.keys
                 for (category in requiredCategories) {
                     if (downloadManager.isCategoryComplete(category, m)) continue
 
