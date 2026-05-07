@@ -105,9 +105,11 @@ fun PullToSyncContainer(
     downloadingHoldFraction: Float = 0.50f,
     mediaState: MediaControllerUiState = MediaControllerUiState(),
     onMediaAction: (MediaAction) -> Unit = {},
+    prayerAlertState: PrayerAlertState = PrayerAlertState(),
     content: @Composable (syncState: SyncContainerState) -> Unit
 ) {
     val isDownloading = downloadProgress > 0f
+    val isPrayerAlert = prayerAlertState.isActive
     val hapticFeedback = LocalHapticFeedback.current
 
     // Wobble state management
@@ -184,16 +186,14 @@ fun PullToSyncContainer(
     // Refreshing/downloading/media state: Animatable for instant snap-to
     // This eliminates the gap where wobbleIntensity would drop between drag release and hold
     val mediaHoldFraction = refreshingHoldFraction
+    val prayerAlertHoldFraction = 0.20f
     val refreshingOffset = remember { Animatable(0f) }
-    LaunchedEffect(isRefreshing, isDownloading, mediaState.isVisible) {
+    LaunchedEffect(isRefreshing, isDownloading, mediaState.isVisible, isPrayerAlert) {
         if (isRefreshing || isDownloading) {
-            // Snap instantly to held position for sync/download.
             refreshingOffset.snapTo(
                 if (isDownloading) downloadingHoldFraction else refreshingHoldFraction,
             )
         } else if (mediaState.isVisible) {
-            // Media is playing: push content down to reveal media controls in sage area.
-            // Use spring animation for expand/collapse transitions.
             refreshingOffset.animateTo(
                 targetValue = mediaHoldFraction,
                 animationSpec = spring(
@@ -201,8 +201,15 @@ fun PullToSyncContainer(
                     stiffness = Spring.StiffnessMediumLow,
                 ),
             )
+        } else if (isPrayerAlert) {
+            refreshingOffset.animateTo(
+                targetValue = prayerAlertHoldFraction,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            )
         } else {
-            // Nothing active — settle back smoothly
             refreshingOffset.animateTo(
                 targetValue = 0f,
                 animationSpec = tween(durationMillis = 600)
@@ -285,13 +292,14 @@ fun PullToSyncContainer(
                     rawWobbleIntensity > 0.01f -> fitbitBgColorLight
                     isRefreshing || isDownloading -> fitbitBgColorLight
                     mediaState.isVisible -> fitbitBgColorLight
+                    isPrayerAlert -> fitbitBgColorLight
                     else -> MaterialTheme.colorScheme.background
                 }
             )
     ) {
         // Horizontal progress fill: sweeps sage color left-to-right (background hidden until sweep covers it)
         // Shows during syncing, downloading, or media playback
-        val showSweep = (isRefreshing || isDownloading || mediaState.isVisible) && wobbleIntensity > 0.01f
+        val showSweep = (isRefreshing || isDownloading || mediaState.isVisible || isPrayerAlert) && wobbleIntensity > 0.01f
         if (showSweep) {
             val fillProgress = when {
                 isDownloading -> animatedDownloadProgress
@@ -300,6 +308,7 @@ fun PullToSyncContainer(
                     (mediaState.playback.currentPosition.toFloat() / mediaState.playback.duration.toFloat())
                         .coerceIn(0f, 1f)
                 }
+                isPrayerAlert -> 1f
                 else -> 0f
             }
             Box(
@@ -366,6 +375,49 @@ fun PullToSyncContainer(
                         onAction = onMediaAction,
                         modifier = Modifier.padding(bottom = 6.dp),
                     )
+                }
+            } else if (isPrayerAlert) {
+                Box(
+                    modifier = Modifier
+                        .zIndex(1f)
+                        .fillMaxWidth()
+                        .height(contentOffsetY)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Canvas(
+                            modifier = Modifier.size(18.dp)
+                        ) {
+                            val strokeWidth = 2.dp.toPx()
+                            drawArc(
+                                color = indicatorColor,
+                                startAngle = spinAngle,
+                                sweepAngle = 270f,
+                                useCenter = false,
+                                style = Stroke(
+                                    width = strokeWidth,
+                                    cap = StrokeCap.Round
+                                ),
+                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+                                size = androidx.compose.ui.geometry.Size(
+                                    size.width - strokeWidth,
+                                    size.height - strokeWidth
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = prayerAlertState.displayText,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontSize = 14.sp,
+                            color = indicatorColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             } else if (isRefreshing || isDownloading || rawWobbleIntensity > 0.01f) {
             // Only show sync/download indicators when actively dragging or syncing/downloading.
