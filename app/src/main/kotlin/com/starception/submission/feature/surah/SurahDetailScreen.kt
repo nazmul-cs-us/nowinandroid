@@ -81,6 +81,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -818,6 +819,8 @@ fun SurahDetailScreen(
                     maxFontSize = maxFontSize,
                     onToggleContinuousReadingMode = { viewModel.toggleContinuousReadingMode() },
                     continuousReadingMode = continuousReadingMode,
+                    initialMushafPage = viewModel.getLastMushafPage(surahNumber),
+                    onMushafPageChange = { page -> viewModel.saveLastMushafPage(surahNumber, page) },
                     modifier = Modifier
                 )
             }
@@ -1514,6 +1517,8 @@ private fun AlbumPlayerContent(
     maxFontSize: Float = 60f,
     onToggleContinuousReadingMode: () -> Unit = {},
     continuousReadingMode: Boolean = false,
+    initialMushafPage: Int = 0,
+    onMushafPageChange: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Use current playing surah/ayahs if available, otherwise use original
@@ -1822,9 +1827,13 @@ private fun AlbumPlayerContent(
                     showBismillah = showBismillahRow,
                     textAlignment = textAlignment,
                     parentScrollState = scrollState,
+                    initialPage = initialMushafPage,
                     onAyahLongPress = { ayahNumber ->
                         selectedAyahForOptions = ayahNumber
                         showBottomSheet = true
+                    },
+                    onPageChange = { current, _ ->
+                        onMushafPageChange(current)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -3660,14 +3669,16 @@ private fun MushafPageWithFrame(
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
 
     val statusBarHeight = with(LocalDensity.current) {
-        WindowInsets.statusBars.getTop(this).toDp()
+        val cutout = WindowInsets.displayCutout.getTop(this)
+        val statusBar = WindowInsets.statusBars.getTop(this)
+        maxOf(cutout, statusBar).toDp()
     }
-    val horizontalPadding = 16.dp
-    val topPadding = statusBarHeight + 8.dp
-    val bottomPadding = 8.dp
-    val bismillahHeightDp = if (showBismillah) 40.dp else 0.dp
-    val pageFooterHeightDp = 28.dp
-    val lineSpacingMultiplier = 1.5f
+    val horizontalPadding = 12.dp
+    val topPadding = statusBarHeight / 2 + 4.dp
+    val bottomPadding = 4.dp
+    val bismillahHeightDp = if (showBismillah) 36.dp else 0.dp
+    val pageFooterHeightDp = 24.dp
+    val lineSpacingMultiplier = 1.35f
     val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
 
     Surface(
@@ -3691,7 +3702,7 @@ private fun MushafPageWithFrame(
                         text = "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Normal,
-                            fontSize = 22.sp,
+                            fontSize = 20.sp,
                             fontFamily = getArabicFontFamily(arabicFont)
                         ),
                         color = onSurfaceColor,
@@ -3736,10 +3747,10 @@ private fun MushafPageWithFrame(
             ) {
                 Text(
                     text = pageNumber.toArabicIndic(),
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 16.sp
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 20.sp
                     ),
-                    color = onSurfaceColor.copy(alpha = 0.6f)
+                    color = onSurfaceColor.copy(alpha = 0.7f)
                 )
             }
         }
@@ -3762,6 +3773,7 @@ private fun MushafPagerView(
     showBismillah: Boolean = false,
     textAlignment: String = "start",
     parentScrollState: androidx.compose.foundation.lazy.LazyListState? = null,
+    initialPage: Int = 0,
     onAyahLongPress: (Int) -> Unit,
     onPageChange: (current: Int, total: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
@@ -3770,18 +3782,20 @@ private fun MushafPagerView(
 
     val markerColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
-    val state = eu.wewox.pagecurl.page.rememberPageCurlState()
+    val state = eu.wewox.pagecurl.page.rememberPageCurlState(initialPage)
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val statusBarHeight = with(density) {
-        WindowInsets.statusBars.getTop(this).toDp()
+        val cutout = WindowInsets.displayCutout.getTop(this)
+        val statusBar = WindowInsets.statusBars.getTop(this)
+        maxOf(cutout, statusBar).toDp()
     }
-    val lineSpacingMultiplier = 1.5f
-    val horizontalPadding = 16.dp
-    val topPadding = statusBarHeight + 8.dp
-    val bottomPadding = 8.dp
-    val bismillahHeightDp = 40.dp
-    val pageFooterHeightDp = 28.dp
+    val lineSpacingMultiplier = 1.35f
+    val horizontalPadding = 12.dp
+    val topPadding = statusBarHeight / 2 + 4.dp
+    val bottomPadding = 4.dp
+    val bismillahHeightDp = 36.dp
+    val pageFooterHeightDp = 24.dp
 
     val masterString = remember(ayahs, showTajweed, tajweedAnnotations, markerColor) {
         buildAnnotatedString {

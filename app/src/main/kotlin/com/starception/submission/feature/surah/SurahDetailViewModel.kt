@@ -323,6 +323,14 @@ class SurahDetailViewModel @Inject constructor(
         }
     }
 
+    fun saveLastMushafPage(surahNumber: Int, page: Int) {
+        prefs.edit().putInt("last_mushaf_page_$surahNumber", page).apply()
+    }
+
+    fun getLastMushafPage(surahNumber: Int): Int {
+        return prefs.getInt("last_mushaf_page_$surahNumber", 0)
+    }
+
     fun toggleContinuousReadingMode() {
         viewModelScope.launch {
             val newValue = !_continuousReadingMode.value
