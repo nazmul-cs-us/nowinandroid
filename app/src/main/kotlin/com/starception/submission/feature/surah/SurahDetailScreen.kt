@@ -21,6 +21,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -79,6 +80,8 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -852,6 +855,20 @@ fun SurahDetailScreen(
         }
     }
 
+        // Hide toolbar when Mushaf mode is active and snapped to Mushaf content
+        val showTopBar = remember {
+            derivedStateOf {
+                !(continuousReadingMode && scrollState.firstVisibleItemIndex >= 1)
+            }
+        }
+
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showTopBar.value,
+            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) +
+                    androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) +
+                    androidx.compose.animation.fadeOut(),
+        ) {
         // Always visible toolbar with collapsing effect based on scroll position
         AlbumPlayerTopBar(
             collapseProgress = collapseProgress.value,
@@ -905,9 +922,10 @@ fun SurahDetailScreen(
             },
             modifier = Modifier.align(Alignment.TopCenter)
         )
+        }
 
         // Floating Surah name that moves from info card to toolbar when scrolling
-        if (uiState is SurahDetailUiState.Success) {
+        if (uiState is SurahDetailUiState.Success && showTopBar.value) {
             val surah = (uiState as SurahDetailUiState.Success).surah
             val density = LocalDensity.current
             val localConfig = LocalConfiguration.current
@@ -1572,27 +1590,21 @@ private fun AlbumPlayerContent(
         }
     }
 
-    // Magnetic snap: Mushaf must be fully visible when scrolled down (no partial view)
-    // Either show full header (top) OR full Mushaf - no middle state
+    // Strong magnetic snap: any scroll immediately snaps to either top or Mushaf.
+    // Threshold is just 1px — the snap fling behavior handles the rest.
     LaunchedEffect(scrollState.isScrollInProgress) {
         if (!scrollState.isScrollInProgress && continuousReadingMode && displayAyahs.isNotEmpty()) {
-            kotlinx.coroutines.delay(100)
-
             val firstItem = scrollState.firstVisibleItemIndex
             val offset = scrollState.firstVisibleItemScrollOffset
 
             when {
-                // On header with some scroll - decide direction
-                firstItem == 0 && offset > 200 -> {
-                    // Scrolled enough - snap to full Mushaf
+                firstItem == 0 && offset > 0 -> {
                     scrollState.animateScrollToItem(index = 1, scrollOffset = 0)
                 }
-                firstItem == 0 && offset in 1..200 -> {
-                    // Small scroll - snap back to top
-                    scrollState.animateScrollToItem(index = 0, scrollOffset = 0)
+                firstItem >= 1 && offset > 0 -> {
+                    scrollState.animateScrollToItem(index = 1, scrollOffset = 0)
                 }
-                // On Mushaf (item 1) with any offset - ensure it's at top of Mushaf
-                firstItem == 1 && offset > 0 -> {
+                firstItem >= 2 -> {
                     scrollState.animateScrollToItem(index = 1, scrollOffset = 0)
                 }
             }
@@ -1807,7 +1819,6 @@ private fun AlbumPlayerContent(
                     arabicFontSize = arabicFontSize,
                     showTajweed = showTajweed,
                     tajweedAnnotations = tajweedAnnotations,
-                    surahName = displaySurah.nameArabic,
                     showBismillah = showBismillahRow,
                     textAlignment = textAlignment,
                     parentScrollState = scrollState,
@@ -3632,98 +3643,103 @@ private fun ContinuousAyahsContent(
 }
 
 // ---------------------------------------------------------------------------
-// Mushaf page without decorative frame (clean layout)
+// Mushaf page — renders pre-paginated justified text
 // ---------------------------------------------------------------------------
 @Composable
 private fun MushafPageWithFrame(
-    ayahs: List<com.starception.submission.core.qurandatabase.Ayah>,
+    pageText: AnnotatedString,
     pageNumber: Int,
-    surahName: String,
-    showSurahHeader: Boolean,
     arabicFont: String,
     arabicFontSize: Float,
-    showTajweed: Boolean,
-    tajweedAnnotations: Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>,
     showBismillah: Boolean,
     onAyahLongPress: (Int) -> Unit,
+    ayahRanges: List<Pair<Int, IntRange>>,
     modifier: Modifier = Modifier
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-    val headerBgColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)
-    val headerBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
 
-    val contentPadding = 16.dp
-    val surahHeaderHeightDp = if (showSurahHeader) 38.dp else 0.dp
-    val pageFooterHeightDp = 24.dp
+    val statusBarHeight = with(LocalDensity.current) {
+        WindowInsets.statusBars.getTop(this).toDp()
+    }
+    val horizontalPadding = 16.dp
+    val topPadding = statusBarHeight + 8.dp
+    val bottomPadding = 8.dp
+    val bismillahHeightDp = if (showBismillah) 40.dp else 0.dp
+    val pageFooterHeightDp = 28.dp
+    val lineSpacingMultiplier = 1.5f
+    val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
 
     Surface(
         modifier = modifier.fillMaxSize(),
         color = surfaceColor
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Surah header banner
-            if (showSurahHeader) {
+            if (showBismillah) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(
-                            start = contentPadding,
-                            end = contentPadding,
-                            top = contentPadding
+                            start = horizontalPadding,
+                            end = horizontalPadding,
+                            top = topPadding
                         )
-                        .height(surahHeaderHeightDp - 4.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(headerBgColor)
-                        .border(
-                            width = 0.5.dp,
-                            color = headerBorderColor,
-                            shape = RoundedCornerShape(6.dp)
-                        ),
+                        .height(bismillahHeightDp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = surahName,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                        text = "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 22.sp,
+                            fontFamily = getArabicFontFamily(arabicFont)
                         ),
-                        color = onSurfaceColor.copy(alpha = 0.8f),
+                        color = onSurfaceColor,
                         textAlign = TextAlign.Center
                     )
                 }
             }
 
-            // Ayah text content
-            ContinuousAyahsContent(
-                ayahs = ayahs,
-                arabicFont = arabicFont,
-                arabicFontSize = arabicFontSize,
-                showTajweed = showTajweed,
-                tajweedAnnotations = tajweedAnnotations,
-                showBismillah = showBismillah,
-                onAyahLongPress = onAyahLongPress,
+            Text(
+                text = pageText,
+                color = onSurfaceColor,
+                style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
+                    fontSize = arabicFontSize.sp,
+                    textAlign = TextAlign.Justify,
+                    lineHeight = (arabicFontSize * lineSpacingMultiplier).sp
+                ),
+                overflow = TextOverflow.Clip,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
-                        start = contentPadding,
-                        end = contentPadding,
-                        top = contentPadding + surahHeaderHeightDp,
-                        bottom = contentPadding + pageFooterHeightDp
+                        start = horizontalPadding,
+                        end = horizontalPadding,
+                        top = topPadding + bismillahHeightDp,
+                        bottom = bottomPadding + pageFooterHeightDp
                     )
+                    .pointerInput(ayahRanges) {
+                        detectTapGestures(
+                            onLongPress = {
+                                if (ayahRanges.isNotEmpty()) {
+                                    onAyahLongPress(ayahRanges.first().first)
+                                }
+                            }
+                        )
+                    }
             )
 
-            // Page number at bottom
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = contentPadding),
+                    .padding(bottom = bottomPadding),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = pageNumber.toArabicIndic(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = onSurfaceColor.copy(alpha = 0.5f)
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 16.sp
+                    ),
+                    color = onSurfaceColor.copy(alpha = 0.6f)
                 )
             }
         }
@@ -3731,9 +3747,9 @@ private fun MushafPageWithFrame(
 }
 
 // ---------------------------------------------------------------------------
-// Mushaf Pager — page-by-page reading with real page-curl animation
-// Uses oleksandrbalan/pagecurl (MIT) for authentic book page turn effect.
-// Ayahs are grouped by their database `page` field (actual Mushaf page numbers).
+// Mushaf Pager — page-by-page reading with justified, page-filling text.
+// Builds one master AnnotatedString, measures lines, splits at line boundaries.
+// Ayahs flow naturally across pages like a real printed Quran.
 // ---------------------------------------------------------------------------
 @OptIn(eu.wewox.pagecurl.ExperimentalPageCurlApi::class)
 @Composable
@@ -3743,7 +3759,6 @@ private fun MushafPagerView(
     arabicFontSize: Float,
     showTajweed: Boolean,
     tajweedAnnotations: Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>,
-    surahName: String,
     showBismillah: Boolean = false,
     textAlignment: String = "start",
     parentScrollState: androidx.compose.foundation.lazy.LazyListState? = null,
@@ -3751,40 +3766,83 @@ private fun MushafPagerView(
     onPageChange: (current: Int, total: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
+    if (ayahs.isEmpty()) return
 
-    // Group ayahs by their Mushaf page number (actual Quran page boundaries)
-    val pages: List<List<com.starception.submission.core.qurandatabase.Ayah>> = remember(ayahs) {
-        ayahs.groupBy { it.page }
-            .entries
-            .sortedBy { it.key }
-            .map { it.value }
+    val markerColor = MaterialTheme.colorScheme.primary
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val state = eu.wewox.pagecurl.page.rememberPageCurlState()
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val statusBarHeight = with(density) {
+        WindowInsets.statusBars.getTop(this).toDp()
+    }
+    val lineSpacingMultiplier = 1.5f
+    val horizontalPadding = 16.dp
+    val topPadding = statusBarHeight + 8.dp
+    val bottomPadding = 8.dp
+    val bismillahHeightDp = 40.dp
+    val pageFooterHeightDp = 28.dp
+
+    val masterString = remember(ayahs, showTajweed, tajweedAnnotations, markerColor) {
+        buildAnnotatedString {
+            ayahs.forEachIndexed { index, ayah ->
+                val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
+
+                if (showTajweed) {
+                    val annotations = tajweedAnnotations[ayah.numberInSurah]
+                    if (annotations != null && annotations.isNotEmpty()) {
+                        val annotated = com.starception.submission.feature.surah.tajweed.TajweedTextApplier.applyWithOverlap(
+                            text = arabicText,
+                            annotations = annotations,
+                            defaultStyle = SpanStyle()
+                        )
+                        append(annotated)
+                    } else {
+                        append(arabicText)
+                    }
+                } else {
+                    append(arabicText)
+                }
+
+                withStyle(SpanStyle(
+                    color = markerColor,
+                    fontSize = 0.85.em,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                )) {
+                    append(" ۝${ayah.numberInSurah.toArabicIndic()}")
+                }
+
+                if (index < ayahs.size - 1) append(" ")
+            }
+        }
     }
 
-    if (pages.isEmpty()) return
-
-    val state = eu.wewox.pagecurl.page.rememberPageCurlState()
-    val surfaceColor = MaterialTheme.colorScheme.surface
-
-    // Report page changes to parent so the top bar can show the correct X / Y counter
-    LaunchedEffect(state.current, pages.size) {
-        onPageChange(state.current, pages.size)
+    val ayahCharRanges = remember(ayahs, masterString) {
+        val ranges = mutableListOf<Pair<Int, IntRange>>()
+        var pos = 0
+        ayahs.forEachIndexed { index, ayah ->
+            val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
+            val startPos = pos
+            pos += arabicText.length
+            val markerText = " ۝${ayah.numberInSurah.toArabicIndic()}"
+            pos += markerText.length
+            if (index < ayahs.size - 1) pos += 1
+            ranges.add(ayah.numberInSurah to (startPos until pos))
+        }
+        ranges
     }
 
     Column(
         modifier = modifier.background(surfaceColor)
     ) {
-        // Reserve space for the floating toolbar so ayah text doesn't overlap it
-        Spacer(modifier = Modifier.height(80.dp))
-
         val scope = rememberCoroutineScope()
 
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(parentScrollState, state) {
                     awaitEachGesture {
                         val firstDown = awaitFirstDown(requireUnconsumed = false)
-                        // Don't consume firstDown - let parent have a chance
                         var totalDx = 0f
                         var totalDy = 0f
                         var directionDecided = false
@@ -3812,12 +3870,10 @@ private fun MushafPagerView(
                                     }
                                 }
 
-                                // Only consume horizontal swipes, let vertical pass through
                                 if (directionDecided && !isVerticalScroll) {
                                     change.consume()
                                     horizontalDragTotal += delta.x
                                 }
-                                // Vertical scrolls are NOT consumed - parent LazyColumn handles them
                             }
                         } while (event.changes.any { it.pressed })
 
@@ -3832,37 +3888,129 @@ private fun MushafPagerView(
                     }
                 }
         ) {
+            val availableWidthPx = with(density) { (maxWidth - horizontalPadding * 2).toPx() }
+            val fullPageHeightPx = with(density) {
+                (maxHeight - topPadding - bottomPadding - pageFooterHeightDp).toPx()
+            }
+            val firstPageHeightPx = if (showBismillah) {
+                with(density) { (maxHeight - topPadding - bottomPadding - pageFooterHeightDp - bismillahHeightDp).toPx() }
+            } else {
+                fullPageHeightPx
+            }
+
+            val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
+            val measureStyle = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
+                fontSize = arabicFontSize.sp,
+                textAlign = TextAlign.Justify,
+                lineHeight = (arabicFontSize * lineSpacingMultiplier).sp
+            )
+
+            data class PaginatedPage(
+                val text: AnnotatedString,
+                val pageNumber: Int,
+                val showBismillah: Boolean,
+                val ayahRanges: List<Pair<Int, IntRange>>
+            )
+
+            val paginatedPages = remember(
+                masterString, arabicFontSize, arabicFont,
+                availableWidthPx, fullPageHeightPx, firstPageHeightPx
+            ) {
+                if (masterString.text.isEmpty() || availableWidthPx <= 0f || fullPageHeightPx <= 0f) {
+                    return@remember listOf(
+                        PaginatedPage(masterString, 1, showBismillah, ayahCharRanges)
+                    )
+                }
+
+                val fullLayout = textMeasurer.measure(
+                    text = masterString,
+                    style = measureStyle,
+                    constraints = androidx.compose.ui.unit.Constraints(
+                        maxWidth = availableWidthPx.toInt()
+                    ),
+                    density = density
+                )
+
+                if (fullLayout.lineCount == 0) {
+                    return@remember listOf(
+                        PaginatedPage(masterString, 1, showBismillah, ayahCharRanges)
+                    )
+                }
+
+                val pages = mutableListOf<PaginatedPage>()
+                var currentLine = 0
+                var pageNum = 1
+
+                while (currentLine < fullLayout.lineCount) {
+                    val pageHeightPx = if (pageNum == 1) firstPageHeightPx else fullPageHeightPx
+                    var linesOnPage = 0
+                    var accumulatedHeight = 0f
+
+                    for (line in currentLine until fullLayout.lineCount) {
+                        val lineTop = fullLayout.getLineTop(line) - fullLayout.getLineTop(currentLine)
+                        val lineBottom = fullLayout.getLineBottom(line) - fullLayout.getLineTop(currentLine)
+                        if (lineBottom > pageHeightPx && linesOnPage > 0) break
+                        linesOnPage++
+                        accumulatedHeight = lineBottom
+                    }
+
+                    if (linesOnPage == 0) linesOnPage = 1
+
+                    val startCharIndex = fullLayout.getLineStart(currentLine)
+                    val endLine = currentLine + linesOnPage - 1
+                    val endCharIndex = if (endLine >= fullLayout.lineCount - 1) {
+                        masterString.length
+                    } else {
+                        fullLayout.getLineEnd(endLine, visibleEnd = true)
+                    }
+
+                    val pageString = masterString.subSequence(startCharIndex, endCharIndex)
+
+                    val pageAyahRanges = ayahCharRanges.mapNotNull { (ayahNum, range) ->
+                        val overlapStart = maxOf(range.first, startCharIndex)
+                        val overlapEnd = minOf(range.last, endCharIndex - 1)
+                        if (overlapStart <= overlapEnd) {
+                            ayahNum to ((overlapStart - startCharIndex) until (overlapEnd - startCharIndex + 1))
+                        } else null
+                    }
+
+                    pages.add(PaginatedPage(
+                        text = pageString,
+                        pageNumber = pageNum,
+                        showBismillah = showBismillah && pageNum == 1,
+                        ayahRanges = pageAyahRanges
+                    ))
+
+                    currentLine += linesOnPage
+                    pageNum++
+                }
+
+                pages
+            }
+
+            LaunchedEffect(state.current, paginatedPages.size) {
+                onPageChange(state.current, paginatedPages.size)
+            }
+
             val pageCurlConfig = eu.wewox.pagecurl.config.rememberPageCurlConfig(
                 dragForwardEnabled = false,
                 dragBackwardEnabled = false
             )
             eu.wewox.pagecurl.page.PageCurl(
-                count = pages.size,
+                count = paginatedPages.size,
                 state = state,
                 config = pageCurlConfig,
                 modifier = Modifier.fillMaxSize()
             ) { pageIndex ->
-                val currentPageAyahs = pages[pageIndex]
-                val mushafPageNumber = currentPageAyahs.firstOrNull()?.page ?: 1
-                val showHeader = if (pageIndex == 0) {
-                    true
-                } else {
-                    val prevSurah = pages[pageIndex - 1].lastOrNull()?.surahNumber ?: 0
-                    val curSurah = currentPageAyahs.firstOrNull()?.surahNumber ?: 0
-                    curSurah != prevSurah
-                }
-
+                val page = paginatedPages[pageIndex]
                 MushafPageWithFrame(
-                    ayahs = currentPageAyahs,
-                    pageNumber = mushafPageNumber,
-                    surahName = surahName,
-                    showSurahHeader = showHeader,
+                    pageText = page.text,
+                    pageNumber = page.pageNumber,
                     arabicFont = arabicFont,
                     arabicFontSize = arabicFontSize,
-                    showTajweed = showTajweed,
-                    tajweedAnnotations = tajweedAnnotations,
-                    showBismillah = showBismillah && pageIndex == 0,
+                    showBismillah = page.showBismillah,
                     onAyahLongPress = onAyahLongPress,
+                    ayahRanges = page.ayahRanges,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -3870,12 +4018,8 @@ private fun MushafPagerView(
     }
 }
 
-// Helper to get FontFamily from font name string (used in MushafPagerView header)
 private fun getArabicFontFamily(arabicFont: String): androidx.compose.ui.text.font.FontFamily {
-    return when (arabicFont.lowercase()) {
-        "hafs", "uthmani" -> androidx.compose.ui.text.font.FontFamily.Default
-        else -> androidx.compose.ui.text.font.FontFamily.Default
-    }
+    return getArabicFontFamilyForSelection(arabicFont)
 }
 
 private fun Int.toArabicIndic(): String = this.toString().map { c ->
