@@ -1392,8 +1392,8 @@ fun PrayerTimesScreen(
                     }
                 )
         ) {
-            val prayerAlertState = remember(currentTime, prayerTimes) {
-                calculatePrayerAlertState(currentTime, prayerTimes)
+            val prayerAlertState = remember(currentTime, prayerTimes, notificationPreferences) {
+                calculatePrayerAlertState(currentTime, prayerTimes, notificationPreferences)
             }
 
             PullToSyncContainer(
@@ -2715,17 +2715,16 @@ private fun getLocationWithCountryCode(
 
 private fun calculatePrayerAlertState(
     currentTime: LocalTime,
-    prayerTimes: com.starception.submission.prayer.model.DayPrayerTimes?
+    prayerTimes: com.starception.submission.prayer.model.DayPrayerTimes?,
+    notificationPrefs: com.starception.submission.prayer.model.PrayerNotificationPreferences
 ): PrayerAlertState {
     if (prayerTimes == null) return PrayerAlertState()
-
-    val priorMinutes = 15L
-    val goToMosqueDuration = 20L
 
     val actualPrayers = prayerTimes.getActualPrayers()
     val currentPrayer = actualPrayers.firstOrNull { it.isCurrently }
 
     if (currentPrayer != null && currentPrayer.name != "Sunrise") {
+        val goToMosqueDuration = notificationPrefs.getGoToMosqueDurationForPrayer(currentPrayer.name).toLong()
         val minutesSince = Duration.between(currentPrayer.time, currentTime).toMinutes()
         val minutesLeft = goToMosqueDuration - minutesSince
         if (minutesLeft > 0) {
@@ -2734,13 +2733,14 @@ private fun calculatePrayerAlertState(
                 prayerName = currentPrayer.name,
                 phase = AlertPhase.GO_TO_MOSQUE,
                 countdownMinutes = minutesLeft.toInt(),
-                displayText = "🕌 ${currentPrayer.name} · Go now, ${minutesLeft}m left"
+                displayText = "${currentPrayer.name} · Go now, ${minutesLeft}m left"
             )
         }
     }
 
     val nextPrayer = prayerTimes.getNextPrayer()
     if (nextPrayer != null && nextPrayer.name != "Sunrise") {
+        val priorMinutes = notificationPrefs.getPriorMinutesForPrayer(nextPrayer.name).toLong()
         val minutesUntil = Duration.between(currentTime, nextPrayer.time).toMinutes()
         if (minutesUntil in 1..priorMinutes) {
             return PrayerAlertState(
@@ -2748,7 +2748,7 @@ private fun calculatePrayerAlertState(
                 prayerName = nextPrayer.name,
                 phase = AlertPhase.BEFORE_PRAYER,
                 countdownMinutes = minutesUntil.toInt(),
-                displayText = "🕌 ${nextPrayer.name} in ${minutesUntil}m"
+                displayText = "${nextPrayer.name} in ${minutesUntil}m"
             )
         }
     }

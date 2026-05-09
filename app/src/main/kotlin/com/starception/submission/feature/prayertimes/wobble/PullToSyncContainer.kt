@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -109,7 +110,11 @@ fun PullToSyncContainer(
     content: @Composable (syncState: SyncContainerState) -> Unit
 ) {
     val isDownloading = downloadProgress > 0f
-    val isPrayerAlert = prayerAlertState.isActive
+    var prayerAlertDismissed by remember { mutableStateOf(false) }
+    LaunchedEffect(prayerAlertState.displayText) {
+        prayerAlertDismissed = false
+    }
+    val isPrayerAlert = prayerAlertState.isActive && !prayerAlertDismissed
     val hapticFeedback = LocalHapticFeedback.current
 
     // Wobble state management
@@ -186,7 +191,7 @@ fun PullToSyncContainer(
     // Refreshing/downloading/media state: Animatable for instant snap-to
     // This eliminates the gap where wobbleIntensity would drop between drag release and hold
     val mediaHoldFraction = refreshingHoldFraction
-    val prayerAlertHoldFraction = 0.20f
+    val prayerAlertHoldFraction = refreshingHoldFraction
     val refreshingOffset = remember { Animatable(0f) }
     LaunchedEffect(isRefreshing, isDownloading, mediaState.isVisible, isPrayerAlert) {
         if (isRefreshing || isDownloading) {
@@ -382,7 +387,22 @@ fun PullToSyncContainer(
                         .zIndex(1f)
                         .fillMaxWidth()
                         .height(contentOffsetY)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                        .pointerInput(Unit) {
+                            var totalDrag = 0f
+                            detectVerticalDragGestures(
+                                onDragStart = { totalDrag = 0f },
+                                onVerticalDrag = { _, dragAmount ->
+                                    totalDrag += dragAmount
+                                },
+                                onDragEnd = {
+                                    if (totalDrag < -80f) {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        prayerAlertDismissed = true
+                                    }
+                                },
+                            )
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     Row(
