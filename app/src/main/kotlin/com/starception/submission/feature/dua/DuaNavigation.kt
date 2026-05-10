@@ -5,6 +5,10 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.starception.submission.navigation.detailEnterTransition
+import com.starception.submission.navigation.detailExitTransition
+import com.starception.submission.navigation.detailPopEnterTransition
+import com.starception.submission.navigation.detailPopExitTransition
 import kotlinx.serialization.Serializable
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -69,7 +73,12 @@ fun NavGraphBuilder.duaDetailScreen(
     onTopicClick: (String) -> Unit = {},
     onHadithClick: ((collectionName: String, hadithNumber: Int, databaseFile: String) -> Unit)? = null
 ) {
-    composable<DuaDetailRoute> { backStackEntry ->
+    composable<DuaDetailRoute>(
+        enterTransition = { detailEnterTransition() },
+        exitTransition = { detailExitTransition() },
+        popEnterTransition = { detailPopEnterTransition() },
+        popExitTransition = { detailPopExitTransition() },
+    ) { backStackEntry ->
         val route = backStackEntry.toRoute<DuaDetailRoute>()
         val decodedTitle = URLDecoder.decode(route.title, "UTF-8")
         val decodedContent = URLDecoder.decode(route.content, "UTF-8")

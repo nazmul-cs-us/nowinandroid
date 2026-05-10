@@ -5,6 +5,10 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.starception.submission.navigation.detailEnterTransition
+import com.starception.submission.navigation.detailExitTransition
+import com.starception.submission.navigation.detailPopEnterTransition
+import com.starception.submission.navigation.detailPopExitTransition
 import com.starception.submission.feature.surah.SurahDetailScreen
 import kotlinx.serialization.Serializable
 
@@ -30,7 +34,12 @@ fun NavGraphBuilder.surahScreen(
     onNavigateToPreviousSurah: (Int) -> Unit = {},
     onNavigateToNextSurah: (Int) -> Unit = {}
 ) {
-    composable<SurahRoute> { backStackEntry ->
+    composable<SurahRoute>(
+        enterTransition = { detailEnterTransition() },
+        exitTransition = { detailExitTransition() },
+        popEnterTransition = { detailPopEnterTransition() },
+        popExitTransition = { detailPopExitTransition() },
+    ) { backStackEntry ->
         val surahRoute = backStackEntry.toRoute<SurahRoute>()
         // Use the Surah detail screen with MaterialTheme.colorScheme
         SurahDetailScreen(

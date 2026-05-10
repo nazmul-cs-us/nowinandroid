@@ -5,6 +5,10 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.starception.submission.navigation.detailEnterTransition
+import com.starception.submission.navigation.detailExitTransition
+import com.starception.submission.navigation.detailPopEnterTransition
+import com.starception.submission.navigation.detailPopExitTransition
 import kotlinx.serialization.Serializable
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -51,7 +55,12 @@ fun NavGraphBuilder.hadithDetailScreen(
     onNavigateToPreviousHadith: (collectionName: String, currentHadithNumber: Int, databaseFile: String) -> Unit = { _, _, _ -> },
     onNavigateToNextHadith: (collectionName: String, currentHadithNumber: Int, databaseFile: String) -> Unit = { _, _, _ -> }
 ) {
-    composable<HadithDetailRoute> { backStackEntry ->
+    composable<HadithDetailRoute>(
+        enterTransition = { detailEnterTransition() },
+        exitTransition = { detailExitTransition() },
+        popEnterTransition = { detailPopEnterTransition() },
+        popExitTransition = { detailPopExitTransition() },
+    ) { backStackEntry ->
         val route = backStackEntry.toRoute<HadithDetailRoute>()
         val decodedCollection = URLDecoder.decode(route.collectionName, "UTF-8")
         val decodedDbFile = URLDecoder.decode(route.databaseFile, "UTF-8")

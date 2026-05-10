@@ -31,6 +31,7 @@ import com.starception.submission.core.data.util.SyncManager
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.media.GlobalMediaViewModel
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.SherpaOnnxTtsService
@@ -81,6 +82,15 @@ class MainActivityViewModel @Inject constructor(
 
     // Triggers a background sync via WorkManager — used by app-level pull-to-sync
     fun requestSync() = syncManager.requestSync()
+
+    // Prayer alert state shared from PrayerTimesScreen so all pages can show the banner.
+    private val _prayerAlertState = MutableStateFlow(PrayerAlertState())
+    val prayerAlertState: StateFlow<PrayerAlertState> = _prayerAlertState.asStateFlow()
+
+    fun updatePrayerAlert(state: PrayerAlertState) {
+        _prayerAlertState.value = state
+    }
+
 
     private val _showMissingBukhariPrompt = MutableStateFlow(false)
     val showMissingBukhariPrompt: StateFlow<Boolean> = _showMissingBukhariPrompt.asStateFlow()

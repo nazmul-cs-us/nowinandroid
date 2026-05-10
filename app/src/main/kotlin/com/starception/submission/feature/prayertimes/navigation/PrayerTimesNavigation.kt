@@ -22,6 +22,8 @@ fun NavGraphBuilder.prayerTimesScreen(
     downloadLabel: String = "Downloading content",
     mediaState: com.starception.submission.media.MediaControllerUiState = com.starception.submission.media.MediaControllerUiState(),
     onMediaAction: (com.starception.submission.media.MediaAction) -> Unit = {},
+    onPrayerAlertChanged: (com.starception.submission.feature.prayertimes.wobble.PrayerAlertState) -> Unit = {},
+    prayerAlertOverride: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState = com.starception.submission.feature.prayertimes.wobble.PrayerAlertState(),
 ) {
     composable<PrayerTimesRoute> {
         PrayerTimesScreen(
@@ -33,6 +35,8 @@ fun NavGraphBuilder.prayerTimesScreen(
             downloadLabel = downloadLabel,
             mediaState = mediaState,
             onMediaAction = onMediaAction,
+            onPrayerAlertChanged = onPrayerAlertChanged,
+            prayerAlertOverride = prayerAlertOverride,
         )
     }
 }

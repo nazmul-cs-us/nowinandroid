@@ -11,8 +11,14 @@ data class PrayerAlertState(
     val prayerName: String = "",
     val phase: AlertPhase = AlertPhase.NONE,
     val countdownMinutes: Int = 0,
+    val totalMinutes: Int = 0,
     val displayText: String = ""
-)
+) {
+    // 0f = just started showing, 1f = prayer time reached
+    val fillProgress: Float get() = if (totalMinutes > 0)
+        ((totalMinutes - countdownMinutes).toFloat() / totalMinutes).coerceIn(0f, 1f)
+    else 1f
+}
 
 enum class AlertPhase {
     NONE,

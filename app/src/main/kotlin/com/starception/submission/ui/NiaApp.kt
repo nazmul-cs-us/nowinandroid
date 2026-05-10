@@ -54,6 +54,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import kotlinx.coroutines.delay
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -91,6 +97,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.starception.submission.MainActivityViewModel
+import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.media.MediaControllerUiState
 import com.starception.submission.feature.settings.R as settingsR
@@ -360,13 +367,16 @@ private fun NiaMainContent(
         // Home has its own PullToSyncContainer — suppress app-level banner and
         // pull-to-sync there to avoid doubles. All other pages get both.
         val isOnHome = appState.currentTopLevelDestination == TopLevelDestination.HOME
-        val downloadProgress = if (mainViewModel != null && !isOnHome) {
-            val isDownloading by mainViewModel.isContentDownloading.collectAsStateWithLifecycle()
-            val dlProgress by mainViewModel.contentDownloadProgress.collectAsStateWithLifecycle()
-            if (isDownloading) dlProgress else 0f
-        } else {
-            0f
-        }
+        val isDownloadingRaw = if (mainViewModel != null) {
+            val d by mainViewModel.isContentDownloading.collectAsStateWithLifecycle()
+            d
+        } else false
+        val rawDownloadProgress = if (mainViewModel != null) {
+            val p by mainViewModel.contentDownloadProgress.collectAsStateWithLifecycle()
+            p
+        } else 0f
+        // Suppress on HOME — PrayerTimesScreen has its own PullToSyncContainer that shows it.
+        val downloadProgress = if (!isOnHome && isDownloadingRaw) rawDownloadProgress else 0f
         val downloadLabel = if (mainViewModel != null) {
             val label by mainViewModel.contentDownloadLabel.collectAsStateWithLifecycle()
             label
@@ -399,9 +409,16 @@ private fun NiaMainContent(
             onPauseOrDispose { }
         }
 
-        // Suppress media on HOME — PrayerTimesScreen has its own PullToSyncContainer
-        // that already shows the media controller to avoid doubles.
+        // Suppress media/prayer-alert on HOME — PrayerTimesScreen has its own PullToSyncContainer.
         val appLevelMediaState = if (isOnHome) MediaControllerUiState() else mediaState
+        val rawPrayerAlert = if (mainViewModel != null) {
+            val alert by mainViewModel.prayerAlertState.collectAsStateWithLifecycle()
+            alert
+        } else {
+            PrayerAlertState()
+        }
+        // Only pass to app-level container on non-HOME pages (HOME handles its own alert).
+        val appLevelPrayerAlert = if (!isOnHome) rawPrayerAlert else PrayerAlertState()
 
         PullToSyncContainer(
             isRefreshing = if (isOnHome) false else isRefreshing,
@@ -411,6 +428,7 @@ private fun NiaMainContent(
             downloadLabel = downloadLabel,
             mediaState = appLevelMediaState,
             onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
+            prayerAlertState = appLevelPrayerAlert,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -432,23 +450,17 @@ private fun NiaMainContent(
         Column(
             Modifier.fillMaxSize(),
         ) {
-            // Show the top app bar on top level destinations
-            // Hide top bar for ForYou and Bookmarks in landscape mode (two-pane layout)
             val destination = appState.currentTopLevelDestination
-            // Hide top bar for HOME (PrayerTimes) - it renders its own top bar inside PullToSyncContainer
-            // so the entire page pushes down together (like Fitbit)
-            val hideTopBarForPrayerTimes = destination == TopLevelDestination.HOME
             val hideTopBarForTwoPane = isLandscape && (
                 destination == TopLevelDestination.FOR_YOU ||
                 destination == TopLevelDestination.BOOKMARKS
             )
-            var shouldShowTopAppBar = false
+            // Always show the top bar on every top-level destination — including Home.
+            // This keeps the NavHost area at a CONSTANT height, so content (e.g. the
+            // For You mosque image) never shifts position when switching tabs.
+            val shouldShowTopAppBar = destination != null && !hideTopBarForTwoPane
 
-            if (destination != null && !hideTopBarForTwoPane && !hideTopBarForPrayerTimes) {
-                shouldShowTopAppBar = true
-                // Dynamic top inset: collapses during download/sync (like Home screen)
-                // When PullToSyncContainer pushes content down, the banner covers the
-                // status bar area so the toolbar doesn't need its own status bar padding.
+            if (shouldShowTopAppBar && destination != null) {
                 val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
                     .asPaddingValues().calculateTopPadding()
                 val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
@@ -472,7 +484,6 @@ private fun NiaMainContent(
             }
 
             Box(
-                // Workaround for https://issuetracker.google.com/338478720
                 modifier = Modifier.consumeWindowInsets(
                     if (shouldShowTopAppBar) {
                         WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
@@ -495,9 +506,6 @@ private fun NiaMainContent(
                     deepLinkCourseId = deepLinkCourseId,
                 )
             }
-
-            // TODO: We may want to add padding or spacer when the snackbar is shown so that
-            //  content doesn't display behind it.
         }
         }
     }

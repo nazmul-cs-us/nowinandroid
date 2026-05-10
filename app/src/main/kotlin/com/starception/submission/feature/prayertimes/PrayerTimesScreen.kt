@@ -291,6 +291,8 @@ fun PrayerTimesScreen(
     downloadLabel: String = "Downloading content",
     mediaState: com.starception.submission.media.MediaControllerUiState = com.starception.submission.media.MediaControllerUiState(),
     onMediaAction: (com.starception.submission.media.MediaAction) -> Unit = {},
+    onPrayerAlertChanged: (com.starception.submission.feature.prayertimes.wobble.PrayerAlertState) -> Unit = {},
+    prayerAlertOverride: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState = com.starception.submission.feature.prayertimes.wobble.PrayerAlertState(),
 ) {
     val screenContext = LocalContext.current
     
@@ -1392,8 +1394,13 @@ fun PrayerTimesScreen(
                     }
                 )
         ) {
-            val prayerAlertState = remember(currentTime, prayerTimes, notificationPreferences) {
+            val calculatedPrayerAlert = remember(currentTime, prayerTimes, notificationPreferences) {
                 calculatePrayerAlertState(currentTime, prayerTimes, notificationPreferences)
+            }
+            // Use override (e.g. test simulation) when active, otherwise use real calculation.
+            val prayerAlertState = if (prayerAlertOverride.isActive) prayerAlertOverride else calculatedPrayerAlert
+            LaunchedEffect(calculatedPrayerAlert) {
+                onPrayerAlertChanged(calculatedPrayerAlert)
             }
 
             PullToSyncContainer(
@@ -2733,6 +2740,7 @@ private fun calculatePrayerAlertState(
                 prayerName = currentPrayer.name,
                 phase = AlertPhase.GO_TO_MOSQUE,
                 countdownMinutes = minutesLeft.toInt(),
+                totalMinutes = goToMosqueDuration.toInt(),
                 displayText = "${currentPrayer.name} · Go now, ${minutesLeft}m left"
             )
         }
@@ -2748,6 +2756,7 @@ private fun calculatePrayerAlertState(
                 prayerName = nextPrayer.name,
                 phase = AlertPhase.BEFORE_PRAYER,
                 countdownMinutes = minutesUntil.toInt(),
+                totalMinutes = priorMinutes.toInt(),
                 displayText = "${nextPrayer.name} in ${minutesUntil}m"
             )
         }

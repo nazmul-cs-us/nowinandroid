@@ -313,7 +313,7 @@ fun PullToSyncContainer(
                     (mediaState.playback.currentPosition.toFloat() / mediaState.playback.duration.toFloat())
                         .coerceIn(0f, 1f)
                 }
-                isPrayerAlert -> 1f
+                isPrayerAlert -> prayerAlertState.fillProgress
                 else -> 0f
             }
             Box(

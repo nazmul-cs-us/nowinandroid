@@ -24,6 +24,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.navigation.compose.NavHost
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.core.qurandatabase.QuranRepository
@@ -96,6 +99,12 @@ fun NiaNavHost(
     } else {
         com.starception.submission.media.MediaControllerUiState()
     }
+    val homePrayerAlertOverride = if (mainViewModel != null) {
+        val override by mainViewModel.prayerAlertState.collectAsStateWithLifecycle()
+        override
+    } else {
+        com.starception.submission.feature.prayertimes.wobble.PrayerAlertState()
+    }
 
     // Handle deep link for course
     var deepLinkHandled by remember { mutableStateOf(false) }
@@ -112,6 +121,13 @@ fun NiaNavHost(
         navController = navController,
         startDestination = PrayerTimesRoute,
         modifier = modifier,
+        // Smooth crossfade for top-level tab switches. NavHost size is constant
+        // (top bar overlays in NiaApp), so a balanced crossfade has no layout artifacts.
+        // Detail screens (Dua/Surah/Hadith) override with their own slide transitions.
+        enterTransition = { fadeIn(tween(220)) },
+        exitTransition = { fadeOut(tween(220)) },
+        popEnterTransition = { fadeIn(tween(220)) },
+        popExitTransition = { fadeOut(tween(220)) },
     ) {
         // ForYou two-pane layout (similar to Interests)
         forYouListDetailScreen(
@@ -284,6 +300,8 @@ fun NiaNavHost(
             downloadLabel = homeDownloadLabel,
             mediaState = homeMediaState,
             onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
+            onPrayerAlertChanged = { state -> mainViewModel?.updatePrayerAlert(state) },
+            prayerAlertOverride = homePrayerAlertOverride,
         )
         courseScreen(
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
