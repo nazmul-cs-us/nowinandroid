@@ -179,8 +179,19 @@ fun NewsResourceCardExpanded(
                         )
                     }
                     Spacer(modifier = Modifier.height(14.dp))
+                    val arabicLine = smartCardArabicLine(
+                        content = userNewsResource.content,
+                        type = userNewsResource.type,
+                    )
+                    if (arabicLine != null) {
+                        NewsResourceArabicLine(arabicLine)
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
                     NewsResourceShortDescription(
-                        newsResourceShortDescription = userNewsResource.content,
+                        newsResourceShortDescription = smartCardExcerpt(
+                            content = userNewsResource.content,
+                            type = userNewsResource.type,
+                        ),
                         searchQuery = searchQuery,
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -468,6 +479,23 @@ fun NewsResourceMetaData(
 }
 
 @Composable
+fun NewsResourceArabicLine(text: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
+    val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+    val arabicFontFamily = getArabicFontFamilyForSelection(selectedFont)
+    Text(
+        text = text,
+        maxLines = 1,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        style = MaterialTheme.typography.headlineLarge.copy(
+            fontFamily = arabicFontFamily,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+        ),
+    )
+}
+
+@Composable
 fun NewsResourceShortDescription(
     newsResourceShortDescription: String,
     searchQuery: String = "",
@@ -494,6 +522,8 @@ fun NewsResourceShortDescription(
 
     Text(
         text = highlightedText,
+        maxLines = 3,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         style = if (containsArabic && arabicFontFamily != null) {
             MaterialTheme.typography.bodyLarge.copy(
                 fontFamily = arabicFontFamily,

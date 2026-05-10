@@ -454,20 +454,26 @@ private fun NiaMainContent(
             // (Home via PrayerTimesScreen's inner top bar, others via
             // TopLevelTopBarScaffold). NavHost height is therefore identical
             // across tabs, so content does not jump on tab switch.
-            Box(modifier = Modifier) {
-                NiaNavHost(
-                    appState = appState,
-                    onShowSnackbar = { message, action ->
-                        snackbarHostState.showSnackbar(
-                            message = message,
-                            actionLabel = action,
-                            duration = Short,
-                        ) == ActionPerformed
-                    },
-                    onTopAppBarActionClick = onTopAppBarActionClick,
-                    mainViewModel = mainViewModel,
-                    deepLinkCourseId = deepLinkCourseId,
-                )
+            // Provide wobble so TopLevelTopBarScaffold can collapse its status-bar
+            // inset during sync, matching Home and avoiding a tall gap above the title.
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.starception.submission.ui.LocalWobbleIntensity provides syncState.wobbleIntensity,
+            ) {
+                Box(modifier = Modifier) {
+                    NiaNavHost(
+                        appState = appState,
+                        onShowSnackbar = { message, action ->
+                            snackbarHostState.showSnackbar(
+                                message = message,
+                                actionLabel = action,
+                                duration = Short,
+                            ) == ActionPerformed
+                        },
+                        onTopAppBarActionClick = onTopAppBarActionClick,
+                        mainViewModel = mainViewModel,
+                        deepLinkCourseId = deepLinkCourseId,
+                    )
+                }
             }
         }
         }

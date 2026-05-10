@@ -631,14 +631,36 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                             else -> "drawable://masjid_al_haram" // Default to Makkah
                         }
 
+                        // Concatenate from ayah 2 onward so the single-line preview fills the
+                        // card width (the Text uses maxLines=1 + ellipsis). Ayah 1 is Bismillah
+                        // for almost every surah in this DB, so it's skipped. Falls back to ayah
+                        // 1 only when there is no second ayah.
+                        val firstAyah: String? = quranDb.rawQuery(
+                            "SELECT text FROM ayahs WHERE surah_number = ? AND number_in_surah >= 2 ORDER BY number_in_surah ASC LIMIT 6",
+                            arrayOf(number.toString())
+                        ).use { ac ->
+                            val parts = mutableListOf<String>()
+                            while (ac.moveToNext()) {
+                                ac.getString(0)?.takeIf { it.isNotBlank() }?.let { parts.add(it.trim()) }
+                            }
+                            parts.joinToString(separator = " ").takeIf { it.isNotBlank() }
+                        } ?: quranDb.rawQuery(
+                            "SELECT text FROM ayahs WHERE surah_number = ? ORDER BY number_in_surah ASC LIMIT 1",
+                            arrayOf(number.toString())
+                        ).use { ac ->
+                            if (ac.moveToFirst()) ac.getString(0)?.takeIf { it.isNotBlank() } else null
+                        }
+
                         val title = "Surah $number: $nameEn ($nameTranslation)"
-                        val content = """**Arabic:** $nameAr
-
-**Type:** $type
-
-**Verses:** $totalVerses
-
-Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal chapter of the Holy Quran with $totalVerses verses."""
+                        val content = buildString {
+                            append("**Arabic:** $nameAr\n\n")
+                            if (firstAyah != null) {
+                                append("**FirstAyah:** $firstAyah\n\n")
+                            }
+                            append("**Type:** $type\n\n")
+                            append("**Verses:** $totalVerses\n\n")
+                            append("Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal chapter of the Holy Quran with $totalVerses verses.")
+                        }
 
                         newsResources.add(NewsResourceEntity(
                             id = newsId,
