@@ -44,17 +44,26 @@ fun NavController.navigateToCourseDetail(courseId: String) {
 }
 
 fun NavGraphBuilder.courseScreen(
+    titleRes: Int,
+    onSearchClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     onSurahClick: (Int) -> Unit,
     onHadithClick: (databaseFile: String, hadithNumber: Int) -> Unit = { _, _ -> },
     onCourseClick: (String) -> Unit = { },
     onBackClick: () -> Unit = { },
 ) {
     composable<CourseRoute> {
-        CourseScreen(
-            onSurahClick = onSurahClick,
-            onHadithClick = onHadithClick,
-            onCourseClick = onCourseClick,
-        )
+        com.starception.submission.ui.TopLevelTopBarScaffold(
+            titleRes = titleRes,
+            onSearchClick = onSearchClick,
+            onSettingsClick = onSettingsClick,
+        ) {
+            CourseScreen(
+                onSurahClick = onSurahClick,
+                onHadithClick = onHadithClick,
+                onCourseClick = onCourseClick,
+            )
+        }
     }
 
     composable<CourseDetailRoute> { backStackEntry ->

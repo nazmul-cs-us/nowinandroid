@@ -66,6 +66,9 @@ import kotlinx.coroutines.launch
 import kotlin.math.max
 
 fun NavGraphBuilder.bookmarksListDetailScreen(
+    titleRes: Int,
+    onSearchClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     onTopicClick: (String) -> Unit = {},
     onShowSnackbar: suspend (String, String?) -> Boolean,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
@@ -73,13 +76,23 @@ fun NavGraphBuilder.bookmarksListDetailScreen(
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
 ) {
     composable<BookmarksNavRoute> {
-        BookmarksListDetailScreen(
-            onTopicClick = onTopicClick,
-            onShowSnackbar = onShowSnackbar,
-            onSurahClick = onSurahClick,
-            onDuaClick = onDuaClick,
-            onHadithClick = onHadithClick,
-        )
+        val isLandscape = LocalConfiguration.current.orientation ==
+            Configuration.ORIENTATION_LANDSCAPE
+        com.starception.submission.ui.TopLevelTopBarScaffold(
+            titleRes = titleRes,
+            onSearchClick = onSearchClick,
+            onSettingsClick = onSettingsClick,
+            // Two-pane in landscape provides its own chrome.
+            showTopBar = !isLandscape,
+        ) {
+            BookmarksListDetailScreen(
+                onTopicClick = onTopicClick,
+                onShowSnackbar = onShowSnackbar,
+                onSurahClick = onSurahClick,
+                onDuaClick = onDuaClick,
+                onHadithClick = onHadithClick,
+            )
+        }
     }
 }
 

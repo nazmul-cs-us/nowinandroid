@@ -131,6 +131,9 @@ fun NiaNavHost(
     ) {
         // ForYou two-pane layout (similar to Interests)
         forYouListDetailScreen(
+            titleRes = TopLevelDestination.FOR_YOU.titleTextId,
+            onSearchClick = { appState.navigateToSearch() },
+            onSettingsClick = onTopAppBarActionClick,
             onTopicClick = navController::navigateToTopic,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
             onDuaClick = { userNewsResource, topicId ->
@@ -205,6 +208,9 @@ fun NiaNavHost(
         )
         // Bookmarks two-pane layout (similar to ForYou)
         bookmarksListDetailScreen(
+            titleRes = TopLevelDestination.BOOKMARKS.titleTextId,
+            onSearchClick = { appState.navigateToSearch() },
+            onSettingsClick = onTopAppBarActionClick,
             onTopicClick = navController::navigateToTopic,
             onShowSnackbar = onShowSnackbar,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
@@ -267,6 +273,9 @@ fun NiaNavHost(
             },
         )
         interestsListDetailScreen(
+            titleRes = TopLevelDestination.INTERESTS.titleTextId,
+            onSearchClick = { appState.navigateToSearch() },
+            onSettingsClick = onTopAppBarActionClick,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
             onDuaClick = { userNewsResource, topicId ->
                 val duaNumber = Regex("#(\\d+)").find(userNewsResource.title)
@@ -304,6 +313,9 @@ fun NiaNavHost(
             prayerAlertOverride = homePrayerAlertOverride,
         )
         courseScreen(
+            titleRes = TopLevelDestination.COURSE.titleTextId,
+            onSearchClick = { appState.navigateToSearch() },
+            onSettingsClick = onTopAppBarActionClick,
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
             onHadithClick = { databaseFile, hadithNumber ->
                 val collectionName = databaseFile.removeSuffix(".db")

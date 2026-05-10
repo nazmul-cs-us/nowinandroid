@@ -66,16 +66,25 @@ import kotlin.math.max
 @Serializable internal object TopicPlaceholderRoute
 
 fun NavGraphBuilder.interestsListDetailScreen(
+    titleRes: Int,
+    onSearchClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
 ) {
     composable<InterestsRoute> {
-        InterestsListDetailScreen(
-            onSurahClick = onSurahClick,
-            onDuaClick = onDuaClick,
-            onHadithClick = onHadithClick,
-        )
+        com.starception.submission.ui.TopLevelTopBarScaffold(
+            titleRes = titleRes,
+            onSearchClick = onSearchClick,
+            onSettingsClick = onSettingsClick,
+        ) {
+            InterestsListDetailScreen(
+                onSurahClick = onSurahClick,
+                onDuaClick = onDuaClick,
+                onHadithClick = onHadithClick,
+            )
+        }
     }
 }
 

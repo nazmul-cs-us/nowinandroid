@@ -450,48 +450,11 @@ private fun NiaMainContent(
         Column(
             Modifier.fillMaxSize(),
         ) {
-            val destination = appState.currentTopLevelDestination
-            val hideTopBarForTwoPane = isLandscape && (
-                destination == TopLevelDestination.FOR_YOU ||
-                destination == TopLevelDestination.BOOKMARKS
-            )
-            // Always show the top bar on every top-level destination — including Home.
-            // This keeps the NavHost area at a CONSTANT height, so content (e.g. the
-            // For You mosque image) never shifts position when switching tabs.
-            val shouldShowTopAppBar = destination != null && !hideTopBarForTwoPane
-
-            if (shouldShowTopAppBar && destination != null) {
-                val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
-                    .asPaddingValues().calculateTopPadding()
-                val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
-                NiaTopAppBar(
-                    titleRes = destination.titleTextId,
-                    navigationIcon = NiaIcons.Search,
-                    navigationIconContentDescription = stringResource(
-                        id = settingsR.string.feature_settings_top_app_bar_navigation_icon_description,
-                    ),
-                    actionIcon = NiaIcons.Settings,
-                    actionIconContentDescription = stringResource(
-                        id = settingsR.string.feature_settings_top_app_bar_action_icon_description,
-                    ),
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                    ),
-                    onActionClick = { onTopAppBarActionClick() },
-                    onNavigationClick = { appState.navigateToSearch() },
-                    topInset = dynamicTopInset,
-                )
-            }
-
-            Box(
-                modifier = Modifier.consumeWindowInsets(
-                    if (shouldShowTopAppBar) {
-                        WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
-                    } else {
-                        WindowInsets(0, 0, 0, 0)
-                    },
-                ),
-            ) {
+            // Top bar is rendered by each top-level destination itself
+            // (Home via PrayerTimesScreen's inner top bar, others via
+            // TopLevelTopBarScaffold). NavHost height is therefore identical
+            // across tabs, so content does not jump on tab switch.
+            Box(modifier = Modifier) {
                 NiaNavHost(
                     appState = appState,
                     onShowSnackbar = { message, action ->

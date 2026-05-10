@@ -64,18 +64,31 @@ import kotlinx.coroutines.launch
 import kotlin.math.max
 
 fun NavGraphBuilder.forYouListDetailScreen(
+    titleRes: Int,
+    onSearchClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     onTopicClick: (String) -> Unit = {},
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
 ) {
     composable<ForYouRoute> {
-        ForYouListDetailScreen(
-            onTopicClick = onTopicClick,
-            onSurahClick = onSurahClick,
-            onDuaClick = onDuaClick,
-            onHadithClick = onHadithClick,
-        )
+        val isLandscape = LocalConfiguration.current.orientation ==
+            Configuration.ORIENTATION_LANDSCAPE
+        com.starception.submission.ui.TopLevelTopBarScaffold(
+            titleRes = titleRes,
+            onSearchClick = onSearchClick,
+            onSettingsClick = onSettingsClick,
+            // Two-pane in landscape provides its own chrome.
+            showTopBar = !isLandscape,
+        ) {
+            ForYouListDetailScreen(
+                onTopicClick = onTopicClick,
+                onSurahClick = onSurahClick,
+                onDuaClick = onDuaClick,
+                onHadithClick = onHadithClick,
+            )
+        }
     }
 }
 
