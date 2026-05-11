@@ -1394,8 +1394,8 @@ fun PrayerTimesScreen(
                     }
                 )
         ) {
-            val calculatedPrayerAlert = remember(currentTime, prayerTimes, notificationPreferences) {
-                calculatePrayerAlertState(currentTime, prayerTimes, notificationPreferences)
+            val calculatedPrayerAlert = remember(currentTime, prayerTimes, notificationPreferences, storedOffsets) {
+                calculatePrayerAlertState(currentTime, prayerTimes, notificationPreferences, storedOffsets)
             }
             // Use override (e.g. test simulation) when active, otherwise use real calculation.
             val prayerAlertState = if (prayerAlertOverride.isActive) prayerAlertOverride else calculatedPrayerAlert
@@ -2723,14 +2723,26 @@ private fun getLocationWithCountryCode(
 private fun calculatePrayerAlertState(
     currentTime: LocalTime,
     prayerTimes: com.starception.submission.prayer.model.DayPrayerTimes?,
-    notificationPrefs: com.starception.submission.prayer.model.PrayerNotificationPreferences
+    notificationPrefs: com.starception.submission.prayer.model.PrayerNotificationPreferences,
+    timeOffsets: com.starception.submission.prayer.model.PrayerTimeOffsets,
 ): PrayerAlertState {
     if (prayerTimes == null) return PrayerAlertState()
 
-    val actualPrayers = prayerTimes.getActualPrayers()
-    val currentPrayer = actualPrayers.firstOrNull { it.isCurrently }
+    // Apply the user's per-prayer offset so the banner aligns with the time
+    // shown on the prayer card and the Smart Prediction tile. Without this,
+    // a +3m offset on Dhuhr would make "Xm left" off by 3 vs. what the user sees.
+    val actualPrayers = prayerTimes.getActualPrayers().map { p ->
+        val adjusted = p.time.plusMinutes(timeOffsets.getOffset(p.name).toLong())
+        p.copy(time = adjusted)
+    }
+    val currentPrayer = actualPrayers.firstOrNull {
+        currentTime.isAfter(it.time) && it.name != "Sunrise" &&
+            (actualPrayers.getOrNull(actualPrayers.indexOf(it) + 1)?.let { next ->
+                currentTime.isBefore(next.time)
+            } ?: currentTime.isBefore(it.time.plusHours(2)))
+    }
 
-    if (currentPrayer != null && currentPrayer.name != "Sunrise") {
+    if (currentPrayer != null) {
         val goToMosqueDuration = notificationPrefs.getGoToMosqueDurationForPrayer(currentPrayer.name).toLong()
         val minutesSince = Duration.between(currentPrayer.time, currentTime).toMinutes()
         val minutesLeft = goToMosqueDuration - minutesSince
@@ -2746,8 +2758,8 @@ private fun calculatePrayerAlertState(
         }
     }
 
-    val nextPrayer = prayerTimes.getNextPrayer()
-    if (nextPrayer != null && nextPrayer.name != "Sunrise") {
+    val nextPrayer = actualPrayers.firstOrNull { it.time.isAfter(currentTime) && it.name != "Sunrise" }
+    if (nextPrayer != null) {
         val priorMinutes = notificationPrefs.getPriorMinutesForPrayer(nextPrayer.name).toLong()
         val minutesUntil = Duration.between(currentTime, nextPrayer.time).toMinutes()
         if (minutesUntil in 1..priorMinutes) {
