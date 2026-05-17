@@ -55,7 +55,7 @@ class SurahDetailViewModel @Inject constructor(
     val selectedArabicFont: StateFlow<String> = _selectedArabicFont.asStateFlow()
 
     private val _arabicFontSize = MutableStateFlow(
-        prefs.getFloat("arabic_font_size", 22f)
+        prefs.getFloat("arabic_font_size", 41f)
     )
     val arabicFontSize: StateFlow<Float> = _arabicFontSize.asStateFlow()
 

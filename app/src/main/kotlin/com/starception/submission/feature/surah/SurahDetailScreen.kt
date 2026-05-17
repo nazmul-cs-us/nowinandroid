@@ -10,6 +10,7 @@ import androidx.compose.animation.*
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
@@ -41,6 +42,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -74,6 +76,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -542,6 +545,44 @@ fun SurahDetailScreen(
     // Load the surah
     LaunchedEffect(surahNumber) {
         viewModel.loadSurah(surahNumber)
+    }
+
+    // First-launch peek hint: once per install, after the surah loads, briefly
+    // peek toward the "other" view and spring back. In Mushaf mode that means
+    // peek UP (the ayah header is above); in ayah-list mode that means peek
+    // DOWN (more content is below). Mirrors the TikTok / Reels / YouTube
+    // Shorts content-tease pattern. Skipped when scrollToAyah is set.
+    run {
+        val hintDensity = LocalDensity.current
+        LaunchedEffect(uiState, continuousReadingMode) {
+            if (uiState !is SurahDetailUiState.Success) return@LaunchedEffect
+            if (scrollToAyah > 0) return@LaunchedEffect
+            val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
+            if (prefs.getBoolean("mushaf_view_hint_shown", false)) return@LaunchedEffect
+            // Wait for auto-scroll-to-Mushaf (80ms delay + ~350ms animation) to
+            // fully settle before we peek.
+            kotlinx.coroutines.delay(900L)
+            if (scrollState.isScrollInProgress) return@LaunchedEffect
+            val peekPx = with(hintDensity) { 140.dp.toPx() }
+            // Peek away from the current view to reveal the other view briefly.
+            val peekDelta = if (continuousReadingMode) -peekPx else peekPx
+            scrollState.animateScrollBy(
+                value = peekDelta,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 380,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing,
+                ),
+            )
+            kotlinx.coroutines.delay(260L)
+            scrollState.animateScrollBy(
+                value = -peekDelta,
+                animationSpec = androidx.compose.animation.core.spring(
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                ),
+            )
+            prefs.edit().putBoolean("mushaf_view_hint_shown", true).apply()
+        }
     }
 
     // Scroll to specific ayah when content is loaded (if scrollToAyah > 0)
@@ -1225,6 +1266,39 @@ fun SurahDetailScreen(
             com.starception.submission.feature.surah.tajweed.TajweedLegendDialog(
                 onDismiss = { showTajweedLegendDialog = false }
             )
+        }
+
+        // Floating animated chevron anchored at the bottom edge of the album
+        // header (i.e., the boundary where the ayah view begins). When the
+        // header is scrolled off-screen, the chevron sticks to the top of the
+        // viewport. Hints that swiping up reveals more (surah info / full
+        // Mushaf).
+        // Floating chevron. When the album header is visible, anchor it just
+        // above the header's bottom edge (where the ayah view begins). Once
+        // the user scrolls past the header (Mushaf fullscreen), reposition it
+        // at the bottom of the screen, just above the Mushaf page number.
+        if (uiState is SurahDetailUiState.Success) {
+            val item0BottomPx = scrollState.layoutInfo.visibleItemsInfo
+                .firstOrNull { it.index == 0 }
+                ?.let { it.offset + it.size }
+            if (item0BottomPx != null) {
+                val anchorOffsetDp = with(LocalDensity.current) { item0BottomPx.toDp() }
+                    .coerceAtLeast(0.dp)
+                SwipeUpToMushafHint(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = anchorOffsetDp - 28.dp)
+                        .zIndex(10f),
+                )
+            } else {
+                SwipeUpToMushafHint(
+                    pointDown = true,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 22.dp)
+                        .zIndex(10f),
+                )
+            }
         }
     }
 }
@@ -5107,5 +5181,53 @@ fun TafseerDialog(
                 }
             }
         }
+    }
+}
+
+
+/**
+ * Small animated upward chevron shown at the top of the ayah list when not in
+ * Mushaf mode. Bounces gently upward in an infinite loop to hint that swiping
+ * up switches to the Mushaf view.
+ */
+@Composable
+private fun SwipeUpToMushafHint(modifier: Modifier = Modifier, pointDown: Boolean = false) {
+    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "swipeUpHint")
+    val bouncePeak = if (pointDown) 8f else -8f
+    val bounceDp by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = bouncePeak,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "swipeUpHintBounce",
+    )
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "swipeUpHintAlpha",
+    )
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            imageVector = if (pointDown) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+            contentDescription = "Swipe up for Mushaf view",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .size(28.dp)
+                .graphicsLayer {
+                    translationY = bounceDp.dp.toPx()
+                    this.alpha = alpha
+                },
+        )
     }
 }
