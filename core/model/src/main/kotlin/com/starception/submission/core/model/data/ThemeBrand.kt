@@ -20,4 +20,10 @@ enum class ThemeBrand {
     DEFAULT,
     ANDROID,
     COASTAL,
+
+    /**
+     * "Royal" theme — Apple-style four-accent palette:
+     * Lapis (primary), Gold (secondary), Sage (tertiary), Garnet (error/warning).
+     */
+    ROYAL,
 }

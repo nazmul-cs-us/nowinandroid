@@ -1,0 +1,19 @@
+/*
+ * Copyright 2026 Starception
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ */
+
+syntax = "proto3";
+
+option java_package = "com.starception.submission.core.datastore";
+option java_multiple_files = true;
+
+enum TextAccentColorProto {
+  TEXT_ACCENT_COLOR_UNSPECIFIED = 0;
+  TEXT_ACCENT_COLOR_DEFAULT = 1;
+  TEXT_ACCENT_COLOR_GOLD = 2;
+  TEXT_ACCENT_COLOR_SAGE = 3;
+  TEXT_ACCENT_COLOR_GARNET = 4;
+  TEXT_ACCENT_COLOR_LAPIS = 5;
+}

@@ -112,6 +112,22 @@ internal val SoftSage40 = Color(0xFF5C6B4F)     // Gentle sage - peaceful
 internal val SoftSage80 = Color(0xFFB8C3AC)     // Light sage
 internal val SoftSage90 = Color(0xFFD6DFD0)     // Pale sage cream
 
+// Garnet Family - Deep refined red (Apple "Garnet" accent)
+internal val Garnet10 = Color(0xFF2A0A0E)       // Very deep garnet
+internal val Garnet20 = Color(0xFF4A1A20)       // Dark garnet
+internal val Garnet30 = Color(0xFF6B2A30)       // Medium dark garnet
+internal val Garnet40 = Color(0xFF9B3D3A)       // Rich garnet — primary
+internal val Garnet80 = Color(0xFFE6A89F)       // Soft garnet tint
+internal val Garnet90 = Color(0xFFF6D9D2)       // Pale garnet cream
+
+// Lapis Family - Deep refined blue (Apple "Lapis" accent)
+internal val Lapis10 = Color(0xFF071029)        // Deep ink blue
+internal val Lapis20 = Color(0xFF152547)        // Dark lapis
+internal val Lapis30 = Color(0xFF233E70)        // Medium dark lapis
+internal val Lapis40 = Color(0xFF2D5DA8)        // Rich lapis — primary
+internal val Lapis80 = Color(0xFFA8C4EE)        // Soft lapis tint
+internal val Lapis90 = Color(0xFFD6E2F7)        // Pale lapis cream
+
 // Wave Gray Family - Premium neutral tones
 internal val WaveGray10 = Color(0xFF1C1E20)   // Dark wave shadow
 internal val WaveGray20 = Color(0xFF2F3133)   // Medium dark gray

@@ -135,6 +135,22 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
         // No-op: we don't want LibGDX to exit the activity
     }
 
+    // Volume keys turn Mushaf pages while the Surah reader is in foreground.
+    // Convention: VOLUME_DOWN = forward (next page), VOLUME_UP = back. The
+    // MushafKeyBus is bound only while MushafPagerView is composed, so volume
+    // keeps its normal function on every other screen.
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        when (keyCode) {
+            android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                if (com.starception.submission.feature.surah.MushafKeyBus.handleNext()) return true
+            }
+            android.view.KeyEvent.KEYCODE_VOLUME_UP -> {
+                if (com.starception.submission.feature.surah.MushafKeyBus.handlePrev()) return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     // LAZY DEPENDENCY INJECTION - Prevents main thread blocking during startup
     @Inject
     lateinit var lazyStats: dagger.Lazy<JankStats>        // Performance monitoring (lazy loaded)

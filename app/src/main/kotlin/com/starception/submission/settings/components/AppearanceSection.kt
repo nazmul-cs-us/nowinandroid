@@ -103,6 +103,16 @@ fun AppearanceSection(
                     },
                     modifier = Modifier.weight(1f)
                 )
+                ThemePill(
+                    label = "Royal",
+                    selected = themeSettings.brand == ThemeBrand.ROYAL,
+                    color = Color(0xFF2D5DA8),  // Lapis
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onChangeThemeBrand(ThemeBrand.ROYAL)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 

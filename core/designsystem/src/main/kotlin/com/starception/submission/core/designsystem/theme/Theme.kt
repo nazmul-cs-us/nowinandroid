@@ -233,6 +233,78 @@ val DarkCoastalColorScheme = darkColorScheme(
 )
 
 /**
+ * Light Royal theme — Lapis primary, Gold secondary, Sage tertiary, Garnet error.
+ */
+@VisibleForTesting
+val LightRoyalColorScheme = lightColorScheme(
+    primary = Lapis40,
+    onPrimary = Color.White,
+    primaryContainer = Lapis90,
+    onPrimaryContainer = Lapis10,
+    secondary = WarmGold40,
+    onSecondary = Color.White,
+    secondaryContainer = WarmGold90,
+    onSecondaryContainer = WarmGold10,
+    tertiary = SoftSage40,
+    onTertiary = Color.White,
+    tertiaryContainer = SoftSage90,
+    onTertiaryContainer = SoftSage10,
+    error = Garnet40,
+    onError = Color.White,
+    errorContainer = Garnet90,
+    onErrorContainer = Garnet10,
+    background = Color(0xFFFCFBFA),
+    onBackground = Lapis10,
+    surface = Color(0xFFF7F6F4),
+    onSurface = Lapis10,
+    surfaceVariant = Color(0xFFEFEDE9),
+    onSurfaceVariant = Lapis30,
+    inverseSurface = Lapis20,
+    inverseOnSurface = Lapis90,
+    outline = WarmGold40,
+)
+
+/**
+ * Dark Royal theme.
+ */
+@VisibleForTesting
+val DarkRoyalColorScheme = darkColorScheme(
+    primary = Lapis80,
+    onPrimary = Lapis10,
+    primaryContainer = Lapis30,
+    onPrimaryContainer = Lapis90,
+    secondary = WarmGold80,
+    onSecondary = WarmGold10,
+    secondaryContainer = WarmGold30,
+    onSecondaryContainer = WarmGold90,
+    tertiary = SoftSage80,
+    onTertiary = SoftSage10,
+    tertiaryContainer = SoftSage30,
+    onTertiaryContainer = SoftSage90,
+    error = Garnet80,
+    onError = Garnet20,
+    errorContainer = Garnet30,
+    onErrorContainer = Garnet90,
+    background = Color(0xFF0D0F14),
+    onBackground = Color(0xFFF2F4F0),
+    surface = Color(0xFF14171E),
+    onSurface = Color(0xFFF2F4F0),
+    surfaceVariant = Color(0xFF1C2028),
+    onSurfaceVariant = Lapis80,
+    inverseSurface = Lapis90,
+    inverseOnSurface = Lapis10,
+    outline = WarmGold80,
+)
+
+/** Royal gradient + background — light */
+val LightRoyalGradientColors = GradientColors(container = Color(0xFFF7F6F4))
+val LightRoyalBackgroundTheme = BackgroundTheme(color = Color(0xFFFCFBFA))
+
+/** Royal gradient + background — dark */
+val DarkRoyalGradientColors = GradientColors(container = Color(0xFF0D0F14))
+val DarkRoyalBackgroundTheme = BackgroundTheme(color = Color(0xFF0D0F14))
+
+/**
  * Light Android gradient colors
  */
 val LightAndroidGradientColors = GradientColors(container = DarkGreenGray95)
@@ -301,6 +373,7 @@ fun NiaTheme(
         }
         ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidColorScheme else LightAndroidColorScheme
         ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalColorScheme else LightCoastalColorScheme
+        ThemeBrand.ROYAL -> if (darkTheme) DarkRoyalColorScheme else LightRoyalColorScheme
     }
     // Gradient colors
     val emptyGradientColors = GradientColors(container = colorScheme.surfaceColorAtElevation(2.dp))
@@ -316,6 +389,7 @@ fun NiaTheme(
         }
         ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidGradientColors else LightAndroidGradientColors
         ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalGradientColors else LightCoastalGradientColors
+        ThemeBrand.ROYAL -> if (darkTheme) DarkRoyalGradientColors else LightRoyalGradientColors
     }
     // Background theme
     val defaultBackgroundTheme = BackgroundTheme(
@@ -326,6 +400,7 @@ fun NiaTheme(
         ThemeBrand.DEFAULT -> defaultBackgroundTheme
         ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidBackgroundTheme else LightAndroidBackgroundTheme
         ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalBackgroundTheme else LightCoastalBackgroundTheme
+        ThemeBrand.ROYAL -> if (darkTheme) DarkRoyalBackgroundTheme else LightRoyalBackgroundTheme
     }
     val tintTheme = when (themeBrand) {
         ThemeBrand.DEFAULT -> when {
@@ -334,6 +409,7 @@ fun NiaTheme(
         }
         ThemeBrand.ANDROID -> TintTheme()
         ThemeBrand.COASTAL -> TintTheme()
+        ThemeBrand.ROYAL -> TintTheme()
     }
     // Composition locals
     CompositionLocalProvider(

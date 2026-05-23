@@ -65,6 +65,7 @@ import com.starception.submission.core.model.data.DarkThemeConfig.LIGHT
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.model.data.ThemeBrand.ANDROID
 import com.starception.submission.core.model.data.ThemeBrand.COASTAL
+import com.starception.submission.core.model.data.ThemeBrand.ROYAL
 import com.starception.submission.core.model.data.ThemeBrand.DEFAULT
 import com.starception.submission.core.ui.TrackScreenViewEvent
 import com.starception.submission.feature.settings.R.string
@@ -180,6 +181,11 @@ private fun ColumnScope.SettingsPanel(
             text = stringResource(string.feature_settings_brand_coastal),
             selected = settings.brand == COASTAL,
             onClick = { onChangeThemeBrand(COASTAL) },
+        )
+        SettingsDialogThemeChooserRow(
+            text = "Royal",
+            selected = settings.brand == ROYAL,
+            onClick = { onChangeThemeBrand(ROYAL) },
         )
     }
     AnimatedVisibility(visible = settings.brand == DEFAULT && supportDynamicColor) {

@@ -3859,6 +3859,17 @@ private fun MushafPagerView(
     val state = eu.wewox.pagecurl.page.rememberPageCurlState(initialPage)
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
+
+    // Wire physical volume keys to Mushaf page navigation while this composable
+    // is on screen. Activity.onKeyDown checks MushafKeyBus.handle{Next,Prev}().
+    val mushafScope = rememberCoroutineScope()
+    DisposableEffect(state) {
+        MushafKeyBus.bind(
+            next = { mushafScope.launch { state.next() } },
+            prev = { mushafScope.launch { state.prev() } },
+        )
+        onDispose { MushafKeyBus.unbind() }
+    }
     val statusBarHeight = with(density) {
         val cutout = WindowInsets.displayCutout.getTop(this)
         val statusBar = WindowInsets.statusBars.getTop(this)
@@ -5229,5 +5240,34 @@ private fun SwipeUpToMushafHint(modifier: Modifier = Modifier, pointDown: Boolea
                     this.alpha = alpha
                 },
         )
+    }
+}
+
+
+/**
+ * Routes physical volume key presses from MainActivity.onKeyDown into the
+ * MushafPagerView while it is composed. Bound on enter (DisposableEffect),
+ * unbound on dispose so volume keys regain their normal function elsewhere.
+ */
+object MushafKeyBus {
+    @Volatile private var next: (() -> Unit)? = null
+    @Volatile private var prev: (() -> Unit)? = null
+    fun bind(next: () -> Unit, prev: () -> Unit) {
+        this.next = next
+        this.prev = prev
+    }
+    fun unbind() {
+        next = null
+        prev = null
+    }
+    fun handleNext(): Boolean {
+        val handler = next ?: return false
+        handler()
+        return true
+    }
+    fun handlePrev(): Boolean {
+        val handler = prev ?: return false
+        handler()
+        return true
     }
 }
