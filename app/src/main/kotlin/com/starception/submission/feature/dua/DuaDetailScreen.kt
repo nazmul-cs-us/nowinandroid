@@ -1190,26 +1190,9 @@ fun DuaDetailScreen(
                             }
                         }
 
-                        // Update toolbar collapse progress based on scroll position (matches SurahDetailScreen)
-                        LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
-                            val itemIndex = lazyListState.firstVisibleItemIndex
-                            val offset = lazyListState.firstVisibleItemScrollOffset.toFloat()
-
-                            toolbarCollapseProgress = when {
-                                // Past the header - fully solid
-                                itemIndex >= 1 -> 1f
-                                // Within header (item 0) - smooth transition
-                                itemIndex == 0 -> {
-                                    val transitionStart = 100f
-                                    val transitionEnd = 300f
-                                    when {
-                                        offset <= transitionStart -> 0f  // Transparent
-                                        offset >= transitionEnd -> 1f    // Solid
-                                        else -> (offset - transitionStart) / (transitionEnd - transitionStart)
-                                    }
-                                }
-                                else -> 0f
-                            }
+                        // Toolbar always shows solid surface background regardless of scroll position
+                        LaunchedEffect(Unit) {
+                            toolbarCollapseProgress = 1f
                         }
 
                         // Build list of available sections based on dua data

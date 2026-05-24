@@ -41,6 +41,7 @@ fun MediaMiniBar(
     state: MediaControllerUiState,
     onAction: (MediaAction) -> Unit,
     modifier: Modifier = Modifier,
+    titleDragModifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
     val playback = state.playback
@@ -56,11 +57,14 @@ fun MediaMiniBar(
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Title + Subtitle, takes remaining space
+        // Title + Subtitle, takes remaining space.
+        // Drag-to-dismiss is bound to this area only so taps on the playback
+        // buttons below are never intercepted by the parent drag detector.
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(end = 12.dp),
+                .padding(end = 12.dp)
+                .then(titleDragModifier),
         ) {
             Text(
                 text = playback.title,

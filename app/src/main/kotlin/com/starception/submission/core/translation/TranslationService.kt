@@ -91,6 +91,13 @@ class TranslationService private constructor(private val context: Context) {
     }
 
     /**
+     * Persist the selected translation language code
+     */
+    fun setSelectedLanguage(language: String) {
+        prefs.edit().putString(TRANSLATION_KEY, language).apply()
+    }
+
+    /**
      * Translate text to the selected language.
      * Auto-detects source language.
      * Handles Arabic → English translation when English is selected.

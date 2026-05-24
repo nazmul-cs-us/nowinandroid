@@ -372,13 +372,27 @@ fun NiaNavHost(
             onBackClick = navController::popBackStack,
             onNavigateToPreviousHadith = { collectionName, currentHadithNumber, databaseFile ->
                 if (currentHadithNumber > 1) {
-                    navController.popBackStack()
-                    navController.navigateToHadithDetail(collectionName, currentHadithNumber - 1, databaseFile)
+                    // Replace the current hadith entry in a single navigate call so only
+                    // the forward enter/exit transition plays (no chained pop+push jank).
+                    navController.navigateToHadithDetail(
+                        collectionName, currentHadithNumber - 1, databaseFile,
+                        navOptions = androidx.navigation.navOptions {
+                            popUpTo<com.starception.submission.feature.hadith.HadithDetailRoute> {
+                                inclusive = true
+                            }
+                        },
+                    )
                 }
             },
             onNavigateToNextHadith = { collectionName, currentHadithNumber, databaseFile ->
-                navController.popBackStack()
-                navController.navigateToHadithDetail(collectionName, currentHadithNumber + 1, databaseFile)
+                navController.navigateToHadithDetail(
+                    collectionName, currentHadithNumber + 1, databaseFile,
+                    navOptions = androidx.navigation.navOptions {
+                        popUpTo<com.starception.submission.feature.hadith.HadithDetailRoute> {
+                            inclusive = true
+                        }
+                    },
+                )
             }
         )
     }

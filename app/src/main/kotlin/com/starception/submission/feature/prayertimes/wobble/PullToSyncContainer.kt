@@ -350,14 +350,21 @@ fun PullToSyncContainer(
         if (wobbleIntensity > 0.05f) {
             if (mediaState.isVisible) {
                 // --- Media Mini-Bar fills the sage area ---
-                // Pull up on this area to dismiss the media controller.
+                // Pull-up-to-dismiss is scoped to the title column inside MediaMiniBar
+                // (via titleDragModifier) so playback button taps are not swallowed.
                 Box(
                     modifier = Modifier
                         .zIndex(1f)
                         .fillMaxWidth()
                         .height(contentOffsetY)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-                        .pointerInput(Unit) {
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MediaMiniBar(
+                        state = mediaState,
+                        onAction = onMediaAction,
+                        modifier = Modifier.padding(bottom = 6.dp),
+                        titleDragModifier = Modifier.pointerInput(Unit) {
                             var totalDrag = 0f
                             detectVerticalDragGestures(
                                 onDragStart = { totalDrag = 0f },
@@ -365,7 +372,6 @@ fun PullToSyncContainer(
                                     totalDrag += dragAmount
                                 },
                                 onDragEnd = {
-                                    // Pull up to dismiss
                                     if (totalDrag < -80f) {
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                         onMediaAction(MediaAction.Dismiss)
@@ -373,12 +379,6 @@ fun PullToSyncContainer(
                                 },
                             )
                         },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    MediaMiniBar(
-                        state = mediaState,
-                        onAction = onMediaAction,
-                        modifier = Modifier.padding(bottom = 6.dp),
                     )
                 }
             } else if (isPrayerAlert) {

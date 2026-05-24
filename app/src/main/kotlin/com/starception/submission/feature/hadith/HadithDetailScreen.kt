@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -52,6 +53,11 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.CallReceived
+import androidx.compose.material.icons.filled.VolumeDown
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -63,6 +69,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -116,6 +126,10 @@ import android.content.res.AssetFileDescriptor
 import android.media.MediaPlayer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.scaleIn
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
@@ -171,6 +185,13 @@ fun HadithDetailScreen(
     onNavigateToNextHadith: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    // Capture the route-provided value, then shadow with mutable state so navigation
+    // between hadiths (swipe or mini-bar prev/next) stays within this composable
+    // instance — the same pattern SurahDetailScreen uses to keep the global mini-bar
+    // visible across track changes instead of dismissing during a remount.
+    val routeHadithNumber = hadithNumber
+    @Suppress("NAME_SHADOWING")
+    var hadithNumber by remember(routeHadithNumber) { mutableStateOf(routeHadithNumber) }
     // Enable immersive full-screen mode (hides status bar)
     // Don't restore on dispose to prevent status bar flash when swiping between hadiths
     ImmersiveFullScreenEffect(restoreOnDispose = false)
@@ -227,6 +248,11 @@ fun HadithDetailScreen(
     var downloadCategory by remember { mutableStateOf("") }
     var reloadTrigger by remember { mutableStateOf(0) }
 
+    // Per-hadith cache so the AnimatedContent swipe transition can render the
+    // exiting page with its original data while the new page slides in with its
+    // own (preloaded) data — matching DuaDetailScreen's HorizontalPager feel.
+    val hadithCache = remember(databaseFile) { androidx.compose.runtime.mutableStateMapOf<Int, Hadith>() }
+
     // Translation state
     var translatedArabic by remember { mutableStateOf<String?>(null) }
     var translatedText by remember { mutableStateOf<String?>(null) }
@@ -256,13 +282,25 @@ fun HadithDetailScreen(
     var isDownloadingAudio by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf(0f) }
 
-    // Notify global media controller when hadith playback state changes
-    // and poll progress while playing (for horizontal sweep in PullToSyncContainer)
-    androidx.compose.runtime.LaunchedEffect(isPlaying) {
+    // Audio handoff state — during mini-bar/swipe navigation we swap hadith inside
+    // this composable instance (no remount). To prevent the mini-bar from briefly
+    // dismissing during the audio swap, we suppress the "stopped" notification and
+    // auto-resume playback on the new hadith.
+    var prevHadithNumberRef by remember { mutableStateOf(hadithNumber) }
+    var shouldAutoPlayAfterLoad by remember { mutableStateOf(false) }
+    var suppressStopNotification by remember { mutableStateOf(false) }
+
+    // Notify global media controller when hadith playback state OR hadith changes
+    // (so the mini-bar title updates when navigating between hadiths while playing).
+    androidx.compose.runtime.LaunchedEffect(isPlaying, hadithNumber) {
+        if (!isPlaying && suppressStopNotification) {
+            // Skip the (false) notification while a navigation handoff is in progress
+            return@LaunchedEffect
+        }
+        suppressStopNotification = false
         val title = "Hadith #$hadithNumber"
         GlobalMediaViewModel.onHadithPlaybackChanged?.invoke(isPlaying, hadithNumber, collectionName, title)
 
-        // Poll MediaPlayer progress while playing
         if (isPlaying) {
             while (true) {
                 val mp = mediaPlayer
@@ -276,6 +314,22 @@ fun HadithDetailScreen(
                 }
                 kotlinx.coroutines.delay(500)
             }
+        }
+    }
+
+    // When the user navigates between hadiths (mini-bar prev/next or swipe), tear
+    // down the old audio silently, then auto-resume on the freshly loaded hadith.
+    androidx.compose.runtime.LaunchedEffect(hadithNumber) {
+        if (prevHadithNumberRef != hadithNumber) {
+            shouldAutoPlayAfterLoad = isPlaying
+            if (isPlaying) suppressStopNotification = true
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            mediaPlayer = null
+            textToSpeech?.stop()
+            sherpaOnnxTts.stopSpeaking()
+            isPlaying = false
+            prevHadithNumberRef = hadithNumber
         }
     }
 
@@ -299,8 +353,13 @@ fun HadithDetailScreen(
         translatedText = null
         translatedElaboration = null
         try {
-            hadith = repository.getHadith(databaseFile, hadithNumber)
-            if (hadith == null) {
+            val cached = hadithCache[hadithNumber]
+            val current = cached ?: repository.getHadith(databaseFile, hadithNumber)
+            if (current != null) {
+                hadithCache[hadithNumber] = current
+                hadith = current
+            } else {
+                hadith = null
                 error = "Hadith not found"
             }
         } catch (e: Exception) {
@@ -323,6 +382,20 @@ fun HadithDetailScreen(
             }
         }
         isLoading = false
+    }
+
+    // Preload neighbours so the swipe transition has correct per-page data instantly.
+    LaunchedEffect(databaseFile, hadithNumber) {
+        listOf(hadithNumber - 1, hadithNumber + 1)
+            .filter { it > 0 && it !in hadithCache }
+            .forEach { num ->
+                try {
+                    val h = repository.getHadith(databaseFile, num)
+                    if (h != null) hadithCache[num] = h
+                } catch (_: Exception) {
+                    // Neighbour preload failure is non-fatal — silent.
+                }
+            }
     }
 
     // Translate content when hadith is loaded or settings change
@@ -415,19 +488,26 @@ fun HadithDetailScreen(
         isTranslating = false
     }
 
+    // In-place navigation handlers — update internal hadithNumber state instead of
+    // popping/pushing the back stack, so the composable stays mounted and the mini-bar
+    // doesn't get a dispose/remount cycle.
+    val handleSkipNext: () -> Unit = { hadithNumber += 1 }
+    val handleSkipPrev: () -> Unit = { if (hadithNumber > 1) hadithNumber -= 1 }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,  // Solid background to prevent sky showing through
         contentWindowInsets = WindowInsets(0, 0, 0, 0) // No padding for status bar in immersive mode
     ) { _ ->
-        // Don't apply paddingValues - let content scroll under transparent toolbar like SurahDetailScreen
         HadithSwipeContainer(
             hadithNumber = hadithNumber,
-            onNavigateToPreviousHadith = onNavigateToPreviousHadith,
-            onNavigateToNextHadith = onNavigateToNextHadith
+            onNavigateToPreviousHadith = handleSkipPrev,
+            onNavigateToNextHadith = handleSkipNext
         ) {
             when {
-                isLoading -> {
+                // Show shimmer only on first load (no hadith yet). During swipe/mini-bar
+                // navigation, keep the previous hadith visible while the new one loads.
+                isLoading && hadith == null -> {
                     HadithShimmerLoading(onBackClick = wrappedOnBackClick, isLandscape = isLandscape)
                 }
                 error != null && showDownloadPrompt -> {
@@ -480,21 +560,7 @@ fun HadithDetailScreen(
                     )
                 }
                 hadith != null -> {
-                    HadithContent(
-                        hadith = hadith!!,
-                        collectionName = collectionName,
-                        hadithNumber = hadithNumber,
-                        databaseFile = databaseFile,
-                        onBackClick = wrappedOnBackClick,
-                        translatedArabic = translatedArabic,
-                        translatedText = translatedText,
-                        translatedElaboration = translatedElaboration,
-                        isTranslating = isTranslating,
-                        selectedLanguage = selectedLanguage,
-                        onLanguageClick = { showLanguageDialog = true },
-                        isLandscape = isLandscape,
-                        isPlaying = isPlaying,
-                        onPlayClick = {
+                    val handlePlayClick: () -> Unit = {
                             if (isPlaying) {
                                 // Stop playback
                                 mediaPlayer?.stop()
@@ -677,7 +743,91 @@ fun HadithDetailScreen(
                                 }
                             }
                         }
-                    )
+
+                    val currentHandlePlayClick by androidx.compose.runtime.rememberUpdatedState(handlePlayClick)
+                    val currentSkipNext by androidx.compose.runtime.rememberUpdatedState(handleSkipNext)
+                    val currentSkipPrev by androidx.compose.runtime.rememberUpdatedState(handleSkipPrev)
+
+                    // Auto-resume playback on the freshly loaded hadith when navigation
+                    // was triggered while audio was playing (mini-bar prev/next or swipe).
+                    androidx.compose.runtime.LaunchedEffect(hadith) {
+                        if (shouldAutoPlayAfterLoad && !isPlaying) {
+                            shouldAutoPlayAfterLoad = false
+                            kotlinx.coroutines.delay(50)
+                            handlePlayClick()
+                        }
+                    }
+                    androidx.compose.runtime.DisposableEffect(Unit) {
+                        // Capture the exact lambdas we install so we can check identity on dispose
+                        // and avoid clobbering a successor screen that mounted before we tore down.
+                        val playCb: () -> Unit = {
+                            android.util.Log.d("HadithMiniBar", "🎯 PLAY/PAUSE invoked | hadith=$hadithNumber | currentlyPlaying=$isPlaying")
+                            currentHandlePlayClick()
+                        }
+                        val nextCb: () -> Unit = {
+                            android.util.Log.d("HadithMiniBar", "🎯 SKIP_NEXT invoked | hadith=$hadithNumber → ${hadithNumber + 1}")
+                            currentSkipNext()
+                        }
+                        val prevCb: () -> Unit = {
+                            android.util.Log.d("HadithMiniBar", "🎯 SKIP_PREV invoked | hadith=$hadithNumber → ${hadithNumber - 1}")
+                            currentSkipPrev()
+                        }
+                        android.util.Log.d("HadithMiniBar", "📌 REGISTER | hadith=$hadithNumber | callbacks installed")
+                        GlobalMediaViewModel.onHadithPlayPauseRequested = playCb
+                        GlobalMediaViewModel.onHadithSkipNextRequested = nextCb
+                        GlobalMediaViewModel.onHadithSkipPreviousRequested = prevCb
+                        onDispose {
+                            android.util.Log.d("HadithMiniBar", "🧹 UNREGISTER | hadith=$hadithNumber | clearing only own callbacks")
+                            if (GlobalMediaViewModel.onHadithPlayPauseRequested === playCb) {
+                                GlobalMediaViewModel.onHadithPlayPauseRequested = null
+                            }
+                            if (GlobalMediaViewModel.onHadithSkipNextRequested === nextCb) {
+                                GlobalMediaViewModel.onHadithSkipNextRequested = null
+                            }
+                            if (GlobalMediaViewModel.onHadithSkipPreviousRequested === prevCb) {
+                                GlobalMediaViewModel.onHadithSkipPreviousRequested = null
+                            }
+                        }
+                    }
+
+                    // Horizontal slide between hadiths to match DuaDetailScreen's
+                    // HorizontalPager swipe feel. Each pane reads its hadith from the
+                    // cache so the exiting page keeps its original data and the entering
+                    // page shows the new hadith immediately (preloaded as a neighbour).
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = hadithNumber,
+                        transitionSpec = {
+                            val direction = if (targetState > initialState) {
+                                androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Left
+                            } else {
+                                androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Right
+                            }
+                            slideIntoContainer(direction, animationSpec = tween(350, easing = FastOutSlowInEasing)) togetherWith
+                                slideOutOfContainer(direction, animationSpec = tween(350, easing = FastOutSlowInEasing))
+                        },
+                        label = "hadithPageSwipe",
+                        modifier = Modifier.fillMaxSize(),
+                    ) { num ->
+                        val pageHadith = hadithCache[num] ?: hadith
+                        if (pageHadith != null) {
+                            HadithContent(
+                                hadith = pageHadith,
+                                collectionName = collectionName,
+                                hadithNumber = num,
+                                databaseFile = databaseFile,
+                                onBackClick = wrappedOnBackClick,
+                                translatedArabic = if (num == hadithNumber) translatedArabic else null,
+                                translatedText = if (num == hadithNumber) translatedText else null,
+                                translatedElaboration = if (num == hadithNumber) translatedElaboration else null,
+                                isTranslating = if (num == hadithNumber) isTranslating else false,
+                                selectedLanguage = selectedLanguage,
+                                onLanguageClick = { showLanguageDialog = true },
+                                isLandscape = isLandscape,
+                                isPlaying = if (num == hadithNumber) isPlaying else false,
+                                onPlayClick = handlePlayClick,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -761,11 +911,11 @@ fun HadithDetailScreen(
                                 .fillMaxWidth()
                                 .clickable {
                                     if (langCode != selectedLanguage) {
-                                        // Clear cache to force re-translation
                                         translationService.clearCache()
                                         translatedText = null
                                         translatedElaboration = null
                                         selectedLanguage = langCode
+                                        translationService.setSelectedLanguage(langCode)
                                     }
                                     showLanguageDialog = false
                                 }
@@ -780,6 +930,7 @@ fun HadithDetailScreen(
                                         translatedText = null
                                         translatedElaboration = null
                                         selectedLanguage = langCode
+                                        translationService.setSelectedLanguage(langCode)
                                     }
                                     showLanguageDialog = false
                                 }
@@ -825,25 +976,11 @@ private fun HadithContent(
         // No status bar padding - immersive mode hides status bar
         val lazyListState = rememberLazyListState()
 
-        // Calculate toolbar collapse state with smooth transition
-        // At top (album art visible) → Transparent
-        // Scrolled down (past album art) → Solid theme color
-        val collapseProgress = remember {
-            androidx.compose.runtime.derivedStateOf {
-                val itemIndex = lazyListState.firstVisibleItemIndex
-                val offset = lazyListState.firstVisibleItemScrollOffset.toFloat()
+        // Toolbar always shows solid surface background regardless of scroll position
+        val collapseProgress = remember { androidx.compose.runtime.derivedStateOf { 1f } }
 
-                when {
-                    // Past the header - fully solid
-                    itemIndex >= 1 -> 1f
-                    // At header - calculate progress based on scroll offset
-                    else -> {
-                        val headerHeight = if (isLandscape) 340f else 596f // image + info card height
-                        (offset / headerHeight).coerceIn(0f, 1f)
-                    }
-                }
-            }
-        }
+        // Player UI swap (mirrors SurahDetailScreen): info card transforms into player controls when audio starts.
+        var showMusicPlayer by remember { mutableStateOf(false) }
 
         // Track scroll direction for FAB animation
         var previousScrollOffset by remember { mutableStateOf(0) }
@@ -988,72 +1125,111 @@ private fun HadithContent(
                             )
                         }
 
-                        // Fixed-height container for info card to match SurahDetailScreen FAB positioning
+                        // Fixed-height container for info card to match SurahDetailScreen FAB positioning.
+                        // Swaps between info card and music player controls when playback starts.
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(if (isLandscape) 130.dp else 170.dp)
                         ) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 24.dp, vertical = 16.dp)
-                            ) {
-                                Column {
-                                    // Collection name
-                                    Text(
-                                        text = hadith.collectionNameEnglish.ifEmpty { collectionName },
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-
-                                    // Author
-                                    if (hadith.author.isNotEmpty()) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "Compiled by ${hadith.author}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontStyle = FontStyle.Italic
+                            AnimatedContent(
+                                targetState = showMusicPlayer,
+                                transitionSpec = {
+                                    if (targetState) {
+                                        slideInVertically(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                            initialOffsetY = { it / 3 }
+                                        ) + fadeIn(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                        ) togetherWith slideOutVertically(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                            targetOffsetY = { -it / 3 }
+                                        ) + fadeOut(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                        )
+                                    } else {
+                                        slideInVertically(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                            initialOffsetY = { -it / 3 }
+                                        ) + fadeIn(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                        ) togetherWith slideOutVertically(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                            targetOffsetY = { it / 3 }
+                                        ) + fadeOut(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
                                         )
                                     }
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-
-                                    // Hadith number chip and course badge in same row
-                                    val courseCompletionInfo = CourseProgressTracker.getHadithCourseCompletion(
-                                        context,
-                                        hadithNumber,
-                                        databaseFile
+                                },
+                                label = "Hadith Player Controls Transition",
+                                modifier = Modifier.fillMaxSize()
+                            ) { showPlayer ->
+                                if (showPlayer) {
+                                    HadithPlayerControls(
+                                        isPlaying = isPlaying,
+                                        onPlayPauseClick = onPlayClick,
+                                        onCollapse = { showMusicPlayer = false }
                                     )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                } else {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 24.dp, vertical = 16.dp)
                                     ) {
-                                        NiaTopicTag(
-                                            followed = true,
-                                            onClick = { },
-                                            enabled = true,
-                                            text = {
+                                        Column {
+                                            Text(
+                                                text = hadith.collectionNameEnglish.ifEmpty { collectionName },
+                                                style = MaterialTheme.typography.headlineMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+
+                                            if (hadith.author.isNotEmpty()) {
+                                                Spacer(modifier = Modifier.height(4.dp))
                                                 Text(
-                                                    text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
+                                                    text = "Compiled by ${hadith.author}",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    fontStyle = FontStyle.Italic
                                                 )
                                             }
-                                        )
 
-                                        if (courseCompletionInfo != null) {
-                                            NiaVerifiedTag(
-                                                onClick = { },
-                                                enabled = true,
-                                                text = {
-                                                    Text(
-                                                        text = courseCompletionInfo.courseName.uppercase(Locale.getDefault())
+                                            Spacer(modifier = Modifier.height(12.dp))
+
+                                            val courseCompletionInfo = CourseProgressTracker.getHadithCourseCompletion(
+                                                context,
+                                                hadithNumber,
+                                                databaseFile
+                                            )
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                NiaTopicTag(
+                                                    followed = true,
+                                                    onClick = { },
+                                                    enabled = true,
+                                                    text = {
+                                                        Text(
+                                                            text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
+                                                        )
+                                                    }
+                                                )
+
+                                                if (courseCompletionInfo != null) {
+                                                    NiaVerifiedTag(
+                                                        onClick = { },
+                                                        enabled = true,
+                                                        text = {
+                                                            Text(
+                                                                text = courseCompletionInfo.courseName.uppercase(Locale.getDefault())
+                                                            )
+                                                        }
                                                     )
                                                 }
-                                            )
+                                            }
                                         }
                                     }
                                 }
@@ -1077,13 +1253,28 @@ private fun HadithContent(
                             .padding(end = 12.dp)
                     ) {
                         FloatingActionButton(
-                            onClick = onPlayClick,
+                            onClick = {
+                                if (showMusicPlayer) {
+                                    showMusicPlayer = false
+                                } else {
+                                    if (!isPlaying) showMusicPlayer = true
+                                    onPlayClick()
+                                }
+                            },
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         ) {
                             Icon(
-                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Pause" else "Play"
+                                imageVector = when {
+                                    showMusicPlayer -> Icons.Default.CallReceived
+                                    isPlaying -> Icons.Default.Pause
+                                    else -> Icons.Default.PlayArrow
+                                },
+                                contentDescription = when {
+                                    showMusicPlayer -> "Minimize player"
+                                    isPlaying -> "Pause"
+                                    else -> "Play"
+                                }
                             )
                         }
                     }
@@ -2146,5 +2337,146 @@ private fun HadithSwipeEdgeIndicator(
             tint = Color.White,
             modifier = Modifier.size((28f + progress * 8f).dp),
         )
+    }
+}
+
+@Composable
+private fun HadithPlayerControls(
+    isPlaying: Boolean,
+    onPlayPauseClick: () -> Unit,
+    onCollapse: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val audioManager = remember {
+        context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+    }
+    val maxVolume = remember {
+        audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+    }
+    var currentVolume by remember {
+        mutableStateOf(audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat() / maxVolume)
+    }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onCollapse() },
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        val contentColor = MaterialTheme.colorScheme.onSurface
+        Column(modifier = Modifier.padding(vertical = 12.dp)) {
+            if (isPlaying) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 48.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onPlayPauseClick,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Replay,
+                        contentDescription = "Replay",
+                        tint = contentColor,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onPlayPauseClick,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        tint = contentColor,
+                        modifier = Modifier.size(44.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        if (isPlaying) onPlayPauseClick()
+                        onCollapse()
+                    },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Stop,
+                        contentDescription = "Stop",
+                        tint = contentColor,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.VolumeDown,
+                    contentDescription = "Volume down",
+                    tint = contentColor,
+                    modifier = Modifier.size(20.dp)
+                )
+
+                Slider(
+                    value = currentVolume,
+                    onValueChange = { v ->
+                        currentVolume = v
+                        audioManager.setStreamVolume(
+                            android.media.AudioManager.STREAM_MUSIC,
+                            (v * maxVolume).toInt(),
+                            0
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                )
+
+                Icon(
+                    imageVector = Icons.Default.VolumeUp,
+                    contentDescription = "Volume up",
+                    tint = contentColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
     }
 }

@@ -48,6 +48,18 @@ class GlobalMediaViewModel(
          * Static listener for hadith playback progress updates (position/duration in ms).
          */
         var onHadithProgressChanged: ((currentPosition: Int, duration: Int) -> Unit)? = null
+
+        /**
+         * Reverse channel: invoked when the global mini-bar requests play/pause for an active
+         * hadith source. HadithDetailScreen registers this and toggles its own playback.
+         */
+        var onHadithPlayPauseRequested: (() -> Unit)? = null
+
+        /**
+         * Reverse channels for skip prev/next on hadith — navigate to adjacent hadith.
+         */
+        var onHadithSkipNextRequested: (() -> Unit)? = null
+        var onHadithSkipPreviousRequested: (() -> Unit)? = null
     }
 
     private val _controllerState = MutableStateFlow(MediaControllerUiState())
@@ -286,37 +298,41 @@ class GlobalMediaViewModel(
     }
 
     fun play() {
+        Log.d(TAG, "▶️ play() | source=${activeSource::class.simpleName} | hadithCb=${onHadithPlayPauseRequested != null}")
         when (activeSource) {
             is MediaSource.Quran -> quranService?.togglePlayPause()
             is MediaSource.DrivingMode -> drivingService?.resume()
-            is MediaSource.Hadith -> {} // Hadith playback managed by HadithDetailScreen
+            is MediaSource.Hadith -> onHadithPlayPauseRequested?.invoke()
             is MediaSource.None -> {}
         }
     }
 
     fun pause() {
+        Log.d(TAG, "⏸️ pause() | source=${activeSource::class.simpleName} | hadithCb=${onHadithPlayPauseRequested != null}")
         when (activeSource) {
             is MediaSource.Quran -> quranService?.togglePlayPause()
             is MediaSource.DrivingMode -> drivingService?.pause()
-            is MediaSource.Hadith -> {} // Hadith playback managed by HadithDetailScreen
+            is MediaSource.Hadith -> onHadithPlayPauseRequested?.invoke()
             is MediaSource.None -> {}
         }
     }
 
     fun skipNext() {
+        Log.d(TAG, "⏭️ skipNext() | source=${activeSource::class.simpleName} | hadithCb=${onHadithSkipNextRequested != null}")
         when (activeSource) {
             is MediaSource.Quran -> quranService?.playNext()
             is MediaSource.DrivingMode -> drivingService?.skipCurrent()
-            is MediaSource.Hadith -> {} // Hadith doesn't support skip
+            is MediaSource.Hadith -> onHadithSkipNextRequested?.invoke()
             is MediaSource.None -> {}
         }
     }
 
     fun skipPrevious() {
+        Log.d(TAG, "⏮️ skipPrevious() | source=${activeSource::class.simpleName} | hadithCb=${onHadithSkipPreviousRequested != null}")
         when (activeSource) {
             is MediaSource.Quran -> quranService?.playPrevious()
             is MediaSource.DrivingMode -> {} // Driving mode doesn't support previous
-            is MediaSource.Hadith -> {} // Hadith doesn't support previous
+            is MediaSource.Hadith -> onHadithSkipPreviousRequested?.invoke()
             is MediaSource.None -> {}
         }
     }

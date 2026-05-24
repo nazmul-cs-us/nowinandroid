@@ -404,6 +404,28 @@ fun SurahDetailScreen(
         }
     }
 
+    // Per-surah cache so the AnimatedContent swipe transition can render the
+    // exiting page with its original data while the new page slides in with its
+    // own (preloaded) data — same pattern as DuaDetailScreen's HorizontalPager
+    // and HadithDetailScreen's swipe transition.
+    val surahCache = remember { androidx.compose.runtime.mutableStateMapOf<Int, Pair<Surah, List<Ayah>>>() }
+    // Preload the current and neighbouring surahs (clamped to 1..114).
+    LaunchedEffect(currentPlayingSurahNumber) {
+        listOf(currentPlayingSurahNumber - 1, currentPlayingSurahNumber, currentPlayingSurahNumber + 1)
+            .filter { it in 1..114 && it !in surahCache }
+            .forEach { num ->
+                try {
+                    val fetchedSurah = quranRepository.getSurahByNumber(num)
+                    val fetchedAyahs = quranRepository.getAyahsBySurahOnce(num)
+                    if (fetchedSurah != null) {
+                        surahCache[num] = fetchedSurah to fetchedAyahs
+                    }
+                } catch (_: Exception) {
+                    // Neighbour preload failure is non-fatal — silent.
+                }
+            }
+    }
+
     // Load volume from ViewModel (persisted in SharedPreferences)
     val currentVolume by viewModel.currentVolume.collectAsState()
 
@@ -469,20 +491,18 @@ fun SurahDetailScreen(
     // Continuous (Mushaf) reading mode
     val continuousReadingMode by viewModel.continuousReadingMode.collectAsState()
 
-    // Track bookmark state using UserDataRepository (the correct repository for news bookmarks)
+    // Track bookmark state using UserDataRepository
+    // When opened from the news feed we use the real news resource ID; otherwise fall back to a
+    // synthetic per-surah ID so bookmarking still works from Prayer Times, Course, prev/next nav, etc.
+    val bookmarkId = newsResourceId ?: "quran-surah-$surahNumber"
     var isBookmarked by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
-    // Sync bookmark state from UserDataRepository if we have a news resource ID
-    LaunchedEffect(newsResourceId) {
-        if (newsResourceId != null) {
-            val userData = userDataRepository.userData.first()
-            val bookmarkState = newsResourceId in userData.bookmarkedNewsResources
-            android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "🔄 SYNC | surah=$surahNumber | newsResourceId=$newsResourceId | bookmarked=$bookmarkState")
-            isBookmarked = bookmarkState
-        } else {
-            android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "⚠️ NO_NEWS_ID | surah=$surahNumber | bookmark disabled")
-        }
+    LaunchedEffect(bookmarkId) {
+        val userData = userDataRepository.userData.first()
+        val bookmarkState = bookmarkId in userData.bookmarkedNewsResources
+        android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "🔄 SYNC | surah=$surahNumber | bookmarkId=$bookmarkId | bookmarked=$bookmarkState")
+        isBookmarked = bookmarkState
     }
 
     // Load topics for this news resource or by surah number
@@ -524,6 +544,19 @@ fun SurahDetailScreen(
 
                 playbackService?.setAudioLanguage(currentAudioLanguage)
                 isPlaying = playbackService?.isPlaying() ?: false
+
+                // Sync the visible AlbumInfoCard with what's already playing on the
+                // service so the page matches the mini-bar when opened mid-playback.
+                if (isPlaying) {
+                    val playingIndex = playbackService?.getCurrentSurahIndex() ?: -1
+                    if (playingIndex >= 0) {
+                        val playingSurahNumber = playingIndex + 1
+                        if (playingSurahNumber != currentPlayingSurahNumber) {
+                            android.util.Log.d("QuranAlbumPlayer", "🔁 SYNC_TO_AUDIO | route=$surahNumber → playing=$playingSurahNumber")
+                            currentPlayingSurahNumber = playingSurahNumber
+                        }
+                    }
+                }
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
@@ -605,36 +638,8 @@ fun SurahDetailScreen(
         }
     }
 
-    // Calculate toolbar collapse state with smooth single-stage transition:
-    // At top (album art visible) → Transparent
-    // Scrolled down (past album art) → Solid theme color
-    val collapseProgress = remember {
-        derivedStateOf {
-            val itemIndex = scrollState.firstVisibleItemIndex
-            val offset = scrollState.firstVisibleItemScrollOffset.toFloat()
-
-            when {
-                // Past the header - fully solid
-                itemIndex >= 1 -> 1f
-
-                // Within AlbumHeader + InfoCard (item 0)
-                // Smooth transition as album art scrolls off
-                itemIndex == 0 -> {
-                    // Transition zone: 600px to 1000px of scroll
-                    val transitionStart = 600f
-                    val transitionEnd = 1000f
-
-                    when {
-                        offset <= transitionStart -> 0f  // Transparent
-                        offset >= transitionEnd -> 1f    // Solid
-                        else -> (offset - transitionStart) / (transitionEnd - transitionStart)
-                    }
-                }
-
-                else -> 0f
-            }
-        }
-    }
+    // Toolbar always shows solid surface background regardless of scroll position
+    val collapseProgress = remember { derivedStateOf { 1f } }
 
     val isCollapsed = remember {
         derivedStateOf {
@@ -686,10 +691,29 @@ fun SurahDetailScreen(
         }
     }
 
+    // In-place swipe handlers — match the mini-bar prev/next behavior. Bumping
+    // currentPlayingSurahNumber drives the AnimatedContent slide; if audio is
+    // playing we also advance the service so its onSurahChanged echo lines up.
     SurahSwipeContainer(
-        surahNumber = surahNumber,
-        onNavigateToPreviousSurah = onNavigateToPreviousSurah,
-        onNavigateToNextSurah = onNavigateToNextSurah
+        surahNumber = currentPlayingSurahNumber,
+        onNavigateToPreviousSurah = {
+            if (currentPlayingSurahNumber > 1) {
+                if (isPlaying) {
+                    playbackService?.playPrevious()
+                } else {
+                    currentPlayingSurahNumber -= 1
+                }
+            }
+        },
+        onNavigateToNextSurah = {
+            if (currentPlayingSurahNumber < 114) {
+                if (isPlaying) {
+                    playbackService?.playNext()
+                } else {
+                    currentPlayingSurahNumber += 1
+                }
+            }
+        },
     ) {
         Scaffold(
             topBar = {},
@@ -707,18 +731,38 @@ fun SurahDetailScreen(
                 }
             }
             is SurahDetailUiState.Success -> {
+                androidx.compose.animation.AnimatedContent(
+                    targetState = currentPlayingSurahNumber,
+                    transitionSpec = {
+                        val direction = if (targetState > initialState) {
+                            androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Left
+                        } else {
+                            androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Right
+                        }
+                        slideIntoContainer(direction, animationSpec = tween(350, easing = FastOutSlowInEasing)) togetherWith
+                            slideOutOfContainer(direction, animationSpec = tween(350, easing = FastOutSlowInEasing))
+                    },
+                    label = "surahPageSwipe",
+                    modifier = Modifier.fillMaxSize(),
+                ) { num ->
+                    // Each pane reads its surah+ayahs from the preloaded cache so the
+                    // exiting page keeps its original content and the entering page
+                    // immediately shows the new surah while sliding in.
+                    val cached = surahCache[num]
+                    val pageSurah = cached?.first ?: state.surah
+                    val pageAyahs = cached?.second ?: state.ayahs
                 AlbumPlayerContent(
-                    surah = state.surah,
-                    ayahs = state.ayahs,
+                    surah = pageSurah,
+                    ayahs = pageAyahs,
                     scrollState = scrollState,
                     collapseProgress = collapseProgress.value,
                     showMusicPlayer = showMusicPlayer,
                     isPlaying = isPlaying,
                     currentProgress = currentProgress,
                     currentVolume = currentVolume,
-                    currentPlayingSurahNumber = currentPlayingSurahNumber,
-                    currentPlayingSurah = currentPlayingSurah,
-                    currentPlayingAyahs = currentPlayingAyahs,
+                    currentPlayingSurahNumber = num,
+                    currentPlayingSurah = null,
+                    currentPlayingAyahs = null,
                     showFabVisible = showFabVisible,
                     selectedArabicFont = selectedArabicFont,
                     arabicFontSize = arabicFontSize,
@@ -864,6 +908,7 @@ fun SurahDetailScreen(
                     onMushafPageChange = { page -> viewModel.saveLastMushafPage(surahNumber, page) },
                     modifier = Modifier
                 )
+                }
             }
             is SurahDetailUiState.Error -> {
                 Box(
@@ -918,11 +963,13 @@ fun SurahDetailScreen(
             collapseProgress = collapseProgress.value,
             isCollapsed = isCollapsed.value,
             surahName = when (uiState) {
-                is SurahDetailUiState.Success -> (uiState as SurahDetailUiState.Success).surah.nameEnglish
+                is SurahDetailUiState.Success -> (surahCache[currentPlayingSurahNumber]?.first
+                    ?: (uiState as SurahDetailUiState.Success).surah).nameEnglish
                 else -> ""
             },
             surahNameArabic = when (uiState) {
-                is SurahDetailUiState.Success -> (uiState as SurahDetailUiState.Success).surah.nameArabic
+                is SurahDetailUiState.Success -> (surahCache[currentPlayingSurahNumber]?.first
+                    ?: (uiState as SurahDetailUiState.Success).surah).nameArabic
                 else -> ""
             },
             currentTranslation = currentTranslation,
@@ -940,20 +987,14 @@ fun SurahDetailScreen(
                 }
             },
             onBookmarkClick = {
-                // Only toggle bookmark if we have a valid news resource ID
-                if (newsResourceId != null) {
-                    val oldState = isBookmarked
-                    val newState = !oldState
-                    isBookmarked = newState
-                    android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "👆 CLICK | surah=$surahNumber | newsResourceId=$newsResourceId | old_state=$oldState | new_state=$newState")
+                val oldState = isBookmarked
+                val newState = !oldState
+                isBookmarked = newState
+                android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "👆 CLICK | surah=$surahNumber | bookmarkId=$bookmarkId | old_state=$oldState | new_state=$newState")
 
-                    // Update bookmark in UserDataRepository (correct repository for news bookmarks)
-                    coroutineScope.launch {
-                        userDataRepository.setNewsResourceBookmarked(newsResourceId, newState)
-                        android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "✅ CLICK_COMPLETE | surah=$surahNumber | newsResourceId=$newsResourceId | state=$newState")
-                    }
-                } else {
-                    android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "⚠️ CLICK_IGNORED | surah=$surahNumber | no newsResourceId")
+                coroutineScope.launch {
+                    userDataRepository.setNewsResourceBookmarked(bookmarkId, newState)
+                    android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "✅ CLICK_COMPLETE | surah=$surahNumber | bookmarkId=$bookmarkId | state=$newState")
                 }
             },
             onMoreClick = {
@@ -970,7 +1011,11 @@ fun SurahDetailScreen(
 
         // Floating Surah name that moves from info card to toolbar when scrolling
         if (uiState is SurahDetailUiState.Success && showTopBar.value) {
-            val surah = (uiState as SurahDetailUiState.Success).surah
+            // Prefer the currently-playing surah from the cache so the floating
+            // name matches the AlbumInfoCard / mini-bar when audio advances to a
+            // different surah than the route param.
+            val surah = surahCache[currentPlayingSurahNumber]?.first
+                ?: (uiState as SurahDetailUiState.Success).surah
             val density = LocalDensity.current
             val localConfig = LocalConfiguration.current
             val localIsLandscape = localConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -1842,6 +1887,26 @@ private fun AlbumPlayerContent(
                             }
                         }
                     }
+                }
+
+                // Floating Ayahs/Mushaf reading-mode toggle — mirrors the FAB on the left side of the info card
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showFabVisible && !showMusicPlayer,
+                    enter = scaleIn(
+                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+                    exit = scaleOut(
+                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                    ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset(y = (-168.dp))
+                        .padding(start = 12.dp)
+                ) {
+                    ReadingModeToggle(
+                        isMushafMode = continuousReadingMode,
+                        onToggle = onToggleContinuousReadingMode
+                    )
                 }
 
                 // FAB positioned with more overlap on the info card
@@ -5269,5 +5334,115 @@ object MushafKeyBus {
         val handler = prev ?: return false
         handler()
         return true
+    }
+}
+
+@Composable
+private fun ReadingModeToggle(
+    isMushafMode: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val pillShape = RoundedCornerShape(percent = 50)
+
+    // Selection position: 0f = Ayahs (left), 1f = Mushaf (right)
+    val selectionFraction by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isMushafMode) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.75f,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+        ),
+        label = "selectionSlide"
+    )
+
+    Surface(
+        modifier = modifier
+            .height(52.dp)
+            .width(240.dp),
+        shape = pillShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shadowElevation = 8.dp
+    ) {
+        BoxWithConstraints(modifier = Modifier.padding(5.dp)) {
+            val segmentWidth = maxWidth / 2f
+            val indicatorOffset = segmentWidth * selectionFraction
+
+            // Sliding selection indicator
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(segmentWidth)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.primary, pillShape)
+            )
+
+            Row(modifier = Modifier.fillMaxSize()) {
+                ReadingModeSegment(
+                    icon = Icons.Default.ViewDay,
+                    label = "Ayahs",
+                    selectionFraction = 1f - selectionFraction,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (isMushafMode) {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            onToggle()
+                        }
+                    }
+                )
+                ReadingModeSegment(
+                    icon = Icons.Default.MenuBook,
+                    label = "Mushaf",
+                    selectionFraction = selectionFraction,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (!isMushafMode) {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            onToggle()
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReadingModeSegment(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    selectionFraction: Float,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val contentColor = androidx.compose.ui.graphics.lerp(onSurfaceVariant, onPrimary, selectionFraction)
+    Row(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = contentColor,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = label,
+            color = contentColor,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }
