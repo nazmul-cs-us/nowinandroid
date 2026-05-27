@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.CallReceived
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
@@ -277,6 +278,8 @@ fun HadithDetailScreen(
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var textToSpeech by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsInitialized by remember { mutableStateOf(false) }
+    // When on, hitting the end of a hadith auto-advances to the next one.
+    var autoAdvance by remember { mutableStateOf(false) }
 
     // On-demand audio download state
     var isDownloadingAudio by remember { mutableStateOf(false) }
@@ -321,8 +324,11 @@ fun HadithDetailScreen(
     // down the old audio silently, then auto-resume on the freshly loaded hadith.
     androidx.compose.runtime.LaunchedEffect(hadithNumber) {
         if (prevHadithNumberRef != hadithNumber) {
-            shouldAutoPlayAfterLoad = isPlaying
-            if (isPlaying) suppressStopNotification = true
+            // Auto-resume if the user was playing OR if continuous-play toggle is on.
+            // Continuous-play covers the natural-end case where isPlaying is already
+            // false by the time onCompletionListener bumps the hadith number.
+            shouldAutoPlayAfterLoad = isPlaying || autoAdvance
+            if (isPlaying || autoAdvance) suppressStopNotification = true
             mediaPlayer?.stop()
             mediaPlayer?.release()
             mediaPlayer = null
@@ -587,6 +593,7 @@ fun HadithDetailScreen(
                                                     mp.release()
                                                     mediaPlayer = null
                                                     isPlaying = false
+                                                    if (autoAdvance) handleSkipNext()
                                                 }
                                                 setOnErrorListener { mp, _, _ ->
                                                     mp.release()
@@ -652,6 +659,7 @@ fun HadithDetailScreen(
                                                                     mp.release()
                                                                     mediaPlayer = null
                                                                     isPlaying = false
+                                                                    if (autoAdvance) handleSkipNext()
                                                                 }
                                                                 setOnErrorListener { mp, _, _ ->
                                                                     mp.release()
@@ -825,6 +833,8 @@ fun HadithDetailScreen(
                                 isLandscape = isLandscape,
                                 isPlaying = if (num == hadithNumber) isPlaying else false,
                                 onPlayClick = handlePlayClick,
+                                autoAdvance = autoAdvance,
+                                onToggleAutoAdvance = { autoAdvance = !autoAdvance },
                             )
                         }
                     }
@@ -968,7 +978,9 @@ private fun HadithContent(
     onLanguageClick: () -> Unit = {},
     isLandscape: Boolean = false,
     isPlaying: Boolean = false,
-    onPlayClick: () -> Unit = {}
+    onPlayClick: () -> Unit = {},
+    autoAdvance: Boolean = false,
+    onToggleAutoAdvance: () -> Unit = {},
 ) {
     val context = LocalContext.current
 
@@ -1168,7 +1180,9 @@ private fun HadithContent(
                                     HadithPlayerControls(
                                         isPlaying = isPlaying,
                                         onPlayPauseClick = onPlayClick,
-                                        onCollapse = { showMusicPlayer = false }
+                                        onCollapse = { showMusicPlayer = false },
+                                        autoAdvance = autoAdvance,
+                                        onToggleAutoAdvance = onToggleAutoAdvance,
                                     )
                                 } else {
                                     Surface(
@@ -2345,6 +2359,8 @@ private fun HadithPlayerControls(
     isPlaying: Boolean,
     onPlayPauseClick: () -> Unit,
     onCollapse: () -> Unit,
+    autoAdvance: Boolean,
+    onToggleAutoAdvance: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -2392,19 +2408,19 @@ private fun HadithPlayerControls(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 48.dp),
+                    .padding(horizontal = 28.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
                     onClick = onPlayPauseClick,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Replay,
                         contentDescription = "Replay",
                         tint = contentColor,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
@@ -2421,17 +2437,29 @@ private fun HadithPlayerControls(
                 }
 
                 IconButton(
+                    onClick = onToggleAutoAdvance,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Repeat,
+                        contentDescription = if (autoAdvance) "Auto-advance on" else "Auto-advance off",
+                        tint = if (autoAdvance) MaterialTheme.colorScheme.primary else contentColor.copy(alpha = 0.5f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                IconButton(
                     onClick = {
                         if (isPlaying) onPlayPauseClick()
                         onCollapse()
                     },
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Stop,
                         contentDescription = "Stop",
                         tint = contentColor,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
