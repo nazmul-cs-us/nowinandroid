@@ -32,6 +32,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.Orientation
 import kotlin.math.sqrt
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -50,6 +51,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Spellcheck
 import androidx.compose.material.icons.rounded.Bookmark
@@ -384,6 +386,11 @@ fun SurahDetailScreen(
     var playbackService by remember { mutableStateOf<QuranPlaybackService?>(null) }
     var currentProgress by remember { mutableStateOf(0f) }
 
+    // Audio recitation tracking — fetch per-ayah timings on surah change and
+    // compute the ayah currently being recited from playback position.
+    var ayahTimings by remember { mutableStateOf<List<com.starception.submission.core.qurandatabase.AyahTiming>>(emptyList()) }
+    var currentRecitingAyah by remember { mutableStateOf<Int?>(null) }
+
     // Track current playing surah number for updating AlbumInfoCard when next/previous is pressed
     var currentPlayingSurahNumber by remember { mutableStateOf(surahNumber) }
 
@@ -409,6 +416,15 @@ fun SurahDetailScreen(
     // own (preloaded) data — same pattern as DuaDetailScreen's HorizontalPager
     // and HadithDetailScreen's swipe transition.
     val surahCache = remember { androidx.compose.runtime.mutableStateMapOf<Int, Pair<Surah, List<Ayah>>>() }
+
+    // Fetch per-ayah timings for the currently playing surah so we can highlight
+    // the ayah being recited as audio plays.
+    LaunchedEffect(currentPlayingSurahNumber) {
+        ayahTimings = com.starception.submission.core.qurandatabase
+            .AyahTimingRepository.getTimings(currentPlayingSurahNumber)
+        currentRecitingAyah = null
+    }
+
     // Preload the current and neighbouring surahs (clamped to 1..114).
     LaunchedEffect(currentPlayingSurahNumber) {
         listOf(currentPlayingSurahNumber - 1, currentPlayingSurahNumber, currentPlayingSurahNumber + 1)
@@ -532,6 +548,12 @@ fun SurahDetailScreen(
                 playbackService?.onProgressChanged = { position, duration ->
                     if (duration > 0) {
                         currentProgress = position.toFloat() / duration.toFloat()
+                    }
+                    // Map current ms → ayah number using cached timings.
+                    val nowAyah = com.starception.submission.core.qurandatabase
+                        .AyahTimingRepository.findAyahAt(ayahTimings, position.toLong())
+                    if (nowAyah != currentRecitingAyah) {
+                        currentRecitingAyah = nowAyah
                     }
                 }
 
@@ -750,7 +772,22 @@ fun SurahDetailScreen(
                     // immediately shows the new surah while sliding in.
                     val cached = surahCache[num]
                     val pageSurah = cached?.first ?: state.surah
-                    val pageAyahs = cached?.second ?: state.ayahs
+                    val baseAyahs = cached?.second ?: state.ayahs
+                    // Swap Arabic text to the IndoPak edition when an IndoPak font is
+                    // selected, so the "extra alif" issue from Uthmani text rendered in
+                    // an IndoPak font goes away (matches quran.com IndoPak reading mode).
+                    val pageAyahs = remember(num, baseAyahs, selectedArabicFont) {
+                        if (selectedArabicFont == "pdms_saleem" || selectedArabicFont == "indopak_script") {
+                            val indoPakTexts = com.starception.submission.core.qurandatabase
+                                .IndoPakTextRepository.getInstance(context)
+                                .getSurahTexts(num)
+                            if (indoPakTexts.isEmpty()) baseAyahs
+                            else baseAyahs.map { ayah ->
+                                val ip = indoPakTexts[ayah.numberInSurah]
+                                if (ip != null) ayah.copy(text = ip) else ayah
+                            }
+                        } else baseAyahs
+                    }
                 AlbumPlayerContent(
                     surah = pageSurah,
                     ayahs = pageAyahs,
@@ -906,6 +943,7 @@ fun SurahDetailScreen(
                     continuousReadingMode = continuousReadingMode,
                     initialMushafPage = viewModel.getLastMushafPage(surahNumber),
                     onMushafPageChange = { page -> viewModel.saveLastMushafPage(surahNumber, page) },
+                    currentRecitingAyah = currentRecitingAyah,
                     modifier = Modifier
                 )
                 }
@@ -1009,7 +1047,7 @@ fun SurahDetailScreen(
         )
         }
 
-        // Floating Surah name that moves from info card to toolbar when scrolling
+        // Floating Surah name that moves from info card to toolbar when scrolling.
         if (uiState is SurahDetailUiState.Success && showTopBar.value) {
             // Prefer the currently-playing surah from the cache so the floating
             // name matches the AlbumInfoCard / mini-bar when audio advances to a
@@ -1021,7 +1059,8 @@ fun SurahDetailScreen(
             val localIsLandscape = localConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
             // Calculate positions once (stable values)
-            val albumHeaderHeight = if (localIsLandscape) 200 else localConfig.screenWidthDp
+            // Album art is height(160) in landscape, 4/3 (width/height) ratio portrait — height = width * 3/4.
+            val albumHeaderHeight = if (localIsLandscape) 160 else (localConfig.screenWidthDp * 3 / 4)
             // Start floating names higher (12dp) to ensure good separation from translation text below
             val headerYPx = with(density) { (albumHeaderHeight + 12).dp.toPx() }
             val toolbarYPx = with(density) { 24.dp.toPx() }  // Stop at toolbar level (locked position)
@@ -1144,100 +1183,232 @@ fun SurahDetailScreen(
             )
         }
 
-        // Bottom floating toolbar - replaces navigation bar when More is clicked
-        if (showFloatingToolbar) {
-            // Scrim to dismiss on tap outside
+        // Reading settings sheet — slides in/out from the right with a subtle
+        // scrim fade, replacing the bottom toolbar when More is tapped.
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showFloatingToolbar,
+            enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)),
+            exit = androidx.compose.animation.fadeOut(animationSpec = tween(180)),
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.25f))
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
                     ) { showFloatingToolbar = false }
             )
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showFloatingToolbar,
+            enter = androidx.compose.animation.slideInHorizontally(
+                initialOffsetX = { it },
+                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+            ) + androidx.compose.animation.fadeIn(animationSpec = tween(220)),
+            exit = androidx.compose.animation.slideOutHorizontally(
+                targetOffsetX = { it },
+                animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+            ) + androidx.compose.animation.fadeOut(animationSpec = tween(200)),
+            modifier = Modifier.align(Alignment.CenterEnd),
+        ) {
 
-            // Bottom toolbar container - positioned at bottom, hiding navigation bar
+            // Fade the sheet to ~25% alpha while the user is changing text size
+            // (slider drag or +/- tap) so they can see the effect on the ayahs
+            // behind the sheet without dismissing it.
+            val sliderInteractionSource = remember { MutableInteractionSource() }
+            val isSliderDragged by sliderInteractionSource.collectIsDraggedAsState()
+            var fontSizeBumpTick by remember { mutableStateOf(0) }
+            var fontSizeBumpActive by remember { mutableStateOf(false) }
+            LaunchedEffect(fontSizeBumpTick) {
+                if (fontSizeBumpTick > 0) {
+                    fontSizeBumpActive = true
+                    kotlinx.coroutines.delay(700)
+                    fontSizeBumpActive = false
+                }
+            }
+            val showThrough = isSliderDragged || fontSizeBumpActive
+            val sheetAlpha by animateFloatAsState(
+                targetValue = if (showThrough) 0.25f else 1f,
+                animationSpec = tween(durationMillis = if (showThrough) 100 else 240),
+                label = "sheetAlpha",
+            )
+
+            // Tesla-style sheet: minimal, near-black surface, hairline border,
+            // no tonal tints. All accents are neutral grays / whites.
             Surface(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .navigationBarsPadding(),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 3.dp
+                    .fillMaxHeight()
+                    .width(248.dp)
+                    .padding(vertical = 12.dp, horizontal = 8.dp)
+                    .navigationBarsPadding()
+                    .statusBarsPadding()
+                    .graphicsLayer { alpha = sheetAlpha },
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                tonalElevation = 0.dp,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                ),
             ) {
-                Row(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 12.dp)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
                 ) {
-                    // Font Size controls
-                    BottomToolbarItem(
-                        icon = Icons.Default.TextDecrease,
-                        label = "A-",
-                        onClick = { if (arabicFontSize > minFontSize) viewModel.changeArabicFontSize(arabicFontSize - 2f) },
-                        enabled = arabicFontSize > minFontSize
-                    )
-
-                    BottomToolbarItem(
-                        icon = Icons.Default.TextIncrease,
-                        label = "A+",
-                        onClick = { if (arabicFontSize < maxFontSize) viewModel.changeArabicFontSize(arabicFontSize + 2f) },
-                        enabled = arabicFontSize < maxFontSize
-                    )
-
-                    // Divider
-                    Box(
+                    // ─── Header ───
+                    Row(
                         modifier = Modifier
-                            .width(1.dp)
-                            .height(32.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant)
+                            .fillMaxWidth()
+                            .padding(start = 18.dp, end = 8.dp, top = 40.dp, bottom = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "READING SETTINGS",
+                            style = MaterialTheme.typography.titleSmall.copy(letterSpacing = 1.6.sp),
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        IconButton(
+                            onClick = { showFloatingToolbar = false },
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+
+                    // ─── Reading mode ───
+                    SettingsSectionLabel("Reading mode")
+                    SettingsListRow(
+                        leadingIcon = if (continuousReadingMode) Icons.Default.AutoStories else Icons.Default.ViewDay,
+                        title = "Mushaf page",
+                        subtitle = if (continuousReadingMode) "Single justified page" else "One ayah per line",
+                        trailing = {
+                            Switch(
+                                checked = continuousReadingMode,
+                                onCheckedChange = { viewModel.toggleContinuousReadingMode() },
+                                colors = teslaSwitchColors(),
+                            )
+                        },
+                        onClick = { viewModel.toggleContinuousReadingMode() },
                     )
 
-                    // Alignment buttons
-                    BottomToolbarItem(
-                        icon = Icons.Default.FormatAlignLeft,
-                        label = "Left",
-                        onClick = { viewModel.changeTextAlignment("start") },
-                        isActive = textAlignment == "start"
-                    )
-
-                    BottomToolbarItem(
-                        icon = Icons.Default.FormatAlignCenter,
-                        label = "Center",
-                        onClick = { viewModel.changeTextAlignment("center") },
-                        isActive = textAlignment == "center"
-                    )
-
-                    BottomToolbarItem(
-                        icon = Icons.Default.FormatAlignRight,
-                        label = "Right",
-                        onClick = { viewModel.changeTextAlignment("end") },
-                        isActive = textAlignment == "end"
-                    )
-
-                    // Divider
-                    Box(
+                    // ─── Text size — leading "A−", slider, trailing "A+", value pill ───
+                    SettingsSectionLabel("Text size")
+                    Row(
                         modifier = Modifier
-                            .width(1.dp)
-                            .height(32.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant)
-                    )
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        IconButton(
+                            onClick = {
+                                if (arabicFontSize > minFontSize) viewModel.changeArabicFontSize(arabicFontSize - 2f)
+                                fontSizeBumpTick++
+                            },
+                            enabled = arabicFontSize > minFontSize,
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Text(
+                                text = "A−",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = if (arabicFontSize > minFontSize)
+                                    MaterialTheme.colorScheme.onSurface
+                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                            )
+                        }
+                        Slider(
+                            value = arabicFontSize,
+                            onValueChange = { viewModel.changeArabicFontSize(it.coerceIn(minFontSize, maxFontSize)) },
+                            valueRange = minFontSize..maxFontSize,
+                            modifier = Modifier.weight(1f),
+                            colors = teslaSliderColors(),
+                            interactionSource = sliderInteractionSource,
+                        )
+                        IconButton(
+                            onClick = {
+                                if (arabicFontSize < maxFontSize) viewModel.changeArabicFontSize(arabicFontSize + 2f)
+                                fontSizeBumpTick++
+                            },
+                            enabled = arabicFontSize < maxFontSize,
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Text(
+                                text = "A+",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (arabicFontSize < maxFontSize)
+                                    MaterialTheme.colorScheme.onSurface
+                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                            )
+                        }
+                    }
 
-                    // Translation toggle
-                    BottomToolbarItem(
-                        icon = if (showTranslationInText) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                        label = "Trans",
+                    // ─── Alignment ───
+                    SettingsSectionLabel("Alignment")
+                    @OptIn(ExperimentalMaterial3Api::class)
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 4.dp),
+                    ) {
+                        val opts = listOf(
+                            Triple(Icons.Default.FormatAlignLeft, "Left", "start"),
+                            Triple(Icons.Default.FormatAlignCenter, "Center", "center"),
+                            Triple(Icons.Default.FormatAlignRight, "Right", "end"),
+                        )
+                        opts.forEachIndexed { i, (icon, _, value) ->
+                            SegmentedButton(
+                                selected = textAlignment == value,
+                                onClick = { viewModel.changeTextAlignment(value) },
+                                shape = SegmentedButtonDefaults.itemShape(index = i, count = opts.size),
+                                icon = {},
+                            ) {
+                                Icon(icon, contentDescription = value, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    // ─── Display ───
+                    SettingsSectionLabel("Display")
+                    SettingsListRow(
+                        leadingIcon = Icons.Default.Translate,
+                        title = "Translation",
+                        subtitle = "Show inline with each ayah",
+                        trailing = {
+                            Switch(
+                                checked = showTranslationInText,
+                                onCheckedChange = { viewModel.changeShowTranslation(it) },
+                                colors = teslaSwitchColors(),
+                            )
+                        },
                         onClick = { viewModel.changeShowTranslation(!showTranslationInText) },
-                        isActive = showTranslationInText
                     )
-
-                    // Tajweed toggle
-                    BottomToolbarItem(
-                        icon = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
-                        label = "Tajweed",
+                    SettingsListRow(
+                        leadingIcon = Icons.Rounded.CheckCircleOutline,
+                        title = "Tajweed",
+                        subtitle = "Color-coded recitation rules",
+                        trailing = {
+                            Switch(
+                                checked = showTajweed,
+                                onCheckedChange = {
+                                    if (!showTajweed && !viewModel.isTajweedAvailable) {
+                                        Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        viewModel.changeTajweed(it)
+                                    }
+                                },
+                                colors = teslaSwitchColors(),
+                            )
+                        },
                         onClick = {
                             if (!showTajweed && !viewModel.isTajweedAvailable) {
                                 Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
@@ -1245,37 +1416,60 @@ fun SurahDetailScreen(
                                 viewModel.changeTajweed(!showTajweed)
                             }
                         },
-                        isActive = showTajweed
                     )
 
-                    // Continuous (Mushaf) reading mode toggle
-                    BottomToolbarItem(
-                        icon = if (continuousReadingMode) Icons.Default.MenuBook else Icons.Default.ViewDay,
-                        label = if (continuousReadingMode) "Mushaf" else "Ayahs",
-                        onClick = { viewModel.toggleContinuousReadingMode() },
-                        isActive = continuousReadingMode
+                    // ─── Language & Font ───
+                    SettingsSectionLabel("Language & Font")
+                    SettingsListRow(
+                        leadingIcon = Icons.Default.Language,
+                        title = "Translation language",
+                        subtitle = when (currentTranslation) {
+                            "ar" -> "Arabic"
+                            "transliteration" -> "Transliteration"
+                            "bn" -> "Bengali"
+                            "zh" -> "Chinese"
+                            "en" -> "English"
+                            "es" -> "Spanish"
+                            "fr" -> "French"
+                            "id" -> "Indonesian"
+                            "ru" -> "Russian"
+                            "sv" -> "Swedish"
+                            "tr" -> "Turkish"
+                            "ur" -> "Urdu"
+                            else -> "Choose language"
+                        },
+                        trailing = {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        },
+                        onClick = { showTranslationDialog = true },
                     )
-
-                    // Font selection
-                    BottomToolbarItem(
-                        icon = Icons.Default.FontDownload,
-                        label = when (selectedArabicFont) {
+                    SettingsListRow(
+                        leadingIcon = Icons.Default.FontDownload,
+                        title = "Arabic font",
+                        subtitle = when (selectedArabicFont) {
                             "pdms_saleem" -> "Saleem"
                             "noor_e_hidayat" -> "Noor"
                             "thabit" -> "Thabit"
                             "uthmani_script" -> "Uthmani"
                             "indopak_script" -> "IndoPak"
-                            else -> "Font"
+                            else -> "Choose font"
                         },
-                        onClick = { showFontDialog = true }
+                        trailing = {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        },
+                        onClick = { showFontDialog = true },
                     )
-
-                    // Close button
-                    BottomToolbarItem(
-                        icon = Icons.Default.Close,
-                        label = "Close",
-                        onClick = { showFloatingToolbar = false }
-                    )
+                    Spacer(Modifier.height(20.dp))
                 }
             }
         }
@@ -1364,6 +1558,7 @@ private fun AlbumPlayerTopBar(
     onTajweedClick: () -> Unit = {},
     onBookmarkClick: () -> Unit = {},
     onMoreClick: () -> Unit = {},
+    onAllSurahsClick: () -> Unit = onBackClick,
     modifier: Modifier = Modifier
 ) {
     // Smooth transition based on collapseProgress (0 = transparent, 1 = solid)
@@ -1430,11 +1625,11 @@ private fun AlbumPlayerTopBar(
     val remainingWidth = availableWidthDp - moreButtonSize
     val maxIconsThatFit = (remainingWidth / iconButtonSize).toInt().coerceAtLeast(0)
 
-    // Priority order: Translation, Bookmark, Font, Tajweed
-    // Show as many as can fit, rest go to overflow menu
-    val showTranslation = maxIconsThatFit >= 1
+    // Translation and font are accessible via the Reading Settings side sheet
+    // (More menu); keep them off the toolbar so it stays uncluttered.
+    val showTranslation = false
     val showBookmark = maxIconsThatFit >= 2
-    val showFont = maxIconsThatFit >= 3
+    val showFont = false
     val showTajweedButton = maxIconsThatFit >= 4
 
     Surface(
@@ -1447,8 +1642,8 @@ private fun AlbumPlayerTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
-                .padding(horizontal = 4.dp),
+                .height(48.dp)
+                .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -1473,6 +1668,7 @@ private fun AlbumPlayerTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(0.dp)
             ) {
+                if (true) {
                 // Translation button - shown if space allows (priority 1)
                 if (showTranslation) {
                     Surface(
@@ -1558,6 +1754,7 @@ private fun AlbumPlayerTopBar(
                         )
                     }
                 }
+                } // end hidden actions block
 
                 // More options menu - always shown (floating toolbar has all options)
                 IconButton(
@@ -1638,6 +1835,8 @@ private fun AlbumPlayerContent(
     continuousReadingMode: Boolean = false,
     initialMushafPage: Int = 0,
     onMushafPageChange: (Int) -> Unit = {},
+    /** numberInSurah of the ayah currently being recited (audio sync), or null. */
+    currentRecitingAyah: Int? = null,
     modifier: Modifier = Modifier
 ) {
     // Use current playing surah/ayahs if available, otherwise use original
@@ -1889,9 +2088,10 @@ private fun AlbumPlayerContent(
                     }
                 }
 
-                // Floating Ayahs/Mushaf reading-mode toggle — mirrors the FAB on the left side of the info card
+                // Floating Ayahs/Mushaf reading-mode toggle — hidden; mode is
+                // accessible via the More menu's floating bottom toolbar.
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = showFabVisible && !showMusicPlayer,
+                    visible = false,
                     enter = scaleIn(
                         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
                     ) + fadeIn(animationSpec = tween(durationMillis = 300)),
@@ -2003,6 +2203,7 @@ private fun AlbumPlayerContent(
                     tajweedAnnotations = tajweedAnnotations[ayah.numberInSurah],
                     isFavourite = ayah.numberInSurah in favouriteAyahs,
                     hasNote = ayah.numberInSurah in ayahsWithNotes,
+                    isReciting = currentRecitingAyah == ayah.numberInSurah,
                     onClick = { onAyahClick(ayah) },
                     onLongPress = {
                         selectedAyahForOptions = ayah.numberInSurah
@@ -3363,9 +3564,9 @@ private fun AlbumHeader(
             .fillMaxWidth()
             .then(
                 if (isLandscape) {
-                    Modifier.height(200.dp) // Limited height in landscape
+                    Modifier.height(160.dp) // Limited height in landscape
                 } else {
-                    Modifier.aspectRatio(1f) // Square album cover in portrait
+                    Modifier.aspectRatio(4f / 3f) // Shortened portrait album cover (was square)
                 }
             )
             .background(MaterialTheme.colorScheme.surfaceContainerHigh) // Match info card background
@@ -3395,20 +3596,23 @@ private fun AlbumInfoCard(
     topics: List<com.starception.submission.core.topicsdatabase.Topic> = emptyList(),
     onTopicClick: (String) -> Unit = {},
     courseCompletionInfo: CourseCompletionInfo? = null,
+    // Inline player + reading-mode controls (new design): title/subtitle on the
+    // left, segmented Ayahs/Mushaf toggle in the middle, square play button on
+    // the right, with a thin progress bar below.
+    isMushafMode: Boolean = false,
+    onToggleMode: () -> Unit = {},
+    isPlaying: Boolean = false,
+    onPlayClick: () -> Unit = {},
+    currentProgress: Float = 0f,
 ) {
-    // Use MaterialTheme.colorScheme for automatic theme support
-    // NOTE: Surah names are now handled by the floating overlay for smooth scroll transition
-    // Using surfaceContainer for better contrast with ayah background (surfaceContainerHigh)
+    // Original layout: spacer for floating surah-name overlay at top, then
+    // translation text + optional course badge + info chips at the bottom.
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight() // Fill parent Box container (196dp)
+            .fillMaxHeight()
     ) {
-        // Dynamic spacer height based on whether course badge exists
-        // Spacer creates room for floating names (English + Arabic)
-        // When course badge exists, need more space to separate from badge content
-        // When no badge, less space needed for cleaner appearance
         val floatingNameSpacerHeight = if (courseCompletionInfo != null) 72.dp else 44.dp
 
         Column(
@@ -3416,71 +3620,58 @@ private fun AlbumInfoCard(
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
                 .padding(top = 10.dp, bottom = 4.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            // Top section: Spacer for floating overlay (item 3: Al-Fatihah / الفاتحة)
-            // Height is dynamic based on whether course badge exists
             Spacer(Modifier.height(floatingNameSpacerHeight))
 
-            // Bottom section: Translation + Course badge + Chips grouped together
-            // Consistent spacing for proper separation
             Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                // Item 4: Translation
                 if (surah.nameTranslation.isNotBlank()) {
                     Text(
                         text = "\"${surah.nameTranslation}\"",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
                     )
                 }
 
-                // Course completion badge (if applicable)
                 if (courseCompletionInfo != null) {
                     NiaVerifiedTag(
                         onClick = { },
                         enabled = true,
                         text = {
-                            Text(
-                                text = courseCompletionInfo.courseName.uppercase(Locale.getDefault())
-                            )
-                        }
+                            Text(text = courseCompletionInfo.courseName.uppercase(Locale.getDefault()))
+                        },
                     )
                 }
 
-                // Item 5: Chips row - 7 AYAHS, MECCAN on left | HOLY QURAN on right
-                // Use weight to prevent shrinking of info chips
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Left side - Info chips (fixed size, should not shrink)
                     Row(
                         modifier = Modifier.wrapContentWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         InfoChip(text = "${surah.ayahCount} Ayahs")
                         InfoChip(text = surah.revelationType)
                     }
-
-                    // Right side - Topic tags (can wrap if needed)
                     Row(
                         modifier = Modifier.wrapContentWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         if (topics.isNotEmpty()) {
                             topics.forEach { topic ->
                                 NiaTopicTag(
                                     followed = true,
                                     onClick = { onTopicClick(topic.id) },
-                                    text = {
-                                        Text(text = topic.name.uppercase(Locale.getDefault()))
-                                    }
+                                    text = { Text(text = topic.name.uppercase(Locale.getDefault())) },
                                 )
                             }
+                        } else {
+                            InfoChip(text = "Holy Quran")
                         }
                     }
                 }
@@ -3497,6 +3688,127 @@ private fun InfoChip(text: String) {
         enabled = true  // Changed from false to true for better visibility
     ) {
         Text(text = text.uppercase(Locale.getDefault()))
+    }
+}
+
+/**
+ * Compact Ayahs/Mushaf segmented control for inline use inside AlbumInfoCard.
+ * Same animated sliding indicator as ReadingModeToggle but sized to fit a row.
+ */
+@Composable
+private fun InlineReadingModeToggle(
+    isMushafMode: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val pillShape = RoundedCornerShape(percent = 50)
+    val selectionFraction by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isMushafMode) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.75f,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+        ),
+        label = "inlineSelectionSlide",
+    )
+
+    Surface(
+        modifier = modifier
+            .height(40.dp)
+            .width(168.dp),
+        shape = pillShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    ) {
+        BoxWithConstraints(modifier = Modifier.padding(4.dp)) {
+            val segmentWidth = maxWidth / 2f
+            val indicatorOffset = segmentWidth * selectionFraction
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(segmentWidth)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.primary, pillShape),
+            )
+            Row(modifier = Modifier.fillMaxSize()) {
+                InlineReadingModeSegment(
+                    label = "Ayahs",
+                    selectionFraction = 1f - selectionFraction,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (isMushafMode) {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            onToggle()
+                        }
+                    },
+                )
+                InlineReadingModeSegment(
+                    label = "Mushaf",
+                    selectionFraction = selectionFraction,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (!isMushafMode) {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            onToggle()
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InlineReadingModeSegment(
+    label: String,
+    selectionFraction: Float,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val contentColor = androidx.compose.ui.graphics.lerp(onSurfaceVariant, onPrimary, selectionFraction)
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = contentColor,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+/** Rounded-square play/pause button used in the inline AlbumInfoCard layout. */
+@Composable
+private fun SquarePlayButton(
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.size(52.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Icon(
+                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = if (isPlaying) "Pause" else "Play",
+                modifier = Modifier.size(28.dp),
+            )
+        }
     }
 }
 
@@ -4012,6 +4324,8 @@ private fun MushafPagerView(
                         var directionDecided = false
                         var isVerticalScroll = false
                         var horizontalDragTotal = 0f
+                        var verticalDragTotal = 0f
+                        var isUpwardSwipe = false
                         val touchSlop = viewConfiguration.touchSlop
 
                         do {
@@ -4031,12 +4345,26 @@ private fun MushafPagerView(
                                     if (totalMove > touchSlop) {
                                         directionDecided = true
                                         isVerticalScroll = totalDy > totalDx
+                                        if (isVerticalScroll) {
+                                            // Initial vertical direction wins;
+                                            // upward = page turn (consumed),
+                                            // downward = pass through to parent.
+                                            isUpwardSwipe = delta.y < 0
+                                        }
                                     }
                                 }
 
                                 if (directionDecided && !isVerticalScroll) {
                                     change.consume()
                                     horizontalDragTotal += delta.x
+                                } else if (directionDecided && isVerticalScroll && isUpwardSwipe) {
+                                    // Upward: own the gesture so the page
+                                    // stays still while the user flicks up.
+                                    change.consume()
+                                    verticalDragTotal += delta.y
+                                } else if (directionDecided && isVerticalScroll) {
+                                    // Downward: don't consume — parent scrolls.
+                                    verticalDragTotal += delta.y
                                 }
                             }
                         } while (event.changes.any { it.pressed })
@@ -4048,7 +4376,15 @@ private fun MushafPagerView(
                             } else if (horizontalDragTotal > swipeThreshold) {
                                 scope.launch { state.prev() }
                             }
+                        } else if (directionDecided && isVerticalScroll && isUpwardSwipe) {
+                            // Upward swipe → next page (20% of page height).
+                            val upThreshold = size.height * 0.20f
+                            if (verticalDragTotal < -upThreshold) {
+                                scope.launch { state.next() }
+                            }
                         }
+                        // Downward swipes are not handled here — they pass to
+                        // the parent untouched so scroll-down works normally.
                     }
                 }
         ) {
@@ -4205,13 +4541,17 @@ private fun AyahTrackItem(
     tajweedAnnotations: List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>? = null,
     isFavourite: Boolean = false,
     hasNote: Boolean = false,
+    isReciting: Boolean = false,
     onClick: () -> Unit,
     onLongPress: () -> Unit = {},
     onDoubleTap: () -> Unit = {}
 ) {
-    // Use MaterialTheme.colorScheme for automatic theme support
+    // Soft tint when this ayah is the one currently being recited.
+    val highlightColor = if (isReciting) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+    } else Color.Transparent
     Surface(
-        color = Color.Transparent,
+        color = highlightColor,
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
@@ -4637,6 +4977,195 @@ private fun FloatingToolbarButton(
  * Bottom toolbar item - used in the bottom floating toolbar
  * Displays an icon with a small label below it
  */
+@Composable
+private fun SettingsSectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text.uppercase(Locale.getDefault()),
+        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.6.sp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        fontWeight = FontWeight.Normal,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 14.dp, top = 22.dp, bottom = 6.dp),
+    )
+}
+
+@Composable
+private fun SettingsListRow(
+    leadingIcon: ImageVector,
+    title: String,
+    subtitle: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    onClick: () -> Unit = {},
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Icon(
+            imageVector = leadingIcon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        trailing?.invoke()
+    }
+}
+
+/** Tesla-style monochrome Switch — neutral grays only, no primary green. */
+@Composable
+private fun teslaSwitchColors() = SwitchDefaults.colors(
+    checkedThumbColor = MaterialTheme.colorScheme.surface,
+    checkedTrackColor = MaterialTheme.colorScheme.onSurface,
+    checkedBorderColor = MaterialTheme.colorScheme.onSurface,
+    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    uncheckedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+)
+
+@Composable
+private fun teslaSliderColors() = SliderDefaults.colors(
+    thumbColor = MaterialTheme.colorScheme.onSurface,
+    activeTrackColor = MaterialTheme.colorScheme.onSurface,
+    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+)
+
+@Composable
+private fun SettingsSheetDivider() {
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .height(1.dp)
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+    )
+}
+
+@Composable
+private fun SettingsStepperButton(
+    icon: ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.height(40.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = if (enabled) MaterialTheme.colorScheme.onSurface
+                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsIconChoice(
+    icon: ImageVector,
+    contentDescription: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val container = if (selected) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.surface
+    val tint = if (selected) MaterialTheme.colorScheme.onPrimary
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = container,
+        modifier = modifier.height(40.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsRowItem(
+    icon: ImageVector,
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val container = if (active) MaterialTheme.colorScheme.primaryContainer
+    else MaterialTheme.colorScheme.surface
+    val contentColor = if (active) MaterialTheme.colorScheme.onPrimaryContainer
+    else MaterialTheme.colorScheme.onSurface
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = container,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 3.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = contentColor,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            trailing?.invoke()
+        }
+    }
+}
+
 @Composable
 private fun BottomToolbarItem(
     icon: ImageVector,

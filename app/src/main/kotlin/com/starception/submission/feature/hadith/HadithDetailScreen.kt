@@ -1108,9 +1108,9 @@ private fun HadithContent(
                                 .fillMaxWidth()
                                 .then(
                                     if (isLandscape) {
-                                        Modifier.height(200.dp)
+                                        Modifier.height(160.dp)
                                     } else {
-                                        Modifier.aspectRatio(1f)
+                                        Modifier.aspectRatio(4f / 3f)
                                     }
                                 )
                         ) {
@@ -2085,9 +2085,9 @@ private fun HadithShimmerLoading(
                         .fillMaxWidth()
                         .then(
                             if (isLandscape) {
-                                Modifier.height(200.dp)
+                                Modifier.height(160.dp)
                             } else {
-                                Modifier.aspectRatio(1f)
+                                Modifier.aspectRatio(4f / 3f)
                             }
                         )
                 ) {
