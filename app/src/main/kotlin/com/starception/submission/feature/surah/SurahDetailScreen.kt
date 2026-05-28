@@ -4325,7 +4325,6 @@ private fun MushafPagerView(
                         var isVerticalScroll = false
                         var horizontalDragTotal = 0f
                         var verticalDragTotal = 0f
-                        var isUpwardSwipe = false
                         val touchSlop = viewConfiguration.touchSlop
 
                         do {
@@ -4345,25 +4344,14 @@ private fun MushafPagerView(
                                     if (totalMove > touchSlop) {
                                         directionDecided = true
                                         isVerticalScroll = totalDy > totalDx
-                                        if (isVerticalScroll) {
-                                            // Initial vertical direction wins;
-                                            // upward = page turn (consumed),
-                                            // downward = pass through to parent.
-                                            isUpwardSwipe = delta.y < 0
                                         }
-                                    }
                                 }
 
                                 if (directionDecided && !isVerticalScroll) {
                                     change.consume()
                                     horizontalDragTotal += delta.x
-                                } else if (directionDecided && isVerticalScroll && isUpwardSwipe) {
-                                    // Upward: own the gesture so the page
-                                    // stays still while the user flicks up.
-                                    change.consume()
-                                    verticalDragTotal += delta.y
                                 } else if (directionDecided && isVerticalScroll) {
-                                    // Downward: don't consume — parent scrolls.
+                                    // Don't consume — let parent scroll first.
                                     verticalDragTotal += delta.y
                                 }
                             }
@@ -4376,15 +4364,20 @@ private fun MushafPagerView(
                             } else if (horizontalDragTotal > swipeThreshold) {
                                 scope.launch { state.prev() }
                             }
-                        } else if (directionDecided && isVerticalScroll && isUpwardSwipe) {
-                            // Upward swipe → next page (20% of page height).
-                            val upThreshold = size.height * 0.20f
-                            if (verticalDragTotal < -upThreshold) {
+                        } else if (directionDecided && isVerticalScroll) {
+                            // Only fire swipe-up → next page when the parent
+                            // LazyColumn is already at the bottom of its
+                            // scroll range (i.e., Mushaf fully takes the
+                            // viewport — nothing left to scroll). Otherwise
+                            // the parent owns the gesture and scroll up
+                            // behaves normally.
+                            val parentExhausted = parentScrollState?.canScrollForward == false
+                            val upThreshold = size.height * 0.25f
+                            if (parentExhausted && verticalDragTotal < -upThreshold) {
                                 scope.launch { state.next() }
                             }
+                            // Downward swipes never turn the page.
                         }
-                        // Downward swipes are not handled here — they pass to
-                        // the parent untouched so scroll-down works normally.
                     }
                 }
         ) {
