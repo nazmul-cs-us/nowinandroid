@@ -16,16 +16,11 @@
 
 package com.starception.submission.core.ui
 
-import android.content.ClipData
-import android.os.Build.VERSION
-import android.os.Build.VERSION_CODES
 import com.starception.submission.core.designsystem.theme.QuranFonts
-import android.view.View
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,7 +49,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draganddrop.DragAndDropTransferData
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -109,18 +103,6 @@ fun NewsResourceCardExpanded(
     searchQuery: String = "",
 ) {
     val clickActionLabel = stringResource(R.string.core_ui_card_tap_action)
-    val sharingLabel = stringResource(R.string.core_ui_feed_sharing)
-    val sharingContent = stringResource(
-        R.string.core_ui_feed_sharing_data,
-        userNewsResource.title,
-        userNewsResource.url,
-    )
-
-    val dragAndDropFlags = if (VERSION.SDK_INT >= VERSION_CODES.N) {
-        View.DRAG_FLAG_GLOBAL
-    } else {
-        0
-    }
 
     Card(
         onClick = onClick,
@@ -148,17 +130,7 @@ fun NewsResourceCardExpanded(
                         NewsResourceTitle(
                             newsResourceTitle = userNewsResource.title,
                             searchQuery = searchQuery,
-                            modifier = Modifier
-                                .fillMaxWidth((.8f))
-                                .dragAndDropSource { _ ->
-                                    DragAndDropTransferData(
-                                        ClipData.newPlainText(
-                                            sharingLabel,
-                                            sharingContent,
-                                        ),
-                                        flags = dragAndDropFlags,
-                                    )
-                                },
+                            modifier = Modifier.fillMaxWidth((.8f)),
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         BookmarkButton(isBookmarked, onToggleBookmark)

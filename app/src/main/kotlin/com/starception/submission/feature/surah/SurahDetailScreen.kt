@@ -1063,7 +1063,7 @@ fun SurahDetailScreen(
             val albumHeaderHeight = if (localIsLandscape) 160 else (localConfig.screenWidthDp * 3 / 4)
             // Start floating names higher (12dp) to ensure good separation from translation text below
             val headerYPx = with(density) { (albumHeaderHeight + 12).dp.toPx() }
-            val toolbarYPx = with(density) { 24.dp.toPx() }  // Stop at toolbar level (locked position)
+            val toolbarYPx = with(density) { 21.dp.toPx() }  // Stop at toolbar level (locked position)
             val startXPx = with(density) { 24.dp.toPx() }
             val endXPx = with(density) { 56.dp.toPx() }  // Position after back button
 
@@ -1642,7 +1642,7 @@ private fun AlbumPlayerTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                .height(64.dp)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
