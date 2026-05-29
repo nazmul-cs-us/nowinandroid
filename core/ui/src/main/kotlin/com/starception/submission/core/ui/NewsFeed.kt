@@ -127,32 +127,38 @@ fun LazyStaggeredGridScope.newsFeed(
                 val isHadithItem = userNewsResource.type.contains("Hadith", ignoreCase = true)
                 val hadithInfo = if (isHadithItem) extractHadithInfo(userNewsResource.url) else null
 
+                val handleCardClick = {
+                    android.util.Log.d("NewsFeed_CARD", "🖱️ CLICK | id=${userNewsResource.id} | title='${userNewsResource.title.take(40)}' | type='${userNewsResource.type}' | onNewsClick=${onNewsClick != null} | surahNumber=$surahNumber | isHadith=$isHadithItem | isDua=$isDuaItem")
+                    onExpandedCardClick()
+                    analyticsHelper.logNewsResourceOpened(
+                        newsResourceId = userNewsResource.id,
+                    )
+
+                    // If onNewsClick is provided (two-pane mode), show all items in detail pane
+                    if (onNewsClick != null) {
+                        android.util.Log.d("NewsFeed_CARD", "  → onNewsClick (two-pane)")
+                        onNewsClick(userNewsResource)
+                    } else if (surahNumber != null) {
+                        android.util.Log.d("NewsFeed_CARD", "  → onSurahClick($surahNumber, ${userNewsResource.id})")
+                        onSurahClick(surahNumber, userNewsResource.id)
+                    } else if (isHadithItem && hadithInfo != null) {
+                        onHadithClick(hadithInfo.first, hadithInfo.second)
+                    } else if (isDuaItem) {
+                        onDuaClick(userNewsResource)
+                    } else if (userNewsResource.url.isNotBlank()) {
+                        launchCustomChromeTab(context, Uri.parse(userNewsResource.url), backgroundColor)
+                    } else {
+                        android.util.Log.w("NewsFeed_CARD", "  ⚠️ no handler matched — click is a no-op")
+                    }
+
+                    onNewsResourceViewed(userNewsResource.id)
+                }
+
                 NewsResourceCardExpanded(
                     userNewsResource = userNewsResource,
                     isBookmarked = userNewsResource.isSaved,
                     searchQuery = searchQuery,
-                    onClick = {
-                        onExpandedCardClick()
-                        analyticsHelper.logNewsResourceOpened(
-                            newsResourceId = userNewsResource.id,
-                        )
-
-                        // If onNewsClick is provided (two-pane mode), show all items in detail pane
-                        if (onNewsClick != null) {
-                            onNewsClick(userNewsResource)
-                        } else if (surahNumber != null) {
-                            // Navigate to Surah detail screen
-                            onSurahClick(surahNumber, userNewsResource.id)
-                        } else if (isHadithItem && hadithInfo != null) {
-                            onHadithClick(hadithInfo.first, hadithInfo.second)
-                        } else if (isDuaItem) {
-                            onDuaClick(userNewsResource)
-                        } else if (userNewsResource.url.isNotBlank()) {
-                            launchCustomChromeTab(context, Uri.parse(userNewsResource.url), backgroundColor)
-                        }
-
-                        onNewsResourceViewed(userNewsResource.id)
-                    },
+                    onClick = { handleCardClick() },
                     hasBeenViewed = userNewsResource.hasBeenViewed,
                     onToggleBookmark = {
                         onNewsResourcesCheckedChanged(
@@ -163,19 +169,7 @@ fun LazyStaggeredGridScope.newsFeed(
                     onTopicClick = onTopicClick,
                     modifier = Modifier
                         .padding(horizontal = 8.dp)
-                        .animateItem()
-                        .then(
-                            // Add long-press detection for Surah items
-                            if (surahNumber != null) {
-                                Modifier.pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onLongPress = {
-                                            showFloatingToolbar = true
-                                        }
-                                    )
-                                }
-                            } else Modifier
-                        ),
+                        .animateItem(),
                 )
             }
         }
