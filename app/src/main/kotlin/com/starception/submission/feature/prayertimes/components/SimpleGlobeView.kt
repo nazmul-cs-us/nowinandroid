@@ -29,6 +29,13 @@ import gov.nasa.worldwind.render.ImageSource
 import gov.nasa.worldwind.shape.Placemark
 import gov.nasa.worldwind.shape.PlacemarkAttributes
 
+// Camera distance from the midpoint of (user, Kaaba), expressed as a multiplier of
+// Earth's equatorial radius. Smaller → camera close, Earth overfills the clip circle
+// (looks like a flat zoomed map). Larger → camera far, Earth visible as a small sphere
+// with sky around its limb. Used in BOTH the LookAt range AND the user-dot projection
+// formula — they must stay in sync.
+private const val GLOBE_RANGE_MULTIPLIER = 2.0
+
 /**
  * WorldWind 3D globe for the Qibla compass.
  *
@@ -181,7 +188,7 @@ fun SimpleGlobeView(
                         val heading = userPos.greatCircleAzimuth(kaabaPos)
                         val midLat  = (userLatitude  + makkahLatitude)  / 2.0
                         val midLon  = (userLongitude + makkahLongitude) / 2.0
-                        val range   = globe.equatorialRadius * 1.05
+                        val range   = globe.equatorialRadius * GLOBE_RANGE_MULTIPLIER
                         ww.navigator.setAsLookAt(globe, LookAt().apply {
                             set(midLat, midLon, 0.0, WorldWind.ABSOLUTE, range, heading, 0.0, 0.0)
                         })
@@ -286,11 +293,11 @@ class RingOverlayView(ctx: Context) : View(ctx) {
         val angularDistRad = 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         val halfAngDist = angularDistRad / 2.0
 
-        // With range=1.05*R and FOV=45°, the sphere-to-viewport projection is:
-        //   NDC = sin(halfAngDist) * focalLen / (1.05 + cos(halfAngDist))
+        // With range=GLOBE_RANGE_MULTIPLIER*R and FOV=45°, the sphere-to-viewport projection is:
+        //   NDC = sin(halfAngDist) * focalLen / (GLOBE_RANGE_MULTIPLIER + cos(halfAngDist))
         // where focalLen = 1/tan(FOV/2) = 1/tan(22.5°) ≈ 2.414
         val focalLen = 1.0 / Math.tan(Math.toRadians(22.5))
-        val ndc = Math.sin(halfAngDist) * focalLen / (1.05 + Math.cos(halfAngDist))
+        val ndc = Math.sin(halfAngDist) * focalLen / (GLOBE_RANGE_MULTIPLIER + Math.cos(halfAngDist))
 
         // Map NDC to pixels (viewport half = globeSizePx/2)
         val vpHalf = if (globeViewportHalf > 0f) globeViewportHalf else globeRadius
