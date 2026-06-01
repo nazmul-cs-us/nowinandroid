@@ -6,7 +6,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -218,7 +220,11 @@ fun SwipeToRevealCard(
                     .width(resetRevealedWidth)
                     .align(Alignment.CenterStart)
                     .clip(RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp))
-                    .background(color = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .background(color = MaterialTheme.colorScheme.surfaceVariant)
+                    .border(
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                        RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
+                    )
                     .pointerInput(isRevealed, revealedSide) {
                         // Enable swipe left on Reset area to collapse
                         if (isRevealed && revealedSide == "reset") {
@@ -277,7 +283,7 @@ fun SwipeToRevealCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.errorContainer)
+                            .background(MaterialTheme.colorScheme.tertiaryContainer)
                             .clickable {
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onResetOffset()
@@ -294,7 +300,7 @@ fun SwipeToRevealCard(
                         Icon(
                             painter = painterResource(id = R.drawable.ic_reset_settings),
                             contentDescription = "Reset to default",
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -316,7 +322,11 @@ fun SwipeToRevealCard(
                     .width(adjustRevealedWidth)
                     .align(Alignment.CenterEnd)
                     .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
-                    .background(color = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .background(color = MaterialTheme.colorScheme.surfaceVariant)
+                    .border(
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                        RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
+                    )
                     // ENTIRE area is swipeable to collapse - drag anywhere on the +/- panel
                     .pointerInput(isRevealed, revealedSide) {
                         if (isRevealed && revealedSide == "adjust") {
@@ -387,7 +397,7 @@ fun SwipeToRevealCard(
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            .background(MaterialTheme.colorScheme.surface),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Minus button

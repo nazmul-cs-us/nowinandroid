@@ -157,6 +157,7 @@ import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.sqrt
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.SkipNext
@@ -1140,6 +1141,7 @@ fun SwipeableBigTiles(
         ) { page ->
             val actualPage = page % 4 // Map infinite pages to our 4 actual tiles
             val tileShape = RoundedCornerShape(32.dp)
+            val tileBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
 
             // Outer wrapper with shadow for sharp edges (like Material Components)
             Box(modifier = Modifier.fillMaxSize().padding(4.dp)) {
@@ -1148,15 +1150,43 @@ fun SwipeableBigTiles(
                     modifier = Modifier
                         .matchParentSize()
                         .graphicsLayer {
-                            this.shadowElevation = 8.dp.toPx()
+                            this.shadowElevation = 24.dp.toPx()
                             this.shape = tileShape
                             this.clip = false
-                            this.ambientShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.12f)
-                            this.spotShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.2f)
+                            this.ambientShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.28f)
+                            this.spotShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f)
                         }
                 )
-                // Content layer
-                Box(modifier = Modifier.fillMaxSize()) {
+                // Content layer with subtle top-lit bevel drawn on top (clipped to tile shape)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(tileShape)
+                        .drawWithContent {
+                            drawContent()
+                            // Soft top-to-bottom shading only — no hard top stroke.
+                            // Lower alphas so the highlight tints the tile rather than washing it out.
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    0f to androidx.compose.ui.graphics.Color.White.copy(alpha = 0.10f),
+                                    0.35f to androidx.compose.ui.graphics.Color.Transparent,
+                                    1f to androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.10f)
+                                )
+                            )
+                            // Visible outline stroke (drawn on top of the bevel so it isn't washed out)
+                            val strokePx = 1.5.dp.toPx()
+                            drawRoundRect(
+                                color = tileBorderColor,
+                                cornerRadius = CornerRadius(32.dp.toPx()),
+                                style = Stroke(width = strokePx),
+                                topLeft = Offset(strokePx / 2f, strokePx / 2f),
+                                size = androidx.compose.ui.geometry.Size(
+                                    size.width - strokePx,
+                                    size.height - strokePx
+                                )
+                            )
+                        }
+                ) {
                     when (actualPage) {
                                 0 -> NextPrayerTile(
                             prayerTimes = prayerTimes,
