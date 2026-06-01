@@ -112,6 +112,10 @@ import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.feature.quran.AudioLanguage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
@@ -1773,7 +1777,7 @@ private fun AlbumPlayerTopBar(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, FlowPreview::class)
 @Composable
 private fun AlbumPlayerContent(
     surah: Surah,
@@ -1911,6 +1915,34 @@ private fun AlbumPlayerContent(
             kotlinx.coroutines.delay(80)
             scrollState.animateScrollToItem(index = 1, scrollOffset = 0)
         }
+    }
+
+    // Persist per-Surah reading progress: which ayah is currently first-visible.
+    // Skipped while in Mushaf mode (HorizontalPager — first-visible-ayah doesn't
+    // make sense). Ayah items use the key `"${displaySurah.number}_<ayahNumber>"`
+    // (defined where items() is called), so we parse that to find the ayah.
+    LaunchedEffect(displaySurah.number, displayAyahs.size, continuousReadingMode) {
+        if (continuousReadingMode || displayAyahs.isEmpty()) return@LaunchedEffect
+        val keyPrefix = "${displaySurah.number}_"
+        val total = displayAyahs.size
+        androidx.compose.runtime.snapshotFlow {
+            scrollState.layoutInfo.visibleItemsInfo
+                .firstNotNullOfOrNull { info ->
+                    (info.key as? String)?.takeIf { it.startsWith(keyPrefix) }
+                        ?.substringAfter(keyPrefix)?.toIntOrNull()
+                }
+        }
+            .filterNotNull()
+            .distinctUntilChanged()
+            .debounce(800L)
+            .collect { ayahNumber ->
+                com.starception.submission.core.ui.SurahReadingProgressRepository.update(
+                    context = context,
+                    surahNumber = displaySurah.number,
+                    currentAyahNumber = ayahNumber,
+                    totalAyahs = total,
+                )
+            }
     }
 
     // Strong magnetic snap: any scroll immediately snaps to either top or Mushaf.

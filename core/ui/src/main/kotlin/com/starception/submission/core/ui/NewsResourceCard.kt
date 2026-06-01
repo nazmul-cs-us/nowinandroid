@@ -31,7 +31,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -149,6 +152,27 @@ fun NewsResourceCardExpanded(
                             resourceType = userNewsResource.type,
                             lastOpenedTimeMillis = userNewsResource.lastOpenedTimeMillis,
                         )
+                    }
+                    // Per-Surah reading-progress badge (hidden for non-Surah cards
+                    // or when the user has not opened this Surah yet).
+                    val cardContext = androidx.compose.ui.platform.LocalContext.current
+                    val surahNumberForProgress = remember(
+                        userNewsResource.title,
+                        userNewsResource.url,
+                        userNewsResource.type,
+                    ) {
+                        extractSurahNumber(
+                            title = userNewsResource.title,
+                            url = userNewsResource.url,
+                            type = userNewsResource.type,
+                        )
+                    }
+                    val surahProgress = surahNumberForProgress?.let { sn ->
+                        SurahReadingProgressRepository.progressFor(cardContext, sn)
+                    }
+                    if (surahProgress != null && surahProgress.totalAyahs > 0) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        SurahReadingProgressRow(progress = surahProgress)
                     }
                     Spacer(modifier = Modifier.height(14.dp))
                     val arabicLine = smartCardArabicLine(
@@ -448,6 +472,47 @@ fun NewsResourceMetaData(
         displayText,
         style = MaterialTheme.typography.labelSmall,
     )
+}
+
+@Composable
+private fun SurahReadingProgressRow(progress: SurahReadingProgress) {
+    val accent = if (progress.isComplete) {
+        MaterialTheme.colorScheme.secondary
+    } else {
+        MaterialTheme.colorScheme.tertiary
+    }
+    val label = if (progress.isComplete) {
+        "Read all ${progress.totalAyahs} ayahs"
+    } else {
+        "Resume at ayah ${progress.lastAyahIndex} of ${progress.totalAyahs}"
+    }
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Tiny status dot — colored to match the progress bar.
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(accent)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        LinearProgressIndicator(
+            progress = { progress.percent.coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp)),
+            color = accent,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
+    }
 }
 
 @Composable

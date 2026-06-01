@@ -81,7 +81,7 @@ fun GlobePopupScreen(
     }
 
     val backgroundAlpha by animateFloatAsState(
-        targetValue = if (isVisible) 0.97f else 0f,
+        targetValue = if (isVisible) 0.55f else 0f,
         animationSpec = if (isVisible) {
             spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -113,6 +113,19 @@ fun GlobePopupScreen(
         label = "contentAlpha"
     )
 
+    // Distance to Kaaba (great-circle) for the bottom status pill
+    val distanceKm = remember(userLatitude, userLongitude) {
+        val lat1 = Math.toRadians(userLatitude)
+        val lat2 = Math.toRadians(MAKKAH_LAT)
+        val dLat = lat2 - lat1
+        val dLon = Math.toRadians(MAKKAH_LON - userLongitude)
+        val a = kotlin.math.sin(dLat / 2).let { it * it } +
+                kotlin.math.cos(lat1) * kotlin.math.cos(lat2) *
+                kotlin.math.sin(dLon / 2).let { it * it }
+        val c = 2.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+        (EARTH_RADIUS_KM * c).toInt()
+    }
+
     // Wrap in Dialog for proper lifecycle management of OpenGL surface
     Dialog(
         onDismissRequest = onDismiss,
@@ -127,13 +140,34 @@ fun GlobePopupScreen(
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = backgroundAlpha))
                 .windowInsetsPadding(WindowInsets.systemBars)
         ) {
-            // Globe container - NO graphicsLayer to ensure touch events work properly
-            // AndroidView (WorldWind) requires unmodified touch coordinates
+            // Floating modal card — vertically centered with equal dim above and
+            // below, horizontal padding so it doesn't touch the screen edges, and
+            // all four corners rounded so it reads as a card hovering over the
+            // dimmed background. Pull-down-to-dismiss still works.
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 12.dp)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.7f),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+            // Globe container — fills the sheet area minus insets for the drag
+            // handle + close button (top) and status pill (bottom). Top inset is
+            // generous enough that the globe's own "LEFT / RIGHT N°" angle badge
+            // sits clear of the close button at the sheet's top-right corner.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 72.dp, bottom = 140.dp)  // Leave space for header and instructions
-                    .padding(horizontal = 8.dp)  // Match tile content padding
+                    .padding(top = 60.dp, bottom = 84.dp)
+                    .padding(horizontal = 12.dp)
             ) {
                 // Background layer with animations (separate from touch-receiving globe)
                 Box(
@@ -146,7 +180,7 @@ fun GlobePopupScreen(
                         }
                         .background(
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            shape = RoundedCornerShape(32.dp)
+                            shape = RoundedCornerShape(28.dp)
                         )
                 )
 
@@ -156,11 +190,12 @@ fun GlobePopupScreen(
                     userLongitude = userLongitude,
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(32.dp))
+                        .clip(RoundedCornerShape(28.dp))
                 )
             }
 
-            // Header overlay with drag handle and close button
+            // Slim top chrome: drag handle (centered) + glass close button (top-right).
+            // No "Qibla Direction" title — the globe IS the title.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -188,84 +223,113 @@ fun GlobePopupScreen(
                             }
                         )
                     }
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
             ) {
-                // Drag handle indicator
+                // Slim drag handle indicator
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .width(60.dp)
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
+                        .padding(top = 4.dp)
+                        .width(40.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
                         .background(
                             MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = 0.3f + dragProgress * 0.3f
+                                alpha = 0.25f + dragProgress * 0.35f
                             )
                         )
                 )
 
-                // Close button
-                IconButton(
+                // Glass-style close button floating in top-right
+                Surface(
                     onClick = {
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         dismissWithAnimation({ isVisible = it }, onDismiss, coroutineScope)
                     },
-                    modifier = Modifier.align(Alignment.TopEnd)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Close,
-                        contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                // Title
-                Text(
-                    text = "Qibla Direction",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(top = 16.dp)
-                )
+                        .align(Alignment.TopEnd)
+                        .size(40.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                    ),
+                    tonalElevation = 0.dp
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.Close,
+                            contentDescription = "Close",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
 
-            // Instructions overlay at bottom
+            // Compact bottom status pill — distance + swipe-down hint.
+            // No more "Pan, zoom, and rotate the globe" lecture; users discover gestures.
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 4.dp)
-                    .padding(bottom = 24.dp)
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
                     .graphicsLayer {
                         scaleX = contentScale
                         scaleY = contentScale
                         alpha = contentAlpha
                     },
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                ),
+                tonalElevation = 0.dp
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Row(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text(
-                        text = "Interact with the globe",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Pan, zoom, and rotate the globe.\nTap the location button to reset view.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "Makkah",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 13.sp
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(3.dp)
+                            .clip(CircleShape)
+                            .background(
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            )
+                    )
+                    Text(
+                        text = "${formatDistance(distanceKm)} km",
+                        style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 20.sp
+                        fontSize = 13.sp
                     )
                 }
             }
+                }  // close inner sheet Box
+            }  // close Surface sheet container
         }
     }
 }
+
+private const val MAKKAH_LAT = 21.4225
+private const val MAKKAH_LON = 39.8262
+private const val EARTH_RADIUS_KM = 6371.0
+
+private fun formatDistance(km: Int): String =
+    if (km >= 1000) "%,d".format(km) else km.toString()
