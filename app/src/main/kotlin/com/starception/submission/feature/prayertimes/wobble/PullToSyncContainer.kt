@@ -34,6 +34,9 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DoNotDisturbOn
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -107,6 +110,7 @@ fun PullToSyncContainer(
     mediaState: MediaControllerUiState = MediaControllerUiState(),
     onMediaAction: (MediaAction) -> Unit = {},
     prayerAlertState: PrayerAlertState = PrayerAlertState(),
+    silentModeState: SilentModeState = SilentModeState(),
     content: @Composable (syncState: SyncContainerState) -> Unit
 ) {
     val isDownloading = downloadProgress > 0f
@@ -115,6 +119,7 @@ fun PullToSyncContainer(
         prayerAlertDismissed = false
     }
     val isPrayerAlert = prayerAlertState.isActive && !prayerAlertDismissed
+    val isSilentMode = silentModeState.isActive
     val hapticFeedback = LocalHapticFeedback.current
 
     // Wobble state management
@@ -193,7 +198,7 @@ fun PullToSyncContainer(
     val mediaHoldFraction = refreshingHoldFraction
     val prayerAlertHoldFraction = refreshingHoldFraction
     val refreshingOffset = remember { Animatable(0f) }
-    LaunchedEffect(isRefreshing, isDownloading, mediaState.isVisible, isPrayerAlert) {
+    LaunchedEffect(isRefreshing, isDownloading, mediaState.isVisible, isPrayerAlert, isSilentMode) {
         if (isRefreshing || isDownloading) {
             refreshingOffset.snapTo(
                 if (isDownloading) downloadingHoldFraction else refreshingHoldFraction,
@@ -206,7 +211,7 @@ fun PullToSyncContainer(
                     stiffness = Spring.StiffnessMediumLow,
                 ),
             )
-        } else if (isPrayerAlert) {
+        } else if (isPrayerAlert || isSilentMode) {
             refreshingOffset.animateTo(
                 targetValue = prayerAlertHoldFraction,
                 animationSpec = spring(
@@ -298,6 +303,7 @@ fun PullToSyncContainer(
                     isRefreshing || isDownloading -> fitbitBgColorLight
                     mediaState.isVisible -> fitbitBgColorLight
                     isPrayerAlert -> fitbitBgColorLight
+                    isSilentMode -> fitbitBgColorLight
                     else -> MaterialTheme.colorScheme.background
                 }
             )
@@ -431,6 +437,33 @@ fun PullToSyncContainer(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = prayerAlertState.displayText,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontSize = 14.sp,
+                            color = indicatorColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            } else if (isSilentMode) {
+                Box(
+                    modifier = Modifier
+                        .zIndex(1f)
+                        .fillMaxWidth()
+                        .height(contentOffsetY)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.DoNotDisturbOn,
+                            contentDescription = null,
+                            tint = indicatorColor,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = silentModeState.displayText,
                             style = MaterialTheme.typography.labelMedium,
                             fontSize = 14.sp,
                             color = indicatorColor,

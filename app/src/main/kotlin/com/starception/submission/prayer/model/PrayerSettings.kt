@@ -114,7 +114,11 @@ data class PrayerNotificationPreferences(
     val dhuhrGoToMosqueDuration: Int = 20,    // Dhuhr go-to-mosque phase duration
     val asrGoToMosqueDuration: Int = 20,      // Asr go-to-mosque phase duration
     val maghribGoToMosqueDuration: Int = 10,  // Maghrib go-to-mosque phase duration (shorter due to short window)
-    val ishaGoToMosqueDuration: Int = 20      // Isha go-to-mosque phase duration
+    val ishaGoToMosqueDuration: Int = 20,     // Isha go-to-mosque phase duration
+
+    // SILENT-DURING-PRAYER: auto-enable DND when prayer time arrives, restore after N minutes
+    val silentDuringPrayerEnabled: Boolean = false,
+    val silentDuringPrayerMinutes: Int = 20
 ) {
     /**
      * Check if notifications are enabled for a specific prayer

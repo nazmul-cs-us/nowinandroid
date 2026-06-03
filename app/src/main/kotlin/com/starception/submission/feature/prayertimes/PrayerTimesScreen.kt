@@ -1403,6 +1403,7 @@ fun PrayerTimesScreen(
                 onPrayerAlertChanged(calculatedPrayerAlert)
             }
 
+            val silentModeState by com.starception.submission.feature.prayertimes.wobble.rememberSilentModeState()
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = { isRefreshing = true },
@@ -1411,6 +1412,7 @@ fun PrayerTimesScreen(
                 mediaState = mediaState,
                 onMediaAction = onMediaAction,
                 prayerAlertState = prayerAlertState,
+                silentModeState = silentModeState,
                 modifier = Modifier.fillMaxSize()
             ) { syncState ->
             val outerConfiguration = LocalConfiguration.current

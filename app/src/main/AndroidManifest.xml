@@ -149,7 +149,12 @@
         <receiver
             android:name=".prayer.receiver.PrayerNotificationReceiver"
             android:exported="false" />
-        
+
+        <!-- Restores DND filter after silent-during-prayer window expires -->
+        <receiver
+            android:name=".prayer.silent.RestorePrayerSilentReceiver"
+            android:exported="false" />
+
         <!-- Prayer Boot Receiver for automatic rescheduling after device restart -->
         <receiver
             android:name=".prayer.receiver.PrayerBootReceiver"

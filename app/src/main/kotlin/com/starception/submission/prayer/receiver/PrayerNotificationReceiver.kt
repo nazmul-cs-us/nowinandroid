@@ -15,8 +15,11 @@ import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.drawable.toBitmap
 import androidx.work.*
 import com.starception.submission.R
+import com.starception.submission.prayer.model.PrayerNotificationPreferences
+import com.starception.submission.prayer.silent.PrayerSilentModeController
 import com.starception.submission.prayer.worker.PrayerNotificationWorker
 import com.starception.submission.prayer.util.FileLogger
+import kotlinx.serialization.json.Json
 import java.util.concurrent.TimeUnit
 
 /**
@@ -59,12 +62,30 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             // Show notification directly (WorkManager has issues with Hilt)
             showPrayerNotification(context, prayerName, prayerTime, notificationType, priorMinutes)
 
+            if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) {
+                maybeEnableSilentMode(context, prayerName)
+            }
+
         } catch (e: Exception) {
             Log.e(TAG, "❌ PrayerNotificationReceiver failed", e)
             FileLogger.e(TAG, "PrayerNotificationReceiver failed", e)
         }
     }
     
+    private fun maybeEnableSilentMode(context: Context, prayerName: String) {
+        val prefs = context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
+        val json = prefs.getString("notification_preferences_json", null) ?: return
+        val preferences = runCatching {
+            Json { ignoreUnknownKeys = true }.decodeFromString(
+                PrayerNotificationPreferences.serializer(),
+                json,
+            )
+        }.getOrNull() ?: return
+        if (!preferences.silentDuringPrayerEnabled) return
+        PrayerSilentModeController(context.applicationContext)
+            .enableForPrayer(prayerName, preferences.silentDuringPrayerMinutes)
+    }
+
     private fun scheduleWorkManagerJob(
         context: Context,
         prayerName: String,

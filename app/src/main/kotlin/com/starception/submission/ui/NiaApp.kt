@@ -420,6 +420,8 @@ private fun NiaMainContent(
         // Only pass to app-level container on non-HOME pages (HOME handles its own alert).
         val appLevelPrayerAlert = if (!isOnHome) rawPrayerAlert else PrayerAlertState()
 
+        val silentModeState by com.starception.submission.feature.prayertimes.wobble.rememberSilentModeState()
+        val appLevelSilentModeState = if (!isOnHome) silentModeState else com.starception.submission.feature.prayertimes.wobble.SilentModeState()
         PullToSyncContainer(
             isRefreshing = if (isOnHome) false else isRefreshing,
             onRefresh = { if (!isOnHome) isRefreshing = true },
@@ -429,6 +431,7 @@ private fun NiaMainContent(
             mediaState = appLevelMediaState,
             onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
             prayerAlertState = appLevelPrayerAlert,
+            silentModeState = appLevelSilentModeState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)

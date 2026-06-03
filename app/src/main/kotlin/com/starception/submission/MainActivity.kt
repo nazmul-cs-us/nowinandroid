@@ -34,8 +34,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
@@ -64,7 +62,6 @@ import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.prayer.service.CountryPrayerMethodService
 import com.starception.submission.prayer.model.CalculationMethod
 import android.location.Location as AndroidLocation
-import com.starception.submission.download.AssetDownloadScreen
 import com.starception.submission.download.AssetDownloadViewModel
 import com.starception.submission.util.isSystemInDarkTheme
 import com.starception.submission.util.PermissionManager
@@ -89,7 +86,6 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.starception.submission.util.GoogleSampleNotificationManager
 import android.app.NotificationManager
@@ -274,24 +270,22 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
                 // Update theme color bridge so View-based components can access theme colors
                 com.starception.submission.util.ThemeColorBridge.UpdateColors()
 
-                var contentReady by remember { mutableStateOf(false) }
+                // Render the app immediately; trigger asset manifest sync in the background
+                // (bundled assets are always available, CDN refresh runs without blocking the UI).
+                LaunchedEffect(Unit) {
+                    @Suppress("UNUSED_EXPRESSION")
+                    downloadViewModel
+                }
 
                 CompositionLocalProvider(
                     LocalAnalyticsHelper provides analyticsHelper,
                     LocalTimeZone provides currentTimeZone,
                 ) {
-                    if (contentReady) {
-                        NiaApp(
-                            appState = appState,
-                            mainViewModel = viewModel,
-                            deepLinkCourseId = deepLinkCourseId,
-                        )
-                    } else {
-                        AssetDownloadScreen(
-                            viewModel = downloadViewModel,
-                            onReady = { contentReady = true },
-                        )
-                    }
+                    NiaApp(
+                        appState = appState,
+                        mainViewModel = viewModel,
+                        deepLinkCourseId = deepLinkCourseId,
+                    )
                 }
             }
         }

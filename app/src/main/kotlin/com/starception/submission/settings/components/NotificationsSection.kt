@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -174,6 +175,65 @@ fun NotificationsSection(
                         onPreferencesChanged(preferences.copy(ishaNotificationEnabled = enabled))
                     }
                 }
+
+                SilentDuringPrayerSection(
+                    preferences = preferences,
+                    onPreferencesChanged = onPreferencesChanged,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SilentDuringPrayerSection(
+    preferences: PrayerNotificationPreferences,
+    onPreferencesChanged: (PrayerNotificationPreferences) -> Unit,
+) {
+    val context = LocalContext.current
+    CollapsibleSubSection(
+        title = "Silent During Prayer",
+        subtitle = "Auto-enable Do Not Disturb at prayer time",
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Enable",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Switch(
+                checked = preferences.silentDuringPrayerEnabled,
+                onCheckedChange = { enabled ->
+                    val nm = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE)
+                        as android.app.NotificationManager
+                    if (enabled && !nm.isNotificationPolicyAccessGranted) {
+                        val intent = android.content.Intent(
+                            android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS,
+                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                        return@Switch
+                    }
+                    onPreferencesChanged(preferences.copy(silentDuringPrayerEnabled = enabled))
+                },
+            )
+        }
+        AnimatedVisibility(
+            visible = preferences.silentDuringPrayerEnabled,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+        ) {
+            SliderItem(
+                prayerName = "Duration",
+                value = preferences.silentDuringPrayerMinutes,
+                maxValue = 60,
+            ) { value ->
+                onPreferencesChanged(preferences.copy(silentDuringPrayerMinutes = value.coerceAtLeast(5)))
             }
         }
     }

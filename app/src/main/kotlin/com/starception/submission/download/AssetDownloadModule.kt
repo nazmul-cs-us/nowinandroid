@@ -1,6 +1,7 @@
 package com.starception.submission.download
 
 import android.content.Context
+import com.starception.submission.core.data.util.NetworkMonitor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -17,8 +18,11 @@ object AssetDownloadModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.MINUTES)
+        // Fail fast when the network is dead so the manifest fallback chain runs quickly.
+        // readTimeout is per-read (not per-request), so streaming downloads are unaffected
+        // as long as bytes keep flowing within the window.
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
@@ -27,7 +31,8 @@ object AssetDownloadModule {
     fun provideAssetDownloadManager(
         @ApplicationContext context: Context,
         okHttpClient: OkHttpClient,
-    ): AssetDownloadManager = AssetDownloadManager(context, okHttpClient)
+        networkMonitor: NetworkMonitor,
+    ): AssetDownloadManager = AssetDownloadManager(context, okHttpClient, networkMonitor)
 
     @Provides
     @Singleton
