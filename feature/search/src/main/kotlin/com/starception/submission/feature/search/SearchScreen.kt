@@ -114,9 +114,19 @@ internal fun SearchRoute(
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onNoteClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     searchNotes: suspend (String) -> List<SearchNote> = { emptyList() },
+    initialQuery: String? = null,
     modifier: Modifier = Modifier,
     searchViewModel: SearchViewModel = hiltViewModel(),
 ) {
+    // Seed the query when the user arrives with one (e.g., submitted via the
+    // inline top-bar SearchView). Keyed so it fires once per nav entry — typing
+    // in this screen won't trigger it again.
+    LaunchedEffect(initialQuery) {
+        if (!initialQuery.isNullOrBlank()) {
+            searchViewModel.onSearchQueryChanged(initialQuery)
+            searchViewModel.onSearchTriggered(initialQuery)
+        }
+    }
     val recentSearchQueriesUiState by searchViewModel.recentSearchQueriesUiState.collectAsStateWithLifecycle()
     val searchResultUiState by searchViewModel.searchResultUiState.collectAsStateWithLifecycle()
     val searchQuery by searchViewModel.searchQuery.collectAsStateWithLifecycle()

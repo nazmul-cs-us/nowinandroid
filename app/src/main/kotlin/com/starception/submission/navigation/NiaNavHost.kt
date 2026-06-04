@@ -133,6 +133,7 @@ fun NiaNavHost(
         forYouListDetailScreen(
             titleRes = TopLevelDestination.FOR_YOU.titleTextId,
             onSearchClick = { appState.navigateToSearch() },
+            onSearchSubmit = { query -> appState.navigateToSearch(query) },
             onSettingsClick = onTopAppBarActionClick,
             onTopicClick = navController::navigateToTopic,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
@@ -210,6 +211,7 @@ fun NiaNavHost(
         bookmarksListDetailScreen(
             titleRes = TopLevelDestination.BOOKMARKS.titleTextId,
             onSearchClick = { appState.navigateToSearch() },
+            onSearchSubmit = { query -> appState.navigateToSearch(query) },
             onSettingsClick = onTopAppBarActionClick,
             onTopicClick = navController::navigateToTopic,
             onShowSnackbar = onShowSnackbar,
@@ -275,6 +277,7 @@ fun NiaNavHost(
         interestsListDetailScreen(
             titleRes = TopLevelDestination.INTERESTS.titleTextId,
             onSearchClick = { appState.navigateToSearch() },
+            onSearchSubmit = { query -> appState.navigateToSearch(query) },
             onSettingsClick = onTopAppBarActionClick,
             onSurahClick = { surahNumber, newsResourceId -> navController.navigateToSurah(surahNumber, newsResourceId) },
             onDuaClick = { userNewsResource, topicId ->
@@ -302,6 +305,7 @@ fun NiaNavHost(
         )
         prayerTimesScreen(
             onSearchClick = { appState.navigateToSearch() },
+            onSearchSubmit = { query -> appState.navigateToSearch(query) },
             onSettingsClick = onTopAppBarActionClick,
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
             onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) },
@@ -315,6 +319,7 @@ fun NiaNavHost(
         courseScreen(
             titleRes = TopLevelDestination.COURSE.titleTextId,
             onSearchClick = { appState.navigateToSearch() },
+            onSearchSubmit = { query -> appState.navigateToSearch(query) },
             onSettingsClick = onTopAppBarActionClick,
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
             onHadithClick = { databaseFile, hadithNumber ->

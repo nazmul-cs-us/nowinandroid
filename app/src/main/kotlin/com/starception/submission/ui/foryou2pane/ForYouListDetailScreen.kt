@@ -71,6 +71,7 @@ fun NavGraphBuilder.forYouListDetailScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    onSearchSubmit: (query: String) -> Unit = {},
 ) {
     composable<ForYouRoute> {
         val isLandscape = LocalConfiguration.current.orientation ==
@@ -81,6 +82,7 @@ fun NavGraphBuilder.forYouListDetailScreen(
             onSettingsClick = onSettingsClick,
             // Two-pane in landscape provides its own chrome.
             showTopBar = !isLandscape,
+            onSearchSubmit = onSearchSubmit,
         ) {
             ForYouListDetailScreen(
                 onTopicClick = onTopicClick,

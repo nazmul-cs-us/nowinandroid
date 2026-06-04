@@ -226,7 +226,8 @@ class NiaAppState(
         }
     }
 
-    fun navigateToSearch() = navController.navigateToSearch()
+    fun navigateToSearch(initialQuery: String? = null) =
+        navController.navigateToSearch(initialQuery = initialQuery)
 }
 
 /**

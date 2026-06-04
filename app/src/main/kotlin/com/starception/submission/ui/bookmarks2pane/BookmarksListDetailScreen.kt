@@ -74,6 +74,7 @@ fun NavGraphBuilder.bookmarksListDetailScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    onSearchSubmit: (query: String) -> Unit = {},
 ) {
     composable<BookmarksNavRoute> {
         val isLandscape = LocalConfiguration.current.orientation ==
@@ -84,6 +85,7 @@ fun NavGraphBuilder.bookmarksListDetailScreen(
             onSettingsClick = onSettingsClick,
             // Two-pane in landscape provides its own chrome.
             showTopBar = !isLandscape,
+            onSearchSubmit = onSearchSubmit,
         ) {
             BookmarksListDetailScreen(
                 onTopicClick = onTopicClick,

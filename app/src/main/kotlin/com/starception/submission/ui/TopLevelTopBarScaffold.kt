@@ -7,7 +7,6 @@
 package com.starception.submission.ui
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
@@ -30,40 +29,46 @@ val LocalWobbleIntensity = compositionLocalOf { 0f }
 
 /**
  * Scaffold used by every non-Home top-level destination so each page renders
- * its own NiaTopAppBar at Y=0 of the NavHost. This keeps the NavHost height
- * identical across tabs (Home renders its own top bar inside PrayerTimesScreen),
- * which prevents content from jumping when switching between tabs.
+ * its own SearchBar at Y=0 of the NavHost. Wraps the page content inside
+ * [AppTopSearchBar] so the SearchBar can morph into a full-screen SearchView
+ * when tapped, matching the M3 catalog's SearchBarWithAppBarIcons demo.
  */
 @Composable
 fun TopLevelTopBarScaffold(
     titleRes: Int,
-    onSearchClick: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
     showTopBar: Boolean = true,
+    onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    onSearchSubmit: (query: String) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize()) {
-        if (showTopBar) {
-            val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
-                .asPaddingValues()
-                .calculateTopPadding()
-            val wobbleIntensity = LocalWobbleIntensity.current
-            val dynamicTopInset = statusBarInset * (1f - (wobbleIntensity * 2f).coerceAtMost(1f))
-            AppTopSearchBar(
-                title = stringResource(id = titleRes),
-                onSearchClick = onSearchClick,
-                onSettingsClick = onSettingsClick,
-                topInset = dynamicTopInset,
-            )
+    if (showTopBar) {
+        val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+            .asPaddingValues()
+            .calculateTopPadding()
+        val wobbleIntensity = LocalWobbleIntensity.current
+        val dynamicTopInset = statusBarInset * (1f - (wobbleIntensity * 2f).coerceAtMost(1f))
+        AppTopSearchBar(
+            title = stringResource(id = titleRes),
+            onSettingsClick = onSettingsClick,
+            topInset = dynamicTopInset,
+            onVerseClick = onVerseClick,
+            onSearchSubmit = onSearchSubmit,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
+            ) {
+                content()
+            }
         }
+    } else {
         Box(
-            modifier = Modifier.consumeWindowInsets(
-                if (showTopBar) {
-                    WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
-                } else {
-                    WindowInsets(0, 0, 0, 0)
-                },
-            ),
+            modifier = Modifier
+                .fillMaxSize()
+                .consumeWindowInsets(WindowInsets(0, 0, 0, 0)),
         ) {
             content()
         }

@@ -72,12 +72,14 @@ fun NavGraphBuilder.interestsListDetailScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    onSearchSubmit: (query: String) -> Unit = {},
 ) {
     composable<InterestsRoute> {
         com.starception.submission.ui.TopLevelTopBarScaffold(
             titleRes = titleRes,
             onSearchClick = onSearchClick,
             onSettingsClick = onSettingsClick,
+            onSearchSubmit = onSearchSubmit,
         ) {
             InterestsListDetailScreen(
                 onSurahClick = onSurahClick,

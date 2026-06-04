@@ -293,6 +293,7 @@ fun PrayerTimesScreen(
     onMediaAction: (com.starception.submission.media.MediaAction) -> Unit = {},
     onPrayerAlertChanged: (com.starception.submission.feature.prayertimes.wobble.PrayerAlertState) -> Unit = {},
     prayerAlertOverride: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState = com.starception.submission.feature.prayertimes.wobble.PrayerAlertState(),
+    onSearchSubmit: (query: String) -> Unit = {},
 ) {
     val screenContext = LocalContext.current
     
@@ -1421,13 +1422,14 @@ fun PrayerTimesScreen(
             val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
                 .asPaddingValues().calculateTopPadding()
             val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
-            Column(modifier = Modifier.fillMaxSize().then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
             com.starception.submission.ui.AppTopSearchBar(
                 title = stringResource(R.string.prayer_times_title),
-                onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,
                 topInset = dynamicTopInset,
-            )
+                onVerseClick = onSurahClickWithAyah,
+                onSearchSubmit = onSearchSubmit,
+            ) {
+            Column(modifier = Modifier.fillMaxSize().then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
             // Pull-to-refresh indicator is handled by PullToSyncContainer in the sage background
             // Home page content with wobble transformation applied to actual content
             Box(
@@ -2513,7 +2515,8 @@ fun PrayerTimesScreen(
         )
     }
 
-        } // Close Column inside PullToSyncContainer
+        } // Close Column inside AppTopSearchBar content lambda
+        } // Close AppTopSearchBar scaffold (content lambda)
         } // Close PullToSyncContainer lambda
         } // Close Box with layerBackdrop
 

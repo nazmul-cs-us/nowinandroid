@@ -1,17 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ported from material-components-android catalog cat_search_appbar_icons_fragment.xml -->
+<!-- Ported from material-components-android catalog cat_search_appbar_icons_fragment.xml.
+     Scaffold layout: the CoordinatorLayout is full-screen so the SearchView has
+     room to expand to fullscreen via setupWithSearchBar(). App content is hosted
+     inside content_container via a ComposeView added programmatically. -->
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="match_parent">
 
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/app_bar_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:theme="@style/ThemeOverlay.Material3Expressive.AppBarWithSearch"
-        android:fitsSystemWindows="true">
+        android:fitsSystemWindows="false">
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
@@ -63,4 +66,30 @@
                 app:layout_constraintTop_toTopOf="parent" />
         </androidx.constraintlayout.widget.ConstraintLayout>
     </com.google.android.material.appbar.AppBarLayout>
+
+    <FrameLayout
+        android:id="@+id/content_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
+    <com.google.android.material.search.SearchView
+        android:id="@+id/app_search_view"
+        style="@style/Widget.Material3Expressive.SearchView.AppBarWithSearch"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:hint="@string/app_top_bar_search_hint"
+        app:layout_anchor="@id/app_search_bar">
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <LinearLayout
+                android:id="@+id/search_suggestion_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </androidx.core.widget.NestedScrollView>
+    </com.google.android.material.search.SearchView>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -24,6 +24,7 @@ fun NavGraphBuilder.prayerTimesScreen(
     onMediaAction: (com.starception.submission.media.MediaAction) -> Unit = {},
     onPrayerAlertChanged: (com.starception.submission.feature.prayertimes.wobble.PrayerAlertState) -> Unit = {},
     prayerAlertOverride: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState = com.starception.submission.feature.prayertimes.wobble.PrayerAlertState(),
+    onSearchSubmit: (query: String) -> Unit = {},
 ) {
     composable<PrayerTimesRoute> {
         PrayerTimesScreen(
@@ -37,6 +38,7 @@ fun NavGraphBuilder.prayerTimesScreen(
             onMediaAction = onMediaAction,
             onPrayerAlertChanged = onPrayerAlertChanged,
             prayerAlertOverride = prayerAlertOverride,
+            onSearchSubmit = onSearchSubmit,
         )
     }
 }

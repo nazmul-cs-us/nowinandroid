@@ -52,4 +52,7 @@
   <string name="app_top_bar_search_hint">Search</string>
   <string name="app_top_bar_leading_icon_description">Home</string>
   <string name="app_top_bar_settings_icon_description">Settings</string>
+  <string name="app_search_section_yesterday">YESTERDAY</string>
+  <string name="app_search_section_this_week">THIS WEEK</string>
+  <string name="app_search_section_popular_verses">POPULAR VERSES</string>
 </resources>

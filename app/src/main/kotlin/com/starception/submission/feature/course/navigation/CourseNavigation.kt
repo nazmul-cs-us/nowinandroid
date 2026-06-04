@@ -51,12 +51,14 @@ fun NavGraphBuilder.courseScreen(
     onHadithClick: (databaseFile: String, hadithNumber: Int) -> Unit = { _, _ -> },
     onCourseClick: (String) -> Unit = { },
     onBackClick: () -> Unit = { },
+    onSearchSubmit: (query: String) -> Unit = {},
 ) {
     composable<CourseRoute> {
         com.starception.submission.ui.TopLevelTopBarScaffold(
             titleRes = titleRes,
             onSearchClick = onSearchClick,
             onSettingsClick = onSettingsClick,
+            onSearchSubmit = onSearchSubmit,
         ) {
             CourseScreen(
                 onSurahClick = onSurahClick,
