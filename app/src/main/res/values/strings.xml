@@ -49,4 +49,7 @@
 
   <string name="cat_music_player_album_duration" description="Duration of the album [CHAR_LIMIT=NONE]">52 mins</string>
   <string name="quran_audio_permission_required">Audio permission is required to play Quran surah audio from your device storage.</string>
+  <string name="app_top_bar_search_hint">Search</string>
+  <string name="app_top_bar_leading_icon_description">Home</string>
+  <string name="app_top_bar_settings_icon_description">Settings</string>
 </resources>

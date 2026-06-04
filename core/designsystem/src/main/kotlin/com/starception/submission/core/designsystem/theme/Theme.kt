@@ -70,6 +70,11 @@ val LightDefaultColorScheme = lightColorScheme(
     inverseSurface = DarkPurpleGray20,
     inverseOnSurface = DarkPurpleGray95,
     outline = PurpleGray50,
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFFAFAF8),
+    surfaceContainer = Color(0xFFF4F4F2),
+    surfaceContainerHigh = Color(0xFFEEEEEC),
+    surfaceContainerHighest = Color(0xFFE8E8E6),
 )
 
 /**
@@ -134,6 +139,11 @@ val LightAndroidColorScheme = lightColorScheme(
     inverseSurface = DarkGreenGray20,
     inverseOnSurface = DarkGreenGray95,
     outline = GreenGray50,
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF8FAF6),
+    surfaceContainer = Color(0xFFF2F4F0),
+    surfaceContainerHigh = Color(0xFFECEFEA),
+    surfaceContainerHighest = Color(0xFFE6E9E4),
 )
 
 /**
@@ -198,6 +208,11 @@ val LightCoastalColorScheme = lightColorScheme(
     inverseSurface = ForestGreen20,
     inverseOnSurface = ForestGreen90,
     outline = SoftSage40,
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF8FAF6),
+    surfaceContainer = Color(0xFFF2F4F0),
+    surfaceContainerHigh = Color(0xFFECEFEA),
+    surfaceContainerHighest = Color(0xFFE6E9E4),
 )
 
 /**
@@ -278,6 +293,11 @@ val LightRoyalColorScheme = lightColorScheme(
     inverseSurface = Lapis20,
     inverseOnSurface = Lapis90,
     outline = WarmGold40,
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF9F8F6),
+    surfaceContainer = Color(0xFFF3F2EF),
+    surfaceContainerHigh = Color(0xFFEDEBE7),
+    surfaceContainerHighest = Color(0xFFE7E5E0),
 )
 
 /**

@@ -1041,7 +1041,8 @@ fun SwipeableBigTiles(
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
     isLandscape: Boolean = false,
     onSurahClick: (Int) -> Unit = {},
-    onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> }
+    onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    goToMosqueDurationMinutes: (String) -> Int = { 20 },
 ) {
     // Swipeable Big Tiles - HorizontalPager with 3 tiles and infinite scroll
     val pagerState = rememberPagerState(
@@ -1185,7 +1186,8 @@ fun SwipeableBigTiles(
                             getTimeSinceCurrentPrayer = getTimeSinceCurrentPrayer,
                             onCompassClick = onCompassClick,
                             timeOffsets = timeOffsets,
-                            isLandscape = isLandscape
+                            isLandscape = isLandscape,
+                            goToMosqueDurationMinutes = goToMosqueDurationMinutes,
                         )
                         1 -> SmartInfoTile(
                             getSmartTitle = getSmartTitle,
@@ -1367,7 +1369,8 @@ private fun NextPrayerTile(
     getTimeSinceCurrentPrayer: () -> String,
     onCompassClick: () -> Unit,
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    goToMosqueDurationMinutes: (String) -> Int = { 20 },
 ) {
     val view = LocalView.current
     val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
@@ -1393,8 +1396,8 @@ private fun NextPrayerTile(
             val compassSizeFallback = if (isLandscape) 140.dp else 150.dp
 
             // Shared sync content
-            val syncContent = remember(prayerTimes, currentTime, timeOffsets) {
-                SmartContentUtils.getNotificationSyncContent(prayerTimes, currentTime, timeOffsets)
+            val syncContent = remember(prayerTimes, currentTime, timeOffsets, goToMosqueDurationMinutes) {
+                SmartContentUtils.getNotificationSyncContent(prayerTimes, currentTime, timeOffsets, goToMosqueDurationMinutes)
             }
 
             // Shared compass composable

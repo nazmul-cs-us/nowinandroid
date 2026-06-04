@@ -411,7 +411,8 @@ object SmartContentUtils {
     fun getNotificationSyncContent(
         prayerTimes: DayPrayerTimes?,
         currentTime: LocalTime,
-        timeOffsets: com.starception.submission.prayer.model.PrayerTimeOffsets = com.starception.submission.prayer.model.PrayerTimeOffsets()
+        timeOffsets: com.starception.submission.prayer.model.PrayerTimeOffsets = com.starception.submission.prayer.model.PrayerTimeOffsets(),
+        goToMosqueDurationMinutes: (String) -> Int = { 20 },
     ): NotificationSyncContent? {
         return try {
             val times = prayerTimes ?: return null
@@ -510,9 +511,10 @@ object SmartContentUtils {
                 val elapsedText = formatNotificationElapsedTime(elapsedMinutes)
                 val content = "$elapsedText since $prayerName"
 
-                // Calculate prayer phase (exact same logic and format as notification service)
+                // Calculate prayer phase using the user's per-prayer "Go to Mosque" duration.
+                val mosqueWindowMinutes = goToMosqueDurationMinutes(prayerName)
                 val title = when {
-                    elapsedMinutes <= 20 -> "Go to Mosque for $prayerName"
+                    elapsedMinutes <= mosqueWindowMinutes -> "Go to Mosque for $prayerName"
                     elapsedMinutes <= 60 -> "Best Time to Pray $prayerName"
                     else -> "Make Time for $prayerName"
                 }

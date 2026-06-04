@@ -1422,35 +1422,12 @@ fun PrayerTimesScreen(
                 .asPaddingValues().calculateTopPadding()
             val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
             Column(modifier = Modifier.fillMaxSize().then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
-            // Top bar inside PullToSyncContainer - pushes down with content (like Fitbit)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = dynamicTopInset)
-                    .padding(horizontal = 4.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onSearchClick) {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.prayer_times_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                IconButton(onClick = onSettingsClick) {
-                    Icon(
-                        imageVector = Icons.Filled.Settings,
-                        contentDescription = "Settings",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
+            com.starception.submission.ui.AppTopSearchBar(
+                title = stringResource(R.string.prayer_times_title),
+                onSearchClick = onSearchClick,
+                onSettingsClick = onSettingsClick,
+                topInset = dynamicTopInset,
+            )
             // Pull-to-refresh indicator is handled by PullToSyncContainer in the sage background
             // Home page content with wobble transformation applied to actual content
             Box(
@@ -1547,7 +1524,8 @@ fun PrayerTimesScreen(
                                 timeOffsets = storedOffsets,
                                 isLandscape = true,
                                 onSurahClick = onSurahClick,
-                                onSurahClickWithAyah = onSurahClickWithAyah
+                                onSurahClickWithAyah = onSurahClickWithAyah,
+                                goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                             )
                         }
 
@@ -1763,7 +1741,8 @@ fun PrayerTimesScreen(
                     },
                     timeOffsets = storedOffsets,
                     onSurahClick = onSurahClick,
-                    onSurahClickWithAyah = onSurahClickWithAyah
+                    onSurahClickWithAyah = onSurahClickWithAyah,
+                    goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                 )
                 }
 
