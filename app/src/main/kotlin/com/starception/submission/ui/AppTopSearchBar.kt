@@ -17,6 +17,13 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +36,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
@@ -93,14 +107,18 @@ fun AppTopSearchBar(
     val whisperService = remember(context) { WhisperVoiceService(context.applicationContext) }
     val cloudVoiceService = remember(context) { VoiceSearchService(context.applicationContext) }
     var isListening by remember { mutableStateOf(false) }
+    // SearchBar's bounds inside the AndroidView, used to position the
+    // Gemini-style listening glow overlay precisely around the pill.
+    var searchBarBoundsPx by remember { mutableStateOf<Rect?>(null) }
 
     DisposableEffect(whisperService) {
         whisperService.initialize()
         onDispose { whisperService.release() }
     }
 
+    Box(modifier = modifier.fillMaxSize()) {
     AndroidView(
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         factory = { ctx ->
             val themed = ContextThemeWrapper(
                 ctx,
@@ -120,6 +138,20 @@ fun AppTopSearchBar(
             appBar.background = ColorDrawable(Color.TRANSPARENT)
             appBar.backgroundTintList = null
             searchBar.backgroundTintList = ColorStateList.valueOf(pillBackground)
+
+            // Track the SearchBar's position so the listening glow overlay can
+            // be drawn precisely around the pill. Bounds are reported relative
+            // to the inflated CoordinatorLayout (= the AndroidView's own coord
+            // space), which matches the overlay Canvas's coordinate space.
+            searchBar.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                val loc = IntArray(2)
+                val rootLoc = IntArray(2)
+                v.getLocationInWindow(loc)
+                root.getLocationInWindow(rootLoc)
+                val l = (loc[0] - rootLoc[0]).toFloat()
+                val t = (loc[1] - rootLoc[1]).toFloat()
+                searchBarBoundsPx = Rect(l, t, l + v.width.toFloat(), t + v.height.toFloat())
+            }
 
             val hintText = ctx.getString(R.string.app_top_bar_search_hint) + " " + title
             searchBar.hint = hintText
@@ -261,6 +293,84 @@ fun AppTopSearchBar(
             }
         },
     )
+    // Gemini-style listening glow: a multi-color gradient that flows around
+    // the SearchBar pill while the mic is capturing. The overlay sits above
+    // the AndroidView so the SearchBar stays interactive when not listening.
+    val bounds = searchBarBoundsPx
+    if (isListening && bounds != null) {
+        ListeningEdgeGlow(bounds = bounds, modifier = Modifier.matchParentSize())
+    }
+    }
+}
+
+@Composable
+private fun ListeningEdgeGlow(
+    bounds: Rect,
+    modifier: Modifier = Modifier,
+) {
+    val transition = rememberInfiniteTransition(label = "listenGlow")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "phase",
+    )
+    val pulse by transition.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "pulse",
+    )
+
+    Canvas(modifier = modifier) {
+        if (bounds.width <= 0f || bounds.height <= 0f) return@Canvas
+
+        val strokeWidth = 3.dp.toPx()
+        val cornerRadius = bounds.height / 2f
+        val width = bounds.width
+        val shift = phase * width
+
+        val colors = listOf(
+            androidx.compose.ui.graphics.Color(0xFF4285F4), // Google blue
+            androidx.compose.ui.graphics.Color(0xFFEA4335), // red
+            androidx.compose.ui.graphics.Color(0xFFFBBC04), // yellow
+            androidx.compose.ui.graphics.Color(0xFF34A853), // green
+            androidx.compose.ui.graphics.Color(0xFF4285F4), // wrap
+        )
+        val brush = Brush.linearGradient(
+            colors = colors,
+            start = Offset(bounds.left - width + shift, bounds.center.y),
+            end = Offset(bounds.left + shift, bounds.center.y),
+            tileMode = TileMode.Repeated,
+        )
+
+        // Outer soft halo — wider, fainter, pulses with `pulse`.
+        val haloInset = strokeWidth * 2f
+        drawRoundRect(
+            brush = brush,
+            topLeft = Offset(bounds.left - haloInset, bounds.top - haloInset),
+            size = Size(bounds.width + haloInset * 2f, bounds.height + haloInset * 2f),
+            cornerRadius = CornerRadius(cornerRadius + haloInset),
+            style = Stroke(width = haloInset * 2f),
+            alpha = pulse * 0.25f,
+        )
+
+        // Crisp main stroke hugging the pill.
+        drawRoundRect(
+            brush = brush,
+            topLeft = bounds.topLeft,
+            size = bounds.size,
+            cornerRadius = CornerRadius(cornerRadius),
+            style = Stroke(width = strokeWidth),
+            alpha = 0.55f + 0.45f * pulse,
+        )
+    }
 }
 
 private const val COMPOSE_CONTENT_TAG = "app_top_search_bar_compose_content"
