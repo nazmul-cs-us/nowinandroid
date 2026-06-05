@@ -59,10 +59,14 @@ object PrayerNotificationScheduler {
                 details = mapOf("reminderMinutes" to reminderMinutes)
             )
 
-            // Check if notifications are enabled for this specific prayer
+            // Schedule the main alarm if EITHER notifications OR silent-during-prayer
+            // is enabled. The receiver decides what to actually do (show banner vs
+            // enable DND) — so silent mode no longer gets gated off when a user
+            // turns prayer notifications off.
             val notificationsEnabled = isNotificationEnabledForPrayer(context, prayerName)
-            if (!notificationsEnabled) {
-                Log.d(TAG, "🔕 Notifications disabled for $prayerName - skipping scheduling")
+            val silentModeEnabled = isSilentDuringPrayerEnabled(context)
+            if (!notificationsEnabled && !silentModeEnabled) {
+                Log.d(TAG, "🔕 Notifications & silent-mode both off for $prayerName - skipping scheduling")
                 return
             }
 
@@ -71,7 +75,7 @@ object PrayerNotificationScheduler {
                 Log.e(TAG, "❌ Failed to parse prayer time: $prayerTime")
                 return
             }
-            
+
             // Schedule main prayer notification
             scheduleExactNotification(
                 context = context,
@@ -83,8 +87,9 @@ object PrayerNotificationScheduler {
                 priorMinutes = reminderMinutes
             )
 
-            // Schedule reminder notification if requested
-            if (reminderMinutes > 0) {
+            // Schedule reminder notification if requested. Reminders are purely a
+            // notification feature, so skip them when per-prayer notifications are off.
+            if (notificationsEnabled && reminderMinutes > 0) {
                 val reminderTime = prayerDateTime.minusMinutes(reminderMinutes.toLong())
                 if (reminderTime.isAfter(LocalDateTime.now())) {
                     scheduleExactNotification(
@@ -381,6 +386,22 @@ object PrayerNotificationScheduler {
         }
         val typeCode = if (type == "main") 0 else 1
         return ALARM_REQUEST_CODE_PREFIX + (prayerCode * 10) + typeCode
+    }
+
+    /**
+     * Global silent-during-prayer toggle (independent of per-prayer notification toggles).
+     */
+    private fun isSilentDuringPrayerEnabled(context: Context): Boolean {
+        return try {
+            val prefs = context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
+            val json = prefs.getString("notification_preferences_json", null) ?: return false
+            val parsed = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                .decodeFromString<com.starception.submission.prayer.model.PrayerNotificationPreferences>(json)
+            parsed.silentDuringPrayerEnabled
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error reading silent-during-prayer pref", e)
+            false
+        }
     }
 
     /**

@@ -294,6 +294,8 @@ fun PrayerTimesScreen(
     onPrayerAlertChanged: (com.starception.submission.feature.prayertimes.wobble.PrayerAlertState) -> Unit = {},
     prayerAlertOverride: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState = com.starception.submission.feature.prayertimes.wobble.PrayerAlertState(),
     onSearchSubmit: (query: String) -> Unit = {},
+    isSyncingExternal: Boolean = false,
+    onSetSyncing: (Boolean) -> Unit = {},
 ) {
     val screenContext = LocalContext.current
     
@@ -461,7 +463,11 @@ fun PrayerTimesScreen(
     }
     
     // PULL-TO-REFRESH STATE - Simple implementation
-    var isRefreshing by remember { mutableStateOf(false) }
+    // Single source of truth: read straight from the hoisted VM flag.
+    // All writes go through onSetSyncing so the app-level container on other
+    // tabs sees the same value. (Previous mirror-state approach used a
+    // remember(key) that snapped the reset signal mid-flight.)
+    val isRefreshing = isSyncingExternal
     var isDragging by remember { mutableStateOf(false) }
     
     // Track refresh state changes
@@ -657,7 +663,7 @@ fun PrayerTimesScreen(
                     android.util.Log.w("PullToRefresh", "Showing dialog to prompt user to enable location services")
                     
                     // Stop refresh and show dialog
-                    isRefreshing = false
+                    onSetSyncing(false)
                     isLoading = false
                     showLocationServiceDialog = true
                     return@LaunchedEffect
@@ -732,7 +738,7 @@ fun PrayerTimesScreen(
                 }
                 // Always reset loading and refresh states after visual hold
                 isLoading = false
-                isRefreshing = false
+                onSetSyncing(false)
             }
         }
     }
@@ -1407,7 +1413,7 @@ fun PrayerTimesScreen(
             val silentModeState by com.starception.submission.feature.prayertimes.wobble.rememberSilentModeState()
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
-                onRefresh = { isRefreshing = true },
+                onRefresh = { onSetSyncing(true) },
                 downloadProgress = downloadProgress,
                 downloadLabel = downloadLabel,
                 mediaState = mediaState,
@@ -1418,7 +1424,7 @@ fun PrayerTimesScreen(
             ) { syncState ->
             val outerConfiguration = LocalConfiguration.current
             val outerIsLandscape = outerConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
-            // Calculate dynamic top inset: full at rest, collapsed during pull (Fitbit-style)
+            // Dynamic top inset: full at rest, collapses during pull (Fitbit-style)
             val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
                 .asPaddingValues().calculateTopPadding()
             val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
@@ -1429,7 +1435,13 @@ fun PrayerTimesScreen(
                 onVerseClick = onSurahClickWithAyah,
                 onSearchSubmit = onSearchSubmit,
             ) {
-            Column(modifier = Modifier.fillMaxSize().then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
+            // Apply syncState.pullModifier here so the inner ComposeView's scrollable
+            // feeds the outer PullToSyncContainer's NestedScrollConnection. Without
+            // this the View↔Compose boundary swallows the drag events.
+            Column(modifier = Modifier
+                .fillMaxSize()
+                .then(syncState.pullModifier)
+                .then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
             // Pull-to-refresh indicator is handled by PullToSyncContainer in the sage background
             // Home page content with wobble transformation applied to actual content
             Box(

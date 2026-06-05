@@ -105,6 +105,10 @@ fun NiaNavHost(
     } else {
         com.starception.submission.feature.prayertimes.wobble.PrayerAlertState()
     }
+    val homeIsSyncing = if (mainViewModel != null) {
+        val s by mainViewModel.isSyncing.collectAsStateWithLifecycle()
+        s
+    } else false
 
     // Handle deep link for course
     var deepLinkHandled by remember { mutableStateOf(false) }
@@ -315,6 +319,8 @@ fun NiaNavHost(
             onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
             onPrayerAlertChanged = { state -> mainViewModel?.updatePrayerAlert(state) },
             prayerAlertOverride = homePrayerAlertOverride,
+            isSyncingExternal = homeIsSyncing,
+            onSetSyncing = { syncing -> mainViewModel?.setSyncing(syncing) },
         )
         courseScreen(
             titleRes = TopLevelDestination.COURSE.titleTextId,

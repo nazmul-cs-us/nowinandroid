@@ -70,13 +70,17 @@ import com.starception.submission.media.MediaControllerUiState
 import com.starception.submission.media.MediaMiniBar
 
 /**
- * Data class to hold sync container state and configuration
+ * Sync container state forwarded to the content lambda. `pullModifier` carries
+ * the [NestedScrollConnection] so the scrollable child can opt in — needed
+ * because the page content lives inside an AndroidView+ComposeView island that
+ * doesn't propagate nested-scroll events across the View boundary.
  */
-data class SyncContainerState(
+class SyncContainerState(
     val dragDistance: Float = 0f,
     val isWobbling: Boolean = false,
     val maxDragDistance: Float = 0f,
-    val wobbleIntensity: Float = 0f
+    val wobbleIntensity: Float = 0f,
+    val pullModifier: Modifier = Modifier,
 )
 
 /**
@@ -289,7 +293,8 @@ fun PullToSyncContainer(
         dragDistance = dragDistanceAnimated,
         isWobbling = wobbleIntensity > 0.01f,
         maxDragDistance = maxDragDistance,
-        wobbleIntensity = wobbleIntensity
+        wobbleIntensity = wobbleIntensity,
+        pullModifier = Modifier.nestedScroll(nestedScrollConnection),
     )
 
     // Outer Box: sage only during active pull; during sync the sweep reveals it progressively

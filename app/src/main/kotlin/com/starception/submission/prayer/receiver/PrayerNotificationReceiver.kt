@@ -59,8 +59,13 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                 )
             )
 
-            // Show notification directly (WorkManager has issues with Hilt)
-            showPrayerNotification(context, prayerName, prayerTime, notificationType, priorMinutes)
+            // The alarm fires whenever EITHER notification or silent-mode is enabled.
+            // Only show the notification banner if this prayer's notification toggle is on.
+            if (isNotificationEnabledForPrayer(context, prayerName)) {
+                showPrayerNotification(context, prayerName, prayerTime, notificationType, priorMinutes)
+            } else {
+                Log.d(TAG, "🔕 Notifications off for $prayerName — skipping banner (silent mode may still fire)")
+            }
 
             if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) {
                 maybeEnableSilentMode(context, prayerName)
@@ -72,6 +77,21 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
         }
     }
     
+    private fun isNotificationEnabledForPrayer(context: Context, prayerName: String): Boolean {
+        return try {
+            val prefs = context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
+            val json = prefs.getString("notification_preferences_json", null) ?: return true
+            val parsed = Json { ignoreUnknownKeys = true }.decodeFromString(
+                PrayerNotificationPreferences.serializer(),
+                json,
+            )
+            parsed.isNotificationEnabledForPrayer(prayerName)
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error reading per-prayer notification pref", e)
+            true
+        }
+    }
+
     private fun maybeEnableSilentMode(context: Context, prayerName: String) {
         val prefs = context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
         val json = prefs.getString("notification_preferences_json", null) ?: return

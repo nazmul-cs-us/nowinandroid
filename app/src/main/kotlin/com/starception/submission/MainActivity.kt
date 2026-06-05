@@ -253,19 +253,32 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
 
             val currentTimeZone by appState.currentTimeZone.collectAsStateWithLifecycle()
 
+            val resolvedDarkTheme = when (uiState) {
+                is MainActivityUiState.Success -> (uiState as MainActivityUiState.Success).shouldUseDarkTheme(isSystemDarkTheme)
+                is MainActivityUiState.Loading -> isSystemDarkTheme
+            }
+            val resolvedBrand = when (uiState) {
+                is MainActivityUiState.Success -> (uiState as MainActivityUiState.Success).themeBrand
+                is MainActivityUiState.Loading -> ThemeBrand.COASTAL
+            }
+            val resolvedDisableDynamic = when (uiState) {
+                is MainActivityUiState.Success -> (uiState as MainActivityUiState.Success).shouldDisableDynamicTheming
+                is MainActivityUiState.Loading -> true
+            }
+            // Mirror the active theme into ThemeColorBridge so inner ComposeViews
+            // (inside the SearchBar's AndroidView island) can re-apply the same
+            // brand instead of falling back to NiaTheme's COASTAL default.
+            androidx.compose.runtime.LaunchedEffect(resolvedBrand, resolvedDarkTheme, resolvedDisableDynamic) {
+                com.starception.submission.util.ThemeColorBridge.updateThemeConfig(
+                    brand = resolvedBrand,
+                    darkTheme = resolvedDarkTheme,
+                    disableDynamicTheming = resolvedDisableDynamic,
+                )
+            }
             NiaTheme(
-                darkTheme = when (uiState) {
-                    is MainActivityUiState.Success -> uiState.shouldUseDarkTheme(isSystemDarkTheme)
-                    is MainActivityUiState.Loading -> isSystemDarkTheme
-                },
-                themeBrand = when (uiState) {
-                    is MainActivityUiState.Success -> uiState.themeBrand
-                    is MainActivityUiState.Loading -> ThemeBrand.COASTAL
-                },
-                disableDynamicTheming = when (uiState) {
-                    is MainActivityUiState.Success -> uiState.shouldDisableDynamicTheming
-                    is MainActivityUiState.Loading -> true
-                },
+                darkTheme = resolvedDarkTheme,
+                themeBrand = resolvedBrand,
+                disableDynamicTheming = resolvedDisableDynamic,
             ) {
                 // Update theme color bridge so View-based components can access theme colors
                 com.starception.submission.util.ThemeColorBridge.UpdateColors()

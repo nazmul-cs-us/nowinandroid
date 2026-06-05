@@ -91,6 +91,16 @@ class MainActivityViewModel @Inject constructor(
         _prayerAlertState.value = state
     }
 
+    // Pull-to-sync state shared across pages. Hoisting it here means a sync that
+    // started on Home stays visible after navigating to another tab (and vice
+    // versa) — the per-screen PullToSyncContainers all read this one source.
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
+    fun setSyncing(syncing: Boolean) {
+        _isSyncing.value = syncing
+    }
+
 
     private val _showMissingBukhariPrompt = MutableStateFlow(false)
     val showMissingBukhariPrompt: StateFlow<Boolean> = _showMissingBukhariPrompt.asStateFlow()

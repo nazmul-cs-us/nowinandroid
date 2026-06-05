@@ -1,18 +1,13 @@
 package com.starception.submission.feature.prayertimes.wobble
 
 import android.app.NotificationManager
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.media.AudioManager
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import com.starception.submission.prayer.silent.PrayerSilentModeController
 import kotlinx.coroutines.delay
 
@@ -21,27 +16,19 @@ data class SilentModeState(
     val displayText: String = "",
 )
 
+/**
+ * Surfaces "do not disturb" state to the pull-to-sync banner. Only true DND
+ * (NotificationManager interruption filter ≠ ALL) and prayer-driven silence
+ * count — ringer mode (vibrate/silent) is intentionally ignored, since most
+ * phones live in vibrate and we don't want the whole-screen `tertiaryContainer`
+ * background tint baked into PullToSyncContainer to be permanently on.
+ */
 @Composable
 fun rememberSilentModeState(): State<SilentModeState> {
     val context = LocalContext.current
     val state = remember { mutableStateOf(computeSilentState(context)) }
-
-    // Ringer mode changes have a public broadcast; DND interruption filter does
-    // not, so we also poll on a timer to keep the banner fresh when the user
-    // toggles DND from Quick Settings.
-    DisposableEffect(context) {
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(c: Context?, intent: Intent?) {
-                state.value = computeSilentState(context)
-            }
-        }
-        context.registerReceiver(
-            receiver,
-            IntentFilter(AudioManager.RINGER_MODE_CHANGED_ACTION),
-        )
-        onDispose { runCatching { context.unregisterReceiver(receiver) } }
-    }
-
+    // Interruption filter has no public broadcast; poll on a short timer so
+    // the banner picks up DND toggles from Quick Settings.
     LaunchedEffect(Unit) {
         while (true) {
             state.value = computeSilentState(context)
@@ -59,18 +46,9 @@ private fun computeSilentState(context: Context): SilentModeState {
             displayText = "Silent for $prayer · ${session.minutesLeft()}m left",
         )
     }
-
     val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     if (nm.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) {
         return SilentModeState(isActive = true, displayText = "Do Not Disturb")
     }
-
-    val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    return when (am.ringerMode) {
-        AudioManager.RINGER_MODE_SILENT ->
-            SilentModeState(isActive = true, displayText = "Silent mode")
-        AudioManager.RINGER_MODE_VIBRATE ->
-            SilentModeState(isActive = true, displayText = "Vibrate mode")
-        else -> SilentModeState()
-    }
+    return SilentModeState()
 }

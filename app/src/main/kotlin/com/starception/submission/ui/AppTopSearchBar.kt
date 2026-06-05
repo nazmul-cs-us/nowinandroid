@@ -17,6 +17,8 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -66,7 +68,16 @@ fun AppTopSearchBar(
     onSearchSubmit: (query: String) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
-    val pillBackground = MaterialTheme.colorScheme.surfaceVariant.toArgb()
+    // Use primaryContainer so the SearchBar pill takes on the user's selected
+    // brand color (e.g. Royal -> pale Lapis blue) instead of the near-cream
+    // surfaceVariant that's visually indistinguishable from the page background.
+    val pillBackground = MaterialTheme.colorScheme.primaryContainer.toArgb()
+    val pillTextColor = MaterialTheme.colorScheme.onPrimaryContainer.toArgb()
+    // Inflated SearchView ships M3 default lavender — repaint with brand colors.
+    val searchViewBg = MaterialTheme.colorScheme.surface.toArgb()
+    val accentColor = MaterialTheme.colorScheme.primary.toArgb()
+    val titleColor = MaterialTheme.colorScheme.onSurface.toArgb()
+    val subtitleColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
     val topInsetPx = with(LocalDensity.current) { topInset.roundToPx() }
     val currentContent by rememberUpdatedState(content)
     val viewModel = hiltViewModel<TopBarSearchViewModel>()
@@ -112,6 +123,8 @@ fun AppTopSearchBar(
 
             val hintText = ctx.getString(R.string.app_top_bar_search_hint) + " " + title
             searchBar.hint = hintText
+            searchBar.textView?.setHintTextColor(pillTextColor)
+            searchBar.textView?.setTextColor(pillTextColor)
             searchView.hint = hintText
             searchBar.inflateMenu(R.menu.app_top_search_bar_menu)
             searchBar.setOnMenuItemClickListener { item ->
@@ -172,6 +185,11 @@ fun AppTopSearchBar(
             }
 
             val composeView = ComposeView(ctx).apply {
+                // setParentCompositionContext is intentionally NOT used here —
+                // it propagates CompositionLocals but loses the inner content's
+                // ability to participate in layout/draw, leaving the body blank.
+                // Re-wrap in NiaTheme inside setContent instead so the user's
+                // selected brand still reaches the inner subtree.
                 setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
                 tag = COMPOSE_CONTENT_TAG
             }
@@ -195,8 +213,22 @@ fun AppTopSearchBar(
             val searchView = root.findViewById<SearchView>(R.id.app_search_view)
             val hintText = root.context.getString(R.string.app_top_bar_search_hint) + " " + title
             searchBar.hint = hintText
+            searchBar.textView?.setHintTextColor(pillTextColor)
+            searchBar.textView?.setTextColor(pillTextColor)
             searchView.hint = hintText
             appBar.setPadding(0, topInsetPx, 0, 0)
+
+            // Re-tint only the SearchView's INTERNAL surface (open_search_view_background)
+            // and the toolbar container — those become visible when expanded.
+            // Do NOT call searchView.setBackgroundColor: SearchView itself is sized
+            // match_parent x match_parent and that paints over the body even when collapsed.
+            root.findViewById<View?>(
+                MaterialR.id.open_search_view_background
+            )?.setBackgroundColor(searchViewBg)
+            root.findViewById<View?>(
+                MaterialR.id.open_search_view_toolbar_container
+            )?.setBackgroundColor(searchViewBg)
+            searchView.getEditText().setTextColor(titleColor)
 
             renderSuggestions(
                 container = suggestionContainer,
@@ -204,6 +236,9 @@ fun AppTopSearchBar(
                 searchView = searchView,
                 recentSearches = recentSearches,
                 query = liveQuery,
+                accentColor = accentColor,
+                titleColor = titleColor,
+                subtitleColor = subtitleColor,
                 onVerseClick = { surah, ayah ->
                     searchView.hide()
                     currentOnVerseClick(surah, ayah)
@@ -237,6 +272,9 @@ private fun renderSuggestions(
     searchView: SearchView,
     recentSearches: List<RecentSearchQuery>,
     query: String,
+    accentColor: Int,
+    titleColor: Int,
+    subtitleColor: Int,
     onVerseClick: (Int, Int) -> Unit,
     onRecentClick: (String) -> Unit,
 ) {
@@ -271,21 +309,21 @@ private fun renderSuggestions(
     val inflater = LayoutInflater.from(ctx)
 
     if (filteredYesterday.isNotEmpty()) {
-        addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_yesterday))
+        addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_yesterday), subtitleColor)
         filteredYesterday.forEach { recent ->
-            addRecentSearchItem(container, inflater, recent.query, onRecentClick)
+            addRecentSearchItem(container, inflater, recent.query, titleColor, subtitleColor, onRecentClick)
         }
     }
     if (filteredThisWeek.isNotEmpty()) {
-        addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_this_week))
+        addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_this_week), subtitleColor)
         filteredThisWeek.forEach { recent ->
-            addRecentSearchItem(container, inflater, recent.query, onRecentClick)
+            addRecentSearchItem(container, inflater, recent.query, titleColor, subtitleColor, onRecentClick)
         }
     }
     if (filteredVerses.isNotEmpty()) {
-        addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_popular_verses))
+        addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_popular_verses), subtitleColor)
         filteredVerses.forEach { verse ->
-            addVerseItem(container, inflater, verse, onVerseClick)
+            addVerseItem(container, inflater, verse, accentColor, titleColor, subtitleColor, onVerseClick)
         }
     }
 }
@@ -314,9 +352,10 @@ private fun partitionRecentSearches(
     return yesterday to thisWeek
 }
 
-private fun addSectionTitle(parent: ViewGroup, inflater: LayoutInflater, text: String) {
+private fun addSectionTitle(parent: ViewGroup, inflater: LayoutInflater, text: String, subtitleColor: Int) {
     val view = inflater.inflate(R.layout.app_search_suggestion_title, parent, false) as TextView
     view.text = text
+    view.setTextColor(subtitleColor)
     parent.addView(view)
 }
 
@@ -324,12 +363,19 @@ private fun addRecentSearchItem(
     parent: ViewGroup,
     inflater: LayoutInflater,
     query: String,
+    titleColor: Int,
+    subtitleColor: Int,
     onClick: (String) -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    view.findViewById<ImageView>(R.id.app_search_suggestion_icon)
-        .setImageResource(R.drawable.ic_app_search_schedule_24)
-    view.findViewById<TextView>(R.id.app_search_suggestion_title).text = query
+    view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
+        setImageResource(R.drawable.ic_app_search_schedule_24)
+        imageTintList = android.content.res.ColorStateList.valueOf(subtitleColor)
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
+        text = query
+        setTextColor(titleColor)
+    }
     view.findViewById<TextView>(R.id.app_search_suggestion_subtitle).visibility = View.GONE
     view.setOnClickListener { onClick(query) }
     parent.addView(view)
@@ -339,15 +385,32 @@ private fun addVerseItem(
     parent: ViewGroup,
     inflater: LayoutInflater,
     verse: SuggestedVerse,
+    accentColor: Int,
+    titleColor: Int,
+    subtitleColor: Int,
     onClick: (Int, Int) -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_verse_item, parent, false)
-    view.findViewById<TextView>(R.id.app_search_verse_badge).text =
-        "${verse.surahNumber}:${verse.ayahNumber}"
-    view.findViewById<TextView>(R.id.app_search_verse_title).text = verse.name
-    view.findViewById<TextView>(R.id.app_search_verse_arabic).text = verse.arabicName
-    view.findViewById<TextView>(R.id.app_search_verse_subtitle).text = verse.description
-    view.findViewById<TextView>(R.id.app_search_verse_category).text = verse.category
+    view.findViewById<TextView>(R.id.app_search_verse_badge).apply {
+        text = "${verse.surahNumber}:${verse.ayahNumber}"
+        setTextColor(accentColor)
+    }
+    view.findViewById<TextView>(R.id.app_search_verse_title).apply {
+        text = verse.name
+        setTextColor(titleColor)
+    }
+    view.findViewById<TextView>(R.id.app_search_verse_arabic).apply {
+        text = verse.arabicName
+        setTextColor(subtitleColor)
+    }
+    view.findViewById<TextView>(R.id.app_search_verse_subtitle).apply {
+        text = verse.description
+        setTextColor(subtitleColor)
+    }
+    view.findViewById<TextView>(R.id.app_search_verse_category).apply {
+        text = verse.category
+        setTextColor(accentColor)
+    }
     view.setOnClickListener { onClick(verse.surahNumber, verse.ayahNumber) }
     parent.addView(view)
 }

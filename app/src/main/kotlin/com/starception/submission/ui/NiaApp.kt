@@ -383,15 +383,19 @@ private fun NiaMainContent(
         } else {
             ""
         }
-        // Local refresh state — driven by pull gesture, not WorkManager's isSyncing.
-        // WorkManager's state is unreliable for UI (KEEP policy, conflated flow, instant worker).
-        // Instead we hold the banner for a minimum 2s so the animation is always visible.
-        var isRefreshing by remember { mutableStateOf(false) }
-        LaunchedEffect(isRefreshing) {
-            if (isRefreshing) {
+        // Refresh state is hoisted to MainActivityViewModel so the sync banner
+        // persists when navigating between Home and other tabs mid-sync.
+        val isRefreshing = if (mainViewModel != null) {
+            val state by mainViewModel.isSyncing.collectAsStateWithLifecycle()
+            state
+        } else false
+        // Non-Home tabs run the generic WorkManager sync (Home runs its own
+        // location+prayer refresh and is responsible for clearing the flag).
+        LaunchedEffect(isRefreshing, isOnHome) {
+            if (isRefreshing && !isOnHome) {
                 mainViewModel?.requestSync()
                 delay(2000L)
-                isRefreshing = false
+                mainViewModel?.setSyncing(false)
             }
         }
 
@@ -423,8 +427,12 @@ private fun NiaMainContent(
         val silentModeState by com.starception.submission.feature.prayertimes.wobble.rememberSilentModeState()
         val appLevelSilentModeState = if (!isOnHome) silentModeState else com.starception.submission.feature.prayertimes.wobble.SilentModeState()
         PullToSyncContainer(
+            // Suppress the outer visual on Home (the inner container in
+            // PrayerTimesScreen renders it there). When the user navigates away
+            // mid-sync, this gate flips and the app-level visual picks up the
+            // still-true VM state, so the banner persists across the transition.
             isRefreshing = if (isOnHome) false else isRefreshing,
-            onRefresh = { if (!isOnHome) isRefreshing = true },
+            onRefresh = { mainViewModel?.setSyncing(true) },
             enabled = !isOnHome,
             downloadProgress = downloadProgress,
             downloadLabel = downloadLabel,
@@ -461,8 +469,9 @@ private fun NiaMainContent(
             // inset during sync, matching Home and avoiding a tall gap above the title.
             androidx.compose.runtime.CompositionLocalProvider(
                 com.starception.submission.ui.LocalWobbleIntensity provides syncState.wobbleIntensity,
+                com.starception.submission.ui.LocalPullToSyncModifier provides syncState.pullModifier,
             ) {
-                Box(modifier = Modifier) {
+                Box(modifier = Modifier.fillMaxSize()) {
                     NiaNavHost(
                         appState = appState,
                         onShowSnackbar = { message, action ->

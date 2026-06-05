@@ -28,6 +28,14 @@ import androidx.compose.ui.res.stringResource
 val LocalWobbleIntensity = compositionLocalOf { 0f }
 
 /**
+ * Forwards the app-level PullToSyncContainer's nestedScroll modifier across the
+ * View↔Compose island created by [AppTopSearchBar] (CoordinatorLayout + inner
+ * ComposeView). Non-Home tabs apply this to their content so drag events reach
+ * the outer container's connection.
+ */
+val LocalPullToSyncModifier = compositionLocalOf<Modifier> { Modifier }
+
+/**
  * Scaffold used by every non-Home top-level destination so each page renders
  * its own SearchBar at Y=0 of the NavHost. Wraps the page content inside
  * [AppTopSearchBar] so the SearchBar can morph into a full-screen SearchView
@@ -49,6 +57,7 @@ fun TopLevelTopBarScaffold(
             .calculateTopPadding()
         val wobbleIntensity = LocalWobbleIntensity.current
         val dynamicTopInset = statusBarInset * (1f - (wobbleIntensity * 2f).coerceAtMost(1f))
+        val pullToSyncModifier = LocalPullToSyncModifier.current
         AppTopSearchBar(
             title = stringResource(id = titleRes),
             onSettingsClick = onSettingsClick,
@@ -59,6 +68,7 @@ fun TopLevelTopBarScaffold(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .then(pullToSyncModifier)
                     .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
             ) {
                 content()
