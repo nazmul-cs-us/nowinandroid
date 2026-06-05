@@ -129,7 +129,9 @@ fun AppTopSearchBar(
             searchBar.inflateMenu(R.menu.app_top_search_bar_menu)
             searchBar.setOnMenuItemClickListener { item ->
                 if (item.itemId == R.id.action_mic) {
-                    searchView.show()
+                    // Mic tap on the collapsed SearchBar starts voice capture in-place —
+                    // do NOT expand the SearchView. Transcribed text is submitted via
+                    // currentOnSearchSubmit so the user navigates straight to results.
                     startVoiceCapture(
                         ctx = ctx,
                         searchBar = searchBar,
@@ -139,6 +141,7 @@ fun AppTopSearchBar(
                         onListeningChanged = { isListening = it },
                         onSearchSubmit = { q -> currentOnSearchSubmit(q) },
                         viewModel = viewModel,
+                        autoSubmit = true,
                     )
                 } else {
                     searchView.show()
@@ -148,6 +151,8 @@ fun AppTopSearchBar(
             searchView.inflateMenu(R.menu.app_top_search_bar_menu)
             searchView.setOnMenuItemClickListener { item ->
                 if (item.itemId == R.id.action_mic) {
+                    // Mic tap inside the expanded SearchView fills the input field
+                    // but does NOT auto-submit — the user can still edit before searching.
                     startVoiceCapture(
                         ctx = ctx,
                         searchBar = searchBar,
@@ -157,6 +162,7 @@ fun AppTopSearchBar(
                         onListeningChanged = { isListening = it },
                         onSearchSubmit = { q -> currentOnSearchSubmit(q) },
                         viewModel = viewModel,
+                        autoSubmit = false,
                     )
                 }
                 true
@@ -430,6 +436,7 @@ private fun startVoiceCapture(
     onListeningChanged: (Boolean) -> Unit,
     onSearchSubmit: (String) -> Unit,
     viewModel: TopBarSearchViewModel,
+    autoSubmit: Boolean,
 ) {
     if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
         != PackageManager.PERMISSION_GRANTED
@@ -438,16 +445,25 @@ private fun startVoiceCapture(
         return
     }
 
+    Toast.makeText(ctx, "Listening…", Toast.LENGTH_SHORT).show()
+
     val handleResult: (VoiceSearchService.VoiceSearchResult) -> Unit = { result ->
         onListeningChanged(false)
         when (result) {
             is VoiceSearchService.VoiceSearchResult.Success -> {
                 val text = result.text.trim()
                 if (text.isNotEmpty()) {
-                    // Drop transcription into the inline field; the TextWatcher
-                    // then refreshes filtered suggestions. User picks a verse
-                    // or hits Enter — voice itself never auto-navigates.
-                    searchView.setText(text)
+                    if (autoSubmit) {
+                        // Mic tap from collapsed bar: skip the SearchView entirely and
+                        // navigate straight to results.
+                        viewModel.saveSearchQuery(text)
+                        searchBar.setText(text)
+                        onSearchSubmit(text)
+                    } else {
+                        // Mic tap from inside expanded SearchView: just fill the field
+                        // so the user can review and submit (or pick a suggestion).
+                        searchView.setText(text)
+                    }
                 }
             }
             is VoiceSearchService.VoiceSearchResult.Error -> {
