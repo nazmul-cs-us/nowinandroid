@@ -80,7 +80,11 @@ internal class DefaultSearchContentsRepository @Inject constructor(
      * This maintains backward compatibility while being efficient.
      */
     override fun searchContents(searchQuery: String): Flow<SearchResult> {
-        val ftsQuery = "*$searchQuery*"
+        // SQLite FTS3/4 only supports trailing wildcards — `*query*` silently
+        // matches nothing (parsed as a literal token), which is why obvious hits
+        // like the "Distress & Anxiety" topic used to disappear. Use prefix
+        // matching instead so any token starting with the query is found.
+        val ftsQuery = "$searchQuery*"
 
         // Use paginated approach with first page only for Flow-based search
         val newsResourceIds = newsResourceFtsDao.searchAllNewsResources(ftsQuery)
@@ -131,7 +135,7 @@ internal class DefaultSearchContentsRepository @Inject constructor(
         page: Int,
         pageSize: Int,
     ): SearchResult = withContext(ioDispatcher) {
-        val ftsQuery = "*$searchQuery*"
+        val ftsQuery = "$searchQuery*"
         val offset = page * pageSize
 
         // Fetch paginated IDs from FTS tables
@@ -167,7 +171,7 @@ internal class DefaultSearchContentsRepository @Inject constructor(
      */
     override suspend fun getSearchResultsCount(searchQuery: String): SearchResultsCount =
         withContext(ioDispatcher) {
-            val ftsQuery = "*$searchQuery*"
+            val ftsQuery = "$searchQuery*"
             SearchResultsCount(
                 newsResourcesCount = newsResourceFtsDao.getSearchResultCount(ftsQuery),
                 topicsCount = topicFtsDao.getSearchResultCount(ftsQuery),

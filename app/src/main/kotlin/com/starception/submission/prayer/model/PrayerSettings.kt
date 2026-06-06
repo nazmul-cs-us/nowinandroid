@@ -137,6 +137,16 @@ data class PrayerNotificationPreferences(
         }
     }
 
+    /** Minutes the user wants to allow for travelling to the mosque before the silent window kicks in. */
+    fun goToMosqueDurationFor(prayerName: String): Int = when (prayerName.lowercase()) {
+        "fajr" -> fajrGoToMosqueDuration
+        "dhuhr" -> dhuhrGoToMosqueDuration
+        "asr" -> asrGoToMosqueDuration
+        "maghrib" -> maghribGoToMosqueDuration
+        "isha" -> ishaGoToMosqueDuration
+        else -> 0
+    }
+
     /**
      * Get prior notification minutes for a specific prayer
      */

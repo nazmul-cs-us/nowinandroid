@@ -36,6 +36,27 @@ val LocalWobbleIntensity = compositionLocalOf { 0f }
 val LocalPullToSyncModifier = compositionLocalOf<Modifier> { Modifier }
 
 /**
+ * The 4 tap-target callbacks fired by the inline FTS suggestion list in
+ * [AppTopSearchBar]. Packaged once so the various 2-pane scaffolds can forward
+ * them without each accepting four separate lambdas.
+ */
+data class SearchNavCallbacks(
+    val onTopicClick: (String) -> Unit = {},
+    val onNewsClick: (com.starception.submission.core.model.data.UserNewsResource) -> Unit = {},
+    val onFortressDuaClick: (com.starception.submission.core.duadatabase.Dua) -> Unit = {},
+    val onQuranicDuaClick: (com.starception.submission.core.quranicduas.QuranicDuaEntity) -> Unit = {},
+    /** Tapped surah (X) + ayah (Y); also used for the curated SuggestedVerses rows. */
+    val onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+)
+
+/**
+ * App-wide CompositionLocal providing the search nav callbacks. Set once at the
+ * NavHost level; every [TopLevelTopBarScaffold] reads it so we don't have to
+ * thread the same 4 lambdas through every 2-pane scaffold's parameter list.
+ */
+val LocalSearchNavCallbacks = compositionLocalOf { SearchNavCallbacks() }
+
+/**
  * Scaffold used by every non-Home top-level destination so each page renders
  * its own SearchBar at Y=0 of the NavHost. Wraps the page content inside
  * [AppTopSearchBar] so the SearchBar can morph into a full-screen SearchView
@@ -58,11 +79,19 @@ fun TopLevelTopBarScaffold(
         val wobbleIntensity = LocalWobbleIntensity.current
         val dynamicTopInset = statusBarInset * (1f - (wobbleIntensity * 2f).coerceAtMost(1f))
         val pullToSyncModifier = LocalPullToSyncModifier.current
+        val searchNav = LocalSearchNavCallbacks.current
         AppTopSearchBar(
             title = stringResource(id = titleRes),
             onSettingsClick = onSettingsClick,
             topInset = dynamicTopInset,
-            onVerseClick = onVerseClick,
+            // Both the scaffold's explicit override and the NavHost-level
+            // SearchNavCallbacks fire — the override exists for legacy callers
+            // that pre-date the CompositionLocal; new code paths only need to
+            // wire it at the NavHost.
+            onVerseClick = { s, a ->
+                onVerseClick(s, a)
+                searchNav.onVerseClick(s, a)
+            },
             onSearchSubmit = onSearchSubmit,
         ) {
             Box(

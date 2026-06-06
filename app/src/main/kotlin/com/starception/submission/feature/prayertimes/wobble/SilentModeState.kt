@@ -1,6 +1,5 @@
 package com.starception.submission.feature.prayertimes.wobble
 
-import android.app.NotificationManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -17,18 +16,19 @@ data class SilentModeState(
 )
 
 /**
- * Surfaces "do not disturb" state to the pull-to-sync banner. Only true DND
- * (NotificationManager interruption filter ≠ ALL) and prayer-driven silence
- * count — ringer mode (vibrate/silent) is intentionally ignored, since most
- * phones live in vibrate and we don't want the whole-screen `tertiaryContainer`
- * background tint baked into PullToSyncContainer to be permanently on.
+ * Surfaces the prayer-driven silent window to the pull-to-sync banner. The
+ * banner appears only when [PrayerSilentModeController] has an active session —
+ * i.e. after the "go to mosque" phase ends, for the duration configured in
+ * Settings. Generic system DND (toggled via Quick Settings, Pixel Modes,
+ * Bedtime, etc.) is intentionally ignored so the banner doesn't lie about why
+ * the phone is silent.
  */
 @Composable
 fun rememberSilentModeState(): State<SilentModeState> {
     val context = LocalContext.current
     val state = remember { mutableStateOf(computeSilentState(context)) }
-    // Interruption filter has no public broadcast; poll on a short timer so
-    // the banner picks up DND toggles from Quick Settings.
+    // The session is timestamp-based — poll so the "Xm left" countdown stays
+    // current and the banner clears as soon as the configured window ends.
     LaunchedEffect(Unit) {
         while (true) {
             state.value = computeSilentState(context)
@@ -39,16 +39,10 @@ fun rememberSilentModeState(): State<SilentModeState> {
 }
 
 private fun computeSilentState(context: Context): SilentModeState {
-    PrayerSilentModeController.currentSession(context)?.let { session ->
-        val prayer = session.prayerName.replaceFirstChar { it.uppercase() }
-        return SilentModeState(
-            isActive = true,
-            displayText = "Silent for $prayer · ${session.minutesLeft()}m left",
-        )
-    }
-    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    if (nm.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) {
-        return SilentModeState(isActive = true, displayText = "Do Not Disturb")
-    }
-    return SilentModeState()
+    val session = PrayerSilentModeController.currentSession(context) ?: return SilentModeState()
+    val prayer = session.prayerName.replaceFirstChar { it.uppercase() }
+    return SilentModeState(
+        isActive = true,
+        displayText = "Silent for $prayer · ${session.minutesLeft()}m left",
+    )
 }

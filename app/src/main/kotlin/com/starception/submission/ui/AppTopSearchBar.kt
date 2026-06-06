@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.material.R as MaterialR
@@ -82,6 +83,15 @@ fun AppTopSearchBar(
     onSearchSubmit: (query: String) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
+    // All non-verse search tap callbacks (topic, news, fortress dua, quranic dua,
+    // ayah) flow through this CompositionLocal — set once at NavHost level so
+    // direct callers like PrayerTimesScreen also get them without per-screen
+    // boilerplate.
+    val searchNav = LocalSearchNavCallbacks.current
+    val onTopicClick = searchNav.onTopicClick
+    val onNewsClick = searchNav.onNewsClick
+    val onFortressDuaClick = searchNav.onFortressDuaClick
+    val onQuranicDuaClick = searchNav.onQuranicDuaClick
     // Use primaryContainer so the SearchBar pill takes on the user's selected
     // brand color (e.g. Royal -> pale Lapis blue) instead of the near-cream
     // surfaceVariant that's visually indistinguishable from the page background.
@@ -96,8 +106,15 @@ fun AppTopSearchBar(
     val currentContent by rememberUpdatedState(content)
     val viewModel = hiltViewModel<TopBarSearchViewModel>()
     val recentSearches by viewModel.recentSearches.collectAsStateWithLifecycle()
+    val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+    val duaResults by viewModel.duaResults.collectAsStateWithLifecycle()
+    val quranResults by viewModel.quranResults.collectAsStateWithLifecycle()
     val currentOnVerseClick by rememberUpdatedState(onVerseClick)
     val currentOnSearchSubmit by rememberUpdatedState(onSearchSubmit)
+    val currentOnTopicClick by rememberUpdatedState(onTopicClick)
+    val currentOnNewsClick by rememberUpdatedState(onNewsClick)
+    val currentOnFortressDuaClick by rememberUpdatedState(onFortressDuaClick)
+    val currentOnQuranicDuaClick by rememberUpdatedState(onQuranicDuaClick)
 
     val context = LocalContext.current
     // Track the live query so renderSuggestions can filter in real time as the
@@ -155,25 +172,24 @@ fun AppTopSearchBar(
 
             val hintText = ctx.getString(R.string.app_top_bar_search_hint) + " " + title
             searchBar.hint = hintText
+            // Match the rest of the app — Roboto Serif (downloadable Google Font),
+            // same family Compose uses via NiaTheme. SearchBar/SearchView are View
+            // components so they ignore Compose Typography and default to system sans.
+            val appTypeface = ResourcesCompat.getFont(ctx, R.font.roboto_serif)
             searchBar.textView?.setHintTextColor(pillTextColor)
             searchBar.textView?.setTextColor(pillTextColor)
+            searchBar.textView?.typeface = appTypeface
             searchView.hint = hintText
+            searchView.getEditText().typeface = appTypeface
             searchBar.inflateMenu(R.menu.app_top_search_bar_menu)
             searchBar.setOnMenuItemClickListener { item ->
                 if (item.itemId == R.id.action_mic) {
-                    // Mic tap on the collapsed SearchBar starts voice capture in-place —
-                    // do NOT expand the SearchView. Transcribed text is submitted via
-                    // currentOnSearchSubmit so the user navigates straight to results.
                     startVoiceCapture(
                         ctx = ctx,
-                        searchBar = searchBar,
                         searchView = searchView,
                         whisper = whisperService,
                         cloud = cloudVoiceService,
                         onListeningChanged = { isListening = it },
-                        onSearchSubmit = { q -> currentOnSearchSubmit(q) },
-                        viewModel = viewModel,
-                        autoSubmit = true,
                     )
                 } else {
                     searchView.show()
@@ -183,18 +199,12 @@ fun AppTopSearchBar(
             searchView.inflateMenu(R.menu.app_top_search_bar_menu)
             searchView.setOnMenuItemClickListener { item ->
                 if (item.itemId == R.id.action_mic) {
-                    // Mic tap inside the expanded SearchView fills the input field
-                    // but does NOT auto-submit — the user can still edit before searching.
                     startVoiceCapture(
                         ctx = ctx,
-                        searchBar = searchBar,
                         searchView = searchView,
                         whisper = whisperService,
                         cloud = cloudVoiceService,
                         onListeningChanged = { isListening = it },
-                        onSearchSubmit = { q -> currentOnSearchSubmit(q) },
-                        viewModel = viewModel,
-                        autoSubmit = false,
                     )
                 }
                 true
@@ -208,18 +218,23 @@ fun AppTopSearchBar(
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
                 override fun afterTextChanged(s: Editable?) {
-                    liveQuery = s?.toString().orEmpty()
+                    val q = s?.toString().orEmpty()
+                    liveQuery = q
+                    viewModel.onSearchQueryChanged(q)
                 }
             })
             searchView.getEditText().setOnEditorActionListener { _, _, _ ->
+                // Pressing Enter / the keyboard search button used to navigate to
+                // the old feature:search results page. Now the SearchView itself
+                // renders inline FTS rows for everything (duas, topics, news,
+                // ayahs), so submit only saves the query as recent and dismisses
+                // the keyboard — the user stays put and taps a row to drill in.
                 val query = searchView.text.toString().trim()
                 if (query.isNotEmpty()) {
                     viewModel.saveSearchQuery(query)
                     searchBar.setText(query)
-                    searchView.hide()
-                    currentOnSearchSubmit(query)
                 }
-                false
+                true
             }
 
             val composeView = ComposeView(ctx).apply {
@@ -274,6 +289,9 @@ fun AppTopSearchBar(
                 searchView = searchView,
                 recentSearches = recentSearches,
                 query = liveQuery,
+                searchResults = searchResults,
+                duaResults = duaResults,
+                quranResults = quranResults,
                 accentColor = accentColor,
                 titleColor = titleColor,
                 subtitleColor = subtitleColor,
@@ -282,9 +300,30 @@ fun AppTopSearchBar(
                     currentOnVerseClick(surah, ayah)
                 },
                 onRecentClick = { query ->
-                    searchBar.setText(query)
+                    // Refill the SearchView so inline FTS re-runs against the
+                    // chosen recent query — don't dump the user back on the old
+                    // feature:search page.
+                    searchView.setText(query)
+                },
+                onTopicClick = { id ->
+                    viewModel.saveSearchQuery(liveQuery)
                     searchView.hide()
-                    currentOnSearchSubmit(query)
+                    currentOnTopicClick(id)
+                },
+                onNewsClick = { news ->
+                    viewModel.saveSearchQuery(liveQuery)
+                    searchView.hide()
+                    currentOnNewsClick(news)
+                },
+                onFortressDuaClick = { dua ->
+                    viewModel.saveSearchQuery(liveQuery)
+                    searchView.hide()
+                    currentOnFortressDuaClick(dua)
+                },
+                onQuranicDuaClick = { dua ->
+                    viewModel.saveSearchQuery(liveQuery)
+                    searchView.hide()
+                    currentOnQuranicDuaClick(dua)
                 },
             )
 
@@ -331,7 +370,7 @@ private fun ListeningEdgeGlow(
     Canvas(modifier = modifier) {
         if (bounds.width <= 0f || bounds.height <= 0f) return@Canvas
 
-        val strokeWidth = 3.dp.toPx()
+        val strokeWidth = 1.5.dp.toPx()
         val cornerRadius = bounds.height / 2f
         val width = bounds.width
         val shift = phase * width
@@ -350,24 +389,34 @@ private fun ListeningEdgeGlow(
             tileMode = TileMode.Repeated,
         )
 
-        // Outer soft halo — wider, fainter, pulses with `pulse`.
-        val haloInset = strokeWidth * 2f
-        drawRoundRect(
-            brush = brush,
-            topLeft = Offset(bounds.left - haloInset, bounds.top - haloInset),
-            size = Size(bounds.width + haloInset * 2f, bounds.height + haloInset * 2f),
-            cornerRadius = CornerRadius(cornerRadius + haloInset),
-            style = Stroke(width = haloInset * 2f),
+        // Both strokes are drawn with their OUTER edge lined up with the pill's
+        // inner edge — i.e. nothing extends beyond the pill bounds at any point.
+        fun drawInsetStroke(strokePx: Float, inwardOffset: Float, alpha: Float) {
+            val center = inwardOffset + strokePx / 2f
+            drawRoundRect(
+                brush = brush,
+                topLeft = Offset(bounds.left + center, bounds.top + center),
+                size = Size(
+                    (bounds.width - center * 2f).coerceAtLeast(0f),
+                    (bounds.height - center * 2f).coerceAtLeast(0f),
+                ),
+                cornerRadius = CornerRadius((cornerRadius - center).coerceAtLeast(0f)),
+                style = Stroke(width = strokePx),
+                alpha = alpha,
+            )
+        }
+
+        // Soft halo, sits inside the border.
+        drawInsetStroke(
+            strokePx = 6.dp.toPx(),
+            inwardOffset = strokeWidth,
             alpha = pulse * 0.25f,
         )
 
-        // Crisp main stroke hugging the pill.
-        drawRoundRect(
-            brush = brush,
-            topLeft = bounds.topLeft,
-            size = bounds.size,
-            cornerRadius = CornerRadius(cornerRadius),
-            style = Stroke(width = strokeWidth),
+        // Thin gradient border — outer edge touches the pill edge, fully inside.
+        drawInsetStroke(
+            strokePx = strokeWidth,
+            inwardOffset = 0f,
             alpha = 0.55f + 0.45f * pulse,
         )
     }
@@ -388,11 +437,18 @@ private fun renderSuggestions(
     searchView: SearchView,
     recentSearches: List<RecentSearchQuery>,
     query: String,
+    searchResults: com.starception.submission.core.model.data.UserSearchResult,
+    duaResults: DuaSearchResult,
+    quranResults: QuranSearchResult,
     accentColor: Int,
     titleColor: Int,
     subtitleColor: Int,
     onVerseClick: (Int, Int) -> Unit,
     onRecentClick: (String) -> Unit,
+    onTopicClick: (String) -> Unit,
+    onNewsClick: (com.starception.submission.core.model.data.UserNewsResource) -> Unit,
+    onFortressDuaClick: (com.starception.submission.core.duadatabase.Dua) -> Unit,
+    onQuranicDuaClick: (com.starception.submission.core.quranicduas.QuranicDuaEntity) -> Unit,
 ) {
     val trimmedQuery = query.trim()
     val isFiltering = trimmedQuery.isNotEmpty()
@@ -407,6 +463,13 @@ private fun renderSuggestions(
     val filteredVerses = if (isFiltering) {
         SuggestedVerses.search(trimmedQuery)
     } else SuggestedVerses.verses
+    // FTS results — capped per-section so the suggestion list stays scannable.
+    val ftsTopics = searchResults.topics.take(5)
+    val ftsNews = searchResults.newsResources.take(8)
+    val fortressDuas = duaResults.fortressDuas.take(8)
+    val quranicDuas = duaResults.quranicDuas.take(8)
+    val quranSurahs = quranResults.surahs.take(5)
+    val quranAyahs = quranResults.ayahs.take(8)
 
     val stateKey = buildString {
         append(trimmedQuery)
@@ -416,6 +479,18 @@ private fun renderSuggestions(
         append(filteredThisWeek.joinToString("|") { it.query })
         append("##")
         append(filteredVerses.joinToString("|") { "${it.surahNumber}:${it.ayahNumber}" })
+        append("##")
+        append(ftsTopics.joinToString("|") { it.topic.id })
+        append("##")
+        append(ftsNews.joinToString("|") { it.id })
+        append("##")
+        append(fortressDuas.joinToString("|") { "f${it.id}" })
+        append("##")
+        append(quranicDuas.joinToString("|") { "q${it.id}" })
+        append("##")
+        append(quranSurahs.joinToString("|") { "s${it.number}" })
+        append("##")
+        append(quranAyahs.joinToString("|") { "a${it.surahNumber}:${it.numberInSurah}" })
     }
     if (container.getTag(SUGGESTION_STATE_TAG.hashCode()) == stateKey) return
     container.setTag(SUGGESTION_STATE_TAG.hashCode(), stateKey)
@@ -424,6 +499,54 @@ private fun renderSuggestions(
     val ctx = container.context
     val inflater = LayoutInflater.from(ctx)
 
+    // Quran (surahs + ayahs) comes first — verses are the highest-value content
+    // for the user's typical "find a meaning / find a topic" search intent.
+    if (quranSurahs.isNotEmpty()) {
+        addSectionTitle(container, inflater, "Surahs", subtitleColor)
+        quranSurahs.forEach { surah ->
+            addSurahItem(container, inflater, surah,
+                accentColor, titleColor, subtitleColor) { onVerseClick(surah.number, 1) }
+        }
+    }
+    if (quranAyahs.isNotEmpty()) {
+        addSectionTitle(container, inflater, "Quran", subtitleColor)
+        quranAyahs.forEach { ayah ->
+            addAyahItem(container, inflater, ayah,
+                accentColor, titleColor, subtitleColor) {
+                onVerseClick(ayah.surahNumber, ayah.numberInSurah)
+            }
+        }
+    }
+    // Duas lead the suggestion list — they're the primary content users search for.
+    if (quranicDuas.isNotEmpty()) {
+        addSectionTitle(container, inflater, "Quranic Duas", subtitleColor)
+        quranicDuas.forEach { dua ->
+            addQuranicDuaItem(container, inflater, dua,
+                accentColor, titleColor, subtitleColor) { onQuranicDuaClick(dua) }
+        }
+    }
+    if (fortressDuas.isNotEmpty()) {
+        addSectionTitle(container, inflater, "Fortress of the Muslim", subtitleColor)
+        fortressDuas.forEach { dua ->
+            addFortressDuaItem(container, inflater, dua,
+                accentColor, titleColor, subtitleColor) { onFortressDuaClick(dua) }
+        }
+    }
+    // FTS results lead so a typing user sees the most-useful matches first.
+    if (ftsTopics.isNotEmpty()) {
+        addSectionTitle(container, inflater, "Topics", subtitleColor)
+        ftsTopics.forEach { topic ->
+            addTopicItem(container, inflater, topic.topic.name, topic.topic.shortDescription,
+                accentColor, titleColor, subtitleColor) { onTopicClick(topic.topic.id) }
+        }
+    }
+    if (ftsNews.isNotEmpty()) {
+        addSectionTitle(container, inflater, "Duas & Articles", subtitleColor)
+        ftsNews.forEach { news ->
+            addNewsItem(container, inflater, news.title, news.content,
+                accentColor, titleColor, subtitleColor) { onNewsClick(news) }
+        }
+    }
     if (filteredYesterday.isNotEmpty()) {
         addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_yesterday), subtitleColor)
         filteredYesterday.forEach { recent ->
@@ -436,7 +559,12 @@ private fun renderSuggestions(
             addRecentSearchItem(container, inflater, recent.query, titleColor, subtitleColor, onRecentClick)
         }
     }
-    if (filteredVerses.isNotEmpty()) {
+    // Suppress hardcoded popular verses once we have real FTS hits — keeping
+    // both adds noise and pushes the relevant content below the fold.
+    val showPopularVerses = filteredVerses.isNotEmpty() && ftsTopics.isEmpty() &&
+        ftsNews.isEmpty() && fortressDuas.isEmpty() && quranicDuas.isEmpty() &&
+        quranSurahs.isEmpty() && quranAyahs.isEmpty()
+    if (showPopularVerses) {
         addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_popular_verses), subtitleColor)
         filteredVerses.forEach { verse ->
             addVerseItem(container, inflater, verse, accentColor, titleColor, subtitleColor, onVerseClick)
@@ -472,6 +600,226 @@ private fun addSectionTitle(parent: ViewGroup, inflater: LayoutInflater, text: S
     val view = inflater.inflate(R.layout.app_search_suggestion_title, parent, false) as TextView
     view.text = text
     view.setTextColor(subtitleColor)
+    view.typeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    parent.addView(view)
+}
+
+private fun addSurahItem(
+    parent: ViewGroup,
+    inflater: LayoutInflater,
+    surah: com.starception.submission.core.qurandatabase.SurahEntity,
+    accentColor: Int,
+    titleColor: Int,
+    subtitleColor: Int,
+    onClick: () -> Unit,
+) {
+    val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
+        setImageResource(R.drawable.ic_app_search_home_24)
+        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+    }
+    val name = surah.nameEnglish?.takeIf { it.isNotBlank() }
+        ?: surah.nameTranslation?.takeIf { it.isNotBlank() }
+        ?: surah.nameArabic
+        ?: "Surah ${surah.number}"
+    view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
+        text = "Surah ${surah.number} — $name"
+        setTextColor(titleColor)
+        typeface = appTypeface
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_subtitle).apply {
+        val subtitle = listOfNotNull(
+            surah.nameArabic?.takeIf { it.isNotBlank() },
+            surah.revelationType?.takeIf { it.isNotBlank() },
+        ).joinToString(" · ")
+        text = subtitle
+        setTextColor(subtitleColor)
+        typeface = appTypeface
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        visibility = if (subtitle.isBlank()) View.GONE else View.VISIBLE
+    }
+    view.setOnClickListener { onClick() }
+    parent.addView(view)
+}
+
+private fun addAyahItem(
+    parent: ViewGroup,
+    inflater: LayoutInflater,
+    ayah: com.starception.submission.core.qurandatabase.AyahEntity,
+    accentColor: Int,
+    titleColor: Int,
+    subtitleColor: Int,
+    onClick: () -> Unit,
+) {
+    val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
+        setImageResource(R.drawable.ic_app_search_home_24)
+        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
+        text = "${ayah.surahNumber}:${ayah.numberInSurah}"
+        setTextColor(accentColor)
+        typeface = appTypeface
+        maxLines = 1
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_subtitle).apply {
+        val snippet = ayah.text.replace(Regex("\\s+"), " ").trim()
+        text = snippet
+        setTextColor(titleColor)
+        typeface = appTypeface
+        maxLines = 2
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        visibility = if (snippet.isBlank()) View.GONE else View.VISIBLE
+    }
+    view.setOnClickListener { onClick() }
+    parent.addView(view)
+}
+
+private fun addQuranicDuaItem(
+    parent: ViewGroup,
+    inflater: LayoutInflater,
+    dua: com.starception.submission.core.quranicduas.QuranicDuaEntity,
+    accentColor: Int,
+    titleColor: Int,
+    subtitleColor: Int,
+    onClick: () -> Unit,
+) {
+    val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
+        setImageResource(R.drawable.ic_app_search_home_24)
+        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
+        text = "Dua ${dua.duaNumber}: ${dua.title}"
+        setTextColor(titleColor)
+        typeface = appTypeface
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_subtitle).apply {
+        val snippet = (dua.translation ?: dua.explanation ?: "")
+            .replace(Regex("\\s+"), " ").trim()
+        text = snippet
+        setTextColor(subtitleColor)
+        typeface = appTypeface
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        visibility = if (snippet.isBlank()) View.GONE else View.VISIBLE
+    }
+    view.setOnClickListener { onClick() }
+    parent.addView(view)
+}
+
+private fun addFortressDuaItem(
+    parent: ViewGroup,
+    inflater: LayoutInflater,
+    dua: com.starception.submission.core.duadatabase.Dua,
+    accentColor: Int,
+    titleColor: Int,
+    subtitleColor: Int,
+    onClick: () -> Unit,
+) {
+    val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
+        setImageResource(R.drawable.ic_app_search_home_24)
+        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
+        text = dua.chapterTitle.ifBlank { "Dua" }
+        setTextColor(titleColor)
+        typeface = appTypeface
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_subtitle).apply {
+        val snippet = (dua.translation ?: dua.transliteration ?: dua.context ?: "")
+            .replace(Regex("\\s+"), " ").trim()
+        text = snippet
+        setTextColor(subtitleColor)
+        typeface = appTypeface
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        visibility = if (snippet.isBlank()) View.GONE else View.VISIBLE
+    }
+    view.setOnClickListener { onClick() }
+    parent.addView(view)
+}
+
+private fun addTopicItem(
+    parent: ViewGroup,
+    inflater: LayoutInflater,
+    name: String,
+    description: String,
+    accentColor: Int,
+    titleColor: Int,
+    subtitleColor: Int,
+    onClick: () -> Unit,
+) {
+    val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
+        setImageResource(R.drawable.ic_app_search_home_24)
+        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
+        text = name
+        setTextColor(titleColor)
+        typeface = appTypeface
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_subtitle).apply {
+        text = description
+        setTextColor(subtitleColor)
+        typeface = appTypeface
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        visibility = if (description.isBlank()) View.GONE else View.VISIBLE
+    }
+    view.setOnClickListener { onClick() }
+    parent.addView(view)
+}
+
+private fun addNewsItem(
+    parent: ViewGroup,
+    inflater: LayoutInflater,
+    title: String,
+    snippet: String,
+    accentColor: Int,
+    titleColor: Int,
+    subtitleColor: Int,
+    onClick: () -> Unit,
+) {
+    val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
+        setImageResource(R.drawable.ic_app_search_home_24)
+        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
+        text = title
+        setTextColor(titleColor)
+        typeface = appTypeface
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_subtitle).apply {
+        // Strip markdown-ish bullets & collapse whitespace so the snippet stays scannable.
+        val cleaned = snippet.replace(Regex("[\\n\\r]+"), " ")
+            .replace(Regex("\\s+"), " ").trim()
+        text = cleaned
+        setTextColor(subtitleColor)
+        typeface = appTypeface
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        visibility = if (cleaned.isBlank()) View.GONE else View.VISIBLE
+    }
+    view.setOnClickListener { onClick() }
     parent.addView(view)
 }
 
@@ -484,6 +832,7 @@ private fun addRecentSearchItem(
     onClick: (String) -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         setImageResource(R.drawable.ic_app_search_schedule_24)
         imageTintList = android.content.res.ColorStateList.valueOf(subtitleColor)
@@ -491,6 +840,7 @@ private fun addRecentSearchItem(
     view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
         text = query
         setTextColor(titleColor)
+        typeface = appTypeface
     }
     view.findViewById<TextView>(R.id.app_search_suggestion_subtitle).visibility = View.GONE
     view.setOnClickListener { onClick(query) }
@@ -507,13 +857,16 @@ private fun addVerseItem(
     onClick: (Int, Int) -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_verse_item, parent, false)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
     view.findViewById<TextView>(R.id.app_search_verse_badge).apply {
         text = "${verse.surahNumber}:${verse.ayahNumber}"
         setTextColor(accentColor)
+        typeface = appTypeface
     }
     view.findViewById<TextView>(R.id.app_search_verse_title).apply {
         text = verse.name
         setTextColor(titleColor)
+        typeface = appTypeface
     }
     view.findViewById<TextView>(R.id.app_search_verse_arabic).apply {
         text = verse.arabicName
@@ -522,10 +875,12 @@ private fun addVerseItem(
     view.findViewById<TextView>(R.id.app_search_verse_subtitle).apply {
         text = verse.description
         setTextColor(subtitleColor)
+        typeface = appTypeface
     }
     view.findViewById<TextView>(R.id.app_search_verse_category).apply {
         text = verse.category
         setTextColor(accentColor)
+        typeface = appTypeface
     }
     view.setOnClickListener { onClick(verse.surahNumber, verse.ayahNumber) }
     parent.addView(view)
@@ -533,20 +888,16 @@ private fun addVerseItem(
 
 /**
  * Mic tap: try offline Whisper first (private, low-latency), fall back to the
- * cloud SpeechRecognizer if Whisper isn't initialised. Result is written into
- * the SearchView's edit field and then submitted via [onSearchSubmit] so the
- * caller can navigate to full FTS results.
+ * cloud SpeechRecognizer if Whisper isn't initialised. Result opens the in-place
+ * SearchView with the transcribed text so the user can review and pick a
+ * suggestion or submit via IME.
  */
 private fun startVoiceCapture(
     ctx: Context,
-    searchBar: SearchBar,
     searchView: SearchView,
     whisper: WhisperVoiceService,
     cloud: VoiceSearchService,
     onListeningChanged: (Boolean) -> Unit,
-    onSearchSubmit: (String) -> Unit,
-    viewModel: TopBarSearchViewModel,
-    autoSubmit: Boolean,
 ) {
     if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
         != PackageManager.PERMISSION_GRANTED
@@ -563,17 +914,15 @@ private fun startVoiceCapture(
             is VoiceSearchService.VoiceSearchResult.Success -> {
                 val text = result.text.trim()
                 if (text.isNotEmpty()) {
-                    if (autoSubmit) {
-                        // Mic tap from collapsed bar: skip the SearchView entirely and
-                        // navigate straight to results.
-                        viewModel.saveSearchQuery(text)
-                        searchBar.setText(text)
-                        onSearchSubmit(text)
-                    } else {
-                        // Mic tap from inside expanded SearchView: just fill the field
-                        // so the user can review and submit (or pick a suggestion).
-                        searchView.setText(text)
+                    // Mic always opens the in-place SearchView with the transcribed
+                    // text so the user sees our suggestion UI (recents + popular
+                    // verses filtered by the query) instead of being pushed to the
+                    // old feature:search results page. They can pick a suggestion
+                    // or hit IME-search to submit.
+                    if (!searchView.isShowing) {
+                        searchView.show()
                     }
+                    searchView.setText(text)
                 }
             }
             is VoiceSearchService.VoiceSearchResult.Error -> {

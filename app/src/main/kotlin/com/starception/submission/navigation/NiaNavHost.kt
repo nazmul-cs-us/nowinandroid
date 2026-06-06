@@ -121,6 +121,54 @@ fun NiaNavHost(
         }
     }
 
+    // SearchView tap-target callbacks reach every top-level scaffold via this
+    // CompositionLocal so we don't thread the same 4 lambdas through each
+    // 2-pane wrapper. Defined once around the NavHost so all routes share them.
+    val searchNavCallbacks = com.starception.submission.ui.SearchNavCallbacks(
+        onTopicClick = navController::navigateToTopic,
+        onNewsClick = { userNewsResource ->
+            val duaNumber = Regex("Dua (\\d+)").find(userNewsResource.title)
+                ?.groupValues?.get(1)?.toIntOrNull()
+                ?: Regex("#(\\d+)").find(userNewsResource.title)
+                    ?.groupValues?.get(1)?.toIntOrNull()
+                ?: 1
+            navController.navigateToDuaDetail(
+                title = userNewsResource.title,
+                content = userNewsResource.content,
+                quranReference = null,
+                duaNumber = duaNumber,
+                newsResourceId = userNewsResource.id,
+                topicId = "",
+            )
+        },
+        onFortressDuaClick = { dua ->
+            navController.navigateToDuaDetail(
+                title = dua.chapterTitle.ifBlank { "Dua" },
+                content = dua.translation ?: dua.transliteration ?: "",
+                quranReference = null,
+                duaNumber = dua.position,
+                newsResourceId = "",
+                topicId = "",
+            )
+        },
+        onQuranicDuaClick = { dua ->
+            navController.navigateToDuaDetail(
+                title = "Dua ${dua.duaNumber}: ${dua.title}",
+                content = dua.translation ?: dua.explanation ?: "",
+                quranReference = dua.surahReference,
+                duaNumber = dua.duaNumber,
+                newsResourceId = "",
+                topicId = "",
+            )
+        },
+        onVerseClick = { surah, ayah ->
+            navController.navigateToSurah(surahNumber = surah, scrollToAyah = ayah)
+        },
+    )
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.starception.submission.ui.LocalSearchNavCallbacks provides searchNavCallbacks,
+    ) {
     NavHost(
         navController = navController,
         startDestination = PrayerTimesRoute,
@@ -406,5 +454,6 @@ fun NiaNavHost(
                 )
             }
         )
+    }
     }
 }

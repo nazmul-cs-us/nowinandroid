@@ -102,8 +102,16 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             )
         }.getOrNull() ?: return
         if (!preferences.silentDuringPrayerEnabled) return
-        PrayerSilentModeController(context.applicationContext)
-            .enableForPrayer(prayerName, preferences.silentDuringPrayerMinutes)
+        // "Go to Mosque" phase delays the silent window so the user has time to
+        // travel before their phone goes silent. Once the delay elapses, the
+        // scheduled StartPrayerSilentReceiver flips DND on for the configured
+        // silent-during-prayer duration.
+        val delayMin = preferences.goToMosqueDurationFor(prayerName)
+        PrayerSilentModeController(context.applicationContext).scheduleStartAfter(
+            prayerName = prayerName,
+            delayMinutes = delayMin,
+            durationMinutes = preferences.silentDuringPrayerMinutes,
+        )
     }
 
     private fun scheduleWorkManagerJob(

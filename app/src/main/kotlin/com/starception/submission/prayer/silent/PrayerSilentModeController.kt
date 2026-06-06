@@ -17,6 +17,39 @@ class PrayerSilentModeController(private val context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    /**
+     * Schedules silent mode to switch ON at `now + delayMinutes` (i.e. once the
+     * user-configured "Go to Mosque" window for this prayer has elapsed), then
+     * stay on for [durationMinutes]. The actual DND flip + restore alarm are
+     * set when [StartPrayerSilentReceiver] fires this back into [enableForPrayer].
+     * No-op if delay <= 0 — in that case the caller should invoke [enableForPrayer]
+     * directly.
+     */
+    fun scheduleStartAfter(prayerName: String, delayMinutes: Int, durationMinutes: Int) {
+        if (delayMinutes <= 0) {
+            enableForPrayer(prayerName, durationMinutes)
+            return
+        }
+        if (!nm.isNotificationPolicyAccessGranted) {
+            Log.w(TAG, "DND access not granted — cannot schedule silent mode for $prayerName")
+            return
+        }
+        val triggerAt = System.currentTimeMillis() + delayMinutes * 60_000L
+        val intent = Intent(context, StartPrayerSilentReceiver::class.java).apply {
+            action = ACTION_START
+            putExtra(EXTRA_PRAYER_NAME, prayerName)
+            putExtra(EXTRA_DURATION_MIN, durationMinutes)
+        }
+        val pi = PendingIntent.getBroadcast(
+            context,
+            START_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+        Log.i(TAG, "Silent mode for $prayerName scheduled at +${delayMinutes}m (Go to Mosque phase), then ${durationMinutes}m duration")
+    }
+
     fun enableForPrayer(prayerName: String, durationMinutes: Int) {
         if (!nm.isNotificationPolicyAccessGranted) {
             Log.w(TAG, "DND access not granted — cannot enable silent mode for $prayerName")
@@ -66,7 +99,11 @@ class PrayerSilentModeController(private val context: Context) {
         private const val KEY_PRAYER_NAME = "prayer_name"
         private const val KEY_END_AT_MS = "end_at_ms"
         private const val REQUEST_CODE = 47291
+        private const val START_REQUEST_CODE = 47292
         const val ACTION_RESTORE = "com.starception.submission.action.RESTORE_PRAYER_SILENT"
+        const val ACTION_START = "com.starception.submission.action.START_PRAYER_SILENT"
+        const val EXTRA_PRAYER_NAME = "prayer_name"
+        const val EXTRA_DURATION_MIN = "duration_min"
 
         fun currentSession(context: Context): SilentSession? {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

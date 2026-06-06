@@ -155,6 +155,11 @@
             android:name=".prayer.silent.RestorePrayerSilentReceiver"
             android:exported="false" />
 
+        <!-- Fires at end of the "Go to Mosque" window and flips DND on for the silent-during-prayer duration -->
+        <receiver
+            android:name=".prayer.silent.StartPrayerSilentReceiver"
+            android:exported="false" />
+
         <!-- Prayer Boot Receiver for automatic rescheduling after device restart -->
         <receiver
             android:name=".prayer.receiver.PrayerBootReceiver"
