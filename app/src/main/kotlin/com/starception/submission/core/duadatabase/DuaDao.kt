@@ -171,6 +171,60 @@ interface DuaDao {
     suspend fun searchAll(query: String, limit: Int = 100): List<DuaInvocationEntity>
 
     /**
+     * Multi-token invocation search: every non-empty token must hit *some* searched
+     * field on the same row. Joined to chapters so a token can also match the
+     * chapter title (e.g. "anxiety" hits the Distress & Anxiety chapter even when
+     * the individual invocation translations don't contain the word).
+     *
+     * Pass empty strings for unused token slots — the `:tN = ''` short-circuit
+     * makes those AND clauses no-ops at SQL level.
+     *
+     * Ordering: chapter-title hits float to the top, then shorter translations,
+     * then natural chapter/position order.
+     */
+    @Query("""
+        SELECT i.* FROM invocations i
+        LEFT JOIN chapters c ON i.chapter_id = c.id
+        WHERE (
+            i.arabic LIKE '%' || :t0 || '%'
+            OR i.transliteration LIKE '%' || :t0 || '%'
+            OR i.translation LIKE '%' || :t0 || '%'
+            OR i.context LIKE '%' || :t0 || '%'
+            OR i.instruction LIKE '%' || :t0 || '%'
+            OR c.title LIKE '%' || :t0 || '%'
+        )
+        AND (
+            :t1 = ''
+            OR i.arabic LIKE '%' || :t1 || '%'
+            OR i.transliteration LIKE '%' || :t1 || '%'
+            OR i.translation LIKE '%' || :t1 || '%'
+            OR i.context LIKE '%' || :t1 || '%'
+            OR i.instruction LIKE '%' || :t1 || '%'
+            OR c.title LIKE '%' || :t1 || '%'
+        )
+        AND (
+            :t2 = ''
+            OR i.arabic LIKE '%' || :t2 || '%'
+            OR i.transliteration LIKE '%' || :t2 || '%'
+            OR i.translation LIKE '%' || :t2 || '%'
+            OR i.context LIKE '%' || :t2 || '%'
+            OR i.instruction LIKE '%' || :t2 || '%'
+            OR c.title LIKE '%' || :t2 || '%'
+        )
+        ORDER BY
+            CASE WHEN c.title LIKE '%' || :t0 || '%' THEN 0 ELSE 1 END,
+            length(COALESCE(i.translation, '')) ASC,
+            i.chapter_id ASC, i.position ASC
+        LIMIT :limit
+    """)
+    suspend fun searchAllMultiToken(
+        t0: String,
+        t1: String,
+        t2: String,
+        limit: Int,
+    ): List<DuaInvocationEntity>
+
+    /**
      * Get invocations with chapter title
      */
     @Query("""

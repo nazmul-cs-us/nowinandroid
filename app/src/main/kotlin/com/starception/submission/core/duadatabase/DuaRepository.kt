@@ -128,6 +128,29 @@ class DuaRepository @Inject constructor(
     }
 
     /**
+     * Search duas where every supplied token must hit somewhere on the row
+     * (including the chapter title via JOIN). Pass empty strings for unused slots.
+     */
+    suspend fun searchDuasMultiToken(
+        tokens: List<String>,
+        limit: Int = 30,
+    ): List<Dua> {
+        if (tokens.isEmpty()) return emptyList()
+        val t0 = tokens[0]
+        val t1 = tokens.getOrElse(1) { "" }
+        val t2 = tokens.getOrElse(2) { "" }
+        val results = duaDao.searchAllMultiToken(t0, t1, t2, limit)
+        // Batch chapter lookups to avoid N+1 round trips
+        val chapterIds = results.map { it.chapterId }.toSet()
+        val chapterTitles = chapterIds.associateWith { id ->
+            duaDao.getChapterById(id)?.title ?: ""
+        }
+        return results.map { entity ->
+            entity.toDua(chapterTitles[entity.chapterId] ?: "")
+        }
+    }
+
+    /**
      * Search duas by Arabic text
      */
     suspend fun searchByArabic(query: String): List<Dua> {

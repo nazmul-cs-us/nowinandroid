@@ -1,6 +1,5 @@
 package com.starception.submission.ui
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.core.data.model.RecentSearchQuery
@@ -12,21 +11,20 @@ import com.starception.submission.core.duadatabase.DuaRepository
 import com.starception.submission.core.model.data.UserSearchResult
 import com.starception.submission.core.qurandatabase.AyahEntity
 import com.starception.submission.core.qurandatabase.QuranDao
-import com.starception.submission.core.qurandatabase.SurahEntity
-import com.starception.submission.core.quranicduas.QuranicDuaDatabase
-import com.starception.submission.core.quranicduas.QuranicDuaEntity
+import com.starception.submission.ui.search.InMemorySearchResult
+import com.starception.submission.ui.search.InMemorySearchService
+import com.starception.submission.ui.search.SearchTokenizer
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -34,23 +32,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/**
- * Combined dua search hit. [fortressDuas] are individual invocations from
- * fortress_of_the_muslim DB; [quranicDuas] are the 40 Quranic Duas table rows.
- * Both are searched in parallel with the FTS query.
- */
-data class DuaSearchResult(
-    val fortressDuas: List<Dua> = emptyList(),
-    val quranicDuas: List<QuranicDuaEntity> = emptyList(),
-)
-
-/** Quran FTS hits — ayahs whose translation/text matches plus matching surah names. */
-data class QuranSearchResult(
-    val surahs: List<SurahEntity> = emptyList(),
-    val ayahs: List<AyahEntity> = emptyList(),
-)
-
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class TopBarSearchViewModel @Inject constructor(
     getRecentSearchQueriesUseCase: GetRecentSearchQueriesUseCase,
@@ -58,10 +40,8 @@ class TopBarSearchViewModel @Inject constructor(
     getSearchContentsUseCase: GetSearchContentsUseCase,
     private val duaRepository: DuaRepository,
     private val quranDao: QuranDao,
-    @ApplicationContext appContext: Context,
+    private val inMemorySearchService: InMemorySearchService,
 ) : ViewModel() {
-
-    private val quranicDuaDao = QuranicDuaDatabase.getInstance(appContext).quranicDuaDao()
 
     val recentSearches: StateFlow<List<RecentSearchQuery>> =
         getRecentSearchQueriesUseCase(limit = 20)
@@ -74,6 +54,29 @@ class TopBarSearchViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    /**
+     * Fast path: surahs, Quranic duas, popular verses, and Fortress chapter
+     * titles — all tokenized + ranked in-memory. Runs at 50ms debounce so
+     * results materialise almost as fast as the user types.
+     */
+    val inMemoryResults: StateFlow<InMemorySearchResult> =
+        _searchQuery
+            .debounce(50)
+            .flatMapLatest { query ->
+                val trimmed = query.trim()
+                if (trimmed.length < SEARCH_QUERY_MIN_LENGTH) {
+                    flowOf(InMemorySearchResult())
+                } else {
+                    flow { emit(inMemorySearchService.search(trimmed, limitPerSource = 5)) }
+                }
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = InMemorySearchResult(),
+            )
+
+    /** Topics + News FTS, unchanged. SQL-backed, 120ms debounce. */
     val searchResults: StateFlow<UserSearchResult> =
         _searchQuery
             .debounce(120)
@@ -93,25 +96,34 @@ class TopBarSearchViewModel @Inject constructor(
             )
 
     /**
-     * Ayah + surah search via QuranDao (LIKE on the active translation DB so
-     * English keywords like "patience" surface verses, plus surah name matches).
+     * Ayah text search — every tokenized word must appear in the ayah text via
+     * a multi-LIKE AND. Falls back to the raw trimmed query if tokenization
+     * yields nothing (1-char queries, all-stop-word queries) so users still
+     * get something.
      */
-    val quranResults: StateFlow<QuranSearchResult> =
+    val ayahResults: StateFlow<List<AyahEntity>> =
         _searchQuery
             .debounce(120)
             .flatMapLatest { query ->
                 val trimmed = query.trim()
                 if (trimmed.length < SEARCH_QUERY_MIN_LENGTH) {
-                    flowOf(QuranSearchResult())
+                    flowOf(emptyList())
                 } else {
                     flow {
-                        val ayahs = runCatching {
-                            quranDao.searchAyahsWithLimit(trimmed, 12)
+                        val tokens = pickQueryTokens(trimmed)
+                        if (tokens.isEmpty()) {
+                            emit(emptyList())
+                            return@flow
+                        }
+                        val result = runCatching {
+                            quranDao.searchAyahsMultiToken(
+                                t0 = tokens[0],
+                                t1 = tokens.getOrElse(1) { "" },
+                                t2 = tokens.getOrElse(2) { "" },
+                                limit = 12,
+                            )
                         }.getOrDefault(emptyList())
-                        val surahs = runCatching {
-                            quranDao.searchSurahs(trimmed).first()
-                        }.getOrDefault(emptyList())
-                        emit(QuranSearchResult(surahs = surahs.take(5), ayahs = ayahs))
+                        emit(result)
                     }
                 }
             }
@@ -119,29 +131,33 @@ class TopBarSearchViewModel @Inject constructor(
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = QuranSearchResult(),
+                initialValue = emptyList(),
             )
 
     /**
-     * Parallel dua search across the two SQLite-backed dua DBs (fortress + quranic).
-     * Both DAOs already implement LIKE-based search, so we just call them on IO.
+     * Fortress of the Muslim invocation search — multi-token AND across arabic,
+     * transliteration, translation, context AND the chapter title via JOIN.
+     * Chapter-title hits float to the top so typing "anxiety" surfaces the
+     * Distress & Anxiety chapter's invocations first.
      */
-    val duaResults: StateFlow<DuaSearchResult> =
+    val fortressDuaResults: StateFlow<List<Dua>> =
         _searchQuery
             .debounce(120)
             .flatMapLatest { query ->
                 val trimmed = query.trim()
                 if (trimmed.length < SEARCH_QUERY_MIN_LENGTH) {
-                    flowOf(DuaSearchResult())
+                    flowOf(emptyList())
                 } else {
                     flow {
-                        val fortress = runCatching {
-                            duaRepository.searchDuas(query = trimmed, limit = 20)
+                        val tokens = pickQueryTokens(trimmed)
+                        if (tokens.isEmpty()) {
+                            emit(emptyList())
+                            return@flow
+                        }
+                        val result = runCatching {
+                            duaRepository.searchDuasMultiToken(tokens, limit = 20)
                         }.getOrDefault(emptyList())
-                        val quranic = runCatching {
-                            quranicDuaDao.searchQuranicDuas(trimmed)
-                        }.getOrDefault(emptyList())
-                        emit(DuaSearchResult(fortressDuas = fortress, quranicDuas = quranic))
+                        emit(result)
                     }
                 }
             }
@@ -149,7 +165,7 @@ class TopBarSearchViewModel @Inject constructor(
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = DuaSearchResult(),
+                initialValue = emptyList(),
             )
 
     fun onSearchQueryChanged(query: String) {
@@ -161,6 +177,17 @@ class TopBarSearchViewModel @Inject constructor(
         viewModelScope.launch {
             recentSearchRepository.insertOrReplaceRecentSearch(query.trim())
         }
+    }
+
+    /**
+     * Return the up-to-3 most informative tokens for an SQL multi-LIKE query.
+     * Stop words are dropped; if every word is a stop word, keep the longest
+     * so a bare "dua" / "surah" still searches.
+     */
+    private fun pickQueryTokens(trimmed: String): List<String> {
+        val tokens = SearchTokenizer.tokenize(trimmed)
+        if (tokens.isNotEmpty()) return tokens.take(3)
+        return listOf(trimmed.lowercase()).filter { it.length >= SEARCH_QUERY_MIN_LENGTH }
     }
 
     private companion object {

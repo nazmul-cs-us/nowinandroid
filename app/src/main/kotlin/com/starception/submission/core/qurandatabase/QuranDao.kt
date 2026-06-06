@@ -133,6 +133,27 @@ interface QuranDao {
      */
     @Query("SELECT * FROM ayahs WHERE text LIKE '%' || :query || '%' ORDER BY number ASC LIMIT :limit")
     suspend fun searchAyahsWithLimit(query: String, limit: Int): List<AyahEntity>
+
+    /**
+     * Multi-token ayah search: every non-empty token must appear somewhere in the
+     * ayah text. Pass empty strings for unused token slots so the AND clauses
+     * become no-ops. `ORDER BY length(text)` is a cheap relevance proxy — shorter
+     * ayahs containing all tokens are usually the targeted verse.
+     */
+    @Query("""
+        SELECT * FROM ayahs
+        WHERE text LIKE '%' || :t0 || '%'
+          AND (:t1 = '' OR text LIKE '%' || :t1 || '%')
+          AND (:t2 = '' OR text LIKE '%' || :t2 || '%')
+        ORDER BY length(text) ASC, number ASC
+        LIMIT :limit
+    """)
+    suspend fun searchAyahsMultiToken(
+        t0: String,
+        t1: String,
+        t2: String,
+        limit: Int,
+    ): List<AyahEntity>
     
     // ============= Combined Queries =============
     

@@ -14,6 +14,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.util.TypedValue
+import android.view.Gravity
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -30,11 +33,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -67,6 +72,9 @@ import com.starception.submission.feature.search.SuggestedVerse
 import com.starception.submission.feature.search.SuggestedVerses
 import com.starception.submission.feature.search.VoiceSearchService
 import com.starception.submission.feature.search.WhisperVoiceService
+import com.starception.submission.ui.search.InMemorySearchResult
+import com.starception.submission.ui.search.PopularSuggestion
+import com.starception.submission.ui.search.SearchHints
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -107,8 +115,9 @@ fun AppTopSearchBar(
     val viewModel = hiltViewModel<TopBarSearchViewModel>()
     val recentSearches by viewModel.recentSearches.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
-    val duaResults by viewModel.duaResults.collectAsStateWithLifecycle()
-    val quranResults by viewModel.quranResults.collectAsStateWithLifecycle()
+    val inMemoryResults by viewModel.inMemoryResults.collectAsStateWithLifecycle()
+    val ayahResults by viewModel.ayahResults.collectAsStateWithLifecycle()
+    val fortressDuaResults by viewModel.fortressDuaResults.collectAsStateWithLifecycle()
     val currentOnVerseClick by rememberUpdatedState(onVerseClick)
     val currentOnSearchSubmit by rememberUpdatedState(onSearchSubmit)
     val currentOnTopicClick by rememberUpdatedState(onTopicClick)
@@ -121,6 +130,37 @@ fun AppTopSearchBar(
     // user types. mutableStateOf survives recomposition; the TextWatcher writes
     // here and Compose re-invokes update() so the suggestion list re-renders.
     var liveQuery by remember { mutableStateOf("") }
+    // Typewriter-animated hint cycling through SearchHints.rotatingHintsFor —
+    // the SearchBar's pill shows a fresh time-of-day-aware suggestion every few
+    // seconds. Paused while the SearchView is open so the animation doesn't
+    // fight the user's own typing.
+    var isSearchViewOpen by remember { mutableStateOf(false) }
+    var animatedHint by remember { mutableStateOf(SearchHints.hintFor()) }
+    LaunchedEffect(Unit) {
+        var hints = SearchHints.rotatingHintsFor()
+        var idx = 0
+        while (true) {
+            // If the user opens the SearchView, pause cycling so we don't
+            // animate inside the editor. Re-pick the time slot's hints on
+            // resume — the slot may have ticked over while paused.
+            while (isSearchViewOpen) {
+                delay(250)
+            }
+            hints = SearchHints.rotatingHintsFor()
+            val target = hints[idx % hints.size]
+            for (i in 1..target.length) {
+                animatedHint = target.substring(0, i)
+                delay(45)
+            }
+            delay(1_800)
+            for (i in target.length - 1 downTo 0) {
+                animatedHint = target.substring(0, i)
+                delay(22)
+            }
+            delay(180)
+            idx++
+        }
+    }
     val whisperService = remember(context) { WhisperVoiceService(context.applicationContext) }
     val cloudVoiceService = remember(context) { VoiceSearchService(context.applicationContext) }
     var isListening by remember { mutableStateOf(false) }
@@ -170,8 +210,20 @@ fun AppTopSearchBar(
                 searchBarBoundsPx = Rect(l, t, l + v.width.toFloat(), t + v.height.toFloat())
             }
 
-            val hintText = ctx.getString(R.string.app_top_bar_search_hint) + " " + title
-            searchBar.hint = hintText
+            // Time-of-day-aware hint set on first inflate. The typewriter loop
+            // (LaunchedEffect above) overwrites this through `update` and
+            // animates char-by-char, cycling between multiple suggestions
+            // every few seconds. Beats a static "Search Home" because it
+            // teaches users what's actually searchable.
+            searchBar.hint = SearchHints.hintFor()
+
+            // Track SearchView open/close so the typewriter pauses while the
+            // user is editing — otherwise the animated hint would compete with
+            // the SearchView's own (empty-state) placeholder.
+            searchView.addTransitionListener { _, _, newState ->
+                isSearchViewOpen = newState == SearchView.TransitionState.SHOWN ||
+                    newState == SearchView.TransitionState.SHOWING
+            }
             // Match the rest of the app — Roboto Serif (downloadable Google Font),
             // same family Compose uses via NiaTheme. SearchBar/SearchView are View
             // components so they ignore Compose Typography and default to system sans.
@@ -179,7 +231,7 @@ fun AppTopSearchBar(
             searchBar.textView?.setHintTextColor(pillTextColor)
             searchBar.textView?.setTextColor(pillTextColor)
             searchBar.textView?.typeface = appTypeface
-            searchView.hint = hintText
+            searchView.hint = SearchHints.hintFor()
             searchView.getEditText().typeface = appTypeface
             searchBar.inflateMenu(R.menu.app_top_search_bar_menu)
             searchBar.setOnMenuItemClickListener { item ->
@@ -264,11 +316,12 @@ fun AppTopSearchBar(
             val suggestionContainer = root.findViewById<LinearLayout>(R.id.search_suggestion_container)
 
             val searchView = root.findViewById<SearchView>(R.id.app_search_view)
-            val hintText = root.context.getString(R.string.app_top_bar_search_hint) + " " + title
-            searchBar.hint = hintText
+            // Drive the SearchBar's hint from the typewriter state; the
+            // SearchView shows its own static placeholder when expanded.
+            searchBar.hint = animatedHint
+            searchView.hint = SearchHints.hintFor()
             searchBar.textView?.setHintTextColor(pillTextColor)
             searchBar.textView?.setTextColor(pillTextColor)
-            searchView.hint = hintText
             appBar.setPadding(0, topInsetPx, 0, 0)
 
             // Re-tint only the SearchView's INTERNAL surface (open_search_view_background)
@@ -290,8 +343,9 @@ fun AppTopSearchBar(
                 recentSearches = recentSearches,
                 query = liveQuery,
                 searchResults = searchResults,
-                duaResults = duaResults,
-                quranResults = quranResults,
+                inMemoryResults = inMemoryResults,
+                ayahResults = ayahResults,
+                fortressDuaResults = fortressDuaResults,
                 accentColor = accentColor,
                 titleColor = titleColor,
                 subtitleColor = subtitleColor,
@@ -304,6 +358,12 @@ fun AppTopSearchBar(
                     // chosen recent query — don't dump the user back on the old
                     // feature:search page.
                     searchView.setText(query)
+                },
+                onPopularClick = { suggestion ->
+                    // Tapping a popular-search chip refills the SearchView with
+                    // the chip's query so the full ranked-search pipeline runs
+                    // against it (same as picking a recent search).
+                    searchView.setText(suggestion.query)
                 },
                 onTopicClick = { id ->
                     viewModel.saveSearchQuery(liveQuery)
@@ -426,10 +486,15 @@ private const val COMPOSE_CONTENT_TAG = "app_top_search_bar_compose_content"
 private const val SUGGESTION_STATE_TAG = "app_top_search_bar_suggestion_state"
 
 /**
- * Re-renders the SearchView suggestion list. When [query] is blank we show
- * three sections: YESTERDAY (today + yesterday's queries), THIS WEEK
- * (2–7 days ago), POPULAR VERSES. When the user types, recents and verses are
- * filtered by [query] so matches surface in real time without leaving the view.
+ * Re-renders the SearchView suggestion list.
+ *
+ * When the query is blank: shows popular-search chips (rotating with the time
+ * of day), YESTERDAY recents, and THIS WEEK recents.
+ *
+ * When the user types: renders the ranked sections returned by the in-memory
+ * service (surahs, Quranic duas, popular verses) plus SQL hits (ayahs, fortress
+ * invocations, FTS topics + news). Sections are ordered by the highest-scoring
+ * section first so the strongest match leads the list.
  */
 private fun renderSuggestions(
     container: LinearLayout,
@@ -438,13 +503,15 @@ private fun renderSuggestions(
     recentSearches: List<RecentSearchQuery>,
     query: String,
     searchResults: com.starception.submission.core.model.data.UserSearchResult,
-    duaResults: DuaSearchResult,
-    quranResults: QuranSearchResult,
+    inMemoryResults: InMemorySearchResult,
+    ayahResults: List<com.starception.submission.core.qurandatabase.AyahEntity>,
+    fortressDuaResults: List<com.starception.submission.core.duadatabase.Dua>,
     accentColor: Int,
     titleColor: Int,
     subtitleColor: Int,
     onVerseClick: (Int, Int) -> Unit,
     onRecentClick: (String) -> Unit,
+    onPopularClick: (PopularSuggestion) -> Unit,
     onTopicClick: (String) -> Unit,
     onNewsClick: (com.starception.submission.core.model.data.UserNewsResource) -> Unit,
     onFortressDuaClick: (com.starception.submission.core.duadatabase.Dua) -> Unit,
@@ -454,22 +521,35 @@ private fun renderSuggestions(
     val isFiltering = trimmedQuery.isNotEmpty()
 
     val (yesterdayQueries, thisWeekQueries) = partitionRecentSearches(recentSearches)
-    val filteredYesterday = if (isFiltering) {
-        yesterdayQueries.filter { it.query.contains(trimmedQuery, ignoreCase = true) }
-    } else yesterdayQueries
-    val filteredThisWeek = if (isFiltering) {
-        thisWeekQueries.filter { it.query.contains(trimmedQuery, ignoreCase = true) }
-    } else thisWeekQueries
-    val filteredVerses = if (isFiltering) {
-        SuggestedVerses.search(trimmedQuery)
-    } else SuggestedVerses.verses
-    // FTS results — capped per-section so the suggestion list stays scannable.
+    // Cap to 4 per section so a chatty recent-search history doesn't push
+    // the curated verses below the fold. Older queries are still searchable
+    // by re-typing — recents are a shortcut, not an archive.
+    val filteredYesterday = (
+        if (isFiltering) yesterdayQueries.filter { it.query.contains(trimmedQuery, ignoreCase = true) }
+        else yesterdayQueries
+        ).take(MAX_RECENTS_PER_SECTION)
+    val filteredThisWeek = (
+        if (isFiltering) thisWeekQueries.filter { it.query.contains(trimmedQuery, ignoreCase = true) }
+        else thisWeekQueries
+        ).take(MAX_RECENTS_PER_SECTION)
+    val popularSuggestions = if (isFiltering) emptyList() else SearchHints.popularSuggestions()
+    // Curated highlight verses (Ayatul Kursi, Al-Fatiha, Ar-Rahman, etc.) shown
+    // on the empty state so users can jump straight to the staples without
+    // typing. Hidden once they start searching — the ranked verseIndex inside
+    // inMemoryResults takes over for filtered matches.
+    val emptyStateVerses = if (isFiltering) emptyList()
+    else SuggestedVerses.verses.take(MAX_EMPTY_STATE_VERSES)
+
+    // In-memory ranked hits (already sorted by score). Cap per-section so the
+    // suggestion list stays scannable.
+    val rankedSurahs = inMemoryResults.surahs.take(5)
+    val rankedQuranicDuas = inMemoryResults.quranicDuas.take(5)
+    val rankedVerses = inMemoryResults.verses.take(5)
+    // SQL hits (already capped and sorted at the DAO level)
+    val cappedAyahs = ayahResults.take(8)
+    val cappedFortressDuas = fortressDuaResults.take(8)
     val ftsTopics = searchResults.topics.take(5)
     val ftsNews = searchResults.newsResources.take(8)
-    val fortressDuas = duaResults.fortressDuas.take(8)
-    val quranicDuas = duaResults.quranicDuas.take(8)
-    val quranSurahs = quranResults.surahs.take(5)
-    val quranAyahs = quranResults.ayahs.take(8)
 
     val stateKey = buildString {
         append(trimmedQuery)
@@ -478,19 +558,21 @@ private fun renderSuggestions(
         append("##")
         append(filteredThisWeek.joinToString("|") { it.query })
         append("##")
-        append(filteredVerses.joinToString("|") { "${it.surahNumber}:${it.ayahNumber}" })
+        append(popularSuggestions.joinToString("|") { it.query })
+        append("##")
+        append(rankedSurahs.joinToString("|") { "s${it.item.number}@${"%.1f".format(it.score)}" })
+        append("##")
+        append(rankedQuranicDuas.joinToString("|") { "q${it.item.id}@${"%.1f".format(it.score)}" })
+        append("##")
+        append(rankedVerses.joinToString("|") { "v${it.item.surahNumber}:${it.item.ayahNumber}@${"%.1f".format(it.score)}" })
+        append("##")
+        append(cappedAyahs.joinToString("|") { "a${it.surahNumber}:${it.numberInSurah}" })
+        append("##")
+        append(cappedFortressDuas.joinToString("|") { "f${it.id}" })
         append("##")
         append(ftsTopics.joinToString("|") { it.topic.id })
         append("##")
         append(ftsNews.joinToString("|") { it.id })
-        append("##")
-        append(fortressDuas.joinToString("|") { "f${it.id}" })
-        append("##")
-        append(quranicDuas.joinToString("|") { "q${it.id}" })
-        append("##")
-        append(quranSurahs.joinToString("|") { "s${it.number}" })
-        append("##")
-        append(quranAyahs.joinToString("|") { "a${it.surahNumber}:${it.numberInSurah}" })
     }
     if (container.getTag(SUGGESTION_STATE_TAG.hashCode()) == stateKey) return
     container.setTag(SUGGESTION_STATE_TAG.hashCode(), stateKey)
@@ -499,92 +581,204 @@ private fun renderSuggestions(
     val ctx = container.context
     val inflater = LayoutInflater.from(ctx)
 
-    // Quran (surahs + ayahs) comes first — verses are the highest-value content
-    // for the user's typical "find a meaning / find a topic" search intent.
-    if (quranSurahs.isNotEmpty()) {
-        addSectionTitle(container, inflater, "Surahs", subtitleColor)
-        quranSurahs.forEach { surah ->
-            addSurahItem(container, inflater, surah,
-                accentColor, titleColor, subtitleColor) { onVerseClick(surah.number, 1) }
-        }
+    // Sections are sorted by their highest-scoring item so the strongest match
+    // leads. In-memory ranked sources contribute their actual RankedHit score;
+    // SQL sources get a fixed prior reflecting natural source priority
+    // (popular verses > surahs > ayahs > fortress > topics > news) so they
+    // sort sensibly when nothing in-memory dominates.
+    //
+    // Plus a "section-intent" boost: if the user's raw query contains a kind
+    // word ("surah", "dua", "verse", "ayah"), that section is bumped above
+    // unrelated SQL/FTS hits even when its only match is fuzzy. This makes
+    // "Surah imran" pin Al-Imran first even though "imran" only fuzzy-matches
+    // the stored "Imraan".
+    val rawWords = trimmedQuery.lowercase().split(Regex("\\s+")).toSet()
+    val surahIntent = "surah" in rawWords || "sura" in rawWords || "soorah" in rawWords
+    val duaIntent = "dua" in rawWords || "duas" in rawWords
+    val verseIntent = "verse" in rawWords || "ayah" in rawWords || "ayat" in rawWords ||
+        "verses" in rawWords
+    val intentBoost: (Boolean) -> Double = { if (it) INTENT_BOOST else 0.0 }
+    val sections = mutableListOf<RenderableSection>()
+    if (rankedVerses.isNotEmpty()) {
+        sections.add(
+            RenderableSection(
+                title = ctx.getString(R.string.app_search_section_popular_verses),
+                score = rankedVerses.first().score + intentBoost(verseIntent),
+            ) {
+                rankedVerses.forEach { hit ->
+                    addVerseItem(
+                        container, inflater, hit.item,
+                        accentColor, titleColor, subtitleColor, onVerseClick,
+                    )
+                }
+            },
+        )
     }
-    if (quranAyahs.isNotEmpty()) {
-        addSectionTitle(container, inflater, "Quran", subtitleColor)
-        quranAyahs.forEach { ayah ->
-            addAyahItem(container, inflater, ayah,
-                accentColor, titleColor, subtitleColor) {
-                onVerseClick(ayah.surahNumber, ayah.numberInSurah)
-            }
-        }
+    if (rankedSurahs.isNotEmpty()) {
+        sections.add(
+            RenderableSection(
+                title = "Surahs",
+                score = rankedSurahs.first().score + intentBoost(surahIntent),
+            ) {
+                rankedSurahs.forEach { hit ->
+                    addSurahItem(
+                        container, inflater, hit.item,
+                        accentColor, titleColor, subtitleColor,
+                    ) { onVerseClick(hit.item.number, 1) }
+                }
+            },
+        )
     }
-    // Duas lead the suggestion list — they're the primary content users search for.
-    if (quranicDuas.isNotEmpty()) {
-        addSectionTitle(container, inflater, "Quranic Duas", subtitleColor)
-        quranicDuas.forEach { dua ->
-            addQuranicDuaItem(container, inflater, dua,
-                accentColor, titleColor, subtitleColor) { onQuranicDuaClick(dua) }
-        }
+    if (rankedQuranicDuas.isNotEmpty()) {
+        sections.add(
+            RenderableSection(
+                title = "Quranic Duas",
+                score = rankedQuranicDuas.first().score + intentBoost(duaIntent),
+            ) {
+                rankedQuranicDuas.forEach { hit ->
+                    addQuranicDuaItem(
+                        container, inflater, hit.item,
+                        accentColor, titleColor, subtitleColor,
+                    ) { onQuranicDuaClick(hit.item) }
+                }
+            },
+        )
     }
-    if (fortressDuas.isNotEmpty()) {
-        addSectionTitle(container, inflater, "Fortress of the Muslim", subtitleColor)
-        fortressDuas.forEach { dua ->
-            addFortressDuaItem(container, inflater, dua,
-                accentColor, titleColor, subtitleColor) { onFortressDuaClick(dua) }
-        }
+    // SQL-source priors (kept below in-memory exact-match scores but above each other)
+    if (cappedAyahs.isNotEmpty()) {
+        sections.add(
+            RenderableSection(
+                title = "Quran",
+                score = SQL_AYAH_PRIOR + intentBoost(verseIntent),
+            ) {
+                cappedAyahs.forEach { ayah ->
+                    addAyahItem(
+                        container, inflater, ayah,
+                        accentColor, titleColor, subtitleColor,
+                    ) { onVerseClick(ayah.surahNumber, ayah.numberInSurah) }
+                }
+            },
+        )
     }
-    // FTS results lead so a typing user sees the most-useful matches first.
+    if (cappedFortressDuas.isNotEmpty()) {
+        sections.add(
+            RenderableSection(
+                title = "Fortress of the Muslim",
+                score = SQL_FORTRESS_PRIOR + intentBoost(duaIntent),
+            ) {
+                cappedFortressDuas.forEach { dua ->
+                    addFortressDuaItem(
+                        container, inflater, dua,
+                        accentColor, titleColor, subtitleColor,
+                    ) { onFortressDuaClick(dua) }
+                }
+            },
+        )
+    }
     if (ftsTopics.isNotEmpty()) {
-        addSectionTitle(container, inflater, "Topics", subtitleColor)
-        ftsTopics.forEach { topic ->
-            addTopicItem(container, inflater, topic.topic.name, topic.topic.shortDescription,
-                accentColor, titleColor, subtitleColor) { onTopicClick(topic.topic.id) }
-        }
+        sections.add(
+            RenderableSection(title = "Topics", score = FTS_TOPICS_PRIOR) {
+                ftsTopics.forEach { topic ->
+                    addTopicItem(
+                        container, inflater, topic.topic.name, topic.topic.shortDescription,
+                        accentColor, titleColor, subtitleColor,
+                    ) { onTopicClick(topic.topic.id) }
+                }
+            },
+        )
     }
     if (ftsNews.isNotEmpty()) {
-        addSectionTitle(container, inflater, "Duas & Articles", subtitleColor)
-        ftsNews.forEach { news ->
-            addNewsItem(container, inflater, news.title, news.content,
-                accentColor, titleColor, subtitleColor) { onNewsClick(news) }
-        }
+        sections.add(
+            RenderableSection(title = "Duas & Articles", score = FTS_NEWS_PRIOR) {
+                ftsNews.forEach { news ->
+                    addNewsItem(
+                        container, inflater, news.title, news.content,
+                        accentColor, titleColor, subtitleColor,
+                    ) { onNewsClick(news) }
+                }
+            },
+        )
     }
+    sections
+        .sortedByDescending { it.score }
+        .forEach { section ->
+            addSectionTitle(container, inflater, section.title, subtitleColor)
+            section.render()
+        }
+
+    // Empty-state extras: popular-search chips, then recents.
+    if (!isFiltering && popularSuggestions.isNotEmpty()) {
+        addSectionTitle(
+            container, inflater,
+            ctx.getString(R.string.app_search_section_popular_searches), subtitleColor,
+        )
+        addPopularChipsRow(
+            container, inflater, popularSuggestions,
+            accentColor, titleColor, onPopularClick,
+        )
+    }
+
     // Recents only help when the user has nothing to act on yet — once any
-    // real content section has matches, hide them so the suggestion list
-    // doesn't push the relevant hits below the fold.
-    val hasContentHits = ftsTopics.isNotEmpty() || ftsNews.isNotEmpty() ||
-        fortressDuas.isNotEmpty() || quranicDuas.isNotEmpty() ||
-        quranSurahs.isNotEmpty() || quranAyahs.isNotEmpty()
+    // real content section has matches, hide them so the relevant hits aren't
+    // pushed below the fold.
+    val hasContentHits = sections.isNotEmpty()
     if (!hasContentHits && filteredYesterday.isNotEmpty()) {
-        addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_yesterday), subtitleColor)
+        addSectionTitle(
+            container, inflater,
+            ctx.getString(R.string.app_search_section_yesterday), subtitleColor,
+        )
         filteredYesterday.forEach { recent ->
             addRecentSearchItem(container, inflater, recent.query, titleColor, subtitleColor, onRecentClick)
         }
     }
     if (!hasContentHits && filteredThisWeek.isNotEmpty()) {
-        addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_this_week), subtitleColor)
+        addSectionTitle(
+            container, inflater,
+            ctx.getString(R.string.app_search_section_this_week), subtitleColor,
+        )
         filteredThisWeek.forEach { recent ->
             addRecentSearchItem(container, inflater, recent.query, titleColor, subtitleColor, onRecentClick)
         }
     }
-    // Always show curated popular verses when the user's query matches one —
-    // these are name-keyed entries like "Ayatul Kursi" that wouldn't surface
-    // via the FTS text/translation search. Capped at 3 to stay scannable when
-    // mixed with FTS/dua sections.
-    val popularVersesToShow = if (filteredVerses.isEmpty()) {
-        emptyList()
-    } else if (ftsTopics.isEmpty() && ftsNews.isEmpty() && fortressDuas.isEmpty() &&
-        quranicDuas.isEmpty() && quranSurahs.isEmpty() && quranAyahs.isEmpty()
-    ) {
-        filteredVerses
-    } else {
-        filteredVerses.take(3)
-    }
-    if (popularVersesToShow.isNotEmpty()) {
-        addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_popular_verses), subtitleColor)
-        popularVersesToShow.forEach { verse ->
-            addVerseItem(container, inflater, verse, accentColor, titleColor, subtitleColor, onVerseClick)
+    // Empty-state highlight verses (Ayatul Kursi, Al-Fatiha, Ar-Rahman, …) so
+    // the staples are always one tap away even with an empty recents list.
+    if (emptyStateVerses.isNotEmpty()) {
+        addSectionTitle(
+            container, inflater,
+            ctx.getString(R.string.app_search_section_popular_verses), subtitleColor,
+        )
+        emptyStateVerses.forEach { verse ->
+            addVerseItem(
+                container, inflater, verse,
+                accentColor, titleColor, subtitleColor, onVerseClick,
+            )
         }
     }
 }
+
+private const val MAX_RECENTS_PER_SECTION = 4
+private const val MAX_EMPTY_STATE_VERSES = 8
+
+/** Holds a ranked section's title, lead score, and render closure. */
+private data class RenderableSection(
+    val title: String,
+    val score: Double,
+    val render: () -> Unit,
+)
+
+// Fixed priors for SQL sources so they sort sensibly when in-memory hits don't
+// dominate. Anything above ~20 represents a strong in-memory match; below that,
+// these priors keep the natural order: ayahs > fortress > topics > news.
+private const val SQL_AYAH_PRIOR = 18.0
+private const val SQL_FORTRESS_PRIOR = 16.0
+private const val FTS_TOPICS_PRIOR = 14.0
+private const val FTS_NEWS_PRIOR = 12.0
+
+// Boost applied when the raw query contains a kind word ("surah", "dua",
+// "verse") matching the section. Calibrated to bring a fuzzy-only in-memory
+// match (≈8–13) above the SQL priors so user intent ("Surah imran" → Surahs)
+// pins reliably without over-promoting incidental matches.
+private const val INTENT_BOOST = 25.0
 
 /**
  * Splits recent searches into (yesterday-or-today, 2–7-days-ago). Anything older
@@ -899,6 +1093,73 @@ private fun addVerseItem(
     view.setOnClickListener { onClick(verse.surahNumber, verse.ayahNumber) }
     parent.addView(view)
 }
+
+/**
+ * Renders the empty-state "Popular Searches" row as horizontally-scrollable
+ * tappable chips. Tap = refill the SearchView's text with the chip's [query]
+ * so the full ranked-search pipeline runs against it.
+ */
+private fun addPopularChipsRow(
+    parent: ViewGroup,
+    inflater: LayoutInflater,
+    suggestions: List<PopularSuggestion>,
+    accentColor: Int,
+    titleColor: Int,
+    onClick: (PopularSuggestion) -> Unit,
+) {
+    val ctx = parent.context
+    val appTypeface = ResourcesCompat.getFont(ctx, R.font.roboto_serif)
+    val scroll = HorizontalScrollView(ctx).apply {
+        isHorizontalScrollBarEnabled = false
+        overScrollMode = View.OVER_SCROLL_NEVER
+        layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply {
+            // Match the section title's horizontal padding so chips align with
+            // the section header above them.
+            setMargins(0, dp(ctx, 4), 0, dp(ctx, 8))
+        }
+    }
+    val row = LinearLayout(ctx).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(ctx, 16), 0, dp(ctx, 16), 0)
+    }
+    suggestions.forEachIndexed { index, suggestion ->
+        val chip = TextView(ctx).apply {
+            text = suggestion.display
+            setTextColor(titleColor)
+            typeface = appTypeface
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding(dp(ctx, 14), dp(ctx, 8), dp(ctx, 14), dp(ctx, 8))
+            background = ContextCompat.getDrawable(
+                ctx, R.drawable.app_search_chip_background,
+            )
+            isClickable = true
+            isFocusable = true
+            // Use the surface ripple from the parent theme so the chip feels
+            // tactile without dragging in extra dependencies.
+            val tv = TypedValue()
+            ctx.theme.resolveAttribute(
+                android.R.attr.selectableItemBackground, tv, true,
+            )
+            foreground = ContextCompat.getDrawable(ctx, tv.resourceId)
+            setOnClickListener { onClick(suggestion) }
+        }
+        val lp = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
+        if (index > 0) lp.leftMargin = dp(ctx, 8)
+        row.addView(chip, lp)
+    }
+    scroll.addView(row)
+    parent.addView(scroll)
+}
+
+private fun dp(ctx: Context, value: Int): Int =
+    (value * ctx.resources.displayMetrics.density).toInt()
 
 /**
  * Mic tap: try offline Whisper first (private, low-latency), fall back to the
