@@ -547,26 +547,40 @@ private fun renderSuggestions(
                 accentColor, titleColor, subtitleColor) { onNewsClick(news) }
         }
     }
-    if (filteredYesterday.isNotEmpty()) {
+    // Recents only help when the user has nothing to act on yet — once any
+    // real content section has matches, hide them so the suggestion list
+    // doesn't push the relevant hits below the fold.
+    val hasContentHits = ftsTopics.isNotEmpty() || ftsNews.isNotEmpty() ||
+        fortressDuas.isNotEmpty() || quranicDuas.isNotEmpty() ||
+        quranSurahs.isNotEmpty() || quranAyahs.isNotEmpty()
+    if (!hasContentHits && filteredYesterday.isNotEmpty()) {
         addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_yesterday), subtitleColor)
         filteredYesterday.forEach { recent ->
             addRecentSearchItem(container, inflater, recent.query, titleColor, subtitleColor, onRecentClick)
         }
     }
-    if (filteredThisWeek.isNotEmpty()) {
+    if (!hasContentHits && filteredThisWeek.isNotEmpty()) {
         addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_this_week), subtitleColor)
         filteredThisWeek.forEach { recent ->
             addRecentSearchItem(container, inflater, recent.query, titleColor, subtitleColor, onRecentClick)
         }
     }
-    // Suppress hardcoded popular verses once we have real FTS hits — keeping
-    // both adds noise and pushes the relevant content below the fold.
-    val showPopularVerses = filteredVerses.isNotEmpty() && ftsTopics.isEmpty() &&
-        ftsNews.isEmpty() && fortressDuas.isEmpty() && quranicDuas.isEmpty() &&
-        quranSurahs.isEmpty() && quranAyahs.isEmpty()
-    if (showPopularVerses) {
+    // Always show curated popular verses when the user's query matches one —
+    // these are name-keyed entries like "Ayatul Kursi" that wouldn't surface
+    // via the FTS text/translation search. Capped at 3 to stay scannable when
+    // mixed with FTS/dua sections.
+    val popularVersesToShow = if (filteredVerses.isEmpty()) {
+        emptyList()
+    } else if (ftsTopics.isEmpty() && ftsNews.isEmpty() && fortressDuas.isEmpty() &&
+        quranicDuas.isEmpty() && quranSurahs.isEmpty() && quranAyahs.isEmpty()
+    ) {
+        filteredVerses
+    } else {
+        filteredVerses.take(3)
+    }
+    if (popularVersesToShow.isNotEmpty()) {
         addSectionTitle(container, inflater, ctx.getString(R.string.app_search_section_popular_verses), subtitleColor)
-        filteredVerses.forEach { verse ->
+        popularVersesToShow.forEach { verse ->
             addVerseItem(container, inflater, verse, accentColor, titleColor, subtitleColor, onVerseClick)
         }
     }
