@@ -234,6 +234,13 @@ class DrivingAudioService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Anything that hits onStartCommand from a startForegroundService() caller
+        // must call startForeground() within 5s — or the system kills us with
+        // "Context.startForegroundService() did not then call Service.startForeground()".
+        // Some action paths (resume, pause, skip, unknown audioType) don't reach
+        // startForegroundForPlayback(), so promote unconditionally here. stop()
+        // immediately tears it down again so the no-op stop path is still fine.
+        ensureForegroundStarted()
         MediaButtonReceiver.handleIntent(mediaSession, intent)
 
         when (intent?.action) {
@@ -297,6 +304,20 @@ class DrivingAudioService : Service() {
     private fun hasRecordAudioPermission(): Boolean {
         return checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
+    }
+
+    /** Track whether startForeground has been called this lifecycle so the
+     *  onStartCommand guard doesn't keep re-promoting after we've started. */
+    private var hasStartedForeground = false
+
+    private fun ensureForegroundStarted() {
+        if (hasStartedForeground) return
+        try {
+            startForegroundForPlayback()
+            hasStartedForeground = true
+        } catch (e: Exception) {
+            Log.e(TAG, "ensureForegroundStarted failed", e)
+        }
     }
 
     private fun startForegroundForPlayback() {
@@ -1271,6 +1292,7 @@ class DrivingAudioService : Service() {
         updateState(PlaybackState.IDLE, "Driving Mode", "Stopped")
 
         stopForeground(STOP_FOREGROUND_REMOVE)
+        hasStartedForeground = false
         stopSelf()
     }
 

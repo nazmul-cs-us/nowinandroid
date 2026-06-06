@@ -349,7 +349,11 @@ fun CompassProgressIndicator(
             val center = Offset(this.size.width / 2f, this.size.height / 2f)
             val radius = (this.size.minDimension / 2f) - 1.dp.toPx()
 
-            if (glowAlpha > 0f) {
+            // RadialGradient throws when radius <= 0; this happens transiently during
+            // window-resize layout when minDimension hasn't been measured yet (Crashlytics
+            // captured this with Relaunch-Reason=window_resize). Skip the glow draw —
+            // there's nothing meaningful to render at zero size anyway.
+            if (glowAlpha > 0f && radius > 0f) {
                 // Outer halo: wide soft sweep (±40°) around the Qibla direction (12 o'clock = -90°)
                 val sweepDeg = 80f
                 val startDeg = -90f - sweepDeg / 2f

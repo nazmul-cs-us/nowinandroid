@@ -280,6 +280,42 @@ class SurahDetailViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Load a surah's ayahs with the current translation applied (Arabic + translation
+     * joined by "\n\n" when a non-Arabic translation is selected). Used by the surah
+     * cache preloader so neighbouring surahs render with translation, not just Arabic.
+     */
+    suspend fun loadSurahWithTranslation(surahNumber: Int): Pair<Surah, List<Ayah>>? {
+        val translationCode = _currentTranslation.value
+        val repo = try {
+            getRepository(translationCode)
+        } catch (_: Exception) {
+            return null
+        }
+        val surah = repo.getSurahByNumber(surahNumber) ?: return null
+
+        val rawAyahs = if (translationCode != "ar") {
+            getRepository("ar").getAyahsBySurahOnce(surah.id)
+        } else {
+            repo.getAyahsBySurahOnce(surah.id)
+        }
+        if (rawAyahs.isEmpty()) return surah to emptyList()
+
+        val ayahs = if (translationCode != "ar") {
+            val arabicAyahs = rawAyahs
+            val translationAyahs = repo.getAyahsBySurahOnce(surah.id)
+            arabicAyahs.mapIndexed { index, arabicAyah ->
+                val translationText = translationAyahs.getOrNull(index)?.text ?: ""
+                val cleanedArabic = removeBismillahIfNeeded(arabicAyah.text, surahNumber, arabicAyah.numberInSurah)
+                val cleanedTr = removeBismillahIfNeeded(translationText, surahNumber, arabicAyah.numberInSurah)
+                arabicAyah.copy(text = "$cleanedArabic\n\n$cleanedTr")
+            }
+        } else {
+            rawAyahs.map { it.copy(text = removeBismillahIfNeeded(it.text, surahNumber, it.numberInSurah)) }
+        }
+        return surah to ayahs
+    }
+
     fun changeTranslation(translationCode: String, surahNumber: Int) {
         viewModelScope.launch {
             _currentTranslation.value = translationCode

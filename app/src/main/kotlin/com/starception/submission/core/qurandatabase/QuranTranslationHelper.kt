@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * Helper class to manage multiple Quran translation databases
@@ -91,6 +92,31 @@ object QuranTranslationHelper {
         }
         databaseCache.clear()
         Log.d(TAG, "🗑️  Database cache cleared")
+    }
+
+    /**
+     * Close + evict the in-memory Room instance for [translationCode] AND delete the
+     * Room-managed DB file on disk (including -shm / -wal siblings).
+     *
+     * Why this exists: Room only copies the source database into its managed location
+     * on first open. If a previous open used an empty/broken bundled stub and produced
+     * a near-empty managed file, simply clearing the in-memory cache and reopening will
+     * reuse that broken file — the freshly downloaded CDN source is never re-copied.
+     * Deleting the managed file forces Room to re-copy from the current source on the
+     * next [getDatabase] call.
+     */
+    @Synchronized
+    fun resetTranslationDatabase(context: Context, translationCode: String) {
+        databaseCache.remove(translationCode)?.close()
+        val dbName = "quran_${translationCode}_instance"
+        val dbDir = context.applicationContext.getDatabasePath(dbName).parentFile ?: return
+        listOf(dbName, "$dbName-shm", "$dbName-wal", "$dbName-journal").forEach { name ->
+            val f = File(dbDir, name)
+            if (f.exists()) {
+                val deleted = f.delete()
+                Log.d(TAG, "🗑️  ${if (deleted) "deleted" else "FAILED to delete"} $name")
+            }
+        }
     }
     
     /**

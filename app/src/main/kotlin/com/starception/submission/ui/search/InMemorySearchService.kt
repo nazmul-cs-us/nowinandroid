@@ -47,8 +47,10 @@ class InMemorySearchService @Inject constructor(
         readyMutex.withLock {
             if (surahIndex != null) return
             withContext(Dispatchers.IO) {
+                val t0 = System.nanoTime()
                 val surahs = runCatching { quranDao.getAllSurahsOnce() }
                     .getOrDefault(emptyList())
+                val tSurahsLoaded = System.nanoTime()
                 surahIndex = FieldWeightedIndex(
                     items = surahs,
                     fields = listOf(
@@ -58,6 +60,7 @@ class InMemorySearchService @Inject constructor(
                         IndexedField("number", weight = 6.0) { it.number.toString() },
                     ),
                 )
+                val tSurahIdx = System.nanoTime()
 
                 val qDuas = runCatching { quranicDuaDao.getAllQuranicDuas() }
                     .getOrDefault(emptyList())
@@ -86,6 +89,9 @@ class InMemorySearchService @Inject constructor(
                     ),
                 )
 
+                val tQDuasIdx = System.nanoTime()
+                val tVerseIdx = System.nanoTime()
+
                 val chapters = runCatching { duaDao.getAllChaptersWithCount() }
                     .getOrDefault(emptyList())
                 chapterIndex = FieldWeightedIndex(
@@ -94,25 +100,47 @@ class InMemorySearchService @Inject constructor(
                         IndexedField("title", weight = 10.0) { it.title },
                     ),
                 )
+                val tDone = System.nanoTime()
+                fun ms(start: Long, end: Long) = (end - start) / 1_000_000
+                android.util.Log.d(
+                    "SearchPerf",
+                    "ensureReady built indices total=${ms(t0, tDone)}ms " +
+                        "(surahs:load=${ms(t0, tSurahsLoaded)} idx=${ms(tSurahsLoaded, tSurahIdx)}, " +
+                        "qduas+verses=${ms(tSurahIdx, tVerseIdx)}, chapters=${ms(tVerseIdx, tDone)})",
+                )
             }
         }
     }
+
+    /** Pre-warm indices on app start so the first user keystroke isn't waiting on disk. */
+    suspend fun preload() = ensureReady()
 
     /**
      * Run the tokenized, ranked search against every in-memory source. Each
      * source returns at most [limitPerSource] items, sorted by score desc.
      */
     suspend fun search(query: String, limitPerSource: Int = 5): InMemorySearchResult {
+        val tReady = System.nanoTime()
         ensureReady()
+        val tReadyDone = System.nanoTime()
         val tokens = SearchTokenizer.tokenize(query)
         if (tokens.isEmpty()) return InMemorySearchResult()
         val fullNorm = SearchTokenizer.normalize(query.trim())
-        return InMemorySearchResult(
+        val tQ = System.nanoTime()
+        val result = InMemorySearchResult(
             surahs = surahIndex?.query(tokens, fullNorm, limitPerSource).orEmpty(),
             quranicDuas = quranicDuaIndex?.query(tokens, fullNorm, limitPerSource).orEmpty(),
             verses = verseIndex?.query(tokens, fullNorm, limitPerSource).orEmpty(),
             chapters = chapterIndex?.query(tokens, fullNorm, limitPerSource).orEmpty(),
         )
+        val tDone = System.nanoTime()
+        android.util.Log.d(
+            "SearchPerf",
+            "search('$query') readyWait=${(tReadyDone - tReady) / 1_000_000}ms " +
+                "queries=${(tDone - tQ) / 1_000_000}ms total=${(tDone - tReady) / 1_000_000}ms " +
+                "[s=${result.surahs.size} qd=${result.quranicDuas.size} v=${result.verses.size} c=${result.chapters.size}]",
+        )
+        return result
     }
 }
 

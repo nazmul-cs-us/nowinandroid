@@ -39,7 +39,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -74,12 +73,8 @@ import com.starception.submission.feature.search.VoiceSearchService
 import com.starception.submission.feature.search.WhisperVoiceService
 import com.starception.submission.ui.search.InMemorySearchResult
 import com.starception.submission.ui.search.PopularSuggestion
+import com.starception.submission.ui.search.SearchHintAnimator
 import com.starception.submission.ui.search.SearchHints
-import kotlinx.datetime.Clock
-import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.minus
-import kotlinx.datetime.toLocalDateTime
 
 @Composable
 fun AppTopSearchBar(
@@ -130,37 +125,14 @@ fun AppTopSearchBar(
     // user types. mutableStateOf survives recomposition; the TextWatcher writes
     // here and Compose re-invokes update() so the suggestion list re-renders.
     var liveQuery by remember { mutableStateOf("") }
-    // Typewriter-animated hint cycling through SearchHints.rotatingHintsFor —
-    // the SearchBar's pill shows a fresh time-of-day-aware suggestion every few
-    // seconds. Paused while the SearchView is open so the animation doesn't
-    // fight the user's own typing.
-    var isSearchViewOpen by remember { mutableStateOf(false) }
-    var animatedHint by remember { mutableStateOf(SearchHints.hintFor()) }
-    LaunchedEffect(Unit) {
-        var hints = SearchHints.rotatingHintsFor()
-        var idx = 0
-        while (true) {
-            // If the user opens the SearchView, pause cycling so we don't
-            // animate inside the editor. Re-pick the time slot's hints on
-            // resume — the slot may have ticked over while paused.
-            while (isSearchViewOpen) {
-                delay(250)
-            }
-            hints = SearchHints.rotatingHintsFor()
-            val target = hints[idx % hints.size]
-            for (i in 1..target.length) {
-                animatedHint = target.substring(0, i)
-                delay(45)
-            }
-            delay(1_800)
-            for (i in target.length - 1 downTo 0) {
-                animatedHint = target.substring(0, i)
-                delay(22)
-            }
-            delay(180)
-            idx++
-        }
-    }
+    // Typewriter hint is driven by a process-wide singleton ([SearchHintAnimator])
+    // so the cycle keeps running across page switches — every screen wraps
+    // itself in its own top-bar scaffold, and without the singleton each new
+    // composition would restart the typewriter from the first phrase. The
+    // animation visually pauses while the SearchView is open because the pill
+    // collapses out of view during the morph; no extra pause logic needed.
+    LaunchedEffect(Unit) { SearchHintAnimator.ensureStarted() }
+    val animatedHint by SearchHintAnimator.hintText.collectAsStateWithLifecycle()
     val whisperService = remember(context) { WhisperVoiceService(context.applicationContext) }
     val cloudVoiceService = remember(context) { VoiceSearchService(context.applicationContext) }
     var isListening by remember { mutableStateOf(false) }
@@ -210,20 +182,11 @@ fun AppTopSearchBar(
                 searchBarBoundsPx = Rect(l, t, l + v.width.toFloat(), t + v.height.toFloat())
             }
 
-            // Time-of-day-aware hint set on first inflate. The typewriter loop
-            // (LaunchedEffect above) overwrites this through `update` and
-            // animates char-by-char, cycling between multiple suggestions
-            // every few seconds. Beats a static "Search Home" because it
-            // teaches users what's actually searchable.
+            // Hint will be overwritten on every `update` pass from the
+            // typewriter StateFlow; seed it with the current slot's first
+            // phrase so the pill isn't blank for the one frame before the
+            // singleton emits.
             searchBar.hint = SearchHints.hintFor()
-
-            // Track SearchView open/close so the typewriter pauses while the
-            // user is editing — otherwise the animated hint would compete with
-            // the SearchView's own (empty-state) placeholder.
-            searchView.addTransitionListener { _, _, newState ->
-                isSearchViewOpen = newState == SearchView.TransitionState.SHOWN ||
-                    newState == SearchView.TransitionState.SHOWING
-            }
             // Match the rest of the app — Roboto Serif (downloadable Google Font),
             // same family Compose uses via NiaTheme. SearchBar/SearchView are View
             // components so they ignore Compose Typography and default to system sans.
@@ -520,18 +483,13 @@ private fun renderSuggestions(
     val trimmedQuery = query.trim()
     val isFiltering = trimmedQuery.isNotEmpty()
 
-    val (yesterdayQueries, thisWeekQueries) = partitionRecentSearches(recentSearches)
-    // Cap to 4 per section so a chatty recent-search history doesn't push
-    // the curated verses below the fold. Older queries are still searchable
-    // by re-typing — recents are a shortcut, not an archive.
-    val filteredYesterday = (
-        if (isFiltering) yesterdayQueries.filter { it.query.contains(trimmedQuery, ignoreCase = true) }
-        else yesterdayQueries
-        ).take(MAX_RECENTS_PER_SECTION)
-    val filteredThisWeek = (
-        if (isFiltering) thisWeekQueries.filter { it.query.contains(trimmedQuery, ignoreCase = true) }
-        else thisWeekQueries
-        ).take(MAX_RECENTS_PER_SECTION)
+    // One flat "RECENT" list (newest first) — bucketing by YESTERDAY / THIS WEEK
+    // felt fussy for a search shortcut. Cap so a chatty history doesn't push
+    // the curated verses below the fold.
+    val filteredRecent = (
+        if (isFiltering) recentSearches.filter { it.query.contains(trimmedQuery, ignoreCase = true) }
+        else recentSearches
+        ).take(MAX_RECENTS_TOTAL)
     val popularSuggestions = if (isFiltering) emptyList() else SearchHints.popularSuggestions()
     // Curated highlight verses (Ayatul Kursi, Al-Fatiha, Ar-Rahman, etc.) shown
     // on the empty state so users can jump straight to the staples without
@@ -554,9 +512,7 @@ private fun renderSuggestions(
     val stateKey = buildString {
         append(trimmedQuery)
         append("##")
-        append(filteredYesterday.joinToString("|") { it.query })
-        append("##")
-        append(filteredThisWeek.joinToString("|") { it.query })
+        append(filteredRecent.joinToString("|") { it.query })
         append("##")
         append(popularSuggestions.joinToString("|") { it.query })
         append("##")
@@ -722,21 +678,12 @@ private fun renderSuggestions(
     // real content section has matches, hide them so the relevant hits aren't
     // pushed below the fold.
     val hasContentHits = sections.isNotEmpty()
-    if (!hasContentHits && filteredYesterday.isNotEmpty()) {
+    if (!hasContentHits && filteredRecent.isNotEmpty()) {
         addSectionTitle(
             container, inflater,
-            ctx.getString(R.string.app_search_section_yesterday), subtitleColor,
+            ctx.getString(R.string.app_search_section_recent), subtitleColor,
         )
-        filteredYesterday.forEach { recent ->
-            addRecentSearchItem(container, inflater, recent.query, titleColor, subtitleColor, onRecentClick)
-        }
-    }
-    if (!hasContentHits && filteredThisWeek.isNotEmpty()) {
-        addSectionTitle(
-            container, inflater,
-            ctx.getString(R.string.app_search_section_this_week), subtitleColor,
-        )
-        filteredThisWeek.forEach { recent ->
+        filteredRecent.forEach { recent ->
             addRecentSearchItem(container, inflater, recent.query, titleColor, subtitleColor, onRecentClick)
         }
     }
@@ -756,7 +703,7 @@ private fun renderSuggestions(
     }
 }
 
-private const val MAX_RECENTS_PER_SECTION = 4
+private const val MAX_RECENTS_TOTAL = 6
 private const val MAX_EMPTY_STATE_VERSES = 8
 
 /** Holds a ranked section's title, lead score, and render closure. */
@@ -780,29 +727,6 @@ private const val FTS_NEWS_PRIOR = 12.0
 // pins reliably without over-promoting incidental matches.
 private const val INTENT_BOOST = 25.0
 
-/**
- * Splits recent searches into (yesterday-or-today, 2–7-days-ago). Anything older
- * than a week is dropped — old searches stop being useful as quick-suggestions.
- */
-private fun partitionRecentSearches(
-    recents: List<RecentSearchQuery>,
-): Pair<List<RecentSearchQuery>, List<RecentSearchQuery>> {
-    val tz = TimeZone.currentSystemDefault()
-    val today = Clock.System.now().toLocalDateTime(tz).date
-    val yesterdayCutoff = today.minus(1, DateTimeUnit.DAY)
-    val weekCutoff = today.minus(7, DateTimeUnit.DAY)
-
-    val yesterday = mutableListOf<RecentSearchQuery>()
-    val thisWeek = mutableListOf<RecentSearchQuery>()
-    recents.forEach { recent ->
-        val date = recent.queriedDate.toLocalDateTime(tz).date
-        when {
-            date >= yesterdayCutoff -> yesterday.add(recent)
-            date >= weekCutoff -> thisWeek.add(recent)
-        }
-    }
-    return yesterday to thisWeek
-}
 
 private fun addSectionTitle(parent: ViewGroup, inflater: LayoutInflater, text: String, subtitleColor: Int) {
     val view = inflater.inflate(R.layout.app_search_suggestion_title, parent, false) as TextView

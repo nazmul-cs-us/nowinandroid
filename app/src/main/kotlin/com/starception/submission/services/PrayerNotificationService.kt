@@ -1955,6 +1955,26 @@ class PrayerNotificationService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     /**
+     * Called on Android 14+ when the system is about to stop this foreground
+     * service due to the type timeout (dataSync FGS is capped at ~6h cumulative
+     * runtime per UI session). If we don't stop ourselves cleanly, the system
+     * throws ForegroundServiceDidNotStopInTimeException and Crashlytics records
+     * it as an app crash — which is exactly what's been showing up.
+     *
+     * Stop quietly here; the next prayer alarm / boot receiver / app open will
+     * bring the service back up with a fresh runtime budget.
+     */
+    override fun onTimeout(startId: Int) {
+        Log.w(TAG, "⏰ Foreground service timeout reached — stopping cleanly to avoid crash")
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error stopping foreground on timeout", e)
+        }
+        stopSelf()
+    }
+
+    /**
      * Called when the app is removed from recent tasks (user swipes it away)
      * This ensures the service restarts itself to maintain prayer notifications
      */

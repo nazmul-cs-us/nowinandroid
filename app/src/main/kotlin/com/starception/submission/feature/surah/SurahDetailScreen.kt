@@ -430,15 +430,20 @@ fun SurahDetailScreen(
     }
 
     // Preload the current and neighbouring surahs (clamped to 1..114).
-    LaunchedEffect(currentPlayingSurahNumber) {
+    // Uses the translation-aware loader so cached ayahs carry both Arabic and the
+    // selected translation joined by "\n\n" — otherwise the renderer's split would
+    // produce one-part text and the translation row would silently disappear.
+    LaunchedEffect(currentPlayingSurahNumber, currentTranslation) {
+        // Translation changed — invalidate the cache so neighbours reload in the
+        // new language instead of serving stale Arabic-only entries.
+        surahCache.clear()
         listOf(currentPlayingSurahNumber - 1, currentPlayingSurahNumber, currentPlayingSurahNumber + 1)
             .filter { it in 1..114 && it !in surahCache }
             .forEach { num ->
                 try {
-                    val fetchedSurah = quranRepository.getSurahByNumber(num)
-                    val fetchedAyahs = quranRepository.getAyahsBySurahOnce(num)
-                    if (fetchedSurah != null) {
-                        surahCache[num] = fetchedSurah to fetchedAyahs
+                    val pair = viewModel.loadSurahWithTranslation(num)
+                    if (pair != null) {
+                        surahCache[num] = pair
                     }
                 } catch (_: Exception) {
                     // Neighbour preload failure is non-fatal — silent.
@@ -787,8 +792,13 @@ fun SurahDetailScreen(
                                 .getSurahTexts(num)
                             if (indoPakTexts.isEmpty()) baseAyahs
                             else baseAyahs.map { ayah ->
-                                val ip = indoPakTexts[ayah.numberInSurah]
-                                if (ip != null) ayah.copy(text = ip) else ayah
+                                val ip = indoPakTexts[ayah.numberInSurah] ?: return@map ayah
+                                // Swap Arabic for IndoPak text but keep any translation
+                                // suffix joined with "\n\n" (renderer splits on this to
+                                // show Arabic on top and translation under it).
+                                val translationSuffix = ayah.text.substringAfter("\n\n", missingDelimiterValue = "")
+                                val newText = if (translationSuffix.isEmpty()) ip else "$ip\n\n$translationSuffix"
+                                ayah.copy(text = newText)
                             }
                         } else baseAyahs
                     }
@@ -976,8 +986,12 @@ fun SurahDetailScreen(
                         description = state.description,
                         downloadManager = viewModel.downloadManager,
                         onDownloadComplete = {
-                            // Clear database cache so Room re-opens with new file
-                            com.starception.submission.core.qurandatabase.QuranTranslationHelper.clearCache()
+                            // Close cached Room instance AND delete its managed DB file
+                            // so Room re-copies from the freshly downloaded source.
+                            // (Plain clearCache() would reuse the stale empty file Room
+                            // created on the previous open.)
+                            com.starception.submission.core.qurandatabase.QuranTranslationHelper
+                                .resetTranslationDatabase(context, currentTranslation)
                             viewModel.loadSurah(surahNumber, currentTranslation)
                         },
                     )

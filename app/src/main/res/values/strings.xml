@@ -54,6 +54,7 @@
   <string name="app_top_bar_settings_icon_description">Settings</string>
   <string name="app_search_section_yesterday">YESTERDAY</string>
   <string name="app_search_section_this_week">THIS WEEK</string>
+  <string name="app_search_section_recent">RECENT</string>
   <string name="app_search_section_popular_verses">POPULAR VERSES</string>
   <string name="app_search_section_popular_searches">POPULAR SEARCHES</string>
 </resources>

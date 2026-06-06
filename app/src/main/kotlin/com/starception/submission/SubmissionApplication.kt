@@ -31,8 +31,13 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import com.starception.submission.services.PrayerNotificationService
+import com.starception.submission.ui.search.InMemorySearchService
 import com.starception.submission.util.PrayerNotificationManager
 import com.starception.submission.prayer.util.FileLogger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * [Application] class for Submission
@@ -44,6 +49,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
 
     @Inject
     lateinit var profileVerifierLogger: ProfileVerifierLogger
+
+    @Inject
+    lateinit var inMemorySearchService: InMemorySearchService
 
     override fun onCreate() {
         Log.d("SubmissionApplication", "Application onCreate started")
@@ -92,6 +100,19 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
             name = "AppInitThread"
         }.start()
         
+        // Pre-warm the in-memory search indices (surahs + quranic duas + verses
+        // + fortress chapters) on a background coroutine. Without this, the very
+        // first keystroke pays ~160ms to build all four indices, so SQL hits
+        // (fortress / ayahs) show before the in-memory hits — the gap is visible
+        // to the user.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                inMemorySearchService.preload()
+            } catch (e: Exception) {
+                Log.w("SubmissionApplication", "Search index preload failed", e)
+            }
+        }
+
         Log.d("SubmissionApplication", "Application onCreate completed")
         
         // DISABLE automatic service startup from Application to prevent service timeout ANR

@@ -67,9 +67,18 @@ class TopBarSearchViewModel @Inject constructor(
                 if (trimmed.length < SEARCH_QUERY_MIN_LENGTH) {
                     flowOf(InMemorySearchResult())
                 } else {
-                    flow { emit(inMemorySearchService.search(trimmed, limitPerSource = 5)) }
+                    flow {
+                        val t0 = System.nanoTime()
+                        val r = inMemorySearchService.search(trimmed, limitPerSource = 5)
+                        android.util.Log.d(
+                            "SearchPerf",
+                            "VM inMemory emit('$trimmed') after ${(System.nanoTime() - t0) / 1_000_000}ms",
+                        )
+                        emit(r)
+                    }
                 }
             }
+            .flowOn(Dispatchers.IO)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
@@ -115,6 +124,7 @@ class TopBarSearchViewModel @Inject constructor(
                             emit(emptyList())
                             return@flow
                         }
+                        val t0 = System.nanoTime()
                         val result = runCatching {
                             quranDao.searchAyahsMultiToken(
                                 t0 = tokens[0],
@@ -123,6 +133,10 @@ class TopBarSearchViewModel @Inject constructor(
                                 limit = 12,
                             )
                         }.getOrDefault(emptyList())
+                        android.util.Log.d(
+                            "SearchPerf",
+                            "VM ayah emit('$trimmed') sql=${(System.nanoTime() - t0) / 1_000_000}ms n=${result.size}",
+                        )
                         emit(result)
                     }
                 }
@@ -154,9 +168,14 @@ class TopBarSearchViewModel @Inject constructor(
                             emit(emptyList())
                             return@flow
                         }
+                        val t0 = System.nanoTime()
                         val result = runCatching {
                             duaRepository.searchDuasMultiToken(tokens, limit = 20)
                         }.getOrDefault(emptyList())
+                        android.util.Log.d(
+                            "SearchPerf",
+                            "VM fortress emit('$trimmed') sql=${(System.nanoTime() - t0) / 1_000_000}ms n=${result.size}",
+                        )
                         emit(result)
                     }
                 }
