@@ -240,7 +240,11 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
 
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-            val isSystemDarkTheme = resources.configuration.isSystemInDarkTheme
+            // Compose-reactive variant — re-evaluates when the system flips uiMode,
+            // unlike `resources.configuration.isSystemInDarkTheme` which only reads
+            // the Configuration once at composition and leaves the body theme stale
+            // after dark↔light switches.
+            val isSystemDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
 
             // IMPORTANT: rememberNiaAppState must be OUTSIDE NiaTheme to prevent
             // navigation state loss when theme changes. Theme recomposition inside

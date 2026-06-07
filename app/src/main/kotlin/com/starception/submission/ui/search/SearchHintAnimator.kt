@@ -56,20 +56,26 @@ object SearchHintAnimator {
             // the current time of day (slots roll over mid-loop without a restart).
             val hints = SearchHints.rotatingHintsFor()
             val target = hints[idx % hints.size]
-            // Type out
+            // Type out — frame-aligned (~16ms ≈ one display frame) so each
+            // character lands on its own frame and the cadence feels even
+            // instead of micro-stuttering between irregular delays. Three
+            // frames per char (~48ms) reads as a natural typing speed.
             for (i in 1..target.length) {
                 _hintText.value = target.substring(0, i)
-                delay(70)
+                delay(48)
             }
-            // Hold so the user has time to actually read the hint.
-            delay(4_000)
-            // Erase
+            // Hold for 3 minutes — long enough that the hint feels stable
+            // instead of flickering, short enough that an idle user still
+            // sees a fresh suggestion if they linger.
+            delay(180_000)
+            // Erase — two frames per char (~32ms) so it clears noticeably
+            // faster than it was typed, matching the natural rhythm.
             for (i in target.length - 1 downTo 0) {
                 _hintText.value = target.substring(0, i)
-                delay(35)
+                delay(32)
             }
-            // Breath between hints — feels less hectic than the old 180ms snap.
-            delay(900)
+            // Beat between hints so the next type-in doesn't slam in.
+            delay(600)
             idx++
         }
     }

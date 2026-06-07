@@ -277,6 +277,8 @@ fun AppTopSearchBar(
             val contentContainer = root.findViewById<FrameLayout>(R.id.content_container)
             val composeView = contentContainer.findViewWithTag<ComposeView>(COMPOSE_CONTENT_TAG)
             val suggestionContainer = root.findViewById<LinearLayout>(R.id.search_suggestion_container)
+            val leading = root.findViewById<MaterialButton>(R.id.leading_button)
+            val settings = root.findViewById<MaterialButton>(R.id.settings_button)
 
             val searchView = root.findViewById<SearchView>(R.id.app_search_view)
             // Drive the SearchBar's hint from the typewriter state; the
@@ -285,6 +287,21 @@ fun AppTopSearchBar(
             searchView.hint = SearchHints.hintFor()
             searchBar.textView?.setHintTextColor(pillTextColor)
             searchBar.textView?.setTextColor(pillTextColor)
+            // Native View icons read tints from the Activity's Configuration
+            // (system dark mode), not from the user's app-level Dark pref — so
+            // we tint them manually to match the active Compose colorScheme.
+            // Buttons outside the pill sit on the AppBar/window surface → onSurface.
+            // Icons inside the SearchBar pill (magnifier + mic) → onPrimaryContainer.
+            leading.iconTint = ColorStateList.valueOf(titleColor)
+            settings.iconTint = ColorStateList.valueOf(titleColor)
+            searchBar.navigationIcon?.mutate()?.setTint(pillTextColor)
+            for (i in 0 until searchBar.menu.size()) {
+                searchBar.menu.getItem(i).icon?.mutate()?.setTint(pillTextColor)
+            }
+            for (i in 0 until searchView.toolbar.menu.size()) {
+                searchView.toolbar.menu.getItem(i).icon?.mutate()?.setTint(titleColor)
+            }
+            searchView.toolbar.navigationIcon?.mutate()?.setTint(titleColor)
             appBar.setPadding(0, topInsetPx, 0, 0)
 
             // Re-tint only the SearchView's INTERNAL surface (open_search_view_background)
@@ -351,7 +368,15 @@ fun AppTopSearchBar(
             )
 
             composeView?.setContent {
-                NiaTheme { currentContent() }
+                // Read from ThemeColorBridge so the inner island honours the user's
+                // app-level Dark/Brand pref instead of NiaTheme's COASTAL/system-dark
+                // defaults — otherwise the body stays light while the outer toolbar
+                // and bottom nav (which sit outside this ComposeView) follow Dark.
+                NiaTheme(
+                    darkTheme = com.starception.submission.util.ThemeColorBridge.darkTheme,
+                    themeBrand = com.starception.submission.util.ThemeColorBridge.themeBrand,
+                    disableDynamicTheming = com.starception.submission.util.ThemeColorBridge.disableDynamicTheming,
+                ) { currentContent() }
             }
         },
     )

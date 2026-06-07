@@ -986,11 +986,23 @@ fun DuaDetailScreen(
             ?: 1
     }
 
+    // Fortress search routes pass title = "{Chapter}: Dua N" — that exact match
+    // beats id-match because navigateToDuaDetail auto-fills newsResourceId from
+    // duaNumber (=Fortress position), which collides with real Quranic Dua ids.
+    val isFortressTitle = title.contains(": Dua ")
+
     // Find page index by news resource ID first (works for fortress_of_the_muslim duas)
-    // Fall back to dua number matching if ID not found
-    val initialPageIndex = remember(duasList, initialDuaNumber, initialNewsResourceId) {
+    // and Quranic Duas; Fortress routes match by title.
+    val initialPageIndex = remember(duasList, initialDuaNumber, initialNewsResourceId, title) {
         if (duasList.isNotEmpty()) {
-            // First try to find by news resource ID (for fortress_of_the_muslim and all duas)
+            // Fortress: match by exact title (e.g. "Before sleeping: Dua 3")
+            if (isFortressTitle) {
+                val indexByTitle = duasList.indexOfFirst { it.title == title }
+                if (indexByTitle >= 0) {
+                    return@remember indexByTitle
+                }
+            }
+            // Otherwise try news resource ID (Quranic Duas + topic-filtered lists)
             if (initialNewsResourceId.isNotEmpty()) {
                 val indexById = duasList.indexOfFirst { it.id == initialNewsResourceId }
                 if (indexById >= 0) {
@@ -1022,15 +1034,20 @@ fun DuaDetailScreen(
     }
 
     // Also scroll when duas load (in case index needs adjustment based on ID or duaNumber field)
-    LaunchedEffect(duasList, initialNewsResourceId) {
+    LaunchedEffect(duasList, initialNewsResourceId, title) {
         if (duasList.isNotEmpty()) {
-            // First try to find by news resource ID
+            // Fortress: title match wins so we don't fall into a Quranic Dua id collision
+            val indexByTitle = if (isFortressTitle) {
+                duasList.indexOfFirst { it.title == title }.takeIf { it >= 0 }
+            } else null
+            // Otherwise: news resource ID (Quranic Duas + topic-filtered lists)
             val indexById = if (initialNewsResourceId.isNotEmpty()) {
                 duasList.indexOfFirst { it.id == initialNewsResourceId }.takeIf { it >= 0 }
             } else null
             // Fall back to dua number matching
             val indexByNumber = duasList.indexOfFirst { it.duaNumber == initialDuaNumber }.takeIf { it >= 0 }
-            val targetIndex = indexById ?: indexByNumber ?: targetPageIndex.coerceIn(0, duasList.size - 1)
+            val targetIndex = indexByTitle ?: indexById ?: indexByNumber
+                ?: targetPageIndex.coerceIn(0, duasList.size - 1)
             if (pagerState.currentPage != targetIndex) {
                 pagerState.scrollToPage(targetIndex)
             }

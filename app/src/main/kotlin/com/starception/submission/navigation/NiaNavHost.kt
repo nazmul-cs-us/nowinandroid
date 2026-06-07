@@ -142,8 +142,12 @@ fun NiaNavHost(
             )
         },
         onFortressDuaClick = { dua ->
+            // Pass title in the "{Chapter}: Dua N" format the pager's title-match
+            // fallback recognises — otherwise the screen would treat dua.position
+            // as a Quranic-Dua page index and open the wrong invocation.
+            val chapter = dua.chapterTitle.ifBlank { "Dua" }
             navController.navigateToDuaDetail(
-                title = dua.chapterTitle.ifBlank { "Dua" },
+                title = "$chapter: Dua ${dua.position}",
                 content = dua.translation ?: dua.transliteration ?: "",
                 quranReference = null,
                 duaNumber = dua.position,
