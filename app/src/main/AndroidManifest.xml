@@ -136,6 +136,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- Debug receiver to simulate a prayer alert in PullToSyncContainer via adb -->
+        <receiver
+            android:name=".util.DebugPrayerAlertReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.starception.submission.DEBUG_SIMULATE_PRAYER_ALERT" />
+            </intent-filter>
+        </receiver>
+
         <!-- Prayer Action Receiver for notification actions like "Mark as Prayed" -->
         <receiver
             android:name=".util.PrayerActionReceiver"

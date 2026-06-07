@@ -23,6 +23,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * Media mini-bar for the PullToSyncContainer sage area.
@@ -68,7 +69,8 @@ fun MediaMiniBar(
         ) {
             Text(
                 text = playback.title,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
+                fontSize = 15.sp,
                 color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -76,7 +78,7 @@ fun MediaMiniBar(
             if (playback.subtitle.isNotEmpty()) {
                 Text(
                     text = playback.subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = subtitleColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -90,12 +92,12 @@ fun MediaMiniBar(
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onAction(MediaAction.SkipPrevious)
             },
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.size(44.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.SkipPrevious,
                 contentDescription = "Previous",
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(28.dp),
                 tint = contentColor,
             )
         }
@@ -108,12 +110,12 @@ fun MediaMiniBar(
                 if (playback.isPlaying) onAction(MediaAction.Pause)
                 else onAction(MediaAction.Play)
             },
-            modifier = Modifier.size(44.dp),
+            modifier = Modifier.size(48.dp),
         ) {
             Icon(
                 imageVector = if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                 contentDescription = if (playback.isPlaying) "Pause" else "Play",
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(36.dp),
                 tint = contentColor,
             )
         }
@@ -125,12 +127,12 @@ fun MediaMiniBar(
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onAction(MediaAction.SkipNext)
             },
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.size(44.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.SkipNext,
                 contentDescription = "Next",
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(28.dp),
                 tint = contentColor,
             )
         }

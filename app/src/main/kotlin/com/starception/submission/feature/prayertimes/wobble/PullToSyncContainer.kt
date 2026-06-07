@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -201,6 +202,9 @@ fun PullToSyncContainer(
     // This eliminates the gap where wobbleIntensity would drop between drag release and hold
     val mediaHoldFraction = refreshingHoldFraction
     val prayerAlertHoldFraction = refreshingHoldFraction
+    // When media AND a prayer alert are live, the strip stacks a chip above the
+    // MediaMiniBar — that needs more vertical room than either alone.
+    val stackedHoldFraction = 0.72f
     val refreshingOffset = remember { Animatable(0f) }
     LaunchedEffect(isRefreshing, isDownloading, mediaState.isVisible, isPrayerAlert, isSilentMode) {
         if (isRefreshing || isDownloading) {
@@ -209,7 +213,7 @@ fun PullToSyncContainer(
             )
         } else if (mediaState.isVisible) {
             refreshingOffset.animateTo(
-                targetValue = mediaHoldFraction,
+                targetValue = if (isPrayerAlert) stackedHoldFraction else mediaHoldFraction,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
                     stiffness = Spring.StiffnessMediumLow,
@@ -363,6 +367,9 @@ fun PullToSyncContainer(
                 // --- Media Mini-Bar fills the sage area ---
                 // Pull-up-to-dismiss is scoped to the title column inside MediaMiniBar
                 // (via titleDragModifier) so playback button taps are not swallowed.
+                // If a prayer alert is also live (e.g. Maghrib while a Surah plays in
+                // driving mode), stack a compact chip on top so the user sees both
+                // events instead of media silently winning the if/else.
                 Box(
                     modifier = Modifier
                         .zIndex(1f)
@@ -371,26 +378,70 @@ fun PullToSyncContainer(
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    MediaMiniBar(
-                        state = mediaState,
-                        onAction = onMediaAction,
-                        modifier = Modifier.padding(bottom = 6.dp),
-                        titleDragModifier = Modifier.pointerInput(Unit) {
-                            var totalDrag = 0f
-                            detectVerticalDragGestures(
-                                onDragStart = { totalDrag = 0f },
-                                onVerticalDrag = { _, dragAmount ->
-                                    totalDrag += dragAmount
-                                },
-                                onDragEnd = {
-                                    if (totalDrag < -80f) {
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        onMediaAction(MediaAction.Dismiss)
-                                    }
-                                },
-                            )
-                        },
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        // Small top padding keeps the chip off the status-bar
+                        // inset; tight spacedBy keeps chip and MediaMiniBar
+                        // visually grouped without feeling cramped.
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                    ) {
+                        if (isPrayerAlert) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Canvas(modifier = Modifier.size(14.dp)) {
+                                    val strokeWidth = 1.5.dp.toPx()
+                                    drawArc(
+                                        color = indicatorColor,
+                                        startAngle = spinAngle,
+                                        sweepAngle = 270f,
+                                        useCenter = false,
+                                        style = Stroke(
+                                            width = strokeWidth,
+                                            cap = StrokeCap.Round
+                                        ),
+                                        topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+                                        size = androidx.compose.ui.geometry.Size(
+                                            size.width - strokeWidth,
+                                            size.height - strokeWidth
+                                        )
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = prayerAlertState.displayText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 13.sp,
+                                    color = indicatorColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        MediaMiniBar(
+                            state = mediaState,
+                            onAction = onMediaAction,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                            titleDragModifier = Modifier.pointerInput(Unit) {
+                                var totalDrag = 0f
+                                detectVerticalDragGestures(
+                                    onDragStart = { totalDrag = 0f },
+                                    onVerticalDrag = { _, dragAmount ->
+                                        totalDrag += dragAmount
+                                    },
+                                    onDragEnd = {
+                                        if (totalDrag < -80f) {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onMediaAction(MediaAction.Dismiss)
+                                        }
+                                    },
+                                )
+                            },
+                        )
+                    }
                 }
             } else if (isPrayerAlert) {
                 Box(

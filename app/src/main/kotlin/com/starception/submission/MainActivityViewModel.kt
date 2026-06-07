@@ -168,6 +168,15 @@ class MainActivityViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             preGenerateHadithTtsOnStartup()
         }
+
+        // Forward debug-injected prayer alerts (DebugPrayerAlertReceiver) through
+        // the same flow real ones use, so the stacked layout in PullToSyncContainer
+        // can be exercised without waiting for an actual prayer window.
+        viewModelScope.launch {
+            com.starception.submission.util.DebugPrayerAlertBus.state.collect { injected ->
+                if (injected != null) _prayerAlertState.value = injected
+            }
+        }
     }
 
     fun refreshMissingBukhariPrompt() {

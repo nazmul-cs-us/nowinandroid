@@ -338,12 +338,16 @@ fun AppTopSearchBar(
                     // chosen recent query — don't dump the user back on the old
                     // feature:search page.
                     searchView.setText(query)
+                    // setText leaves the cursor at position 0 — move it to the
+                    // end so the user can immediately edit/extend the query.
+                    searchView.getEditText().setSelection(query.length)
                 },
                 onPopularClick = { suggestion ->
                     // Tapping a popular-search chip refills the SearchView with
                     // the chip's query so the full ranked-search pipeline runs
                     // against it (same as picking a recent search).
                     searchView.setText(suggestion.query)
+                    searchView.getEditText().setSelection(suggestion.query.length)
                 },
                 onTopicClick = { id ->
                     viewModel.saveSearchQuery(liveQuery)
@@ -1147,6 +1151,7 @@ private fun startVoiceCapture(
                         searchView.show()
                     }
                     searchView.setText(text)
+                    searchView.getEditText().setSelection(text.length)
                 }
             }
             is VoiceSearchService.VoiceSearchResult.Error -> {
