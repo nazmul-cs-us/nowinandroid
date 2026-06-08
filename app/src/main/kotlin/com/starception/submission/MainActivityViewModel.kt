@@ -52,8 +52,11 @@ class MainActivityViewModel @Inject constructor(
     private val sherpaOnnxTts: SherpaOnnxTtsService,
     private val downloadManager: AssetDownloadManager,
     private val syncManager: SyncManager,
+    private val islamicEventStateProvider: com.starception.submission.islamic.shared.IslamicEventStateProvider,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
+
+    val islamicEventState = islamicEventStateProvider.state
 
     companion object {
         private const val THEME_CACHE_PREFS = "theme_cache_prefs"

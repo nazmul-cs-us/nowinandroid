@@ -22,6 +22,7 @@ interface PrayerTimeCalculatorEntryPoint {
     fun prayerSettingsRepository(): com.starception.submission.prayer.repository.PrayerSettingsRepository
     fun locationCache(): com.starception.submission.prayer.cache.LocationCache
     fun prayerTimeSuggestionRepository(): com.starception.submission.prayer.repository.PrayerTimeSuggestionRepository
+    fun islamicEventStateProvider(): com.starception.submission.islamic.shared.IslamicEventStateProvider
 }
 
 /**

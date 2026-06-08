@@ -161,6 +161,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.starception.submission.feature.prayertimes.utils.getCurrentDate
 import com.starception.submission.feature.prayertimes.utils.formatTime
 import com.starception.submission.feature.prayertimes.data.PrayerTimesCalculator
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint
 import com.starception.submission.feature.prayertimes.animations.RefreshIndicator
 import com.starception.submission.feature.prayertimes.animations.FlowingArrowsAnimation
@@ -1411,6 +1412,13 @@ fun PrayerTimesScreen(
             }
 
             val silentModeState by com.starception.submission.feature.prayertimes.wobble.rememberSilentModeState()
+            val islamicEventStateProvider = remember {
+                EntryPointAccessors.fromApplication(
+                    screenContext.applicationContext,
+                    PrayerTimeCalculatorEntryPoint::class.java
+                ).islamicEventStateProvider()
+            }
+            val islamicEventState by islamicEventStateProvider.state.collectAsStateWithLifecycle()
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = { onSetSyncing(true) },
@@ -1420,6 +1428,7 @@ fun PrayerTimesScreen(
                 onMediaAction = onMediaAction,
                 prayerAlertState = prayerAlertState,
                 silentModeState = silentModeState,
+                islamicEventState = islamicEventState,
                 modifier = Modifier.fillMaxSize()
             ) { syncState ->
             val outerConfiguration = LocalConfiguration.current

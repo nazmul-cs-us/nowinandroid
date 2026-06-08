@@ -29,7 +29,8 @@
                 android:scaleType="center"
                 android:contentDescription="@string/app_top_bar_leading_icon_description"
                 style="?attr/materialIconButtonStyle"
-                app:icon="@drawable/ic_app_top_bar_home_24"
+                app:icon="@drawable/ic_app_top_bar_profile_24"
+                app:iconSize="26dp"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintLeft_toLeftOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
@@ -61,6 +62,7 @@
                 android:contentDescription="@string/app_top_bar_settings_icon_description"
                 style="?attr/materialIconButtonStyle"
                 app:icon="@drawable/ic_app_top_bar_settings_24"
+                app:iconSize="26dp"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintRight_toRightOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />

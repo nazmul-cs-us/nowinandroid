@@ -17,6 +17,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,6 +67,8 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.starception.submission.feature.surah.MushafMiniBar
+import com.starception.submission.feature.surah.MushafMiniBarState
 import com.starception.submission.media.MediaAction
 import com.starception.submission.media.MediaControllerUiState
 import com.starception.submission.media.MediaMiniBar
@@ -116,6 +119,11 @@ fun PullToSyncContainer(
     onMediaAction: (MediaAction) -> Unit = {},
     prayerAlertState: PrayerAlertState = PrayerAlertState(),
     silentModeState: SilentModeState = SilentModeState(),
+    islamicEventState: IslamicEventState = IslamicEventState(),
+    onIslamicEventClick: (IslamicEventState) -> Unit = {},
+    mushafState: MushafMiniBarState? = null,
+    onMushafPrevious: () -> Unit = {},
+    onMushafNext: () -> Unit = {},
     content: @Composable (syncState: SyncContainerState) -> Unit
 ) {
     val isDownloading = downloadProgress > 0f
@@ -123,8 +131,13 @@ fun PullToSyncContainer(
     LaunchedEffect(prayerAlertState.displayText) {
         prayerAlertDismissed = false
     }
+    var islamicEventDismissed by remember { mutableStateOf(false) }
+    LaunchedEffect(islamicEventState.eventKey) {
+        islamicEventDismissed = false
+    }
     val isPrayerAlert = prayerAlertState.isActive && !prayerAlertDismissed
     val isSilentMode = silentModeState.isActive
+    val isIslamicEvent = islamicEventState.isActive && !islamicEventDismissed
     val hapticFeedback = LocalHapticFeedback.current
 
     // Wobble state management
@@ -200,13 +213,18 @@ fun PullToSyncContainer(
 
     // Refreshing/downloading/media state: Animatable for instant snap-to
     // This eliminates the gap where wobbleIntensity would drop between drag release and hold
-    val mediaHoldFraction = refreshingHoldFraction
+    // Media needs a touch more vertical room than sync so the MediaMiniBar's
+    // title + subtitle (e.g. "البقرة / Al-Baqarah") clear the safeDrawing
+    // top inset without the subtitle being clipped on devices with tall
+    // hole-punch cutouts.
+    val mediaHoldFraction = 0.58f
     val prayerAlertHoldFraction = refreshingHoldFraction
     // When media AND a prayer alert are live, the strip stacks a chip above the
     // MediaMiniBar — that needs more vertical room than either alone.
     val stackedHoldFraction = 0.72f
+    val isMushafActive = mushafState != null
     val refreshingOffset = remember { Animatable(0f) }
-    LaunchedEffect(isRefreshing, isDownloading, mediaState.isVisible, isPrayerAlert, isSilentMode) {
+    LaunchedEffect(isRefreshing, isDownloading, mediaState.isVisible, isPrayerAlert, isSilentMode, isIslamicEvent, isMushafActive) {
         if (isRefreshing || isDownloading) {
             refreshingOffset.snapTo(
                 if (isDownloading) downloadingHoldFraction else refreshingHoldFraction,
@@ -219,9 +237,19 @@ fun PullToSyncContainer(
                     stiffness = Spring.StiffnessMediumLow,
                 ),
             )
-        } else if (isPrayerAlert || isSilentMode) {
+        } else if (isPrayerAlert || isSilentMode || isIslamicEvent) {
             refreshingOffset.animateTo(
                 targetValue = prayerAlertHoldFraction,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            )
+        } else if (isMushafActive) {
+            // Same vertical room as media so the Surah/page line clears the
+            // tall hole-punch top inset and stays fully visible.
+            refreshingOffset.animateTo(
+                targetValue = mediaHoldFraction,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
                     stiffness = Spring.StiffnessMediumLow,
@@ -313,6 +341,8 @@ fun PullToSyncContainer(
                     mediaState.isVisible -> fitbitBgColorLight
                     isPrayerAlert -> fitbitBgColorLight
                     isSilentMode -> fitbitBgColorLight
+                    isIslamicEvent -> fitbitBgColorLight
+                    isMushafActive -> fitbitBgColorLight
                     else -> MaterialTheme.colorScheme.background
                 }
             )
@@ -380,13 +410,8 @@ fun PullToSyncContainer(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        // Small top padding keeps the chip off the status-bar
-                        // inset; tight spacedBy keeps chip and MediaMiniBar
-                        // visually grouped without feeling cramped.
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         if (isPrayerAlert) {
                             Row(
@@ -424,7 +449,6 @@ fun PullToSyncContainer(
                         MediaMiniBar(
                             state = mediaState,
                             onAction = onMediaAction,
-                            modifier = Modifier.padding(bottom = 4.dp),
                             titleDragModifier = Modifier.pointerInput(Unit) {
                                 var totalDrag = 0f
                                 detectVerticalDragGestures(
@@ -501,6 +525,54 @@ fun PullToSyncContainer(
                         )
                     }
                 }
+            } else if (isIslamicEvent) {
+                Box(
+                    modifier = Modifier
+                        .zIndex(1f)
+                        .fillMaxWidth()
+                        .height(contentOffsetY)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                        .pointerInput(islamicEventState.eventKey) {
+                            var totalDrag = 0f
+                            detectVerticalDragGestures(
+                                onDragStart = { totalDrag = 0f },
+                                onVerticalDrag = { _, dragAmount ->
+                                    totalDrag += dragAmount
+                                },
+                                onDragEnd = {
+                                    if (totalDrag < -80f) {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        islamicEventDismissed = true
+                                    }
+                                },
+                            )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onIslamicEventClick(islamicEventState)
+                        },
+                    ) {
+                        Text(
+                            text = "✦",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontSize = 14.sp,
+                            color = indicatorColor,
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = islamicEventState.title,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontSize = 14.sp,
+                            color = indicatorColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             } else if (isSilentMode) {
                 Box(
                     modifier = Modifier
@@ -527,6 +599,21 @@ fun PullToSyncContainer(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                }
+            } else if (mushafState != null) {
+                Box(
+                    modifier = Modifier
+                        .zIndex(1f)
+                        .fillMaxWidth()
+                        .height(contentOffsetY)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MushafMiniBar(
+                        state = mushafState,
+                        onPrevious = onMushafPrevious,
+                        onNext = onMushafNext,
+                    )
                 }
             } else if (isRefreshing || isDownloading || rawWobbleIntensity > 0.01f) {
             // Only show sync/download indicators when actively dragging or syncing/downloading.

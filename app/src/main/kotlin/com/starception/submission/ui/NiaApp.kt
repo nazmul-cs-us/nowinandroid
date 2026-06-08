@@ -426,6 +426,14 @@ private fun NiaMainContent(
 
         val silentModeState by com.starception.submission.feature.prayertimes.wobble.rememberSilentModeState()
         val appLevelSilentModeState = if (!isOnHome) silentModeState else com.starception.submission.feature.prayertimes.wobble.SilentModeState()
+
+        val mushafState by com.starception.submission.feature.surah.MushafMiniBarBus.state.collectAsStateWithLifecycle()
+        val appLevelMushafState = if (!isOnHome) mushafState else null
+
+        val rawIslamicEventState = mainViewModel?.islamicEventState?.collectAsStateWithLifecycle()?.value
+            ?: com.starception.submission.feature.prayertimes.wobble.IslamicEventState()
+        val appLevelIslamicEventState = if (!isOnHome) rawIslamicEventState
+            else com.starception.submission.feature.prayertimes.wobble.IslamicEventState()
         PullToSyncContainer(
             // Suppress the outer visual on Home (the inner container in
             // PrayerTimesScreen renders it there). When the user navigates away
@@ -440,6 +448,10 @@ private fun NiaMainContent(
             onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
             prayerAlertState = appLevelPrayerAlert,
             silentModeState = appLevelSilentModeState,
+            islamicEventState = appLevelIslamicEventState,
+            mushafState = appLevelMushafState,
+            onMushafPrevious = { com.starception.submission.feature.surah.MushafMiniBarBus.onPrevious?.invoke() },
+            onMushafNext = { com.starception.submission.feature.surah.MushafMiniBarBus.onNext?.invoke() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)

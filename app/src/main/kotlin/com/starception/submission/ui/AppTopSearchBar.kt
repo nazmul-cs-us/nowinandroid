@@ -343,11 +343,11 @@ fun AppTopSearchBar(
                     searchView.getEditText().setSelection(query.length)
                 },
                 onPopularClick = { suggestion ->
-                    // Tapping a popular-search chip refills the SearchView with
-                    // the chip's query so the full ranked-search pipeline runs
-                    // against it (same as picking a recent search).
-                    searchView.setText(suggestion.query)
-                    searchView.getEditText().setSelection(suggestion.query.length)
+                    // Tapping a popular-search chip refills the SearchView with the
+                    // chip's visible text (WYSIWYG) so the full ranked-search pipeline
+                    // runs against the same string the user just tapped.
+                    searchView.setText(suggestion.display)
+                    searchView.getEditText().setSelection(suggestion.display.length)
                 },
                 onTopicClick = { id ->
                     viewModel.saveSearchQuery(liveQuery)

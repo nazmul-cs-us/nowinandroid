@@ -689,6 +689,16 @@ class DrivingAudioService : Service() {
                 audioFile = legacyFiles.find { it.exists() }
                 if (audioFile == null) {
                     Log.w(TAG, "📚 Hadith audio not found for #$hadithNumber")
+                    // Background download so the next driving session can play it.
+                    val cdnKey = audioDownloadHelper.getHadithCdnKey(hadithNumber)
+                    scope.launch {
+                        try {
+                            Log.i(TAG, "📚 Background-downloading missing Hadith audio: $cdnKey")
+                            audioDownloadHelper.downloadAudio(cdnKey)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "📚 Background download failed for $cdnKey", e)
+                        }
+                    }
                     onHadithComplete(hadithNumber)
                     return
                 }
@@ -1013,6 +1023,22 @@ class DrivingAudioService : Service() {
                     TAG,
                     "🕌 Quran audio missing for Surah ${surah.number}. selected=$selectedAudioLanguage key=${selectedCdnKey ?: "n/a"} fallback=${fallbackCdnKey ?: "n/a"}"
                 )
+                // Fire-and-forget background download so the next driving session
+                // (or a later retry in this chain) will find the audio on disk.
+                // Driving mode is hands-free, so we don't surface a UI — we just
+                // ensure assets accumulate over time instead of being permanently
+                // skipped.
+                val keyToFetch = fallbackCdnKey ?: selectedCdnKey
+                if (keyToFetch != null) {
+                    scope.launch {
+                        try {
+                            Log.i(TAG, "🕌 Background-downloading missing Quran audio: $keyToFetch")
+                            audioDownloadHelper.downloadAudio(keyToFetch)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "🕌 Background download failed for $keyToFetch", e)
+                        }
+                    }
+                }
                 val nextIndex = CourseProgressTracker.completeCurrentSurah(this)
                 if (nextIndex == candidateIndex) {
                     break

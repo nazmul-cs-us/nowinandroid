@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 
 class QuranPlayerViewModel(
     private val context: Context,
-    private val audioDownloadHelper: AudioDownloadHelper? = null,
+    private val audioDownloadHelper: AudioDownloadHelper,
 ) : ViewModel() {
 
     private var playbackService: QuranPlaybackService? = null
@@ -89,12 +89,7 @@ class QuranPlayerViewModel(
                 triggerOnDemandDownload(cdnKey)
             }
 
-            // Pass AudioDownloadHelper to service
-            audioDownloadHelper?.let { helper ->
-                playbackService?.setAudioDownloadHelper(helper)
-            }
-
-            // Set initial language
+            // Set initial language (helper is injected directly into the service via Hilt)
             playbackService?.setAudioLanguage(audioLanguage)
 
             // Sync current state
@@ -203,12 +198,6 @@ class QuranPlayerViewModel(
      * Called when service reports audio needs downloading.
      */
     private fun triggerOnDemandDownload(cdnKey: String) {
-        if (audioDownloadHelper == null) {
-            Log.e("QuranPlayerViewModel", "AudioDownloadHelper not available for download")
-            _downloadError.value = "Download service not available"
-            return
-        }
-
         viewModelScope.launch {
             try {
                 _isDownloading.value = true

@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import android.speech.tts.UtteranceProgressListener
 import com.starception.submission.download.AssetRepository
+import com.starception.submission.download.AudioDownloadHelper
 import com.starception.submission.sensor.ActivityDetectionService
 import com.starception.submission.config.ActivityDetectionConfig
 import com.starception.submission.config.TravelDuaSettings
@@ -77,11 +78,16 @@ object ActivityTracker {
     @InstallIn(SingletonComponent::class)
     interface AssetRepoEntryPoint {
         fun assetRepository(): AssetRepository
+        fun audioDownloadHelper(): AudioDownloadHelper
     }
 
     private fun getAssetRepository(ctx: Context): AssetRepository =
         EntryPointAccessors.fromApplication(ctx.applicationContext, AssetRepoEntryPoint::class.java)
             .assetRepository()
+
+    private fun getAudioDownloadHelper(ctx: Context): AudioDownloadHelper =
+        EntryPointAccessors.fromApplication(ctx.applicationContext, AssetRepoEntryPoint::class.java)
+            .audioDownloadHelper()
 
     private const val PREFS_NAME = "activity_tracker_prefs"
     private const val KEY_NOTIFICATION_MODE = "notification_mode"
@@ -1003,78 +1009,65 @@ object ActivityTracker {
         }
     }
 
-    // SD card path for Bukhari audio files (moved from APK assets due to size)
-    private val bukhariAudioPath = "/sdcard/Bukhari/bukhari_audio_bn"
-
     /**
-     * Play Sahih Bukhari audio file from SD card for Bengali language
-     * Audio files are stored in /sdcard/Bukhari/ folder
-     * Naming convention: bukhari_{hadith_number}.ogg or bukhari_{hadith_number}.mp3
+     * Play Sahih Bukhari audio (Bengali) via AudioDownloadHelper (CDN first, then legacy SD card).
+     * Kicks off a background download if missing so the next call can play it.
      *
-     * @param ctx Context
-     * @param hadithNumber The hadith number (1-5515)
-     * @return true if audio file found and started playing, false otherwise
+     * @return true if a local file was found and playback started, false otherwise
      */
     private fun playBukhariAudioFromAssets(ctx: Context, hadithNumber: Int): Boolean {
-        // Release any existing MediaPlayer for hadith
         hadithMediaPlayer?.release()
         hadithMediaPlayer = null
 
-        // Format hadith number with leading zeros (4 digits)
-        val formattedNumber = String.format("%04d", hadithNumber)
+        val helper = getAudioDownloadHelper(ctx)
+        val audioFile = helper.resolveHadithAudioFile(hadithNumber)
 
-        // Try OGG first (most files are OGG), then MP3 - from SD card
-        val possibleFiles = listOf(
-            java.io.File(bukhariAudioPath, "bukhari_$formattedNumber.ogg"),
-            java.io.File(bukhariAudioPath, "bukhari_$formattedNumber.mp3")
-        )
-
-        for (audioFile in possibleFiles) {
-            if (!audioFile.exists()) {
-                Log.d("ActivityTracker", "📚 Audio file not found: ${audioFile.absolutePath}")
-                continue
-            }
-
-            try {
-                hadithMediaPlayer = MediaPlayer().apply {
-                    setDataSource(audioFile.absolutePath)
-
-                    setOnCompletionListener { mp ->
-                        mp.release()
-                        hadithMediaPlayer = null
-                        Log.d("ActivityTracker", "📚 Bengali hadith audio completed")
-
-                        // Trigger voice completion prompt for hands-free lesson marking
-                        triggerVoiceCompletionPrompt(
-                            ctx,
-                            "daily_bukhari",
-                            "hadith_$hadithNumber",
-                            "Hadith #$hadithNumber",
-                            isManualTriggerMode
-                        )
-                    }
-
-                    setOnErrorListener { mp, what, extra ->
-                        Log.e("ActivityTracker", "📚 MediaPlayer error: what=$what, extra=$extra")
-                        mp.release()
-                        hadithMediaPlayer = null
-                        true
-                    }
-
-                    prepare()
-                    start()
+        if (audioFile == null) {
+            val cdnKey = helper.getHadithCdnKey(hadithNumber)
+            Log.w("ActivityTracker", "📚 No Bengali audio for hadith #$hadithNumber locally; background-downloading $cdnKey")
+            scope.launch {
+                try {
+                    helper.downloadAudio(cdnKey)
+                } catch (e: Exception) {
+                    Log.w("ActivityTracker", "📚 Background download failed for $cdnKey", e)
                 }
-
-                Log.i("ActivityTracker", "📚 ▶️ Playing Bengali Bukhari audio: ${audioFile.absolutePath}")
-                return true
-
-            } catch (e: Exception) {
-                Log.e("ActivityTracker", "📚 Error playing audio file ${audioFile.absolutePath}: ${e.message}")
             }
+            return false
         }
 
-        Log.w("ActivityTracker", "📚 No Bengali audio file found for hadith #$hadithNumber on SD card")
-        return false
+        return try {
+            hadithMediaPlayer = MediaPlayer().apply {
+                setDataSource(audioFile.absolutePath)
+
+                setOnCompletionListener { mp ->
+                    mp.release()
+                    hadithMediaPlayer = null
+                    Log.d("ActivityTracker", "📚 Bengali hadith audio completed")
+                    triggerVoiceCompletionPrompt(
+                        ctx,
+                        "daily_bukhari",
+                        "hadith_$hadithNumber",
+                        "Hadith #$hadithNumber",
+                        isManualTriggerMode
+                    )
+                }
+
+                setOnErrorListener { mp, what, extra ->
+                    Log.e("ActivityTracker", "📚 MediaPlayer error: what=$what, extra=$extra")
+                    mp.release()
+                    hadithMediaPlayer = null
+                    true
+                }
+
+                prepare()
+                start()
+            }
+            Log.i("ActivityTracker", "📚 ▶️ Playing Bengali Bukhari audio: ${audioFile.absolutePath}")
+            true
+        } catch (e: Exception) {
+            Log.e("ActivityTracker", "📚 Error playing audio file ${audioFile.absolutePath}: ${e.message}")
+            false
+        }
     }
 
     /**

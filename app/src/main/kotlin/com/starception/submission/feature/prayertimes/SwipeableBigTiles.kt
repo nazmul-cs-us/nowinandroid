@@ -2199,15 +2199,10 @@ private fun DailyStatsTile(
     val view = LocalView.current
     val context = LocalContext.current
     val audioDownloadHelper = remember {
-        try {
-            val entryPoint = EntryPointAccessors.fromApplication(
-                context.applicationContext,
-                AudioDownloadHelperEntryPoint::class.java
-            )
-            entryPoint.audioDownloadHelper()
-        } catch (e: Exception) {
-            null
-        }
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            AudioDownloadHelperEntryPoint::class.java
+        ).audioDownloadHelper()
     }
     val viewModel: QuranPlayerViewModel = viewModel {
         QuranPlayerViewModel(context, audioDownloadHelper)

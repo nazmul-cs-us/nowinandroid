@@ -110,6 +110,9 @@ import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.core.qurandatabase.Surah
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.feature.quran.AudioLanguage
+import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import com.starception.submission.download.AssetDownloadManager
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.FlowPreview
@@ -543,6 +546,17 @@ fun SurahDetailScreen(
 
     val availableTranslations = remember { viewModel.getAvailableTranslations() }
 
+    // Hilt entry point for AudioDownloadHelper — needed so the service can fetch
+    // missing translation audio (e.g. Bengali / English) on demand. Without
+    // wiring this here, playSurah() silently fails for any audio not already
+    // on disk because the service's onAudioNeedsDownload callback is unbound.
+    val audioDownloadHelper = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            SherpaOnnxTtsEntryPoint::class.java,
+        ).audioDownloadHelper()
+    }
+
     // Service connection
     val serviceConnection = remember {
         object : ServiceConnection {
@@ -571,6 +585,25 @@ fun SurahDetailScreen(
                     val newSurahNumber = surahIndex + 1 // Convert 0-based index to 1-based surah number
                     android.util.Log.d("QuranAlbumPlayer", "🔄 SURAH_CHANGED | index=$surahIndex | surahNumber=$newSurahNumber")
                     currentPlayingSurahNumber = newSurahNumber
+                }
+
+                // Wire the on-demand download trigger so missing translation audio gets
+                // fetched and auto-played when ready. The helper itself is injected into
+                // the service directly via Hilt.
+                playbackService?.onAudioNeedsDownload = { cdnKey, _ ->
+                    android.util.Log.i("PlaybackTrace", "⬇️ download requested: $cdnKey")
+                    coroutineScope.launch {
+                        try {
+                            val result = audioDownloadHelper.downloadAudio(cdnKey)
+                            android.util.Log.i("PlaybackTrace", "⬇️ download result: $result")
+                            if (result is AssetDownloadManager.DownloadState.Completed) {
+                                val idx = playbackService?.getCurrentSurahIndex() ?: return@launch
+                                playbackService?.playAfterDownload(idx)
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("PlaybackTrace", "⬇️ download failed", e)
+                        }
+                    }
                 }
 
                 playbackService?.setAudioLanguage(currentAudioLanguage)
@@ -647,6 +680,14 @@ fun SurahDetailScreen(
             )
             prefs.edit().putBoolean("mushaf_view_hint_shown", true).apply()
         }
+    }
+
+    // Highlighted ayah: when the user arrives via search (e.g. tapping
+    // "Ayatul Kursi" jumps to 2:255), tint that ayah so they can see which
+    // ayah the search picked instead of just landing in the middle of the
+    // surah. Keyed on surahNumber + scrollToAyah so revisiting clears it.
+    var highlightedAyahNumber by remember(surahNumber, scrollToAyah) {
+        mutableStateOf<Int?>(if (scrollToAyah > 0) scrollToAyah else null)
     }
 
     // Scroll to specific ayah when content is loaded (if scrollToAyah > 0)
@@ -841,6 +882,7 @@ fun SurahDetailScreen(
                     },
                     onPlayPauseClick = {
                         val service = playbackService
+                        android.util.Log.d("PlaybackTrace", "▶️ onPlayPauseClick | route=$surahNumber | num=$num | service=${service != null} | isPlaying=${service?.isPlaying()}")
                         if (service != null) {
                             if (service.isPlaying()) {
                                 service.togglePlayPause()
@@ -848,7 +890,8 @@ fun SurahDetailScreen(
                                 playWithPermissionCheck {
                                     showMusicPlayer = true
                                     service.setAudioLanguage(currentAudioLanguage)
-                                    service.playSurah(surahNumber - 1, true)
+                                    android.util.Log.d("PlaybackTrace", "▶️ calling playSurah(index=${num - 1}) for num=$num")
+                                    service.playSurah(num - 1, true)
                                 }
                             }
                         }
@@ -872,6 +915,7 @@ fun SurahDetailScreen(
                     onAyahClick = { /* TODO */ },
                     onFabClick = {
                         val service = playbackService
+                        android.util.Log.d("PlaybackTrace", "▶️ onFabClick | route=$surahNumber | num=$num | service=${service != null} | isPlaying=${service?.isPlaying()} | currentPlayingSurahNumber=$currentPlayingSurahNumber")
                         if (service != null) {
                             if (service.isPlaying()) {
                                 service.togglePlayPause()
@@ -879,7 +923,8 @@ fun SurahDetailScreen(
                                 playWithPermissionCheck {
                                     showMusicPlayer = true
                                     service.setAudioLanguage(currentAudioLanguage)
-                                    service.playSurah(surahNumber - 1, true)
+                                    android.util.Log.d("PlaybackTrace", "▶️ FAB calling playSurah(index=${num - 1}) for num=$num")
+                                    service.playSurah(num - 1, true)
                                 }
                             }
                         }
@@ -958,6 +1003,11 @@ fun SurahDetailScreen(
                     initialMushafPage = viewModel.getLastMushafPage(surahNumber),
                     onMushafPageChange = { page -> viewModel.saveLastMushafPage(surahNumber, page) },
                     currentRecitingAyah = currentRecitingAyah,
+                    // Highlight + Mushaf snap only on the originating surah —
+                    // swiping to a neighbour surah shouldn't drag the tint or
+                    // page-jump to its same-numbered ayah.
+                    highlightedAyahNumber = if (num == surahNumber) highlightedAyahNumber else null,
+                    scrollToAyahForMushafJump = if (num == surahNumber) scrollToAyah else 0,
                     modifier = Modifier
                 )
                 }
@@ -1855,6 +1905,12 @@ private fun AlbumPlayerContent(
     onMushafPageChange: (Int) -> Unit = {},
     /** numberInSurah of the ayah currently being recited (audio sync), or null. */
     currentRecitingAyah: Int? = null,
+    /** numberInSurah to softly tint after a search-driven scrollToAyah jump,
+     *  so the user can see which verse the link picked. */
+    highlightedAyahNumber: Int? = null,
+    /** Search-driven jump target — forwarded to the Mushaf pager so it can
+     *  snap to the page containing this ayah. 0 = no jump. */
+    scrollToAyahForMushafJump: Int = 0,
     modifier: Modifier = Modifier
 ) {
     // Use current playing surah/ayahs if available, otherwise use original
@@ -1913,6 +1969,14 @@ private fun AlbumPlayerContent(
     val view = LocalView.current
     var currentFontSizeState by remember { mutableStateOf(arabicFontSize) }
     val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    // Wobble offset: when the app-level PullToSyncContainer pushes content
+    // down (media playing, prayer alert, sync), shrink the Mushaf height so
+    // it fits the reduced viewport instead of overflowing — which previously
+    // pulled the page-number footer up into the visible area and left a big
+    // gap at the top.
+    val wobbleIntensity = com.starception.submission.ui.LocalWobbleIntensity.current
+    val mushafHeight = (screenHeightDp - (wobbleIntensity * 220f).dp)
+        .coerceAtLeast(200.dp)
 
     // Update local state when arabicFontSize changes externally (e.g. +/- buttons)
     LaunchedEffect(arabicFontSize) {
@@ -2213,6 +2277,10 @@ private fun AlbumPlayerContent(
                     textAlignment = textAlignment,
                     parentScrollState = scrollState,
                     initialPage = initialMushafPage,
+                    surahNameArabic = displaySurah.nameArabic,
+                    surahNameEnglish = displaySurah.nameEnglish,
+                    scrollToAyah = scrollToAyahForMushafJump,
+                    highlightedAyahNumber = highlightedAyahNumber,
                     onAyahLongPress = { ayahNumber ->
                         selectedAyahForOptions = ayahNumber
                         showBottomSheet = true
@@ -2222,7 +2290,7 @@ private fun AlbumPlayerContent(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(screenHeightDp)
+                        .height(mushafHeight)
                 )
             }
         } else {
@@ -2250,6 +2318,7 @@ private fun AlbumPlayerContent(
                     isFavourite = ayah.numberInSurah in favouriteAyahs,
                     hasNote = ayah.numberInSurah in ayahsWithNotes,
                     isReciting = currentRecitingAyah == ayah.numberInSurah,
+                    isHighlighted = highlightedAyahNumber == ayah.numberInSurah,
                     onClick = { onAyahClick(ayah) },
                     onLongPress = {
                         selectedAyahForOptions = ayah.numberInSurah
@@ -4160,10 +4229,28 @@ private fun MushafPageWithFrame(
     showBismillah: Boolean,
     onAyahLongPress: (Int) -> Unit,
     ayahRanges: List<Pair<Int, IntRange>>,
+    highlightedAyahNumber: Int? = null,
     modifier: Modifier = Modifier
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val highlightBg = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
+
+    // Overlay a background tint over the highlighted ayah's char range. The
+    // range is page-local (already remapped in MushafPagerView's paginator),
+    // so we can apply SpanStyle directly without re-mapping.
+    val renderedText = remember(pageText, highlightedAyahNumber, ayahRanges, highlightBg) {
+        val target = highlightedAyahNumber ?: return@remember pageText
+        val range = ayahRanges.firstOrNull { it.first == target }?.second
+            ?: return@remember pageText
+        androidx.compose.ui.text.AnnotatedString.Builder(pageText).apply {
+            addStyle(
+                style = androidx.compose.ui.text.SpanStyle(background = highlightBg),
+                start = range.first,
+                end = (range.last + 1).coerceAtMost(pageText.length),
+            )
+        }.toAnnotatedString()
+    }
 
     val statusBarHeight = with(LocalDensity.current) {
         val cutout = WindowInsets.displayCutout.getTop(this)
@@ -4171,7 +4258,7 @@ private fun MushafPageWithFrame(
         maxOf(cutout, statusBar).toDp()
     }
     val horizontalPadding = 12.dp
-    val topPadding = statusBarHeight / 2 + 4.dp
+    val topPadding = 4.dp
     val bottomPadding = 4.dp
     val bismillahHeightDp = if (showBismillah) 36.dp else 0.dp
     val pageFooterHeightDp = 24.dp
@@ -4209,7 +4296,7 @@ private fun MushafPageWithFrame(
             }
 
             Text(
-                text = pageText,
+                text = renderedText,
                 color = onSurfaceColor,
                 style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
                     fontSize = arabicFontSize.sp,
@@ -4271,6 +4358,15 @@ private fun MushafPagerView(
     textAlignment: String = "start",
     parentScrollState: androidx.compose.foundation.lazy.LazyListState? = null,
     initialPage: Int = 0,
+    /** Names used by the app-level Mushaf mini-bar in PullToSyncContainer. */
+    surahNameArabic: String = "",
+    surahNameEnglish: String = "",
+    /** Search-driven jump target; snap once after pagination so the user lands
+     *  on the page containing this ayah (e.g. Ayatul Kursi → 2:255). 0 = none. */
+    scrollToAyah: Int = 0,
+    /** Numerically equal ayah inside [scrollToAyah]'s page gets a background tint
+     *  so the user can locate the verse the search link picked. */
+    highlightedAyahNumber: Int? = null,
     onAyahLongPress: (Int) -> Unit,
     onPageChange: (current: Int, total: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
@@ -4300,7 +4396,7 @@ private fun MushafPagerView(
     }
     val lineSpacingMultiplier = 1.35f
     val horizontalPadding = 12.dp
-    val topPadding = statusBarHeight / 2 + 4.dp
+    val topPadding = 4.dp
     val bottomPadding = 4.dp
     val bismillahHeightDp = 36.dp
     val pageFooterHeightDp = 24.dp
@@ -4531,6 +4627,39 @@ private fun MushafPagerView(
                 onPageChange(state.current, paginatedPages.size)
             }
 
+            // Publish current Mushaf page to PullToSyncContainer's mini-bar.
+            // Cleared on dispose so leaving Mushaf mode hides the strip.
+            DisposableEffect(surahNameArabic, surahNameEnglish, state.current, paginatedPages.size) {
+                if (paginatedPages.isNotEmpty()) {
+                    MushafMiniBarBus.state.value = MushafMiniBarState(
+                        surahNameArabic = surahNameArabic,
+                        surahNameEnglish = surahNameEnglish,
+                        currentPage = state.current + 1,
+                        totalPages = paginatedPages.size,
+                    )
+                    MushafMiniBarBus.bind(
+                        next = { mushafScope.launch { state.next() } },
+                        previous = { mushafScope.launch { state.prev() } },
+                    )
+                }
+                onDispose { MushafMiniBarBus.unbind() }
+            }
+
+            // Snap to the page containing scrollToAyah after pagination is ready.
+            // Keyed on paginatedPages so we re-run once the pages exist; further
+            // user swipes stay put because the key doesn't change without a font
+            // / size / width edit (which invalidates the layout anyway).
+            LaunchedEffect(paginatedPages, scrollToAyah) {
+                if (scrollToAyah > 0 && paginatedPages.isNotEmpty()) {
+                    val targetIndex = paginatedPages.indexOfFirst { page ->
+                        page.ayahRanges.any { it.first == scrollToAyah }
+                    }
+                    if (targetIndex >= 0 && targetIndex != state.current) {
+                        state.snapTo(targetIndex)
+                    }
+                }
+            }
+
             val pageCurlConfig = eu.wewox.pagecurl.config.rememberPageCurlConfig(
                 dragForwardEnabled = false,
                 dragBackwardEnabled = false
@@ -4550,6 +4679,7 @@ private fun MushafPagerView(
                     showBismillah = page.showBismillah,
                     onAyahLongPress = onAyahLongPress,
                     ayahRanges = page.ayahRanges,
+                    highlightedAyahNumber = highlightedAyahNumber,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -4581,18 +4711,35 @@ private fun AyahTrackItem(
     isFavourite: Boolean = false,
     hasNote: Boolean = false,
     isReciting: Boolean = false,
+    isHighlighted: Boolean = false,
     onClick: () -> Unit,
     onLongPress: () -> Unit = {},
     onDoubleTap: () -> Unit = {}
 ) {
-    // Soft tint when this ayah is the one currently being recited.
-    val highlightColor = if (isReciting) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+    // Soft tint when this ayah is the one currently being recited, OR was
+    // jumped to from search (e.g. "Ayatul Kursi" → 2:255). Reciting wins so a
+    // playing ayah is still visually distinct from the search-target tint.
+    val highlightColor = when {
+        isReciting -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        isHighlighted -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
+        else -> Color.Transparent
+    }
+    val highlightBorderColor = if (isHighlighted && !isReciting) {
+        MaterialTheme.colorScheme.tertiary
     } else Color.Transparent
     Surface(
         color = highlightColor,
         modifier = Modifier
             .fillMaxWidth()
+            .drawBehind {
+                if (highlightBorderColor != Color.Transparent) {
+                    drawRect(
+                        color = highlightBorderColor,
+                        topLeft = Offset.Zero,
+                        size = androidx.compose.ui.geometry.Size(4.dp.toPx(), size.height),
+                    )
+                }
+            }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongPress,

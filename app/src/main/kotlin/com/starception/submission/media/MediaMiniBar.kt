@@ -49,7 +49,7 @@ fun MediaMiniBar(
 
     // Use sage-area colors so the mini-bar blends into PullToSyncContainer
     val contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-    val subtitleColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+    val subtitleColor = MaterialTheme.colorScheme.onPrimaryContainer
 
     // Single row: title area on left, controls on right
     Row(
@@ -79,6 +79,7 @@ fun MediaMiniBar(
                 Text(
                     text = playback.subtitle,
                     style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 13.sp,
                     color = subtitleColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

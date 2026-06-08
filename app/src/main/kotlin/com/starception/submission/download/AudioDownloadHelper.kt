@@ -83,10 +83,13 @@ class AudioDownloadHelper @Inject constructor(
                 }
             }
             AudioLanguage.ENGLISH_TRANSLATION -> {
-                // English: "001 surah_al_fatihah.ogg"
-                val num = String.format("%03d", surah.number)
-                val name = "surah_${surah.nameEnglish.lowercase().replace("-", "_").replace(" ", "_")}"
-                "audio/quran/english/$num $name.ogg"
+                // Manifest naming is inconsistent across English files:
+                //   1-30:  "001 surah_al_fatihah.ogg"  (space + lowercase 's')
+                //   31-114:"031Surah_luqman.ogg"      (no space + capital 'S')
+                // Plus spelling variants (at_tawbah, as_safat, adh_dhariyat, al_muddaththir,
+                // al_layl, quraysh) that don't match QuranData.nameEnglish.
+                // So look up by numeric prefix rather than trying to reconstruct the filename.
+                findCdnKeyByNumericPrefix("audio/quran/english/", surah.number)
             }
         }
     }
@@ -104,6 +107,27 @@ class AudioDownloadHelper @Inject constructor(
                 .getOrNull(index)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to lookup CDN key by prefix: $prefix, index=$index", e)
+            null
+        }
+    }
+
+    /**
+     * Find a manifest CDN key under [folderPrefix] whose filename starts with the
+     * zero-padded surah number. Used when filename suffix conventions vary across
+     * entries (e.g. English Quran audio).
+     */
+    private fun findCdnKeyByNumericPrefix(folderPrefix: String, surahNumber: Int): String? {
+        return try {
+            val manifest = downloadManager.getCachedManifest() ?: return null
+            val numPrefix = folderPrefix + String.format("%03d", surahNumber)
+            manifest.assets.keys.firstOrNull { key ->
+                if (!key.startsWith(numPrefix)) return@firstOrNull false
+                // Ensure the digits don't bleed into a higher number (e.g. "003" matching "0030").
+                val next = key.getOrNull(numPrefix.length)
+                next == null || !next.isDigit()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to lookup CDN key by numeric prefix: $folderPrefix #$surahNumber", e)
             null
         }
     }
