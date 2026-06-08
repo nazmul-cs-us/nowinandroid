@@ -145,6 +145,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- Debug receiver to force-show an Islamic-event banner via adb -->
+        <receiver
+            android:name=".util.DebugIslamicEventReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.starception.submission.DEBUG_SIMULATE_ISLAMIC_EVENT" />
+            </intent-filter>
+        </receiver>
+
         <!-- Prayer Action Receiver for notification actions like "Mark as Prayed" -->
         <receiver
             android:name=".util.PrayerActionReceiver"
