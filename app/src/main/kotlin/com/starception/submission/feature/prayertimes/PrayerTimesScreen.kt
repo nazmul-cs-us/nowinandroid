@@ -1429,6 +1429,9 @@ fun PrayerTimesScreen(
                 prayerAlertState = prayerAlertState,
                 silentModeState = silentModeState,
                 islamicEventState = islamicEventState,
+                onIslamicEventClick = { event ->
+                    com.starception.submission.ui.search.SearchPrefillBus.requestSearch(event.searchQuery)
+                },
                 modifier = Modifier.fillMaxSize()
             ) { syncState ->
             val outerConfiguration = LocalConfiguration.current

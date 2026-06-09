@@ -1,13 +1,16 @@
 package com.starception.submission.islamic.shared
 
 import com.starception.submission.feature.prayertimes.wobble.IslamicEventState
+import com.starception.submission.util.DebugIslamicEventBus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -31,13 +34,26 @@ import javax.inject.Singleton
 class IslamicEventStateProvider @Inject constructor() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val _state = MutableStateFlow(resolve())
-    val state: StateFlow<IslamicEventState> = _state.asStateFlow()
+    private val _calculated = MutableStateFlow(resolve())
+
+    /**
+     * Final state surfaced to the UI: debug-bus override wins when present,
+     * otherwise the real-date calculation. Debug entries are cleared via the
+     * `--ez clear true` extra on the debug broadcast.
+     */
+    val state: StateFlow<IslamicEventState> = combine(
+        _calculated,
+        DebugIslamicEventBus.state,
+    ) { real, override -> override ?: real }.stateIn(
+        scope = scope,
+        started = SharingStarted.Eagerly,
+        initialValue = _calculated.value,
+    )
 
     init {
         scope.launch {
             while (isActive) {
-                _state.value = resolve()
+                _calculated.value = resolve()
                 delay(TimeUnit.MINUTES.toMillis(5))
             }
         }

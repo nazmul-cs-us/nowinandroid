@@ -24,6 +24,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.em
@@ -87,6 +88,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -102,6 +104,7 @@ import androidx.lifecycle.viewModelScope
 import com.starception.submission.R
 import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.core.designsystem.theme.QuranFonts
+import com.starception.submission.core.designsystem.theme.ubuntuInspiredFontFamily
 import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
 import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
@@ -1602,7 +1605,7 @@ fun SurahDetailScreen(
                     pointDown = true,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 22.dp)
+                        .padding(bottom = 30.dp)
                         .zIndex(10f),
                 )
             }
@@ -4135,7 +4138,7 @@ private fun ContinuousAyahsContent(
                 withStyle(SpanStyle(
                     color = currentMarkerColor,
                     fontSize = 0.85.em,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+                    fontFamily = ubuntuInspiredFontFamily
                 )) {
                     append(" \u06DD${ayah.numberInSurah.toArabicIndic()}")
                 }
@@ -4235,6 +4238,32 @@ private fun MushafPageWithFrame(
     val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val highlightBg = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
+    val markerColor = MaterialTheme.colorScheme.primary
+    val markerFontFamily = remember(arabicFont) { getArabicFontFamily(arabicFont) }
+
+    // One inline content entry per ayah marker on this page; placeholder dims
+    // must match what the paginator measured with (2.15em x 1.85em).
+    val ayahMarkerInlineContent = remember(ayahRanges, markerColor, surfaceColor, markerFontFamily, arabicFontSize) {
+        val digitSp = (arabicFontSize * 0.65f).sp
+        ayahRanges.associate { (ayahNum, _) ->
+            "ayah_$ayahNum" to androidx.compose.foundation.text.InlineTextContent(
+                placeholder = androidx.compose.ui.text.Placeholder(
+                    width = 2.1.em,
+                    height = 1.2.em,
+                    placeholderVerticalAlign = androidx.compose.ui.text.PlaceholderVerticalAlign.Center,
+                ),
+                children = {
+                    AyahMarkerRosette(
+                        ayahNumber = ayahNum,
+                        color = markerColor,
+                        digitColor = markerColor,
+                        arabicFontFamily = markerFontFamily,
+                        digitFontSize = digitSp,
+                    )
+                },
+            )
+        }
+    }
 
     // Overlay a background tint over the highlighted ayah's char range. The
     // range is page-local (already remapped in MushafPagerView's paginator),
@@ -4257,11 +4286,14 @@ private fun MushafPageWithFrame(
         val statusBar = WindowInsets.statusBars.getTop(this)
         maxOf(cutout, statusBar).toDp()
     }
+    val navBarHeight = with(LocalDensity.current) {
+        WindowInsets.navigationBars.getBottom(this).toDp()
+    }
     val horizontalPadding = 12.dp
     val topPadding = 4.dp
-    val bottomPadding = 4.dp
+    val bottomPadding = 16.dp
     val bismillahHeightDp = if (showBismillah) 36.dp else 0.dp
-    val pageFooterHeightDp = 24.dp
+    val pageFooterHeightDp = 8.dp
     val lineSpacingMultiplier = 1.35f
     val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
 
@@ -4301,8 +4333,10 @@ private fun MushafPageWithFrame(
                 style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
                     fontSize = arabicFontSize.sp,
                     textAlign = TextAlign.Justify,
+                    textDirection = androidx.compose.ui.text.style.TextDirection.Rtl,
                     lineHeight = (arabicFontSize * lineSpacingMultiplier).sp
                 ),
+                inlineContent = ayahMarkerInlineContent,
                 overflow = TextOverflow.Clip,
                 modifier = Modifier
                     .fillMaxSize()
@@ -4330,10 +4364,10 @@ private fun MushafPageWithFrame(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = pageNumber.toArabicIndic(),
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = 20.sp
-                    ),
+                    text = pageNumber.toString(),
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Normal,
+                    fontFamily = ubuntuInspiredFontFamily,
                     color = onSurfaceColor.copy(alpha = 0.7f)
                 )
             }
@@ -4394,14 +4428,33 @@ private fun MushafPagerView(
         val statusBar = WindowInsets.statusBars.getTop(this)
         maxOf(cutout, statusBar).toDp()
     }
+    val navBarHeight = with(density) {
+        WindowInsets.navigationBars.getBottom(this).toDp()
+    }
     val lineSpacingMultiplier = 1.35f
     val horizontalPadding = 12.dp
     val topPadding = 4.dp
-    val bottomPadding = 4.dp
+    val bottomPadding = navBarHeight + 8.dp
     val bismillahHeightDp = 36.dp
-    val pageFooterHeightDp = 24.dp
+    val pageFooterHeightDp = 8.dp
 
-    val masterString = remember(ayahs, showTajweed, tajweedAnnotations, markerColor) {
+    // Force Scheherazade for the end-of-ayah marker (U+06DD) regardless of the
+    // user's body-font choice. Scheherazade ships the printed-Madinah-mushaf
+    // rosette glyph (8-petal flower, see Wikimedia File:U+06DD_Scheherazade.svg);
+    // FontFamily.Default and most body fonts fall back to a plain thin circle.
+    val markerFontFamily = remember(arabicFont) { getArabicFontFamily(arabicFont) }
+    val markerPlaceholderWidth = 2.1.em
+    val markerPlaceholderHeight = 1.2.em
+    // U+0627 ARABIC LETTER ALEF has BIDI class AL (Arabic Letter, strong RTL),
+    // anchoring the inline placeholder in the surrounding Arabic run so the
+    // rosette renders at its logical position instead of being reordered by BIDI.
+    val markerChar = "ا"
+    // Hair space (U+200A) before and after the marker keeps the ornament close
+    // to the previous word without inflating word-spacing in justified Arabic.
+    val markerPrefix = " "
+    val markerSuffix = " "
+
+    val masterString = remember(ayahs, showTajweed, tajweedAnnotations, markerColor, markerFontFamily) {
         buildAnnotatedString {
             ayahs.forEachIndexed { index, ayah ->
                 val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
@@ -4422,32 +4475,57 @@ private fun MushafPagerView(
                     append(arabicText)
                 }
 
-                withStyle(SpanStyle(
-                    color = markerColor,
-                    fontSize = 0.85.em,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default
-                )) {
-                    append(" ۝${ayah.numberInSurah.toArabicIndic()}")
-                }
+                append(" ‏")
+                appendInlineContent(
+                    id = "ayah_${ayah.numberInSurah}",
+                    alternateText = markerChar,
+                )
+                append("‏")
 
                 if (index < ayahs.size - 1) append(" ")
             }
         }
     }
 
-    val ayahCharRanges = remember(ayahs, masterString) {
+    val ayahCharRanges = remember(ayahs) {
         val ranges = mutableListOf<Pair<Int, IntRange>>()
         var pos = 0
         ayahs.forEachIndexed { index, ayah ->
             val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
             val startPos = pos
-            pos += arabicText.length
-            val markerText = " ۝${ayah.numberInSurah.toArabicIndic()}"
-            pos += markerText.length
+            // arabicText + " " + RLM + markerChar + RLM
+            pos += arabicText.length + 1 + 1 + markerChar.length + 1
             if (index < ayahs.size - 1) pos += 1
             ranges.add(ayah.numberInSurah to (startPos until pos))
         }
         ranges
+    }
+
+    // Parallel placeholder list so paginator's TextMeasurer reserves the same
+    // space the renderer will draw the rosette into.
+    val markerPlaceholders = remember(ayahs, markerPlaceholderWidth, markerPlaceholderHeight) {
+        val list = mutableListOf<AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>()
+        var pos = 0
+        ayahs.forEachIndexed { index, ayah ->
+            val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
+            // Skip arabicText + " " (1 char) + RLM (1 char) -> markerChar position
+            val markerStart = pos + arabicText.length + 1 + 1
+            val markerEnd = markerStart + markerChar.length
+            list.add(
+                AnnotatedString.Range(
+                    item = androidx.compose.ui.text.Placeholder(
+                        width = markerPlaceholderWidth,
+                        height = markerPlaceholderHeight,
+                        placeholderVerticalAlign = androidx.compose.ui.text.PlaceholderVerticalAlign.Center,
+                    ),
+                    start = markerStart,
+                    end = markerEnd,
+                )
+            )
+            // After markerEnd: RLM (1 char), then optional inter-ayah space
+            pos = markerEnd + 1 + (if (index < ayahs.size - 1) 1 else 0)
+        }
+        list
     }
 
     Column(
@@ -4560,6 +4638,7 @@ private fun MushafPagerView(
                 val fullLayout = textMeasurer.measure(
                     text = masterString,
                     style = measureStyle,
+                    placeholders = markerPlaceholders,
                     constraints = androidx.compose.ui.unit.Constraints(
                         maxWidth = availableWidthPx.toInt()
                     ),

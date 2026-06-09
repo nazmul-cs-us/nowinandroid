@@ -145,6 +145,19 @@ fun AppTopSearchBar(
         onDispose { whisperService.release() }
     }
 
+    // Stable holder so the bus collector (Composable-scope) can reach the
+    // SearchView that the AndroidView factory creates exactly once.
+    val searchViewHolder = remember { mutableStateOf<SearchView?>(null) }
+    LaunchedEffect(Unit) {
+        com.starception.submission.ui.search.SearchPrefillBus.requests.collect { query ->
+            val sv = searchViewHolder.value ?: return@collect
+            if (!sv.isAttachedToWindow) return@collect
+            sv.show()
+            sv.setText(query)
+            sv.getEditText().setSelection(query.length)
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -158,6 +171,7 @@ fun AppTopSearchBar(
 
             val searchBar = root.findViewById<SearchBar>(R.id.app_search_bar)
             val searchView = root.findViewById<SearchView>(R.id.app_search_view)
+            searchViewHolder.value = searchView
             val appBar = root.findViewById<AppBarLayout>(R.id.app_bar_layout)
             val leading = root.findViewById<MaterialButton>(R.id.leading_button)
             val settings = root.findViewById<MaterialButton>(R.id.settings_button)

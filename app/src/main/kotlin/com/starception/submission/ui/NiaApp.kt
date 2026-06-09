@@ -449,6 +449,9 @@ private fun NiaMainContent(
             prayerAlertState = appLevelPrayerAlert,
             silentModeState = appLevelSilentModeState,
             islamicEventState = appLevelIslamicEventState,
+            onIslamicEventClick = { event ->
+                com.starception.submission.ui.search.SearchPrefillBus.requestSearch(event.searchQuery)
+            },
             mushafState = appLevelMushafState,
             onMushafPrevious = { com.starception.submission.feature.surah.MushafMiniBarBus.onPrevious?.invoke() },
             onMushafNext = { com.starception.submission.feature.surah.MushafMiniBarBus.onNext?.invoke() },
