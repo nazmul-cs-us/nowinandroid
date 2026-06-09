@@ -58,6 +58,14 @@ internal class OfflineFirstUserDataRepository @Inject constructor(
         analyticsHelper.logThemeChanged(themeBrand.name)
     }
 
+    override suspend fun setCustomThemeColor(argb: Int) {
+        niaPreferencesDataSource.setCustomThemeColor(argb)
+    }
+
+    override suspend fun setCustomThemeColors(primary: Int, secondary: Int, tertiary: Int) {
+        niaPreferencesDataSource.setCustomThemeColors(primary, secondary, tertiary)
+    }
+
     override suspend fun setDarkThemeConfig(darkThemeConfig: DarkThemeConfig) {
         niaPreferencesDataSource.setDarkThemeConfig(darkThemeConfig)
         analyticsHelper.logDarkThemeConfigChanged(darkThemeConfig.name)

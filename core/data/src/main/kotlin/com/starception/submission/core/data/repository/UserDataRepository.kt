@@ -164,6 +164,12 @@ interface UserDataRepository {
      */
     suspend fun setThemeBrand(themeBrand: ThemeBrand)
 
+    /** Persists the ARGB primary seed colour for [ThemeBrand.CUSTOM]. */
+    suspend fun setCustomThemeColor(argb: Int)
+
+    /** Persists all 3 ARGB accents (primary, secondary, tertiary) for [ThemeBrand.CUSTOM]. */
+    suspend fun setCustomThemeColors(primary: Int, secondary: Int, tertiary: Int)
+
     /**
      * DARK THEME CONFIGURATION: Controls dark mode behavior
      * 

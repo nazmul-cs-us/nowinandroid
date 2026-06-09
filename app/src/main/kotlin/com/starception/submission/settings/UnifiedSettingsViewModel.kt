@@ -82,7 +82,10 @@ class UnifiedSettingsViewModel @Inject constructor(
             ThemeSettingsState(
                 brand = userData.themeBrand,
                 useDynamicColor = userData.useDynamicColor,
-                darkThemeConfig = userData.darkThemeConfig
+                darkThemeConfig = userData.darkThemeConfig,
+                customColor = userData.customThemeColor,
+                customSecondaryColor = userData.customSecondaryColor,
+                customTertiaryColor = userData.customTertiaryColor,
             )
         }
         .stateIn(
@@ -233,6 +236,14 @@ class UnifiedSettingsViewModel @Inject constructor(
         Log.d(TAG, "Updating theme brand to: $themeBrand")
         viewModelScope.launch {
             userDataRepository.setThemeBrand(themeBrand)
+        }
+    }
+
+    /** Saves all 3 HSV-picked accents and switches the active brand to CUSTOM. */
+    fun updateCustomThemeColors(primary: Int, secondary: Int, tertiary: Int) {
+        viewModelScope.launch {
+            userDataRepository.setCustomThemeColors(primary, secondary, tertiary)
+            userDataRepository.setThemeBrand(ThemeBrand.CUSTOM)
         }
     }
 
@@ -1285,5 +1296,9 @@ class UnifiedSettingsViewModel @Inject constructor(
 data class ThemeSettingsState(
     val brand: ThemeBrand = ThemeBrand.COASTAL,
     val useDynamicColor: Boolean = false,
-    val darkThemeConfig: DarkThemeConfig = DarkThemeConfig.FOLLOW_SYSTEM
+    val darkThemeConfig: DarkThemeConfig = DarkThemeConfig.FOLLOW_SYSTEM,
+    /** ARGB ints of the three custom accents (primary/secondary/tertiary) when [brand] == ThemeBrand.CUSTOM. 0 = none yet. */
+    val customColor: Int = 0,
+    val customSecondaryColor: Int = 0,
+    val customTertiaryColor: Int = 0,
 )

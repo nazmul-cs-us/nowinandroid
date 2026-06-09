@@ -227,7 +227,8 @@ fun UnifiedSettingsScreen(
                             themeSettings = themeSettings,
                             onChangeThemeBrand = viewModel::updateThemeBrand,
                             onChangeDynamicColorPreference = viewModel::updateDynamicColorPreference,
-                            onChangeDarkThemeConfig = viewModel::updateDarkThemeConfig
+                            onChangeDarkThemeConfig = viewModel::updateDarkThemeConfig,
+                            onChangeCustomColors = viewModel::updateCustomThemeColors,
                         )
                     }
                 }

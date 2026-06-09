@@ -58,5 +58,15 @@ message UserPreferences {
 
     TextAccentColorProto text_accent_color = 23;
 
-    // NEXT AVAILABLE ID: 24
+    // ARGB int of the user-selected PRIMARY accent for ThemeBrand.CUSTOM.
+    // Stored as fixed32 to preserve the alpha bits; 0 means "no custom colour set".
+    fixed32 custom_theme_color = 24;
+
+    // ARGB int of the user-selected SECONDARY accent for ThemeBrand.CUSTOM. 0 = unset.
+    fixed32 custom_secondary_color = 25;
+
+    // ARGB int of the user-selected TERTIARY accent for ThemeBrand.CUSTOM. 0 = unset.
+    fixed32 custom_tertiary_color = 26;
+
+    // NEXT AVAILABLE ID: 27
 }

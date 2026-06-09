@@ -314,6 +314,10 @@ sealed interface MainActivityUiState {
 
         override val themeBrand: ThemeBrand = userData.themeBrand
 
+        override val customThemeColor: Int = userData.customThemeColor
+        override val customSecondaryColor: Int = userData.customSecondaryColor
+        override val customTertiaryColor: Int = userData.customTertiaryColor
+
         override fun shouldUseDarkTheme(isSystemDarkTheme: Boolean) =
             when (userData.darkThemeConfig) {
                 DarkThemeConfig.FOLLOW_SYSTEM -> isSystemDarkTheme
@@ -336,6 +340,11 @@ sealed interface MainActivityUiState {
      * Returns the theme brand to be used.
      */
     val themeBrand: ThemeBrand get() = ThemeBrand.DEFAULT
+
+    /** Seed colour (ARGB) when [themeBrand] is CUSTOM. 0 = not set. */
+    val customThemeColor: Int get() = 0
+    val customSecondaryColor: Int get() = 0
+    val customTertiaryColor: Int get() = 0
 
     /**
      * Returns `true` if dark theme should be used.

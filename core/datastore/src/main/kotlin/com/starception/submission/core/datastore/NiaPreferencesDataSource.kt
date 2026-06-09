@@ -82,6 +82,7 @@ class NiaPreferencesDataSource @Inject constructor(
                     ThemeBrandProto.THEME_BRAND_ANDROID -> ThemeBrand.ANDROID
                     ThemeBrandProto.THEME_BRAND_COASTAL -> ThemeBrand.COASTAL
                     ThemeBrandProto.THEME_BRAND_ROYAL -> ThemeBrand.ROYAL
+                    ThemeBrandProto.THEME_BRAND_CUSTOM -> ThemeBrand.CUSTOM
                 },
                 darkThemeConfig = when (it.darkThemeConfig) {
                     null,
@@ -98,6 +99,9 @@ class NiaPreferencesDataSource @Inject constructor(
                 shouldHideOnboarding = it.shouldHideOnboarding,
                 newsResourceLastOpenedTimes = it.newsResourceLastOpenedTimestampsMap,
                 topicOrder = it.topicOrderIdsList,
+                customThemeColor = it.customThemeColor,
+                customSecondaryColor = it.customSecondaryColor,
+                customTertiaryColor = it.customTertiaryColor,
             )
         }
 
@@ -174,6 +178,7 @@ class NiaPreferencesDataSource @Inject constructor(
                         ThemeBrand.ANDROID -> ThemeBrandProto.THEME_BRAND_ANDROID
                         ThemeBrand.COASTAL -> ThemeBrandProto.THEME_BRAND_COASTAL
                         ThemeBrand.ROYAL -> ThemeBrandProto.THEME_BRAND_ROYAL
+                        ThemeBrand.CUSTOM -> ThemeBrandProto.THEME_BRAND_CUSTOM
                     }
                 }
             }
@@ -303,6 +308,30 @@ class NiaPreferencesDataSource @Inject constructor(
             }
         } catch (ioException: IOException) {
             Log.e("NiaPreferences", "Failed to update user preferences", ioException)
+        }
+    }
+
+    suspend fun setCustomThemeColor(argb: Int) {
+        try {
+            userPreferences.updateData {
+                it.copy { this.customThemeColor = argb }
+            }
+        } catch (exception: Exception) {
+            Log.e(TAG, "❌ DATASTORE ERROR: Failed to update custom theme color", exception)
+        }
+    }
+
+    suspend fun setCustomThemeColors(primary: Int, secondary: Int, tertiary: Int) {
+        try {
+            userPreferences.updateData {
+                it.copy {
+                    this.customThemeColor = primary
+                    this.customSecondaryColor = secondary
+                    this.customTertiaryColor = tertiary
+                }
+            }
+        } catch (exception: Exception) {
+            Log.e(TAG, "❌ DATASTORE ERROR: Failed to update custom theme colors", exception)
         }
     }
 

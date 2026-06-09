@@ -1,6 +1,7 @@
 package com.starception.submission.settings.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -55,10 +56,15 @@ fun AppearanceSection(
     onChangeThemeBrand: (ThemeBrand) -> Unit,
     onChangeDynamicColorPreference: (Boolean) -> Unit,
     onChangeDarkThemeConfig: (DarkThemeConfig) -> Unit,
+    onChangeCustomColors: (primary: Int, secondary: Int, tertiary: Int) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val supportDynamicColor = supportsDynamicTheming()
     val haptic = LocalHapticFeedback.current
+    val showColorPickerState = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val customColorOrFallback = if (themeSettings.customColor != 0) Color(themeSettings.customColor) else Color(0xFF6750A4)
+    val customSecondaryOrFallback = if (themeSettings.customSecondaryColor != 0) Color(themeSettings.customSecondaryColor) else Color(0xFF625B71)
+    val customTertiaryOrFallback = if (themeSettings.customTertiaryColor != 0) Color(themeSettings.customTertiaryColor) else Color(0xFF7D5260)
 
     Column(
         modifier = modifier,
@@ -113,7 +119,36 @@ fun AppearanceSection(
                     },
                     modifier = Modifier.weight(1f)
                 )
+                ThemePill(
+                    label = "Custom",
+                    selected = themeSettings.brand == ThemeBrand.CUSTOM,
+                    color = customColorOrFallback,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        showColorPickerState.value = true
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
+        }
+
+        if (showColorPickerState.value) {
+            HsvColorWheelDialog(
+                initialPrimary = customColorOrFallback,
+                initialSecondary = customSecondaryOrFallback,
+                initialTertiary = customTertiaryOrFallback,
+                onConfirm = { p, s, t ->
+                    fun argb(c: Color) = android.graphics.Color.argb(
+                        (c.alpha * 255).toInt(),
+                        (c.red * 255).toInt(),
+                        (c.green * 255).toInt(),
+                        (c.blue * 255).toInt(),
+                    )
+                    onChangeCustomColors(argb(p), argb(s), argb(t))
+                    showColorPickerState.value = false
+                },
+                onDismiss = { showColorPickerState.value = false },
+            )
         }
 
         // Dynamic Color Section (only visible when Default theme and Android 12+)
@@ -222,25 +257,27 @@ private fun ThemePill(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
             // Color dot
             Box(
                 modifier = Modifier
-                    .size(16.dp)
+                    .size(12.dp)
                     .clip(CircleShape)
                     .background(color)
             )
 
-            Spacer(modifier = Modifier.size(8.dp))
+            Spacer(modifier = Modifier.size(6.dp))
 
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (selected) color else MaterialTheme.colorScheme.onSurface
+                color = if (selected) color else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Visible,
             )
 
             if (selected) {

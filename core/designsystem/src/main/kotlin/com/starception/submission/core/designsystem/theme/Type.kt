@@ -18,9 +18,10 @@ package com.starception.submission.core.designsystem.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.Font as GoogleFontFont
 import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.LineHeightStyle.Alignment
@@ -37,11 +38,19 @@ private val provider = GoogleFont.Provider(
 
 private val robotoSerifFontName = GoogleFont("Roboto Serif")
 
+// Roboto Serif with bundled local TTFs as a guaranteed fallback. The Google
+// downloadable font is listed first (lighter APK if Play Services serves it),
+// and the bundled font is used when the download hasn't completed yet or fails
+// (offline, missing Play Services).
 val ubuntuInspiredFontFamily = FontFamily(
-    Font(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Light),
-    Font(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Normal),
-    Font(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Medium),
-    Font(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Bold),
+    GoogleFontFont(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Light),
+    Font(R.font.roboto_serif_light, FontWeight.Light),
+    GoogleFontFont(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Normal),
+    Font(R.font.roboto_serif_regular, FontWeight.Normal),
+    GoogleFontFont(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Medium),
+    Font(R.font.roboto_serif_medium, FontWeight.Medium),
+    GoogleFontFont(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Bold),
+    Font(R.font.roboto_serif_bold, FontWeight.Bold),
 )
 
 /**

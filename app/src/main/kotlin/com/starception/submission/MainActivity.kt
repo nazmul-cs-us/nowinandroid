@@ -269,6 +269,18 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
                 is MainActivityUiState.Success -> (uiState as MainActivityUiState.Success).shouldDisableDynamicTheming
                 is MainActivityUiState.Loading -> true
             }
+            val resolvedCustomSeed = when (uiState) {
+                is MainActivityUiState.Success -> (uiState as MainActivityUiState.Success).customThemeColor
+                is MainActivityUiState.Loading -> 0
+            }
+            val resolvedCustomSecondary = when (uiState) {
+                is MainActivityUiState.Success -> (uiState as MainActivityUiState.Success).customSecondaryColor
+                is MainActivityUiState.Loading -> 0
+            }
+            val resolvedCustomTertiary = when (uiState) {
+                is MainActivityUiState.Success -> (uiState as MainActivityUiState.Success).customTertiaryColor
+                is MainActivityUiState.Loading -> 0
+            }
             // Mirror the active theme into ThemeColorBridge so inner ComposeViews
             // (inside the SearchBar's AndroidView island) can re-apply the same
             // brand instead of falling back to NiaTheme's COASTAL default.
@@ -282,6 +294,9 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
             NiaTheme(
                 darkTheme = resolvedDarkTheme,
                 themeBrand = resolvedBrand,
+                customSeedColor = if (resolvedCustomSeed != 0) androidx.compose.ui.graphics.Color(resolvedCustomSeed) else androidx.compose.ui.graphics.Color.Unspecified,
+                customSecondaryColor = if (resolvedCustomSecondary != 0) androidx.compose.ui.graphics.Color(resolvedCustomSecondary) else androidx.compose.ui.graphics.Color.Unspecified,
+                customTertiaryColor = if (resolvedCustomTertiary != 0) androidx.compose.ui.graphics.Color(resolvedCustomTertiary) else androidx.compose.ui.graphics.Color.Unspecified,
                 disableDynamicTheming = resolvedDisableDynamic,
             ) {
                 // Update theme color bridge so View-based components can access theme colors

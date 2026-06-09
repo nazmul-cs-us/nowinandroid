@@ -62,4 +62,10 @@ data class UserData(
     val shouldHideOnboarding: Boolean,
     val newsResourceLastOpenedTimes: Map<String, Long> = emptyMap(),
     val topicOrder: List<String> = emptyList(),
+    /** ARGB int of the PRIMARY seed colour for ThemeBrand.CUSTOM; 0 = none chosen yet. */
+    val customThemeColor: Int = 0,
+    /** ARGB int of the SECONDARY seed colour for ThemeBrand.CUSTOM; 0 = none chosen yet. */
+    val customSecondaryColor: Int = 0,
+    /** ARGB int of the TERTIARY seed colour for ThemeBrand.CUSTOM; 0 = none chosen yet. */
+    val customTertiaryColor: Int = 0,
 )

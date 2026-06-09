@@ -26,4 +26,11 @@ enum class ThemeBrand {
      * Lapis (primary), Gold (secondary), Sage (tertiary), Garnet (error/warning).
      */
     ROYAL,
+
+    /**
+     * User-chosen seed colour via the HSV picker. The actual ARGB value lives in
+     * UserData.customThemeColor; Theme.kt derives a Material 3 colour scheme
+     * from that seed.
+     */
+    CUSTOM,
 }

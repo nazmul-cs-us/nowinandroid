@@ -94,6 +94,24 @@ class TestUserDataRepository : UserDataRepository {
         }
     }
 
+    override suspend fun setCustomThemeColor(argb: Int) {
+        currentUserData.let { current ->
+            _userData.tryEmit(current.copy(customThemeColor = argb))
+        }
+    }
+
+    override suspend fun setCustomThemeColors(primary: Int, secondary: Int, tertiary: Int) {
+        currentUserData.let { current ->
+            _userData.tryEmit(
+                current.copy(
+                    customThemeColor = primary,
+                    customSecondaryColor = secondary,
+                    customTertiaryColor = tertiary,
+                ),
+            )
+        }
+    }
+
     override suspend fun setDarkThemeConfig(darkThemeConfig: DarkThemeConfig) {
         currentUserData.let { current ->
             _userData.tryEmit(current.copy(darkThemeConfig = darkThemeConfig))

@@ -395,6 +395,9 @@ val DarkCoastalBackgroundTheme = BackgroundTheme(color = Color(0xFF0F130E))
 fun NiaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     themeBrand: ThemeBrand = ThemeBrand.COASTAL,
+    customSeedColor: Color = Color.Unspecified,
+    customSecondaryColor: Color = Color.Unspecified,
+    customTertiaryColor: Color = Color.Unspecified,
     disableDynamicTheming: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -410,6 +413,12 @@ fun NiaTheme(
         ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidColorScheme else LightAndroidColorScheme
         ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalColorScheme else LightCoastalColorScheme
         ThemeBrand.ROYAL -> if (darkTheme) DarkRoyalColorScheme else LightRoyalColorScheme
+        ThemeBrand.CUSTOM -> {
+            val primary = if (customSeedColor == Color.Unspecified) Color(0xFF6750A4) else customSeedColor
+            val secondary = if (customSecondaryColor == Color.Unspecified) null else customSecondaryColor
+            val tertiary = if (customTertiaryColor == Color.Unspecified) null else customTertiaryColor
+            colorSchemeFromSeeds(primary, secondary, tertiary, darkTheme)
+        }
     }
     // Gradient colors
     val emptyGradientColors = GradientColors(container = colorScheme.surfaceColorAtElevation(2.dp))
@@ -426,6 +435,7 @@ fun NiaTheme(
         ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidGradientColors else LightAndroidGradientColors
         ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalGradientColors else LightCoastalGradientColors
         ThemeBrand.ROYAL -> if (darkTheme) DarkRoyalGradientColors else LightRoyalGradientColors
+        ThemeBrand.CUSTOM -> defaultGradientColors
     }
     // Background theme
     val defaultBackgroundTheme = BackgroundTheme(
@@ -437,6 +447,7 @@ fun NiaTheme(
         ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidBackgroundTheme else LightAndroidBackgroundTheme
         ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalBackgroundTheme else LightCoastalBackgroundTheme
         ThemeBrand.ROYAL -> if (darkTheme) DarkRoyalBackgroundTheme else LightRoyalBackgroundTheme
+        ThemeBrand.CUSTOM -> defaultBackgroundTheme
     }
     val tintTheme = when (themeBrand) {
         ThemeBrand.DEFAULT -> when {
@@ -446,6 +457,7 @@ fun NiaTheme(
         ThemeBrand.ANDROID -> TintTheme()
         ThemeBrand.COASTAL -> TintTheme()
         ThemeBrand.ROYAL -> TintTheme()
+        ThemeBrand.CUSTOM -> TintTheme(colorScheme.primary)
     }
     // Composition locals
     CompositionLocalProvider(
@@ -465,3 +477,109 @@ fun NiaTheme(
 
 @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
 fun supportsDynamicTheming() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+/**
+ * Derives a Material 3 ColorScheme from a single seed colour by deriving
+ * primary/secondary/tertiary roles via HSL rotations of the seed. This is a
+ * pragmatic stand-in for Material's HCT-based scheme generator; it gives a
+ * coherent palette without pulling in material-color-utilities.
+ */
+internal fun colorSchemeFromSeeds(
+    primary: Color,
+    secondary: Color?,
+    tertiary: Color?,
+    darkTheme: Boolean,
+): androidx.compose.material3.ColorScheme {
+    val primaryHsl = primary.toHsl()
+    val primaryHue = primaryHsl[0]
+    val secondaryHsl = (secondary ?: hslToColor((primaryHue + 30f).mod(360f), 0.40f, 0.45f)).toHsl()
+    val tertiaryHsl = (tertiary ?: hslToColor((primaryHue + 60f).mod(360f), 0.45f, 0.45f)).toHsl()
+    val secondaryHue = secondaryHsl[0]
+    val tertiaryHue = tertiaryHsl[0]
+
+    fun hsl(h: Float, s: Float, l: Float): Color {
+        val safeS = s.coerceIn(0f, 1f)
+        val safeL = l.coerceIn(0f, 1f)
+        return hslToColor(h.mod(360f), safeS, safeL)
+    }
+
+    return if (darkTheme) {
+        darkColorScheme(
+            primary = hsl(primaryHue, 0.50f, 0.80f),
+            onPrimary = hsl(primaryHue, 0.40f, 0.20f),
+            primaryContainer = hsl(primaryHue, 0.40f, 0.30f),
+            onPrimaryContainer = hsl(primaryHue, 0.40f, 0.90f),
+            secondary = hsl(secondaryHue, 0.30f, 0.75f),
+            onSecondary = hsl(secondaryHue, 0.25f, 0.20f),
+            secondaryContainer = hsl(secondaryHue, 0.25f, 0.30f),
+            onSecondaryContainer = hsl(secondaryHue, 0.30f, 0.90f),
+            tertiary = hsl(tertiaryHue, 0.40f, 0.78f),
+            onTertiary = hsl(tertiaryHue, 0.30f, 0.20f),
+            tertiaryContainer = hsl(tertiaryHue, 0.30f, 0.30f),
+            onTertiaryContainer = hsl(tertiaryHue, 0.30f, 0.90f),
+            background = hsl(primaryHue, 0.06f, 0.10f),
+            onBackground = hsl(primaryHue, 0.04f, 0.92f),
+            surface = hsl(primaryHue, 0.06f, 0.10f),
+            onSurface = hsl(primaryHue, 0.04f, 0.92f),
+            surfaceVariant = hsl(primaryHue, 0.08f, 0.20f),
+            onSurfaceVariant = hsl(primaryHue, 0.06f, 0.78f),
+            outline = hsl(primaryHue, 0.06f, 0.55f),
+        )
+    } else {
+        lightColorScheme(
+            primary = hsl(primaryHue, 0.55f, 0.40f),
+            onPrimary = Color.White,
+            primaryContainer = hsl(primaryHue, 0.40f, 0.90f),
+            onPrimaryContainer = hsl(primaryHue, 0.45f, 0.15f),
+            secondary = hsl(secondaryHue, 0.30f, 0.45f),
+            onSecondary = Color.White,
+            secondaryContainer = hsl(secondaryHue, 0.30f, 0.90f),
+            onSecondaryContainer = hsl(secondaryHue, 0.30f, 0.15f),
+            tertiary = hsl(tertiaryHue, 0.45f, 0.45f),
+            onTertiary = Color.White,
+            tertiaryContainer = hsl(tertiaryHue, 0.35f, 0.90f),
+            onTertiaryContainer = hsl(tertiaryHue, 0.35f, 0.15f),
+            background = hsl(primaryHue, 0.05f, 0.98f),
+            onBackground = hsl(primaryHue, 0.05f, 0.10f),
+            surface = hsl(primaryHue, 0.05f, 0.98f),
+            onSurface = hsl(primaryHue, 0.05f, 0.10f),
+            surfaceVariant = hsl(primaryHue, 0.06f, 0.92f),
+            onSurfaceVariant = hsl(primaryHue, 0.06f, 0.30f),
+            outline = hsl(primaryHue, 0.06f, 0.55f),
+        )
+    }
+}
+
+private fun Color.toHsl(): FloatArray {
+    val r = red
+    val g = green
+    val b = blue
+    val max = maxOf(r, g, b)
+    val min = minOf(r, g, b)
+    val delta = max - min
+    val l = (max + min) / 2f
+    val s = if (delta == 0f) 0f else delta / (1f - kotlin.math.abs(2f * l - 1f))
+    val h = when {
+        delta == 0f -> 0f
+        max == r -> 60f * (((g - b) / delta).mod(6f))
+        max == g -> 60f * (((b - r) / delta) + 2f)
+        else -> 60f * (((r - g) / delta) + 4f)
+    }
+    return floatArrayOf(h.mod(360f), s, l)
+}
+
+private fun hslToColor(h: Float, s: Float, l: Float): Color {
+    val c = (1f - kotlin.math.abs(2f * l - 1f)) * s
+    val hp = h / 60f
+    val x = c * (1f - kotlin.math.abs(hp.mod(2f) - 1f))
+    val (r1, g1, b1) = when {
+        hp < 1f -> Triple(c, x, 0f)
+        hp < 2f -> Triple(x, c, 0f)
+        hp < 3f -> Triple(0f, c, x)
+        hp < 4f -> Triple(0f, x, c)
+        hp < 5f -> Triple(x, 0f, c)
+        else -> Triple(c, 0f, x)
+    }
+    val m = l - c / 2f
+    return Color(r1 + m, g1 + m, b1 + m)
+}
