@@ -1,14 +1,18 @@
 package com.starception.submission.feature.surah
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
@@ -40,10 +44,22 @@ fun AyahMarkerRosette(
     digitFontSize: TextUnit = 0.78.em,
 ) {
     val arabicDigits = remember(ayahNumber) { ayahNumber.toArabicIndicDigits() }
+    val surface = MaterialTheme.colorScheme.surface
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
+        // Opaque disc behind the rosette flower stamps out anything underneath
+        // — the SVG path has a transparent interior, so without this, adjacent
+        // Arabic letter bearings (sub-baseline tails of ن, ر, ي, etc.) show
+        // through the rosette and read as visual overlap.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 2.dp)
+                .clip(CircleShape)
+                .background(surface),
+        )
         Image(
             painter = painterResource(id = R.drawable.ic_ayah_marker_rosette),
             contentDescription = null,

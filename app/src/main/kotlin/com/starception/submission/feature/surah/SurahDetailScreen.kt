@@ -4248,7 +4248,7 @@ private fun MushafPageWithFrame(
         ayahRanges.associate { (ayahNum, _) ->
             "ayah_$ayahNum" to androidx.compose.foundation.text.InlineTextContent(
                 placeholder = androidx.compose.ui.text.Placeholder(
-                    width = 2.1.em,
+                    width = 3.2.em,
                     height = 1.2.em,
                     placeholderVerticalAlign = androidx.compose.ui.text.PlaceholderVerticalAlign.Center,
                 ),
@@ -4443,7 +4443,7 @@ private fun MushafPagerView(
     // rosette glyph (8-petal flower, see Wikimedia File:U+06DD_Scheherazade.svg);
     // FontFamily.Default and most body fonts fall back to a plain thin circle.
     val markerFontFamily = remember(arabicFont) { getArabicFontFamily(arabicFont) }
-    val markerPlaceholderWidth = 2.1.em
+    val markerPlaceholderWidth = 3.2.em
     val markerPlaceholderHeight = 1.2.em
     // U+0627 ARABIC LETTER ALEF has BIDI class AL (Arabic Letter, strong RTL),
     // anchoring the inline placeholder in the surrounding Arabic run so the
