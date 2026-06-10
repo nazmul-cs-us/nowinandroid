@@ -204,7 +204,7 @@ fun AppTopSearchBar(
             // Match the rest of the app — Roboto Serif (downloadable Google Font),
             // same family Compose uses via NiaTheme. SearchBar/SearchView are View
             // components so they ignore Compose Typography and default to system sans.
-            val appTypeface = ResourcesCompat.getFont(ctx, R.font.roboto_serif)
+            val appTypeface = ResourcesCompat.getFont(ctx, R.font.ubuntu_sans)
             searchBar.textView?.setHintTextColor(pillTextColor)
             searchBar.textView?.setTextColor(pillTextColor)
             searchBar.textView?.typeface = appTypeface
@@ -775,7 +775,7 @@ private fun addSectionTitle(parent: ViewGroup, inflater: LayoutInflater, text: S
     val view = inflater.inflate(R.layout.app_search_suggestion_title, parent, false) as TextView
     view.text = text
     view.setTextColor(subtitleColor)
-    view.typeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    view.typeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     parent.addView(view)
 }
 
@@ -789,7 +789,7 @@ private fun addSurahItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         setImageResource(R.drawable.ic_app_search_home_24)
         imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
@@ -831,7 +831,7 @@ private fun addAyahItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         setImageResource(R.drawable.ic_app_search_home_24)
         imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
@@ -865,7 +865,7 @@ private fun addQuranicDuaItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         setImageResource(R.drawable.ic_app_search_home_24)
         imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
@@ -901,7 +901,7 @@ private fun addFortressDuaItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         setImageResource(R.drawable.ic_app_search_home_24)
         imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
@@ -938,7 +938,7 @@ private fun addTopicItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         setImageResource(R.drawable.ic_app_search_home_24)
         imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
@@ -971,7 +971,7 @@ private fun addNewsItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         setImageResource(R.drawable.ic_app_search_home_24)
         imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
@@ -1007,7 +1007,7 @@ private fun addRecentSearchItem(
     onClick: (String) -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         setImageResource(R.drawable.ic_app_search_schedule_24)
         imageTintList = android.content.res.ColorStateList.valueOf(subtitleColor)
@@ -1032,7 +1032,7 @@ private fun addVerseItem(
     onClick: (Int, Int) -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_verse_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.roboto_serif)
+    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<TextView>(R.id.app_search_verse_badge).apply {
         text = "${verse.surahNumber}:${verse.ayahNumber}"
         setTextColor(accentColor)
@@ -1075,7 +1075,7 @@ private fun addPopularChipsRow(
     onClick: (PopularSuggestion) -> Unit,
 ) {
     val ctx = parent.context
-    val appTypeface = ResourcesCompat.getFont(ctx, R.font.roboto_serif)
+    val appTypeface = ResourcesCompat.getFont(ctx, R.font.ubuntu_sans)
     val scroll = HorizontalScrollView(ctx).apply {
         isHorizontalScrollBarEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER

@@ -29,28 +29,31 @@ import androidx.compose.ui.text.style.LineHeightStyle.Trim
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.R
 
-// Roboto Serif font family from Google Fonts
+// Ubuntu Sans font family from Google Fonts (designed by Dalton Maag).
+// Ubuntu Sans is Dalton Maag's newer reinterpretation of Ubuntu with tighter
+// geometry and modern proportions; we keep the `ubuntuInspiredFontFamily`
+// public name to avoid touching the dozens of call sites.
 private val provider = GoogleFont.Provider(
     providerAuthority = "com.google.android.gms.fonts",
     providerPackage = "com.google.android.gms",
     certificates = R.array.com_google_android_gms_fonts_certs
 )
 
-private val robotoSerifFontName = GoogleFont("Roboto Serif")
+private val ubuntuFontName = GoogleFont("Ubuntu Sans")
 
-// Roboto Serif with bundled local TTFs as a guaranteed fallback. The Google
-// downloadable font is listed first (lighter APK if Play Services serves it),
-// and the bundled font is used when the download hasn't completed yet or fails
-// (offline, missing Play Services).
+// Ubuntu Sans (Dalton Maag) with bundled local TTFs as a guaranteed fallback.
+// The Google downloadable font is listed first (lighter APK if Play Services
+// serves it), and the bundled font is used while the download is in flight or
+// if it fails entirely (offline, missing Play Services).
 val ubuntuInspiredFontFamily = FontFamily(
-    GoogleFontFont(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Light),
-    Font(R.font.roboto_serif_light, FontWeight.Light),
-    GoogleFontFont(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Normal),
-    Font(R.font.roboto_serif_regular, FontWeight.Normal),
-    GoogleFontFont(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Medium),
-    Font(R.font.roboto_serif_medium, FontWeight.Medium),
-    GoogleFontFont(googleFont = robotoSerifFontName, fontProvider = provider, weight = FontWeight.Bold),
-    Font(R.font.roboto_serif_bold, FontWeight.Bold),
+    GoogleFontFont(googleFont = ubuntuFontName, fontProvider = provider, weight = FontWeight.Light),
+    Font(R.font.ubuntu_sans_light, FontWeight.Light),
+    GoogleFontFont(googleFont = ubuntuFontName, fontProvider = provider, weight = FontWeight.Normal),
+    Font(R.font.ubuntu_sans_regular, FontWeight.Normal),
+    GoogleFontFont(googleFont = ubuntuFontName, fontProvider = provider, weight = FontWeight.Medium),
+    Font(R.font.ubuntu_sans_medium, FontWeight.Medium),
+    GoogleFontFont(googleFont = ubuntuFontName, fontProvider = provider, weight = FontWeight.Bold),
+    Font(R.font.ubuntu_sans_bold, FontWeight.Bold),
 )
 
 /**

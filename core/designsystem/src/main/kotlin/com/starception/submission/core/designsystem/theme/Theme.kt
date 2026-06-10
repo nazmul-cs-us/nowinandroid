@@ -216,51 +216,43 @@ val LightCoastalColorScheme = lightColorScheme(
 )
 
 /**
- * Dark Elegant theme color scheme - sophisticated dark mode for peaceful reflection
- */
-/**
- * Tesla-style dark palette: pure black backgrounds, bright red as the primary
- * accent (alerts/active actions), bright green as secondary (success/armed),
- * crisp blue tertiary, neutral grays for surfaces and dividers.
+ * Dark Coastal — mirrors the light Coastal palette (Forest green + Soft sage),
+ * adapted to dark mode tones. Was previously a Tesla-style red scheme; that
+ * leaked an aggressive red into every primary slot in dark mode, which read as
+ * "error / warning" everywhere instead of the calm coastal feel.
  */
 @VisibleForTesting
 val DarkCoastalColorScheme = darkColorScheme(
-    primary = Color(0xFFFF3B30),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFF3A0E0B),
-    onPrimaryContainer = Color(0xFFFFD8D5),
-    secondary = Color(0xFF34C759),
-    onSecondary = Color(0xFF002C0E),
-    secondaryContainer = Color(0xFF0B3318),
-    onSecondaryContainer = Color(0xFFB6F2C5),
-    tertiary = Color(0xFF0A84FF),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFF0C2A4A),
-    onTertiaryContainer = Color(0xFFCEE3FF),
-    error = Color(0xFFFF453A),
-    onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFF3A0E0B),
-    onErrorContainer = Color(0xFFFFD8D5),
-    background = Color(0xFF000000),
-    onBackground = Color(0xFFFFFFFF),
-    surface = Color(0xFF0F0F10),
-    onSurface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFF1A1A1C),
-    onSurfaceVariant = Color(0xFF9A9A9F),
-    surfaceTint = Color(0xFFFF3B30),
-    inverseSurface = Color(0xFFFFFFFF),
-    inverseOnSurface = Color(0xFF0F0F10),
-    inversePrimary = Color(0xFFFF3B30),
-    outline = Color(0xFF2A2A2D),
-    outlineVariant = Color(0xFF1F1F22),
-    scrim = Color(0xFF000000),
-    surfaceBright = Color(0xFF1F1F22),
-    surfaceDim = Color(0xFF000000),
-    surfaceContainerLowest = Color(0xFF000000),
-    surfaceContainerLow = Color(0xFF0A0A0B),
-    surfaceContainer = Color(0xFF111113),
-    surfaceContainerHigh = Color(0xFF17171A),
-    surfaceContainerHighest = Color(0xFF1F1F22),
+    primary = ForestGreen80,
+    onPrimary = ForestGreen10,
+    primaryContainer = ForestGreen30,
+    onPrimaryContainer = ForestGreen90,
+    secondary = SoftSage80,
+    onSecondary = SoftSage10,
+    secondaryContainer = SoftSage30,
+    onSecondaryContainer = SoftSage90,
+    tertiary = Teal80,
+    onTertiary = Teal10,
+    tertiaryContainer = Teal30,
+    onTertiaryContainer = Teal90,
+    error = Red80,
+    onError = Red20,
+    errorContainer = Red30,
+    onErrorContainer = Red90,
+    background = Color(0xFF0F1410),
+    onBackground = Color(0xFFE3E8E3),
+    surface = Color(0xFF0F1410),
+    onSurface = Color(0xFFE3E8E3),
+    surfaceVariant = Color(0xFF1A201B),
+    onSurfaceVariant = Color(0xFFB8C3AC),
+    inverseSurface = Color(0xFFE3E8E3),
+    inverseOnSurface = Color(0xFF0F1410),
+    outline = ForestGreen30,
+    surfaceContainerLowest = Color(0xFF080B09),
+    surfaceContainerLow = Color(0xFF111613),
+    surfaceContainer = Color(0xFF161B17),
+    surfaceContainerHigh = Color(0xFF1B201C),
+    surfaceContainerHighest = Color(0xFF222621),
 )
 
 /**
