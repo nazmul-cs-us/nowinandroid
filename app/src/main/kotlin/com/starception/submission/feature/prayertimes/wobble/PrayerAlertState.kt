@@ -4,7 +4,7 @@ package com.starception.submission.feature.prayertimes.wobble
  * State for the prayer alert banner shown in PullToSyncContainer.
  * Displays countdown alerts in two phases:
  * 1. BEFORE_PRAYER: "Fajr in 15m" - countdown to prayer time
- * 2. GO_TO_MOSQUE: "Go now, 18m left" - window to leave for mosque
+ * 2. GO_TO_MOSQUE: "Go now to mosque, 18m left" - window to leave for mosque
  */
 data class PrayerAlertState(
     val isActive: Boolean = false,

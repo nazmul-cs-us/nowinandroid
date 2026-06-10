@@ -61,7 +61,7 @@ class DebugPrayerAlertReceiver : BroadcastReceiver() {
 
         val displayText = when (phase) {
             AlertPhase.BEFORE_PRAYER -> "$prayer in ${countdown}m"
-            AlertPhase.GO_TO_MOSQUE -> "Go now, ${countdown}m left"
+            AlertPhase.GO_TO_MOSQUE -> "Go now to mosque, ${countdown}m left"
             AlertPhase.NONE -> "$prayer alert"
         }
 

@@ -2761,7 +2761,7 @@ private fun calculatePrayerAlertState(
                 phase = AlertPhase.GO_TO_MOSQUE,
                 countdownMinutes = minutesLeft.toInt(),
                 totalMinutes = goToMosqueDuration.toInt(),
-                displayText = "${currentPrayer.name} · Go now, ${minutesLeft}m left"
+                displayText = "${currentPrayer.name} · Go now to mosque, ${minutesLeft}m left"
             )
         }
     }
