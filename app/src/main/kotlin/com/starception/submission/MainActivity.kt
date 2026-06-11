@@ -284,11 +284,21 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
             // Mirror the active theme into ThemeColorBridge so inner ComposeViews
             // (inside the SearchBar's AndroidView island) can re-apply the same
             // brand instead of falling back to NiaTheme's COASTAL default.
-            androidx.compose.runtime.LaunchedEffect(resolvedBrand, resolvedDarkTheme, resolvedDisableDynamic) {
+            androidx.compose.runtime.LaunchedEffect(
+                resolvedBrand,
+                resolvedDarkTheme,
+                resolvedDisableDynamic,
+                resolvedCustomSeed,
+                resolvedCustomSecondary,
+                resolvedCustomTertiary,
+            ) {
                 com.starception.submission.util.ThemeColorBridge.updateThemeConfig(
                     brand = resolvedBrand,
                     darkTheme = resolvedDarkTheme,
                     disableDynamicTheming = resolvedDisableDynamic,
+                    customSeedColor = resolvedCustomSeed,
+                    customSecondaryColor = resolvedCustomSecondary,
+                    customTertiaryColor = resolvedCustomTertiary,
                 )
             }
             NiaTheme(

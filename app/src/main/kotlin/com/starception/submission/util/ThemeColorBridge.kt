@@ -37,6 +37,20 @@ object ThemeColorBridge {
     var disableDynamicTheming by mutableStateOf(true)
         private set
 
+    // CUSTOM-brand seed colors (ARGB, 0 = unset) so inner ComposeViews can
+    // re-invoke NiaTheme with the user's palette instead of the default seed.
+    var customSeedColor by mutableStateOf(0)
+        private set
+    var customSecondaryColor by mutableStateOf(0)
+        private set
+    var customTertiaryColor by mutableStateOf(0)
+        private set
+
+    // Set while the theme-picker preview is open so inner ComposeView islands
+    // (which run their own composition and can't see the preview's NiaTheme)
+    // render the candidate palette instead of the active one.
+    var previewOverride by mutableStateOf<PreviewThemeOverride?>(null)
+
     /**
      * Call this from Compose to update the current theme colors.
      * This should be called whenever MaterialTheme changes.
@@ -59,9 +73,23 @@ object ThemeColorBridge {
         brand: ThemeBrand,
         darkTheme: Boolean,
         disableDynamicTheming: Boolean,
+        customSeedColor: Int = 0,
+        customSecondaryColor: Int = 0,
+        customTertiaryColor: Int = 0,
     ) {
         this.themeBrand = brand
         this.darkTheme = darkTheme
         this.disableDynamicTheming = disableDynamicTheming
+        this.customSeedColor = customSeedColor
+        this.customSecondaryColor = customSecondaryColor
+        this.customTertiaryColor = customTertiaryColor
     }
 }
+
+/** Candidate palette routed to inner ComposeView islands during theme preview. */
+data class PreviewThemeOverride(
+    val brand: ThemeBrand,
+    val customSeedArgb: Int,
+    val customSecondaryArgb: Int,
+    val customTertiaryArgb: Int,
+)

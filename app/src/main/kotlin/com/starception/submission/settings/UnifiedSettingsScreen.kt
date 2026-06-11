@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.DeveloperSettingsSection
@@ -160,6 +161,11 @@ fun UnifiedSettingsScreen(
             viewModel.expandSection(sectionId)
         }
     }
+
+    // Hide the status bar like the Surah/Hadith/Dua detail screens so the back
+    // button sits at the same top position as on those pages; the toolbar's own
+    // 8dp top padding then matches their layout exactly. Restored on dispose.
+    ImmersiveFullScreenEffect()
 
     Box(
         modifier = Modifier
@@ -463,7 +469,9 @@ private fun ModernSettingsTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp)
-                .padding(horizontal = 4.dp),
+                // Align the back button's left edge with the hero title and the
+                // section cards (16dp content margin).
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
@@ -546,9 +554,9 @@ private fun SettingsHeroSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            // No extra horizontal padding: the LazyColumn's 16dp contentPadding
+            // already lines the title up with the back button and section cards.
             .padding(
-                start = 24.dp,
-                end = 24.dp,
                 top = 96.dp,
                 bottom = 24.dp,
             ),

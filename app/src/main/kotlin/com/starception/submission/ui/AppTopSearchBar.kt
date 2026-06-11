@@ -45,6 +45,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
@@ -391,10 +392,20 @@ fun AppTopSearchBar(
                 // app-level Dark/Brand pref instead of NiaTheme's COASTAL/system-dark
                 // defaults — otherwise the body stays light while the outer toolbar
                 // and bottom nav (which sit outside this ComposeView) follow Dark.
+                // A previewOverride (set by the theme-picker preview) wins over the
+                // active theme so the candidate palette reaches this island too.
+                val bridge = com.starception.submission.util.ThemeColorBridge
+                val override = bridge.previewOverride
+                val seedArgb = override?.customSeedArgb ?: bridge.customSeedColor
+                val secondaryArgb = override?.customSecondaryArgb ?: bridge.customSecondaryColor
+                val tertiaryArgb = override?.customTertiaryArgb ?: bridge.customTertiaryColor
                 NiaTheme(
-                    darkTheme = com.starception.submission.util.ThemeColorBridge.darkTheme,
-                    themeBrand = com.starception.submission.util.ThemeColorBridge.themeBrand,
-                    disableDynamicTheming = com.starception.submission.util.ThemeColorBridge.disableDynamicTheming,
+                    darkTheme = bridge.darkTheme,
+                    themeBrand = override?.brand ?: bridge.themeBrand,
+                    customSeedColor = if (seedArgb != 0) ComposeColor(seedArgb) else ComposeColor.Unspecified,
+                    customSecondaryColor = if (secondaryArgb != 0) ComposeColor(secondaryArgb) else ComposeColor.Unspecified,
+                    customTertiaryColor = if (tertiaryArgb != 0) ComposeColor(tertiaryArgb) else ComposeColor.Unspecified,
+                    disableDynamicTheming = bridge.disableDynamicTheming,
                 ) { currentContent() }
             }
         },
