@@ -77,6 +77,8 @@ object GoogleSampleNotificationManager {
     // Track app startup time to prevent Adhan during first few minutes after app launch
     private var appInitializedTime: Long = 0L
 
+    fun isInitialized(): Boolean = ::appContext.isInitialized
+
     @RequiresApi(Build.VERSION_CODES.O)
     fun initialize(context: Context, notifManager: NotificationManager) {
         notificationManager = notifManager

@@ -21,8 +21,9 @@
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <!-- FOREGROUND_SERVICE_SPECIAL_USE removed: no service declares foregroundServiceType="specialUse" -->
+    <!-- specialUse (not dataSync) for PrayerNotificationService: dataSync FGS cannot be
+         launched from BOOT_COMPLETED on Android 15 and is killed after a ~6h budget. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -120,12 +121,19 @@
             </intent-filter>
         </activity>
         
+        <!-- location for prayer-time positioning + specialUse for the persistent
+             live prayer countdown. Both types are allowed to start from
+             BOOT_COMPLETED on Android 15 and have no runtime budget, unlike the
+             previous dataSync type (banned from boot, killed after ~6h). -->
         <service
             android:name=".services.PrayerNotificationService"
             android:exported="false"
-            android:foregroundServiceType="dataSync|location"
-            android:stopWithTask="false" />
-            <!-- Using dataSync|location for prayer data sync and background location for activity detection -->
+            android:foregroundServiceType="location|specialUse"
+            android:stopWithTask="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Persistent live prayer-time countdown notification and prayer activity detection" />
+        </service>
             
         <!-- Debug receiver to simulate driving detection via adb -->
         <receiver
@@ -183,10 +191,17 @@
             android:name=".prayer.receiver.PrayerBootReceiver"
             android:exported="true"
             android:enabled="true">
-            <!-- Boot and package updates -->
+            <!-- Boot and own-package updates. MUST NOT contain a <data> element:
+                 a filter with a data scheme only matches intents that carry a
+                 data URI, and BOOT_COMPLETED has none — combining them silently
+                 broke boot delivery entirely. -->
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+            <!-- Other-package updates carry a package: data URI, so the data
+                 scheme lives in its own filter. -->
+            <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.PACKAGE_REPLACED" />
                 <data android:scheme="package" />
             </intent-filter>

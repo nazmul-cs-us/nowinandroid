@@ -150,9 +150,20 @@ class PrayerNotificationService : Service() {
         try {
             createNotificationChannel()
             PrayerNotificationManager.initialize(this)
-            
+
             // Initialize notification manager for separate Live Update notifications
             notificationManager = getSystemService(NotificationManager::class.java)
+
+            // The Live Updates builder is normally initialized by MainActivity.
+            // When this service starts from boot the app never ran, so
+            // buildPrayerNotification would throw (lateinit appContext) and the
+            // notification would stay stuck on the minimal placeholder.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                !GoogleSampleNotificationManager.isInitialized()
+            ) {
+                GoogleSampleNotificationManager.initialize(applicationContext, notificationManager)
+                Log.d(TAG, "✓ GoogleSampleNotificationManager initialized from service (boot path)")
+            }
             Log.d(TAG, "✓ Live Update notification manager initialized separately from foreground service")
 
             // Register timezone change receiver for dynamic updates
@@ -215,18 +226,42 @@ class PrayerNotificationService : Service() {
         }
     }
     
+    /**
+     * Starts/updates the foreground notification with types valid for the current
+     * state. On Android 14+ the location type may only be used from a background
+     * start (e.g. boot) when "Allow all the time" location is granted — otherwise
+     * fall back to specialUse alone so the service still comes up after reboot.
+     */
+    private fun startForegroundWithSafeTypes(notification: Notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val hasBackgroundLocation = ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val types = if (hasBackgroundLocation) {
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            } else {
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            }
+            startForeground(NOTIFICATION_ID, notification, types)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "Prayer notification service onStartCommand - startId: $startId, isServiceRunning: $isServiceRunning")
-        
+
         if (isServiceRunning) {
             Log.w(TAG, "Service already running, ignoring duplicate start - startId: $startId")
             return START_STICKY
         }
-        
+
         try {
             // IMMEDIATE FOREGROUND START - but with proper notification now that dependencies are available
             Log.d(TAG, "Starting foreground service immediately - startId: $startId")
-            startForeground(NOTIFICATION_ID, createInitialNotification())
+            startForegroundWithSafeTypes(createInitialNotification())
 
             // Clear any old/legacy notifications that may be lingering
             // ID 1003 was previously used for separate activity change notifications (now merged into main)
@@ -262,7 +297,7 @@ class PrayerNotificationService : Service() {
             Log.e(TAG, "Error in onStartCommand: ${e.message}")
             // Emergency fallback
             try {
-                startForeground(NOTIFICATION_ID, createEmergencyNotification())
+                startForegroundWithSafeTypes(createEmergencyNotification())
                 isServiceRunning = true
                 Log.w(TAG, "Emergency fallback notification started")
             } catch (fallbackError: Exception) {
@@ -774,7 +809,7 @@ class PrayerNotificationService : Service() {
 
                             // Use startForeground() to update notification while maintaining foreground service priority
                             // This keeps OOM adj at ~200 instead of 915, preventing system from killing the service
-                            startForeground(NOTIFICATION_ID, liveUpdateNotification)
+                            startForegroundWithSafeTypes(liveUpdateNotification)
                             Log.d(TAG, "🧪 Updated foreground notification via startForeground() with phase: $prayerPhase, real progress: ${progress}%")
 
                             // Log notification update to file - now using startForeground() to maintain priority
