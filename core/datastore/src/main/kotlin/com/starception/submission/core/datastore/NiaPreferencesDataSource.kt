@@ -73,12 +73,15 @@ class NiaPreferencesDataSource @Inject constructor(
                 bookmarkedNewsResources = it.bookmarkedNewsResourceIdsMap.keys,
                 viewedNewsResources = it.viewedNewsResourceIdsMap.keys,
                 followedTopics = it.followedTopicIdsMap.keys,
+                // Unset prefs fall back to COASTAL (the app's launch theme), but an
+                // explicit DEFAULT selection must round-trip — mapping it to COASTAL
+                // here made the Default pill impossible to select.
                 themeBrand = when (it.themeBrand) {
                     null,
                     ThemeBrandProto.THEME_BRAND_UNSPECIFIED,
                     ThemeBrandProto.UNRECOGNIZED,
-                    ThemeBrandProto.THEME_BRAND_DEFAULT,
                     -> ThemeBrand.COASTAL
+                    ThemeBrandProto.THEME_BRAND_DEFAULT -> ThemeBrand.DEFAULT
                     ThemeBrandProto.THEME_BRAND_ANDROID -> ThemeBrand.ANDROID
                     ThemeBrandProto.THEME_BRAND_COASTAL -> ThemeBrand.COASTAL
                     ThemeBrandProto.THEME_BRAND_ROYAL -> ThemeBrand.ROYAL

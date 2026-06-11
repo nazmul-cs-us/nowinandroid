@@ -8,7 +8,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,9 +76,13 @@ fun AppearanceSection(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ModernSectionTitle(text = "Color Theme")
 
-            // Theme pills
+            // Theme pills: content-sized in a scrollable row so labels never
+            // get clipped — equal weights used to trim "Default"/"Android"/
+            // "Coastal"/"Custom" down to whatever fit.
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 ThemePill(
@@ -87,7 +93,6 @@ fun AppearanceSection(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onChangeThemeBrand(ThemeBrand.DEFAULT)
                     },
-                    modifier = Modifier.weight(1f)
                 )
                 ThemePill(
                     label = "Android",
@@ -97,7 +102,6 @@ fun AppearanceSection(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onChangeThemeBrand(ThemeBrand.ANDROID)
                     },
-                    modifier = Modifier.weight(1f)
                 )
                 ThemePill(
                     label = "Coastal",
@@ -107,7 +111,6 @@ fun AppearanceSection(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onChangeThemeBrand(ThemeBrand.COASTAL)
                     },
-                    modifier = Modifier.weight(1f)
                 )
                 ThemePill(
                     label = "Royal",
@@ -117,7 +120,6 @@ fun AppearanceSection(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onChangeThemeBrand(ThemeBrand.ROYAL)
                     },
-                    modifier = Modifier.weight(1f)
                 )
                 ThemePill(
                     label = "Custom",
@@ -127,7 +129,6 @@ fun AppearanceSection(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         showColorPickerState.value = true
                     },
-                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -255,9 +256,7 @@ private fun ThemePill(
         shape = RoundedCornerShape(16.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp),
+            modifier = Modifier.padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
