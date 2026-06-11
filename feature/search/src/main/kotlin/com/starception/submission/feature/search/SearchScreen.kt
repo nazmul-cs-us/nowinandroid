@@ -17,6 +17,8 @@
 package com.starception.submission.feature.search
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -192,7 +194,7 @@ internal fun SearchScreen(
     onLoadMore: () -> Unit = {},
 ) {
     TrackScreenViewEvent(screenName = "Search")
-    Column(modifier = modifier) {
+    Column(modifier = modifier.fillMaxSize()) {
         Spacer(Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
         SearchToolbar(
             onBackClick = onBackClick,
@@ -208,23 +210,40 @@ internal fun SearchScreen(
             SearchResultUiState.SearchNotReady -> SearchNotReadyBody()
             SearchResultUiState.EmptyQuery,
             -> {
-                if (recentSearchesUiState is RecentSearchQueriesUiState.Success) {
-                    RecentSearchesBody(
-                        onClearRecentSearches = onClearRecentSearches,
-                        onRecentSearchClicked = {
-                            onSearchQueryChanged(it)
-                            onSearchTriggered(it)
-                        },
-                        recentSearchQueries = recentSearchesUiState.recentQueries.map { it.query },
-                    )
+                // Single LazyColumn at this level — eliminates the nested-scroll
+                // conflict by giving the recent searches + popular verses one
+                // unified scrollable container.
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    if (recentSearchesUiState is RecentSearchQueriesUiState.Success) {
+                        item(key = "recent_searches") {
+                            RecentSearchesBody(
+                                onClearRecentSearches = onClearRecentSearches,
+                                onRecentSearchClicked = {
+                                    onSearchQueryChanged(it)
+                                    onSearchTriggered(it)
+                                },
+                                recentSearchQueries = recentSearchesUiState.recentQueries.map { it.query },
+                            )
+                        }
+                    }
+                    item(key = "popular_verses_header") {
+                        Text(
+                            text = buildAnnotatedString {
+                                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                                    append("Popular Verses")
+                                }
+                            },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    items(SuggestedVerses.verses) { verse ->
+                        SuggestedVerseItem(
+                            verse = verse,
+                            onClick = { onNoteClick(verse.surahNumber, verse.ayahNumber) },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
                 }
-                // Show suggested verses when search is empty
-                SuggestedVersesBody(
-                    suggestedVerses = SuggestedVerses.verses,
-                    onVerseClick = { verse ->
-                        onNoteClick(verse.surahNumber, verse.ayahNumber)
-                    },
-                )
             }
 
             is SearchResultUiState.Success -> {
@@ -620,8 +639,8 @@ private fun RecentSearchesBody(
                 }
             }
         }
-        LazyColumn(modifier = Modifier.padding(horizontal = 16.dp)) {
-            items(recentSearchQueries) { recentSearch ->
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            recentSearchQueries.forEach { recentSearch ->
                 Text(
                     text = recentSearch,
                     style = MaterialTheme.typography.headlineSmall,
@@ -982,8 +1001,8 @@ private fun SuggestedVersesBody(
             },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
-        LazyColumn(modifier = Modifier.padding(horizontal = 16.dp)) {
-            items(suggestedVerses) { verse ->
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            suggestedVerses.forEach { verse ->
                 SuggestedVerseItem(
                     verse = verse,
                     onClick = { onVerseClick(verse) },

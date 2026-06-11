@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.widget.NestedScrollView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.material.R as MaterialR
@@ -538,8 +539,9 @@ private fun renderSuggestions(
     // on the empty state so users can jump straight to the staples without
     // typing. Hidden once they start searching — the ranked verseIndex inside
     // inMemoryResults takes over for filtered matches.
-    val emptyStateVerses = if (isFiltering) emptyList()
-    else SuggestedVerses.verses.take(MAX_EMPTY_STATE_VERSES)
+    // Rendered in batches: the first batch up front, more appended as the user
+    // scrolls toward the bottom of the NestedScrollView.
+    val emptyStateVerses = if (isFiltering) emptyList() else SuggestedVerses.verses
 
     // In-memory ranked hits (already sorted by score). Cap per-section so the
     // suggestion list stays scannable.
@@ -732,22 +734,57 @@ private fun renderSuggestions(
     }
     // Empty-state highlight verses (Ayatul Kursi, Al-Fatiha, Ar-Rahman, …) so
     // the staples are always one tap away even with an empty recents list.
+    val scrollParent = container.parent as? NestedScrollView
     if (emptyStateVerses.isNotEmpty()) {
         addSectionTitle(
             container, inflater,
             ctx.getString(R.string.app_search_section_popular_verses), subtitleColor,
         )
-        emptyStateVerses.forEach { verse ->
-            addVerseItem(
-                container, inflater, verse,
-                accentColor, titleColor, subtitleColor, onVerseClick,
-            )
+        var rendered = 0
+        fun appendNextBatch() {
+            val end = minOf(rendered + EMPTY_STATE_VERSES_BATCH, emptyStateVerses.size)
+            emptyStateVerses.subList(rendered, end).forEach { verse ->
+                addVerseItem(
+                    container, inflater, verse,
+                    accentColor, titleColor, subtitleColor, onVerseClick,
+                )
+            }
+            rendered = end
         }
+        // Stale-render guard for async callbacks: skip if the container has
+        // been re-rendered for a different query/state since we were attached.
+        fun isCurrentRender() = container.getTag(SUGGESTION_STATE_TAG.hashCode()) == stateKey
+
+        appendNextBatch()
+        // If the first batch (plus recents/chips above it) doesn't overflow the
+        // viewport, the scroll listener can never fire — keep appending until
+        // the content is actually scrollable or the list is exhausted.
+        fun fillUntilScrollable() {
+            val parent = scrollParent ?: return
+            if (!isCurrentRender() || rendered >= emptyStateVerses.size) return
+            if (container.height <= parent.height) {
+                appendNextBatch()
+                parent.post { fillUntilScrollable() }
+            }
+        }
+        scrollParent?.post { fillUntilScrollable() }
+        scrollParent?.setOnScrollChangeListener(
+            NestedScrollView.OnScrollChangeListener { v, _, scrollY, _, _ ->
+                if (isCurrentRender() &&
+                    rendered < emptyStateVerses.size &&
+                    scrollY + v.height * 2 >= container.height
+                ) {
+                    appendNextBatch()
+                }
+            },
+        )
+    } else {
+        scrollParent?.setOnScrollChangeListener(null as NestedScrollView.OnScrollChangeListener?)
     }
 }
 
 private const val MAX_RECENTS_TOTAL = 6
-private const val MAX_EMPTY_STATE_VERSES = 8
+private const val EMPTY_STATE_VERSES_BATCH = 8
 
 /** Holds a ranked section's title, lead score, and render closure. */
 private data class RenderableSection(

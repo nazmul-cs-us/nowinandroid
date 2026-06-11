@@ -29,7 +29,7 @@ object SearchHints {
         else -> Slot.LATE_NIGHT
     }
 
-    /** Hint to show inside the SearchBar pill, e.g. "Try 'morning duas'…". */
+    /** Hint to show inside the SearchBar pill, e.g. "Search 'morning duas'…". */
     fun hintFor(slot: Slot = currentSlot()): String = rotatingHintsFor(slot).first()
 
     /**
@@ -40,45 +40,45 @@ object SearchHints {
      */
     fun rotatingHintsFor(slot: Slot = currentSlot()): List<String> = when (slot) {
         Slot.FAJR_MORNING -> listOf(
-            "Try 'morning duas'",
+            "Search 'morning duas'",
             "Search 'Fajr'",
-            "Try 'waking up'",
-            "Try 'Ayatul Kursi'",
+            "Search 'waking up'",
+            "Search 'Ayatul Kursi'",
         )
         Slot.FORENOON -> listOf(
-            "Try 'Surah Yasin'",
-            "Try 'morning dhikr'",
-            "Try 'gratitude'",
+            "Search 'Surah Yasin'",
+            "Search 'morning dhikr'",
+            "Search 'gratitude'",
             "Search 'Quran'",
         )
         Slot.DHUHR -> listOf(
-            "Try 'Dhuhr'",
-            "Try 'Surah Mulk'",
-            "Try 'patience'",
+            "Search 'Dhuhr'",
+            "Search 'Surah Mulk'",
+            "Search 'patience'",
             "Search 'Ayatul Kursi'",
         )
         Slot.ASR -> listOf(
-            "Try 'Asr'",
-            "Try 'travel duas'",
-            "Try 'Surah Kahf'",
-            "Try 'forgiveness'",
+            "Search 'Asr'",
+            "Search 'travel duas'",
+            "Search 'Surah Kahf'",
+            "Search 'forgiveness'",
         )
         Slot.MAGHRIB_EVENING -> listOf(
-            "Try 'evening duas'",
+            "Search 'evening duas'",
             "Search 'Ar-Rahman'",
-            "Try 'Maghrib'",
-            "Try 'forgiveness'",
+            "Search 'Maghrib'",
+            "Search 'forgiveness'",
         )
         Slot.ISHA_NIGHT -> listOf(
-            "Try 'Ayatul Kursi'",
-            "Try 'sleep duas'",
+            "Search 'Ayatul Kursi'",
+            "Search 'sleep duas'",
             "Search 'Isha'",
-            "Try 'Surah Mulk'",
+            "Search 'Surah Mulk'",
         )
         Slot.LATE_NIGHT -> listOf(
-            "Try 'Tahajjud'",
-            "Try 'Surah Sajdah'",
-            "Try 'repentance'",
+            "Search 'Tahajjud'",
+            "Search 'Surah Sajdah'",
+            "Search 'repentance'",
             "Search 'Ar-Rahman'",
         )
     }
