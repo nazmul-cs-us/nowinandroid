@@ -20,6 +20,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -44,10 +45,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color as ComposeColor
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
@@ -141,6 +141,10 @@ fun AppTopSearchBar(
     // SearchBar's bounds inside the AndroidView, used to position the
     // Gemini-style listening glow overlay precisely around the pill.
     var searchBarBoundsPx by remember { mutableStateOf<Rect?>(null) }
+    // Bounds of the expanded SearchView's input toolbar — when the search page
+    // is open the glow must wrap that full-width bar, not the collapsed pill.
+    var searchViewBarBoundsPx by remember { mutableStateOf<Rect?>(null) }
+    var isSearchViewOpen by remember { mutableStateOf(false) }
 
     DisposableEffect(whisperService) {
         whisperService.initialize()
@@ -196,6 +200,25 @@ fun AppTopSearchBar(
                 val l = (loc[0] - rootLoc[0]).toFloat()
                 val t = (loc[1] - rootLoc[1]).toFloat()
                 searchBarBoundsPx = Rect(l, t, l + v.width.toFloat(), t + v.height.toFloat())
+            }
+
+            // Track the expanded SearchView's input toolbar the same way so the
+            // glow can wrap the whole search input on the search page.
+            val searchViewToolbar: View? =
+                searchView.findViewById(MaterialR.id.open_search_view_toolbar)
+                    ?: (searchView.getEditText().parent as? View)
+            searchViewToolbar?.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                val loc = IntArray(2)
+                val rootLoc = IntArray(2)
+                v.getLocationInWindow(loc)
+                root.getLocationInWindow(rootLoc)
+                val l = (loc[0] - rootLoc[0]).toFloat()
+                val t = (loc[1] - rootLoc[1]).toFloat()
+                searchViewBarBoundsPx = Rect(l, t, l + v.width.toFloat(), t + v.height.toFloat())
+            }
+            searchView.addTransitionListener { _, _, newState ->
+                isSearchViewOpen = newState == SearchView.TransitionState.SHOWN ||
+                    newState == SearchView.TransitionState.SHOWING
             }
 
             // Hint will be overwritten on every `update` pass from the
@@ -413,7 +436,13 @@ fun AppTopSearchBar(
     // Gemini-style listening glow: a multi-color gradient that flows around
     // the SearchBar pill while the mic is capturing. The overlay sits above
     // the AndroidView so the SearchBar stays interactive when not listening.
-    val bounds = searchBarBoundsPx
+    // On the search page the glow wraps the SearchView's full input bar; on the
+    // home page it wraps the collapsed pill.
+    val bounds = if (isSearchViewOpen) {
+        searchViewBarBoundsPx ?: searchBarBoundsPx
+    } else {
+        searchBarBoundsPx
+    }
     if (isListening && bounds != null) {
         ListeningEdgeGlow(bounds = bounds, modifier = Modifier.matchParentSize())
     }
@@ -426,76 +455,87 @@ private fun ListeningEdgeGlow(
     modifier: Modifier = Modifier,
 ) {
     val transition = rememberInfiniteTransition(label = "listenGlow")
-    val phase by transition.animateFloat(
+    // Continuous rotation of the sweep gradient — the light travels around the
+    // pill instead of smearing across it horizontally.
+    val angle by transition.animateFloat(
         initialValue = 0f,
-        targetValue = 1f,
+        targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1800, easing = LinearEasing),
+            animation = tween(durationMillis = 4000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
-        label = "phase",
+        label = "angle",
     )
-    val pulse by transition.animateFloat(
-        initialValue = 0.55f,
+    // Slow breathing for the halo; subtle so it reads as "alive", not blinking.
+    val breath by transition.animateFloat(
+        initialValue = 0.7f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900),
+            animation = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
-        label = "pulse",
+        label = "breath",
     )
 
     Canvas(modifier = modifier) {
         if (bounds.width <= 0f || bounds.height <= 0f) return@Canvas
 
-        val strokeWidth = 1.5.dp.toPx()
-        val cornerRadius = bounds.height / 2f
-        val width = bounds.width
-        val shift = phase * width
-
-        val colors = listOf(
-            androidx.compose.ui.graphics.Color(0xFF4285F4), // Google blue
-            androidx.compose.ui.graphics.Color(0xFFEA4335), // red
-            androidx.compose.ui.graphics.Color(0xFFFBBC04), // yellow
-            androidx.compose.ui.graphics.Color(0xFF34A853), // green
-            androidx.compose.ui.graphics.Color(0xFF4285F4), // wrap
+        val cx = bounds.center.x
+        val cy = bounds.center.y
+        val glowColors = intArrayOf(
+            0xFF4285F4.toInt(), // Google blue
+            0xFF9B72CB.toInt(), // Gemini purple
+            0xFFD96570.toInt(), // Gemini coral
+            0xFFF9AB00.toInt(), // amber
+            0xFF34A853.toInt(), // green
+            0xFF4285F4.toInt(), // wrap back to blue
         )
-        val brush = Brush.linearGradient(
-            colors = colors,
-            start = Offset(bounds.left - width + shift, bounds.center.y),
-            end = Offset(bounds.left + shift, bounds.center.y),
-            tileMode = TileMode.Repeated,
-        )
-
-        // Both strokes are drawn with their OUTER edge lined up with the pill's
-        // inner edge — i.e. nothing extends beyond the pill bounds at any point.
-        fun drawInsetStroke(strokePx: Float, inwardOffset: Float, alpha: Float) {
-            val center = inwardOffset + strokePx / 2f
-            drawRoundRect(
-                brush = brush,
-                topLeft = Offset(bounds.left + center, bounds.top + center),
-                size = Size(
-                    (bounds.width - center * 2f).coerceAtLeast(0f),
-                    (bounds.height - center * 2f).coerceAtLeast(0f),
-                ),
-                cornerRadius = CornerRadius((cornerRadius - center).coerceAtLeast(0f)),
-                style = Stroke(width = strokePx),
-                alpha = alpha,
-            )
+        val sweepShader = android.graphics.SweepGradient(cx, cy, glowColors, null).apply {
+            setLocalMatrix(android.graphics.Matrix().apply { setRotate(angle, cx, cy) })
         }
 
-        // Soft halo, sits inside the border.
-        drawInsetStroke(
-            strokePx = 6.dp.toPx(),
-            inwardOffset = strokeWidth,
-            alpha = pulse * 0.25f,
-        )
+        // Both rings keep their OUTER edge aligned with the pill's edge — nothing
+        // extends beyond the pill bounds. Drawn via the native canvas so the halo
+        // can use a real BlurMaskFilter glow (no-op below API 28, crisp fallback).
+        fun drawGlowRing(strokePx: Float, blurPx: Float, alpha: Float) {
+            val inset = strokePx / 2f
+            val radius = (bounds.height / 2f - inset).coerceAtLeast(0f)
+            drawIntoCanvas { canvas ->
+                val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    style = android.graphics.Paint.Style.STROKE
+                    strokeWidth = strokePx
+                    shader = sweepShader
+                    this.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
+                    if (blurPx > 0f) {
+                        maskFilter = android.graphics.BlurMaskFilter(
+                            blurPx,
+                            android.graphics.BlurMaskFilter.Blur.NORMAL,
+                        )
+                    }
+                }
+                canvas.nativeCanvas.drawRoundRect(
+                    bounds.left + inset,
+                    bounds.top + inset,
+                    bounds.right - inset,
+                    bounds.bottom - inset,
+                    radius,
+                    radius,
+                    paint,
+                )
+            }
+        }
 
-        // Thin gradient border — outer edge touches the pill edge, fully inside.
-        drawInsetStroke(
-            strokePx = strokeWidth,
-            inwardOffset = 0f,
-            alpha = 0.55f + 0.45f * pulse,
+        // Soft blurred halo breathing beneath the border.
+        drawGlowRing(
+            strokePx = 6.dp.toPx(),
+            blurPx = 8.dp.toPx() * breath,
+            alpha = 0.35f * breath,
+        )
+        // Crisp gradient border riding on top.
+        drawGlowRing(
+            strokePx = 2.dp.toPx(),
+            blurPx = 0f,
+            alpha = 0.85f + 0.15f * breath,
         )
     }
 }
