@@ -507,16 +507,19 @@ object SmartContentUtils {
 
                 android.util.Log.d("SmartPrediction", "⏱️ Elapsed since $prayerName: $elapsedMinutes minutes")
 
-                // Format elapsed time exactly like notification service
+                // Format elapsed time exactly like notification service. Use the display
+                // name ("Jumu'ah" for Dhuhr on Fridays) for the user-facing strings only;
+                // prayerName stays the key for the goToMosqueDuration lookup below.
+                val displayName = getPrayerDisplayName(prayerName)
                 val elapsedText = formatNotificationElapsedTime(elapsedMinutes)
-                val content = "$elapsedText since $prayerName"
+                val content = "$elapsedText since $displayName"
 
                 // Calculate prayer phase using the user's per-prayer "Go to Mosque" duration.
                 val mosqueWindowMinutes = goToMosqueDurationMinutes(prayerName)
                 val title = when {
-                    elapsedMinutes <= mosqueWindowMinutes -> "Go to Mosque for $prayerName"
-                    elapsedMinutes <= 60 -> "Best Time to Pray $prayerName"
-                    else -> "Make Time for $prayerName"
+                    elapsedMinutes <= mosqueWindowMinutes -> "Go to Mosque for $displayName"
+                    elapsedMinutes <= 60 -> "Best Time to Pray $displayName"
+                    else -> "Make Time for $displayName"
                 }
 
                 android.util.Log.d("SmartPrediction", "📝 Generated title: $title")
@@ -535,7 +538,7 @@ object SmartContentUtils {
                         Duration.between(currentTime, nextTime).toMinutes()
                     }
                     val nextFormatted = formatNotificationTimeRemaining(timeUntilNext)
-                    "Next • $nextName in $nextFormatted"
+                    "Next • ${getPrayerDisplayName(nextName)} in $nextFormatted"
                 } else ""
 
                 android.util.Log.d("SmartPrediction", "📝 Next prayer info: $nextPrayerText")

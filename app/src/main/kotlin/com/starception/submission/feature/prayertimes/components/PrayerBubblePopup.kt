@@ -20,6 +20,8 @@
  */
 package com.starception.submission.feature.prayertimes.components
 
+import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+import com.starception.submission.feature.prayertimes.isJumuahDay
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -325,7 +327,7 @@ private fun IOSPrayerCard(
 
             // Prayer name - clean typography
             Text(
-                text = prayerData.name,
+                text = getPrayerDisplayName(prayerData.name),
                 fontSize = 26.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -445,6 +447,7 @@ private fun IOSPrayerCard(
  * Helper function to get Arabic prayer name
  */
 fun getArabicPrayerName(prayerName: String): String {
+    if (prayerName == "Dhuhr" && isJumuahDay()) return "ٱلْجُمُعَة"
     return when (prayerName) {
         "Fajr" -> "ٱلْفَجْر"
         "Dhuhr" -> "ٱلظُّهْر"

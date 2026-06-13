@@ -1166,7 +1166,7 @@ fun PrayerTimesScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    text = prayerName,
+                                    text = getPrayerDisplayName(prayerName),
                                     style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
                                     color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                                         "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
@@ -2761,7 +2761,7 @@ private fun calculatePrayerAlertState(
                 phase = AlertPhase.GO_TO_MOSQUE,
                 countdownMinutes = minutesLeft.toInt(),
                 totalMinutes = goToMosqueDuration.toInt(),
-                displayText = "${currentPrayer.name} · Go now to mosque, ${minutesLeft}m left"
+                displayText = "${getPrayerDisplayName(currentPrayer.name)} · Go now to mosque, ${minutesLeft}m left"
             )
         }
     }
@@ -2777,7 +2777,7 @@ private fun calculatePrayerAlertState(
                 phase = AlertPhase.BEFORE_PRAYER,
                 countdownMinutes = minutesUntil.toInt(),
                 totalMinutes = priorMinutes.toInt(),
-                displayText = "${nextPrayer.name} in ${minutesUntil}m"
+                displayText = "${getPrayerDisplayName(nextPrayer.name)} in ${minutesUntil}m"
             )
         }
     }

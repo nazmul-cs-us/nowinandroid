@@ -1,5 +1,30 @@
 package com.starception.submission.feature.prayertimes
 
+import java.time.DayOfWeek
+import java.time.LocalDate
+
+/**
+ * Friday is Jumu'ah day: the midday (Dhuhr) prayer is the congregational Jumu'ah
+ * prayer, so it is shown to the user as "Jumu'ah". This is display-only — the
+ * underlying "Dhuhr" key is still used everywhere for time lookup, offsets,
+ * notifications and tracking.
+ */
+fun isJumuahDay(date: LocalDate = LocalDate.now()): Boolean = date.dayOfWeek == DayOfWeek.FRIDAY
+
+/** User-facing English prayer label, substituting "Jumu'ah" for Dhuhr on Fridays. */
+fun getPrayerDisplayName(englishName: String, date: LocalDate = LocalDate.now()): String =
+    if (englishName == "Dhuhr" && isJumuahDay(date)) "Jumu'ah" else englishName
+
+/** Local-language Jumu'ah name, mirroring the language buckets in [getPrayerNameInLocalLanguage]. */
+private fun getJumuahNameInLocalLanguage(countryCode: String?): String = when (countryCode?.uppercase()) {
+    "TR" -> "Cuma"
+    "PK" -> "جمعہ"
+    "IR" -> "جمعه"
+    "MY", "ID", "BN" -> "Jumaat"
+    "BD" -> "জুমা"
+    else -> "ٱلْجُمُعَة"
+}
+
 /**
  * Prayer Name Translator - Location-based prayer name translations
  * 
@@ -25,7 +50,14 @@ package com.starception.submission.feature.prayertimes
  * @param countryCode The ISO 3166-1 alpha-2 country code (e.g., "AE", "TR", "PK")
  * @return The prayer name in the local language, or Arabic as default
  */
-fun getPrayerNameInLocalLanguage(englishName: String, countryCode: String?): String {
+fun getPrayerNameInLocalLanguage(
+    englishName: String,
+    countryCode: String?,
+    date: LocalDate = LocalDate.now(),
+): String {
+    if (englishName == "Dhuhr" && isJumuahDay(date)) {
+        return getJumuahNameInLocalLanguage(countryCode)
+    }
     return when (countryCode?.uppercase()) {
         // Arabic-speaking countries
         "AE", "SA", "EG", "JO", "LB", "SY", "IQ", "KW", "QA", "BH", "OM", "YE", "LY", "TN", "DZ", "MA", "SD" -> {

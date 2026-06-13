@@ -1507,7 +1507,7 @@ private fun NextPrayerTile(
                     val prayerTime = getPrayerTimeDisplay(prayerName)
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = "Next Prayer: $prayerName",
+                            text = "Next Prayer: ${getPrayerDisplayName(prayerName)}",
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontWeight = FontWeight.Medium,
