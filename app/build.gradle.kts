@@ -159,6 +159,7 @@ dependencies {
     implementation(libs.androidx.window.core)
     implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.coil.kt)
+    implementation(libs.coil.kt.compose)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.play.services.location)
     implementation(libs.accompanist.permissions)
@@ -195,6 +196,13 @@ dependencies {
 
     // OSS Licenses for About section
     implementation(libs.google.oss.licenses)
+
+    // Social sign-in via Firebase Authentication (Google/Microsoft/Facebook/Apple).
+    // Google uses Credential Manager; the rest use Firebase's OAuthProvider web flow.
+    implementation(libs.firebase.auth)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
     ksp(libs.hilt.compiler)
     ksp(libs.hilt.ext.compiler)

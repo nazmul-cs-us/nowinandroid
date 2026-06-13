@@ -48,6 +48,11 @@ class VoiceSearchService(
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
 
+    // Normalized microphone level (0..1) derived from onRmsChanged while
+    // listening. Drives the live voice-wave visualization in the search bar.
+    private val _voiceLevel = MutableStateFlow(0f)
+    val voiceLevel: StateFlow<Float> = _voiceLevel.asStateFlow()
+
     private val _recognizedText = MutableStateFlow<String?>(null)
     val recognizedText: StateFlow<String?> = _recognizedText.asStateFlow()
 
@@ -120,7 +125,8 @@ class VoiceSearchService(
                 }
 
                 override fun onRmsChanged(rmsdB: Float) {
-                    // Audio level changed
+                    // SpeechRecognizer reports roughly -2..10 dB; normalize to 0..1.
+                    _voiceLevel.value = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
                 }
 
                 override fun onBufferReceived(buffer: ByteArray?) {
@@ -232,6 +238,7 @@ class VoiceSearchService(
     }
 
     private fun cleanup() {
+        _voiceLevel.value = 0f
         try {
             speechRecognizer?.destroy()
             speechRecognizer = null

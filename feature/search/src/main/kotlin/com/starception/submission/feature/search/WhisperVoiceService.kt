@@ -73,6 +73,11 @@ class WhisperVoiceService(
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
 
+    // Normalized microphone amplitude (0..1) while recording, ~60 updates/sec.
+    // Drives the live voice-wave visualization in the search bar.
+    private val _voiceLevel = MutableStateFlow(0f)
+    val voiceLevel: StateFlow<Float> = _voiceLevel.asStateFlow()
+
     private val _isTranscribing = MutableStateFlow(false)
     val isTranscribing: StateFlow<Boolean> = _isTranscribing.asStateFlow()
 
@@ -214,17 +219,24 @@ class WhisperVoiceService(
                 val recordingFile = getRecordingFile()
                 Log.i(TAG, "Starting recording to: ${recordingFile.absolutePath}")
 
-                recorder?.startRecording(recordingFile) { error ->
-                    Log.e(TAG, "Recording error", error)
-                    scope.launch(Dispatchers.Main) {
-                        _isListening.value = false
-                        _error.value = "Recording error: ${error.message}"
-                        currentCallback?.invoke(
-                            VoiceSearchService.VoiceSearchResult.Error("Recording failed: ${error.message}")
-                        )
-                        currentCallback = null
-                    }
-                }
+                recorder?.startRecordingWithAmplitude(
+                    recordingFile,
+                    onError = { error ->
+                        Log.e(TAG, "Recording error", error)
+                        scope.launch(Dispatchers.Main) {
+                            _isListening.value = false
+                            _voiceLevel.value = 0f
+                            _error.value = "Recording error: ${error.message}"
+                            currentCallback?.invoke(
+                                VoiceSearchService.VoiceSearchResult.Error("Recording failed: ${error.message}")
+                            )
+                            currentCallback = null
+                        }
+                    },
+                    onAmplitude = { amplitude ->
+                        _voiceLevel.value = amplitude
+                    },
+                )
 
                 Log.i(TAG, "Recording started successfully")
             } catch (e: Exception) {
@@ -253,6 +265,7 @@ class WhisperVoiceService(
                     // Stop recording
                     recorder?.stopRecording()
                     _isListening.value = false
+                    _voiceLevel.value = 0f
 
                     // Start transcription
                     startTranscription()

@@ -23,9 +23,12 @@ import android.widget.Toast
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -45,7 +48,12 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -58,6 +66,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
+import coil.imageLoader
+import coil.request.ImageRequest
 import androidx.core.widget.NestedScrollView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -93,6 +103,8 @@ fun AppTopSearchBar(
     // direct callers like PrayerTimesScreen also get them without per-screen
     // boilerplate.
     val searchNav = LocalSearchNavCallbacks.current
+    val onProfileClick = LocalProfileClick.current
+    val profileAvatarUrl = LocalProfileAvatarUrl.current
     val onTopicClick = searchNav.onTopicClick
     val onNewsClick = searchNav.onNewsClick
     val onFortressDuaClick = searchNav.onFortressDuaClick
@@ -121,6 +133,7 @@ fun AppTopSearchBar(
     val currentOnNewsClick by rememberUpdatedState(onNewsClick)
     val currentOnFortressDuaClick by rememberUpdatedState(onFortressDuaClick)
     val currentOnQuranicDuaClick by rememberUpdatedState(onQuranicDuaClick)
+    val currentOnProfileClick by rememberUpdatedState(onProfileClick)
 
     val context = LocalContext.current
     // Track the live query so renderSuggestions can filter in real time as the
@@ -264,7 +277,7 @@ fun AppTopSearchBar(
                 true
             }
 
-            leading.setOnClickListener { searchView.show() }
+            leading.setOnClickListener { currentOnProfileClick() }
             settings.setOnClickListener { onSettingsClick() }
 
             searchView.setupWithSearchBar(searchBar)
@@ -322,8 +335,15 @@ fun AppTopSearchBar(
             val searchView = root.findViewById<SearchView>(R.id.app_search_view)
             // Drive the SearchBar's hint from the typewriter state; the
             // SearchView shows its own static placeholder when expanded.
-            searchBar.hint = animatedHint
-            searchView.hint = SearchHints.hintFor()
+            // While voice capture is live the hints are cleared so the centered
+            // voice wave owns the field without text bleeding through it.
+            if (isListening) {
+                searchBar.hint = ""
+                searchView.hint = ""
+            } else {
+                searchBar.hint = animatedHint
+                searchView.hint = SearchHints.hintFor()
+            }
             searchBar.textView?.setHintTextColor(pillTextColor)
             searchBar.textView?.setTextColor(pillTextColor)
             // Native View icons read tints from the Activity's Configuration
@@ -331,7 +351,47 @@ fun AppTopSearchBar(
             // we tint them manually to match the active Compose colorScheme.
             // Buttons outside the pill sit on the AppBar/window surface → onSurface.
             // Icons inside the SearchBar pill (magnifier + mic) → onPrimaryContainer.
-            leading.iconTint = ColorStateList.valueOf(titleColor)
+            // Leading button shows the signed-in user's circular avatar when logged in,
+            // otherwise the default profile glyph (tinted to match the theme). The URL is
+            // stored as a tag so Coil only re-enqueues when the avatar actually changes.
+            val density = root.resources.displayMetrics.density
+            if (profileAvatarUrl != null) {
+                leading.iconTint = null
+                // Larger icon so the gradient ring has room to read clearly.
+                leading.iconSize = (34f * density).toInt()
+                if (leading.getTag(R.id.leading_button) != profileAvatarUrl) {
+                    leading.setTag(R.id.leading_button, profileAvatarUrl)
+                    val request = ImageRequest.Builder(root.context)
+                        .data(profileAvatarUrl)
+                        .transformations(RingAvatarTransformation())
+                        .target(
+                            onSuccess = { drawable ->
+                                leading.iconTint = null
+                                leading.icon = drawable
+                            },
+                            onError = {
+                                leading.iconTint = ColorStateList.valueOf(titleColor)
+                                leading.iconSize = (26f * density).toInt()
+                                leading.icon = ContextCompat.getDrawable(
+                                    root.context,
+                                    R.drawable.ic_app_top_bar_profile_24,
+                                )
+                            },
+                        )
+                        .build()
+                    root.context.imageLoader.enqueue(request)
+                }
+            } else {
+                if (leading.getTag(R.id.leading_button) != null) {
+                    leading.setTag(R.id.leading_button, null)
+                    leading.icon = ContextCompat.getDrawable(
+                        root.context,
+                        R.drawable.ic_app_top_bar_profile_24,
+                    )
+                }
+                leading.iconSize = (26f * density).toInt()
+                leading.iconTint = ColorStateList.valueOf(titleColor)
+            }
             settings.iconTint = ColorStateList.valueOf(titleColor)
             searchBar.navigationIcon?.mutate()?.setTint(pillTextColor)
             for (i in 0 until searchBar.menu.size()) {
@@ -341,6 +401,21 @@ fun AppTopSearchBar(
                 searchView.toolbar.menu.getItem(i).icon?.mutate()?.setTint(titleColor)
             }
             searchView.toolbar.navigationIcon?.mutate()?.setTint(titleColor)
+
+            // While voice capture is live the field belongs to the wave alone:
+            // hide the back arrow, mic icons and text cursor; everything is
+            // restored on the next pass once listening ends.
+            val chromeAlpha = if (isListening) 0 else 255
+            searchView.toolbar.navigationIcon?.mutate()?.alpha = chromeAlpha
+            searchBar.navigationIcon?.mutate()?.alpha = chromeAlpha
+            for (i in 0 until searchView.toolbar.menu.size()) {
+                searchView.toolbar.menu.getItem(i).isVisible = !isListening
+            }
+            for (i in 0 until searchBar.menu.size()) {
+                searchBar.menu.getItem(i).isVisible = !isListening
+            }
+            searchView.getEditText().isCursorVisible = !isListening
+
             appBar.setPadding(0, topInsetPx, 0, 0)
 
             // Re-tint only the SearchView's INTERNAL surface (open_search_view_background)
@@ -444,7 +519,28 @@ fun AppTopSearchBar(
         searchBarBoundsPx
     }
     if (isListening && bounds != null) {
-        ListeningEdgeGlow(bounds = bounds, modifier = Modifier.matchParentSize())
+        // Live microphone level (0..1) from whichever engine is capturing,
+        // smoothed so the glow and wave move organically rather than jittering.
+        val whisperLevel by whisperService.voiceLevel.collectAsStateWithLifecycle()
+        val cloudLevel by cloudVoiceService.voiceLevel.collectAsStateWithLifecycle()
+        val smoothedLevel by animateFloatAsState(
+            targetValue = maxOf(whisperLevel, cloudLevel).coerceIn(0f, 1f),
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = 450f,
+            ),
+            label = "voiceLevel",
+        )
+        ListeningEdgeGlow(
+            bounds = bounds,
+            level = smoothedLevel,
+            modifier = Modifier.matchParentSize(),
+        )
+        VoiceWaveOverlay(
+            bounds = bounds,
+            level = smoothedLevel,
+            modifier = Modifier.matchParentSize(),
+        )
     }
     }
 }
@@ -452,6 +548,7 @@ fun AppTopSearchBar(
 @Composable
 private fun ListeningEdgeGlow(
     bounds: Rect,
+    level: Float,
     modifier: Modifier = Modifier,
 ) {
     val transition = rememberInfiniteTransition(label = "listenGlow")
@@ -477,29 +574,33 @@ private fun ListeningEdgeGlow(
         label = "breath",
     )
 
+    // Ring colors come from the active theme so the glow matches the bar and
+    // wave on every brand/custom palette — nothing hardcoded.
+    val ringPrimary = MaterialTheme.colorScheme.primary
+    val ringSecondary = MaterialTheme.colorScheme.secondary
+    val ringTertiary = MaterialTheme.colorScheme.tertiary
+
     Canvas(modifier = modifier) {
         if (bounds.width <= 0f || bounds.height <= 0f) return@Canvas
 
         val cx = bounds.center.x
         val cy = bounds.center.y
         val glowColors = intArrayOf(
-            0xFF4285F4.toInt(), // Google blue
-            0xFF9B72CB.toInt(), // Gemini purple
-            0xFFD96570.toInt(), // Gemini coral
-            0xFFF9AB00.toInt(), // amber
-            0xFF34A853.toInt(), // green
-            0xFF4285F4.toInt(), // wrap back to blue
+            ringPrimary.toArgb(),
+            ringSecondary.toArgb(),
+            ringTertiary.toArgb(),
+            ringPrimary.toArgb(), // wrap
         )
         val sweepShader = android.graphics.SweepGradient(cx, cy, glowColors, null).apply {
             setLocalMatrix(android.graphics.Matrix().apply { setRotate(angle, cx, cy) })
         }
 
-        // Both rings keep their OUTER edge aligned with the pill's edge — nothing
-        // extends beyond the pill bounds. Drawn via the native canvas so the halo
-        // can use a real BlurMaskFilter glow (no-op below API 28, crisp fallback).
-        fun drawGlowRing(strokePx: Float, blurPx: Float, alpha: Float) {
-            val inset = strokePx / 2f
-            val radius = (bounds.height / 2f - inset).coerceAtLeast(0f)
+        // Drawn via the native canvas so the halo can use a real BlurMaskFilter
+        // glow (no-op below API 28, crisp fallback). insetPx positions the
+        // stroke's center relative to the bar edge: 0 = straddling the edge so
+        // the blur blooms outward and the bar itself appears to emit the light.
+        fun drawGlowRing(strokePx: Float, blurPx: Float, alpha: Float, insetPx: Float) {
+            val radius = (bounds.height / 2f - insetPx).coerceAtLeast(0f)
             drawIntoCanvas { canvas ->
                 val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                     style = android.graphics.Paint.Style.STROKE
@@ -514,10 +615,10 @@ private fun ListeningEdgeGlow(
                     }
                 }
                 canvas.nativeCanvas.drawRoundRect(
-                    bounds.left + inset,
-                    bounds.top + inset,
-                    bounds.right - inset,
-                    bounds.bottom - inset,
+                    bounds.left + insetPx,
+                    bounds.top + insetPx,
+                    bounds.right - insetPx,
+                    bounds.bottom - insetPx,
                     radius,
                     radius,
                     paint,
@@ -525,18 +626,209 @@ private fun ListeningEdgeGlow(
             }
         }
 
-        // Soft blurred halo breathing beneath the border.
+        // Subtle outer bloom: centered on the bar's edge so it radiates outward
+        // like the bar is the light source, swelling gently with the voice.
         drawGlowRing(
-            strokePx = 6.dp.toPx(),
-            blurPx = 8.dp.toPx() * breath,
-            alpha = 0.35f * breath,
+            strokePx = 4.dp.toPx() + 3.dp.toPx() * level,
+            blurPx = 6.dp.toPx() + 4.dp.toPx() * level,
+            alpha = 0.16f * breath + 0.16f * level,
+            insetPx = 0f,
         )
-        // Crisp gradient border riding on top.
+        // Thin crisp gradient border hugging the bar edge.
         drawGlowRing(
-            strokePx = 2.dp.toPx(),
+            strokePx = 1.5.dp.toPx(),
             blurPx = 0f,
-            alpha = 0.85f + 0.15f * breath,
+            alpha = 0.9f,
+            insetPx = 0.75.dp.toPx(),
         )
+    }
+}
+
+/**
+ * Siri/sea-style voice wave: smooth continuous curves flowing through the
+ * search field, their swell driven by the live microphone amplitude. Three
+ * layered waves with different frequencies and directions give it the depth of
+ * rolling water; all taper to zero at both ends so the wave breathes out of
+ * the field's center.
+ */
+@Composable
+private fun VoiceWaveOverlay(
+    bounds: Rect,
+    level: Float,
+    modifier: Modifier = Modifier,
+) {
+    val transition = rememberInfiniteTransition(label = "voiceWave")
+    val t by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "wavePhase",
+    )
+
+    // All wave colors come from the active theme so the ribbon reads as part
+    // of the search bar on every brand/custom palette — nothing hardcoded.
+    val primary = MaterialTheme.colorScheme.primary
+    val secondary = MaterialTheme.colorScheme.secondary
+    val tertiary = MaterialTheme.colorScheme.tertiary
+
+    Canvas(modifier = modifier) {
+        if (bounds.width <= 0f || bounds.height <= 0f) return@Canvas
+
+        // The bar's chrome (back arrow, mic, cursor) is hidden while listening,
+        // so the wave runs end to end: strands flatten to the centerline at the
+        // edges and touch the pill's inner border on both sides.
+        val startX = bounds.left + 3.dp.toPx()
+        val endX = bounds.right - 3.dp.toPx()
+        val span = endX - startX
+        if (span <= 0f) return@Canvas
+
+        val centerY = bounds.center.y
+        val maxAmp = bounds.height * 0.42f
+        // Lively idle swell; speech makes the sea rise further.
+        val energy = 0.35f + 0.65f * level
+        val twoPi = 2f * Math.PI.toFloat()
+        val pi = Math.PI.toFloat()
+
+        // Edge fade pins every curve to the baseline at both ends.
+        fun edgeFade(u: Float): Float =
+            kotlin.math.sin(u * pi).coerceAtLeast(0f).let { kotlin.math.sqrt(it) }
+
+        // ONE shared envelope for every strand — this is what makes the wave
+        // read as a single woven ribbon instead of unrelated lines. The crest
+        // drifts slowly across the field for the rolling-sea silhouette. The
+        // wide sigma keeps the braid alive across most of the field instead of
+        // bunching in one small swell.
+        val crest = 0.5f + 0.20f * kotlin.math.sin(t * 0.21f * twoPi)
+        val sigma = 0.34f
+        fun envelopeAt(u: Float): Float {
+            val d = (u - crest) / sigma
+            return kotlin.math.exp(-0.5f * d * d) * edgeFade(u)
+        }
+
+        fun yAt(u: Float, freq: Float, phase0: Float, amp: Float): Float =
+            centerY + kotlin.math.sin((u * freq + t) * twoPi + phase0 * twoPi) *
+                maxAmp * energy * amp * envelopeAt(u)
+
+        val samples = 84
+        fun strand(freq: Float, phase0: Float, amp: Float): Path {
+            val path = Path()
+            for (s in 0..samples) {
+                val u = s / samples.toFloat()
+                val x = startX + u * span
+                val y = yAt(u, freq, phase0, amp)
+                if (s == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            return path
+        }
+
+        // Closed shape between two strands — the ribbon's translucent body.
+        fun ribbonBody(
+            freqA: Float, phaseA: Float, ampA: Float,
+            freqB: Float, phaseB: Float, ampB: Float,
+        ): Path {
+            val path = Path()
+            for (s in 0..samples) {
+                val u = s / samples.toFloat()
+                val x = startX + u * span
+                val y = yAt(u, freqA, phaseA, ampA)
+                if (s == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            for (s in samples downTo 0) {
+                val u = s / samples.toFloat()
+                val x = startX + u * span
+                path.lineTo(x, yAt(u, freqB, phaseB, ampB))
+            }
+            path.close()
+            return path
+        }
+
+        fun drawCrisp(path: Path, color: ComposeColor, widthPx: Float, alpha: Float) {
+            drawPath(
+                path = path,
+                color = color.copy(alpha = alpha),
+                style = Stroke(width = widthPx, cap = StrokeCap.Round),
+            )
+        }
+
+        fun drawBlurred(path: Path, colorArgb: Int, widthPx: Float, blurPx: Float, alpha: Float) {
+            drawIntoCanvas { canvas ->
+                val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    style = android.graphics.Paint.Style.STROKE
+                    strokeWidth = widthPx
+                    color = colorArgb
+                    this.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
+                    maskFilter = android.graphics.BlurMaskFilter(
+                        blurPx,
+                        android.graphics.BlurMaskFilter.Blur.NORMAL,
+                    )
+                }
+                canvas.nativeCanvas.drawPath(path.asAndroidPath(), paint)
+            }
+        }
+
+        // Wash the pill's interior with the wave's own hue so background and
+        // wave read as one luminous unit: a faint full-surface tint plus a
+        // radial glow that tracks the crest and breathes with the voice.
+        val washInset = 2.dp.toPx()
+        val washRadius = (bounds.height - washInset * 2f) / 2f
+        drawRoundRect(
+            color = primary.copy(alpha = 0.06f),
+            topLeft = Offset(bounds.left + washInset, bounds.top + washInset),
+            size = Size(bounds.width - washInset * 2f, bounds.height - washInset * 2f),
+            cornerRadius = CornerRadius(washRadius),
+        )
+        drawRoundRect(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    primary.copy(alpha = 0.13f + 0.12f * level),
+                    primary.copy(alpha = 0f),
+                ),
+                center = Offset(startX + crest * span, centerY),
+                radius = span * 0.45f,
+            ),
+            topLeft = Offset(bounds.left + washInset, bounds.top + washInset),
+            size = Size(bounds.width - washInset * 2f, bounds.height - washInset * 2f),
+            cornerRadius = CornerRadius(washRadius),
+        )
+
+        // Two strand families a half-cycle apart cross each other repeatedly,
+        // braiding around the shared envelope like the reference art. Higher
+        // frequencies give several undulations across the field, not one bump.
+        // Only primary/tertiary are used — secondary is grey in several brands
+        // and muddied the braid.
+        val freqA = 2.3f
+        val freqB = 2.55f
+
+        // 1) Translucent body between the two hero strands gives the ribbon
+        //    real mass — without it the wave reads as bare lines.
+        drawPath(
+            path = ribbonBody(freqA, 0f, 1f, freqB, 0.5f, 0.84f),
+            color = primary.copy(alpha = 0.14f),
+        )
+        drawPath(
+            path = ribbonBody(freqA, 0.08f, 0.9f, freqB, 0.58f, 0.74f),
+            color = tertiary.copy(alpha = 0.10f),
+        )
+
+        // 2) Inner strands — tight phase offsets inside each family so the
+        //    braid looks dense and intentional.
+        drawCrisp(strand(freqA, 0.08f, 0.92f), tertiary, 1.4.dp.toPx(), 0.45f)
+        drawCrisp(strand(freqA, 0.16f, 0.82f), primary, 1.2.dp.toPx(), 0.35f)
+        drawCrisp(strand(freqB, 0.58f, 0.74f), primary, 1.3.dp.toPx(), 0.40f)
+        drawCrisp(strand(freqB, 0.66f, 0.64f), tertiary, 1.2.dp.toPx(), 0.32f)
+
+        // 3) Counter-hero: bright strand of the second family with a soft glow.
+        val counterHero = strand(freqB, 0.5f, 0.84f)
+        drawBlurred(counterHero, tertiary.toArgb(), 4.dp.toPx(), 6.dp.toPx(), 0.25f + 0.20f * level)
+        drawCrisp(counterHero, tertiary, 1.9.dp.toPx(), 0.85f)
+
+        // 4) Hero strand riding on top with a luminous underglow.
+        val hero = strand(freqA, 0f, 1f)
+        drawBlurred(hero, primary.toArgb(), 6.dp.toPx(), 8.dp.toPx(), 0.40f + 0.25f * level)
+        drawCrisp(hero, primary, 2.2.dp.toPx(), 1f)
     }
 }
 

@@ -50,10 +50,19 @@ import androidx.compose.material3.adaptive.WindowAdaptiveInfo
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import android.content.Context
+import android.content.ContextWrapper
+import android.widget.Toast
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.starception.submission.auth.AuthUiState
+import com.starception.submission.auth.AuthViewModel
+import com.starception.submission.auth.ProfileSheet
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -102,6 +111,16 @@ import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.media.MediaControllerUiState
 import com.starception.submission.feature.settings.R as settingsR
 
+/** Unwraps the hosting [Activity] from a Compose [Context], needed for Firebase OAuth flows. */
+private fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return null
+}
+
 @Composable
 fun NiaApp(
     appState: NiaAppState,
@@ -112,6 +131,22 @@ fun NiaApp(
 ) {
     val shouldShowGradientBackground =
         appState.currentTopLevelDestination == TopLevelDestination.FOR_YOU
+
+    // Account/sign-in state for the search-bar profile icon. Hosted here at the top of
+    // the app so the icon (deep inside AppTopSearchBar) can open the sheet via the
+    // LocalProfileClick CompositionLocal without threading a lambda through every screen.
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
+    var showProfileSheet by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+
+    // Surface sign-in errors from the auth engine as toasts.
+    LaunchedEffect(Unit) {
+        authViewModel.messages.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
 
     NiaBackground(modifier = modifier) {
         NiaGradientBackground(
@@ -136,14 +171,34 @@ fun NiaApp(
                 }
             }
 
-            NiaAppContent(
-                appState = appState,
-                snackbarHostState = snackbarHostState,
-                onTopAppBarActionClick = { appState.navController.navigateToSettings() },
-                windowAdaptiveInfo = windowAdaptiveInfo,
-                mainViewModel = mainViewModel,
-                deepLinkCourseId = deepLinkCourseId,
-            )
+            CompositionLocalProvider(
+                LocalProfileClick provides { showProfileSheet = true },
+                LocalProfileAvatarUrl provides (authUiState as? AuthUiState.LoggedIn)?.avatarUrl,
+            ) {
+                NiaAppContent(
+                    appState = appState,
+                    snackbarHostState = snackbarHostState,
+                    onTopAppBarActionClick = { appState.navController.navigateToSettings() },
+                    windowAdaptiveInfo = windowAdaptiveInfo,
+                    mainViewModel = mainViewModel,
+                    deepLinkCourseId = deepLinkCourseId,
+                )
+            }
+
+            if (showProfileSheet) {
+                ProfileSheet(
+                    uiState = authUiState,
+                    onSignIn = { provider ->
+                        activity?.let { authViewModel.signIn(it, provider) }
+                        showProfileSheet = false
+                    },
+                    onSignOut = {
+                        authViewModel.signOut()
+                        showProfileSheet = false
+                    },
+                    onDismiss = { showProfileSheet = false },
+                )
+            }
         }
     }
 }

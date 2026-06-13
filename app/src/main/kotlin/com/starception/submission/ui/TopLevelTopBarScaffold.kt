@@ -57,6 +57,21 @@ data class SearchNavCallbacks(
 val LocalSearchNavCallbacks = compositionLocalOf { SearchNavCallbacks() }
 
 /**
+ * App-wide callback fired when the search bar's leading profile/account icon is tapped.
+ * Provided once near the top of the app (NiaApp) so [AppTopSearchBar] can open the
+ * account/profile sheet without threading a lambda through every screen. Defaults to a
+ * no-op so previews and isolated callers don't crash.
+ */
+val LocalProfileClick = compositionLocalOf<() -> Unit> { {} }
+
+/**
+ * Signed-in user's avatar URL, or null when logged out. Provided once near the top of
+ * the app (NiaApp) so [AppTopSearchBar]'s leading button can show the account photo
+ * instead of the generic profile glyph.
+ */
+val LocalProfileAvatarUrl = compositionLocalOf<String?> { null }
+
+/**
  * Scaffold used by every non-Home top-level destination so each page renders
  * its own SearchBar at Y=0 of the NavHost. Wraps the page content inside
  * [AppTopSearchBar] so the SearchBar can morph into a full-screen SearchView

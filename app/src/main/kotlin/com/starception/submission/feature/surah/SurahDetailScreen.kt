@@ -483,17 +483,33 @@ fun SurahDetailScreen(
     // Bismillah display state from ViewModel (based on database content)
     val showBismillahRow by viewModel.showBismillahRow.collectAsState()
 
-    // Load audio language from ViewModel (persisted in SharedPreferences)
-    val savedAudioLanguage by viewModel.currentAudioLanguage.collectAsState()
+    // Playback audio language always follows the selected translation text, so
+    // Bengali text gets Bengali recitation, English gets English, etc. (translations
+    // without audio fall back to Arabic). The translation key is shared app-wide and
+    // can be changed from other screens, so deriving it here keeps audio in sync
+    // instead of relying on a separate, easily-stale audio_language preference.
     var currentAudioLanguage by remember {
         mutableStateOf(
-            when (savedAudioLanguage) {
-                "ARABIC_ONLY" -> AudioLanguage.ARABIC_ONLY
-                "ENGLISH_TRANSLATION" -> AudioLanguage.ENGLISH_TRANSLATION
-                "BENGALI_TRANSLATION" -> AudioLanguage.BENGALI_TRANSLATION
-                else -> AudioLanguage.ARABIC_ONLY
-            }
+            mapTranslationCodeToAudioLanguage(currentTranslation) ?: AudioLanguage.ARABIC_ONLY
         )
+    }
+
+    // Keep the audio language in lock-step with the translation whenever it changes
+    // (from this screen's dialog or any other surface that writes quran_translation).
+    LaunchedEffect(currentTranslation) {
+        val derived = mapTranslationCodeToAudioLanguage(currentTranslation) ?: AudioLanguage.ARABIC_ONLY
+        if (derived != currentAudioLanguage) {
+            currentAudioLanguage = derived
+        }
+        viewModel.changeAudioLanguage(derived.name)
+        playbackService?.let { service ->
+            service.setAudioLanguage(derived)
+            // If audio is already playing, restart the current surah so the new
+            // language takes effect immediately rather than on the next track.
+            if (service.isPlaying()) {
+                service.playSurah(service.getCurrentSurahIndex(), true)
+            }
+        }
     }
 
     val selectedArabicFont by viewModel.selectedArabicFont.collectAsState()
@@ -1198,30 +1214,18 @@ fun SurahDetailScreen(
                 currentTranslation = currentTranslation,
                 onDismiss = { showTranslationDialog = false },
                 onTranslationSelected = { translationCode ->
-                    // Change the text display
+                    // Change the text display. The LaunchedEffect on currentTranslation
+                    // takes care of switching (and restarting) playback audio to match.
                     viewModel.changeTranslation(translationCode, surahNumber)
 
-                    // Try to map translation to audio language
                     val mappedAudioLanguage = mapTranslationCodeToAudioLanguage(translationCode)
-
                     if (mappedAudioLanguage != null) {
-                        // Translation has audio support
-                        currentAudioLanguage = mappedAudioLanguage
-                        viewModel.changeAudioLanguage(mappedAudioLanguage.name)
-                        val service = playbackService
-                        if (service != null) {
-                            service.setAudioLanguage(mappedAudioLanguage)
-                            val surahIndex = surahNumber - 1
-                            val shouldAutoPlay = service.isPlaying()
-                            service.playSurah(surahIndex, shouldAutoPlay)
-                        }
                         Toast.makeText(
                             context,
                             "Translation applied with ${getAudioLanguageDisplayName(mappedAudioLanguage)} audio",
                             Toast.LENGTH_SHORT
                         ).show()
                     } else {
-                        // Translation has no audio support, keep playing Arabic
                         Toast.makeText(
                             context,
                             "Translation applied. Audio not available for ${viewModel.getTranslationName(translationCode)}, playing Arabic audio.",
