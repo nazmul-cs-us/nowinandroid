@@ -58,8 +58,10 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import android.content.res.Configuration
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -295,7 +297,12 @@ fun PullToSyncContainer(
     // PRIMARY: Vertical translation (content pushes down)
     // Download uses the same sheet geometry as sync so the banner-to-title spacing
     // matches the pull-to-sync state exactly.
-    val contentOffsetY = (wobbleIntensity * 220f).dp
+    // The reveal is a fixed dp height; landscape screens are far shorter, so a
+    // portrait-sized reveal eats too much vertical space and squeezes the page
+    // content. Use a smaller reveal in landscape (the strip only needs a single line).
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val maxRevealDp = if (isLandscape) 130f else 220f
+    val contentOffsetY = (wobbleIntensity * maxRevealDp).dp
 
     // Fitbit-style rounded top corners on content card when pushed down
     val cornerRadius = (wobbleIntensity * 28f).dp.coerceAtMost(28.dp)

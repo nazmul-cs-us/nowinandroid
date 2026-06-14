@@ -1069,10 +1069,19 @@ fun SurahDetailScreen(
         }
     }
 
-        // Hide toolbar when Mushaf mode is active and snapped to Mushaf content
+        // In Mushaf mode the toolbar only shows when the user has scrolled up to the album
+        // header (item 0) and at least half of it is in view. Keying off the header's
+        // scroll fraction (not firstVisibleItemIndex) is robust to landscape, where the
+        // short header + the PullToSync banner's viewport push leave a small bottom sliver
+        // of item 0 peeking at the top of the page — a plain `index >= 1` or "any header
+        // pixels visible" check would wrongly keep the toolbar up during reading.
         val showTopBar = remember {
             derivedStateOf {
-                !(continuousReadingMode && scrollState.firstVisibleItemIndex >= 1)
+                if (!continuousReadingMode) return@derivedStateOf true
+                if (scrollState.firstVisibleItemIndex != 0) return@derivedStateOf false
+                val header = scrollState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == 0 }
+                    ?: return@derivedStateOf false
+                scrollState.firstVisibleItemScrollOffset < header.size / 2
             }
         }
 
@@ -1982,7 +1991,12 @@ private fun AlbumPlayerContent(
     // pulled the page-number footer up into the visible area and left a big
     // gap at the top.
     val wobbleIntensity = com.starception.submission.ui.LocalWobbleIntensity.current
-    val mushafHeight = (screenHeightDp - (wobbleIntensity * 220f).dp)
+    // Must match PullToSyncContainer's banner reveal height (smaller in landscape), else
+    // the page is sized for a taller push than actually shows and ends up ~156px short of
+    // filling the viewport — which pins the scroll and leaves the album header's bottom
+    // (its InfoCard chips) peeking above the page.
+    val mushafBannerRevealDp = if (isLandscape) 130f else 220f
+    val mushafHeight = (screenHeightDp - (wobbleIntensity * mushafBannerRevealDp).dp)
         .coerceAtLeast(200.dp)
 
     // Update local state when arabicFontSize changes externally (e.g. +/- buttons)
@@ -1991,9 +2005,12 @@ private fun AlbumPlayerContent(
     }
 
     // Auto-scroll to Mushaf item whenever Mushaf mode is active and content is loaded.
-    // Keys on both so it fires on first open (default=true) once ayahs arrive,
-    // and again if the user toggles the mode on manually.
-    LaunchedEffect(continuousReadingMode, displayAyahs.size) {
+    // Keys on mode + ayah count so it fires on first open (default=true) once ayahs
+    // arrive, and again if the user toggles the mode on manually. Also keyed on
+    // [isLandscape]: a rotation re-lays-out the list and drops it back to item 0, which
+    // would re-show the toolbar — re-snapping to the page keeps the immersive reading
+    // view (toolbar hidden until the user scrolls up) consistent in both orientations.
+    LaunchedEffect(continuousReadingMode, displayAyahs.size, isLandscape) {
         if (continuousReadingMode && displayAyahs.isNotEmpty()) {
             // Item 0 = AlbumHeader+InfoCard, item 1 = MushafPagerView.
             // Small delay lets Compose finish layout before scrolling.
@@ -4275,7 +4292,7 @@ private fun MushafPageWithFrame(
     val topPadding = 4.dp
     val bottomPadding = 16.dp
     val bismillahHeightDp = if (showBismillah) 36.dp else 0.dp
-    val pageFooterHeightDp = 8.dp
+    val pageFooterHeightDp = 28.dp // tall enough to clear the page-number footer (~22dp) so the last line isn't crowded
     val lineSpacingMultiplier = 1.35f
     val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
 
@@ -4425,7 +4442,7 @@ private fun MushafPagerView(
     val topPadding = 4.dp
     val bottomPadding = navBarHeight + 8.dp
     val bismillahHeightDp = 36.dp
-    val pageFooterHeightDp = 8.dp
+    val pageFooterHeightDp = 28.dp // tall enough to clear the page-number footer (~22dp) so the last line isn't crowded
 
     // Rosette is now part of the text flow as U+06DD ARABIC END OF AYAH +
     // Arabic-Indic digits, styled with Amiri Quran which composes them into a
@@ -4513,6 +4530,11 @@ private fun MushafPagerView(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
+                // Keep the page text clear of the camera cutout (on a side edge in
+                // landscape) — the surface background still fills edge-to-edge, only the
+                // measured content area (and pagination) is inset. Matches how full-screen
+                // pages like Home honor the cutout via safeDrawing.
+                .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
                 .pointerInput(parentScrollState, state) {
                     awaitEachGesture {
                         val firstDown = awaitFirstDown(requireUnconsumed = false)
