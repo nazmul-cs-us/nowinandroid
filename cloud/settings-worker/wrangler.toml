@@ -1,0 +1,22 @@
+# Cloudflare Worker: per-user settings store for the Starception app.
+#
+# Deploy (one-time setup):
+#   1. cd cloud/settings-worker && npm install
+#   2. wrangler login                       # or export CLOUDFLARE_API_TOKEN=<Workers+R2 edit token>
+#   3. wrangler r2 bucket create starception-userdata   # private; do NOT enable public access
+#   4. wrangler deploy
+#   5. Put the printed https://...workers.dev origin into
+#      app/.../usersettings/sync/SettingsSyncConfig.kt (WORKER_BASE_URL) to enable sync.
+
+name = "starception-settings"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+account_id = "a535d591f409b4a31c39625dc1ffd6c7"
+
+# Private bucket holding users/{uid}/settings.db — never enable public r2.dev access on it.
+[[r2_buckets]]
+binding = "USER_DATA"
+bucket_name = "starception-userdata"
+
+[vars]
+FIREBASE_PROJECT_ID = "submission-f8b2b"

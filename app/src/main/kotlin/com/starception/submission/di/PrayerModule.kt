@@ -39,6 +39,7 @@ object PrayerModule {
     @Provides
     @Singleton
     fun providePrayerSettingsRepository(
-        @ApplicationContext context: Context
-    ): PrayerSettingsRepository = PrayerSettingsRepository(context)
+        @ApplicationContext context: Context,
+        userSettingsStore: com.starception.submission.usersettings.UserSettingsStore
+    ): PrayerSettingsRepository = PrayerSettingsRepository(context, userSettingsStore)
 }

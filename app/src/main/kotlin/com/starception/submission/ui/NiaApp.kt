@@ -63,6 +63,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.starception.submission.auth.AuthUiState
 import com.starception.submission.auth.AuthViewModel
 import com.starception.submission.auth.ProfileSheet
+import com.starception.submission.usersettings.ui.CountrySwitchConsentSheet
+import com.starception.submission.usersettings.ui.CountrySwitchViewModel
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -82,6 +84,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -141,6 +145,15 @@ fun NiaApp(
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
 
+    // Country-change consent: when the app detects a move to a new country it proposes switching
+    // prayer settings; nothing changes until the user confirms in the bottom sheet below.
+    val countrySwitchViewModel: CountrySwitchViewModel = hiltViewModel()
+    val pendingCountrySwitch by countrySwitchViewModel.pending.collectAsStateWithLifecycle()
+    // Re-check on every app open/resume so the prompt reappears until the user decides.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        countrySwitchViewModel.revalidate()
+    }
+
     // Surface sign-in errors from the auth engine as toasts.
     LaunchedEffect(Unit) {
         authViewModel.messages.collect { message ->
@@ -197,6 +210,15 @@ fun NiaApp(
                         showProfileSheet = false
                     },
                     onDismiss = { showProfileSheet = false },
+                )
+            }
+
+            pendingCountrySwitch?.let { proposal ->
+                CountrySwitchConsentSheet(
+                    proposal = proposal,
+                    onApply = { countrySwitchViewModel.apply() },
+                    onKeepCurrent = { countrySwitchViewModel.keepCurrent() },
+                    onDismissForNow = { countrySwitchViewModel.dismissForNow() },
                 )
             }
         }

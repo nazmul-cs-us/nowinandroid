@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.starception.submission.prayer.model.*
+import com.starception.submission.usersettings.UserSettingsStore
 import java.time.LocalDateTime
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -15,8 +16,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 import java.time.LocalTime
@@ -59,8 +63,34 @@ import kotlinx.serialization.decodeFromString
  */
 @Singleton
 class PrayerSettingsRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val userSettingsStore: com.starception.submission.usersettings.UserSettingsStore
 ) {
+    // Background scope for per-country store writes (Room DAO is suspend).
+    private val storeScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    // A pending country-change CONSENT request. When the detected country differs from the active
+    // one we surface a proposal here instead of changing anything; the UI shows a consent bottom
+    // sheet and ONLY [applyPendingCountrySwitch] mutates settings. Null when nothing to confirm.
+    private val _pendingCountrySwitch = MutableStateFlow<CountrySwitchProposal?>(null)
+    val pendingCountrySwitch: StateFlow<CountrySwitchProposal?> = _pendingCountrySwitch.asStateFlow()
+
+    // Always-alive country-change detection (repository is an app singleton, unlike the prayer
+    // ViewModel which only exists while the prayer screen is open). Started from the load init
+    // block below, AFTER settingsFlow has been constructed — starting it during property init would
+    // race the async coroutine against settingsFlow's later initializer (NPE on a null flow).
+    private fun startCountryChangeObserver() {
+        storeScope.launch {
+            settingsFlow
+                .map { getCachedCountry()?.trim()?.uppercase().orEmpty() }
+                .distinctUntilChanged()
+                .filter { it.isNotEmpty() }
+                .collect { code ->
+                    runCatching { onCountryDetected(code) }
+                        .onFailure { Log.e(TAG, "country-change observer failed for '$code'", it) }
+                }
+        }
+    }
     companion object {
         private const val TAG = "PrayerSettingsRepository"
         
@@ -670,9 +700,13 @@ class PrayerSettingsRepository @Inject constructor(
                 Log.e(TAG, "=".repeat(70))
                 Log.e(TAG, "")
             }
+
+            // settingsFlow is now constructed and settings are loaded: safe to start the
+            // always-on per-country switch observer (no null-flow race).
+            startCountryChangeObserver()
         }
     }
-    
+
     /**
      * NEW GETTERS: Get current preferences by type with fast fallback
      */
@@ -879,6 +913,10 @@ class PrayerSettingsRepository @Inject constructor(
         _calculationSettingsFlow.tryEmit(settings)
         updateLegacyCombinedFlow()
         Log.i(TAG, "✅ Reactive flows updated - UI will receive new values")
+
+        // PER-COUNTRY STORE: persist this edit into the current country's SQLite bucket and
+        // signal the (dormant) cloud-sync layer. Non-blocking; canonical record for sync.
+        persistActiveCountryToStore(settings)
         
         // ALGORITHM STEP 3: After saving changes, immediately recalculate prayer times
         Log.i(TAG, "")
@@ -929,7 +967,41 @@ class PrayerSettingsRepository @Inject constructor(
         _notificationPreferencesFlow.tryEmit(preferences)
         updateLegacyCombinedFlow()
 
+        // Mirror notification prefs into the synced store (global, not per-country) so they back up.
+        persistNotificationPrefsToStore(preferences)
+
         Log.i(TAG, "✅ NOTIFICATION PREFERENCES UPDATE COMPLETE")
+    }
+
+    /** Persist the global notification preferences JSON into the per-user store and signal sync. */
+    private fun persistNotificationPrefsToStore(prefs: PrayerNotificationPreferences) {
+        storeScope.launch {
+            try {
+                userSettingsStore.putMeta(
+                    UserSettingsStore.KEY_NOTIFICATION_PREFS_JSON,
+                    json.encodeToString(prefs),
+                )
+                userSettingsStore.markLocalChange()
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to persist notification prefs to store", e)
+            }
+        }
+    }
+
+    /**
+     * Apply notification preferences from the per-user store onto the live SharedPreferences + flow.
+     * Called after a cloud pull/merge so restored prefs take effect. Does NOT re-signal sync.
+     */
+    suspend fun applyNotificationPrefsFromStore() {
+        val jsonStr = userSettingsStore.getMeta(UserSettingsStore.KEY_NOTIFICATION_PREFS_JSON) ?: return
+        val prefs = runCatching {
+            json.decodeFromString<PrayerNotificationPreferences>(jsonStr)
+        }.getOrNull() ?: return
+        saveNotificationPreferences(prefs)
+        _notificationPreferencesFlow.value = prefs
+        _notificationPreferencesFlow.tryEmit(prefs)
+        updateLegacyCombinedFlow()
+        Log.i(TAG, "🔔 Applied notification prefs from store (cloud restore)")
     }
 
     /**
@@ -2131,6 +2203,159 @@ class PrayerSettingsRepository @Inject constructor(
         return true
     }
     
+    // =============================================
+    // PER-COUNTRY SETTINGS STORE (SQLite, sync source)
+    // =============================================
+
+    /**
+     * A proposed prayer-settings change after detecting a new country. Surfaced to the UI as a
+     * consent bottom sheet; NOTHING changes until the user accepts via [applyPendingCountrySwitch].
+     */
+    data class CountrySwitchProposal(
+        val countryCode: String,
+        val countryName: String?,
+        val proposedMethod: String,
+        val proposedAsr: String,
+        val currentMethod: String,
+        /** true if we already hold the user's saved settings for this country (restore vs first visit). */
+        val isRestore: Boolean,
+    )
+
+    /** Persist the ACTIVE country's settings into its SQLite bucket and signal cloud sync. */
+    private fun persistActiveCountryToStore(settings: PrayerCalculationSettings) {
+        storeScope.launch {
+            try {
+                val code = userSettingsStore.lastKnownCountry()
+                    ?: getCachedCountry()?.trim()?.uppercase()
+                if (!code.isNullOrEmpty()) {
+                    userSettingsStore.save(code, settings)
+                }
+                userSettingsStore.markLocalChange()
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to persist active country to store", e)
+            }
+        }
+    }
+
+    /**
+     * Resolve a freshly detected country. We NEVER change settings here — on a real country change
+     * we publish a [CountrySwitchProposal] for the UI to confirm. The active country's settings are
+     * mutated only by [applyPendingCountrySwitch] after the user consents.
+     *
+     * - First-ever detection: silently adopt the current (already auto-detected) settings as this
+     *   country's baseline bucket — nothing to override, so no consent needed.
+     * - Same as the active country: clear any stale proposal (and the "declined" marker).
+     * - New country: publish a consent proposal EVERY time (so it re-appears on each app open) unless
+     *   the user has explicitly declined this specific country via "Keep current".
+     */
+    suspend fun onCountryDetected(countryCode: String) {
+        val code = countryCode.trim().uppercase()
+        if (code.isEmpty()) return
+
+        val active = userSettingsStore.lastKnownCountry()
+
+        // First-ever run: adopt current settings as this country's baseline (no change to confirm).
+        if (active.isNullOrEmpty()) {
+            val auto = getAutoDetectedSettingsForCountry(code)
+            userSettingsStore.save(code, getCalculationSettings(), auto?.autoDetectedCountryName)
+            userSettingsStore.setLastKnownCountry(code)
+            userSettingsStore.markLocalChange() // back up the initial bucket
+            Log.i(TAG, "🌍 STORE: seeded baseline bucket for '$code' (first run)")
+            return
+        }
+
+        if (code == active) {
+            _pendingCountrySwitch.value = null
+            // Returned to the active country — allow a fresh prompt on the next departure.
+            if (userSettingsStore.getMeta(UserSettingsStore.KEY_DECLINED_COUNTRY) != null) {
+                userSettingsStore.putMeta(UserSettingsStore.KEY_DECLINED_COUNTRY, null)
+            }
+            return
+        }
+
+        // Only an explicit "Keep current" for THIS country stops the prompt. Otherwise re-publish
+        // every time so the consent sheet reappears on each app open until the user decides.
+        if (userSettingsStore.getMeta(UserSettingsStore.KEY_DECLINED_COUNTRY) == code) return
+
+        Log.i(TAG, "🌍 STORE: country '$active' → '$code' — requesting consent")
+        val existing = userSettingsStore.getForCountry(code)
+        val auto = getAutoDetectedSettingsForCountry(code)
+        val proposed = existing ?: auto?.toCalculationSettings() ?: getCalculationSettings()
+        _pendingCountrySwitch.value = CountrySwitchProposal(
+            countryCode = code,
+            countryName = auto?.autoDetectedCountryName,
+            proposedMethod = proposed.calculationMethod.displayName,
+            proposedAsr = proposed.asrMadhhab.displayName,
+            currentMethod = getCalculationSettings().calculationMethod.displayName,
+            isRestore = existing != null,
+        )
+    }
+
+    /** Re-evaluate the current detected country (e.g. on app resume) so the prompt reappears. */
+    suspend fun revalidatePendingCountrySwitch() {
+        val detected = getCachedCountry()?.trim()?.uppercase() ?: return
+        onCountryDetected(detected)
+    }
+
+    /** User accepted the pending proposal: apply that country's settings and make it active. */
+    suspend fun applyPendingCountrySwitch() {
+        val proposal = _pendingCountrySwitch.value ?: return
+        val code = proposal.countryCode
+        val existing = userSettingsStore.getForCountry(code)
+        val auto = getAutoDetectedSettingsForCountry(code)
+        val settings = existing ?: auto?.toCalculationSettings() ?: getCalculationSettings()
+        if (existing == null) {
+            userSettingsStore.save(code, settings, auto?.autoDetectedCountryName)
+            userSettingsStore.markLocalChange()
+        }
+        applyActiveSettings(settings, code) // sets active country = code, applies + recalculates
+        userSettingsStore.putMeta(UserSettingsStore.KEY_DECLINED_COUNTRY, null) // a clean decision
+        _pendingCountrySwitch.value = null
+        Log.i(TAG, "🌍 STORE: user APPLIED settings for '$code'")
+    }
+
+    /** User chose "Keep current": a terminal decision — don't re-prompt for this country. */
+    suspend fun keepCurrentForDetectedCountry() {
+        val code = _pendingCountrySwitch.value?.countryCode
+        if (code != null) userSettingsStore.putMeta(UserSettingsStore.KEY_DECLINED_COUNTRY, code)
+        _pendingCountrySwitch.value = null
+        Log.i(TAG, "🌍 STORE: user kept current settings (declined '$code')")
+    }
+
+    /** Sheet swiped away without a choice: hide for now, re-prompt on the next app open. */
+    fun dismissProposalForNow() {
+        _pendingCountrySwitch.value = null
+    }
+
+    /** Push a country's settings into the active flows + SharedPreferences cache and recalculate. */
+    private fun applyActiveSettings(settings: PrayerCalculationSettings, countryCode: String) {
+        saveCalculationSettings(settings)
+
+        // Keep cached_prayer_settings (used by the Prayer Settings dialog) in sync, like updateCalculationSettings does.
+        getCachedPrayerSettings()?.let { cached ->
+            saveCachedPrayerSettings(
+                cached.copy(
+                    calculationMethod = settings.calculationMethod,
+                    asrMadhhab = settings.asrMadhhab,
+                    highLatitudeAdjustment = settings.highLatitudeAdjustment,
+                    customFajrAngle = settings.customFajrAngle,
+                    customIshaAngle = settings.customIshaAngle,
+                    customIshaDelay = settings.customIshaDelay,
+                    customMaghribOffset = settings.customMaghribOffset,
+                    timeOffsets = settings.timeOffsets
+                )
+            )
+        }
+
+        _calculationSettingsFlow.value = settings
+        _calculationSettingsFlow.tryEmit(settings)
+        updateLegacyCombinedFlow()
+        storeScope.launch {
+            runCatching { userSettingsStore.setLastKnownCountry(countryCode) }
+        }
+        triggerPrayerTimeRecalculation()
+    }
+
     /**
      * Trigger prayer time recalculation with detailed logging
      */

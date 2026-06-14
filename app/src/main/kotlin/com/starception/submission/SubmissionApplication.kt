@@ -53,6 +53,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
     @Inject
     lateinit var inMemorySearchService: InMemorySearchService
 
+    @Inject
+    lateinit var settingsSyncManager: com.starception.submission.usersettings.sync.SettingsSyncManager
+
     override fun onCreate() {
         Log.d("SubmissionApplication", "Application onCreate started")
         super.onCreate()
@@ -90,6 +93,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                     PrayerNotificationManager.initialize(this)
                 }
                 
+                // Start cloud settings-sync (push on change, pull on login) when signed in.
+                settingsSyncManager.start()
+
                 Log.d("SubmissionApplication", "Background initialization completed")
             } catch (e: Exception) {
                 Log.e("SubmissionApplication", "Error during background initialization", e)

@@ -118,6 +118,9 @@ class AuthManager @Inject constructor(
         emitState(null)
     }
 
+    /** Firebase UID of the signed-in user, or null when signed out / unconfigured. */
+    fun currentUid(): String? = auth?.currentUser?.uid
+
     private fun emitState(user: FirebaseUser?) {
         _uiState.value = if (user == null) {
             AuthUiState.LoggedOut

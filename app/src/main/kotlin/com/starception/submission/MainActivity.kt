@@ -166,6 +166,9 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
     @Inject
     lateinit var prayerNotificationServiceManager: com.starception.submission.prayer.service.PrayerNotificationServiceManager
 
+    @Inject
+    lateinit var prayerSettingsRepository: PrayerSettingsRepository
+
     // EMERGENCY FIX: ViewModel disabled to prevent main thread blocking
     // TODO: Re-enable after fixing performance issues
     // private var viewModel: MainActivityViewModel? = null
@@ -477,8 +480,8 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
         try {
             Log.d("MainActivity", "🌍 Starting location-based auto-detection")
             
-            // Create temporary instances to avoid dependency on disabled ViewModel
-            val settingsRepository = PrayerSettingsRepository(this)
+            // Use the Hilt singleton repository (per-country store lives here too)
+            val settingsRepository = prayerSettingsRepository
             val countryService = CountryPrayerMethodService(this)
             
             // Check if user already has manual settings (don't override)
