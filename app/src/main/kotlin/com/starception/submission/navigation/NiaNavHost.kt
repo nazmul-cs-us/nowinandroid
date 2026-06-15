@@ -245,6 +245,11 @@ fun NiaNavHost(
                     .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
                 navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
             },
+            // Show a download card under the header for content-backed topics (Quran/Bukhari)
+            // whose database isn't downloaded yet.
+            belowHeaderContent = { topicName ->
+                com.starception.submission.download.TopicMissingContentCard(topicName)
+            },
         )
         // Dua detail screen for ForYou
         duaDetailScreen(

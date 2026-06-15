@@ -79,6 +79,9 @@ fun TopicScreen(
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
+    // Optional app-provided content rendered directly under the topic header (gets the topic name).
+    // Used to surface a "download missing content" card for content-backed topics (Quran/Hadith).
+    belowHeaderContent: @Composable (topicName: String) -> Unit = {},
     viewModel: TopicViewModel = hiltViewModel(),
 ) {
     val topicUiState: TopicUiState by viewModel.topicUiState.collectAsStateWithLifecycle()
@@ -98,6 +101,7 @@ fun TopicScreen(
         onSurahClick = onSurahClick,
         onDuaClick = onDuaClick,
         onHadithClick = onHadithClick,
+        belowHeaderContent = belowHeaderContent,
     )
 }
 
@@ -116,6 +120,7 @@ internal fun TopicScreen(
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
+    belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
     val state = rememberLazyListState()
     TrackScrollJank(scrollableState = state, stateName = "topic:screen")
@@ -198,6 +203,7 @@ internal fun TopicScreen(
                         onSurahClick = onSurahClick,
                         onDuaClick = onDuaClick,
                         onHadithClick = onHadithClick,
+                        belowHeaderContent = belowHeaderContent,
                     )
                 }
             }
@@ -248,10 +254,16 @@ private fun LazyListScope.topicBody(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
     // TODO: Show icon if available
     item {
         TopicHeader(name, description, imageUrl)
+    }
+
+    // App-provided slot under the header (e.g. a download card for missing Quran/Hadith content).
+    item {
+        belowHeaderContent(name)
     }
 
     userNewsResourceCards(news, onBookmarkChanged, onNewsResourceViewed, onTopicClick, onSurahClick, onDuaClick, onHadithClick)

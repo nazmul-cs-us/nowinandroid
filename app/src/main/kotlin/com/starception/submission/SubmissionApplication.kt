@@ -56,6 +56,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
     @Inject
     lateinit var settingsSyncManager: com.starception.submission.usersettings.sync.SettingsSyncManager
 
+    @Inject
+    lateinit var contentCoordinator: com.starception.submission.download.ContentCoordinator
+
     override fun onCreate() {
         Log.d("SubmissionApplication", "Application onCreate started")
         super.onCreate()
@@ -95,6 +98,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                 
                 // Start cloud settings-sync (push on change, pull on login) when signed in.
                 settingsSyncManager.start()
+
+                // Rebuild derived content (news.db) when a content category finishes downloading.
+                contentCoordinator.start()
 
                 Log.d("SubmissionApplication", "Background initialization completed")
             } catch (e: Exception) {

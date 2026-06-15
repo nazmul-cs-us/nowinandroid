@@ -16,6 +16,7 @@
 
 package com.starception.submission.feature.topic.navigation
 
+import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
@@ -42,6 +43,7 @@ fun NavGraphBuilder.topicScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
     composable<TopicRoute> { entry ->
         val id = entry.toRoute<TopicRoute>().id
@@ -52,6 +54,7 @@ fun NavGraphBuilder.topicScreen(
             onSurahClick = onSurahClick,
             onDuaClick = { userNewsResource -> onDuaClick(userNewsResource, id) },
             onHadithClick = onHadithClick,
+            belowHeaderContent = belowHeaderContent,
             viewModel = hiltViewModel<TopicViewModel, TopicViewModel.Factory>(
                 key = id,
             ) { factory ->

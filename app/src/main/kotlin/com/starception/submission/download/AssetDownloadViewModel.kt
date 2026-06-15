@@ -65,6 +65,15 @@ class AssetDownloadViewModel @Inject constructor(
         loadManifest()
     }
 
+    /**
+     * Re-evaluate content readiness — e.g. on app resume — so a decision made in [init] while assets
+     * were still settling self-corrects to [DownloadScreenState.AllReady] once they're present.
+     * No-op while a download is in progress.
+     */
+    fun recheck() {
+        if (!isCurrentlyDownloading) loadManifest()
+    }
+
     private fun loadManifest() {
         viewModelScope.launch {
             try {

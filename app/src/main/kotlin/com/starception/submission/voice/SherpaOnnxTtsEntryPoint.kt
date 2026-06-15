@@ -18,6 +18,7 @@ package com.starception.submission.voice
 
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AudioDownloadHelper
+import com.starception.submission.download.ContentCoordinator
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
@@ -33,4 +34,5 @@ interface SherpaOnnxTtsEntryPoint {
     fun sherpaOnnxTtsService(): SherpaOnnxTtsService
     fun assetDownloadManager(): AssetDownloadManager
     fun audioDownloadHelper(): AudioDownloadHelper
+    fun contentCoordinator(): ContentCoordinator
 }

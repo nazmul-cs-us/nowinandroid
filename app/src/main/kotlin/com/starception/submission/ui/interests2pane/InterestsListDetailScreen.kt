@@ -237,6 +237,10 @@ internal fun InterestsListDetailScreen(
                                     onSurahClick = onSurahClick,
                                     onDuaClick = { userNewsResource -> onDuaClick(userNewsResource, route.id) },
                                     onHadithClick = onHadithClick,
+                                    // Offer to download missing content (Quran/Bukhari) for content-backed topics.
+                                    belowHeaderContent = { topicName ->
+                                        com.starception.submission.download.TopicMissingContentCard(topicName)
+                                    },
                                     viewModel = hiltViewModel<TopicViewModel, TopicViewModel.Factory>(
                                         key = route.id,
                                     ) { factory ->

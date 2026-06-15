@@ -10,8 +10,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.SupervisorJob
 import com.starception.submission.core.data.util.NetworkMonitor
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -64,6 +67,11 @@ class AssetDownloadManager @Inject constructor(
 
     private val _globalDownloadLabel = MutableStateFlow("")
     val globalDownloadLabel: StateFlow<String> = _globalDownloadLabel.asStateFlow()
+
+    // Emits a category key whenever its download completes successfully. Lets a coordinator rebuild
+    // derived content (e.g. news.db) without baking content-specific rules into this manager.
+    private val _categoryCompleted = MutableSharedFlow<String>(extraBufferCapacity = 16)
+    val categoryCompleted: SharedFlow<String> = _categoryCompleted.asSharedFlow()
 
     private var activeDownloadCount = 0
     private val activeDownloadLock = Any()
@@ -374,6 +382,7 @@ class AssetDownloadManager @Inject constructor(
                 onProgress?.invoke(progress, downloadedBytes, totalBytes)
             }
 
+            if (allSuccess) _categoryCompleted.tryEmit(category)
             return@withContext allSuccess
         } finally {
             endGlobalDownload()

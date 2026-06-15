@@ -34,12 +34,18 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.starception.submission.download.AssetDownloadScreen
+import com.starception.submission.download.DownloadScreenState
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -315,22 +321,33 @@ class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.Andro
                 // Update theme color bridge so View-based components can access theme colors
                 com.starception.submission.util.ThemeColorBridge.UpdateColors()
 
-                // Render the app immediately; trigger asset manifest sync in the background
-                // (bundled assets are always available, CDN refresh runs without blocking the UI).
-                LaunchedEffect(Unit) {
-                    @Suppress("UNUSED_EXPRESSION")
-                    downloadViewModel
-                }
+                // First-launch content setup: block ONLY when required content is missing
+                // (NeedsDownload). On AllReady/Loading/Error we open straight to the app, so normal
+                // launches have no delay. Once setup is done (downloaded or skipped → onReady) we
+                // never show it again this session.
+                val contentState by downloadViewModel.screenState.collectAsStateWithLifecycle()
+                var contentSetupDone by rememberSaveable { mutableStateOf(false) }
+                val showContentSetup = contentState is DownloadScreenState.NeedsDownload && !contentSetupDone
 
-                CompositionLocalProvider(
-                    LocalAnalyticsHelper provides analyticsHelper,
-                    LocalTimeZone provides currentTimeZone,
-                ) {
-                    NiaApp(
-                        appState = appState,
-                        mainViewModel = viewModel,
-                        deepLinkCourseId = deepLinkCourseId,
+                if (showContentSetup) {
+                    // Re-check on resume so a decision made in init() while assets were still
+                    // settling self-corrects to AllReady once required content is actually present.
+                    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { downloadViewModel.recheck() }
+                    AssetDownloadScreen(
+                        viewModel = downloadViewModel,
+                        onReady = { contentSetupDone = true },
                     )
+                } else {
+                    CompositionLocalProvider(
+                        LocalAnalyticsHelper provides analyticsHelper,
+                        LocalTimeZone provides currentTimeZone,
+                    ) {
+                        NiaApp(
+                            appState = appState,
+                            mainViewModel = viewModel,
+                            deepLinkCourseId = deepLinkCourseId,
+                        )
+                    }
                 }
             }
         }
