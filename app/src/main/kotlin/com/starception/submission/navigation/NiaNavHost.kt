@@ -216,6 +216,8 @@ fun NiaNavHost(
                     .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
                 navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
             },
+            // Empty For You feed → switch to the Interests tab to follow topics.
+            onBrowseTopicsClick = { appState.navigateToTopLevelDestination(INTERESTS) },
         )
         // Topic screen for ForYou
         topicScreen(

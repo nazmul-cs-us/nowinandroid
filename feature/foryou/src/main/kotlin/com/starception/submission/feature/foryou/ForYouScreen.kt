@@ -26,6 +26,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,6 +62,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,6 +77,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
@@ -111,6 +114,7 @@ fun ForYouScreen(
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onNewsResourceClick: ((UserNewsResource) -> Unit)? = null,
+    onBrowseTopicsClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ForYouViewModel = hiltViewModel(),
 ) {
@@ -131,6 +135,7 @@ fun ForYouScreen(
         onDuaClick = onDuaClick,
         onHadithClick = onHadithClick,
         onNewsResourceClick = onNewsResourceClick,
+        onBrowseTopicsClick = onBrowseTopicsClick,
         saveFollowedTopics = viewModel::dismissOnboarding,
         onNewsResourcesCheckedChanged = viewModel::updateNewsResourceSaved,
         onNewsResourceViewed = { viewModel.setNewsResourceViewed(it, true) },
@@ -150,6 +155,7 @@ internal fun ForYouScreen(
     onDuaClick: (UserNewsResource) -> Unit = { _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onNewsResourceClick: ((UserNewsResource) -> Unit)? = null,
+    onBrowseTopicsClick: () -> Unit = {},
     onDeepLinkOpened: (String) -> Unit,
     saveFollowedTopics: () -> Unit,
     onNewsResourcesCheckedChanged: (String, Boolean) -> Unit,
@@ -247,6 +253,13 @@ internal fun ForYouScreen(
                 )
             }
         }
+        // Nothing followed and no content to show → centered empty state (matches the Saved page).
+        if (!isSyncing && !isFeedLoading && !isOnboardingLoading && itemsAvailable == 0) {
+            EmptyFeedContent(
+                onBrowseTopicsClick = onBrowseTopicsClick,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
         state.DraggableScrollbar(
             modifier = Modifier
                 .fillMaxHeight()
@@ -273,6 +286,45 @@ internal fun ForYouScreen(
  * Depending on the [onboardingUiState], this might emit no items.
  *
  */
+@Composable
+private fun EmptyFeedContent(
+    onBrowseTopicsClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // Thin gradient-stroke illustration matching the Saved page's empty-state style.
+        Image(
+            painter = painterResource(id = R.drawable.feature_foryou_img_empty_feed),
+            contentDescription = null,
+            modifier = Modifier.size(110.dp),
+        )
+        Spacer(Modifier.height(32.dp))
+        Text(
+            text = "Your feed is empty",
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Follow a few topics and related content will appear here.",
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = onBrowseTopicsClick) {
+            Text("Browse topics")
+        }
+    }
+}
+
 private fun LazyStaggeredGridScope.onboarding(
     onboardingUiState: OnboardingUiState,
     onTopicCheckedChanged: (String, Boolean) -> Unit,

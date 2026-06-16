@@ -20,6 +20,8 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -177,6 +179,27 @@ fun AppTopSearchBar(
         }
     }
 
+    // Mic tap with no RECORD_AUDIO permission triggers this system request; on
+    // grant we immediately start capture using the SearchView created by the
+    // AndroidView factory (reachable via searchViewHolder from this scope).
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            searchViewHolder.value?.let { sv ->
+                startVoiceCapture(
+                    ctx = context,
+                    searchView = sv,
+                    whisper = whisperService,
+                    cloud = cloudVoiceService,
+                    onListeningChanged = { isListening = it },
+                )
+            }
+        } else {
+            Toast.makeText(context, "Microphone permission required", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -248,9 +271,12 @@ fun AppTopSearchBar(
             searchBar.textView?.typeface = appTypeface
             searchView.hint = SearchHints.hintFor()
             searchView.getEditText().typeface = appTypeface
-            searchBar.inflateMenu(R.menu.app_top_search_bar_menu)
-            searchBar.setOnMenuItemClickListener { item ->
-                if (item.itemId == R.id.action_mic) {
+            // Mic tap: capture straight away when permission is held, otherwise
+            // fire the system permission request (capture resumes in its callback).
+            val onMicTap = {
+                if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
+                    == PackageManager.PERMISSION_GRANTED
+                ) {
                     startVoiceCapture(
                         ctx = ctx,
                         searchView = searchView,
@@ -259,6 +285,14 @@ fun AppTopSearchBar(
                         onListeningChanged = { isListening = it },
                     )
                 } else {
+                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            }
+            searchBar.inflateMenu(R.menu.app_top_search_bar_menu)
+            searchBar.setOnMenuItemClickListener { item ->
+                if (item.itemId == R.id.action_mic) {
+                    onMicTap()
+                } else {
                     searchView.show()
                 }
                 true
@@ -266,13 +300,7 @@ fun AppTopSearchBar(
             searchView.inflateMenu(R.menu.app_top_search_bar_menu)
             searchView.setOnMenuItemClickListener { item ->
                 if (item.itemId == R.id.action_mic) {
-                    startVoiceCapture(
-                        ctx = ctx,
-                        searchView = searchView,
-                        whisper = whisperService,
-                        cloud = cloudVoiceService,
-                        onListeningChanged = { isListening = it },
-                    )
+                    onMicTap()
                 }
                 true
             }

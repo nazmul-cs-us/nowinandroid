@@ -72,6 +72,7 @@ fun NavGraphBuilder.forYouListDetailScreen(
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
+    onBrowseTopicsClick: () -> Unit = {},
 ) {
     composable<ForYouRoute> {
         val isLandscape = LocalConfiguration.current.orientation ==
@@ -89,6 +90,7 @@ fun NavGraphBuilder.forYouListDetailScreen(
                 onSurahClick = onSurahClick,
                 onDuaClick = onDuaClick,
                 onHadithClick = onHadithClick,
+                onBrowseTopicsClick = onBrowseTopicsClick,
             )
         }
     }
@@ -102,6 +104,7 @@ internal fun ForYouListDetailScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    onBrowseTopicsClick: () -> Unit = {},
 ) {
     val selectedNewsResource by viewModel.selectedNewsResource.collectAsStateWithLifecycle()
 
@@ -119,6 +122,7 @@ internal fun ForYouListDetailScreen(
         onSurahClick = onSurahClick,
         onDuaClick = onDuaClick,
         onHadithClick = onHadithClick,
+        onBrowseTopicsClick = onBrowseTopicsClick,
         isLandscape = isLandscape,
     )
 }
@@ -135,6 +139,7 @@ internal fun ForYouListDetailScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    onBrowseTopicsClick: () -> Unit = {},
     isLandscape: Boolean = false,
 ) {
     // In portrait mode, just show ForYouScreen without two-pane scaffold
@@ -148,6 +153,7 @@ internal fun ForYouListDetailScreen(
             },
             onHadithClick = onHadithClick,
             onNewsResourceClick = null, // Use default navigation in portrait
+            onBrowseTopicsClick = onBrowseTopicsClick,
         )
         return
     }
@@ -234,6 +240,7 @@ internal fun ForYouListDetailScreen(
                         },
                         onHadithClick = onHadithClick,
                         onNewsResourceClick = ::onNewsResourceClickShowDetailPane,
+                        onBrowseTopicsClick = onBrowseTopicsClick,
                     )
                 }
             }
