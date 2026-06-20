@@ -19,6 +19,8 @@ package com.starception.submission.feature.bookmarks
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -243,8 +245,9 @@ private fun BookmarksGrid(
 private fun EmptyState(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
-            .padding(16.dp)
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
             .testTag("bookmarks:empty"),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
