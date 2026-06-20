@@ -40,16 +40,17 @@ class RingAvatarTransformation(
             input
         }
 
-        // Supersample ~3x the actual display size, then downscale once to that size
-        // before returning. This keeps the thin ring crisp (drawn at high res with
-        // good anti-aliasing) while handing the consumer a bitmap close to its display
-        // size — so MaterialButton/Compose draw ~1:1 instead of softly rescaling a
-        // huge or tiny bitmap. Falls back to the source size when no target is known.
+        // Supersample at a power-of-two multiple of the display size, then downscale
+        // by repeated halving (a clean box filter) before returning. Halving avoids
+        // the soft, undersampled look of a 3x->1x bilinear shrink, so the thin ring
+        // stays crisp while the consumer (MaterialButton/Compose) draws ~1:1 instead
+        // of rescaling. Falls back to the source size when no target is known.
         val targetPx = outputPx ?: minOf(size.width.pxOrElse { 0 }, size.height.pxOrElse { 0 })
+        val baseTarget = if (targetPx > 0) targetPx else maxOf(square.width, MIN_RENDER_PX)
         val dim = if (targetPx > 0) {
-            (targetPx * 3).coerceIn(MIN_RENDER_PX, MAX_RENDER_PX)
+            (baseTarget * SUPERSAMPLE).coerceAtMost(MAX_RENDER_PX)
         } else {
-            maxOf(square.width, MIN_RENDER_PX)
+            baseTarget
         }
         val output = Bitmap.createBitmap(dim, dim, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
@@ -77,16 +78,32 @@ class RingAvatarTransformation(
 
         // Downscale the supersampled render to the display size for a crisp ~1:1 draw.
         return if (targetPx in 1 until dim) {
-            Bitmap.createScaledBitmap(output, targetPx, targetPx, true)
-                .also { if (it != output) output.recycle() }
+            downscaleByHalving(output, targetPx).also { if (it != output) output.recycle() }
         } else {
             output
         }
     }
 
+    // Shrink to [target] by repeatedly halving (each halving averages a clean 2x2
+    // block) before the final exact resize, which keeps edges sharp where a single
+    // large-ratio bilinear shrink would smear them.
+    private fun downscaleByHalving(src: Bitmap, target: Int): Bitmap {
+        var current = src
+        while (current.width / 2 > target) {
+            val half = current.width / 2
+            val next = Bitmap.createScaledBitmap(current, half, half, true)
+            if (current != src) current.recycle()
+            current = next
+        }
+        if (current.width == target) return current
+        return Bitmap.createScaledBitmap(current, target, target, true)
+            .also { if (current != src && current != it) current.recycle() }
+    }
+
     private companion object {
-        // Supersample bounds: render between these before downscaling to the display
-        // size, so the ring is crisp without producing a needlessly huge bitmap.
+        // Render at this power-of-two multiple of the display size, then downscale by
+        // halving, so the ring is crisp without producing a needlessly huge bitmap.
+        private const val SUPERSAMPLE = 4
         private const val MIN_RENDER_PX = 256
         private const val MAX_RENDER_PX = 1024
 
@@ -95,16 +112,16 @@ class RingAvatarTransformation(
         private const val YELLOW = 0xFFFBBC05.toInt()
         private const val RED = 0xFFEA4335.toInt()
 
-        // Each Google color holds an equal 25% quadrant with a near-instant (~0.2%)
-        // edge between them, so the ring reads as four sharp colors with no blend —
-        // matching the Google account ring. Android's SweepGradient runs clockwise
-        // from 3 o'clock, so this lands: yellow bottom-right, green bottom-left,
-        // blue top-left, red top-right.
+        // Four solid Google colors as hard-edged arcs of unequal size — matching the
+        // Google One profile ring. Each boundary duplicates the stop position so the
+        // color flips instantly (no blend). Android's SweepGradient runs clockwise
+        // from 3 o'clock, so these land: red top (~90°), blue right (~120°),
+        // green bottom (~90°), yellow left (~60°).
         val GOOGLE_RING_COLORS = intArrayOf(
-            YELLOW, YELLOW, GREEN, GREEN, BLUE, BLUE, RED, RED, YELLOW,
+            BLUE, BLUE, GREEN, GREEN, YELLOW, YELLOW, RED, RED, BLUE, BLUE,
         )
         val GOOGLE_RING_POSITIONS = floatArrayOf(
-            0f, 0.249f, 0.251f, 0.499f, 0.501f, 0.749f, 0.751f, 0.999f, 1f,
+            0f, 0.1667f, 0.1677f, 0.4167f, 0.4177f, 0.5833f, 0.5843f, 0.8333f, 0.8343f, 1f,
         )
     }
 }

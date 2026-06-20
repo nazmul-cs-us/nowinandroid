@@ -128,10 +128,18 @@ class AuthManager @Inject constructor(
             AuthUiState.LoggedIn(
                 displayName = user.displayName,
                 email = user.email,
-                avatarUrl = user.photoUrl?.toString(),
+                avatarUrl = upscaleAvatarUrl(user.photoUrl?.toString()),
             )
         }
     }
+
+    /**
+     * Google serves profile photos at a tiny `=s96-c` by default, which looks soft
+     * once the avatar (and its ring) is drawn larger. Rewrite the size token to a
+     * higher resolution so the source is crisp; leave non-Google URLs untouched.
+     */
+    private fun upscaleAvatarUrl(url: String?): String? =
+        url?.replace(Regex("=s\\d+"), "=s512")
 
     /**
      * The google-services plugin generates `default_web_client_id` only when the
