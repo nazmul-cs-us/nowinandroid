@@ -471,7 +471,10 @@ private fun NiaMainContent(
         LaunchedEffect(isRefreshing, isOnHome) {
             if (isRefreshing && !isOnHome) {
                 mainViewModel?.requestSync()
-                delay(2000L)
+                // Match PullToSyncContainer's 3s syncProgress sweep (and Home's
+                // minimum visual hold) so the horizontal progress fills the full
+                // width before the flag clears, instead of stopping mid-sweep.
+                delay(3000L)
                 mainViewModel?.setSyncing(false)
             }
         }

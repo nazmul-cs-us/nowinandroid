@@ -70,6 +70,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import coil.imageLoader
 import coil.request.ImageRequest
+import coil.size.Size as CoilSize
 import androidx.core.widget.NestedScrollView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -383,15 +384,26 @@ fun AppTopSearchBar(
             // otherwise the default profile glyph (tinted to match the theme). The URL is
             // stored as a tag so Coil only re-enqueues when the avatar actually changes.
             val density = root.resources.displayMetrics.density
+            // Leading icon stays a constant 34dp in every auth state (avatar photo
+            // when signed in, profile glyph otherwise) so the pill never shifts on
+            // login/logout. The search bar's asymmetric start/end margins (12dp/8dp
+            // in XML) offset this larger icon against the 26dp settings glyph so the
+            // gaps around the pill stay symmetric.
             if (profileAvatarUrl != null) {
                 leading.iconTint = null
                 // Larger icon so the gradient ring has room to read clearly.
                 leading.iconSize = (34f * density).toInt()
                 if (leading.getTag(R.id.leading_button) != profileAvatarUrl) {
                     leading.setTag(R.id.leading_button, profileAvatarUrl)
+                    val iconPx = (34f * density).toInt()
                     val request = ImageRequest.Builder(root.context)
                         .data(profileAvatarUrl)
-                        .transformations(RingAvatarTransformation())
+                        // Decode the source larger than the icon for a crisp photo, but
+                        // let the transform deliver the bitmap at the icon size so the
+                        // MaterialButton draws it 1:1 (no soft/pixelated rescale).
+                        .size(CoilSize(iconPx * 3, iconPx * 3))
+                        // Slightly thicker ring than the default for this small icon.
+                        .transformations(RingAvatarTransformation(ringFraction = 0.06f, outputPx = iconPx))
                         .target(
                             onSuccess = { drawable ->
                                 leading.iconTint = null
@@ -399,7 +411,7 @@ fun AppTopSearchBar(
                             },
                             onError = {
                                 leading.iconTint = ColorStateList.valueOf(titleColor)
-                                leading.iconSize = (26f * density).toInt()
+                                leading.iconSize = (34f * density).toInt()
                                 leading.icon = ContextCompat.getDrawable(
                                     root.context,
                                     R.drawable.ic_app_top_bar_profile_24,
@@ -417,7 +429,7 @@ fun AppTopSearchBar(
                         R.drawable.ic_app_top_bar_profile_24,
                     )
                 }
-                leading.iconSize = (26f * density).toInt()
+                leading.iconSize = (34f * density).toInt()
                 leading.iconTint = ColorStateList.valueOf(titleColor)
             }
             settings.iconTint = ColorStateList.valueOf(titleColor)
