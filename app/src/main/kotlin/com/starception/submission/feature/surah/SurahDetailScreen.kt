@@ -628,18 +628,11 @@ fun SurahDetailScreen(
                 playbackService?.setAudioLanguage(currentAudioLanguage)
                 isPlaying = playbackService?.isPlaying() ?: false
 
-                // Sync the visible AlbumInfoCard with what's already playing on the
-                // service so the page matches the mini-bar when opened mid-playback.
-                if (isPlaying) {
-                    val playingIndex = playbackService?.getCurrentSurahIndex() ?: -1
-                    if (playingIndex >= 0) {
-                        val playingSurahNumber = playingIndex + 1
-                        if (playingSurahNumber != currentPlayingSurahNumber) {
-                            android.util.Log.d("QuranAlbumPlayer", "🔁 SYNC_TO_AUDIO | route=$surahNumber → playing=$playingSurahNumber")
-                            currentPlayingSurahNumber = playingSurahNumber
-                        }
-                    }
-                }
+                // The page always shows the surah from the route argument. We must NOT
+                // snap it to whatever the service is currently playing — otherwise
+                // opening a different surah (e.g. from For You) while audio plays would
+                // jump to the playing surah. onSurahChanged keeps it in sync only when
+                // playback itself advances while this screen is open.
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {

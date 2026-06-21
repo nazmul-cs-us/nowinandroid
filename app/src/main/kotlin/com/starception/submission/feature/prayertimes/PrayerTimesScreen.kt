@@ -1426,6 +1426,10 @@ fun PrayerTimesScreen(
                 downloadLabel = downloadLabel,
                 mediaState = mediaState,
                 onMediaAction = onMediaAction,
+                onMediaTitleClick = {
+                    (mediaState.playback.source as? com.starception.submission.media.MediaSource.Quran)
+                        ?.let { onSurahClick(it.surahIndex + 1) }
+                },
                 prayerAlertState = prayerAlertState,
                 silentModeState = silentModeState,
                 islamicEventState = islamicEventState,

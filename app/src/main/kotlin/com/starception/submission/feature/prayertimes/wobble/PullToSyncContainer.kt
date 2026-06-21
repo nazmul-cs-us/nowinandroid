@@ -119,6 +119,7 @@ fun PullToSyncContainer(
     downloadingHoldFraction: Float = 0.50f,
     mediaState: MediaControllerUiState = MediaControllerUiState(),
     onMediaAction: (MediaAction) -> Unit = {},
+    onMediaTitleClick: () -> Unit = {},
     prayerAlertState: PrayerAlertState = PrayerAlertState(),
     silentModeState: SilentModeState = SilentModeState(),
     islamicEventState: IslamicEventState = IslamicEventState(),
@@ -456,6 +457,7 @@ fun PullToSyncContainer(
                         MediaMiniBar(
                             state = mediaState,
                             onAction = onMediaAction,
+                            onTitleClick = onMediaTitleClick,
                             titleDragModifier = Modifier.pointerInput(Unit) {
                                 var totalDrag = 0f
                                 detectVerticalDragGestures(

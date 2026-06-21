@@ -561,7 +561,10 @@ fun CompassProgressIndicator(
                     arcStartAngleDeg   = -90f,
                     arcSweepDeg        = arcProgress * 360f,
                     arcRotationDeg     = animatedCompassDegree,
-                    showArc            = arcAlpha > 0.01f,
+                    // Hidden on the globe: the heading cone already conveys direction,
+                    // so the rotating accuracy arc (red when calibrating) is dropped to
+                    // keep the globe clean. arcColor still drives the cone color.
+                    showArc            = false,
                     deviceHeadingDeg   = compassDegree,
                 )
             } else {

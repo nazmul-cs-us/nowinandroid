@@ -1,5 +1,6 @@
 package com.starception.submission.media
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,6 +44,7 @@ fun MediaMiniBar(
     onAction: (MediaAction) -> Unit,
     modifier: Modifier = Modifier,
     titleDragModifier: Modifier = Modifier,
+    onTitleClick: () -> Unit = {},
 ) {
     val haptic = LocalHapticFeedback.current
     val playback = state.playback
@@ -59,12 +61,13 @@ fun MediaMiniBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Title + Subtitle, takes remaining space.
-        // Drag-to-dismiss is bound to this area only so taps on the playback
-        // buttons below are never intercepted by the parent drag detector.
+        // Tapping the title navigates to the playing surah; drag-to-dismiss is bound
+        // to this area only so taps on the playback buttons are never intercepted.
         Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(end = 12.dp)
+                .clickable(onClick = onTitleClick)
                 .then(titleDragModifier),
         ) {
             Text(

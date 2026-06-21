@@ -100,6 +100,7 @@ import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.designsystem.theme.GradientColors
 import com.starception.submission.core.designsystem.theme.LocalGradientColors
 import com.starception.submission.navigation.NiaNavHost
+import com.starception.submission.feature.surah.navigation.navigateToSurah
 import com.starception.submission.settings.navigation.navigateToSettings
 import com.starception.submission.navigation.TopLevelDestination
 import kotlin.reflect.KClass
@@ -526,6 +527,10 @@ private fun NiaMainContent(
             downloadLabel = downloadLabel,
             mediaState = appLevelMediaState,
             onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
+            onMediaTitleClick = {
+                (appLevelMediaState.playback.source as? com.starception.submission.media.MediaSource.Quran)
+                    ?.let { appState.navController.navigateToSurah(it.surahIndex + 1) }
+            },
             prayerAlertState = appLevelPrayerAlert,
             silentModeState = appLevelSilentModeState,
             islamicEventState = appLevelIslamicEventState,

@@ -63,6 +63,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
@@ -1406,10 +1407,13 @@ private fun NextPrayerTile(
                 Box(
                     modifier = Modifier
                         .then(
+                            // Portrait: a larger globe that bleeds slightly past the row
+                            // height into the tile padding, leaving the text column
+                            // narrower (it wraps to more lines).
                             if (isLandscape) Modifier.fillMaxHeight(0.85f).aspectRatio(1f)
-                            else Modifier.fillMaxHeight().aspectRatio(1f)
+                            else Modifier.requiredSize(176.dp)
                         )
-                        .offset(x = if (isLandscape) 0.dp else (-10).dp)
+                        .offset(x = if (isLandscape) 0.dp else 6.dp)
                 ) {
                     Box(
                         modifier = modifier
@@ -1463,7 +1467,7 @@ private fun NextPrayerTile(
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontWeight = FontWeight.Medium,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
@@ -1494,7 +1498,7 @@ private fun NextPrayerTile(
                                     ),
                                     color = MaterialTheme.colorScheme.tertiary,
                                     fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
+                                    maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.padding(horizontal = 0.dp, vertical = if (isLandscape) 2.dp else 4.dp)
                                 )
