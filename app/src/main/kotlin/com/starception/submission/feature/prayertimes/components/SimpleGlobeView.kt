@@ -36,6 +36,16 @@ import gov.nasa.worldwind.shape.PlacemarkAttributes
 // formula — they must stay in sync.
 private const val GLOBE_RANGE_MULTIPLIER = 2.0
 
+// Colored dot radius at the pulse start, as a fraction of its full (end) radius.
+// Google measures ~0.75; bumped so the dot stays a bit larger at the start (gentler
+// pulse, thinner white band at the start) per preference.
+private const val DOT_PULSE_MIN = 0.85f
+
+// White ring outer radius as a multiple of the dot's full radius. The ring stays a
+// constant size while the colored dot grows into it, so the white band is thickest
+// at the pulse start and thinnest at the end — matching Google's location dot.
+private const val WHITE_RING_RATIO = 1.25f
+
 /**
  * WorldWind 3D globe for the Qibla compass.
  *
@@ -266,6 +276,32 @@ class RingOverlayView(ctx: Context) : View(ctx) {
     private val radarOval = android.graphics.RectF()
     private val radarPath = android.graphics.Path()
 
+    // Breathing scale for the user dot (Google Maps style). Oscillates between
+    // DOT_PULSE_MIN and 1.0 while the view is attached; the dot's color is left to
+    // the accuracy-driven [coneColor] — only its radius pulses.
+    private var pulseScale = 1f
+    private val pulseAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 1100L
+        repeatCount = android.animation.ValueAnimator.INFINITE
+        repeatMode = android.animation.ValueAnimator.REVERSE
+        interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+        addUpdateListener {
+            val f = it.animatedValue as Float
+            pulseScale = DOT_PULSE_MIN + (1f - DOT_PULSE_MIN) * f
+            invalidate()
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (!pulseAnimator.isStarted) pulseAnimator.start()
+    }
+
+    override fun onDetachedFromWindow() {
+        pulseAnimator.cancel()
+        super.onDetachedFromWindow()
+    }
+
     override fun onDraw(canvas: Canvas) {
         val sw     = ringStrokeWidthPx
         val radius = (minOf(width, height) / 2f) - sw / 2f - 1f
@@ -354,13 +390,14 @@ class RingOverlayView(ctx: Context) : View(ctx) {
         canvas.drawPath(radarPath, radarPaint)
         radarPaint.shader = null
 
-        // User dot: white border ring + theme-colored fill
-        val dotRadius = minOf(width, height) / 38f  // scale with view size
+        // User dot: constant white ring + theme-colored fill that pulses inside it,
+        // so the white band breathes from thick (start) to thin (end) like Google.
+        val dotRadius = minOf(width, height) / 30f  // scale with view size
         radarPaint.color = 0xFFFFFFFF.toInt()
         radarPaint.style = android.graphics.Paint.Style.FILL
-        canvas.drawCircle(userDotX, userDotY, dotRadius + 2f, radarPaint)
+        canvas.drawCircle(userDotX, userDotY, dotRadius * WHITE_RING_RATIO, radarPaint)
         radarPaint.color = cc
-        canvas.drawCircle(userDotX, userDotY, dotRadius, radarPaint)
+        canvas.drawCircle(userDotX, userDotY, dotRadius * pulseScale, radarPaint)
 
         canvas.restore()
 

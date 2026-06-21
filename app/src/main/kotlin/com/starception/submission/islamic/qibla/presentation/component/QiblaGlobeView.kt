@@ -242,23 +242,9 @@ fun QiblaGlobeView(
                 if (normalizedHeadingDiff > 3f) {
                     deviceHeading = rawHeading
                     lastUpdatedHeading = rawHeading
-
-                    // Update user marker bitmap with new heading and accuracy-based color
-                    userMarkerPlacemark?.let { placemark ->
-                        val relativeHeading = rawHeading - qiblaDirection
-                        // Calculate color based on accuracy and alignment
-                        val isAligned = kotlin.math.abs(relativeHeading) <= 5f || kotlin.math.abs(relativeHeading) >= 355f
-                        val color = when {
-                            isAligned && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF00C853.toInt()
-                            sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF10B981.toInt()
-                            sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> 0xFFFFA500.toInt()
-                            sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_LOW -> 0xFFFF6B6B.toInt()
-                            else -> 0xFFFF4444.toInt()
-                        }
-                        val newBitmap = createUserMarkerWithHeadingShadow(relativeHeading, color)
-                        placemark.attributes.imageSource = ImageSource.fromBitmap(newBitmap)
-                        worldWindowRef?.requestRedraw()
-                    }
+                    // The marker bitmap (heading + accuracy color + breathing pulse) is
+                    // regenerated continuously by the pulse loop below, which reads the
+                    // latest deviceHeading — so we only record the new heading here.
                 }
             }
 
@@ -300,6 +286,37 @@ fun QiblaGlobeView(
         onDispose {
             sensorManager.unregisterListener(orientationListener)
             sensorManager.unregisterListener(magneticFieldListener)
+        }
+    }
+
+    // Breathing pulse for the user dot (Google Maps style), matching the Smart
+    // Prediction globe. Regenerates the marker bitmap at ~20fps with a varying dot
+    // radius while the tile is in the foreground; the cone and white ring stay
+    // constant and the fill stays the accuracy-driven color — only the dot scales.
+    LaunchedEffect(isInForeground) {
+        if (!isInForeground) return@LaunchedEffect
+        val cycleMs = 2200f
+        while (true) {
+            val phase = (System.currentTimeMillis() % cycleMs.toLong()) / cycleMs
+            val dotScale = DOT_PULSE_MIN +
+                (1f - DOT_PULSE_MIN) *
+                (0.5f - 0.5f * kotlin.math.cos(2.0 * Math.PI * phase).toFloat())
+            userMarkerPlacemark?.let { placemark ->
+                val relativeHeading = deviceHeading - qiblaDirection
+                val aligned = kotlin.math.abs(relativeHeading) <= 5f ||
+                    kotlin.math.abs(relativeHeading) >= 355f
+                val color = when {
+                    aligned && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF00C853.toInt()
+                    sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF10B981.toInt()
+                    sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> 0xFFFFA500.toInt()
+                    sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_LOW -> 0xFFFF6B6B.toInt()
+                    else -> 0xFFFF4444.toInt()
+                }
+                val bmp = createUserMarkerWithHeadingShadow(relativeHeading, color, dotScale)
+                placemark.attributes.imageSource = ImageSource.fromBitmap(bmp)
+                worldWindowRef?.requestRedraw()
+            }
+            kotlinx.coroutines.delay(50)
         }
     }
 
@@ -859,6 +876,16 @@ private fun updateGlobeViewForOptimalMarkerVisibility(
     worldWindow.requestRedraw()
 }
 
+// Colored dot radius at the pulse start, as a fraction of its full (end) radius.
+// Google measures ~0.75; bumped so the dot stays a bit larger at the start (gentler
+// pulse, thinner white band at the start) per preference.
+private const val DOT_PULSE_MIN = 0.85f
+
+// White ring outer radius as a multiple of the dot's full radius. The ring stays a
+// constant size while the colored dot grows into it, so the white band is thickest
+// at the pulse start and thinnest at the end — matching Google's location dot.
+private const val WHITE_RING_RATIO = 1.25f
+
 /**
  * Create a Google Maps style user location marker with all elements:
  * 1. Small light blue accuracy circle
@@ -866,7 +893,11 @@ private fun updateGlobeViewForOptimalMarkerVisibility(
  * 3. White ring around center
  * 4. Solid blue dot (center)
  */
-private fun createUserMarkerWithHeadingShadow(heading: Float, coneColor: Int = 0xFF10B981.toInt()): Bitmap {
+private fun createUserMarkerWithHeadingShadow(
+    heading: Float,
+    coneColor: Int = 0xFF10B981.toInt(),
+    dotScale: Float = 1f,
+): Bitmap {
     val size = 400
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
@@ -919,12 +950,13 @@ private fun createUserMarkerWithHeadingShadow(heading: Float, coneColor: Int = 0
     canvas.drawPath(conePath, paint)
     paint.shader = null
 
-    // User dot: white border + teal fill - SAME as Smart Prediction
-    val dotRadius = size * 0.055f
+    // User dot: constant white ring + accuracy-colored fill that pulses inside it,
+    // so the white band breathes from thick (start) to thin (end) like Google.
+    val dotRadius = size * 0.042f
     paint.color = 0xFFFFFFFF.toInt()
-    canvas.drawCircle(centerX, centerY, dotRadius + 4f, paint)
+    canvas.drawCircle(centerX, centerY, dotRadius * WHITE_RING_RATIO, paint)
     paint.color = coneColor
-    canvas.drawCircle(centerX, centerY, dotRadius, paint)
+    canvas.drawCircle(centerX, centerY, dotRadius * dotScale, paint)
 
     return bitmap
 }

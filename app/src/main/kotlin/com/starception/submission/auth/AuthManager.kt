@@ -139,7 +139,7 @@ class AuthManager @Inject constructor(
      * higher resolution so the source is crisp; leave non-Google URLs untouched.
      */
     private fun upscaleAvatarUrl(url: String?): String? =
-        url?.replace(Regex("=s\\d+"), "=s512")
+        url?.replace(Regex("=s\\d+"), "=s1024")
 
     /**
      * The google-services plugin generates `default_web_client_id` only when the
