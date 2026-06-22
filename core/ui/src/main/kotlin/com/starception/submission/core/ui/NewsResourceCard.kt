@@ -83,7 +83,6 @@ import com.starception.submission.core.model.data.NewsResource
 import com.starception.submission.core.model.data.UserNewsResource
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toJavaZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -422,7 +421,7 @@ fun dateFormatted(publishDate: Instant): String = DateTimeFormatter
     .ofLocalizedDate(FormatStyle.MEDIUM)
     .withLocale(Locale.getDefault())
     .withZone(TimeZone.currentSystemDefault().toJavaZoneId())
-    .format(publishDate.toJavaInstant())
+    .format(java.time.Instant.ofEpochMilli(publishDate.toEpochMilliseconds()))
 
 /**
  * Formats a timestamp to relative time string (e.g., "2 minutes ago", "3 days ago")

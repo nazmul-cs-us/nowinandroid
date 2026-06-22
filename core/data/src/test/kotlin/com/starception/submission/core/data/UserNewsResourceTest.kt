@@ -23,7 +23,7 @@ import com.starception.submission.core.model.data.ThemeBrand.DEFAULT
 import com.starception.submission.core.model.data.Topic
 import com.starception.submission.core.model.data.UserData
 import com.starception.submission.core.model.data.UserNewsResource
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

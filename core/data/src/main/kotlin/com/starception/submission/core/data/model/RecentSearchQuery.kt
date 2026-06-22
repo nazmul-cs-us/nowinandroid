@@ -17,7 +17,7 @@
 package com.starception.submission.core.data.model
 
 import com.starception.submission.core.database.model.RecentSearchQueryEntity
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.Instant
 
 data class RecentSearchQuery(

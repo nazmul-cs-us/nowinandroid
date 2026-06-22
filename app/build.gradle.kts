@@ -185,8 +185,15 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
 
-    // NASA WorldWind for 3D globe visualization via JitPack
-    implementation("com.github.NASAWorldWind:WorldWindAndroid:v0.8.0")
+    // WorldWind Kotlin (maintained successor to the archived NASA Java SDK), on
+    // Maven Central. v2 API lives under earth.worldwind.* and includes the
+    // atmosphere/day-night layer that the old gov.nasa.worldwind v0.8.0 lacked.
+    // Some transitive deps (mil-sym, geopackage) set allowBackup=false; we override
+    // that with tools:replace in the manifest rather than excluding them.
+    // Pinned to 1.9.0 (built with Kotlin 2.2.20) — the newest WWK whose metadata our
+    // Kotlin 2.2.21 compiler can read. 1.10.0+ require Kotlin 2.3+/2.4 (whole-project
+    // toolchain bump). 1.9.0 still ships the atmosphere/day-night layer.
+    implementation("earth.worldwind:worldwind:1.9.0")
 
     // AndroidLiquidGlass library for glassmorphism effects
     implementation("io.github.kyant0:backdrop:1.0.0")

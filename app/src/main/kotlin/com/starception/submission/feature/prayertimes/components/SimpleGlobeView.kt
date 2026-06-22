@@ -17,17 +17,16 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import gov.nasa.worldwind.BasicWorldWindowController
-import gov.nasa.worldwind.WorldWind
-import gov.nasa.worldwind.WorldWindow
-import gov.nasa.worldwind.geom.LookAt
-import gov.nasa.worldwind.geom.Position
-import gov.nasa.worldwind.layer.BackgroundLayer
-import gov.nasa.worldwind.layer.BlueMarbleLandsatLayer
-import gov.nasa.worldwind.layer.RenderableLayer
-import gov.nasa.worldwind.render.ImageSource
-import gov.nasa.worldwind.shape.Placemark
-import gov.nasa.worldwind.shape.PlacemarkAttributes
+import earth.worldwind.WorldWindow
+import earth.worldwind.geom.AltitudeMode
+import earth.worldwind.geom.Angle.Companion.degrees
+import earth.worldwind.geom.LookAt
+import earth.worldwind.geom.Position
+import earth.worldwind.layer.BackgroundLayer
+import earth.worldwind.layer.BlueMarbleLandsatLayer
+import earth.worldwind.layer.RenderableLayer
+import earth.worldwind.render.image.ImageSource
+import earth.worldwind.shape.Placemark
 
 // Camera distance from the midpoint of (user, Kaaba), expressed as a multiplier of
 // Earth's equatorial radius. Smaller → camera close, Earth overfills the clip circle
@@ -97,7 +96,7 @@ fun SimpleGlobeView(
     val cameraHeadingDeg = remember(userLatitude, userLongitude) {
         val userPos = Position.fromDegrees(userLatitude, userLongitude, 0.0)
         val kaabaPos = Position.fromDegrees(makkahLatitude, makkahLongitude, 0.0)
-        userPos.greatCircleAzimuth(kaabaPos).toFloat()
+        userPos.greatCircleAzimuth(kaabaPos).inDegrees.toFloat()
     }
 
     // Push updated arc params into the overlay on recomposition
@@ -136,13 +135,13 @@ fun SimpleGlobeView(
                     val lp    = ViewGroup.LayoutParams(sidePx, sidePx)
 
                     // ── WorldWindow (GLSurfaceView) ────────────────────────
+                    // Uses the default controller. Layers/camera live on ww.engine in WWK.
                     val ww = WorldWindow(ctx)
-                    ww.worldWindowController = BasicWorldWindowController()
-                    ww.layers.addLayer(BackgroundLayer())
-                    ww.layers.addLayer(BlueMarbleLandsatLayer())
+                    ww.engine.layers.addLayer(BackgroundLayer())
+                    ww.engine.layers.addLayer(BlueMarbleLandsatLayer())
 
                     val markersLayer = RenderableLayer("Markers")
-                    ww.layers.addLayer(markersLayer)
+                    ww.engine.layers.addLayer(markersLayer)
 
                     val userPos  = Position.fromDegrees(userLatitude,  userLongitude,  0.0)
                     val kaabaPos = Position.fromDegrees(makkahLatitude, makkahLongitude, 0.0)
@@ -150,10 +149,13 @@ fun SimpleGlobeView(
                     // User dot is drawn in the overlay (RingOverlayView) for exact
                     // alignment with the radar direction cone.
                     markersLayer.addRenderable(
-                        Placemark(kaabaPos, PlacemarkAttributes().apply {
-                            imageSource = ImageSource.fromBitmap(emojiToBitmap("🕋", 48))
-                            imageScale  = 0.38
-                        }).apply { altitudeMode = WorldWind.ABSOLUTE }
+                        Placemark.createWithImage(
+                            kaabaPos,
+                            ImageSource.fromBitmap(emojiToBitmap("🕋", 48)),
+                        ).apply {
+                            attributes.imageScale = 0.38
+                            altitudeMode = AltitudeMode.ABSOLUTE
+                        }
                     )
 
                     // Inset the globe by the ring stroke width so the ring sits outside the globe
@@ -194,13 +196,15 @@ fun SimpleGlobeView(
 
                     // ── Camera on GL thread (no ANR) ───────────────────────
                     ww.queueEvent {
-                        val globe   = ww.globe
-                        val heading = userPos.greatCircleAzimuth(kaabaPos)
+                        val heading = userPos.greatCircleAzimuth(kaabaPos) // Angle
                         val midLat  = (userLatitude  + makkahLatitude)  / 2.0
                         val midLon  = (userLongitude + makkahLongitude) / 2.0
-                        val range   = globe.equatorialRadius * GLOBE_RANGE_MULTIPLIER
-                        ww.navigator.setAsLookAt(globe, LookAt().apply {
-                            set(midLat, midLon, 0.0, WorldWind.ABSOLUTE, range, heading, 0.0, 0.0)
+                        val range   = ww.engine.globe.equatorialRadius * GLOBE_RANGE_MULTIPLIER
+                        ww.engine.cameraFromLookAt(LookAt().apply {
+                            set(
+                                midLat.degrees, midLon.degrees, 0.0, AltitudeMode.ABSOLUTE,
+                                range, heading, 0.0.degrees, 0.0.degrees,
+                            )
                         })
                         ww.requestRedraw()
                     }

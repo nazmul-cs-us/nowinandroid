@@ -65,51 +65,21 @@ import android.graphics.drawable.Drawable
 import android.view.MotionEvent
 import com.starception.submission.R
 import com.starception.submission.feature.prayertimes.utils.calculateQiblaDirection
-import gov.nasa.worldwind.BasicWorldWindowController
-import gov.nasa.worldwind.WorldWind
-import gov.nasa.worldwind.WorldWindow
-import gov.nasa.worldwind.geom.LookAt
-import gov.nasa.worldwind.geom.Position
-import gov.nasa.worldwind.gesture.GestureRecognizer
-import gov.nasa.worldwind.layer.BackgroundLayer
-import gov.nasa.worldwind.layer.BlueMarbleLayer
-import gov.nasa.worldwind.layer.BlueMarbleLandsatLayer
-import gov.nasa.worldwind.layer.RenderableLayer
-import gov.nasa.worldwind.render.Color as WwColor
-import gov.nasa.worldwind.render.ImageSource
-import gov.nasa.worldwind.shape.Path
-import gov.nasa.worldwind.shape.Placemark
-import gov.nasa.worldwind.shape.PlacemarkAttributes
-import gov.nasa.worldwind.shape.Polygon
-import gov.nasa.worldwind.shape.ShapeAttributes
+import earth.worldwind.WorldWindow
+import earth.worldwind.geom.AltitudeMode
+import earth.worldwind.geom.Angle.Companion.degrees
+import earth.worldwind.geom.LookAt
+import earth.worldwind.geom.Position
+import earth.worldwind.layer.BackgroundLayer
+import earth.worldwind.layer.BlueMarbleLandsatLayer
+import earth.worldwind.layer.RenderableLayer
+import earth.worldwind.layer.atmosphere.AtmosphereLayer
+import earth.worldwind.render.image.ImageSource
+import earth.worldwind.shape.Placemark
+import earth.worldwind.shape.Polygon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-/**
- * Custom controller that tracks user touch interaction
- * Always returns true to claim the touch sequence and prevent Compose from cancelling it
- */
-private class TouchTrackingController(
-    private val onTouchStart: () -> Unit,
-    private val onTouchEnd: () -> Unit
-) : BasicWorldWindowController() {
-
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                onTouchStart()
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                onTouchEnd()
-            }
-        }
-        // Let WorldWindow handle the gesture
-        super.onTouchEvent(event)
-        // Always return true to claim touch events
-        return true
-    }
-}
 
 /**
  * Qibla Globe View - 3D globe showing direction from user location to Makkah
@@ -317,6 +287,23 @@ fun QiblaGlobeView(
                 worldWindowRef?.requestRedraw()
             }
             kotlinx.coroutines.delay(50)
+        }
+    }
+
+    // Day/night terminator: refresh the AtmosphereLayer time to "now" each minute so the
+    // lit/dark hemispheres track the real time of day while the tile is in the foreground.
+    LaunchedEffect(isInForeground) {
+        if (!isInForeground) return@LaunchedEffect
+        while (true) {
+            worldWindowRef?.let { ww ->
+                for (layer in ww.engine.layers) {
+                    if (layer is AtmosphereLayer) {
+                        layer.time = nowInstant()
+                        ww.requestRedraw()
+                    }
+                }
+            }
+            kotlinx.coroutines.delay(60_000L)
         }
     }
 
@@ -702,20 +689,25 @@ private fun createWorldWindow(
     )
     android.util.Log.d("QiblaGlobeView", "🌍 WorldWindow created with explicit size: ${viewWidth}x${viewHeight}")
 
-    // Use basic controller but touch events are not forwarded (see setOnTouchListener above)
-    // This allows the globe to render without crashing, but swiping works for HorizontalPager
-    worldWindow.worldWindowController = BasicWorldWindowController()
+    // Uses the WorldWindow's default controller; touch is disabled via setOnTouchListener
+    // so HorizontalPager swiping works. Layers/camera live on worldWindow.engine in WWK.
 
     // Add base layers for Earth imagery (CRITICAL - without these, globe is black!)
-    worldWindow.layers.addLayer(BackgroundLayer())
+    worldWindow.engine.layers.addLayer(BackgroundLayer())
 
     // Use BlueMarbleLandsatLayer for better texture stability
     // Note: This may have slightly less uniform ocean color but renders more consistently
-    worldWindow.layers.addLayer(BlueMarbleLandsatLayer())
+    worldWindow.engine.layers.addLayer(BlueMarbleLandsatLayer())
+
+    // Day/night cycle: darkens the night side (with a city-lights texture) and draws the
+    // real terminator from the sun position at `time`. Added above the imagery but below
+    // the markers so the dot/Kaaba/cone stay lit. Time is refreshed on a timer in the
+    // composable so the terminator tracks the real time of day.
+    worldWindow.engine.layers.addLayer(AtmosphereLayer().apply { time = nowInstant() })
 
     // Add renderable layer for path and markers
     val qiblaLayer = RenderableLayer("Qibla Layer")
-    worldWindow.layers.addLayer(qiblaLayer)
+    worldWindow.engine.layers.addLayer(qiblaLayer)
 
     // Create Position objects with elevation for better visibility
     val userPos = Position.fromDegrees(userLat, userLon, 200000.0)  // 200km elevation
@@ -729,12 +721,11 @@ private fun createWorldWindow(
     val kaabaBitmap = emojiToBitmap("🕋", sizeDp = 48)
 
     // 1. Add User Location Placemark with heading shadow marker
-    val userAttributes = PlacemarkAttributes().apply {
-        imageSource = ImageSource.fromBitmap(userMarkerBitmap)
-        imageScale = 1.0
-    }
-    val userPlacemark = Placemark(userPos, userAttributes).apply {
-        altitudeMode = WorldWind.ABSOLUTE
+    val userPlacemark = Placemark.createWithImage(
+        userPos, ImageSource.fromBitmap(userMarkerBitmap),
+    ).apply {
+        attributes.imageScale = 1.0
+        altitudeMode = AltitudeMode.ABSOLUTE
     }
     qiblaLayer.addRenderable(userPlacemark)
 
@@ -743,17 +734,16 @@ private fun createWorldWindow(
     val headingCone: Polygon? = null  // Not used - heading shown via rotated marker
 
     // 3. Add Kaaba Placemark with emoji icon
-    val kaabaAttributes = PlacemarkAttributes().apply {
-        imageSource = ImageSource.fromBitmap(kaabaBitmap)
-        imageScale = 0.4  // Original size
-    }
-    val kaabaPlacemark = Placemark(kaabaPos, kaabaAttributes).apply {
-        altitudeMode = WorldWind.ABSOLUTE
+    val kaabaPlacemark = Placemark.createWithImage(
+        kaabaPos, ImageSource.fromBitmap(kaabaBitmap),
+    ).apply {
+        attributes.imageScale = 0.4  // Original size
+        altitudeMode = AltitudeMode.ABSOLUTE
     }
     qiblaLayer.addRenderable(kaabaPlacemark)
 
     // Setup camera view to show BOTH user location AND Kaaba - ZOOMED IN
-    val globe = worldWindow.globe
+    val globe = worldWindow.engine.globe
 
     // Calculate great circle heading and distance
     val heading = userPos.greatCircleAzimuth(kaabaPos)
@@ -781,18 +771,18 @@ private fun createWorldWindow(
 
     val lookAt = LookAt().apply {
         set(
-            midLat, midLon, 0.0,  // Center on midpoint between user and Kaaba
-            WorldWind.ABSOLUTE,
+            midLat.degrees, midLon.degrees, 0.0,  // Center on midpoint between user and Kaaba
+            AltitudeMode.ABSOLUTE,
             finalRange,           // Closer range - globe fills tile
-            heading,              // Orient view along Qibla direction
-            tilt,                 // 3D perspective
-            0.0                   // No roll
+            heading,              // Orient view along Qibla direction (Angle)
+            tilt.degrees,         // 3D perspective
+            0.0.degrees,          // No roll
         )
     }
 
-    android.util.Log.d("QiblaGlobeView", "🎯 Camera: midpoint=($midLat, $midLon), range=${(finalRange/1000).toInt()}km, heading=$heading°")
+    android.util.Log.d("QiblaGlobeView", "🎯 Camera: midpoint=($midLat, $midLon), range=${(finalRange/1000).toInt()}km, heading=$heading")
 
-    worldWindow.navigator.setAsLookAt(globe, lookAt)
+    worldWindow.engine.cameraFromLookAt(lookAt)
 
     return Triple(worldWindow, qiblaLayer, userPlacemark)
 }
@@ -808,12 +798,12 @@ private fun resetCameraToShowBoth(
     makkahLat: Double,
     makkahLon: Double
 ) {
-    val globe = worldWindow.globe
+    val globe = worldWindow.engine.globe
     val userPos = Position.fromDegrees(userLat, userLon, 0.0)
     val kaabaPos = Position.fromDegrees(makkahLat, makkahLon, 0.0)
 
     // Calculate heading and distance
-    val heading = userPos.greatCircleAzimuth(kaabaPos)
+    val heading = userPos.greatCircleAzimuth(kaabaPos) // Angle
     val distanceRadians = userPos.greatCircleDistance(kaabaPos)
     val distanceMeters = distanceRadians * globe.equatorialRadius
     val earthRadius = globe.equatorialRadius
@@ -830,16 +820,16 @@ private fun resetCameraToShowBoth(
 
     val lookAt = LookAt().apply {
         set(
-            midLat, midLon, 0.0,
-            WorldWind.ABSOLUTE,
+            midLat.degrees, midLon.degrees, 0.0,
+            AltitudeMode.ABSOLUTE,
             finalRange,
             heading,
-            50.0,  // tilt
-            0.0    // roll
+            50.0.degrees,  // tilt
+            0.0.degrees,   // roll
         )
     }
 
-    worldWindow.navigator.setAsLookAt(globe, lookAt)
+    worldWindow.engine.cameraFromLookAt(lookAt)
     worldWindow.requestRedraw()
 
     android.util.Log.d("QiblaGlobeView", "📍 Camera reset to show user ($userLat, $userLon) and Kaaba")
@@ -857,11 +847,8 @@ private fun updateGlobeViewForOptimalMarkerVisibility(
     makkahLat: Double,
     makkahLon: Double
 ) {
-    val globe = worldWindow.globe
-
-    // Get current LookAt position
-    val lookAt = LookAt()
-    worldWindow.navigator.getAsLookAt(globe, lookAt)
+    // Get current camera as a LookAt
+    val lookAt = worldWindow.engine.cameraAsLookAt(LookAt())
 
     // Keep the camera centered on midpoint between user and Kaaba
     // Only update the heading to rotate the view smoothly
@@ -869,12 +856,17 @@ private fun updateGlobeViewForOptimalMarkerVisibility(
 
     // Subtle rotation based on device heading (reduced by 50% for stability)
     val adjustedHeading = (deviceHeading * 0.5) % 360.0
-    lookAt.heading = adjustedHeading.toDouble()
+    lookAt.heading = adjustedHeading.degrees
 
     // Apply updated camera
-    worldWindow.navigator.setAsLookAt(globe, lookAt)
+    worldWindow.engine.cameraFromLookAt(lookAt)
     worldWindow.requestRedraw()
 }
+
+// Current instant, used as the AtmosphereLayer time so the day/night terminator
+// matches the real time of day.
+private fun nowInstant(): kotlin.time.Instant =
+    kotlin.time.Instant.fromEpochMilliseconds(System.currentTimeMillis())
 
 // Colored dot radius at the pulse start, as a fraction of its full (end) radius.
 // Google measures ~0.75; bumped so the dot stays a bit larger at the start (gentler
