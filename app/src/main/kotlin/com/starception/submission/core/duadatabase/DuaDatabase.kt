@@ -30,7 +30,7 @@ import java.io.FileOutputStream
         DuaFootnoteEntity::class,
         HadithReferenceEntity::class
     ],
-    version = 5,
+    version = 10,
     exportSchema = false
 )
 abstract class DuaDatabase : RoomDatabase() {
@@ -38,7 +38,7 @@ abstract class DuaDatabase : RoomDatabase() {
     abstract fun duaDao(): DuaDao
 
     companion object {
-        private const val DATABASE_NAME = "fortress_of_the_muslim.db"
+        private const val DATABASE_NAME = "fortress_of_the_muslim_v2.db"
         private const val TAG = "DuaDatabase"
 
         @Volatile
@@ -174,7 +174,9 @@ abstract class DuaDatabase : RoomDatabase() {
                     while (chaptersCursor.moveToNext()) {
                         chapters.add(DuaChapterEntity(
                             id = chaptersCursor.getInt(chaptersCursor.getColumnIndexOrThrow("id")),
-                            title = chaptersCursor.getString(chaptersCursor.getColumnIndexOrThrow("title"))
+                            title = chaptersCursor.getString(chaptersCursor.getColumnIndexOrThrow("title")),
+                            audioUrl = chaptersCursor.getColumnIndex("audio_url")
+                                .takeIf { it >= 0 }?.let { chaptersCursor.getString(it) }
                         ))
                     }
                     chaptersCursor.close()

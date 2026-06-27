@@ -45,6 +45,12 @@ interface DuaDao {
     suspend fun getChapterById(chapterId: Int): DuaChapterEntity?
 
     /**
+     * Chapter recitation audio URL, looked up by chapter title.
+     */
+    @Query("SELECT audio_url FROM chapters WHERE title = :title LIMIT 1")
+    suspend fun getChapterAudioByTitle(title: String): String?
+
+    /**
      * Get all chapters with dua count
      */
     @Query("""

@@ -35,6 +35,22 @@ import earth.worldwind.shape.Placemark
 // formula — they must stay in sync.
 private const val GLOBE_RANGE_MULTIPLIER = 2.0
 
+// Great-circle midpoint (degrees) between two lat/lon points. Correct for any pair —
+// including far-apart points and across the antimeridian — unlike a lat/lon average,
+// so the camera centers on the true mid-arc and both markers stay framed worldwide.
+private fun greatCircleMidpoint(lat1: Double, lon1: Double, lat2: Double, lon2: Double): DoubleArray {
+    val p1 = Math.toRadians(lat1); val l1 = Math.toRadians(lon1)
+    val p2 = Math.toRadians(lat2); val dl = Math.toRadians(lon2 - lon1)
+    val bx = Math.cos(p2) * Math.cos(dl)
+    val by = Math.cos(p2) * Math.sin(dl)
+    val midLat = Math.atan2(
+        Math.sin(p1) + Math.sin(p2),
+        Math.sqrt((Math.cos(p1) + bx) * (Math.cos(p1) + bx) + by * by),
+    )
+    val midLon = l1 + Math.atan2(by, Math.cos(p1) + bx)
+    return doubleArrayOf(Math.toDegrees(midLat), Math.toDegrees(midLon))
+}
+
 // Colored dot radius at the pulse start, as a fraction of its full (end) radius.
 // Google measures ~0.75; bumped so the dot stays a bit larger at the start (gentler
 // pulse, thinner white band at the start) per preference.
@@ -89,14 +105,15 @@ fun SimpleGlobeView(
     // Stable reference to the overlay so we can push arc updates without recreating views
     val overlayRef = remember { mutableStateOf<RingOverlayView?>(null) }
 
-    // Pre-compute the camera heading (user→Kaaba azimuth) so the overlay knows
-    // where the user dot sits relative to center.
-    // The camera looks at the midpoint with this heading, so the user dot
-    // is offset downward (opposite of heading) from center on screen.
+    // Pre-compute the camera heading: the bearing from the great-circle MIDPOINT toward
+    // the Kaaba. The camera looks at the midpoint with this heading, so the Kaaba lands at
+    // the top and the user dot straight below center. Using the bearing at the midpoint
+    // (not at the user) keeps them vertically aligned for any location worldwide.
     val cameraHeadingDeg = remember(userLatitude, userLongitude) {
-        val userPos = Position.fromDegrees(userLatitude, userLongitude, 0.0)
+        val mid = greatCircleMidpoint(userLatitude, userLongitude, makkahLatitude, makkahLongitude)
+        val midPos = Position.fromDegrees(mid[0], mid[1], 0.0)
         val kaabaPos = Position.fromDegrees(makkahLatitude, makkahLongitude, 0.0)
-        userPos.greatCircleAzimuth(kaabaPos).inDegrees.toFloat()
+        midPos.greatCircleAzimuth(kaabaPos).inDegrees.toFloat()
     }
 
     // Push updated arc params into the overlay on recomposition
@@ -196,9 +213,11 @@ fun SimpleGlobeView(
 
                     // ── Camera on GL thread (no ANR) ───────────────────────
                     ww.queueEvent {
-                        val heading = userPos.greatCircleAzimuth(kaabaPos) // Angle
-                        val midLat  = (userLatitude  + makkahLatitude)  / 2.0
-                        val midLon  = (userLongitude + makkahLongitude) / 2.0
+                        val mid     = greatCircleMidpoint(userLatitude, userLongitude, makkahLatitude, makkahLongitude)
+                        val midLat  = mid[0]
+                        val midLon  = mid[1]
+                        // Heading from the midpoint toward the Kaaba → Kaaba on top, user below.
+                        val heading = Position.fromDegrees(midLat, midLon, 0.0).greatCircleAzimuth(kaabaPos)
                         val range   = ww.engine.globe.equatorialRadius * GLOBE_RANGE_MULTIPLIER
                         ww.engine.cameraFromLookAt(LookAt().apply {
                             set(

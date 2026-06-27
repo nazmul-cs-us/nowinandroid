@@ -39,7 +39,10 @@ data class DuaChapterEntity(
     val id: Int,
 
     @ColumnInfo(name = "title")
-    val title: String
+    val title: String,
+
+    @ColumnInfo(name = "audio_url")
+    val audioUrl: String? = null
 )
 
 /**

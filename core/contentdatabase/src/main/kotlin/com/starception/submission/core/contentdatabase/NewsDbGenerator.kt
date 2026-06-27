@@ -745,15 +745,18 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                 Log.d(TAG, "Generated $quranicDuaCount Quranic Duas")
             }
 
-            // Generate Fortress Duas
-            val fortressDbPath = getAssetDbPath(context, "fortress_of_the_muslim.db")
+            // Generate Fortress Duas from the v2 database (clean text + references in
+            // the hadith_references table instead of the `note` field).
+            val fortressDbPath = getAssetDbPath(context, "fortress_of_the_muslim_v2.db")
             if (fortressDbPath != null) {
                 val fortressDb = SQLiteDatabase.openDatabase(fortressDbPath, null, SQLiteDatabase.OPEN_READONLY)
                 var newsId = 1001
                 try {
                     val cursor = fortressDb.rawQuery(
                         """SELECT c.id, c.title, i.id, i.position, i.arabic, i.transliteration,
-                           i.translation, i.context, i.instruction, i.note, i.post_context
+                           i.translation, i.context, i.instruction, i.note, i.post_context,
+                           (SELECT h.reference_str FROM hadith_references h
+                              WHERE h.invocation_id = i.id LIMIT 1) AS reference
                            FROM chapters c
                            JOIN invocations i ON c.id = i.chapter_id
                            ORDER BY c.id, i.position""",
@@ -770,6 +773,7 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                         val instruction = cursor.getString(8)
                         val note = cursor.getString(9)
                         val postContext = cursor.getString(10)
+                        val reference = cursor.getString(11)
 
                         val contentParts = mutableListOf<String>()
                         if (!contextText.isNullOrBlank()) contentParts.add("**Context:**\n$contextText")
@@ -778,6 +782,7 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                         if (!translation.isNullOrBlank()) contentParts.add("**Translation:**\n$translation")
                         if (!instruction.isNullOrBlank()) contentParts.add("**Instruction:**\n$instruction")
                         if (!note.isNullOrBlank()) contentParts.add("**Note:**\n$note")
+                        if (!reference.isNullOrBlank()) contentParts.add("**Reference:**\n$reference")
                         if (!postContext.isNullOrBlank()) contentParts.add("**Additional Context:**\n$postContext")
 
                         val content = contentParts.joinToString("\n\n")

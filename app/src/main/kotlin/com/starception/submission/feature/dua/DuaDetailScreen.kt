@@ -69,6 +69,9 @@ import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.filled.TextFormat
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.TextDecrease
@@ -891,6 +894,19 @@ fun DuaDetailScreen(
     val showTajweed by viewModel.showTajweed.collectAsState()
     val arabicFontFamily = getArabicFontFamilyForDua(selectedFont)
     val scope = rememberCoroutineScope()
+
+    // Chapter recitation audio (streamed, one chapter at a time). The route title is
+    // "{Chapter}: Dua N", so the chapter title is everything before the first colon.
+    val chapterAudio = rememberChapterAudioPlayer()
+    var chapterAudioUrl by remember(title) { mutableStateOf<String?>(null) }
+    LaunchedEffect(title) {
+        val chTitle = title.substringBefore(":").trim()
+        chapterAudioUrl = withContext(Dispatchers.IO) {
+            runCatching {
+                DuaDatabase.getInstance(context).duaDao().getChapterAudioByTitle(chTitle)
+            }.getOrNull()
+        }
+    }
 
     // Landscape detection
     val configuration = LocalConfiguration.current
@@ -2476,6 +2492,24 @@ fun DuaDetailScreen(
                             }
                             Spacer(modifier = Modifier.width(4.dp))
                         }
+                        // Chapter recitation play/pause (streamed) when audio is available.
+                        chapterAudioUrl?.let { audioUrl ->
+                            IconButton(onClick = { chapterAudio.toggle(audioUrl) }) {
+                                if (chapterAudio.isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = toolbarContentColor
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (chapterAudio.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        contentDescription = if (chapterAudio.isPlaying) "Pause recitation" else "Play chapter recitation",
+                                        tint = toolbarContentColor
+                                    )
+                                }
+                            }
+                        }
                         // Tajweed, Bookmark, MoreVert always in the right group
                         IconButton(onClick = { viewModel.toggleTajweed() }) {
                             Icon(
@@ -3572,4 +3606,59 @@ private fun DuaBottomToolbarItem(
             )
         }
     }
+}
+
+/**
+ * Lightweight streaming player for a chapter's recitation audio. Streams the URL via
+ * MediaPlayer (no caching); only one chapter plays at a time. Created via remember and
+ * released when the screen leaves composition.
+ */
+private class ChapterAudioPlayer {
+    var isPlaying by mutableStateOf(false)
+        private set
+    var isLoading by mutableStateOf(false)
+        private set
+    private var mp: android.media.MediaPlayer? = null
+    private var url: String? = null
+
+    fun toggle(audioUrl: String) {
+        val player = mp
+        if (url == audioUrl && player != null) {
+            if (player.isPlaying) { player.pause(); isPlaying = false }
+            else { player.start(); isPlaying = true }
+            return
+        }
+        release()
+        url = audioUrl
+        isLoading = true
+        val newPlayer = android.media.MediaPlayer()
+        newPlayer.setAudioAttributes(
+            android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+        )
+        newPlayer.setOnPreparedListener { isLoading = false; newPlayer.start(); isPlaying = true }
+        newPlayer.setOnCompletionListener { isPlaying = false }
+        newPlayer.setOnErrorListener { _, _, _ -> isLoading = false; isPlaying = false; url = null; true }
+        mp = newPlayer
+        try {
+            newPlayer.setDataSource(audioUrl)
+            newPlayer.prepareAsync()
+        } catch (_: Exception) {
+            isLoading = false; isPlaying = false; url = null
+        }
+    }
+
+    fun release() {
+        mp?.let { runCatching { it.stop() }; it.release() }
+        mp = null; isPlaying = false; isLoading = false; url = null
+    }
+}
+
+@Composable
+private fun rememberChapterAudioPlayer(): ChapterAudioPlayer {
+    val player = remember { ChapterAudioPlayer() }
+    DisposableEffect(Unit) { onDispose { player.release() } }
+    return player
 }

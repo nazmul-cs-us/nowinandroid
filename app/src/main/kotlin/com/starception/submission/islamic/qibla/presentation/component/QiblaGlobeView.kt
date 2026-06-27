@@ -99,7 +99,8 @@ fun QiblaGlobeView(
     userLatitude: Double,
     userLongitude: Double,
     modifier: Modifier = Modifier,
-    showControls: Boolean = true  // Set to false to hide overlay buttons and info cards
+    showControls: Boolean = true,  // Set to false to hide overlay buttons and info cards
+    isActiveTile: Boolean = true,  // When this becomes true, plays a one-time day/night sweep
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -290,19 +291,39 @@ fun QiblaGlobeView(
         }
     }
 
-    // Day/night terminator: refresh the AtmosphereLayer time to "now" each minute so the
-    // lit/dark hemispheres track the real time of day while the tile is in the foreground.
-    LaunchedEffect(isInForeground) {
-        if (!isInForeground) return@LaunchedEffect
+    // When the user lands on the Kaaba tile, play a one-time ~4s day/night sweep — the
+    // terminator rolls a full 24h loop and lands back on the real current time — then keep
+    // the terminator tracking real time each minute. Re-runs whenever the tile re-activates.
+    LaunchedEffect(isActiveTile, isInForeground) {
+        if (!isActiveTile || !isInForeground) return@LaunchedEffect
+
+        fun atmosphere(): AtmosphereLayer? =
+            worldWindowRef?.engine?.layers?.firstOrNull { it is AtmosphereLayer } as? AtmosphereLayer
+        // Wait for the globe + its AtmosphereLayer to be created.
+        while (atmosphere() == null) kotlinx.coroutines.delay(50)
+
+        fun setTime(instant: kotlin.time.Instant) {
+            atmosphere()?.time = instant
+            worldWindowRef?.requestRedraw()
+        }
+
+        // One-time sweep: ease the atmosphere time a full 24h forward so the terminator
+        // makes one complete loop and returns to the present.
+        val baseMs = System.currentTimeMillis()
+        val dayMs = 24L * 60 * 60 * 1000
+        val durationMs = 4000L
+        val startMs = System.currentTimeMillis()
         while (true) {
-            worldWindowRef?.let { ww ->
-                for (layer in ww.engine.layers) {
-                    if (layer is AtmosphereLayer) {
-                        layer.time = nowInstant()
-                        ww.requestRedraw()
-                    }
-                }
-            }
+            val t = ((System.currentTimeMillis() - startMs).toFloat() / durationMs).coerceIn(0f, 1f)
+            val eased = 0.5f - 0.5f * kotlin.math.cos((t * Math.PI).toFloat()) // ease in/out
+            setTime(kotlin.time.Instant.fromEpochMilliseconds(baseMs + (eased * dayMs).toLong()))
+            if (t >= 1f) break
+            kotlinx.coroutines.delay(16)
+        }
+
+        // Settle on real time, then keep it current while the tile stays active + foreground.
+        while (true) {
+            setTime(nowInstant())
             kotlinx.coroutines.delay(60_000L)
         }
     }
@@ -746,28 +767,31 @@ private fun createWorldWindow(
     val globe = worldWindow.engine.globe
 
     // Calculate great circle heading and distance
-    val heading = userPos.greatCircleAzimuth(kaabaPos)
     val distanceRadians = userPos.greatCircleDistance(kaabaPos)
     val distanceMeters = distanceRadians * globe.equatorialRadius
     val earthRadius = globe.equatorialRadius
 
-    // Calculate midpoint between user and Kaaba for camera centering
-    val midLat = (userLat + makkahLat) / 2.0
-    val midLon = (userLon + makkahLon) / 2.0
+    // Calculate great-circle midpoint between user and Kaaba for camera centering
+    val mid = greatCircleMidpoint(userLat, userLon, makkahLat, makkahLon)
+    val midLat = mid[0]
+    val midLon = mid[1]
+
+    // Heading = bearing from the camera center (midpoint) toward the Kaaba, so the view's
+    // "up" points at the Kaaba: it ends up at the top of the globe and the user at the bottom.
+    val heading = Position.fromDegrees(midLat, midLon, 0.0).greatCircleAzimuth(kaabaPos)
 
     android.util.Log.d("QiblaGlobeView", "📷 Camera setup: distance=${(distanceMeters/1000).toInt()}km, midpoint=($midLat, $midLon)")
 
-    // ZOOMED IN: Closer range to fill the tile with the globe
-    // Use 1.8x distance to show both markers with tight framing
+    // Pulled back so the whole Earth reads as a sphere with the day/night atmosphere
+    // glow visible all around the limb (the user dot + Kaaba markers are smaller as a
+    // result). Range stays in [1.8, 3.2] x Earth radius regardless of user↔Kaaba gap.
     val baseRange = distanceMeters * 1.8
-
-    // Tighter zoom limits - globe fills more of the tile
-    val minRange = earthRadius * 0.8   // Allow closer zoom
-    val maxRange = earthRadius * 2.5   // Don't zoom out too far
+    val minRange = earthRadius * 1.8   // full disc + glow fit, framed a touch closer
+    val maxRange = earthRadius * 3.2
     val finalRange = baseRange.coerceIn(minRange, maxRange)
 
-    // Tilt angle - 50° for good 3D perspective
-    val tilt = 50.0
+    // Small tilt for a touch of 3D depth (still mostly head-on, glow all around).
+    val tilt = 12.0
 
     val lookAt = LookAt().apply {
         set(
@@ -802,20 +826,23 @@ private fun resetCameraToShowBoth(
     val userPos = Position.fromDegrees(userLat, userLon, 0.0)
     val kaabaPos = Position.fromDegrees(makkahLat, makkahLon, 0.0)
 
-    // Calculate heading and distance
-    val heading = userPos.greatCircleAzimuth(kaabaPos) // Angle
+    // Calculate distance
     val distanceRadians = userPos.greatCircleDistance(kaabaPos)
     val distanceMeters = distanceRadians * globe.equatorialRadius
     val earthRadius = globe.equatorialRadius
 
-    // Midpoint between user and Kaaba
-    val midLat = (userLat + makkahLat) / 2.0
-    val midLon = (userLon + makkahLon) / 2.0
+    // Great-circle midpoint between user and Kaaba
+    val mid = greatCircleMidpoint(userLat, userLon, makkahLat, makkahLon)
+    val midLat = mid[0]
+    val midLon = mid[1]
 
-    // Calculate range to show both
+    // Heading toward the Kaaba from the midpoint → Kaaba at top, user at bottom.
+    val heading = Position.fromDegrees(midLat, midLon, 0.0).greatCircleAzimuth(kaabaPos)
+
+    // Calculate range to show the full sphere (matches createWorldWindow framing)
     val baseRange = distanceMeters * 1.8
-    val minRange = earthRadius * 0.8
-    val maxRange = earthRadius * 2.5
+    val minRange = earthRadius * 1.8
+    val maxRange = earthRadius * 3.2
     val finalRange = baseRange.coerceIn(minRange, maxRange)
 
     val lookAt = LookAt().apply {
@@ -824,7 +851,7 @@ private fun resetCameraToShowBoth(
             AltitudeMode.ABSOLUTE,
             finalRange,
             heading,
-            50.0.degrees,  // tilt
+            12.0.degrees,  // tilt (small, for 3D depth)
             0.0.degrees,   // roll
         )
     }
@@ -867,6 +894,22 @@ private fun updateGlobeViewForOptimalMarkerVisibility(
 // matches the real time of day.
 private fun nowInstant(): kotlin.time.Instant =
     kotlin.time.Instant.fromEpochMilliseconds(System.currentTimeMillis())
+
+// Great-circle midpoint (degrees) between two lat/lon points. Correct for any pair —
+// including far-apart points and across the antimeridian — unlike a lat/lon average,
+// so the camera centers on the true mid-arc and both markers stay framed worldwide.
+private fun greatCircleMidpoint(lat1: Double, lon1: Double, lat2: Double, lon2: Double): DoubleArray {
+    val p1 = Math.toRadians(lat1); val l1 = Math.toRadians(lon1)
+    val p2 = Math.toRadians(lat2); val dl = Math.toRadians(lon2 - lon1)
+    val bx = Math.cos(p2) * Math.cos(dl)
+    val by = Math.cos(p2) * Math.sin(dl)
+    val midLat = Math.atan2(
+        Math.sin(p1) + Math.sin(p2),
+        Math.sqrt((Math.cos(p1) + bx) * (Math.cos(p1) + bx) + by * by),
+    )
+    val midLon = l1 + Math.atan2(by, Math.cos(p1) + bx)
+    return doubleArrayOf(Math.toDegrees(midLat), Math.toDegrees(midLon))
+}
 
 // Colored dot radius at the pulse start, as a fraction of its full (end) radius.
 // Google measures ~0.75; bumped so the dot stays a bit larger at the start (gentler

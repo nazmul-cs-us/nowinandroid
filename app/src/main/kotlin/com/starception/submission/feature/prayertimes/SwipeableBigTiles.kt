@@ -1213,7 +1213,8 @@ fun SwipeableBigTiles(
                         )
                         3 -> QiblaGlobeTile(
                             prayerTimes = prayerTimes,
-                            onFullscreenClick = { showGlobePopup = true }
+                            onFullscreenClick = { showGlobePopup = true },
+                            isActiveTile = pagerState.settledPage % 4 == 3,
                         )
                     }
                 }
@@ -2031,7 +2032,8 @@ private fun SmartInfoTile(
 @Composable
 private fun QiblaGlobeTile(
     prayerTimes: DayPrayerTimes?,
-    onFullscreenClick: () -> Unit = {}
+    onFullscreenClick: () -> Unit = {},
+    isActiveTile: Boolean = true,
 ) {
     val density = LocalDensity.current
     val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -2057,7 +2059,8 @@ private fun QiblaGlobeTile(
                 QiblaGlobeView(
                     userLatitude = locationData.latitude,
                     userLongitude = locationData.longitude,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    isActiveTile = isActiveTile,
                 )
 
                 // Fullscreen button in top-left corner (with liquid glass effect)

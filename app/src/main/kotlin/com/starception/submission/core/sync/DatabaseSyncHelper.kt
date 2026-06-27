@@ -91,7 +91,12 @@ object DatabaseSyncHelper {
                     quranicSynced++
                 }
 
-                // Sync Fortress of the Muslim Duas
+                // Sync Fortress of the Muslim Duas. Clear the previously-synced fortress
+                // items first so stale rows from the old DB (different ids/titles) don't
+                // linger after switching to the v2 database.
+                newsDao.deleteNewsTopicsBySource("fortress_db")
+                newsDao.deleteNewsResourcesBySource("fortress_db")
+
                 val chapters = duaDao.getAllChapters()
                 Log.d(TAG, "Found ${chapters.size} Fortress chapters to sync")
 
@@ -101,6 +106,10 @@ object DatabaseSyncHelper {
                     for (invocation in invocations) {
                         val newsId = FORTRESS_DUA_START_ID + invocation.id
 
+                        // v2 stores references in hadith_references (not `note`), so pull it.
+                        val reference = duaDao.getHadithReferencesForInvocation(invocation.id)
+                            .firstOrNull()?.referenceStr
+
                         // Build content
                         val content = buildString {
                             invocation.context?.let { append("$it\n\n") }
@@ -109,6 +118,7 @@ object DatabaseSyncHelper {
                             invocation.translation?.let { append("Translation: $it\n\n") }
                             invocation.instruction?.let { append("Instruction: $it\n\n") }
                             invocation.note?.let { append("Note: $it\n\n") }
+                            reference?.let { append("Reference: $it\n\n") }
                             invocation.postContext?.let { append(it) }
                         }
 

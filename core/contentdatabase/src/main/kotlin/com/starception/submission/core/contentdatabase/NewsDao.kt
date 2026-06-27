@@ -217,6 +217,12 @@ interface NewsDao {
     @Query("DELETE FROM news_topics WHERE news_id = :newsId")
     suspend fun deleteNewsTopics(newsId: Int)
 
+    @Query("DELETE FROM news_topics WHERE news_id IN (SELECT id FROM news_resources WHERE source = :source)")
+    suspend fun deleteNewsTopicsBySource(source: String)
+
+    @Query("DELETE FROM news_resources WHERE source = :source")
+    suspend fun deleteNewsResourcesBySource(source: String)
+
     @Query("DELETE FROM news_resources WHERE is_user_created = 1")
     suspend fun deleteAllUserNewsResources()
 
