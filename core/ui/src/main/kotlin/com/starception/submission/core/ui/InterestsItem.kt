@@ -16,6 +16,7 @@
 
 package com.starception.submission.core.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -44,6 +46,7 @@ import com.starception.submission.core.designsystem.component.DynamicAsyncImage
 import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaIconToggleButton
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.ui.R.string
 
@@ -89,7 +92,7 @@ fun InterestsItem(
                             .size(24.dp),
                     )
                 }
-                InterestsIcon(topicImageUrl, iconModifier.size(48.dp))
+                InterestsIcon(name, topicImageUrl, iconModifier.size(48.dp))
             }
         },
         headlineContent = {
@@ -161,9 +164,15 @@ fun InterestsItem(
 }
 
 @Composable
-private fun InterestsIcon(topicImageUrl: String, modifier: Modifier = Modifier) {
-    if (topicImageUrl.isEmpty()) {
-        Icon(
+private fun InterestsIcon(name: String, topicImageUrl: String, modifier: Modifier = Modifier) {
+    val topicIconRes = topicIconResFor(name)
+    when {
+        topicIconRes != null -> Image(
+            painter = painterResource(topicIconRes),
+            contentDescription = null,
+            modifier = modifier.padding(2.dp),
+        )
+        topicImageUrl.isEmpty() -> Icon(
             modifier = modifier
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(4.dp),
@@ -171,8 +180,7 @@ private fun InterestsIcon(topicImageUrl: String, modifier: Modifier = Modifier) 
             // decorative image
             contentDescription = null,
         )
-    } else {
-        DynamicAsyncImage(
+        else -> DynamicAsyncImage(
             imageUrl = topicImageUrl,
             contentDescription = null,
             modifier = modifier,

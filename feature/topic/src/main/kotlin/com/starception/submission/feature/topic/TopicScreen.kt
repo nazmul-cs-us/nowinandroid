@@ -46,6 +46,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -60,6 +62,7 @@ import com.starception.submission.core.designsystem.component.scrollbar.Draggabl
 import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.FollowableTopic
 import com.starception.submission.core.model.data.UserNewsResource
@@ -274,14 +277,24 @@ private fun TopicHeader(name: String, description: String, imageUrl: String) {
     Column(
         modifier = Modifier.padding(horizontal = 24.dp),
     ) {
-        DynamicAsyncImage(
-            imageUrl = imageUrl,
-            contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .size(132.dp)
-                .padding(bottom = 12.dp),
-        )
+        val topicIconRes = topicIconResFor(name)
+        val headerModifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .size(132.dp)
+            .padding(bottom = 12.dp)
+        if (topicIconRes != null) {
+            Image(
+                painter = painterResource(topicIconRes),
+                contentDescription = null,
+                modifier = headerModifier,
+            )
+        } else {
+            DynamicAsyncImage(
+                imageUrl = imageUrl,
+                contentDescription = null,
+                modifier = headerModifier,
+            )
+        }
         Text(name, style = MaterialTheme.typography.displayMedium)
         if (description.isNotEmpty()) {
             Text(
