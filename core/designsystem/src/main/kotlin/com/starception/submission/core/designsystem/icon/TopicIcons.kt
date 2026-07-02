@@ -35,3 +35,11 @@ fun topicIconResFor(name: String): Int? {
         else -> null
     }
 }
+
+/**
+ * True for topic icons that are single-color glyphs and must be tinted to the theme
+ * (otherwise they vanish against a dark background). Colorful icons return false.
+ * Currently none — all topic icons are colorful — but kept for future solid-glyph icons.
+ */
+@Suppress("UNUSED_PARAMETER")
+fun isMonochromeTopicIcon(name: String): Boolean = false

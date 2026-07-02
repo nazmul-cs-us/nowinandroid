@@ -756,7 +756,8 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                         """SELECT c.id, c.title, i.id, i.position, i.arabic, i.transliteration,
                            i.translation, i.context, i.instruction, i.note, i.post_context,
                            (SELECT h.reference_str FROM hadith_references h
-                              WHERE h.invocation_id = i.id LIMIT 1) AS reference
+                              WHERE h.invocation_id = i.id LIMIT 1) AS reference,
+                           c.audio_url
                            FROM chapters c
                            JOIN invocations i ON c.id = i.chapter_id
                            ORDER BY c.id, i.position""",
@@ -774,6 +775,7 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                         val note = cursor.getString(9)
                         val postContext = cursor.getString(10)
                         val reference = cursor.getString(11)
+                        val audioUrl = cursor.getString(12)
 
                         val contentParts = mutableListOf<String>()
                         if (!contextText.isNullOrBlank()) contentParts.add("**Context:**\n$contextText")
@@ -784,6 +786,9 @@ Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal cha
                         if (!note.isNullOrBlank()) contentParts.add("**Note:**\n$note")
                         if (!reference.isNullOrBlank()) contentParts.add("**Reference:**\n$reference")
                         if (!postContext.isNullOrBlank()) contentParts.add("**Additional Context:**\n$postContext")
+                        // Hidden marker consumed by the news card to show a play button;
+                        // parseDuaContent ignores unknown **sections** so the detail view is unaffected.
+                        if (!audioUrl.isNullOrBlank()) contentParts.add("**Audio:**\n$audioUrl")
 
                         val content = contentParts.joinToString("\n\n")
                         val title = "$chapterTitle: Dua $position"

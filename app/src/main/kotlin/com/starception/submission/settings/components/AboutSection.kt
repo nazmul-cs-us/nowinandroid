@@ -21,7 +21,7 @@ import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 private const val PRIVACY_POLICY_URL = "https://policies.google.com/privacy"
 private const val BRAND_GUIDELINES_URL = "https://developer.android.com/distribute/marketing-tools/brand-guidelines"
 private const val FEEDBACK_URL = "https://goo.gle/nia-app-feedback"
-private const val TWEMOJI_LICENSE_URL = "https://creativecommons.org/licenses/by/4.0/"
+private const val FLATICON_URL = "https://www.flaticon.com"
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -54,8 +54,7 @@ fun AboutSection(
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
-            text = "Topic icons use Twemoji emoji graphics (© Twitter, Inc. and other " +
-                "contributors), licensed under CC-BY 4.0.",
+            text = "Topic icons are from Flaticon (flaticon.com).",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 16.dp)
@@ -96,9 +95,9 @@ fun AboutSection(
             }
 
             TextButton(
-                onClick = { uriHandler.openUri(TWEMOJI_LICENSE_URL) }
+                onClick = { uriHandler.openUri(FLATICON_URL) }
             ) {
-                Text(text = "Twemoji (CC-BY 4.0)")
+                Text(text = "Icons by Flaticon")
             }
         }
     }

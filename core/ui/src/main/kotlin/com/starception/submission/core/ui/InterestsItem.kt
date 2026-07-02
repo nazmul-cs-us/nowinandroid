@@ -46,6 +46,7 @@ import com.starception.submission.core.designsystem.component.DynamicAsyncImage
 import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaIconToggleButton
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.icon.isMonochromeTopicIcon
 import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.ui.R.string
@@ -171,6 +172,11 @@ private fun InterestsIcon(name: String, topicImageUrl: String, modifier: Modifie
             painter = painterResource(topicIconRes),
             contentDescription = null,
             modifier = modifier.padding(2.dp),
+            colorFilter = if (isMonochromeTopicIcon(name)) {
+                androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onSurface)
+            } else {
+                null
+            },
         )
         topicImageUrl.isEmpty() -> Icon(
             modifier = modifier

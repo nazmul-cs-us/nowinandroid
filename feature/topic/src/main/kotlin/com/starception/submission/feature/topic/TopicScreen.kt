@@ -62,6 +62,7 @@ import com.starception.submission.core.designsystem.component.scrollbar.Draggabl
 import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.icon.isMonochromeTopicIcon
 import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.FollowableTopic
@@ -287,6 +288,11 @@ private fun TopicHeader(name: String, description: String, imageUrl: String) {
                 painter = painterResource(topicIconRes),
                 contentDescription = null,
                 modifier = headerModifier,
+                colorFilter = if (isMonochromeTopicIcon(name)) {
+                    androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onSurface)
+                } else {
+                    null
+                },
             )
         } else {
             DynamicAsyncImage(

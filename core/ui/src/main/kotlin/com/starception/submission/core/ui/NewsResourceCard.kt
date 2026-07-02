@@ -39,8 +39,12 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -128,13 +132,19 @@ fun NewsResourceCardExpanded(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Column {
-                    Row {
+                    val chapterAudioUrl = remember(userNewsResource.content, userNewsResource.type) {
+                        extractChapterAudioUrl(userNewsResource.content, userNewsResource.type)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         NewsResourceTitle(
                             newsResourceTitle = userNewsResource.title,
                             searchQuery = searchQuery,
-                            modifier = Modifier.fillMaxWidth((.8f)),
+                            modifier = Modifier.fillMaxWidth((.7f)),
                         )
                         Spacer(modifier = Modifier.weight(1f))
+                        if (chapterAudioUrl != null) {
+                            ChapterPlayButton(chapterAudioUrl)
+                        }
                         BookmarkButton(isBookmarked, onToggleBookmark)
                     }
                     Spacer(modifier = Modifier.height(14.dp))
@@ -196,6 +206,40 @@ fun NewsResourceCardExpanded(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Pulls the chapter recitation URL from the hidden `**Audio:**` marker that
+ * [NewsDbGenerator] appends to dua content. Returns null for non-dua cards.
+ */
+private fun extractChapterAudioUrl(content: String, type: String): String? {
+    if (!type.lowercase().contains("dua")) return null
+    val regex = Regex(
+        pattern = """\*\*Audio:\*\*\s*([\s\S]*?)(?=\n\s*\n|\n\s*\*\*|\z)""",
+        option = RegexOption.IGNORE_CASE,
+    )
+    return regex.find(content)?.groupValues?.get(1)?.trim()?.takeIf { it.startsWith("http") }
+}
+
+@Composable
+private fun ChapterPlayButton(audioUrl: String) {
+    val isThisPlaying = ChapterAudioController.currentUrl == audioUrl && ChapterAudioController.isPlaying
+    val isThisLoading = ChapterAudioController.loadingUrl == audioUrl
+    IconButton(onClick = { ChapterAudioController.toggle(audioUrl) }) {
+        if (isThisLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            Icon(
+                imageVector = if (isThisPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                contentDescription = if (isThisPlaying) "Pause recitation" else "Play chapter recitation",
+                tint = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }
