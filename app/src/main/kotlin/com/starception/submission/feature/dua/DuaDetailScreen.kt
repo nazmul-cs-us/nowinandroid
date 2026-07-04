@@ -2,6 +2,7 @@ package com.starception.submission.feature.dua
 
 import android.content.Context
 import androidx.activity.BackEventCompat
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import android.content.SharedPreferences
 import androidx.compose.animation.AnimatedVisibility
@@ -13,23 +14,33 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -74,14 +85,14 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.TextDecrease
-import androidx.compose.material.icons.filled.TextIncrease
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.FormatAlignLeft
 import androidx.compose.material.icons.filled.FormatAlignCenter
 import androidx.compose.material.icons.filled.FormatAlignRight
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material.icons.outlined.RecordVoiceOver
@@ -117,7 +128,11 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -129,7 +144,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.zIndex
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -145,11 +167,13 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.feature.surah.QuranFonts
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -2160,93 +2184,397 @@ fun DuaDetailScreen(
                 }
             }
 
-            // Bottom floating toolbar - replaces navigation bar when More is clicked
-            if (showFloatingToolbar) {
-                // Scrim to dismiss on tap outside
+            // Reading settings — bottom sheet with a live preview strip. No scrim:
+            // the dua text stays visible above the sheet, and the preview row
+            // re-renders the actual Arabic as the font and size change.
+            AnimatedVisibility(
+                visible = showFloatingToolbar,
+                enter = fadeIn(animationSpec = tween(160)),
+                exit = fadeOut(animationSpec = tween(160)),
+                modifier = Modifier.zIndex(10f),
+            ) {
+                // Tap-outside-to-dismiss layer with a light dim, so the sheet reads
+                // as focused while the page behind stays visible for live preview.
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.30f))
                         .clickable(
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() }
                         ) { showFloatingToolbar = false }
                 )
+            }
+            AnimatedVisibility(
+                visible = showFloatingToolbar,
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                ) + fadeIn(animationSpec = tween(200)),
+                exit = slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+                ) + fadeOut(animationSpec = tween(180)),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .zIndex(10f),
+            ) {
+                val haptics = LocalHapticFeedback.current
+                BackHandler { showFloatingToolbar = false }
+                // Which inline picker is expanded: "font", "language", or null.
+                var expandedSection by remember { mutableStateOf<String?>(null) }
+                // Sheet follows the finger while dragging the handle down; past a
+                // threshold the drag dismisses the sheet.
+                var sheetDragOffset by remember { mutableStateOf(0f) }
+                // The content Column is scrollable, so raw drag events never reach a
+                // parent gesture detector — the scroll gesture claims them. Instead we
+                // join the nested-scroll chain: downward drag the content can't consume
+                // pulls the sheet; release past the threshold dismisses it.
+                val sheetDismissConnection = remember {
+                    object : NestedScrollConnection {
+                        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                            if (available.y < 0f && sheetDragOffset > 0f) {
+                                val consumed = kotlin.math.max(available.y, -sheetDragOffset)
+                                sheetDragOffset += consumed
+                                return Offset(0f, consumed)
+                            }
+                            return Offset.Zero
+                        }
+                        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                            // Sheet follows the finger for the whole drag; the dismiss
+                            // decision happens on release (onPreFling) so nothing pops
+                            // out from under the finger.
+                            if (available.y > 0f) {
+                                sheetDragOffset += available.y
+                                return Offset(0f, available.y)
+                            }
+                            return Offset.Zero
+                        }
+                        override suspend fun onPreFling(available: Velocity): Velocity {
+                            val offset = sheetDragOffset
+                            if (offset > 150f) {
+                                // Keep the offset — the exit animation continues the slide
+                                // from where the finger released instead of jumping back up.
+                                showFloatingToolbar = false
+                                return available
+                            }
+                            if (offset > 0f) {
+                                // Below threshold: settle back into place smoothly.
+                                androidx.compose.animation.core.animate(offset, 0f) { value, _ ->
+                                    sheetDragOffset = value
+                                }
+                                return available
+                            }
+                            return Velocity.Zero
+                        }
+                    }
+                }
 
-                // Bottom toolbar container - positioned at bottom
                 Surface(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .navigationBarsPadding(),
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    tonalElevation = 3.dp
+                        .nestedScroll(sheetDismissConnection)
+                        .graphicsLayer { translationY = sheetDragOffset.coerceAtLeast(0f) }
+                        // Whole-sheet drag-to-dismiss. Runs after children in the Main
+                        // pass, so it only sees drags the inner scroll/slider didn't
+                        // consume — scrolling still scrolls; pulling down when the
+                        // content is at its top drags the sheet away.
+                        .pointerInput(Unit) {
+                            detectVerticalDragGestures(
+                                onVerticalDrag = { _, dragAmount ->
+                                    sheetDragOffset = (sheetDragOffset + dragAmount).coerceAtLeast(0f)
+                                },
+                                onDragEnd = {
+                                    // Keep the offset on dismiss so the exit animation
+                                    // continues from the finger's release point.
+                                    if (sheetDragOffset > 150f) showFloatingToolbar = false
+                                    else sheetDragOffset = 0f
+                                },
+                                onDragCancel = { sheetDragOffset = 0f },
+                            )
+                        },
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 16.dp,
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 12.dp)
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .navigationBarsPadding()
+                            .padding(bottom = 8.dp)
+                            .verticalScroll(rememberScrollState()),
                     ) {
-                        // Font Size controls
-                        DuaBottomToolbarItem(
-                            icon = Icons.Default.TextDecrease,
-                            label = "A-",
-                            onClick = { if (arabicFontSize > minFontSize) arabicFontSize -= 2f },
-                            enabled = arabicFontSize > minFontSize
-                        )
-
-                        DuaBottomToolbarItem(
-                            icon = Icons.Default.TextIncrease,
-                            label = "A+",
-                            onClick = { if (arabicFontSize < maxFontSize) arabicFontSize += 2f },
-                            enabled = arabicFontSize < maxFontSize
-                        )
-
-                        // Divider
+                        // Drag handle (whole sheet is draggable — see the Surface modifier).
                         Box(
                             modifier = Modifier
-                                .width(1.dp)
-                                .height(32.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant)
+                                .fillMaxWidth()
+                                .padding(top = 6.dp)
+                                .height(26.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(36.dp)
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(MaterialTheme.colorScheme.outlineVariant)
+                            )
+                        }
+
+                        // Live preview — the actual dua text, directly on the sheet.
+                        Text(
+                            text = duasList.getOrNull(currentPage)?.arabicText
+                                ?: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                            fontFamily = arabicFontFamily,
+                            fontSize = arabicFontSize.sp,
+                            lineHeight = (arabicFontSize * 1.7f).sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 14.dp),
                         )
 
-                        // Translation toggle
-                        DuaBottomToolbarItem(
-                            icon = Icons.Default.Language,
-                            label = translationCode,
-                            onClick = { showTranslationDialog = true }
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 20.dp)
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                         )
 
-                        // Tajweed toggle
-                        DuaBottomToolbarItem(
-                            icon = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
-                            label = "Tajweed",
-                            onClick = { viewModel.toggleTajweed() },
-                            isActive = showTajweed
+                        // Text size — small A, slider, big A (Play Books style).
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            Text(
+                                text = "A",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Slider(
+                                value = arabicFontSize,
+                                onValueChange = { newValue ->
+                                    val stepped = newValue.toInt()
+                                    if (stepped != arabicFontSize.toInt()) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    }
+                                    arabicFontSize = newValue.coerceIn(minFontSize, maxFontSize)
+                                },
+                                valueRange = minFontSize..maxFontSize,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = "A",
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 20.dp, vertical = 6.dp)
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                         )
 
-                        // Font selection
-                        DuaBottomToolbarItem(
-                            icon = Icons.Default.FontDownload,
-                            label = when (selectedFont) {
-                                "pdms_saleem" -> "Saleem"
-                                "noor_e_hidayat" -> "Noor"
-                                "thabit" -> "Thabit"
-                                "uthmani_script" -> "Uthmani"
-                                "indopak_script" -> "IndoPak"
-                                else -> "Font"
-                            },
-                            onClick = { showFontDialog = true }
-                        )
+                        // Tajweed — plain label + switch row.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.toggleTajweed() }
+                                .padding(horizontal = 20.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Tajweed",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Switch(
+                                checked = showTajweed,
+                                onCheckedChange = { viewModel.toggleTajweed() },
+                            )
+                        }
 
-                        // Close button
-                        DuaBottomToolbarItem(
-                            icon = Icons.Default.Close,
-                            label = "Close",
-                            onClick = { showFloatingToolbar = false }
-                        )
+                        // Arabic font — value + chevron row.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { expandedSection = if (expandedSection == "font") null else "font" }
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Arabic font",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = when (selectedFont) {
+                                    "pdms_saleem" -> "Saleem"
+                                    "noor_e_hidayat" -> "Noor"
+                                    "thabit" -> "Thabit"
+                                    "uthmani_script" -> "Uthmani"
+                                    "indopak_script" -> "IndoPak"
+                                    else -> selectedFont.replaceFirstChar { it.uppercase() }
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .size(12.dp),
+                            )
+                        }
+
+                        AnimatedVisibility(visible = expandedSection == "font") {
+                            Column {
+                                availableFonts.forEach { font ->
+                                    val fontSelected = selectedFont == font
+                                    // Selected row gets a soft tinted pill — no radio circles.
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 14.dp, vertical = 2.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(
+                                                if (fontSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                                else Color.Transparent
+                                            )
+                                            .clickable {
+                                                viewModel.changeArabicFont(font)
+                                                expandedSection = null
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            text = when (font) {
+                                                "pdms_saleem" -> "Saleem"
+                                                "noor_e_hidayat" -> "Noor"
+                                                "thabit" -> "Thabit"
+                                                "uthmani_script" -> "Uthmani"
+                                                "indopak_script" -> "IndoPak"
+                                                else -> font.replaceFirstChar { it.uppercase() }
+                                            },
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (fontSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        // Live sample so the reader can see the script style.
+                                        Text(
+                                            text = "بِسْمِ اللَّهِ",
+                                            fontFamily = getArabicFontFamilyForDua(font),
+                                            fontSize = 18.sp,
+                                            maxLines = 1,
+                                            color = if (fontSelected) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Translation language — value + chevron row.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { expandedSection = if (expandedSection == "language") null else "language" }
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Translation language",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = translationDisplayName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .size(12.dp),
+                            )
+                        }
+
+                        AnimatedVisibility(visible = expandedSection == "language") {
+                            Column {
+                                availableTranslations.forEach { code ->
+                                    val langSelected = selectedTranslation == code
+                                    // Selected row gets a soft tinted pill — no radio circles.
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 14.dp, vertical = 2.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(
+                                                if (langSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                                else Color.Transparent
+                                            )
+                                            .clickable {
+                                                viewModel.changeTranslation(code)
+                                                expandedSection = null
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            text = viewModel.getTranslationName(code),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (langSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        // Endonym so native speakers recognize their language.
+                                        Text(
+                                            text = when (code) {
+                                                "ar" -> "العربية"
+                                                "transliteration" -> "Bismillāh"
+                                                "bn" -> "বাংলা"
+                                                "zh" -> "中文"
+                                                "en" -> "English"
+                                                "es" -> "Español"
+                                                "fr" -> "Français"
+                                                "id" -> "Bahasa Indonesia"
+                                                "ru" -> "Русский"
+                                                "sv" -> "Svenska"
+                                                "tr" -> "Türkçe"
+                                                "ur" -> "اردو"
+                                                else -> ""
+                                            },
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 1,
+                                            color = if (langSelected) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -3558,55 +3886,87 @@ private fun DuaSwipeArrowIndicator(
 }
 
 /**
- * Bottom toolbar item - used in the bottom floating toolbar for Dua detail screen
- * Displays an icon with a small label below it
+ * Font chip for the tuning-mode dock — renders "الله" in the actual font so the
+ * user picks by seeing the glyphs, not by reading a name.
  */
 @Composable
-private fun DuaBottomToolbarItem(
-    icon: ImageVector,
+private fun DuaFontGlyphChip(
+    fontKey: String,
     label: String,
+    selected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    isActive: Boolean = false
 ) {
-    val containerColor = when {
-        isActive -> MaterialTheme.colorScheme.primaryContainer
-        else -> Color.Transparent
-    }
-    val contentColor = when {
-        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        isActive -> MaterialTheme.colorScheme.onPrimaryContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.widthIn(min = 56.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = containerColor
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = contentColor,
-                modifier = Modifier.size(24.dp)
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = contentColor,
-                maxLines = 1
-            )
-        }
+        Text(
+            text = "الله",
+            fontFamily = getArabicFontFamilyForDua(fontKey),
+            fontSize = 24.sp,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.sp,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            maxLines = 1,
+        )
+        Box(
+            modifier = Modifier
+                .padding(top = 3.dp)
+                .width(18.dp)
+                .height(2.5.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+        )
     }
 }
+
+/** Pill toggle/action chip for the tuning-mode dock. */
+@Composable
+private fun DuaTuneChip(label: String, active: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = if (active) MaterialTheme.colorScheme.secondaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
+        contentColor = if (active) MaterialTheme.colorScheme.onSecondaryContainer
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+        border = if (active) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)) else null,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            maxLines = 1,
+        )
+    }
+}
+
+/** Tesla-style monochrome Switch — neutral grays only, no primary green. */
+@Composable
+private fun duaTeslaSwitchColors() = SwitchDefaults.colors(
+    checkedThumbColor = MaterialTheme.colorScheme.surface,
+    checkedTrackColor = MaterialTheme.colorScheme.onSurface,
+    checkedBorderColor = MaterialTheme.colorScheme.onSurface,
+    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    uncheckedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+)
+
+@Composable
+private fun duaTeslaSliderColors() = SliderDefaults.colors(
+    thumbColor = MaterialTheme.colorScheme.onSurface,
+    activeTrackColor = MaterialTheme.colorScheme.onSurface,
+    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+)
 
 /**
  * Lightweight streaming player for a chapter's recitation audio. Streams the URL via

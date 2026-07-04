@@ -20,6 +20,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.text.AnnotatedString
@@ -73,6 +74,10 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -448,7 +453,7 @@ fun SurahDetailScreen(
             .forEach { num ->
                 try {
                     val pair = viewModel.loadSurahWithTranslation(num)
-                    if (pair != null) {
+                    if (pair != null && pair.second.isNotEmpty()) {
                         surahCache[num] = pair
                     }
                 } catch (_: Exception) {
@@ -832,7 +837,10 @@ fun SurahDetailScreen(
                     // Each pane reads its surah+ayahs from the preloaded cache so the
                     // exiting page keeps its original content and the entering page
                     // immediately shows the new surah while sliding in.
-                    val cached = surahCache[num]
+                    // Ignore poisoned cache entries with no ayahs (a transient DB
+                    // failure during preload) — fall back to the loaded state so the
+                    // page never renders empty.
+                    val cached = surahCache[num]?.takeIf { it.second.isNotEmpty() }
                     val pageSurah = cached?.first ?: state.surah
                     val baseAyahs = cached?.second ?: state.ayahs
                     // Swap Arabic text to the IndoPak edition when an IndoPak font is
@@ -1260,17 +1268,21 @@ fun SurahDetailScreen(
             )
         }
 
-        // Reading settings sheet — slides in/out from the right with a subtle
-        // scrim fade, replacing the bottom toolbar when More is tapped.
+        // Reading settings — bottom sheet with a live preview strip. No scrim:
+        // the ayah text stays visible above the sheet, and the preview row
+        // re-renders the actual Arabic as the font and size change.
         androidx.compose.animation.AnimatedVisibility(
             visible = showFloatingToolbar,
-            enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)),
-            exit = androidx.compose.animation.fadeOut(animationSpec = tween(180)),
+            enter = androidx.compose.animation.fadeIn(animationSpec = tween(160)),
+            exit = androidx.compose.animation.fadeOut(animationSpec = tween(160)),
+            modifier = Modifier.zIndex(10f),
         ) {
+            // Tap-outside-to-dismiss layer with a light dim, so the sheet reads
+            // as focused while the page behind stays visible for live preview.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.25f))
+                    .background(Color.Black.copy(alpha = 0.30f))
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
@@ -1279,163 +1291,198 @@ fun SurahDetailScreen(
         }
         androidx.compose.animation.AnimatedVisibility(
             visible = showFloatingToolbar,
-            enter = androidx.compose.animation.slideInHorizontally(
-                initialOffsetX = { it },
+            enter = androidx.compose.animation.slideInVertically(
+                initialOffsetY = { it },
                 animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
-            ) + androidx.compose.animation.fadeIn(animationSpec = tween(220)),
-            exit = androidx.compose.animation.slideOutHorizontally(
-                targetOffsetX = { it },
+            ) + androidx.compose.animation.fadeIn(animationSpec = tween(200)),
+            exit = androidx.compose.animation.slideOutVertically(
+                targetOffsetY = { it },
                 animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
-            ) + androidx.compose.animation.fadeOut(animationSpec = tween(200)),
-            modifier = Modifier.align(Alignment.CenterEnd),
+            ) + androidx.compose.animation.fadeOut(animationSpec = tween(180)),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .zIndex(10f),
         ) {
-
-            // Fade the sheet to ~25% alpha while the user is changing text size
-            // (slider drag or +/- tap) so they can see the effect on the ayahs
-            // behind the sheet without dismissing it.
-            val sliderInteractionSource = remember { MutableInteractionSource() }
-            val isSliderDragged by sliderInteractionSource.collectIsDraggedAsState()
-            var fontSizeBumpTick by remember { mutableStateOf(0) }
-            var fontSizeBumpActive by remember { mutableStateOf(false) }
-            LaunchedEffect(fontSizeBumpTick) {
-                if (fontSizeBumpTick > 0) {
-                    fontSizeBumpActive = true
-                    kotlinx.coroutines.delay(700)
-                    fontSizeBumpActive = false
+            val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+            androidx.activity.compose.BackHandler { showFloatingToolbar = false }
+            // Which inline picker is expanded: "font", "language", or null.
+            var expandedSection by remember { mutableStateOf<String?>(null) }
+            // Sheet follows the finger while dragging the handle down; past a
+            // threshold the drag dismisses the sheet.
+            var sheetDragOffset by remember { mutableStateOf(0f) }
+            // The content Column is scrollable, so raw drag events never reach a
+            // parent gesture detector — the scroll gesture claims them. Instead we
+            // join the nested-scroll chain: downward drag the content can't consume
+            // pulls the sheet; release past the threshold dismisses it.
+            val sheetDismissConnection = remember {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                        if (available.y < 0f && sheetDragOffset > 0f) {
+                            val consumed = kotlin.math.max(available.y, -sheetDragOffset)
+                            sheetDragOffset += consumed
+                            return Offset(0f, consumed)
+                        }
+                        return Offset.Zero
+                    }
+                    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                        // Sheet follows the finger for the whole drag; the dismiss
+                        // decision happens on release (onPreFling) so nothing pops
+                        // out from under the finger.
+                        if (available.y > 0f) {
+                            sheetDragOffset += available.y
+                            return Offset(0f, available.y)
+                        }
+                        return Offset.Zero
+                    }
+                    override suspend fun onPreFling(available: Velocity): Velocity {
+                        val offset = sheetDragOffset
+                        if (offset > 150f) {
+                            // Keep the offset — the exit animation continues the slide
+                            // from where the finger released instead of jumping back up.
+                            showFloatingToolbar = false
+                            return available
+                        }
+                        if (offset > 0f) {
+                            // Below threshold: settle back into place smoothly.
+                            androidx.compose.animation.core.animate(offset, 0f) { value, _ ->
+                                sheetDragOffset = value
+                            }
+                            return available
+                        }
+                        return Velocity.Zero
+                    }
                 }
             }
-            val showThrough = isSliderDragged || fontSizeBumpActive
-            val sheetAlpha by animateFloatAsState(
-                targetValue = if (showThrough) 0.25f else 1f,
-                animationSpec = tween(durationMillis = if (showThrough) 100 else 240),
-                label = "sheetAlpha",
-            )
 
-            // Tesla-style sheet: minimal, near-black surface, hairline border,
-            // no tonal tints. All accents are neutral grays / whites.
             Surface(
                 modifier = Modifier
-                    .fillMaxHeight()
-                    .width(248.dp)
-                    .padding(vertical = 12.dp, horizontal = 8.dp)
-                    .navigationBarsPadding()
-                    .statusBarsPadding()
-                    .graphicsLayer { alpha = sheetAlpha },
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    .fillMaxWidth()
+                    .nestedScroll(sheetDismissConnection)
+                    .graphicsLayer { translationY = sheetDragOffset.coerceAtLeast(0f) }
+                    // Whole-sheet drag-to-dismiss. Runs after children in the Main
+                    // pass, so it only sees drags the inner scroll/slider didn't
+                    // consume — scrolling still scrolls; pulling down when the
+                    // content is at its top drags the sheet away.
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { _, dragAmount ->
+                                sheetDragOffset = (sheetDragOffset + dragAmount).coerceAtLeast(0f)
+                            },
+                            onDragEnd = {
+                                // Keep the offset on dismiss so the exit animation
+                                // continues from the finger's release point.
+                                if (sheetDragOffset > 150f) showFloatingToolbar = false
+                                else sheetDragOffset = 0f
+                            },
+                            onDragCancel = { sheetDragOffset = 0f },
+                        )
+                    },
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
                 tonalElevation = 0.dp,
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                ),
+                shadowElevation = 16.dp,
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(bottom = 8.dp)
                         .verticalScroll(rememberScrollState()),
                 ) {
-                    // ─── Header ───
+                    // Drag handle (whole sheet is draggable — see the Surface modifier).
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp)
+                            .height(26.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(36.dp)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.outlineVariant)
+                        )
+                    }
+
+                    // Live preview — the actual first ayah, directly on the sheet.
+                    Text(
+                        text = (uiState as? SurahDetailUiState.Success)
+                            ?.ayahs?.firstOrNull()?.text?.split("\n\n")?.getOrNull(0)
+                            ?: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                        fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                        fontSize = arabicFontSize.sp,
+                        lineHeight = (arabicFontSize * 1.7f).sp,
+                        textAlign = when (textAlignment) {
+                            "start" -> TextAlign.Start
+                            "center" -> TextAlign.Center
+                            "end" -> TextAlign.End
+                            else -> TextAlign.Center
+                        },
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 14.dp),
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 20.dp)
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    )
+
+                    // Text size — small A, slider, big A (Play Books style).
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 18.dp, end = 8.dp, top = 40.dp, bottom = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .padding(horizontal = 20.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         Text(
-                            text = "READING SETTINGS",
-                            style = MaterialTheme.typography.titleSmall.copy(letterSpacing = 1.6.sp),
+                            text = "A",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Slider(
+                            value = arabicFontSize,
+                            onValueChange = { newValue ->
+                                val stepped = newValue.toInt()
+                                if (stepped != arabicFontSize.toInt()) {
+                                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                }
+                                viewModel.changeArabicFontSize(newValue.coerceIn(minFontSize, maxFontSize))
+                            },
+                            valueRange = minFontSize..maxFontSize,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = "A",
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
-                        IconButton(
-                            onClick = { showFloatingToolbar = false },
-                            modifier = Modifier.size(32.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
                     }
 
-                    // ─── Reading mode ───
-                    SettingsSectionLabel("Reading mode")
-                    SettingsListRow(
-                        leadingIcon = if (continuousReadingMode) Icons.Default.AutoStories else Icons.Default.ViewDay,
-                        title = "Mushaf page",
-                        subtitle = if (continuousReadingMode) "Single justified page" else "One ayah per line",
-                        trailing = {
-                            Switch(
-                                checked = continuousReadingMode,
-                                onCheckedChange = { viewModel.toggleContinuousReadingMode() },
-                                colors = teslaSwitchColors(),
-                            )
-                        },
-                        onClick = { viewModel.toggleContinuousReadingMode() },
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 20.dp, vertical = 6.dp)
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     )
 
-                    // ─── Text size — leading "A−", slider, trailing "A+", value pill ───
-                    SettingsSectionLabel("Text size")
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        IconButton(
-                            onClick = {
-                                if (arabicFontSize > minFontSize) viewModel.changeArabicFontSize(arabicFontSize - 2f)
-                                fontSizeBumpTick++
-                            },
-                            enabled = arabicFontSize > minFontSize,
-                            modifier = Modifier.size(32.dp),
-                        ) {
-                            Text(
-                                text = "A−",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = if (arabicFontSize > minFontSize)
-                                    MaterialTheme.colorScheme.onSurface
-                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                            )
-                        }
-                        Slider(
-                            value = arabicFontSize,
-                            onValueChange = { viewModel.changeArabicFontSize(it.coerceIn(minFontSize, maxFontSize)) },
-                            valueRange = minFontSize..maxFontSize,
-                            modifier = Modifier.weight(1f),
-                            colors = teslaSliderColors(),
-                            interactionSource = sliderInteractionSource,
-                        )
-                        IconButton(
-                            onClick = {
-                                if (arabicFontSize < maxFontSize) viewModel.changeArabicFontSize(arabicFontSize + 2f)
-                                fontSizeBumpTick++
-                            },
-                            enabled = arabicFontSize < maxFontSize,
-                            modifier = Modifier.size(32.dp),
-                        ) {
-                            Text(
-                                text = "A+",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (arabicFontSize < maxFontSize)
-                                    MaterialTheme.colorScheme.onSurface
-                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                            )
-                        }
-                    }
-
-                    // ─── Alignment ───
-                    SettingsSectionLabel("Alignment")
+                    // Alignment — compact segmented icons.
                     @OptIn(ExperimentalMaterial3Api::class)
                     SingleChoiceSegmentedButtonRow(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 4.dp),
+                            .padding(horizontal = 20.dp, vertical = 4.dp),
                     ) {
                         val opts = listOf(
                             Triple(Icons.Default.FormatAlignLeft, "Left", "start"),
@@ -1454,99 +1501,260 @@ fun SurahDetailScreen(
                         }
                     }
 
-                    // ─── Display ───
-                    SettingsSectionLabel("Display")
-                    SettingsListRow(
-                        leadingIcon = Icons.Default.Translate,
-                        title = "Translation",
-                        subtitle = "Show inline with each ayah",
-                        trailing = {
-                            Switch(
-                                checked = showTranslationInText,
-                                onCheckedChange = { viewModel.changeShowTranslation(it) },
-                                colors = teslaSwitchColors(),
-                            )
-                        },
-                        onClick = { viewModel.changeShowTranslation(!showTranslationInText) },
-                    )
-                    SettingsListRow(
-                        leadingIcon = Icons.Rounded.CheckCircleOutline,
-                        title = "Tajweed",
-                        subtitle = "Color-coded recitation rules",
-                        trailing = {
-                            Switch(
-                                checked = showTajweed,
-                                onCheckedChange = {
-                                    if (!showTajweed && !viewModel.isTajweedAvailable) {
-                                        Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
-                                    } else {
-                                        viewModel.changeTajweed(it)
-                                    }
-                                },
-                                colors = teslaSwitchColors(),
-                            )
-                        },
-                        onClick = {
-                            if (!showTajweed && !viewModel.isTajweedAvailable) {
-                                Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
-                            } else {
-                                viewModel.changeTajweed(!showTajweed)
-                            }
-                        },
-                    )
+                    // Mushaf page — plain label + switch row.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.toggleContinuousReadingMode() }
+                            .padding(horizontal = 20.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Mushaf page",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = continuousReadingMode,
+                            onCheckedChange = { viewModel.toggleContinuousReadingMode() },
+                        )
+                    }
 
-                    // ─── Language & Font ───
-                    SettingsSectionLabel("Language & Font")
-                    SettingsListRow(
-                        leadingIcon = Icons.Default.Language,
-                        title = "Translation language",
-                        subtitle = when (currentTranslation) {
-                            "ar" -> "Arabic"
-                            "transliteration" -> "Transliteration"
-                            "bn" -> "Bengali"
-                            "zh" -> "Chinese"
-                            "en" -> "English"
-                            "es" -> "Spanish"
-                            "fr" -> "French"
-                            "id" -> "Indonesian"
-                            "ru" -> "Russian"
-                            "sv" -> "Swedish"
-                            "tr" -> "Turkish"
-                            "ur" -> "Urdu"
-                            else -> "Choose language"
-                        },
-                        trailing = {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(14.dp),
-                            )
-                        },
-                        onClick = { showTranslationDialog = true },
-                    )
-                    SettingsListRow(
-                        leadingIcon = Icons.Default.FontDownload,
-                        title = "Arabic font",
-                        subtitle = when (selectedArabicFont) {
-                            "pdms_saleem" -> "Saleem"
-                            "noor_e_hidayat" -> "Noor"
-                            "thabit" -> "Thabit"
-                            "uthmani_script" -> "Uthmani"
-                            "indopak_script" -> "IndoPak"
-                            else -> "Choose font"
-                        },
-                        trailing = {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(14.dp),
-                            )
-                        },
-                        onClick = { showFontDialog = true },
-                    )
-                    Spacer(Modifier.height(20.dp))
+                    // Inline translation — plain label + switch row.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.changeShowTranslation(!showTranslationInText) }
+                            .padding(horizontal = 20.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Show translation",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = showTranslationInText,
+                            onCheckedChange = { viewModel.changeShowTranslation(it) },
+                        )
+                    }
+
+                    // Tajweed — plain label + switch row.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (!showTajweed && !viewModel.isTajweedAvailable) {
+                                    Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
+                                } else {
+                                    viewModel.changeTajweed(!showTajweed)
+                                }
+                            }
+                            .padding(horizontal = 20.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Tajweed",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = showTajweed,
+                            onCheckedChange = {
+                                if (!showTajweed && !viewModel.isTajweedAvailable) {
+                                    Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
+                                } else {
+                                    viewModel.changeTajweed(it)
+                                }
+                            },
+                        )
+                    }
+
+                    // Arabic font — value + chevron row.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { expandedSection = if (expandedSection == "font") null else "font" }
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Arabic font",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = when (selectedArabicFont) {
+                                "pdms_saleem" -> "Saleem"
+                                "noor_e_hidayat" -> "Noor"
+                                "thabit" -> "Thabit"
+                                "uthmani_script" -> "Uthmani"
+                                "indopak_script" -> "IndoPak"
+                                else -> selectedArabicFont.replaceFirstChar { it.uppercase() }
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .size(12.dp),
+                        )
+                    }
+
+                    androidx.compose.animation.AnimatedVisibility(visible = expandedSection == "font") {
+                        Column {
+                            availableArabicFonts.forEach { font ->
+                                val fontSelected = selectedArabicFont == font
+                                // Selected row gets a soft tinted pill — no radio circles.
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 2.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (fontSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                            else Color.Transparent
+                                        )
+                                        .clickable {
+                                            viewModel.changeArabicFont(font)
+                                            expandedSection = null
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = when (font) {
+                                            "pdms_saleem" -> "Saleem"
+                                            "noor_e_hidayat" -> "Noor"
+                                            "thabit" -> "Thabit"
+                                            "uthmani_script" -> "Uthmani"
+                                            "indopak_script" -> "IndoPak"
+                                            else -> font.replaceFirstChar { it.uppercase() }
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (fontSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    // Live sample so the reader can see the script style.
+                                    Text(
+                                        text = "بِسْمِ اللَّهِ",
+                                        fontFamily = getArabicFontFamilyForSelection(font),
+                                        fontSize = 18.sp,
+                                        maxLines = 1,
+                                        color = if (fontSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Translation language — value + chevron row.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { expandedSection = if (expandedSection == "language") null else "language" }
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Translation language",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = when (currentTranslation) {
+                                "ar" -> "Arabic"
+                                "transliteration" -> "Transliteration"
+                                "bn" -> "Bengali"
+                                "zh" -> "Chinese"
+                                "en" -> "English"
+                                "es" -> "Spanish"
+                                "fr" -> "French"
+                                "id" -> "Indonesian"
+                                "ru" -> "Russian"
+                                "sv" -> "Swedish"
+                                "tr" -> "Turkish"
+                                "ur" -> "Urdu"
+                                else -> currentTranslation.uppercase(Locale.getDefault())
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .size(12.dp),
+                        )
+                    }
+
+                    androidx.compose.animation.AnimatedVisibility(visible = expandedSection == "language") {
+                        Column {
+                            availableTranslations.forEach { code ->
+                                val langSelected = currentTranslation == code
+                                // Selected row gets a soft tinted pill — no radio circles.
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 2.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (langSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                            else Color.Transparent
+                                        )
+                                        .clickable {
+                                            viewModel.changeTranslation(code, surahNumber)
+                                            expandedSection = null
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = viewModel.getTranslationName(code),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (langSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    // Endonym so native speakers recognize their language.
+                                    Text(
+                                        text = when (code) {
+                                            "ar" -> "العربية"
+                                            "transliteration" -> "Bismillāh"
+                                            "bn" -> "বাংলা"
+                                            "zh" -> "中文"
+                                            "en" -> "English"
+                                            "es" -> "Español"
+                                            "fr" -> "Français"
+                                            "id" -> "Bahasa Indonesia"
+                                            "ru" -> "Русский"
+                                            "sv" -> "Svenska"
+                                            "tr" -> "Türkçe"
+                                            "ur" -> "اردو"
+                                            else -> ""
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        color = if (langSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1593,7 +1801,9 @@ fun SurahDetailScreen(
         // above the header's bottom edge (where the ayah view begins). Once
         // the user scrolls past the header (Mushaf fullscreen), reposition it
         // at the bottom of the screen, just above the Mushaf page number.
-        if (uiState is SurahDetailUiState.Success) {
+        // Hidden while the reading-settings sheet is open so it doesn't float
+        // over the sheet.
+        if (uiState is SurahDetailUiState.Success && !showFloatingToolbar) {
             val item0BottomPx = scrollState.layoutInfo.visibleItemsInfo
                 .firstOrNull { it.index == 0 }
                 ?.let { it.offset + it.size }
@@ -5238,15 +5448,53 @@ private fun FloatingToolbarButton(
  * Displays an icon with a small label below it
  */
 @Composable
-private fun SettingsSectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text.uppercase(Locale.getDefault()),
-        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.6.sp),
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-        fontWeight = FontWeight.Normal,
+private fun SettingsSectionLabel(text: String, trailingValue: String? = null, modifier: Modifier = Modifier) {
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 14.dp, top = 22.dp, bottom = 6.dp),
+            .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = text.uppercase(Locale.getDefault()),
+            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.6.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            fontWeight = FontWeight.Normal,
+        )
+        if (trailingValue != null) {
+            Text(
+                text = trailingValue,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+/** Rounded container that groups related settings rows, M3 grouped-list style. */
+@Composable
+private fun SettingsGroupCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer),
+        content = content,
+    )
+}
+
+/** Hairline divider between rows inside a [SettingsGroupCard], inset past the icon tile. */
+@Composable
+private fun SettingsRowDivider() {
+    Box(
+        modifier = Modifier
+            .padding(start = 56.dp, end = 16.dp)
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
     )
 }
 
@@ -5262,21 +5510,29 @@ private fun SettingsListRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(
-            imageVector = leadingIcon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
-        )
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = leadingIcon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(16.dp),
+            )
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Normal,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -5312,6 +5568,71 @@ private fun teslaSliderColors() = SliderDefaults.colors(
     activeTrackColor = MaterialTheme.colorScheme.onSurface,
     inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
 )
+
+/**
+ * Font chip for the tuning-mode dock — renders "الله" in the actual font so the
+ * user picks by seeing the glyphs, not by reading a name.
+ */
+@Composable
+private fun SurahFontGlyphChip(
+    fontKey: String,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "الله",
+            fontFamily = getArabicFontFamilyForSelection(fontKey),
+            fontSize = 24.sp,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.sp,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            maxLines = 1,
+        )
+        Box(
+            modifier = Modifier
+                .padding(top = 3.dp)
+                .width(18.dp)
+                .height(2.5.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+        )
+    }
+}
+
+/** Pill toggle/action chip for the tuning-mode dock. */
+@Composable
+private fun SurahTuneChip(label: String, active: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = if (active) MaterialTheme.colorScheme.secondaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
+        contentColor = if (active) MaterialTheme.colorScheme.onSecondaryContainer
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+        border = if (active) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)) else null,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            maxLines = 1,
+        )
+    }
+}
 
 @Composable
 private fun SettingsSheetDivider() {

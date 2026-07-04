@@ -299,7 +299,10 @@ class SurahDetailViewModel @Inject constructor(
         } else {
             repo.getAyahsBySurahOnce(surah.id)
         }
-        if (rawAyahs.isEmpty()) return surah to emptyList()
+        // An empty result here is a transient failure (DB mid-download, Room busy),
+        // not a surah with no ayahs — return null so callers don't cache it and
+        // permanently render an empty page for this surah.
+        if (rawAyahs.isEmpty()) return null
 
         val ayahs = if (translationCode != "ar") {
             val arabicAyahs = rawAyahs
