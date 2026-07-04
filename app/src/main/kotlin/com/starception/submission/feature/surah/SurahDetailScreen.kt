@@ -879,6 +879,7 @@ fun SurahDetailScreen(
                     selectedArabicFont = selectedArabicFont,
                     arabicFontSize = arabicFontSize,
                     textAlignment = textAlignment,
+                    currentTranslation = currentTranslation,
                     showTranslationInText = showTranslationInText,
                     showBismillahRow = showBismillahRow,
                     showTajweed = showTajweed,
@@ -2078,6 +2079,7 @@ private fun AlbumPlayerContent(
     selectedArabicFont: String,
     arabicFontSize: Float,
     textAlignment: String,
+    currentTranslation: String = "ar",
     showTranslationInText: Boolean,
     showBismillahRow: Boolean,
     showTajweed: Boolean,
@@ -2502,6 +2504,7 @@ private fun AlbumPlayerContent(
                     tajweedAnnotations = tajweedAnnotations,
                     showBismillah = showBismillahRow,
                     textAlignment = textAlignment,
+                    translationCode = currentTranslation,
                     parentScrollState = scrollState,
                     initialPage = initialMushafPage,
                     surahNameArabic = displaySurah.nameArabic,
@@ -4457,6 +4460,7 @@ private fun MushafPageWithFrame(
     onAyahLongPress: (Int) -> Unit,
     ayahRanges: List<Pair<Int, IntRange>>,
     highlightedAyahNumber: Int? = null,
+    inlineContent: Map<String, androidx.compose.foundation.text.InlineTextContent> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
@@ -4531,6 +4535,7 @@ private fun MushafPageWithFrame(
 
             Text(
                 text = renderedText,
+                inlineContent = inlineContent,
                 color = onSurfaceColor,
                 style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
                     fontSize = arabicFontSize.sp,
@@ -4599,6 +4604,8 @@ private fun MushafPagerView(
     tajweedAnnotations: Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>,
     showBismillah: Boolean = false,
     textAlignment: String = "start",
+    /** Selected translation code — drives the digit system of ayah markers. */
+    translationCode: String = "ar",
     parentScrollState: androidx.compose.foundation.lazy.LazyListState? = null,
     initialPage: Int = 0,
     /** Names used by the app-level Mushaf mini-bar in PullToSyncContainer. */
@@ -4647,33 +4654,43 @@ private fun MushafPagerView(
     val bismillahHeightDp = 36.dp
     val pageFooterHeightDp = 28.dp // tall enough to clear the page-number footer (~22dp) so the last line isn't crowded
 
-    // Rosette is now part of the text flow as U+06DD ARABIC END OF AYAH +
-    // Arabic-Indic digits, styled with Amiri Quran which composes them into a
-    // single 8-petal rosette glyph via OpenType GSUB. Treating it as text (not
-    // an inline placeholder) means TextAlign.Justify stretches the spaces
-    // around the rosette identically to inter-word spaces — gap around the
-    // rosette is uniform with the rest of the line on every line.
-    val rosetteFontFamily = remember {
-        androidx.compose.ui.text.font.FontFamily(
-            androidx.compose.ui.text.font.Font(R.font.scheherazade_regular)
-        )
+    // End-of-ayah marker: the user's ornamental frame drawable with the ayah
+    // number centered inside, tinted in the theme color. Drawn as inline
+    // content, it looks identical for any digit system (٤ / ۴ / ৪ / 4).
+    val markerDigitsFor: (Int) -> String = remember(translationCode) {
+        { numberInSurah -> numberInSurah.toAyahDigits(translationCode) }
     }
-
-    val rosetteTextFor: (Int) -> String = remember {
-        { numberInSurah ->
-            val digits = numberInSurah.toString().map { c ->
-                when (c) {
-                    '0' -> '٠'; '1' -> '١'; '2' -> '٢'; '3' -> '٣'; '4' -> '٤'
-                    '5' -> '٥'; '6' -> '٦'; '7' -> '٧'; '8' -> '٨'; '9' -> '٩'
-                    else -> c
+    val ornamentPlaceholder = androidx.compose.ui.text.Placeholder(
+        1.35.em, 1.45.em, androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter)
+    val markerInlineContent: Map<String, androidx.compose.foundation.text.InlineTextContent> =
+        remember(markerColor, arabicFontSize) {
+            mapOf(
+                "ayahOrnament" to androidx.compose.foundation.text.InlineTextContent(ornamentPlaceholder) { digits ->
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.ayah_ornament_frame),
+                            contentDescription = null,
+                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(markerColor),
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Text(
+                            text = digits,
+                            color = markerColor,
+                            fontSize = (arabicFontSize * if (digits.length >= 3) 0.28f else 0.36f).sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                    }
                 }
-            }.joinToString("")
-            "۝$digits"
+            )
         }
-    }
 
-    val masterString = remember(ayahs, showTajweed, tajweedAnnotations, markerColor, rosetteFontFamily, arabicFontSize) {
-        buildAnnotatedString {
+    val masterData = remember(ayahs, showTajweed, tajweedAnnotations, arabicFontSize, translationCode) {
+        val placeholderRanges = mutableListOf<androidx.compose.ui.text.AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>()
+        val built = buildAnnotatedString {
             ayahs.forEach { ayah ->
                 val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
 
@@ -4693,33 +4710,30 @@ private fun MushafPagerView(
                     append(arabicText)
                 }
 
-                append(" ")
-                withStyle(
-                    SpanStyle(
-                        fontFamily = rosetteFontFamily,
-                        color = markerColor,
-                        // Match body fontSize — a larger rosette inflates the
-                        // line's font metrics and adds vertical slack above the
-                        // line, visible as a tall blank top margin on any page
-                        // whose first line contains a rosette.
-                        fontSize = arabicFontSize.sp,
+                val digits = markerDigitsFor(ayah.numberInSurah)
+                val markerStart = length
+                appendInlineContent("ayahOrnament", digits)
+                placeholderRanges.add(
+                    androidx.compose.ui.text.AnnotatedString.Range(
+                        ornamentPlaceholder, markerStart, markerStart + digits.length
                     )
-                ) {
-                    append(rosetteTextFor(ayah.numberInSurah))
-                }
+                )
                 append(" ")
             }
         }
+        built to placeholderRanges
     }
+    val masterString = masterData.first
+    val markerPlaceholders = masterData.second
 
-    val ayahCharRanges = remember(ayahs) {
+    val ayahCharRanges = remember(ayahs, translationCode) {
         val ranges = mutableListOf<Pair<Int, IntRange>>()
         var pos = 0
         ayahs.forEach { ayah ->
             val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
             val startPos = pos
-            // arabicText + " " + rosetteText + " "
-            pos += arabicText.length + 1 + rosetteTextFor(ayah.numberInSurah).length + 1
+            // arabicText + inline marker (alt text = digits) + " "
+            pos += arabicText.length + markerDigitsFor(ayah.numberInSurah).length + 1
             ranges.add(ayah.numberInSurah to (startPos until pos))
         }
         ranges
@@ -4847,6 +4861,7 @@ private fun MushafPagerView(
                     constraints = androidx.compose.ui.unit.Constraints(
                         maxWidth = availableWidthPx.toInt()
                     ),
+                    placeholders = markerPlaceholders,
                     density = density
                 )
 
@@ -4958,6 +4973,7 @@ private fun MushafPagerView(
                 MushafPageWithFrame(
                     pageText = page.text,
                     pageNumber = page.pageNumber,
+                    inlineContent = markerInlineContent,
                     arabicFont = arabicFont,
                     arabicFontSize = arabicFontSize,
                     showBismillah = page.showBismillah,
@@ -4973,6 +4989,18 @@ private fun MushafPagerView(
 
 private fun getArabicFontFamily(arabicFont: String): androidx.compose.ui.text.font.FontFamily {
     return getArabicFontFamilyForSelection(arabicFont)
+}
+
+/** Ayah-number digits in the numbering system of the selected translation. */
+private fun Int.toAyahDigits(translationCode: String): String {
+    val zero: Char? = when (translationCode) {
+        "ar" -> '\u0660'   // ٠ Arabic-Indic
+        "ur" -> '\u06F0'   // ۰ Extended Arabic-Indic
+        "bn" -> '\u09E6'   // ০ Bengali
+        else -> null        // Western digits for Latin/Cyrillic/CJK readers
+    }
+    if (zero == null) return toString()
+    return toString().map { c -> if (c in '0'..'9') zero + (c - '0') else c }.joinToString("")
 }
 
 private fun Int.toArabicIndic(): String = this.toString().map { c ->
