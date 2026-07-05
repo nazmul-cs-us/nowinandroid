@@ -83,7 +83,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.layout.ContentScale
@@ -98,6 +102,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -326,6 +331,18 @@ internal fun getArabicFontFamilyForSelection(selectedFont: String): androidx.com
     }
     android.util.Log.d("FontSelection", "🔤 Mapping '$selectedFont' -> ${fontFamily::class.simpleName}")
     return fontFamily
+}
+
+/** Normal-weight font resource for [selectedFont] — must stay in sync with
+ *  [getArabicFontFamilyForSelection]; used to measure glyph ink bounds with
+ *  android.graphics.Paint (Compose text layout only exposes advance widths). */
+internal fun getArabicFontResId(selectedFont: String): Int = when (selectedFont) {
+    "pdms_saleem" -> R.font.pdms_saleem_quran
+    "noor_e_hidayat" -> R.font.noor_hidayat_quran
+    "thabit" -> R.font.thabit_quran
+    "uthmani_script" -> R.font.amiri_quran
+    "indopak_script" -> R.font.indopak_quran
+    else -> R.font.pdms_saleem_quran
 }
 
 /**
@@ -4448,6 +4465,31 @@ private fun ContinuousAyahsContent(
 }
 
 // ---------------------------------------------------------------------------
+// Ayah-marker slot geometry. Everything is in em (a fraction of the Arabic
+// font size) so the ornament AND the gaps around it scale together when the
+// reader changes the font size.
+// ---------------------------------------------------------------------------
+/** Slot height — must stay under the 1.45x line height or the ornament bleeds into neighbouring lines. */
+private const val MARKER_HEIGHT_EM = 1.2f
+/** Ornament height as a fraction of the slot height. */
+private const val MARKER_ORNAMENT_FILL = 0.92f
+/** Aspect ratio (w/h) of R.drawable.ayah_ornament_frame. */
+private const val MARKER_ASPECT = 1332f / 1418f
+/** Gap between the ayah's last word and the ornament (right side in RTL).
+ *  Deep final swashes (ـين / ـون bowls) overhang their advance width by up to
+ *  ~1em, which no fixed gap can clear without looking loose — so the marker
+ *  is drawn ON TOP with an opaque core and any residual tail tucks behind it,
+ *  the way printed mushaf medallions occlude calligraphy. */
+private const val MARKER_GAP_BEFORE_EM = 0.2f
+/** Gap between the ornament and the next ayah (left side in RTL). Small because the breakable space appended after the marker adds a normal word gap on top. */
+private const val MARKER_GAP_AFTER_EM = 0.05f
+/** Drawn ornament width in em. */
+private const val MARKER_ORNAMENT_WIDTH_EM = MARKER_HEIGHT_EM * MARKER_ORNAMENT_FILL * MARKER_ASPECT
+/** Total slot width reserved in the text flow. */
+private const val MARKER_SLOT_WIDTH_EM =
+    MARKER_GAP_BEFORE_EM + MARKER_ORNAMENT_WIDTH_EM + MARKER_GAP_AFTER_EM
+
+// ---------------------------------------------------------------------------
 // Mushaf page — renders pre-paginated justified text
 // ---------------------------------------------------------------------------
 @Composable
@@ -4500,7 +4542,28 @@ private fun MushafPageWithFrame(
     val bottomPadding = 16.dp
     val bismillahHeightDp = if (showBismillah) 36.dp else 0.dp
     val pageFooterHeightDp = 28.dp // tall enough to clear the page-number footer (~22dp) so the last line isn't crowded
-    val lineSpacingMultiplier = 1.35f
+
+    // The ayah ornaments are painted BEHIND the text at the exact placeholder
+    // rects the layout produced, so overhanging swashes render on top of the
+    // ornament's flourishes (printed-mushaf behaviour) instead of colliding.
+    var markerLayout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+    val ornamentPainter = androidx.compose.ui.graphics.vector.rememberVectorPainter(
+        image = ImageVector.vectorResource(R.drawable.ayah_ornament_frame))
+    // Inline marker annotations in layout order — alt text carries the
+    // localized digits, and the char range locates each marker in the page
+    // text so the drawing pass can find the neighbouring words.
+    val markerAnnotations = remember(pageText) {
+        pageText.getStringAnnotations("androidx.compose.foundation.text.inlineContent", 0, pageText.length)
+            .sortedBy { it.start }
+    }
+    // Same typeface as the rendered text, for measuring glyph INK bounds:
+    // deep final swashes (ـين / ـون) paint up to ~1em past their advance
+    // width, and the layout can't see that ink when positioning markers.
+    val markerContext = androidx.compose.ui.platform.LocalContext.current
+    val arabicTypeface = remember(arabicFont) {
+        androidx.core.content.res.ResourcesCompat.getFont(markerContext, getArabicFontResId(arabicFont))
+    }
+    val lineSpacingMultiplier = 1.45f
     val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
 
     Surface(
@@ -4536,6 +4599,7 @@ private fun MushafPageWithFrame(
             Text(
                 text = renderedText,
                 inlineContent = inlineContent,
+                onTextLayout = { markerLayout = it },
                 color = onSurfaceColor,
                 style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
                     fontSize = arabicFontSize.sp,
@@ -4570,6 +4634,135 @@ private fun MushafPageWithFrame(
                         )
                     }
             )
+
+            // Markers are drawn ON TOP of the text: an opaque page-colored
+            // core first, so deep final swashes (ـين / ـون tails overhang
+            // ~1em past their advance width) tuck BEHIND the medallion like
+            // in printed mushafs instead of striking through the digits.
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        start = horizontalPadding,
+                        end = horizontalPadding,
+                        top = topPadding + bismillahHeightDp,
+                        bottom = bottomPadding + pageFooterHeightDp
+                    )
+            ) {
+                val layout = markerLayout ?: return@Canvas
+                val inkPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    typeface = arabicTypeface
+                    textSize = arabicFontSize.sp.toPx()
+                }
+                // getTextPath = the renderer's true ink outline, including
+                // GPOS-positioned Quranic marks (zero-advance glyphs whose ink
+                // reaches ~0.6em left of their pen) — getTextBounds misses
+                // those inconsistently.
+                val inkPath = android.graphics.Path()
+                val inkRect = android.graphics.RectF()
+                val invisibles = charArrayOf('\u200F', '\u200E', '\u200B', '\uFEFF', '\u2060')
+                layout.placeholderRects.forEachIndexed { i, rect ->
+                    if (rect == null) return@forEachIndexed
+                    val annotation = markerAnnotations.getOrNull(i) ?: return@forEachIndexed
+                    val digits = pageText.text.substring(annotation.start, annotation.end)
+                    val h = rect.height * MARKER_ORNAMENT_FILL
+                    val w = h * MARKER_ASPECT
+                    // Center the medallion in the VISUAL gap between the two
+                    // words, not in its own slot: justification stretches the
+                    // space after the marker, so anchoring to the slot leaves
+                    // all the slack on one side. RTL: the previous word ends
+                    // at rect.right; the next word starts (leading/right edge)
+                    // at the char after the trailing space — when that char
+                    // is on the same line, use it as the gap's left boundary.
+                    val markerLine = layout.getLineForOffset(annotation.start)
+                    val nextWordStart = annotation.end + 1
+                    val gapLeft = if (
+                        nextWordStart < pageText.length &&
+                        layout.getLineForOffset(nextWordStart) == markerLine
+                    ) {
+                        layout.getHorizontalPosition(nextWordStart, usePrimaryDirection = true)
+                    } else {
+                        rect.left
+                    }
+                    // Advance widths lie about the visual gap on BOTH sides:
+                    // the previous word's final swash + stacked Quranic marks
+                    // paint past rect.right (leftwards), while the next word's
+                    // leading ink starts well left of its advance edge (IndoPak
+                    // initials are recessed ~0.3em). Center between INK edges.
+                    val text = pageText.text
+                    var wordEnd = if (annotation.start > 0 && text[annotation.start - 1] == '\u2060') {
+                        annotation.start - 1
+                    } else {
+                        annotation.start
+                    }
+                    var wordStart = wordEnd
+                    while (wordStart > 0 && !text[wordStart - 1].isWhitespace()) wordStart--
+                    while (wordEnd > wordStart && text[wordEnd - 1] in invisibles) wordEnd--
+                    val overhang = if (wordEnd > wordStart) {
+                        inkPaint.getTextPath(text, wordStart, wordEnd, 0f, 0f, inkPath)
+                        inkPath.computeBounds(inkRect, true)
+                        if (inkRect.isEmpty) 0f else maxOf(0f, -inkRect.left)
+                    } else 0f
+                    // Leading ink recess of the next word (only when it bounds
+                    // the gap, i.e. the marker is not last on its line).
+                    var nextBearing = 0f
+                    if (gapLeft != rect.left) {
+                        var nextStart = nextWordStart
+                        while (nextStart < text.length && text[nextStart] in invisibles) nextStart++
+                        var nextEnd = nextStart
+                        while (
+                            nextEnd < text.length && nextEnd - nextStart < 12 &&
+                            !text[nextEnd].isWhitespace() && text[nextEnd] != '\u2060'
+                        ) nextEnd++
+                        if (nextEnd > nextStart) {
+                            inkPaint.getTextPath(text, nextStart, nextEnd, 0f, 0f, inkPath)
+                            inkPath.computeBounds(inkRect, true)
+                            if (!inkRect.isEmpty) {
+                                val advance = inkPaint.measureText(text, nextStart, nextEnd)
+                                nextBearing = maxOf(0f, advance - inkRect.right)
+                            }
+                        }
+                    }
+                    val gapRightInk = rect.right - overhang
+                    val gapLeftInk = gapLeft - nextBearing
+                    val left = if (gapRightInk - gapLeftInk >= w) {
+                        (gapLeftInk + gapRightInk) / 2f - w / 2f
+                    } else {
+                        // Ink leaves less room than the medallion needs (huge
+                        // swash or line-end slot): fall back to advance-based
+                        // centering; the opaque core occludes the crossing tail.
+                        (gapLeft + rect.right) / 2f - w / 2f
+                    }
+                    val top = rect.top + (rect.height - h) / 2f
+                    android.util.Log.d("MarkerPos", "digits=$digits gapL=$gapLeft gapLInk=$gapLeftInk rectR=${rect.right} gapRInk=$gapRightInk overhang=$overhang bearing=$nextBearing left=$left w=$w")
+                    // Opaque core: clips any text ink crossing the medallion.
+                    // Slightly inside the ornament so the flourish tips still
+                    // overlap the tail, keeping the printed depth effect.
+                    drawCircle(
+                        color = surfaceColor,
+                        radius = h * 0.46f,
+                        center = androidx.compose.ui.geometry.Offset(left + w / 2f, top + h / 2f),
+                    )
+                    translate(left, top) {
+                        with(ornamentPainter) {
+                            draw(
+                                androidx.compose.ui.geometry.Size(w, h),
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(markerColor),
+                            )
+                        }
+                    }
+                    drawIntoCanvas { canvas ->
+                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = markerColor.toArgb()
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            textSize = (arabicFontSize * if (digits.length >= 3) 0.25f else 0.32f).sp.toPx()
+                            isFakeBoldText = true
+                        }
+                        val baselineY = rect.center.y - (paint.descent() + paint.ascent()) / 2f
+                        canvas.nativeCanvas.drawText(digits, left + w / 2f, baselineY, paint)
+                    }
+                }
+            }
 
             Box(
                 modifier = Modifier
@@ -4647,7 +4840,7 @@ private fun MushafPagerView(
     val navBarHeight = with(density) {
         WindowInsets.navigationBars.getBottom(this).toDp()
     }
-    val lineSpacingMultiplier = 1.35f
+    val lineSpacingMultiplier = 1.45f
     val horizontalPadding = 12.dp
     val topPadding = 4.dp
     val bottomPadding = navBarHeight + 8.dp
@@ -4660,31 +4853,20 @@ private fun MushafPagerView(
     val markerDigitsFor: (Int) -> String = remember(translationCode) {
         { numberInSurah -> numberInSurah.toAyahDigits(translationCode) }
     }
+    // Slot geometry comes from the MARKER_* constants (all em, so the ornament
+    // and its before/after gaps scale with the font size). The ornament is
+    // painted BEHIND the text layer (see MushafPageWithFrame), so overhanging
+    // swashes (ـون endings etc.) flow over its outer flourishes like in
+    // printed mushafs instead of colliding with a protective margin.
     val ornamentPlaceholder = androidx.compose.ui.text.Placeholder(
-        1.35.em, 1.45.em, androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter)
+        MARKER_SLOT_WIDTH_EM.em, MARKER_HEIGHT_EM.em,
+        androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter)
     val markerInlineContent: Map<String, androidx.compose.foundation.text.InlineTextContent> =
-        remember(markerColor, arabicFontSize) {
+        remember {
             mapOf(
-                "ayahOrnament" to androidx.compose.foundation.text.InlineTextContent(ornamentPlaceholder) { digits ->
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Image(
-                            painter = painterResource(R.drawable.ayah_ornament_frame),
-                            contentDescription = null,
-                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(markerColor),
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                        Text(
-                            text = digits,
-                            color = markerColor,
-                            fontSize = (arabicFontSize * if (digits.length >= 3) 0.28f else 0.36f).sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                        )
-                    }
-                }
+                // Empty content — the slot only reserves space; the ornament and
+                // digits are painted behind the text from placeholderRects.
+                "ayahOrnament" to androidx.compose.foundation.text.InlineTextContent(ornamentPlaceholder) { _ -> }
             )
         }
 
@@ -4711,6 +4893,11 @@ private fun MushafPagerView(
                 }
 
                 val digits = markerDigitsFor(ayah.numberInSurah)
+                // U+2060 WORD JOINER forbids a line break between the ayah's
+                // last word and its marker, so an ornament can never be
+                // orphaned at the start of a line (or on a line of its own) —
+                // it wraps together with the word instead.
+                append('\u2060')
                 val markerStart = length
                 appendInlineContent("ayahOrnament", digits)
                 placeholderRanges.add(
@@ -4718,6 +4905,8 @@ private fun MushafPagerView(
                         ornamentPlaceholder, markerStart, markerStart + digits.length
                     )
                 )
+                // Ordinary breakable space: the line may end after a marker,
+                // and justification stretches it like any word gap.
                 append(" ")
             }
         }
@@ -4732,8 +4921,8 @@ private fun MushafPagerView(
         ayahs.forEach { ayah ->
             val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
             val startPos = pos
-            // arabicText + inline marker (alt text = digits) + " "
-            pos += arabicText.length + markerDigitsFor(ayah.numberInSurah).length + 1
+            // arabicText + word-joiner + inline marker (alt text = digits) + " "
+            pos += arabicText.length + 1 + markerDigitsFor(ayah.numberInSurah).length + 1
             ranges.add(ayah.numberInSurah to (startPos until pos))
         }
         ranges
