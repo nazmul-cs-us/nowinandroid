@@ -4475,19 +4475,35 @@ private const val MARKER_HEIGHT_EM = 1.2f
 private const val MARKER_ORNAMENT_FILL = 0.92f
 /** Aspect ratio (w/h) of R.drawable.ayah_ornament_frame. */
 private const val MARKER_ASPECT = 1332f / 1418f
-/** Gap between the ayah's last word and the ornament (right side in RTL).
- *  Deep final swashes (ـين / ـون bowls) overhang their advance width by up to
- *  ~1em, which no fixed gap can clear without looking loose — so the marker
- *  is drawn ON TOP with an opaque core and any residual tail tucks behind it,
- *  the way printed mushaf medallions occlude calligraphy. */
-private const val MARKER_GAP_BEFORE_EM = 0.2f
-/** Gap between the ornament and the next ayah (left side in RTL). Small because the breakable space appended after the marker adds a normal word gap on top. */
-private const val MARKER_GAP_AFTER_EM = 0.05f
+/** Base gap before the ornament (right side in RTL) — the minimum breathing
+ *  room between the ayah's last-word ink and the ornament. This must be big
+ *  enough that even when a font packs the final letter's tail all the way to
+ *  the advance edge (e.g. Amiri's ـر / ـن), the tail doesn't touch the
+ *  ornate frame. The per-ayah slot adds any measured overhang PAST the
+ *  advance box on top of this, but this base value is what saves fonts whose
+ *  ink fills its own advance without spilling past it. */
+private const val MARKER_MIN_BREATHING_EM = 0.45f
+/** Gap between the ornament and the next ayah (left side in RTL). Symmetric
+ *  with MARKER_MIN_BREATHING_EM so the marker visually sits centered between
+ *  its neighbouring ink edges. */
+private const val MARKER_GAP_AFTER_EM = 0.45f
+/** Legacy alias kept for readability in the MARKER_SLOT_WIDTH_EM default. */
+private const val MARKER_GAP_BEFORE_EM = MARKER_MIN_BREATHING_EM
 /** Drawn ornament width in em. */
 private const val MARKER_ORNAMENT_WIDTH_EM = MARKER_HEIGHT_EM * MARKER_ORNAMENT_FILL * MARKER_ASPECT
-/** Total slot width reserved in the text flow. */
+/** Total slot width reserved in the text flow (fallback for callers that
+ *  don't do per-ayah swash measurement — MushafPagerView bypasses this). */
 private const val MARKER_SLOT_WIDTH_EM =
     MARKER_GAP_BEFORE_EM + MARKER_ORNAMENT_WIDTH_EM + MARKER_GAP_AFTER_EM
+
+/** Bundle returned by MushafPagerView's marker builder: the annotated master
+ *  string, the per-marker placeholder ranges (in layout order), and the
+ *  InlineTextContent map covering every per-ayah slot bucket. */
+private data class MushafMarkerData(
+    val text: androidx.compose.ui.text.AnnotatedString,
+    val placeholders: List<androidx.compose.ui.text.AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>,
+    val inlineContent: Map<String, androidx.compose.foundation.text.InlineTextContent>,
+)
 
 // ---------------------------------------------------------------------------
 // Mushaf page — renders pre-paginated justified text
@@ -4698,10 +4714,22 @@ private fun MushafPageWithFrame(
                     var wordStart = wordEnd
                     while (wordStart > 0 && !text[wordStart - 1].isWhitespace()) wordStart--
                     while (wordEnd > wordStart && text[wordEnd - 1] in invisibles) wordEnd--
+                    // Overhang = ink extending past the advance box. Paint
+                    // renders LTR even for Arabic (its pen goes rightward),
+                    // so ink bounds live in [0..W] where W ≈ advance. Compare
+                    // ink_width vs advance and take the excess — that's how
+                    // much a final swash tail extends past the last glyph's
+                    // advance edge. (Same technique the next-bearing branch
+                    // below uses on line ~4735.)
                     val overhang = if (wordEnd > wordStart) {
                         inkPaint.getTextPath(text, wordStart, wordEnd, 0f, 0f, inkPath)
                         inkPath.computeBounds(inkRect, true)
-                        if (inkRect.isEmpty) 0f else maxOf(0f, -inkRect.left)
+                        if (inkRect.isEmpty) {
+                            0f
+                        } else {
+                            val advance = inkPaint.measureText(text, wordStart, wordEnd)
+                            maxOf(0f, inkRect.width() - advance)
+                        }
                     } else 0f
                     // Leading ink recess of the next word (only when it bounds
                     // the gap, i.e. the marker is not last on its line).
@@ -4853,24 +4881,74 @@ private fun MushafPagerView(
     val markerDigitsFor: (Int) -> String = remember(translationCode) {
         { numberInSurah -> numberInSurah.toAyahDigits(translationCode) }
     }
-    // Slot geometry comes from the MARKER_* constants (all em, so the ornament
-    // and its before/after gaps scale with the font size). The ornament is
-    // painted BEHIND the text layer (see MushafPageWithFrame), so overhanging
-    // swashes (ـون endings etc.) flow over its outer flourishes like in
-    // printed mushafs instead of colliding with a protective margin.
-    val ornamentPlaceholder = androidx.compose.ui.text.Placeholder(
-        MARKER_SLOT_WIDTH_EM.em, MARKER_HEIGHT_EM.em,
-        androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter)
-    val markerInlineContent: Map<String, androidx.compose.foundation.text.InlineTextContent> =
-        remember {
-            mapOf(
-                // Empty content — the slot only reserves space; the ornament and
-                // digits are painted behind the text from placeholderRects.
-                "ayahOrnament" to androidx.compose.foundation.text.InlineTextContent(ornamentPlaceholder) { _ -> }
-            )
+    // Per-ayah slot sizing. A single global placeholder width can't clear both
+    // long-tail endings (ـر / ـين / ـون overhang up to ~0.6em past their
+    // advance) and short endings (~0em overhang) without being wastefully wide
+    // for one or the other. Instead we measure each ayah's final-word swash
+    // overhang up-front with getTextPath (same technique the drawing code uses),
+    // add MARKER_MIN_BREATHING_EM breathing room, and bucket the result into
+    // 0.1em quanta so the InlineTextContent map stays bounded (usually 3–6
+    // buckets even for long surahs).
+    val markerContextForSlots = androidx.compose.ui.platform.LocalContext.current
+    val arabicTypefaceForSlots = remember(arabicFont) {
+        androidx.core.content.res.ResourcesCompat.getFont(markerContextForSlots, getArabicFontResId(arabicFont))
+    }
+    val fontSizePx = with(density) { arabicFontSize.sp.toPx() }
+
+    val markerData = remember(ayahs, showTajweed, tajweedAnnotations, arabicFontSize, translationCode, arabicTypefaceForSlots) {
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = arabicTypefaceForSlots
+            textSize = fontSizePx
+        }
+        val inkPath = android.graphics.Path()
+        val inkRect = android.graphics.RectF()
+        val invisiblesForMeasure = charArrayOf('‏', '‎', '​', '﻿', '⁠')
+        val emPx = fontSizePx
+
+        val perAyahBucket = mutableMapOf<Int, Int>()
+        val bucketWidthsEm = mutableMapOf<Int, Float>()
+        ayahs.forEach { ayah ->
+            val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
+            var wordEnd = arabicText.length
+            while (wordEnd > 0 && arabicText[wordEnd - 1] in invisiblesForMeasure) wordEnd--
+            var wordStart = wordEnd
+            while (wordStart > 0 && !arabicText[wordStart - 1].isWhitespace()) wordStart--
+            // Overhang = ink extending past the advance box. Paint.getTextPath
+            // on Android renders LTR by default even for Arabic (its pen goes
+            // rightward), so the ink bounds are in a coordinate frame [0..W]
+            // where W ≈ advance width. Compare ink_width vs advance and take
+            // the excess — this is robust to text direction. Half that excess
+            // is (approximately) how much a final swash tail extends past the
+            // last-glyph's advance edge, which is what we need to clear.
+            val overhangPx = if (wordEnd > wordStart) {
+                paint.getTextPath(arabicText, wordStart, wordEnd, 0f, 0f, inkPath)
+                inkPath.computeBounds(inkRect, true)
+                if (inkRect.isEmpty) {
+                    0f
+                } else {
+                    val advance = paint.measureText(arabicText, wordStart, wordEnd)
+                    val inkWidth = inkRect.width()
+                    maxOf(0f, inkWidth - advance)
+                }
+            } else 0f
+            val overhangEm = overhangPx / emPx
+            val beforeGapEm = overhangEm + MARKER_MIN_BREATHING_EM
+            val slotWidthEm = beforeGapEm + MARKER_ORNAMENT_WIDTH_EM + MARKER_GAP_AFTER_EM
+            val bucket = kotlin.math.ceil(slotWidthEm * 10f).toInt()
+            perAyahBucket[ayah.numberInSurah] = bucket
+            bucketWidthsEm[bucket] = bucket / 10f
         }
 
-    val masterData = remember(ayahs, showTajweed, tajweedAnnotations, arabicFontSize, translationCode) {
+        val inlineMap: Map<String, androidx.compose.foundation.text.InlineTextContent> =
+            bucketWidthsEm.entries.associate { (bucket, widthEm) ->
+                "ayahOrnament_$bucket" to androidx.compose.foundation.text.InlineTextContent(
+                    androidx.compose.ui.text.Placeholder(
+                        widthEm.em, MARKER_HEIGHT_EM.em,
+                        androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter
+                    )
+                ) { _ -> }
+            }
+
         val placeholderRanges = mutableListOf<androidx.compose.ui.text.AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>()
         val built = buildAnnotatedString {
             ayahs.forEach { ayah ->
@@ -4893,27 +4971,35 @@ private fun MushafPagerView(
                 }
 
                 val digits = markerDigitsFor(ayah.numberInSurah)
-                // U+2060 WORD JOINER forbids a line break between the ayah's
+                val bucket = perAyahBucket[ayah.numberInSurah] ?: bucketWidthsEm.keys.max()
+                val slotTag = "ayahOrnament_$bucket"
+                val slotPlaceholder = inlineMap.getValue(slotTag).placeholder
+                // U+2060 WORD JOINER: forbids a line break between the ayah's
                 // last word and its marker, so an ornament can never be
-                // orphaned at the start of a line (or on a line of its own) —
-                // it wraps together with the word instead.
+                // orphaned at the start of a line — it wraps with the word.
                 append('\u2060')
                 val markerStart = length
-                appendInlineContent("ayahOrnament", digits)
+                appendInlineContent(slotTag, digits)
                 placeholderRanges.add(
                     androidx.compose.ui.text.AnnotatedString.Range(
-                        ornamentPlaceholder, markerStart, markerStart + digits.length
+                        slotPlaceholder, markerStart, markerStart + digits.length
                     )
                 )
-                // Ordinary breakable space: the line may end after a marker,
-                // and justification stretches it like any word gap.
-                append(" ")
+                // U+202F NARROW NO-BREAK SPACE: still counted as whitespace by
+                // Java (so the gap-detection code in MushafPageWithFrame keeps
+                // working), but justification does NOT redistribute stretch
+                // into it — that would pile all the line's slack on one side
+                // of the marker and break the symmetric slot geometry above.
+                // Line breaks between ayahs still work because Compose treats
+                // the previous ayah's own word boundaries as break candidates.
+                append(' ')
             }
         }
-        built to placeholderRanges
+        MushafMarkerData(built, placeholderRanges, inlineMap)
     }
-    val masterString = masterData.first
-    val markerPlaceholders = masterData.second
+    val masterString = markerData.text
+    val markerPlaceholders = markerData.placeholders
+    val markerInlineContent = markerData.inlineContent
 
     val ayahCharRanges = remember(ayahs, translationCode) {
         val ranges = mutableListOf<Pair<Int, IntRange>>()
