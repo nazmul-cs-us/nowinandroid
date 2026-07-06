@@ -4475,24 +4475,32 @@ private const val MARKER_HEIGHT_EM = 1.2f
 private const val MARKER_ORNAMENT_FILL = 0.92f
 /** Aspect ratio (w/h) of R.drawable.ayah_ornament_frame. */
 private const val MARKER_ASPECT = 1332f / 1418f
-/** Gap reserved in the text flow on each side of the ornament. Kept modest —
- *  the drawing pass does the real work of positioning the medallion at the
- *  centre of the visual ink gap and painting a symmetric halo around it, so
- *  the placeholder's exact width is not what determines what the user sees. */
-private const val MARKER_GAP_BEFORE_EM = 0.15f
-private const val MARKER_GAP_AFTER_EM = 0.15f
+/** Gap reserved in the text flow on each side of the ornament. This IS the
+ *  breathing room the user sees: the drawing pass centers the ornament in its
+ *  reserved slot (which Compose already positions correctly in the justified
+ *  RTL flow), so these gaps directly determine the symmetric spacing between
+ *  the ornament and its neighbouring words — no per-letter ink measurement. */
+private const val MARKER_GAP_BEFORE_EM = 0.55f
+private const val MARKER_GAP_AFTER_EM = 0.55f
+/** Extra gap for ayahs ending in a final meem (ـمٌ/ـمُ): its trailing loop
+ *  descends and reaches further left past the advance edge than other endings,
+ *  so it needs more clearance to keep clear of the ornament. */
+private const val MARKER_MEEM_EXTRA_GAP_EM = 0.22f
 /** Drawn ornament width in em. */
 private const val MARKER_ORNAMENT_WIDTH_EM = MARKER_HEIGHT_EM * MARKER_ORNAMENT_FILL * MARKER_ASPECT
 /** Total slot width reserved in the text flow. */
 private const val MARKER_SLOT_WIDTH_EM =
     MARKER_GAP_BEFORE_EM + MARKER_ORNAMENT_WIDTH_EM + MARKER_GAP_AFTER_EM
-/** Visible padding painted around the ornament as an opaque halo, so the
- *  gap between the ornament and any adjacent ink is guaranteed the same on
- *  both sides regardless of font, size, or line-justification stretch. This
- *  is what the user sees as symmetric breathing room. Any letter swash that
- *  reaches into this zone is visually clipped by the surface-coloured halo
- *  (matching printed mushaf medallion behaviour). */
-private const val MARKER_HALO_PADDING_EM = 0.45f
+/** Small radial-gradient halo painted around the ornament. The slot gaps
+ *  above provide the real breathing room; this halo only softens the rare
+ *  minor swash that pokes into the ornament's edge, fading it out rather than
+ *  hard-clipping it. Kept small so it never erases whole neighbouring letters. */
+private const val MARKER_HALO_PADDING_EM = 0.34f
+/** Invisible formatting chars that may trail an ayah's last word before its
+ *  marker slot (RLM, LRM, ZWSP, BOM, WORD JOINER) — skipped when locating the
+ *  final base letter for overhang compensation. */
+private val MARKER_TRAILING_INVISIBLES =
+    charArrayOf('‏', '‎', '​', '﻿', '⁠')
 
 // ---------------------------------------------------------------------------
 // Mushaf page — renders pre-paginated justified text
@@ -4560,13 +4568,6 @@ private fun MushafPageWithFrame(
     val markerAnnotations = remember(pageText) {
         pageText.getStringAnnotations("androidx.compose.foundation.text.inlineContent", 0, pageText.length)
             .sortedBy { it.start }
-    }
-    // Same typeface as the rendered text, for measuring glyph INK bounds:
-    // deep final swashes (ـين / ـون) paint up to ~1em past their advance
-    // width, and the layout can't see that ink when positioning markers.
-    val markerContext = androidx.compose.ui.platform.LocalContext.current
-    val arabicTypeface = remember(arabicFont) {
-        androidx.core.content.res.ResourcesCompat.getFont(markerContext, getArabicFontResId(arabicFont))
     }
     val lineSpacingMultiplier = 1.45f
     val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
@@ -4655,211 +4656,62 @@ private fun MushafPageWithFrame(
                     )
             ) {
                 val layout = markerLayout ?: return@Canvas
-                val inkPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                    typeface = arabicTypeface
-                    textSize = arabicFontSize.sp.toPx()
-                }
-                // getTextPath = the renderer's true ink outline, including
-                // GPOS-positioned Quranic marks (zero-advance glyphs whose ink
-                // reaches ~0.6em left of their pen) — getTextBounds misses
-                // those inconsistently.
-                val inkPath = android.graphics.Path()
-                val inkRect = android.graphics.RectF()
-                val invisibles = charArrayOf('\u200F', '\u200E', '\u200B', '\uFEFF', '\u2060')
                 layout.placeholderRects.forEachIndexed { i, rect ->
                     if (rect == null) return@forEachIndexed
                     val annotation = markerAnnotations.getOrNull(i) ?: return@forEachIndexed
                     val digits = pageText.text.substring(annotation.start, annotation.end)
                     val h = rect.height * MARKER_ORNAMENT_FILL
                     val w = h * MARKER_ASPECT
-                    // Center the medallion in the VISUAL gap between the two
-                    // words, not in its own slot: justification stretches the
-                    // space after the marker, so anchoring to the slot leaves
-                    // all the slack on one side. RTL: the previous word ends
-                    // at rect.right; the next word starts (leading/right edge)
-                    // at the char after the trailing space — when that char
-                    // is on the same line, use it as the gap's left boundary.
-                    val markerLine = layout.getLineForOffset(annotation.start)
-                    val nextWordStart = annotation.end + 1
-                    // gapLeft = the visual LEFT boundary of the marker's gap
-                    // on this line (RTL: where the next content starts). If
-                    // the next word wraps to the next line, there's no gap
-                    // on this line — the marker sits at the line's visual
-                    // end, so we anchor to its own slot's left edge.
-                    // Compose's placeholder rect can include the width of the
-                    // trailing space AFTER the placeholder (its right edge in
-                    // memory order → the LEFT edge in RTL visual order). So
-                    // querying nextWordStart directly gives the same x as
-                    // rect.left. Walk forward past ALL whitespace after the
-                    // marker to find the ACTUAL next-word character.
-                    var actualNextStart = annotation.end
-                    while (actualNextStart < pageText.length &&
-                        (pageText.text[actualNextStart].isWhitespace() ||
-                            pageText.text[actualNextStart] == '⁠' ||
-                            pageText.text[actualNextStart] in invisibles)) {
-                        actualNextStart++
-                    }
-                    val nextOnSameLine = actualNextStart < pageText.length &&
-                        layout.getLineForOffset(actualNextStart) == markerLine
-                    val gapLeft = if (nextOnSameLine) {
-                        layout.getHorizontalPosition(actualNextStart, usePrimaryDirection = true)
-                    } else {
-                        rect.left
-                    }
-                    // Advance widths lie about the visual gap on BOTH sides:
-                    // the previous word's final swash + stacked Quranic marks
-                    // paint past rect.right (leftwards), while the next word's
-                    // leading ink starts well left of its advance edge (IndoPak
-                    // initials are recessed ~0.3em). Center between INK edges.
-                    val text = pageText.text
-                    var wordEnd = if (annotation.start > 0 && text[annotation.start - 1] == '\u2060') {
-                        annotation.start - 1
-                    } else {
-                        annotation.start
-                    }
-                    var wordStart = wordEnd
-                    while (wordStart > 0 && !text[wordStart - 1].isWhitespace()) wordStart--
-                    while (wordEnd > wordStart && text[wordEnd - 1] in invisibles) wordEnd--
-                    // Overhang = ink extending past the advance box. Paint
-                    // renders LTR even for Arabic (its pen goes rightward),
-                    // so ink bounds live in [0..W] where W ≈ advance. Compare
-                    // ink_width vs advance and take the excess — that's how
-                    // much a final swash tail extends past the last glyph's
-                    // advance edge. (Same technique the next-bearing branch
-                    // below uses on line ~4735.)
-                    val overhang = if (wordEnd > wordStart) {
-                        inkPaint.getTextPath(text, wordStart, wordEnd, 0f, 0f, inkPath)
-                        inkPath.computeBounds(inkRect, true)
-                        if (inkRect.isEmpty) {
-                            0f
-                        } else {
-                            val advance = inkPaint.measureText(text, wordStart, wordEnd)
-                            maxOf(0f, inkRect.width() - advance)
-                        }
-                    } else 0f
-                    // Leading ink recess of the next word (only when it bounds
-                    // the gap, i.e. the marker is not last on its line).
-                    var nextBearing = 0f
-                    if (gapLeft != rect.left) {
-                        var nextStart = nextWordStart
-                        while (nextStart < text.length && text[nextStart] in invisibles) nextStart++
-                        var nextEnd = nextStart
-                        while (
-                            nextEnd < text.length && nextEnd - nextStart < 12 &&
-                            !text[nextEnd].isWhitespace() && text[nextEnd] != '\u2060'
-                        ) nextEnd++
-                        if (nextEnd > nextStart) {
-                            inkPaint.getTextPath(text, nextStart, nextEnd, 0f, 0f, inkPath)
-                            inkPath.computeBounds(inkRect, true)
-                            if (!inkRect.isEmpty) {
-                                val advance = inkPaint.measureText(text, nextStart, nextEnd)
-                                nextBearing = maxOf(0f, advance - inkRect.right)
-                            }
-                        }
-                    }
-                    // Position the medallion at the CENTER of the advance-box
-                    // gap (previous word's advance edge → next word's advance
-                    // edge, in RTL: rect.right → gapLeft). Then paint an
-                    // opaque halo of fixed radius around it: the halo
-                    // guarantees a symmetric visible margin between the
-                    // ornament and any adjacent ink, regardless of font size,
-                    // font choice, or line-justification stretch. Letter
-                    // tails that reach into the halo are visually clipped by
-                    // the surface-colored fill (standard printed mushaf look).
-                    // Compose text APIs (getBoundingBox / getPathForRange /
-                    // getHorizontalPosition) all return advance-box coords,
-                    // not true glyph-ink extents. So we can only center in
-                    // the advance-box gap. The halo below then draws a
-                    // large surface-colored disc that visually clips any
-                    // swash reaching into the marker's zone, guaranteeing
-                    // equal-looking padding on both sides regardless of
-                    // where the underlying calligraphy actually paints.
                     val haloPaddingPx = MARKER_HALO_PADDING_EM * arabicFontSize.sp.toPx()
                     val haloRadius = w / 2f + haloPaddingPx
-                    // Ayah-final "fasilah" letters overhang their advance
-                    // edge by variable amounts. The end of the word is
-                    // typically a base letter followed by 0..N diacritic
-                    // marks (harakat + tanwin + shaddah). Both the base
-                    // letter's swash AND the tanwin/kasra strokes can paint
-                    // past the advance edge. We measure both.
-                    val emPx = arabicFontSize.sp.toPx()
-                    // Find the last non-diacritic character (the base letter).
-                    var baseIdx = wordEnd - 1
-                    while (baseIdx > wordStart && (text[baseIdx] in 'ً'..'ٟ' || text[baseIdx] in 'ٰ'..'ۭ')) baseIdx--
-                    val baseLetter = if (baseIdx >= wordStart) text[baseIdx] else ' '
-                    // Detect trailing tanwin/vowel-with-descent that paints
-                    // left past the advance (ٌ ٍ ً and their variants).
-                    val lastChar = if (wordEnd > wordStart) text[wordEnd - 1] else ' '
-                    val hasLeftLeaningDiacritic = lastChar in setOf(
-                        'ً', // FATHATAN
-                        'ٍ', // KASRATAN
-                        'ٌ', // DAMMATAN
-                        'ِ', // KASRA
-                        'َ', // FATHA
-                        'ُ', // DAMMA
-                    )
-                    // Look for the character BEFORE the base letter (also
-                    // skipping diacritics) — the ي+ن (ين) and ي+ي/ى (ين etc.)
-                    // FINAL LIGATURES have a much deeper leftward swash than
-                    // a standalone ن or ي. Same for و+ن (ون) forming a bowl.
-                    var prevBaseIdx = baseIdx - 1
-                    while (prevBaseIdx > wordStart && (text[prevBaseIdx] in 'ً'..'ٟ' || text[prevBaseIdx] in 'ٰ'..'ۭ')) prevBaseIdx--
-                    val prevBaseLetter = if (prevBaseIdx >= wordStart) text[prevBaseIdx] else ' '
-                    val isDeepLigature = (baseLetter == 'ن' && (prevBaseLetter == 'ي' || prevBaseLetter == 'و' || prevBaseLetter == 'ى')) ||
-                        (baseLetter == 'ي' && prevBaseLetter == 'ي') ||
-                        // Deep bowl letters preceded by long stem (ي/و/ا) —
-                        // e.g. يق (شَهِيق), وق (سُوق), يص, وص, يض, يش etc.
-                        (baseLetter in setOf('ق', 'ص', 'ض', 'ش', 'س') &&
-                            prevBaseLetter in setOf('ي', 'و', 'ا', 'ى'))
-                    val letterShift = when {
-                        // Deep final ligatures (ين ون ىن يي) — the yaa/waw
-                        // form a bowl that extends far left of the ن advance.
-                        isDeepLigature -> 0.70f
-                        // Big swash: final ن ي ى ش س ص ض ق ف ج ح خ ع غ have
-                        // long tails/bowls extending ~0.32em past advance.
-                        baseLetter in setOf(
-                            'ن', 'ي', 'ى', 'ی', 'ں', 'ٮ', 'ۍ', 'ې', 'ۑ',
-                            'ش', 'س', 'ص', 'ض',
-                            'ق', 'ف',
-                            'ج', 'ح', 'خ',
-                            'ع', 'غ',
-                        ) -> 0.32f
-                        // Medium: ر ز د ذ ط ظ have a curved descent / trailing
-                        // tanwin bowl that reaches ~0.35em past advance.
-                        baseLetter in setOf('ر', 'ز', 'د', 'ذ', 'ط', 'ظ') -> 0.35f
-                        // Small: م ه ة ب ك ل و have compact endings
-                        baseLetter in setOf('م', 'ه', 'ة', 'ب', 'ك', 'ل', 'و') -> 0.10f
-                        else -> 0.10f
+                    // Center the ornament at the VISUAL midpoint of the gap
+                    // between the word on its right (the ayah's last word) and
+                    // the word on its left (the next ayah's first word). In RTL:
+                    //   • right boundary = where the previous word ends = rect.right
+                    //   • left  boundary = where the next word begins on this line
+                    // Compose's layout positions (getHorizontalPosition) are the
+                    // reliable signal here — native Paint text metrics disagree
+                    // with the shaped Quranic run. If the next word wraps to the
+                    // following line, there is no left neighbour on this line, so
+                    // fall back to centering in the marker's own slot.
+                    val markerLine = layout.getLineForOffset(annotation.start)
+                    var nextCharIdx = annotation.end
+                    while (nextCharIdx < pageText.length &&
+                        (pageText.text[nextCharIdx].isWhitespace() ||
+                            pageText.text[nextCharIdx] in MARKER_TRAILING_INVISIBLES)) {
+                        nextCharIdx++
                     }
-                    // Add extra compensation when a tanwin/vowel diacritic
-                    // trails the letter — those marks add ~0.10em of ink
-                    // that extends leftward past the letter's advance.
-                    val diacriticExtra = if (hasLeftLeaningDiacritic) 0.15f else 0f
-                    val prevSwashCompensation = (letterShift + diacriticExtra) * emPx
+                    val nextOnSameLine = nextCharIdx < pageText.length &&
+                        layout.getLineForOffset(nextCharIdx) == markerLine
+                    val emPx = arabicFontSize.sp.toPx()
+                    // A final meem (ـمٌ / ـمُ) draws a small loop that descends and
+                    // trails LEFT past its advance edge further than other endings,
+                    // so its clearance from the ornament is measured to the ink,
+                    // not the advance box. Nudge the ornament's right boundary a
+                    // touch further left for meem-ending ayahs so the loop clears.
+                    val lastBaseIsMeem = run {
+                        val t = pageText.text
+                        var idx = annotation.start - 1
+                        while (idx >= 0 && (t[idx] in MARKER_TRAILING_INVISIBLES ||
+                                t[idx] in 'ً'..'ٟ' || t[idx] in 'ۖ'..'ۭ' || t[idx] == 'ٰ')) idx--
+                        idx >= 0 && t[idx] == 'م'
+                    }
+                    // Visual right boundary of the gap: the previous (ayah-final)
+                    // word's edge. Pull it left a little for a meem's trailing loop.
+                    val gapRight = rect.right - (if (lastBaseIsMeem) MARKER_MEEM_EXTRA_GAP_EM * emPx else 0f)
                     val centerX = if (nextOnSameLine) {
-                        // Advance-box midpoint, shifted LEFT by prev-word
-                        // swash compensation. But clamp: never let the
-                        // medallion center get closer to the next word (gapLeft)
-                        // than half its own width plus a small margin — else
-                        // it collides with the next word's leading edge.
-                        val nextWordMinDistance = w / 2f + 0.15f * emPx
-                        val minCenter = gapLeft + nextWordMinDistance
-                        val naiveCenter = (gapLeft + rect.right) / 2f - prevSwashCompensation
-                        maxOf(naiveCenter, minCenter)
+                        // Both neighbours are on this line: center the ornament at
+                        // the visual midpoint between them so spacing is equal on
+                        // both sides.
+                        val gapLeft = layout.getHorizontalPosition(nextCharIdx, usePrimaryDirection = true)
+                        (gapLeft + gapRight) / 2f
                     } else {
-                        // Line-end marker: no next word on this line to bound
-                        // the gap. Compose places the placeholder rect right
-                        // next to the previous word, so centering in the rect
-                        // hugs that word tightly. Push LEFT (visual) by half
-                        // the slot width plus swash compensation to sit in
-                        // the line-end whitespace with breathing room from
-                        // the previous word — but clamp so the halo doesn't
-                        // extend past the line's visual left edge.
-                        val lineLeft = layout.getLineLeft(markerLine)
-                        val minCenter = lineLeft + w / 2f
-                        val slotCenter = (rect.left + rect.right) / 2f
-                        val shifted = slotCenter - (rect.width / 2f) - prevSwashCompensation
-                        maxOf(shifted, minCenter)
+                        // The next word wrapped to another line — no left neighbour
+                        // here. Hug the ayah's last word with a consistent gap so
+                        // the ornament stays with the verse it terminates instead
+                        // of floating in the line-end whitespace.
+                        val hug = gapRight - MARKER_GAP_BEFORE_EM * emPx - w / 2f
+                        maxOf(hug, layout.getLineLeft(markerLine) + w / 2f)
                     }
                     val left = centerX - w / 2f
                     val top = rect.top + (rect.height - h) / 2f
