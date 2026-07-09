@@ -219,6 +219,17 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
+        <!-- Chapter Recitation Service (single-track): Fortress duas + Bukhari hadith,
+             with a MediaStyle notification + lock-screen controls. -->
+        <service
+            android:name=".services.ChapterRecitationService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </service>
+
         <!-- Driving Audio Service for travel dua, hadith, and TTS with notification controls -->
         <service
             android:name=".services.DrivingAudioService"

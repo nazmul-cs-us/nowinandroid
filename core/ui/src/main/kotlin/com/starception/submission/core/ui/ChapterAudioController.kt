@@ -55,11 +55,38 @@ object ChapterAudioController {
     var onPlaybackStateChanged: ((isPlaying: Boolean, title: String) -> Unit)? = null
     var onProgressChanged: ((positionMs: Int, durationMs: Int) -> Unit)? = null
 
+    /**
+     * Optional delegate, supplied by the app, that plays through a foreground MediaSession service
+     * (ChapterRecitationService) so playback shows a system notification + lock-screen controls.
+     * When set, toggle() delegates play/pause to it instead of using the in-app MediaPlayer.
+     * The service reports state back via [updateExternalState] / [updateExternalProgress].
+     *   play(url, title) — start (or toggle if same url); togglePlayPause() — pause/resume current.
+     */
+    var playbackDelegate: PlaybackDelegate? = null
+
+    interface PlaybackDelegate {
+        fun play(url: String, title: String)
+        fun togglePlayPause()
+        fun seekTo(positionMs: Int)
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var resolveJob: Job? = null
     private var progressJob: Job? = null
 
     fun toggle(url: String) {
+        // Delegate to the notification-backed service when available.
+        playbackDelegate?.let { delegate ->
+            if (currentUrl == url) {
+                delegate.togglePlayPause()
+            } else {
+                currentUrl = url
+                loadingUrl = url
+                delegate.play(url, currentTitle.orEmpty())
+            }
+            return
+        }
+
         val player = mp
         if (currentUrl == url && player != null) {
             if (isPlaying) {
@@ -99,11 +126,23 @@ object ChapterAudioController {
 
     /** Play/pause the currently loaded track — invoked by the global media mini-bar. */
     fun togglePlayPause() {
+        playbackDelegate?.let { it.togglePlayPause(); return }
         currentUrl?.let { toggle(it) }
+    }
+
+    /**
+     * Called by the app when the notification-backed service reports its state, so the news-card
+     * play/pause icons (Compose state) stay in sync with the service/notification.
+     */
+    fun updateExternalState(playing: Boolean, title: String) {
+        isPlaying = playing
+        loadingUrl = null
+        currentTitle = title
     }
 
     /** Seek the current track — invoked by the global media mini-bar. */
     fun seekTo(positionMs: Int) {
+        playbackDelegate?.let { it.seekTo(positionMs); return }
         mp?.let { player ->
             runCatching { player.seekTo(positionMs) }
             onProgressChanged?.invoke(player.currentPosition, player.duration)

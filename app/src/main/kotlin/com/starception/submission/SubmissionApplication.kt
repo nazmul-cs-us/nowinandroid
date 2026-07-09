@@ -130,6 +130,41 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                 com.starception.submission.media.GlobalMediaViewModel.onFortressSeekRequested =
                     { pos -> com.starception.submission.core.ui.ChapterAudioController.seekTo(pos) }
 
+                // Route Fortress chapter playback through ChapterRecitationService so it shows a
+                // system notification + lock-screen media controls (like Surah). The controller
+                // resolves the CDN/local source here, then hands the final source to the service.
+                val appCtx = applicationContext
+                val delegateScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+                com.starception.submission.core.ui.ChapterAudioController.playbackDelegate =
+                    object : com.starception.submission.core.ui.ChapterAudioController.PlaybackDelegate {
+                        override fun play(url: String, title: String) {
+                            delegateScope.launch {
+                                val source = runCatching {
+                                    audioDownloadHelper.resolveFortressAudioUrlToLocalPath(url)
+                                }.getOrNull() ?: url
+                                com.starception.submission.services.ChapterRecitationService.play(
+                                    appCtx, source, title, "Fortress of the Muslim",
+                                )
+                            }
+                        }
+                        override fun togglePlayPause() {
+                            com.starception.submission.services.ChapterRecitationService.toggle(appCtx)
+                        }
+                        override fun seekTo(positionMs: Int) { /* seek from bar not wired for service yet */ }
+                    }
+
+                // Bridge the service's playback state/progress back to the in-app media bar
+                // (GlobalMediaViewModel) and the news-card play/pause icons (ChapterAudioController).
+                com.starception.submission.services.ChapterRecitationState.onStateChanged =
+                    { playing, title, _ ->
+                        com.starception.submission.core.ui.ChapterAudioController.updateExternalState(playing, title)
+                        com.starception.submission.media.GlobalMediaViewModel.onFortressPlaybackChanged?.invoke(playing, title)
+                    }
+                com.starception.submission.services.ChapterRecitationState.onProgressChanged =
+                    { pos, dur ->
+                        com.starception.submission.media.GlobalMediaViewModel.onFortressProgressChanged?.invoke(pos, dur)
+                    }
+
                 Log.d("SubmissionApplication", "Background initialization completed")
             } catch (e: Exception) {
                 Log.e("SubmissionApplication", "Error during background initialization", e)

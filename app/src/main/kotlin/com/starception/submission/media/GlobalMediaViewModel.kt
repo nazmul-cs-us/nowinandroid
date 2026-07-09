@@ -579,6 +579,23 @@ class GlobalMediaViewModel(
                 return
             }
         }
+
+        // Check the Fortress/Hadith recitation service (survives app close/reopen). Its state is
+        // a process-wide snapshot, so we can restore the mini-bar without a bound connection.
+        val recite = com.starception.submission.services.ChapterRecitationState
+        if (recite.isActive) {
+            onFortressPlaybackStarted(recite.title)
+            _controllerState.update { current ->
+                current.copy(
+                    playback = current.playback.copy(
+                        isPlaying = recite.isPlaying,
+                        currentPosition = recite.positionMs,
+                        duration = recite.durationMs,
+                    ),
+                )
+            }
+            return
+        }
     }
 
     fun cleanup() {

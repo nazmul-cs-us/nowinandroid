@@ -568,12 +568,13 @@ fun HadithDetailScreen(
                 hadith != null -> {
                     val handlePlayClick: () -> Unit = {
                             if (isPlaying) {
-                                // Stop playback
+                                // Stop playback (local player, TTS, and the recitation service)
                                 mediaPlayer?.stop()
                                 mediaPlayer?.release()
                                 mediaPlayer = null
                                 textToSpeech?.stop()
                                 sherpaOnnxTts.stopSpeaking()
+                                com.starception.submission.services.ChapterRecitationService.stop(context)
                                 isPlaying = false
                             } else {
                                 // Start playback
@@ -585,27 +586,18 @@ fun HadithDetailScreen(
                                     val audioFile = audioDownloadHelper.resolveHadithAudioFile(hadithNumber)
 
                                     if (audioFile != null) {
-                                        // File found locally - play it
+                                        // File found locally - play it through the foreground
+                                        // ChapterRecitationService so it shows a system notification
+                                        // + lock-screen media controls (same as Surah/Fortress).
                                         try {
-                                            mediaPlayer = MediaPlayer().apply {
-                                                setDataSource(audioFile.absolutePath)
-                                                setOnCompletionListener { mp ->
-                                                    mp.release()
-                                                    mediaPlayer = null
-                                                    isPlaying = false
-                                                    if (autoAdvance) handleSkipNext()
-                                                }
-                                                setOnErrorListener { mp, _, _ ->
-                                                    mp.release()
-                                                    mediaPlayer = null
-                                                    isPlaying = false
-                                                    true
-                                                }
-                                                prepare()
-                                                start()
-                                            }
+                                            com.starception.submission.services.ChapterRecitationService.play(
+                                                context,
+                                                audioFile.absolutePath,
+                                                "Hadith #$hadithNumber",
+                                                "Sahih Bukhari",
+                                            )
                                             isPlaying = true
-                                            android.util.Log.i("HadithDetailScreen", "Playing Bengali audio: ${audioFile.absolutePath}")
+                                            android.util.Log.i("HadithDetailScreen", "Playing Bengali audio via service: ${audioFile.absolutePath}")
                                         } catch (e: Exception) {
                                             android.util.Log.e("HadithDetailScreen", "Error playing audio: ${e.message}")
                                             // Fall back to TTS on playback error
@@ -652,24 +644,13 @@ fun HadithDetailScreen(
                                                         // Download successful - resolve and play
                                                         val downloadedFile = audioDownloadHelper.resolveHadithAudioFile(hadithNumber)
                                                         if (downloadedFile != null) {
-                                                            android.util.Log.i("HadithDetailScreen", "Download complete, playing: ${downloadedFile.absolutePath}")
-                                                            mediaPlayer = MediaPlayer().apply {
-                                                                setDataSource(downloadedFile.absolutePath)
-                                                                setOnCompletionListener { mp ->
-                                                                    mp.release()
-                                                                    mediaPlayer = null
-                                                                    isPlaying = false
-                                                                    if (autoAdvance) handleSkipNext()
-                                                                }
-                                                                setOnErrorListener { mp, _, _ ->
-                                                                    mp.release()
-                                                                    mediaPlayer = null
-                                                                    isPlaying = false
-                                                                    true
-                                                                }
-                                                                prepare()
-                                                                start()
-                                                            }
+                                                            android.util.Log.i("HadithDetailScreen", "Download complete, playing via service: ${downloadedFile.absolutePath}")
+                                                            com.starception.submission.services.ChapterRecitationService.play(
+                                                                context,
+                                                                downloadedFile.absolutePath,
+                                                                "Hadith #$hadithNumber",
+                                                                "Sahih Bukhari",
+                                                            )
                                                             isPlaying = true
                                                         } else {
                                                             // Shouldn't happen but fall back to TTS
