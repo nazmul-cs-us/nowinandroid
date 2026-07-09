@@ -157,7 +157,7 @@
     },
     "databases/news.db": {
       "size": 6389760,
-      "sha256": "2a306ab5797cea9c58c1ca6b0e0f560b4fa97d6c7c99709f894e03ded29ff859",
+      "sha256": "e92405ba96e8901a018b5967fd4f5fba265051b6ebc6fe613dafc994190aad8f",
       "category": "news",
       "required": true
     },

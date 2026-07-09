@@ -201,6 +201,7 @@ import com.starception.submission.core.duadatabase.DuaDatabase
 import com.starception.submission.core.duadatabase.HadithReference
 import com.starception.submission.core.duadatabase.toHadithReference
 import com.starception.submission.core.qurandatabase.QuranDatabase
+import com.starception.submission.core.ui.ChapterAudioController
 import com.starception.submission.core.ui.DynamicSkyHeader
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.core.ui.getCurrentSkyPeriodForTheme
@@ -919,9 +920,10 @@ fun DuaDetailScreen(
     val arabicFontFamily = getArabicFontFamilyForDua(selectedFont)
     val scope = rememberCoroutineScope()
 
-    // Chapter recitation audio (streamed, one chapter at a time). The route title is
-    // "{Chapter}: Dua N", so the chapter title is everything before the first colon.
-    val chapterAudio = rememberChapterAudioPlayer()
+    // Chapter recitation audio (one chapter at a time), via the shared process-wide
+    // ChapterAudioController — same player the news cards use, so it downloads-and-caches
+    // from the CDN and drives the global media mini-bar. The route title is "{Chapter}: Dua N",
+    // so the chapter title is everything before the first colon.
     var chapterAudioUrl by remember(title) { mutableStateOf<String?>(null) }
     LaunchedEffect(title) {
         val chTitle = title.substringBefore(":").trim()
@@ -2820,10 +2822,18 @@ fun DuaDetailScreen(
                             }
                             Spacer(modifier = Modifier.width(4.dp))
                         }
-                        // Chapter recitation play/pause (streamed) when audio is available.
+                        // Chapter recitation play/pause when audio is available. Uses the shared
+                        // ChapterAudioController (same as news cards) so it downloads-and-caches
+                        // from the CDN AND surfaces the global media mini-bar with progress.
                         chapterAudioUrl?.let { audioUrl ->
-                            IconButton(onClick = { chapterAudio.toggle(audioUrl) }) {
-                                if (chapterAudio.isLoading) {
+                            val isThisPlaying = ChapterAudioController.currentUrl == audioUrl &&
+                                ChapterAudioController.isPlaying
+                            val isThisLoading = ChapterAudioController.loadingUrl == audioUrl
+                            IconButton(onClick = {
+                                ChapterAudioController.currentTitle = title
+                                ChapterAudioController.toggle(audioUrl)
+                            }) {
+                                if (isThisLoading) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(20.dp),
                                         strokeWidth = 2.dp,
@@ -2831,8 +2841,8 @@ fun DuaDetailScreen(
                                     )
                                 } else {
                                     Icon(
-                                        imageVector = if (chapterAudio.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                        contentDescription = if (chapterAudio.isPlaying) "Pause recitation" else "Play chapter recitation",
+                                        imageVector = if (isThisPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        contentDescription = if (isThisPlaying) "Pause recitation" else "Play chapter recitation",
                                         tint = toolbarContentColor
                                     )
                                 }
@@ -3973,52 +3983,7 @@ private fun duaTeslaSliderColors() = SliderDefaults.colors(
  * MediaPlayer (no caching); only one chapter plays at a time. Created via remember and
  * released when the screen leaves composition.
  */
-private class ChapterAudioPlayer {
-    var isPlaying by mutableStateOf(false)
-        private set
-    var isLoading by mutableStateOf(false)
-        private set
-    private var mp: android.media.MediaPlayer? = null
-    private var url: String? = null
-
-    fun toggle(audioUrl: String) {
-        val player = mp
-        if (url == audioUrl && player != null) {
-            if (player.isPlaying) { player.pause(); isPlaying = false }
-            else { player.start(); isPlaying = true }
-            return
-        }
-        release()
-        url = audioUrl
-        isLoading = true
-        val newPlayer = android.media.MediaPlayer()
-        newPlayer.setAudioAttributes(
-            android.media.AudioAttributes.Builder()
-                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build()
-        )
-        newPlayer.setOnPreparedListener { isLoading = false; newPlayer.start(); isPlaying = true }
-        newPlayer.setOnCompletionListener { isPlaying = false }
-        newPlayer.setOnErrorListener { _, _, _ -> isLoading = false; isPlaying = false; url = null; true }
-        mp = newPlayer
-        try {
-            newPlayer.setDataSource(audioUrl)
-            newPlayer.prepareAsync()
-        } catch (_: Exception) {
-            isLoading = false; isPlaying = false; url = null
-        }
-    }
-
-    fun release() {
-        mp?.let { runCatching { it.stop() }; it.release() }
-        mp = null; isPlaying = false; isLoading = false; url = null
-    }
-}
-
-@Composable
-private fun rememberChapterAudioPlayer(): ChapterAudioPlayer {
-    val player = remember { ChapterAudioPlayer() }
-    DisposableEffect(Unit) { onDispose { player.release() } }
-    return player
-}
+// The chapter recitation player now uses the shared core/ui ChapterAudioController (a
+// process-wide singleton with CDN download-and-cache + global media mini-bar integration),
+// replacing the former private ChapterAudioPlayer duplicate that streamed the raw URL and
+// bypassed the media bar.

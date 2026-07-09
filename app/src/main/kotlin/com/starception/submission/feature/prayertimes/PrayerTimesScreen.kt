@@ -1403,14 +1403,12 @@ fun PrayerTimesScreen(
                     }
                 )
         ) {
-            val calculatedPrayerAlert = remember(currentTime, prayerTimes, notificationPreferences, storedOffsets) {
-                calculatePrayerAlertState(currentTime, prayerTimes, notificationPreferences, storedOffsets)
-            }
-            // Use override (e.g. test simulation) when active, otherwise use real calculation.
-            val prayerAlertState = if (prayerAlertOverride.isActive) prayerAlertOverride else calculatedPrayerAlert
-            LaunchedEffect(calculatedPrayerAlert) {
-                onPrayerAlertChanged(calculatedPrayerAlert)
-            }
+            // Single source of truth: Home renders the SAME VM-produced prayer-alert state
+            // (prayerAlertOverride = mainViewModel.prayerAlertState) that every other page
+            // renders, so Home and other pages are always in sync. The VM's app-wide ticker is
+            // the sole producer (it reads the same cached prayer times Home's calculator writes),
+            // so Home no longer computes or pushes its own banner.
+            val prayerAlertState = prayerAlertOverride
 
             val silentModeState by com.starception.submission.feature.prayertimes.wobble.rememberSilentModeState()
             val islamicEventStateProvider = remember {

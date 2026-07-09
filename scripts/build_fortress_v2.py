@@ -31,7 +31,7 @@ N_CHAPTERS = 132
 def load_waf_arabic():
     """{chapter_id: [arabic per dua]} from wafaaelmaandy's JSON — used to fill the
     Arabic that islamawareness omits for ~100 chapters (dua counts align 1:1)."""
-    raw = fetch(WAF_URL).lstrip("﻿")
+    raw = fetch(WAF_URL, encoding="utf-8").lstrip("﻿")
     data = json.loads(raw)["English"]
     out = {}
     for ch in data:
@@ -39,10 +39,15 @@ def load_waf_arabic():
     return out
 
 
-def fetch(url):
+def fetch(url, encoding="cp1252"):
+    # islamawareness.net serves the Fortress pages as Windows-1252 (cp1252) and declares no
+    # charset. They contain cp1252 "smart punctuation" — 0x92 ' , 0x93/0x94 " " , 0x96/0x97 – — ,
+    # 0x85 … — which are INVALID UTF-8. Decoding as UTF-8 with errors="replace" turned every one
+    # of those into U+FFFD (�), corrupting titles/translations. So default to cp1252 here.
+    # The wafaaelmaandy JSON is genuine UTF-8 (Arabic), so its caller passes encoding="utf-8".
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=30) as r:
-        return r.read().decode("utf-8", errors="replace")
+        return r.read().decode(encoding)
 
 
 def parse_index():

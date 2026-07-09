@@ -93,11 +93,18 @@ class MainActivityViewModel @Inject constructor(
     // Timestamp (elapsedRealtime) of the last push from the Home screen. Home holds the
     // freshest, live-recalculated prayer times, so while it's active (pushing every minute)
     // we let it win. When Home leaves composition the pushes stop, and the app-wide ticker
-    // below takes over so the countdown keeps updating on other screens (e.g. Surah detail).
-    private var lastHomePushElapsedMs: Long = 0L
+    // When a debug/test alert is injected (DebugPrayerAlertReceiver) the ticker must not
+    // overwrite it. Any real value clears this flag.
+    private var debugAlertActive: Boolean = false
 
+    /**
+     * SINGLE SOURCE OF TRUTH for the prayer-alert banner. Every screen — Home included —
+     * renders this one value, so Home and all other pages can never drift out of sync.
+     * Home no longer computes/pushes its own banner; the app-wide ticker below is the sole
+     * producer (except debug injection). This retains the old public entry point so a debug
+     * injection path can still force a value.
+     */
     fun updatePrayerAlert(state: PrayerAlertState) {
-        lastHomePushElapsedMs = android.os.SystemClock.elapsedRealtime()
         _prayerAlertState.value = state
     }
 
@@ -106,28 +113,22 @@ class MainActivityViewModel @Inject constructor(
     }
 
     /**
-     * App-wide minute ticker that keeps the prayer-alert countdown live on EVERY screen.
-     * Previously the countdown was produced only inside PrayerTimesScreen (Home); leaving Home
-     * froze it, so the banner on the Surah detail page (and other pages) showed stale data.
-     *
-     * Recomputes from the cached prayer times + settings via the shared calculator. Skips its
-     * write when Home pushed recently (Home's live data is fresher), so there's no dual-writer
-     * flicker while Home is on screen.
+     * App-wide minute ticker — the ONLY producer of the live prayer-alert countdown. Runs
+     * regardless of which screen is showing, so the banner stays identical and live on Home,
+     * the Surah/Dua detail pages, and every tab. Recomputes from the shared cached prayer times
+     * (which Home's calculator writes to, so it's equally fresh) via the shared calculator.
      */
     private fun startPrayerAlertTicker() {
         viewModelScope.launch {
+            // Fire immediately so the banner is correct on first paint, then every 15s so the
+            // "Xm left" text is never more than a few seconds stale on any screen.
             while (true) {
                 try {
-                    // If Home pushed within the last 90s it's active and authoritative — skip.
-                    val sinceHome = android.os.SystemClock.elapsedRealtime() - lastHomePushElapsedMs
-                    if (sinceHome > 90_000L) {
-                        computeAndPublishPrayerAlert()
-                    }
+                    if (!debugAlertActive) computeAndPublishPrayerAlert()
                 } catch (e: Exception) {
                     Log.w("MainActivityViewModel", "Prayer alert ticker failed", e)
                 }
-                // Align to the top of the next minute-ish; 30s keeps the "Xm left" text prompt.
-                delay(30_000L)
+                delay(15_000L)
             }
         }
     }
@@ -236,7 +237,14 @@ class MainActivityViewModel @Inject constructor(
         // can be exercised without waiting for an actual prayer window.
         viewModelScope.launch {
             com.starception.submission.util.DebugPrayerAlertBus.state.collect { injected ->
-                if (injected != null) _prayerAlertState.value = injected
+                if (injected != null) {
+                    // Latch so the app-wide ticker doesn't overwrite the simulated alert.
+                    // A cleared/inactive injection releases the latch back to real data.
+                    debugAlertActive = injected.isActive
+                    _prayerAlertState.value = injected
+                } else {
+                    debugAlertActive = false
+                }
             }
         }
     }
