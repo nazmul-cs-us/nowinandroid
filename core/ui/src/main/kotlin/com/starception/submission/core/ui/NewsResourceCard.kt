@@ -143,7 +143,7 @@ fun NewsResourceCardExpanded(
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         if (chapterAudioUrl != null) {
-                            ChapterPlayButton(chapterAudioUrl)
+                            ChapterPlayButton(chapterAudioUrl, userNewsResource.title)
                         }
                         BookmarkButton(isBookmarked, onToggleBookmark)
                     }
@@ -224,10 +224,14 @@ private fun extractChapterAudioUrl(content: String, type: String): String? {
 }
 
 @Composable
-private fun ChapterPlayButton(audioUrl: String) {
+private fun ChapterPlayButton(audioUrl: String, title: String) {
     val isThisPlaying = ChapterAudioController.currentUrl == audioUrl && ChapterAudioController.isPlaying
     val isThisLoading = ChapterAudioController.loadingUrl == audioUrl
-    IconButton(onClick = { ChapterAudioController.toggle(audioUrl) }) {
+    IconButton(onClick = {
+        // Set the title before toggling so the global media bar can label this track.
+        ChapterAudioController.currentTitle = title
+        ChapterAudioController.toggle(audioUrl)
+    }) {
         if (isThisLoading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(20.dp),

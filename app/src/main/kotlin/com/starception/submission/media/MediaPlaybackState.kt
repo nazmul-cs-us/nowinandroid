@@ -23,6 +23,11 @@ sealed class MediaSource {
         val collectionName: String = "Sahih Al-Bukhari",
     ) : MediaSource()
 
+    /** Fortress-of-the-Muslim chapter recitation from a news card (ChapterAudioController) */
+    data class Fortress(
+        val title: String = "",
+    ) : MediaSource()
+
     /** No active media source */
     data object None : MediaSource()
 }

@@ -90,6 +90,15 @@ android {
         // useLegacyPackaging removed for 16KB page size support (AGP 8.5.1+ handles alignment)
         jniLibs.useLegacyPackaging = false
     }
+
+    androidResources {
+        // Audio recitations (quran/hadith/fortress) are CDN-only: staged under
+        // src/main/assets/audio/ for upload to R2 but must NOT ship in the APK. The app
+        // downloads them on demand into cdn_assets/. Bundling them would (a) bloat the APK
+        // ~68 MB and (b) make AssetDownloadManager.isAssetBundled() short-circuit the
+        // on-demand download so files never cache and the sync banner never shows.
+        ignoreAssetsPattern = "!audio"
+    }
     testOptions.unitTests.isIncludeAndroidResources = true
     namespace = "com.starception.submission"
 }

@@ -118,6 +118,7 @@ import androidx.compose.runtime.LaunchedEffect
 import com.starception.submission.feature.prayertimes.components.ElasticTopShape
 import com.starception.submission.feature.prayertimes.wobble.AlertPhase
 import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
+import com.starception.submission.feature.prayertimes.wobble.calculatePrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.feature.prayertimes.utils.convertToArabicNumerals
 import android.os.Build
@@ -2732,60 +2733,7 @@ private fun getLocationWithCountryCode(
     return fallback
 }
 
-private fun calculatePrayerAlertState(
-    currentTime: LocalTime,
-    prayerTimes: com.starception.submission.prayer.model.DayPrayerTimes?,
-    notificationPrefs: com.starception.submission.prayer.model.PrayerNotificationPreferences,
-    timeOffsets: com.starception.submission.prayer.model.PrayerTimeOffsets,
-): PrayerAlertState {
-    if (prayerTimes == null) return PrayerAlertState()
-
-    // Apply the user's per-prayer offset so the banner aligns with the time
-    // shown on the prayer card and the Smart Prediction tile. Without this,
-    // a +3m offset on Dhuhr would make "Xm left" off by 3 vs. what the user sees.
-    val actualPrayers = prayerTimes.getActualPrayers().map { p ->
-        val adjusted = p.time.plusMinutes(timeOffsets.getOffset(p.name).toLong())
-        p.copy(time = adjusted)
-    }
-    val currentPrayer = actualPrayers.firstOrNull {
-        currentTime.isAfter(it.time) && it.name != "Sunrise" &&
-            (actualPrayers.getOrNull(actualPrayers.indexOf(it) + 1)?.let { next ->
-                currentTime.isBefore(next.time)
-            } ?: currentTime.isBefore(it.time.plusHours(2)))
-    }
-
-    if (currentPrayer != null) {
-        val goToMosqueDuration = notificationPrefs.getGoToMosqueDurationForPrayer(currentPrayer.name).toLong()
-        val minutesSince = Duration.between(currentPrayer.time, currentTime).toMinutes()
-        val minutesLeft = goToMosqueDuration - minutesSince
-        if (minutesLeft > 0) {
-            return PrayerAlertState(
-                isActive = true,
-                prayerName = currentPrayer.name,
-                phase = AlertPhase.GO_TO_MOSQUE,
-                countdownMinutes = minutesLeft.toInt(),
-                totalMinutes = goToMosqueDuration.toInt(),
-                displayText = "${getPrayerDisplayName(currentPrayer.name)} · Go now to mosque, ${minutesLeft}m left"
-            )
-        }
-    }
-
-    val nextPrayer = actualPrayers.firstOrNull { it.time.isAfter(currentTime) && it.name != "Sunrise" }
-    if (nextPrayer != null) {
-        val priorMinutes = notificationPrefs.getPriorMinutesForPrayer(nextPrayer.name).toLong()
-        val minutesUntil = Duration.between(currentTime, nextPrayer.time).toMinutes()
-        if (minutesUntil in 1..priorMinutes) {
-            return PrayerAlertState(
-                isActive = true,
-                prayerName = nextPrayer.name,
-                phase = AlertPhase.BEFORE_PRAYER,
-                countdownMinutes = minutesUntil.toInt(),
-                totalMinutes = priorMinutes.toInt(),
-                displayText = "${getPrayerDisplayName(nextPrayer.name)} in ${minutesUntil}m"
-            )
-        }
-    }
-
-    return PrayerAlertState()
-}
+// calculatePrayerAlertState moved to wobble/PrayerAlertCalculator.kt so MainActivityViewModel's
+// app-wide minute ticker can reuse the exact same logic (keeps the banner countdown live on
+// every screen, not just Home).
 

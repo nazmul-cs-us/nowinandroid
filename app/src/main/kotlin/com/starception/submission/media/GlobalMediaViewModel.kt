@@ -60,6 +60,16 @@ class GlobalMediaViewModel(
          */
         var onHadithSkipNextRequested: (() -> Unit)? = null
         var onHadithSkipPreviousRequested: (() -> Unit)? = null
+
+        // ---- Fortress (chapter recitation) — mirrors the hadith callback pattern ----
+        /** Notify state changes from ChapterAudioController (via the app bridge). */
+        var onFortressPlaybackChanged: ((isPlaying: Boolean, title: String) -> Unit)? = null
+        /** Progress updates (position/duration in ms) for the mini-bar sweep. */
+        var onFortressProgressChanged: ((currentPosition: Int, duration: Int) -> Unit)? = null
+        /** Reverse channel: mini-bar play/pause → toggle ChapterAudioController. */
+        var onFortressPlayPauseRequested: (() -> Unit)? = null
+        /** Reverse channel: mini-bar seek → seek ChapterAudioController. */
+        var onFortressSeekRequested: ((position: Int) -> Unit)? = null
     }
 
     private val _controllerState = MutableStateFlow(MediaControllerUiState())
@@ -196,6 +206,27 @@ class GlobalMediaViewModel(
                 }
             }
         }
+
+        // Register fortress (chapter recitation) listeners — same shape as hadith.
+        onFortressPlaybackChanged = { isPlaying, title ->
+            if (isPlaying) {
+                onFortressPlaybackStarted(title)
+            } else {
+                onFortressPlaybackStopped()
+            }
+        }
+        onFortressProgressChanged = { currentPosition, duration ->
+            if (activeSource is MediaSource.Fortress) {
+                _controllerState.update { current ->
+                    current.copy(
+                        playback = current.playback.copy(
+                            currentPosition = currentPosition,
+                            duration = duration,
+                        )
+                    )
+                }
+            }
+        }
     }
 
     // --- Public API: called by services/ViewModels to show the controller ---
@@ -276,6 +307,42 @@ class GlobalMediaViewModel(
     }
 
     /**
+     * Called when a Fortress chapter recitation starts/resumes (via the app bridge from
+     * ChapterAudioController). Shows the mini-bar with a seekable progress sweep.
+     */
+    private fun onFortressPlaybackStarted(title: String) {
+        activeSource = MediaSource.Fortress(title = title)
+        _controllerState.update { current ->
+            // Preserve position/duration if this is just a resume of the same track.
+            val keepProgress = current.playback.source is MediaSource.Fortress &&
+                current.playback.title == title
+            current.copy(
+                isVisible = true,
+                hasLanguageToggle = false,
+                playback = current.playback.copy(
+                    isPlaying = true,
+                    title = title,
+                    subtitle = "Fortress of the Muslim",
+                    currentPosition = if (keepProgress) current.playback.currentPosition else 0,
+                    duration = if (keepProgress) current.playback.duration else 0,
+                    source = activeSource,
+                ),
+            )
+        }
+        Log.d(TAG, "Fortress playback started: $title")
+    }
+
+    /**
+     * Called when Fortress playback pauses or stops. Pause keeps the bar visible (paused);
+     * a full stop/completion hides it.
+     */
+    private fun onFortressPlaybackStopped() {
+        if (activeSource is MediaSource.Fortress) {
+            hideController()
+        }
+    }
+
+    /**
      * Called when playback stops from a source. Hides the controller.
      */
     fun onPlaybackStopped() {
@@ -303,6 +370,7 @@ class GlobalMediaViewModel(
             is MediaSource.Quran -> quranService?.togglePlayPause()
             is MediaSource.DrivingMode -> drivingService?.resume()
             is MediaSource.Hadith -> onHadithPlayPauseRequested?.invoke()
+            is MediaSource.Fortress -> onFortressPlayPauseRequested?.invoke()
             is MediaSource.None -> {}
         }
     }
@@ -313,6 +381,7 @@ class GlobalMediaViewModel(
             is MediaSource.Quran -> quranService?.togglePlayPause()
             is MediaSource.DrivingMode -> drivingService?.pause()
             is MediaSource.Hadith -> onHadithPlayPauseRequested?.invoke()
+            is MediaSource.Fortress -> onFortressPlayPauseRequested?.invoke()
             is MediaSource.None -> {}
         }
     }
@@ -323,6 +392,7 @@ class GlobalMediaViewModel(
             is MediaSource.Quran -> quranService?.playNext()
             is MediaSource.DrivingMode -> drivingService?.skipCurrent()
             is MediaSource.Hadith -> onHadithSkipNextRequested?.invoke()
+            is MediaSource.Fortress -> {} // Single-track player; no chapter skip
             is MediaSource.None -> {}
         }
     }
@@ -333,6 +403,7 @@ class GlobalMediaViewModel(
             is MediaSource.Quran -> quranService?.playPrevious()
             is MediaSource.DrivingMode -> {} // Driving mode doesn't support previous
             is MediaSource.Hadith -> onHadithSkipPreviousRequested?.invoke()
+            is MediaSource.Fortress -> {} // Single-track player; no chapter skip
             is MediaSource.None -> {}
         }
     }
@@ -342,6 +413,7 @@ class GlobalMediaViewModel(
             is MediaSource.Quran -> quranService?.seekTo(position)
             is MediaSource.DrivingMode -> {} // Driving mode doesn't support seek
             is MediaSource.Hadith -> {} // Hadith doesn't support seek
+            is MediaSource.Fortress -> onFortressSeekRequested?.invoke(position)
             is MediaSource.None -> {}
         }
     }
@@ -351,6 +423,7 @@ class GlobalMediaViewModel(
             is MediaSource.Quran -> quranService?.setVolume(volume)
             is MediaSource.DrivingMode -> {} // Volume managed by system
             is MediaSource.Hadith -> {} // Volume managed by system
+            is MediaSource.Fortress -> {} // Volume managed by system
             is MediaSource.None -> {}
         }
         _controllerState.update { it.copy(volume = volume) }

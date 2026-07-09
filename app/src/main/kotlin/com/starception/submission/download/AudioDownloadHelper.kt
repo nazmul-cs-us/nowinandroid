@@ -5,7 +5,13 @@ import android.util.Log
 import com.starception.submission.feature.quran.AudioLanguage
 import com.starception.submission.feature.quran.QuranData
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,6 +37,13 @@ class AudioDownloadHelper @Inject constructor(
         private const val SD_QURAN_ENGLISH = "/sdcard/Quran/English"
         private const val SD_BUKHARI_BN = "/sdcard/Bukhari/bukhari_audio_bn"
     }
+
+    // App-scoped: on-demand downloads must outlive the (cancellable) UI coroutine that
+    // requested playback, so a re-tap or navigating away doesn't abort a download in progress.
+    private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // Coalesces concurrent requests for the same file into a single shared download.
+    private val inFlight = ConcurrentHashMap<String, Deferred<AssetDownloadManager.DownloadState>>()
 
     // ======================== Quran Audio ========================
 
@@ -186,6 +199,58 @@ class AudioDownloadHelper @Inject constructor(
      */
     fun getHadithCdnKey(hadithNumber: Int): String {
         return "audio/bukhari/bn/bukhari_${String.format("%04d", hadithNumber)}.ogg"
+    }
+
+    // ======================== Fortress (chapter dua) Audio ========================
+
+    /**
+     * Resolve a Fortress chapter audio URL to a LOCAL playable file path, downloading and
+     * caching it on demand if it isn't present yet. Returns null when the URL isn't a fortress
+     * CDN asset or the download fails — the caller should then stream the URL directly.
+     *
+     * Backs the play-local-else-download-then-cache behaviour of the news-card chapter play
+     * button (ChapterAudioController.localAudioResolver).
+     */
+    suspend fun resolveFortressAudioUrlToLocalPath(audioUrl: String): String? {
+        val cdnKey = cdnKeyFromUrl(audioUrl) ?: return null
+
+        // 1. Already downloaded → play the local copy.
+        downloadManager.getAssetFile(cdnKey)?.let {
+            Log.d(TAG, "Fortress audio found in cdn_assets: $cdnKey")
+            return it.absolutePath
+        }
+
+        // 2. Download on demand on the app scope (survives caller cancellation), then return
+        //    the local path. Concurrent requests for the same file share one download.
+        Log.i(TAG, "Fortress audio not local, downloading on demand: $cdnKey")
+        val deferred = inFlight.getOrPut(cdnKey) {
+            downloadScope.async {
+                try {
+                    downloadAudio(cdnKey)
+                } finally {
+                    inFlight.remove(cdnKey)
+                }
+            }
+        }
+        val state = deferred.await()
+        return if (state is AssetDownloadManager.DownloadState.Completed) {
+            downloadManager.getAssetFile(cdnKey)?.absolutePath
+        } else {
+            Log.w(TAG, "Fortress audio download did not complete for $cdnKey: $state")
+            null
+        }
+    }
+
+    /**
+     * Derive the manifest/CDN key from a fortress audio URL, e.g.
+     * "https://pub-xxx.r2.dev/audio/fortress/arabic/001.mp3" -> "audio/fortress/arabic/001.mp3".
+     * Returns null for anything that isn't a fortress CDN audio URL (so the caller streams it).
+     */
+    private fun cdnKeyFromUrl(audioUrl: String): String? {
+        val marker = "audio/fortress/"
+        val idx = audioUrl.indexOf(marker)
+        if (idx < 0) return null
+        return audioUrl.substring(idx).substringBefore('?').substringBefore('#')
     }
 
     // ======================== Download Helpers ========================

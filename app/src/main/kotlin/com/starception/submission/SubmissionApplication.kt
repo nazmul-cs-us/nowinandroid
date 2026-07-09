@@ -59,6 +59,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
     @Inject
     lateinit var contentCoordinator: com.starception.submission.download.ContentCoordinator
 
+    @Inject
+    lateinit var audioDownloadHelper: com.starception.submission.download.AudioDownloadHelper
+
     override fun onCreate() {
         Log.d("SubmissionApplication", "Application onCreate started")
         super.onCreate()
@@ -101,6 +104,31 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
 
                 // Rebuild derived content (news.db) when a content category finishes downloading.
                 contentCoordinator.start()
+
+                // Wire the news-card chapter play button (core/ui) to play-local-else-download-
+                // then-cache fortress audio. core/ui can't see the download system, so we supply
+                // the resolver here; a null return falls back to streaming the URL.
+                com.starception.submission.core.ui.ChapterAudioController.localAudioResolver = { url ->
+                    audioDownloadHelper.resolveFortressAudioUrlToLocalPath(url)
+                }
+
+                // Bridge ChapterAudioController <-> GlobalMediaViewModel so Fortress chapter
+                // playback surfaces the shared media mini-bar with a progress sweep (like Surah/
+                // Hadith). core/ui can't reference the app-module media layer, so wire it here.
+                com.starception.submission.core.ui.ChapterAudioController.onPlaybackStateChanged =
+                    { playing, title ->
+                        com.starception.submission.media.GlobalMediaViewModel
+                            .onFortressPlaybackChanged?.invoke(playing, title)
+                    }
+                com.starception.submission.core.ui.ChapterAudioController.onProgressChanged =
+                    { pos, dur ->
+                        com.starception.submission.media.GlobalMediaViewModel
+                            .onFortressProgressChanged?.invoke(pos, dur)
+                    }
+                com.starception.submission.media.GlobalMediaViewModel.onFortressPlayPauseRequested =
+                    { com.starception.submission.core.ui.ChapterAudioController.togglePlayPause() }
+                com.starception.submission.media.GlobalMediaViewModel.onFortressSeekRequested =
+                    { pos -> com.starception.submission.core.ui.ChapterAudioController.seekTo(pos) }
 
                 Log.d("SubmissionApplication", "Background initialization completed")
             } catch (e: Exception) {

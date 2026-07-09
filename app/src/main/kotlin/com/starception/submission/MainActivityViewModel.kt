@@ -90,8 +90,67 @@ class MainActivityViewModel @Inject constructor(
     private val _prayerAlertState = MutableStateFlow(PrayerAlertState())
     val prayerAlertState: StateFlow<PrayerAlertState> = _prayerAlertState.asStateFlow()
 
+    // Timestamp (elapsedRealtime) of the last push from the Home screen. Home holds the
+    // freshest, live-recalculated prayer times, so while it's active (pushing every minute)
+    // we let it win. When Home leaves composition the pushes stop, and the app-wide ticker
+    // below takes over so the countdown keeps updating on other screens (e.g. Surah detail).
+    private var lastHomePushElapsedMs: Long = 0L
+
     fun updatePrayerAlert(state: PrayerAlertState) {
+        lastHomePushElapsedMs = android.os.SystemClock.elapsedRealtime()
         _prayerAlertState.value = state
+    }
+
+    init {
+        startPrayerAlertTicker()
+    }
+
+    /**
+     * App-wide minute ticker that keeps the prayer-alert countdown live on EVERY screen.
+     * Previously the countdown was produced only inside PrayerTimesScreen (Home); leaving Home
+     * froze it, so the banner on the Surah detail page (and other pages) showed stale data.
+     *
+     * Recomputes from the cached prayer times + settings via the shared calculator. Skips its
+     * write when Home pushed recently (Home's live data is fresher), so there's no dual-writer
+     * flicker while Home is on screen.
+     */
+    private fun startPrayerAlertTicker() {
+        viewModelScope.launch {
+            while (true) {
+                try {
+                    // If Home pushed within the last 90s it's active and authoritative — skip.
+                    val sinceHome = android.os.SystemClock.elapsedRealtime() - lastHomePushElapsedMs
+                    if (sinceHome > 90_000L) {
+                        computeAndPublishPrayerAlert()
+                    }
+                } catch (e: Exception) {
+                    Log.w("MainActivityViewModel", "Prayer alert ticker failed", e)
+                }
+                // Align to the top of the next minute-ish; 30s keeps the "Xm left" text prompt.
+                delay(30_000L)
+            }
+        }
+    }
+
+    private fun computeAndPublishPrayerAlert() {
+        val entryPoint = dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
+        )
+        // Prefer the in-memory location cache (freshest), then the persisted settings cache.
+        val cachedPrayerTimes = entryPoint.locationCache().getCachedPrayerTimes()?.first
+            ?: entryPoint.prayerSettingsRepository().getCachedPrayerTimes()
+            ?: return
+        val repo = entryPoint.prayerSettingsRepository()
+        val settings = repo.calculationSettingsFlow.value
+        val notifPrefs = repo.notificationPreferencesFlow.value
+        val alert = com.starception.submission.feature.prayertimes.wobble.calculatePrayerAlertState(
+            currentTime = java.time.LocalTime.now(),
+            prayerTimes = cachedPrayerTimes,
+            notificationPrefs = notifPrefs,
+            timeOffsets = settings.timeOffsets,
+        )
+        _prayerAlertState.value = alert
     }
 
     // Pull-to-sync state shared across pages. Hoisting it here means a sync that
