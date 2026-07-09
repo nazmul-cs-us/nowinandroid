@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "647708860321-ududrde2tiei739oba1mu8n8rmj75k5h.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.starception.submission.demo.debug",
+            "certificate_hash": "07a9e6461424dbbaa3c8e98851e6f9af3333681d"
+          }
+        },
+        {
           "client_id": "647708860321-mb74a9rshuj3hurj2i1pii9etbr88uk0.apps.googleusercontent.com",
           "client_type": 3
         }
