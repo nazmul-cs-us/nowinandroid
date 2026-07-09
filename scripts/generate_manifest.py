@@ -9,6 +9,18 @@ Usage:
     python3 scripts/generate_manifest.py
     python3 scripts/generate_manifest.py --base-url https://cdn.starception.com
     python3 scripts/generate_manifest.py --output /tmp/manifest.json
+
+IMPORTANT — partial vs full manifest:
+    This script only sees files that are actually present under app/src/main/assets. The
+    full CDN manifest describes ~6400 files (audio recitations, TTS/ASR models, hadith and
+    translation DBs) that are NOT kept on disk locally. Running this script from a sparse
+    checkout therefore produces a PARTIAL manifest that would drop those entries if uploaded.
+
+    For a targeted update of a single asset (e.g. regenerating news.db), do NOT regenerate
+    from scratch. Instead patch that one asset's size+sha256 into the live CDN manifest:
+        curl -s <base_url>/manifest.json -o /tmp/cdn_manifest.json
+        # update assets["databases/news.db"].{size,sha256} + total_size, write scripts/manifest.json
+    Only run a full regenerate when every CDN asset is present locally.
 """
 
 import hashlib
@@ -27,6 +39,9 @@ BUNDLED_FILES = {
     "salah_norm_params.json",
     "databases/fortress_of_the_muslim.db",
     "databases/fortress_of_the_muslim_backup.db",
+    # v2 is a local build input for news.db (see scripts/generate_news_db.py); the app
+    # never downloads it, so it must NOT be uploaded to the CDN.
+    "databases/fortress_of_the_muslim_v2.db",
     "databases/quranic_duas.db",
     "databases/topics.db",
     "databases/hadith/hadith_index.db",
@@ -49,6 +64,7 @@ CATEGORY_RULES = [
     ("databases/hadith/muwatta_malik.db", "hadith_muwatta_malik"),
     ("databases/hadith/sunan_darimi.db", "hadith_sunan_darimi"),
     ("databases/news.db", "news"),
+    ("audio/fortress/arabic", "fortress_audio_arabic"),
     ("databases/fortress_of_the_muslim", "dua"),
     ("databases/quranic_duas.db", "dua"),
     ("databases/topics.db", "content"),
@@ -73,6 +89,11 @@ REQUIRED_CATEGORIES = {"quran_core", "json_data", "news"}
 def get_cdn_key(asset_rel_path: str) -> str:
     """Map local asset path to CDN object key."""
     rel = asset_rel_path
+
+    # Audio (recitations) — CDN key mirrors the local path, e.g.
+    # audio/fortress/arabic/001.mp3, audio/quran/arabic/...
+    if rel.startswith("audio/"):
+        return rel
 
     # Databases
     if rel.startswith("databases/hadith/"):
@@ -213,7 +234,7 @@ def main():
     )
     parser.add_argument(
         "--output",
-        default=str(ASSETS_DIR.parent.parent.parent.parent.parent / "scripts" / "manifest.json"),
+        default=str(Path(__file__).parent / "manifest.json"),
         help="Output path for manifest.json",
     )
     parser.add_argument(

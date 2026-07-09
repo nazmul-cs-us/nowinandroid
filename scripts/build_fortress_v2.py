@@ -19,7 +19,10 @@ import urllib.request
 from html.parser import HTMLParser
 
 BASE = "https://www.islamawareness.net/Dua/Fortress/"
-AUDIO_FMT = "https://www.hisnmuslim.com/audio/ar/ar_7esn_AlMoslem_by_Doors_{:03d}.mp3"
+# Chapter audio is mirrored to our own R2 CDN (keyed by chapter id), not streamed from
+# hisnmuslim.com directly. The MP3s are fetched + uploaded by scripts/download_fortress_audio.py;
+# here we just emit the resulting CDN URL so a rebuilt v2 db already points at the CDN.
+AUDIO_CDN_FMT = "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev/audio/fortress/arabic/{:03d}.mp3"
 WAF_URL = "https://raw.githubusercontent.com/wafaaelmaandy/Hisn-Muslim-Json/master/husn_en.json"
 UA = {"User-Agent": "Mozilla/5.0 (fortress-parser)"}
 N_CHAPTERS = 132
@@ -188,7 +191,7 @@ def main():
         p.feed(raw)
         p.close()
         duas = [d for d in p.duas if d["arabic"] or d["translation"]]
-        audio = AUDIO_FMT.format(num + 1)
+        audio = AUDIO_CDN_FMT.format(num)  # CDN file is keyed by chapter id
         all_chapters.append((num, titles.get(num, f"Chapter {num}"), audio, duas))
         print(f"  ch {num:3d} [{titles.get(num,'?')[:34]:34}] duas={len(duas)}")
         time.sleep(0.15)

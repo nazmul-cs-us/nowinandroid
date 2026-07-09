@@ -76,6 +76,9 @@ def upload_file(cdn_key: str, local_path: str, token: str) -> bool:
                 f"{BUCKET_NAME}/{cdn_key}",
                 f"--file={local_path}",
                 "--content-type=application/octet-stream",
+                # --remote is REQUIRED: without it wrangler (v3+) writes to the LOCAL
+                # simulator, not the real R2 bucket.
+                "--remote",
             ],
             capture_output=True,
             text=True,

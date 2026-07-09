@@ -224,7 +224,8 @@ echo "$LOCAL_PATHS" | while IFS='|' read -r cdn_key local_path; do
 
     echo -ne "  Uploading ${GREEN}$cdn_key${NC} (${SIZE_MB} MB)... "
 
-    if wrangler r2 object put "$BUCKET_NAME/$cdn_key" --file="$local_path" --content-type="application/octet-stream" 2>/dev/null; then
+    # --remote is REQUIRED: without it wrangler (v3+) writes to the LOCAL simulator, not R2.
+    if wrangler r2 object put "$BUCKET_NAME/$cdn_key" --file="$local_path" --content-type="application/octet-stream" --remote 2>/dev/null; then
         echo -e "${GREEN}OK${NC}"
         UPLOADED=$((UPLOADED + 1))
     else
@@ -235,7 +236,7 @@ done
 
 # Upload manifest itself
 echo -ne "  Uploading ${GREEN}manifest.json${NC}... "
-if wrangler r2 object put "$BUCKET_NAME/manifest.json" --file="$MANIFEST_FILE" --content-type="application/json" 2>/dev/null; then
+if wrangler r2 object put "$BUCKET_NAME/manifest.json" --file="$MANIFEST_FILE" --content-type="application/json" --remote 2>/dev/null; then
     echo -e "${GREEN}OK${NC}"
 else
     echo -e "${RED}FAILED${NC}"
